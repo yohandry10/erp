@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # ERP API (NestJS Backend)
+  # ============================================
+  erp-api:
+    build:
+      context: .
+      dockerfile: apps/erp-api/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - PFX_PATH=/app/certs/demo.pfx
+      - PFX_PASS=${PFX_PASS}
+      - OSE_URL=${OSE_URL}
+      - OSE_USERNAME=${OSE_USERNAME}
+      - OSE_PASSWORD=${OSE_PASSWORD}
+    volumes:
+      - ./certs:/app/certs:ro
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # Redis (Cache & Queues)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Worker (Background Jobs)
+  # ============================================
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      - NODE_ENV=development
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - REDIS_URL=redis://redis:6379
+      - OSE_URL=${OSE_URL}
+      - OSE_USERNAME=${OSE_USERNAME}
+      - OSE_PASSWORD=${OSE_PASSWORD}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - erp-api
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: erp-network 

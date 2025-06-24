@@ -1,0 +1,42 @@
+{
+  "name": "@erp-suite/erp-api",
+  "version": "1.0.0",
+  "description": "Backend ERP Suite API (NestJS)",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "build": "nest build",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@erp-suite/dtos": "workspace:*",
+    "@erp-suite/crypto": "workspace:*",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/schedule": "^2.0.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^3.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/postgrest-js": "^1.8.0",
+    "@supabase/auth-helpers-nextjs": "^0.8.7",
+    "axios": "^1.6.0",
+    "express": "^5.1.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/testing": "^10.0.0",
+    "eslint": "^8.0.0",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}

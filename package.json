@@ -1,0 +1,33 @@
+{
+  "name": "erp-suite",
+  "version": "1.0.0",
+  "description": "Sistema ERP completo con CPE, GRE, SIRE - Monorepo TypeScript",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "type-check": "turbo run type-check",
+    "docker:build": "docker build -f apps/erp-api/Dockerfile -t ghcr.io/org/erp-api:latest .",
+    "k8s:lint": "helm lint infra/helm/erp-suite",
+    "k8s:deploy": "helm upgrade --install erp infra/helm/erp-suite"
+  },
+  "devDependencies": {
+    "turbo": "^1.13.4",
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.5",
+    "prettier": "^3.2.5",
+    "eslint": "^8.57.0"
+  },
+  "packageManager": "pnpm@8.15.6"
+} 

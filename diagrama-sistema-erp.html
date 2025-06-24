@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema ERP - Diagrama de Flujo de Módulos</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 600;
+            letter-spacing: -1px;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .diagram-container {
+            padding: 40px;
+            background: #fafafa;
+            text-align: center;
+        }
+        
+        .mermaid {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .info-panel {
+            background: #f8f9fa;
+            padding: 30px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .info-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .info-card h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+        
+        .info-card ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #5a6c7d;
+        }
+        
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 Sistema ERP Integrado</h1>
+            <p>Diagrama de Flujo y Conexiones entre Módulos</p>
+        </div>
+        
+        <div class="diagram-container">
+            <div class="mermaid">
+graph TB
+    %% CAPA DE PRESENTACIÓN
+    subgraph "🖥️ FRONTEND - Next.js Web App"
+        WEB[Web Dashboard]
+        LOGIN[Login/Auth]
+        SIDEBAR[Navegación Sidebar]
+    end
+
+    %% MÓDULOS PRINCIPALES
+    subgraph "📊 MÓDULO DASHBOARD"
+        DASH[Dashboard Principal]
+        ANALYTICS[Analytics & KPIs]
+        REPORTS[Reportes Ejecutivos]
+    end
+
+    subgraph "🛒 MÓDULO POS"
+        POS[Punto de Venta]
+        CAJAS[Gestión de Cajas]
+        SESIONES[Sesiones de Caja]
+        MÉTODOS[Métodos de Pago]
+    end
+
+    subgraph "📦 MÓDULO INVENTARIO"
+        INV[Gestión de Productos]
+        STOCK[Control de Stock]
+        MOVIMIENTOS[Movimientos de Stock]
+    end
+
+    subgraph "🛍️ MÓDULO COMERCIAL"
+        COT[Cotizaciones]
+        COMPRAS[Órdenes de Compra]
+        CLIENTES[Gestión de Clientes]
+        PROVEEDORES[Gestión de Proveedores]
+    end
+
+    subgraph "💰 MÓDULO CONTABILIDAD"
+        PLAN[Plan de Cuentas]
+        ASIENTOS[Asientos Contables]
+        BALANCE[Estados Financieros]
+    end
+
+    subgraph "💳 MÓDULO FINANZAS"
+        FINANZAS[Gestión Financiera]
+        FLUJO[Flujo de Caja]
+        PAGOS[Gestión de Pagos]
+    end
+
+    subgraph "👥 MÓDULO RRHH"
+        EMPLEADOS[Gestión de Empleados]
+        PLANILLAS[Planillas Automatizadas]
+        BOLETAS[Boletas de Pago HTML]
+        RRHH_AUTO["🤖 Sistema Automatizado<br/>Un Click - Todo Calculado"]
+    end
+
+    subgraph "📋 MÓDULO ELECTRÓNICO"
+        CPE[Comprobantes Electrónicos]
+        GRE[Guías de Remisión]
+        SIRE[Reportes SIRE]
+        OSE[Conexión OSE/SUNAT]
+    end
+
+    subgraph "📄 MÓDULO DOCUMENTOS"
+        DOCS[Gestión de Documentos]
+        ARCHIVOS[Almacenamiento de Archivos]
+    end
+
+    subgraph "⚙️ MÓDULO CONFIGURACIÓN"
+        USERS[Gestión de Usuarios]
+        ROLES[Control de Roles]
+        CONFIG[Configuración Empresa]
+        TENANT[Multi-tenant]
+    end
+
+    %% SERVICIOS DE INTEGRACIÓN
+    subgraph "🔧 SERVICIOS DE INTEGRACIÓN"
+        INT_INV[Inventory Integration]
+        INT_ACC[Accounting Integration]
+        INT_FIN[Financial Integration]
+        INT_DASH[Dashboard Integration]
+        EVENT_BUS[Event Bus Service]
+        NOTIFICATIONS[Notification Service]
+    end
+
+    %% BASE DE DATOS
+    subgraph "🗄️ SUPABASE DATABASE"
+        DB[(Base de Datos)]
+        AUTH_DB[Autenticación]
+        TENANT_DB[Multi-tenant]
+    end
+
+    %% CONEXIONES PRINCIPALES
+    WEB --> LOGIN
+    LOGIN --> AUTH_DB
+    WEB --> SIDEBAR
+    SIDEBAR --> DASH
+
+    %% Dashboard recibe de todos
+    DASH --> ANALYTICS
+    ANALYTICS --> REPORTS
+    INT_DASH --> DASH
+    POS --> INT_DASH
+    INV --> INT_DASH
+    COMPRAS --> INT_DASH
+    FINANZAS --> INT_DASH
+
+    %% Flujo de Ventas
+    POS --> CAJAS
+    POS --> SESIONES
+    POS --> MÉTODOS
+    POS --> INT_INV
+    INT_INV --> STOCK
+    INT_INV --> MOVIMIENTOS
+    POS --> INT_ACC
+    INT_ACC --> ASIENTOS
+    INT_ACC --> INT_FIN
+
+    %% Flujo de Compras
+    COT --> COMPRAS
+    COMPRAS --> INT_INV
+    COMPRAS --> PROVEEDORES
+    COMPRAS -.->|"🔄 Crea productos automáticamente"| INV
+    COMPRAS --> INT_ACC
+
+    %% Flujo de Inventario
+    INV --> STOCK
+    STOCK --> MOVIMIENTOS
+    MOVIMIENTOS --> INT_ACC
+
+    %% Flujo de RRHH Automatizado
+    EMPLEADOS --> RRHH_AUTO
+    RRHH_AUTO --> PLANILLAS
+    PLANILLAS --> BOLETAS
+    PLANILLAS --> INT_ACC
+    RRHH_AUTO -.->|"⚡ Proceso Automatizado<br/>Detecta empleados activos<br/>Calcula sueldos automáticamente"| EMPLEADOS
+
+    %% Flujo Electrónico
+    POS --> CPE
+    COMPRAS --> GRE
+    CPE --> OSE
+    GRE --> OSE
+    CPE --> SIRE
+    GRE --> SIRE
+    SIRE -.->|"📊 Auto-polling cada 2s<br/>Estados: GENERANDO → GENERADO"| REPORTS
+
+    %% Integraciones Contables
+    INT_ACC --> PLAN
+    INT_ACC --> ASIENTOS
+    ASIENTOS --> BALANCE
+    INT_FIN --> FLUJO
+    INT_FIN --> PAGOS
+
+    %% Gestión de Usuarios y Configuración
+    USERS --> ROLES
+    ROLES --> AUTH_DB
+    CONFIG --> TENANT
+    TENANT --> TENANT_DB
+
+    %% Documentos
+    DOCS --> ARCHIVOS
+    ARCHIVOS --> DB
+
+    %% Event Bus conecta todo
+    EVENT_BUS --> INT_INV
+    EVENT_BUS --> INT_ACC
+    EVENT_BUS --> INT_FIN
+    EVENT_BUS --> INT_DASH
+    EVENT_BUS --> NOTIFICATIONS
+
+    %% Conexiones a BD
+    DB --> POS
+    DB --> INV
+    DB --> COMPRAS
+    DB --> ASIENTOS
+    DB --> EMPLEADOS
+    DB --> CPE
+    DB --> SIRE
+    DB --> CLIENTES
+    DB --> PROVEEDORES
+
+    %% Estilos
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef pos fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef inventory fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef commercial fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef accounting fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef finance fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    classDef rrhh fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef electronic fill:#e8eaf6,stroke:#1a237e,stroke-width:2px
+    classDef integration fill:#fff8e1,stroke:#ff6f00,stroke-width:2px
+    classDef database fill:#efebe9,stroke:#3e2723,stroke-width:2px
+    classDef automated fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+
+    class WEB,LOGIN,SIDEBAR frontend
+    class POS,CAJAS,SESIONES,MÉTODOS pos
+    class INV,STOCK,MOVIMIENTOS inventory
+    class COT,COMPRAS,CLIENTES,PROVEEDORES commercial
+    class PLAN,ASIENTOS,BALANCE accounting
+    class FINANZAS,FLUJO,PAGOS finance
+    class EMPLEADOS,PLANILLAS,BOLETAS rrhh
+    class RRHH_AUTO automated
+    class CPE,GRE,SIRE,OSE electronic
+    class INT_INV,INT_ACC,INT_FIN,INT_DASH,EVENT_BUS,NOTIFICATIONS integration
+    class DB,AUTH_DB,TENANT_DB database
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📋 Características Principales del Sistema</h2>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <h3>🔄 Flujos Automatizados</h3>
+                    <ul>
+                        <li><strong>RRHH:</strong> Un botón crea planillas y calcula sueldos automáticamente</li>
+                        <li><strong>Compras:</strong> Creación automática de productos y actualización de stock</li>
+                        <li><strong>Ventas:</strong> Integración POS → Inventario → Contabilidad en tiempo real</li>
+                        <li><strong>Reportes:</strong> Generación automática con auto-polling cada 2 segundos</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🔧 Servicios de Integración</h3>
+                    <ul>
+                        <li><strong>Inventory Integration:</strong> Sincroniza stock entre todos los módulos</li>
+                        <li><strong>Accounting Integration:</strong> Automatiza asientos contables</li>
+                        <li><strong>Financial Integration:</strong> Gestiona flujos financieros</li>
+                        <li><strong>Dashboard Integration:</strong> Centraliza métricas y KPIs</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>📊 Módulos Principales</h3>
+                    <ul>
+                        <li><strong>POS:</strong> Punto de venta con gestión de cajas y métodos de pago</li>
+                        <li><strong>Inventario:</strong> Control completo de productos y stock</li>
+                        <li><strong>Comercial:</strong> Cotizaciones, órdenes de compra, clientes y proveedores</li>
+                        <li><strong>Electrónico:</strong> CPE, GRE, SIRE con conexión OSE/SUNAT</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🏢 Arquitectura Empresarial</h3>
+                    <ul>
+                        <li><strong>Multi-tenant:</strong> Soporte para múltiples empresas</li>
+                        <li><strong>Control de Roles:</strong> Gestión granular de permisos</li>
+                        <li><strong>Reportes Profesionales:</strong> HTML corporativo en lugar de CSVs</li>
+                        <li><strong>Base de Datos:</strong> Supabase con 25+ tablas organizadas</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>📅 Generado: <span id="fecha"></span> | Sistema ERP Integrado - Todos los módulos conectados y automatizados</p>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar Mermaid
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+        
+        // Agregar fecha actual
+        document.getElementById('fecha').textContent = new Date().toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    </script>
+</body>
+</html> 
