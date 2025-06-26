@@ -279,11 +279,33 @@ export class PosController {
     try {
       console.log('💰 Procesando venta:', ventaData);
 
-      // 1. Generar número de ticket
+      // 🔍 1. VALIDAR STOCK ANTES DE PROCESAR
+      const validacionStock = await this.inventoryService.verificarDisponibilidadStock(
+        ventaData.items.map((item: any) => ({
+          productoId: item.producto_id || (item.producto && item.producto.id) || item.producto?.codigo,
+          cantidad: item.cantidad
+        }))
+      );
+
+      if (!validacionStock.disponible) {
+        console.error('❌ Stock insuficiente:', validacionStock.faltantes);
+        return {
+          success: false,
+          message: 'Stock insuficiente para algunos productos',
+          data: {
+            faltantes: validacionStock.faltantes,
+            error: 'STOCK_INSUFICIENTE'
+          }
+        };
+      }
+
+      console.log('✅ Stock validado, procediendo con la venta...');
+
+      // 2. Generar número de ticket
       const numeroTicket = `T001-${String(Date.now()).slice(-8)}`;
       const correlativo = parseInt(String(Date.now()).slice(-8));
 
-      // 2. Calcular totales - manejar diferentes estructuras de datos
+      // 3. Calcular totales - manejar diferentes estructuras de datos
       const subtotal = ventaData.subtotal || ventaData.items.reduce((sum: number, item: any) => {
         const precio = item.precio_unitario || (item.producto && item.producto.precio_venta) || 0;
         return sum + (item.cantidad * precio);
@@ -293,17 +315,17 @@ export class PosController {
 
       console.log('Totales calculados:', { subtotal, impuestos, total });
 
-      // 3. Crear la venta en la base de datos (USANDO TABLA CORREGIDA: ventas_pos)
+      // 4. Crear la venta en la base de datos (USANDO TABLA CORREGIDA: ventas_pos)
       const ventaDataInsert = {
         numero_venta: numeroTicket,
         fecha: new Date().toISOString(),
         cliente_nombre: ventaData.cliente_nombre || 'Cliente General',
         cliente_documento: ventaData.cliente_id || 'SIN_DOC',
-        subtotal: subtotal,  // CORREGIDO: usar 'subtotal' en lugar de 'total_parcial'
+        subtotal: subtotal,
         impuestos: impuestos,
         total: total,
         metodo_pago: ventaData.metodo_pago_id || 'EFECTIVO',
-        estado: 'PAGADA',
+        estado: 'PROCESANDO', // 🔧 CAMBIO: Estado inicial PROCESANDO
         caja_id: null,
         usuario_id: ventaData.vendedor_id || 'user-demo',
         observaciones: ventaData.comprobante ? JSON.stringify(ventaData.comprobante) : null
@@ -317,37 +339,52 @@ export class PosController {
         const result = await this.supabase.insert('ventas_pos', ventaDataInsert);
         venta = result.data;
         ventaError = result.error;
-              } else {
-          const result = await this.supabase.getClient()
-            .from('ventas_pos')
-            .insert({
-              numero_venta: ventaDataInsert.numero_venta,
-              fecha: ventaDataInsert.fecha,
-              cliente_nombre: ventaDataInsert.cliente_nombre,
-              cliente_documento: ventaDataInsert.cliente_documento,
-              subtotal: ventaDataInsert.subtotal,  // CORREGIDO: usar el campo correcto
-              impuestos: ventaDataInsert.impuestos,
-              total: ventaDataInsert.total,
-              metodo_pago: ventaDataInsert.metodo_pago,
-              estado: ventaDataInsert.estado,
-              caja_id: ventaDataInsert.caja_id,
-              usuario_id: ventaDataInsert.usuario_id,
-              observaciones: ventaDataInsert.observaciones
-            })
-            .select()
-            .single();
+      } else {
+        const result = await this.supabase.getClient()
+          .from('ventas_pos')
+          .insert({
+            numero_venta: ventaDataInsert.numero_venta,
+            fecha: ventaDataInsert.fecha,
+            cliente_nombre: ventaDataInsert.cliente_nombre,
+            cliente_documento: ventaDataInsert.cliente_documento,
+            subtotal: ventaDataInsert.subtotal,
+            impuestos: ventaDataInsert.impuestos,
+            total: ventaDataInsert.total,
+            metodo_pago: ventaDataInsert.metodo_pago,
+            estado: ventaDataInsert.estado,
+            caja_id: ventaDataInsert.caja_id,
+            usuario_id: ventaDataInsert.usuario_id,
+            observaciones: ventaDataInsert.observaciones
+          })
+          .select()
+          .single();
         venta = result.data;
         ventaError = result.error;
       }
 
-        if (ventaError) {
-          console.error('❌ Error guardando venta en DB:', ventaError);
-          throw new Error('No se pudo guardar la venta en la base de datos');
+      if (ventaError) {
+        console.error('❌ Error guardando venta en DB:', ventaError);
+        throw new Error('No se pudo guardar la venta en la base de datos');
+      }
+
+      console.log('✅ Venta guardada en DB:', venta);
+
+      try {
+        // 📦 5. PREPARAR DATOS PARA DESCUENTO AUTOMÁTICO VÍA EVENTBUS
+        console.log('📦 Preparando datos para descuento automático vía EventBus...');
+        
+        const stockDescontado = [];
+        for (const item of ventaData.items) {
+          const productoId = item.producto_id || (item.producto && item.producto.id) || item.producto?.codigo;
+          const cantidad = item.cantidad;
+          
+          stockDescontado.push({ productoId, cantidad, movimientoId: 'pendiente' });
+          console.log(`✅ Producto preparado para descuento: ${productoId} - ${cantidad} unidades`);
         }
 
-        console.log('✅ Venta guardada en DB:', venta);
+        console.log('✅ Stock será descontado automáticamente por EventBus al emitir evento VentaProcessed');
 
-        // 4. Insertar detalles de venta (USANDO TABLA EXISTENTE: detalle_ventas_pos)
+        // 6. Insertar detalles de venta (USANDO TABLA EXISTENTE: detalle_ventas_pos)
         const detalles = ventaData.items.map((item: any) => {
           const productoId = item.producto_id || (item.producto && item.producto.id) || item.producto?.codigo || `prod-${Date.now()}`;
           const precio = item.precio_unitario || (item.producto && item.producto.precio_venta) || 0;
@@ -369,7 +406,6 @@ export class PosController {
         let detallesError;
         
         if (this.supabase.isMockMode()) {
-          // En modo mock, insertar cada detalle
           for (const detalle of detalles) {
             const result = await this.supabase.insert('detalle_ventas_pos', detalle);
             if (result.error) {
@@ -391,7 +427,15 @@ export class PosController {
 
         console.log('✅ Detalles de venta guardados correctamente');
 
-        // 5. Emitir evento de venta procesada para módulos integrados
+        // 📚 7. ACTUALIZAR ESTADO A COMPLETADA DESPUÉS DEL STOCK
+        if (!this.supabase.isMockMode()) {
+          await this.supabase.getClient()
+            .from('ventas_pos')
+            .update({ estado: 'PAGADA' })
+            .eq('id', venta.id);
+        }
+
+        // 8. Emitir evento de venta procesada para módulos integrados (incluye reducción automática de stock)
         this.eventBus.emitVentaProcessed({
           ventaId: venta.id,
           numeroTicket: numeroTicket,
@@ -409,7 +453,7 @@ export class PosController {
           }))
         });
 
-        // 6. GENERAR FACTURA ELECTRÓNICA (CPE) - USAR ESTRUCTURA REAL
+        // 9. GENERAR FACTURA ELECTRÓNICA (CPE) - USAR ESTRUCTURA REAL
         try {
           // Mapear tipos de documento a códigos SUNAT (2 dígitos)
           const mapearTipoDocumento = (clienteDoc: string) => {
@@ -498,84 +542,45 @@ export class PosController {
           console.warn('⚠️ Error en proceso de facturación:', facturaError);
         }
 
-      // 6. Actualizar stock de productos (opcional, no bloquea la venta)
-      try {
-        console.log('🔄 Intentando actualizar stock de productos...');
-        for (const item of ventaData.items) {
-          const productoId = item.producto_id || item.producto?.codigo;
-          if (productoId) {
-            try {
-              // Actualizar stock en tabla productos directamente
-              await this.supabase.getClient()
-                .from('productos')
-                .update({ 
-                  stock: Math.max(0, (item.producto?.stock_actual || 0) - item.cantidad)
-                })
-                .eq('codigo', productoId);
-              console.log(`✅ Stock actualizado para producto ${productoId}`);
-            } catch (stockError) {
-              console.warn(`⚠️ No se pudo actualizar stock para ${productoId}:`, stockError.message);
-            }
+        return {
+          success: true,
+          data: {
+            venta: venta,
+            numeroTicket: numeroTicket,
+            total: total,
+            stockDescontado: stockDescontado,
+            mensaje: '✅ Venta procesada exitosamente con descuento automático de stock'
           }
+        };
+
+      } catch (stockError) {
+        console.error('❌ Error en descuento de stock, revirtiendo venta...', stockError);
+        
+        // 🔄 ROLLBACK: Eliminar venta si falla el stock
+        if (!this.supabase.isMockMode()) {
+          await this.supabase.getClient()
+            .from('ventas_pos')
+            .delete()
+            .eq('id', venta.id);
         }
-      } catch (error) {
-        console.warn('⚠️ Actualización de stock omitida:', error.message);
+
+        return {
+          success: false,
+          message: `Error procesando stock: ${stockError.message}`,
+          data: {
+            error: 'STOCK_PROCESSING_ERROR',
+            details: stockError.message
+          }
+        };
       }
 
-      console.log('✅ Venta procesada exitosamente:', numeroTicket);
-
-      const respuestaFinal = {
-        success: true,
-        venta_id: venta.id,
-        numero_ticket: numeroTicket,
-        numero_comprobante: ventaData.numero_comprobante || numeroTicket,
-        fecha: new Date().toISOString(),
-        cliente_id: ventaData.cliente_id,
-        vendedor_id: ventaData.vendedor_id || 'demo-user',
-        subtotal: subtotal,
-        impuestos: impuestos,
-        descuentos: ventaData.descuentos || 0,
-        total: total,
-        estado: 'PAGADA',
-        tipo_comprobante: 'TICKET',
-        items: ventaData.items,
-        metodo_pago: ventaData.metodo_pago_id,
-        referencia_pago: ventaData.referencia_pago,
-        factura_electronica: true,
-        url_factura: `/api/cpe/ticket/${numeroTicket}`,
-        comprobante_detalle: ventaData.comprobante,
-        message: '✅ Venta procesada y factura electrónica generada exitosamente'
-      };
-
-      console.log('📤 RESPUESTA FINAL QUE SE ESTÁ ENVIANDO AL FRONTEND:', respuestaFinal);
-      return respuestaFinal;
-
     } catch (error) {
-      console.error('❌ ERROR REAL procesando venta:', error);
-      console.error('📊 Detalles completos del error:', {
-        message: error.message,
-        stack: error.stack,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
-      
-      // NO SIMULAR NADA - MOSTRAR EL ERROR REAL
+      console.error('❌ Error general procesando venta:', error);
       return {
         success: false,
-        message: `❌ ERROR GUARDANDO VENTA: ${error.message}`,
-        error: {
-          tipo: 'DATABASE_ERROR',
-          mensaje: error.message,
-          codigo: error.code,
-          detalles: error.details,
-          sugerencia: error.hint,
-          stack: error.stack
-        },
-        debug_info: {
-          datos_enviados: ventaData,
-          momento_error: new Date().toISOString(),
-          conexion_bd: 'FALLIDA'
+        message: `Error procesando venta: ${error.message}`,
+        data: {
+          error: 'VENTA_PROCESSING_ERROR'
         }
       };
     }
@@ -782,8 +787,6 @@ export class PosController {
       };
     }
   }
-
-
 
   @Post('retiro-efectivo')
   @ApiOperation({ summary: 'Registrar retiro de efectivo' })

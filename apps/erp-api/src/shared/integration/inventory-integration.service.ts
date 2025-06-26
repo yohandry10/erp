@@ -36,28 +36,35 @@ export class InventoryIntegrationService {
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService
   ) {
+    console.log('🏗️ [InventoryIntegrationService] Constructor llamado - inicializando...');
     this.initializeEventListeners();
+    console.log('✅ [InventoryIntegrationService] Servicio de inventario listo y listeners registrados');
   }
 
-  private initializeEventListeners() {
+  initializeEventListeners() {
     console.log('📦 [Inventario] Inicializando listeners de eventos...');
     
     this.eventBus.onVentaProcessed(async (event) => {
-      console.log('📦 [Inventario] Procesando venta para actualizar stock...');
+      console.log('📦 [Inventario] ¡EVENTO RECIBIDO! Procesando venta para actualizar stock...', event.data);
       await this.procesarVentaParaInventario(event.data);
     });
 
     this.eventBus.onCompraEntregada(async (event) => {
-      console.log('📦 [Inventario] Procesando compra entregada para actualizar stock...');
+      console.log('📦 [Inventario] ¡EVENTO RECIBIDO! Procesando compra entregada para actualizar stock...', event.data);
       await this.procesarCompraParaInventario(event.data);
     });
+    
+    console.log('📦 [Inventario] ¡Listeners registrados exitosamente!');
   }
 
   async procesarVentaParaInventario(venta: VentaProcessedEvent): Promise<void> {
     try {
-      console.log(`📦 Procesando venta ${venta.numeroTicket} para inventario`);
+      console.log(`📦 [INVENTARIO] Procesando venta ${venta.numeroTicket} para inventario`);
+      console.log(`📦 [INVENTARIO] Datos de venta:`, JSON.stringify(venta, null, 2));
 
       for (const item of venta.items) {
+        console.log(`📦 [INVENTARIO] Procesando item: ${item.productoId} - cantidad: ${item.cantidad}`);
+        
         await this.realizarMovimientoStock({
           productoId: item.productoId,
           tipoMovimiento: 'SALIDA',
@@ -73,9 +80,9 @@ export class InventoryIntegrationService {
         });
       }
 
-      console.log(`✅ Stock actualizado para venta ${venta.numeroTicket}`);
+      console.log(`✅ [INVENTARIO] Stock actualizado para venta ${venta.numeroTicket}`);
     } catch (error) {
-      console.error('❌ Error procesando venta para inventario:', error);
+      console.error('❌ [INVENTARIO] Error procesando venta para inventario:', error);
     }
   }
 
@@ -186,17 +193,31 @@ export class InventoryIntegrationService {
       movimiento.stockNuevo = nuevoStock;
 
       // 3. Actualizar stock en tabla productos (usar ID del producto encontrado)
-      const { error: updateError } = await this.supabase.getClient()
+      console.log(`📦 ACTUALIZANDO STOCK: producto.id=${producto.id}, stockActual=${stockActual}, nuevoStock=${nuevoStock}`);
+      
+      const { data: updateData, error: updateError } = await this.supabase.getClient()
         .from('productos')
         .update({ 
           stock: nuevoStock
         })
-        .eq('id', producto.id);
+        .eq('id', producto.id)
+        .select();
 
       if (updateError) {
         console.error('❌ Error actualizando stock del producto:', updateError);
         throw updateError;
       }
+
+      console.log(`✅ STOCK ACTUALIZADO EXITOSAMENTE:`, updateData);
+      
+      // VERIFICACIÓN ADICIONAL - Leer de nuevo el producto para confirmar
+      const { data: verificacion } = await this.supabase.getClient()
+        .from('productos')
+        .select('id, codigo, nombre, stock')
+        .eq('id', producto.id)
+        .single();
+      
+      console.log(`🔍 VERIFICACIÓN POST-UPDATE:`, verificacion);
 
       // 4. Registrar el movimiento en histórico usando las columnas correctas según Supabase
       const { data: movimientoGuardado, error: movimientoError } = await this.supabase.getClient()
@@ -208,7 +229,7 @@ export class InventoryIntegrationService {
           cantidad: movimiento.cantidad,
           motivo: movimiento.motivo,
           referencia: movimiento.referencia || null,
-          usuario_id: movimiento.usuarioId || '550e8400-e29b-41d4-a716-446655440000',
+          usuario_id: 'sistema', // Usar string fijo para evitar problemas de foreign key
           created_at: new Date().toISOString()
         })
         .select()
@@ -374,6 +395,28 @@ export class InventoryIntegrationService {
     return stockPromedio > 0 ? totalSalidas / stockPromedio : 0;
   }
 
+  async actualizarStockProducto(
+    productoId: string, 
+    cantidad: number, 
+    tipoMovimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE', 
+    motivo: string, 
+    precioUnitario: number = 0, 
+    usuarioId: string = 'system'
+  ): Promise<string | null> {
+    return await this.realizarMovimientoStock({
+      productoId,
+      tipoMovimiento,
+      cantidad,
+      stockAnterior: 0, // Se calculará automáticamente
+      stockNuevo: 0, // Se calculará automáticamente
+      motivo,
+      precioUnitario,
+      valorTotal: cantidad * precioUnitario,
+      usuarioId,
+      referencia: motivo
+    });
+  }
+
   async ajustarStock(productoId: string, cantidadAjuste: number, motivo: string, usuarioId: string = 'system'): Promise<string | null> {
     try {
       console.log(`📦 Ajustando stock de ${productoId}: ${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste}`);
@@ -450,16 +493,45 @@ export class InventoryIntegrationService {
 
   async verificarDisponibilidadStock(productosVenta: { productoId: string, cantidad: number }[]): Promise<{ disponible: boolean, faltantes: any[] }> {
     try {
+      console.log('🔍 Verificando disponibilidad de stock para:', productosVenta);
       const faltantes = [];
       
       for (const item of productosVenta) {
-        const { data: producto } = await this.supabase.getClient()
-          .from('productos')
-          .select('stock, nombre')
-          .eq('codigo', item.productoId)
-          .single();
+        console.log(`📦 Verificando producto: ${item.productoId} (cantidad: ${item.cantidad})`);
+        
+        // Buscar por ID primero (UUID), luego por código
+        let producto = null;
+        
+        // Intentar por ID (UUID)
+        if (item.productoId && item.productoId.length > 10) {
+          const { data: productoPorId } = await this.supabase.getClient()
+            .from('productos')
+            .select('stock, nombre, codigo')
+            .eq('id', item.productoId)
+            .single();
+          
+          if (productoPorId) {
+            console.log(`✅ Producto encontrado por ID:`, productoPorId);
+            producto = productoPorId;
+          }
+        }
+        
+        // Si no se encontró por ID, buscar por código
+        if (!producto) {
+          const { data: productoPorCodigo } = await this.supabase.getClient()
+            .from('productos')
+            .select('stock, nombre, codigo')
+            .eq('codigo', item.productoId)
+            .single();
+          
+          if (productoPorCodigo) {
+            console.log(`✅ Producto encontrado por código:`, productoPorCodigo);
+            producto = productoPorCodigo;
+          }
+        }
 
         if (!producto) {
+          console.log(`❌ Producto no encontrado: ${item.productoId}`);
           faltantes.push({
             productoId: item.productoId,
             solicitado: item.cantidad,
@@ -471,7 +543,10 @@ export class InventoryIntegrationService {
         }
 
         const stockDisponible = parseFloat(producto.stock || 0);
+        console.log(`📊 Stock disponible: ${stockDisponible}, solicitado: ${item.cantidad}`);
+        
         if (stockDisponible < item.cantidad) {
+          console.log(`❌ Stock insuficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
           faltantes.push({
             productoId: item.productoId,
             nombre: producto.nombre,
@@ -480,6 +555,8 @@ export class InventoryIntegrationService {
             faltante: item.cantidad - stockDisponible,
             motivo: 'Stock insuficiente'
           });
+        } else {
+          console.log(`✅ Stock suficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
         }
       }
 

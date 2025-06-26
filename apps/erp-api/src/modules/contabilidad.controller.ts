@@ -1,12 +1,18 @@
 import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AccountingIntegrationService } from '../shared/integration/accounting-integration.service';
+import { SupabaseService } from '../shared/supabase/supabase.service';
 
 @ApiTags('contabilidad')
 @Controller('contabilidad')
 export class ContabilidadController {
-  
-  constructor(private readonly accountingService: AccountingIntegrationService) {}
+
+  constructor(
+    private readonly accountingService: AccountingIntegrationService,
+    private readonly supabaseService: SupabaseService
+  ) {
+    console.log('📚 [ContabilidadController] Inicializado con AccountingIntegrationService');
+  }
   
   @Get('estado-resultados')
   @ApiOperation({ summary: 'Obtener Estado de Resultados (P&L)' })
@@ -308,25 +314,65 @@ export class ContabilidadController {
     try {
       console.log('📖 Generando Libro Diario...', filtros);
       
-      // Obtener asientos contables con sus detalles
+      // 1. Obtener asientos contables principales
       const asientos = await this.accountingService.getAsientosContables(filtros);
       
+      // 2. 🎯 OBTENER ASIENTOS DE RRHH desde tabla temporal
+      let asientosRrhh = [];
+      try {
+        const { data: rrhhAsientos, error: rrhhError } = await this.supabaseService.getClient()
+          .from('asientos_contables_rrhh')
+          .select('*')
+          .order('fecha', { ascending: false });
+          
+        if (!rrhhError && rrhhAsientos) {
+          // Formatear asientos de RRHH para incluir en el libro diario
+          asientosRrhh = rrhhAsientos.map(asiento => ({
+            numero_asiento: `RRHH-${asiento.planilla_id?.substring(0, 8)}-${asiento.cuenta}`,
+            fecha: asiento.fecha,
+            concepto: asiento.descripcion,
+            referencia: `RRHH-${asiento.planilla_id}`,
+            total_debe: asiento.debe || 0,
+            total_haber: asiento.haber || 0,
+            estado: 'RRHH',
+            detalle_asientos: [{
+              cuenta_id: asiento.cuenta,
+              debe: asiento.debe || 0,
+              haber: asiento.haber || 0,
+              concepto: asiento.descripcion
+            }]
+          }));
+          
+          console.log(`📊 [Contabilidad] Encontrados ${asientosRrhh.length} asientos de RRHH`);
+        }
+      } catch (rrhhError) {
+        console.warn('⚠️ Error obteniendo asientos RRHH:', rrhhError);
+      }
+      
+      // 3. Combinar todos los asientos
+      const todosLosAsientos = [...asientos, ...asientosRrhh];
+      
       // Formatear para Libro Diario (cronológico)
-      const libroDiario = asientos.map(asiento => ({
+      const libroDiario = todosLosAsientos.map(asiento => ({
         numeroAsiento: asiento.numero_asiento,
         fecha: asiento.fecha,
         concepto: asiento.concepto,
         referencia: asiento.referencia,
-        detalles: asiento.detalle_asientos.map(detalle => ({
+        detalles: (asiento.detalle_asientos || []).map(detalle => ({
           cuentaId: detalle.cuenta_id,
-          concepto: detalle.concepto,
-          debe: detalle.debe,
-          haber: detalle.haber
+          cuentaCodigo: detalle.cuenta_id, // Usar el ID como código temporalmente
+          cuentaNombre: detalle.cuenta_id, // Usar el ID como nombre temporalmente
+          descripcion: detalle.concepto || 'Movimiento contable',
+          debe: parseFloat(detalle.debe || 0),
+          haber: parseFloat(detalle.haber || 0)
         })),
-        totalDebe: asiento.total_debe,
-        totalHaber: asiento.total_haber,
+        totalDebe: parseFloat(asiento.total_debe || 0),
+        totalHaber: parseFloat(asiento.total_haber || 0),
         estado: asiento.estado
       }));
+
+      // Ordenar por fecha descendente
+      libroDiario.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
       return {
         success: true,
@@ -337,7 +383,11 @@ export class ContabilidadController {
           totalAsientos: libroDiario.length,
           totalDebe: libroDiario.reduce((sum, a) => sum + a.totalDebe, 0),
           totalHaber: libroDiario.reduce((sum, a) => sum + a.totalHaber, 0),
-          asientos: libroDiario
+          asientos: libroDiario,
+          fuentes: {
+            contabilidad: asientos.length,
+            rrhh: asientosRrhh.length
+          }
         }
       };
     } catch (error) {

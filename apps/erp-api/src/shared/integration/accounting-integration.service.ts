@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { EventBusService, VentaProcessedEvent, MovimientoStockEvent, CompraEntregadaEvent } from '../events/event-bus.service';
+import { EventBusService, VentaProcessedEvent, MovimientoStockEvent, CompraEntregadaEvent, PlanillaCalculadaEvent, PlanillaPagadaEvent, PagoFacturaEvent, GastoRegistradoEvent } from '../events/event-bus.service';
 
 export interface AsientoContable {
   fecha: string;
@@ -21,18 +21,64 @@ export interface AsientoDetalle {
 @Injectable()
 export class AccountingIntegrationService {
   
+  private cuentasCache: Map<string, string> = new Map();
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService
   ) {
+    console.log('🏗️ [AccountingIntegrationService] Constructor llamado - inicializando...');
+    this.initializeCuentasCache();
     this.initializeEventListeners();
+    console.log('✅ [AccountingIntegrationService] Servicio de contabilidad listo y listeners registrados');
   }
 
-  private initializeEventListeners() {
+  async initializeCuentasCache(): Promise<void> {
+    try {
+      const { data: cuentas, error } = await this.supabase.getClient()
+        .from('plan_cuentas')
+        .select('id, codigo, nombre')
+        .eq('acepta_movimiento', true);
+
+      if (error) throw error;
+
+      cuentas?.forEach(cuenta => {
+        this.cuentasCache.set(cuenta.codigo, cuenta.id);
+      });
+
+      console.log(`✅ Cache de cuentas inicializado: ${this.cuentasCache.size} cuentas`);
+    } catch (error) {
+      console.error('❌ Error inicializando cache de cuentas:', error);
+    }
+  }
+
+  private async getCuentaId(codigo: string): Promise<string> {
+    let cuentaId = this.cuentasCache.get(codigo);
+    
+    if (!cuentaId) {
+      const { data: cuenta, error } = await this.supabase.getClient()
+        .from('plan_cuentas')
+        .select('id')
+        .eq('codigo', codigo)
+        .single();
+
+      if (error || !cuenta) {
+        console.error(`❌ Cuenta no encontrada: ${codigo}`);
+        throw new Error(`Cuenta contable ${codigo} no encontrada`);
+      }
+
+      cuentaId = cuenta.id;
+      this.cuentasCache.set(codigo, cuentaId);
+    }
+
+    return cuentaId;
+  }
+
+  initializeEventListeners() {
     console.log('📚 [Contabilidad] Inicializando listeners de eventos...');
     
     this.eventBus.onVentaProcessed(async (event) => {
-      console.log('📚 [Contabilidad] Procesando venta para asientos contables...');
+      console.log('📚 [Contabilidad] ¡EVENTO RECIBIDO! Procesando venta para asientos contables...', event.data);
       await this.procesarAsientoVenta(event.data);
     });
 
@@ -45,61 +91,79 @@ export class AccountingIntegrationService {
       console.log('📚 [Contabilidad] Procesando compra entregada para asientos contables...');
       await this.procesarAsientoCompra(event.data);
     });
+
+    this.eventBus.onPlanillaCalculada(async (event) => {
+      console.log('📚 [Contabilidad] Procesando planilla calculada para asientos contables...');
+      await this.procesarAsientoPlanilla(event.data);
+    });
+
+    this.eventBus.onPlanillaPagada(async (event) => {
+      console.log('📚 [Contabilidad] Procesando pago de planilla para asientos contables...');
+      await this.procesarAsientoPagoPlanilla(event.data);
+    });
+
+    this.eventBus.onPagoFactura(async (event) => {
+      console.log('📚 [Contabilidad] Procesando pago de factura para asientos contables...');
+      await this.procesarAsientoPagoFactura(event.data);
+    });
+
+    this.eventBus.onGastoRegistrado(async (event) => {
+      console.log('📚 [Contabilidad] Procesando gasto registrado para asientos contables...');
+      if (event.data.requiereAsiento) {
+        await this.procesarAsientoGasto(event.data);
+      }
+    });
   }
 
   async procesarAsientoVenta(venta: VentaProcessedEvent): Promise<string | null> {
     try {
-      console.log(`📚 Generando asiento contable para venta ${venta.numeroTicket}`);
+      console.log(`📚 [Contabilidad] Generando asiento contable para venta ${venta.numeroTicket}`);
+      console.log(`📚 [Contabilidad] Datos de venta:`, JSON.stringify(venta, null, 2));
 
-      // Calcular costo de ventas
       const costoVentas = await this.calcularCostoVentas(venta.items);
+      console.log(`💰 [Contabilidad] Costo de ventas calculado: ${costoVentas}`);
 
       const asiento: AsientoContable = {
         fecha: new Date().toISOString(),
         concepto: `Venta ${venta.numeroTicket} - ${venta.clienteNombre}`,
         referencia: venta.ventaId,
         detalles: [
-          // DEBE: Caja/Bancos por el total de la venta
           {
-            cuentaId: 'cuenta-caja',
-            cuentaCodigo: venta.metodoPago === 'EFECTIVO' ? '101' : '102',
-            cuentaNombre: venta.metodoPago === 'EFECTIVO' ? 'Caja' : 'Banco',
+            cuentaId: await this.getCuentaId(venta.metodoPago === 'EFECTIVO' ? '101' : '104'),
+            cuentaCodigo: venta.metodoPago === 'EFECTIVO' ? '101' : '104',
+            cuentaNombre: venta.metodoPago === 'EFECTIVO' ? 'Caja' : 'Cuentas Corrientes en Instituciones Financieras',
             debe: venta.total,
             haber: 0,
             descripcion: `Ingreso por venta ${venta.numeroTicket}`
           },
-          // HABER: Ventas por el subtotal
           {
-            cuentaId: 'cuenta-ventas',
+            cuentaId: await this.getCuentaId('701'),
             cuentaCodigo: '701',
-            cuentaNombre: 'Ventas',
+            cuentaNombre: 'Mercaderías',
             debe: 0,
             haber: venta.subtotal,
             descripcion: `Venta de mercadería ${venta.numeroTicket}`
           },
-          // HABER: IGV por cobrar
           {
-            cuentaId: 'cuenta-igv',
+            cuentaId: await this.getCuentaId('401'),
             cuentaCodigo: '401',
-            cuentaNombre: 'IGV por Pagar',
+            cuentaNombre: 'Gobierno Central',
             debe: 0,
             haber: venta.impuestos,
             descripcion: `IGV de venta ${venta.numeroTicket}`
           },
-          // DEBE: Costo de Ventas
           {
-            cuentaId: 'cuenta-costo-ventas',
+            cuentaId: await this.getCuentaId('691'),
             cuentaCodigo: '691',
-            cuentaNombre: 'Costo de Ventas',
+            cuentaNombre: 'Mercaderías',
             debe: costoVentas,
             haber: 0,
             descripcion: `Costo de mercadería vendida ${venta.numeroTicket}`
           },
-          // HABER: Inventario (reducción)
           {
-            cuentaId: 'cuenta-inventario',
+            cuentaId: await this.getCuentaId('201'),
             cuentaCodigo: '201',
-            cuentaNombre: 'Inventario',
+            cuentaNombre: 'Mercaderías Manufacturadas',
             debe: 0,
             haber: costoVentas,
             descripcion: `Salida de inventario por venta ${venta.numeroTicket}`
@@ -123,18 +187,16 @@ export class AccountingIntegrationService {
         concepto: `Compra de mercaderías - ${compra.numeroOrden}`,
         referencia: `${compra.numeroOrden} - ${compra.proveedorNombre}`,
         detalles: [
-          // DEBE: Inventario (aumento de activo)
           {
-            cuentaId: 'cuenta-inventario',
+            cuentaId: await this.getCuentaId('201'),
             cuentaCodigo: '201',
-            cuentaNombre: 'Inventario',
+            cuentaNombre: 'Mercaderías Manufacturadas',
             debe: compra.total,
             haber: 0,
             descripcion: `Compra a ${compra.proveedorNombre}`
           },
-          // HABER: Cuentas por Pagar o Efectivo (según forma de pago)
           {
-            cuentaId: 'cuenta-cuentas-por-pagar',
+            cuentaId: await this.getCuentaId('421'),
             cuentaCodigo: '421',
             cuentaNombre: 'Facturas por Pagar',
             debe: 0,
@@ -165,17 +227,17 @@ export class AccountingIntegrationService {
             referencia: movimiento.productoId,
             detalles: [
               {
-                cuentaId: 'cuenta-inventario',
+                cuentaId: await this.getCuentaId('201'),
                 cuentaCodigo: '201',
-                cuentaNombre: 'Inventario',
+                cuentaNombre: 'Mercaderías Manufacturadas',
                 debe: movimiento.valor,
                 haber: 0,
                 descripcion: `Entrada de ${movimiento.cantidad} unidades`
               },
               {
-                cuentaId: 'cuenta-compras',
+                cuentaId: await this.getCuentaId('601'),
                 cuentaCodigo: '601',
-                cuentaNombre: 'Compras',
+                cuentaNombre: 'Mercaderías',
                 debe: 0,
                 haber: movimiento.valor,
                 descripcion: movimiento.motivo
@@ -192,17 +254,17 @@ export class AccountingIntegrationService {
             referencia: movimiento.productoId,
             detalles: [
               {
-                cuentaId: 'cuenta-inventario',
+                cuentaId: await this.getCuentaId('201'),
                 cuentaCodigo: '201',
-                cuentaNombre: 'Inventario',
+                cuentaNombre: 'Mercaderías Manufacturadas',
                 debe: esAjustePositivo ? movimiento.valor : 0,
                 haber: esAjustePositivo ? 0 : movimiento.valor,
                 descripcion: `Ajuste de ${movimiento.cantidad} unidades`
               },
               {
-                cuentaId: 'cuenta-ajustes',
+                cuentaId: await this.getCuentaId('659'),
                 cuentaCodigo: '659',
-                cuentaNombre: 'Otras Cargas de Gestión',
+                cuentaNombre: 'Otros Gastos de Gestión',
                 debe: esAjustePositivo ? 0 : movimiento.valor,
                 haber: esAjustePositivo ? movimiento.valor : 0,
                 descripcion: movimiento.motivo
@@ -228,7 +290,6 @@ export class AccountingIntegrationService {
     
     for (const item of items) {
       try {
-        // Obtener costo del producto desde la base de datos
         const { data: producto } = await this.supabase.getClient()
           .from('productos')
           .select('precio')
@@ -236,11 +297,9 @@ export class AccountingIntegrationService {
           .single();
 
         if (producto) {
-          // Asumir costo como 70% del precio de venta
           const costoUnitario = parseFloat(producto.precio) * 0.7;
           costoTotal += costoUnitario * item.cantidad;
         } else {
-          // Fallback: costo estimado basado en precio de venta
           costoTotal += item.precio * 0.7 * item.cantidad;
         }
       } catch (error) {
@@ -255,16 +314,19 @@ export class AccountingIntegrationService {
   private async guardarAsientoContable(asiento: AsientoContable): Promise<string> {
     try {
       const numeroAsiento = `AST-${Date.now()}`;
+      console.log(`📚 [Contabilidad] Guardando asiento: ${numeroAsiento}`);
       
-      // Validar que cuadre el asiento
       const totalDebe = asiento.detalles.reduce((sum, det) => sum + det.debe, 0);
       const totalHaber = asiento.detalles.reduce((sum, det) => sum + det.haber, 0);
+      
+      console.log(`📊 [Contabilidad] Totales: Debe=${totalDebe}, Haber=${totalHaber}`);
+      console.log(`📊 [Contabilidad] Detalles del asiento:`, JSON.stringify(asiento.detalles, null, 2));
       
       if (Math.abs(totalDebe - totalHaber) > 0.01) {
         throw new Error(`Asiento descuadrado: Debe=${totalDebe}, Haber=${totalHaber}`);
       }
 
-      // Guardar cabecera del asiento
+      console.log(`📝 [Contabilidad] Insertando cabecera del asiento...`);
       const { data: asientoGuardado, error: asientoError } = await this.supabase.getClient()
         .from('asientos_contables')
         .insert({
@@ -274,16 +336,20 @@ export class AccountingIntegrationService {
           referencia: asiento.referencia,
           total_debe: totalDebe,
           total_haber: totalHaber,
-          estado: 'CONTABILIZADO',
-          usuario_id: 'system',
+          estado: 'BORRADOR',
+          usuario_id: null, // Cambiado de 'system' a null para evitar error de UUID
           created_at: new Date().toISOString()
         })
         .select()
         .single();
 
-      if (asientoError) throw asientoError;
+      if (asientoError) {
+        console.error('❌ [Contabilidad] Error insertando cabecera:', asientoError);
+        throw asientoError;
+      }
+      
+      console.log(`✅ [Contabilidad] Cabecera insertada con ID: ${asientoGuardado.id}`);
 
-      // Guardar detalles del asiento
       const detallesParaGuardar = asiento.detalles.map(detalle => ({
         asiento_id: asientoGuardado.id,
         cuenta_id: detalle.cuentaId,
@@ -293,11 +359,19 @@ export class AccountingIntegrationService {
         created_at: new Date().toISOString()
       }));
 
+      console.log(`📝 [Contabilidad] Insertando ${detallesParaGuardar.length} detalles...`);
+      console.log(`📝 [Contabilidad] Detalles para guardar:`, JSON.stringify(detallesParaGuardar, null, 2));
+
       const { error: detallesError } = await this.supabase.getClient()
         .from('detalle_asientos')
         .insert(detallesParaGuardar);
 
-      if (detallesError) throw detallesError;
+      if (detallesError) {
+        console.error('❌ [Contabilidad] Error insertando detalles:', detallesError);
+        throw detallesError;
+      }
+      
+      console.log(`✅ [Contabilidad] Detalles insertados exitosamente`);
 
       console.log(`✅ Asiento contable creado: ${numeroAsiento}`);
       return asientoGuardado.id;
@@ -307,7 +381,6 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Método para obtener el plan de cuentas actualizado
   async getPlanCuentas() {
     try {
       const { data, error } = await this.supabase.getClient()
@@ -323,18 +396,21 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Método para obtener asientos contables
   async getAsientosContables(filtros: any = {}) {
     try {
+      console.log('📚 [Contabilidad] Obteniendo asientos contables con filtros:', filtros);
+      
       let query = this.supabase.getClient()
         .from('asientos_contables')
         .select(`
           *,
           detalle_asientos (
+            id,
             cuenta_id,
             debe,
             haber,
-            concepto
+            concepto,
+            referencia
           )
         `)
         .order('created_at', { ascending: false });
@@ -347,9 +423,14 @@ export class AccountingIntegrationService {
         query = query.lte('fecha', filtros.fechaHasta);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(100);
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error en consulta de asientos:', error);
+        throw error;
+      }
+      
+      console.log(`📚 [Contabilidad] Encontrados ${data?.length || 0} asientos contables`);
       return data || [];
     } catch (error) {
       console.error('❌ Error obteniendo asientos contables:', error);
@@ -357,12 +438,10 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Método para obtener Libro Mayor por cuenta específica
   async getLibroMayorPorCuenta(cuentaCodigo: string, filtros: any = {}) {
     try {
       console.log(`📊 Obteniendo movimientos para cuenta: ${cuentaCodigo}`);
       
-      // Obtener información de la cuenta
       const { data: cuenta, error: cuentaError } = await this.supabase.getClient()
         .from('plan_cuentas')
         .select('*')
@@ -373,7 +452,6 @@ export class AccountingIntegrationService {
         throw new Error(`Cuenta ${cuentaCodigo} no encontrada`);
       }
 
-      // Obtener movimientos de la cuenta
       let query = this.supabase.getClient()
         .from('detalle_asientos')
         .select(`
@@ -400,7 +478,6 @@ export class AccountingIntegrationService {
       
       if (movError) throw movError;
 
-      // Calcular saldos
       let saldoAcumulado = 0;
       const movimientosConSaldo = (movimientos || []).map(mov => {
         const movimiento = mov.debe - mov.haber;
@@ -445,12 +522,10 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Método para obtener Libro Mayor completo
   async getLibroMayorCompleto(filtros: any = {}) {
     try {
       console.log('📊 Generando Libro Mayor completo...');
       
-      // Obtener todas las cuentas con movimientos
       let query = this.supabase.getClient()
         .from('detalle_asientos')
         .select(`
@@ -478,7 +553,6 @@ export class AccountingIntegrationService {
       
       if (error) throw error;
 
-      // Agrupar por cuenta
       const cuentasAgrupadas = (movimientos || []).reduce((acc, mov) => {
         const codigo = mov.cuenta_id;
         
@@ -499,7 +573,6 @@ export class AccountingIntegrationService {
         return acc;
       }, {});
 
-      // Convertir a array y agregar saldo
       const libroMayorCompleto = Object.values(cuentasAgrupadas).map((cuenta: any) => ({
         ...cuenta,
         saldo: cuenta.totalDebe - cuenta.totalHaber
@@ -518,16 +591,14 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Método para obtener Registro de Ventas (conecta con CPE)
   async getRegistroVentas(filtros: any = {}) {
     try {
       console.log('📝 Obteniendo datos de CPE para Registro de Ventas...');
       
-      // Obtener comprobantes de pago electrónicos (CPE)
       let query = this.supabase.getClient()
         .from('cpe')
         .select('*')
-        .in('estado', ['ACEPTADO', 'ENVIADO']) // Solo CPE válidos
+        .in('estado', ['ACEPTADO', 'ENVIADO'])
         .order('created_at', { ascending: true });
 
       if (filtros.fechaDesde) {
@@ -546,52 +617,44 @@ export class AccountingIntegrationService {
       
       if (error) throw error;
 
-      // Formatear según normativa SUNAT (Registro de Ventas)
       const registroVentas = (ventas || []).map(venta => ({
-        // Datos del comprobante
         fechaEmision: venta.created_at,
         tipoComprobante: this.getTipoComprobanteTexto(venta.tipo_comprobante),
         serieNumero: `${venta.serie}-${venta.numero.toString().padStart(8, '0')}`,
-        tipoDocumentoCliente: venta.cliente_tipo_documento || '6', // RUC por defecto
+        tipoDocumentoCliente: venta.cliente_tipo_documento || '6',
         numeroDocumentoCliente: venta.cliente_numero_documento,
         razonSocialCliente: venta.cliente_razon_social,
         
-        // Importes según SUNAT
-        valorFacturadoExportacion: 0, // Exportaciones (si aplica)
+        valorFacturadoExportacion: 0,
         baseImponibleOperacionGravada: this.calcularBaseImponible(venta),
-        descuentoBaseImponible: 0, // Descuentos (si aplica)
+        descuentoBaseImponible: 0,
         igv: this.calcularIGV(venta),
         descuentoIGV: 0,
-        baseImponibleOperacionGratuitaGravada: 0, // Gratuitas (si aplica)
+        baseImponibleOperacionGratuitaGravada: 0,
         igvOperacionGratuita: 0,
-        baseImponibleOperacionExonerada: 0, // Exoneradas (si aplica)
-        baseImponibleOperacionInafecta: 0, // Inafectas (si aplica)
-        isc: 0, // ISC (si aplica)
-        baseImponibleArrozPilado: 0, // Específico para arroz
+        baseImponibleOperacionExonerada: 0,
+        baseImponibleOperacionInafecta: 0,
+        isc: 0,
+        baseImponibleArrozPilado: 0,
         ivapArrozPilado: 0,
         otrosTributos: 0,
         totalComprobante: venta.total,
         
-        // Datos adicionales
         moneda: venta.moneda || 'PEN',
         fechaVencimiento: venta.fecha_vencimiento || venta.created_at,
         
-        // Estado SUNAT
         estadoSunat: venta.estado_sunat || venta.estado,
         
-        // Referencia interna
         id: venta.id,
         created_at: venta.created_at
       }));
 
-      // Calcular resumen
       const resumen = registroVentas.reduce((acc, venta) => {
         acc.cantidadComprobantes++;
         acc.baseImponible += venta.baseImponibleOperacionGravada;
         acc.igv += venta.igv;
         acc.total += venta.totalComprobante;
         
-        // Contar por tipo
         const tipo = venta.tipoComprobante;
         if (!acc.porTipo[tipo]) acc.porTipo[tipo] = { cantidad: 0, total: 0 };
         acc.porTipo[tipo].cantidad++;
@@ -619,7 +682,6 @@ export class AccountingIntegrationService {
     }
   }
 
-  // Métodos auxiliares para el Registro de Ventas
   private getTipoComprobanteTexto(codigo: string): string {
     const tipos = {
       '01': 'FACTURA',
@@ -631,9 +693,8 @@ export class AccountingIntegrationService {
   }
 
   private calcularBaseImponible(venta: any): number {
-    // Si el total incluye IGV, calcular base imponible
     if (venta.incluye_igv) {
-      return venta.total / 1.18; // Descontar 18% IGV
+      return venta.total / 1.18;
     }
     return venta.subtotal || (venta.total - this.calcularIGV(venta));
   }
@@ -643,8 +704,197 @@ export class AccountingIntegrationService {
       return venta.igv;
     }
     
-    // Calcular IGV como 18% de la base imponible
     const baseImponible = this.calcularBaseImponible(venta);
     return baseImponible * 0.18;
+  }
+
+  async procesarAsientoPlanilla(planilla: PlanillaCalculadaEvent): Promise<string | null> {
+    try {
+      console.log(`📚 Generando asiento contable para planilla ${planilla.periodo}`);
+
+      const asiento: AsientoContable = {
+        fecha: new Date().toISOString(),
+        concepto: `Planilla de sueldos ${planilla.periodo}`,
+        referencia: `PLANILLA-${planilla.planillaId}`,
+        detalles: [
+          {
+            cuentaId: await this.getCuentaId('621'),
+            cuentaCodigo: '621',
+            cuentaNombre: 'Remuneraciones',
+            debe: planilla.totalIngresos,
+            haber: 0,
+            descripcion: `Sueldos y salarios ${planilla.periodo}`
+          },
+          {
+            cuentaId: await this.getCuentaId('627'),
+            cuentaCodigo: '627',
+            cuentaNombre: 'Seguridad y Previsión Social',
+            debe: planilla.totalAportes,
+            haber: 0,
+            descripcion: `ESSALUD y aportes empleador ${planilla.periodo}`
+          },
+          {
+            cuentaId: await this.getCuentaId('411'),
+            cuentaCodigo: '411',
+            cuentaNombre: 'Remuneraciones por Pagar',
+            debe: 0,
+            haber: planilla.totalNeto,
+            descripcion: `Neto a pagar empleados ${planilla.periodo}`
+          },
+          {
+            cuentaId: await this.getCuentaId('403'),
+            cuentaCodigo: '403',
+            cuentaNombre: 'Instituciones Públicas',
+            debe: 0,
+            haber: planilla.totalDescuentos,
+            descripcion: `AFP/ONP y descuentos ${planilla.periodo}`
+          },
+          {
+            cuentaId: await this.getCuentaId('407'),
+            cuentaCodigo: '407',
+            cuentaNombre: 'Administradoras de Fondos',
+            debe: 0,
+            haber: planilla.totalAportes,
+            descripcion: `ESSALUD por pagar ${planilla.periodo}`
+          }
+        ]
+      };
+
+      return await this.guardarAsientoContable(asiento);
+    } catch (error) {
+      console.error('❌ Error generando asiento de planilla:', error);
+      return null;
+    }
+  }
+
+  async procesarAsientoPagoPlanilla(pago: PlanillaPagadaEvent): Promise<string | null> {
+    try {
+      console.log(`📚 Generando asiento de pago de planilla ${pago.periodo} - ${pago.cantidadEmpleados} empleados`);
+
+      const asiento: AsientoContable = {
+        fecha: new Date().toISOString(),
+        concepto: `Pago planilla ${pago.periodo} - ${pago.cantidadEmpleados} empleados`,
+        referencia: `PAGO-PLANILLA-${pago.planillaId}`,
+        detalles: [
+          {
+            cuentaId: await this.getCuentaId('411'),
+            cuentaCodigo: '411',
+            cuentaNombre: 'Remuneraciones por Pagar',
+            debe: pago.totalPagado,
+            haber: 0,
+            descripcion: `Cancelación sueldos ${pago.periodo} - ${pago.cantidadEmpleados} empleados`
+          },
+          {
+            cuentaId: pago.metodoPago === 'efectivo' ? await this.getCuentaId('101') : await this.getCuentaId('104'),
+            cuentaCodigo: pago.metodoPago === 'efectivo' ? '101' : '104',
+            cuentaNombre: pago.metodoPago === 'efectivo' ? 'Caja' : 'Cuentas Corrientes en Instituciones Financieras',
+            debe: 0,
+            haber: pago.totalPagado,
+            descripcion: `Pago planilla por ${pago.metodoPago} ${pago.periodo} - ${pago.cantidadEmpleados} empleados`
+          }
+        ]
+      };
+
+      return await this.guardarAsientoContable(asiento);
+    } catch (error) {
+      console.error('❌ Error generando asiento de pago de planilla:', error);
+      return null;
+    }
+  }
+
+  async procesarAsientoPagoFactura(pago: PagoFacturaEvent): Promise<string | null> {
+    try {
+      console.log(`📚 Generando asiento de cobro de factura ${pago.numeroFactura}`);
+
+      const asiento: AsientoContable = {
+        fecha: new Date().toISOString(),
+        concepto: `Cobro factura ${pago.numeroFactura}`,
+        referencia: `COBRO-${pago.facturaId}`,
+        detalles: [
+          {
+            cuentaId: pago.metodoPago === 'EFECTIVO' ? await this.getCuentaId('101') : await this.getCuentaId('104'),
+            cuentaCodigo: pago.metodoPago === 'EFECTIVO' ? '101' : '104',
+            cuentaNombre: pago.metodoPago === 'EFECTIVO' ? 'Caja' : 'Cuentas Corrientes en Instituciones Financieras',
+            debe: pago.montoPagado,
+            haber: 0,
+            descripcion: `Cobro factura ${pago.numeroFactura} por ${pago.metodoPago}`
+          },
+          {
+            cuentaId: await this.getCuentaId('122'),
+            cuentaCodigo: '122',
+            cuentaNombre: 'Cuentas por Cobrar Comerciales - Terceros',
+            debe: 0,
+            haber: pago.montoPagado,
+            descripcion: `Cobro cliente factura ${pago.numeroFactura}`
+          }
+        ]
+      };
+
+      return await this.guardarAsientoContable(asiento);
+    } catch (error) {
+      console.error('❌ Error generando asiento de cobro de factura:', error);
+      return null;
+    }
+  }
+
+  async procesarAsientoGasto(gasto: GastoRegistradoEvent): Promise<string | null> {
+    try {
+      console.log(`📚 Generando asiento de gasto: ${gasto.concepto}`);
+
+      const cuentaGasto = await this.determinarCuentaGasto(gasto.categoria);
+
+      const asiento: AsientoContable = {
+        fecha: new Date().toISOString(),
+        concepto: `Gasto: ${gasto.concepto}`,
+        referencia: `GASTO-${gasto.gastoId}`,
+        detalles: [
+          {
+            cuentaId: cuentaGasto.id,
+            cuentaCodigo: cuentaGasto.codigo,
+            cuentaNombre: cuentaGasto.nombre,
+            debe: gasto.monto,
+            haber: 0,
+            descripcion: gasto.concepto
+          },
+          {
+            cuentaId: gasto.metodoPago === 'EFECTIVO' ? await this.getCuentaId('101') : 
+                     gasto.metodoPago === 'TRANSFERENCIA' ? await this.getCuentaId('104') : await this.getCuentaId('421'),
+            cuentaCodigo: gasto.metodoPago === 'EFECTIVO' ? '101' : 
+                         gasto.metodoPago === 'TRANSFERENCIA' ? '104' : '421',
+            cuentaNombre: gasto.metodoPago === 'EFECTIVO' ? 'Caja' : 
+                         gasto.metodoPago === 'TRANSFERENCIA' ? 'Cuentas Corrientes en Instituciones Financieras' : 'Facturas por Pagar',
+            debe: 0,
+            haber: gasto.monto,
+            descripcion: `Pago ${gasto.concepto} ${gasto.proveedor ? 'a ' + gasto.proveedor : ''}`
+          }
+        ]
+      };
+
+      return await this.guardarAsientoContable(asiento);
+    } catch (error) {
+      console.error('❌ Error generando asiento de gasto:', error);
+      return null;
+    }
+  }
+
+  private async determinarCuentaGasto(categoria: string): Promise<{ id: string, codigo: string, nombre: string }> {
+    const categoriasGasto = {
+      'SUMINISTROS': { codigo: '659', nombre: 'Otros Gastos de Gestión' },
+      'SERVICIOS': { codigo: '634', nombre: 'Mantenimiento y Reparaciones' },
+      'TRANSPORTE': { codigo: '659', nombre: 'Otros Gastos de Gestión' },
+      'PUBLICIDAD': { codigo: '637', nombre: 'Publicidad, Publicaciones, Relaciones Públicas' },
+      'MANTENIMIENTO': { codigo: '634', nombre: 'Mantenimiento y Reparaciones' },
+      'ALQUILER': { codigo: '659', nombre: 'Otros Gastos de Gestión' },
+      'OTROS': { codigo: '659', nombre: 'Otros Gastos de Gestión' }
+    };
+
+    const cuentaInfo = categoriasGasto[categoria] || categoriasGasto['OTROS'];
+    const cuentaId = await this.getCuentaId(cuentaInfo.codigo);
+    
+    return {
+      id: cuentaId,
+      codigo: cuentaInfo.codigo,
+      nombre: cuentaInfo.nombre
+    };
   }
 } 

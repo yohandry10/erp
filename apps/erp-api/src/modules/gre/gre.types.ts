@@ -9,6 +9,7 @@ export interface CreateGuiaRemisionDto {
   transportista?: string;
   placaVehiculo?: string;
   licenciaConducir?: string;
+  cpeRelacionado?: string; // ID del CPE relacionado si aplica
 }
 
 export interface GuiaRemisionResponseDto {
@@ -26,4 +27,7 @@ export interface GuiaRemisionResponseDto {
   transportista?: string;
   placaVehiculo?: string;
   licenciaConducir?: string;
+  cpeRelacionado?: string; // ID del CPE relacionado
+  numeroSunat?: string; // Número asignado por SUNAT
+  hashGre?: string; // Hash del XML firmado
 } 

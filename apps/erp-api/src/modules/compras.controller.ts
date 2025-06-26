@@ -1,14 +1,18 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { EventBusService } from '../shared/events/event-bus.service';
+import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
 
 @ApiTags('compras')
 @Controller('compras')
+// @UseGuards(JwtAuthGuard) // Temporalmente deshabilitado para testing
 export class ComprasController {
   constructor(
-    private readonly supabaseService: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly supabase: SupabaseService,
+    private readonly eventBus: EventBusService,
+    private readonly inventoryIntegration: InventoryIntegrationService
   ) {}
   
   @Get('stats')
@@ -16,7 +20,7 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats() {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabase.getClient();
 
       console.log('📊 [Compras Stats] Obteniendo estadísticas de compras...');
 
@@ -103,64 +107,43 @@ export class ComprasController {
     }
   }
 
-  @Get('ordenes')
-  @ApiOperation({ summary: 'Listar órdenes de compra' })
-  @ApiResponse({ status: 200, description: 'Órdenes listadas exitosamente' })
-  async getOrdenes(@Query() filters: any) {
+  @Get()
+  async getOrdenes(@Query() filtros: any) {
     try {
-      const supabase = this.supabaseService.getClient();
-
-      // Primero obtener las órdenes
-      let query = supabase
+      let query = this.supabase.getClient()
         .from('ordenes_compra')
-        .select('*')
+        .select(`
+          *,
+          proveedor:proveedores(*)
+        `)
         .order('created_at', { ascending: false });
 
-      // Aplicar filtros
-      if (filters.estado) {
-        query = query.eq('estado', filters.estado);
+      if (filtros.estado) {
+        query = query.eq('estado', filtros.estado);
       }
 
-      if (filters.proveedor_id) {
-        query = query.eq('proveedor_id', filters.proveedor_id);
+      if (filtros.fechaDesde) {
+        query = query.gte('fecha_orden', filtros.fechaDesde);
       }
 
-      if (filters.fecha_desde) {
-        query = query.gte('fecha_orden', filters.fecha_desde);
-      }
-
-      if (filters.fecha_hasta) {
-        query = query.lte('fecha_orden', filters.fecha_hasta);
+      if (filtros.fechaHasta) {
+        query = query.lte('fecha_orden', filtros.fechaHasta);
       }
 
       const { data: ordenes, error } = await query;
 
       if (error) throw error;
-      
-      console.log('📋 OBTENER ÓRDENES - Datos de BD:', JSON.stringify(ordenes, null, 2));
-
-      // SIMPLIFICADO: Mapear órdenes SIN información de proveedores para evitar errores
-      const ordenesSimplificadas = (ordenes || []).map(orden => ({
-        ...orden,
-        proveedores: {
-          id: orden.proveedor_id || 'unknown',
-          nombre: 'Proveedor',
-          ruc: 'N/A'
-        }
-      }));
-      
-      console.log('📤 OBTENER ÓRDENES - Datos a enviar:', JSON.stringify(ordenesSimplificadas, null, 2));
 
       return {
         success: true,
-        data: ordenesSimplificadas
+        data: ordenes || []
       };
     } catch (error) {
-      console.error('Error getting purchase orders:', error);
+      console.error('❌ Error obteniendo órdenes de compra:', error);
       return {
         success: false,
-        message: 'Error al obtener órdenes de compra',
-        error: error.message
+        error: error.message,
+        data: []
       };
     }
   }
@@ -170,7 +153,7 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Número generado exitosamente' })
   async getNextNumber() {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabase.getClient();
       
       // Obtener el último número de orden
       const { data, error } = await supabase
@@ -208,444 +191,202 @@ export class ComprasController {
     }
   }
 
-  @Post('ordenes')
-  @ApiOperation({ summary: 'Crear nueva orden de compra' })
-  @ApiResponse({ status: 201, description: 'Orden creada exitosamente' })
-  async createOrden(@Body() ordenData: any) {
+  @Post()
+  async crearOrden(@Body() ordenData: any) {
     try {
-      console.log('📥 CREAR ORDEN - Datos recibidos:', JSON.stringify(ordenData, null, 2));
-      
-      const supabase = this.supabaseService.getClient();
+      console.log('🛒 Creando nueva orden de compra');
 
-      // Validar datos requeridos
-      if (!ordenData.proveedor_id || !ordenData.fecha_orden || !ordenData.fecha_entrega) {
-        return {
-          success: false,
-          message: 'Faltan campos requeridos'
-        };
-      }
+      // Calcular totales
+      const subtotal = ordenData.items.reduce((sum, item) => 
+        sum + (item.cantidad * item.precio_unitario), 0);
+      const igv = subtotal * 0.18;
+      const total = subtotal + igv;
 
-      if (!ordenData.items || ordenData.items.length === 0) {
-        return {
-          success: false,
-          message: 'Debe incluir al menos un item'
-        };
-      }
-
-      // PROCESAR PRODUCTOS NUEVOS PRIMERO
-      const itemsProcesados = [];
-      
-      for (const item of ordenData.items) {
-        let productoId = item.producto_id;
-        
-        // Si no tiene producto_id pero tiene nombre, es un producto NUEVO
-        if (!productoId && item.producto_nombre) {
-          console.log(`🆕 CREANDO PRODUCTO NUEVO: ${item.producto_nombre}`);
-          
-          // Crear el producto nuevo en la tabla productos
-          const nuevoProducto = {
-            codigo: `PROD-${Date.now()}`,
-            nombre: item.producto_nombre,
-            precio: parseFloat(item.precio_unitario) || 0,
-            stock: 0, // Se actualizará cuando se entregue la orden
-            categoria: 'General',
-            activo: true,
-            stock_minimo: 10,
-            created_at: new Date().toISOString()
-          };
-          
-          const { data: productoCreado, error: errorProducto } = await supabase
-            .from('productos')
-            .insert([nuevoProducto])
-            .select()
-            .single();
-          
-          if (errorProducto) {
-            console.error('❌ Error creando producto:', errorProducto);
-            throw new Error(`Error creando producto ${item.producto_nombre}: ${errorProducto.message}`);
-          }
-          
-          console.log('✅ PRODUCTO CREADO:', JSON.stringify(productoCreado, null, 2));
-          productoId = productoCreado.id;
-        }
-        
-        // Agregar item procesado
-        itemsProcesados.push({
-          ...item,
-          producto_id: productoId
-        });
-      }
-
-      // Preparar datos de la orden usando EXACTAMENTE las columnas de la tabla
-      const ordenToInsert = {
-        tenant_id: '550e8400-e29b-41d4-a716-446655440000',
-        numero: ordenData.numero,
-        proveedor_id: ordenData.proveedor_id,
-        fecha_orden: ordenData.fecha_orden,
-        fecha_entrega: ordenData.fecha_entrega,
-        moneda: ordenData.moneda || 'PEN',
-        subtotal: parseFloat(ordenData.subtotal) || 0,
-        igv: parseFloat(ordenData.igv) || 0,
-        total: parseFloat(ordenData.total) || 0,
-        estado: ordenData.estado || 'PENDIENTE',
-        items: itemsProcesados,
-        observaciones: ordenData.observaciones || null
-      };
-      
-      console.log('💾 CREAR ORDEN - Datos a insertar:', JSON.stringify(ordenToInsert, null, 2));
-
-      const { data, error } = await supabase
+      // Crear orden de compra
+      const { data: orden, error: ordenError } = await this.supabase.getClient()
         .from('ordenes_compra')
-        .insert([ordenToInsert])
+        .insert({
+          numero_orden: `OC-${Date.now()}`,
+          proveedor_id: ordenData.proveedor_id,
+          fecha_orden: new Date().toISOString(),
+          fecha_requerida: ordenData.fecha_requerida,
+          estado: 'PENDIENTE',
+          subtotal: subtotal,
+          igv: igv,
+          total: total,
+          observaciones: ordenData.observaciones,
+          usuario_id: ordenData.usuario_id || 'sistema'
+        })
         .select()
         .single();
 
-      if (error) {
-        console.error('❌ Error insertando orden:', error);
-        throw error;
-      }
+      if (ordenError) throw ordenError;
 
-      console.log('✅ ORDEN CREADA EXITOSAMENTE:', JSON.stringify(data, null, 2));
+      // Crear detalles de la orden
+      const detalles = ordenData.items.map(item => ({
+        orden_id: orden.id,
+        producto_id: item.producto_id,
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        subtotal: item.cantidad * item.precio_unitario
+      }));
+
+      const { error: detallesError } = await this.supabase.getClient()
+        .from('orden_compra_detalles')
+        .insert(detalles);
+
+      if (detallesError) throw detallesError;
+
+      console.log(`✅ Orden de compra creada: ${orden.numero_orden}`);
 
       return {
         success: true,
-        data,
-        message: 'Orden de compra creada exitosamente'
+        message: 'Orden de compra creada exitosamente',
+        data: orden
       };
     } catch (error) {
-      console.error('Error creating purchase order:', error);
+      console.error('❌ Error creando orden de compra:', error);
       return {
         success: false,
-        message: 'Error al crear orden de compra',
         error: error.message
       };
     }
   }
 
-  @Put('ordenes/:id')
-  @ApiOperation({ summary: 'Actualizar orden de compra' })
-  @ApiResponse({ status: 200, description: 'Orden actualizada exitosamente' })
-  async updateOrden(
-    @Param('id') id: string,
-    @Body() ordenData: any
-  ) {
+  @Put(':id/recibir')
+  async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
     try {
-      console.log(`📥 ACTUALIZAR ORDEN ${id} - Datos recibidos:`, JSON.stringify(ordenData, null, 2));
-      
-      const supabase = this.supabaseService.getClient();
+      console.log(`📦 Procesando recepción de mercancía para orden: ${ordenId}`);
 
-      // Verificar que la orden existe
-      const { data: existingOrder, error: findError } = await supabase
+      // Obtener orden con detalles
+      const { data: orden, error: ordenError } = await this.supabase.getClient()
         .from('ordenes_compra')
-        .select('id')
-        .eq('id', id)
+        .select(`
+          *,
+          orden_compra_detalles(*),
+          proveedor:proveedores(*)
+        `)
+        .eq('id', ordenId)
         .single();
 
-      if (findError || !existingOrder) {
-        return {
-          success: false,
-          message: 'Orden de compra no encontrada'
-        };
-      }
-
-      // PROCESAR PRODUCTOS NUEVOS PRIMERO (IGUAL QUE EN CREATE)
-      const itemsProcesados = [];
-      
-      for (const item of ordenData.items) {
-        let productoId = item.producto_id;
-        
-        // Si no tiene producto_id pero tiene nombre, es un producto NUEVO
-        if (!productoId && item.producto_nombre) {
-          console.log(`🆕 ACTUALIZANDO - CREANDO PRODUCTO NUEVO: ${item.producto_nombre}`);
-          
-          // Crear el producto nuevo en la tabla productos
-          const nuevoProducto = {
-            codigo: `PROD-${Date.now()}`,
-            nombre: item.producto_nombre,
-            precio: parseFloat(item.precio_unitario) || 0,
-            stock: 0, // Se actualizará cuando se entregue la orden
-            categoria: 'General',
-            activo: true,
-            stock_minimo: 10,
-            created_at: new Date().toISOString()
-          };
-          
-          const { data: productoCreado, error: errorProducto } = await supabase
-            .from('productos')
-            .insert([nuevoProducto])
-            .select()
-            .single();
-          
-          if (errorProducto) {
-            console.error('❌ Error creando producto en update:', errorProducto);
-            throw new Error(`Error creando producto ${item.producto_nombre}: ${errorProducto.message}`);
-          }
-          
-          console.log('✅ PRODUCTO CREADO EN UPDATE:', JSON.stringify(productoCreado, null, 2));
-          productoId = productoCreado.id;
-        }
-        
-        // Agregar item procesado
-        itemsProcesados.push({
-          ...item,
-          producto_id: productoId
-        });
-      }
-
-      // Preparar datos para actualizar usando EXACTAMENTE las columnas de la tabla
-      const updateData = {
-        proveedor_id: ordenData.proveedor_id,
-        fecha_orden: ordenData.fecha_orden,
-        fecha_entrega: ordenData.fecha_entrega,
-        moneda: ordenData.moneda,
-        subtotal: parseFloat(ordenData.subtotal),
-        igv: parseFloat(ordenData.igv),
-        total: parseFloat(ordenData.total),
-        estado: ordenData.estado,
-        items: itemsProcesados,
-        observaciones: ordenData.observaciones,
-        updated_at: new Date().toISOString()
-      };
-
-      const { data, error } = await supabase
-        .from('ordenes_compra')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Error actualizando orden:', error);
-        throw error;
-      }
-
-      console.log('✅ ORDEN ACTUALIZADA EXITOSAMENTE:', JSON.stringify(data, null, 2));
-
-      return {
-        success: true,
-        data,
-        message: 'Orden de compra actualizada exitosamente'
-      };
-    } catch (error) {
-      console.error('Error updating purchase order:', error);
-      return {
-        success: false,
-        message: 'Error al actualizar orden de compra',
-        error: error.message
-      };
-    }
-  }
-
-  @Patch('ordenes/:id/estado')
-  @ApiOperation({ summary: 'Cambiar estado de orden de compra' })
-  @ApiResponse({ status: 200, description: 'Estado cambiado exitosamente' })
-  async updateEstadoOrden(@Param('id') id: string, @Body() body: { estado: string }) {
-    try {
-      const { estado } = body;
-      console.log(`🚚 Cambiando estado de orden ${id} a: ${estado}`);
+      if (ordenError || !orden) throw new Error('Orden de compra no encontrada');
 
       // Validar estado
-      const estadosValidos = ['PENDIENTE', 'ENTREGADO', 'FACTURADO', 'CANCELADO'];
-      if (!estadosValidos.includes(estado)) {
-        return {
-          success: false,
-          message: 'Estado inválido'
-        };
+      if (orden.estado !== 'PENDIENTE' && orden.estado !== 'PARCIAL') {
+        throw new Error('La orden no está en estado válido para recepción');
       }
 
-      const supabase = this.supabaseService.getClient();
+      // Procesar cada item recibido
+      for (const itemRecibido of recepcionData.items) {
+        const detalleOrden = orden.orden_compra_detalles.find(d => d.id === itemRecibido.detalle_id);
+        if (!detalleOrden) continue;
 
-      // Obtener la orden completa antes de actualizar
-      const { data: ordenCompleta, error: ordenError } = await supabase
-        .from('ordenes_compra')
-        .select('*')
-        .eq('id', id)
-        .single();
+        // Actualizar stock del producto
+        await this.inventoryIntegration.actualizarStockProducto(
+          detalleOrden.producto_id,
+          itemRecibido.cantidad_recibida,
+          'ENTRADA',
+          `Recepción OC: ${orden.numero_orden}`,
+          detalleOrden.precio_unitario
+        );
 
-      if (ordenError) {
-        console.error('❌ Error obteniendo orden:', ordenError);
-        throw ordenError;
+        // Actualizar cantidad recibida en el detalle
+        await this.supabase.getClient()
+          .from('orden_compra_detalles')
+          .update({
+            cantidad_recibida: (detalleOrden.cantidad_recibida || 0) + itemRecibido.cantidad_recibida,
+            fecha_recepcion: new Date().toISOString()
+          })
+          .eq('id', itemRecibido.detalle_id);
       }
 
-      console.log('📋 Orden completa encontrada:', JSON.stringify(ordenCompleta, null, 2));
+      // Determinar nuevo estado de la orden
+      const { data: detallesActualizados } = await this.supabase.getClient()
+        .from('orden_compra_detalles')
+        .select('cantidad, cantidad_recibida')
+        .eq('orden_id', ordenId);
 
-      // Actualizar el estado
-      const { data, error } = await supabase
+      const totalPedido = detallesActualizados?.reduce((sum, d) => sum + d.cantidad, 0) || 0;
+      const totalRecibido = detallesActualizados?.reduce((sum, d) => sum + (d.cantidad_recibida || 0), 0) || 0;
+
+      let nuevoEstado = 'PENDIENTE';
+      if (totalRecibido >= totalPedido) {
+        nuevoEstado = 'ENTREGADO';
+      } else if (totalRecibido > 0) {
+        nuevoEstado = 'PARCIAL';
+      }
+
+      // Actualizar estado de la orden
+      await this.supabase.getClient()
         .from('ordenes_compra')
-        .update({ 
-          estado,
-          updated_at: new Date().toISOString()
+        .update({
+          estado: nuevoEstado,
+          fecha_entrega: nuevoEstado === 'ENTREGADO' ? new Date().toISOString() : null
         })
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', ordenId);
 
-      if (error) {
-        console.error('❌ Error actualizando estado:', error);
-        throw error;
+      // Si la orden está completamente entregada, emitir evento para contabilidad
+      if (nuevoEstado === 'ENTREGADO') {
+        this.eventBus.emitCompraEntregada({
+          ordenId: orden.id,
+          numeroOrden: orden.numero_orden,
+          proveedorId: orden.proveedor_id,
+          proveedorNombre: orden.proveedor?.nombre || 'Proveedor',
+          total: orden.total,
+          fechaEntrega: new Date().toISOString(),
+          items: orden.orden_compra_detalles.map(item => ({
+            productoId: item.producto_id,
+            descripcion: item.descripcion,
+            cantidad: item.cantidad,
+            precioUnitario: item.precio_unitario,
+            subtotal: item.subtotal
+          }))
+        });
       }
 
-      // Si se marca como ENTREGADO, procesar para inventario
-      if (estado === 'ENTREGADO') {
-        console.log('🚚 Orden marcada como ENTREGADO - Procesando para inventario...');
-        
-        try {
-          // Obtener nombre del proveedor
-          const { data: proveedor } = await supabase
-            .from('proveedores')
-            .select('nombre')
-            .eq('id', ordenCompleta.proveedor_id)
-            .single();
-
-              console.log('📋 Items originales de la orden:', JSON.stringify(ordenCompleta.items, null, 2));
-          console.log('📋 Tipo de items:', typeof ordenCompleta.items, Array.isArray(ordenCompleta.items));
-          
-          if (!ordenCompleta.items || !Array.isArray(ordenCompleta.items)) {
-            console.error('❌ Items no son un array válido');
-            throw new Error('Items de la orden no válidos');
-          }
-          
-          const itemsParaInventario = ordenCompleta.items.map((item: any, index: number) => {
-            console.log(`🔍 Procesando item ${index + 1}:`, JSON.stringify(item, null, 2));
-            
-            const itemMapeado = {
-              productoId: item.producto_id || item.codigo || item.id || item.nombre,
-              cantidad: parseFloat(item.cantidad) || 0,
-              precioUnitario: parseFloat(item.precio_unitario) || parseFloat(item.precio) || 0,
-              total: parseFloat(item.total) || (parseFloat(item.cantidad) * parseFloat(item.precio_unitario)) || 0
-            };
-            
-            console.log('🔄 Item mapeado para inventario:', JSON.stringify(itemMapeado, null, 2));
-            
-            if (!itemMapeado.productoId) {
-              console.error(`❌ Item ${index + 1} no tiene producto_id válido`);
-            }
-            
-            return itemMapeado;
-          });
-
-                     // Emitir evento real de compra entregada
-           const eventoCompra = {
-             ordenId: ordenCompleta.id,
-             numeroOrden: ordenCompleta.numero,
-             proveedorId: ordenCompleta.proveedor_id,
-             proveedorNombre: proveedor?.nombre || 'Proveedor desconocido',
-             fechaEntrega: new Date().toISOString(),
-             total: ordenCompleta.total,
-             items: itemsParaInventario
-           };
-           
-           console.log('📤 Emitiendo evento de compra entregada:', JSON.stringify(eventoCompra, null, 2));
-           
-           this.eventBus.emitCompraEntregada(eventoCompra);
-           
-           console.log('✅ Evento de compra entregada emitido exitosamente');
-           
-           // RESPALDO: Actualizar stock directamente como fallback
-           console.log('🔄 Actualizando stock directamente como respaldo...');
-           for (const item of itemsParaInventario) {
-             try {
-               if (item.productoId && item.cantidad > 0) {
-                 // Buscar el producto
-                 console.log(`🔍 Buscando producto con ID: ${item.productoId}`);
-                 const { data: producto, error: prodError } = await supabase
-                   .from('productos')
-                   .select('id, codigo, nombre, precio, stock, activo')
-                   .eq('id', item.productoId)
-                   .single();
-                 
-                 console.log('🔍 Resultado búsqueda producto:', JSON.stringify(producto, null, 2));
-                 if (prodError) {
-                   console.error('❌ Error buscando producto:', prodError);
-                 }
-
-                 if (!prodError && producto) {
-                   const stockActual = parseFloat(producto.stock || 0);
-                   const nuevoStock = stockActual + item.cantidad;
-                   
-                   console.log(`📊 ACTUALIZANDO STOCK: ${producto.nombre}`);
-                   console.log(`   Stock actual: ${stockActual}`);
-                   console.log(`   Cantidad a sumar: ${item.cantidad}`);
-                   console.log(`   Nuevo stock: ${nuevoStock}`);
-                   
-                                        // Actualizar stock (SIN updated_at que no existe en la tabla)
-                     const { error: updateError } = await supabase
-                       .from('productos')
-                       .update({ 
-                         stock: nuevoStock
-                       })
-                       .eq('id', producto.id);
-
-                   if (!updateError) {
-                     console.log(`✅ STOCK ACTUALIZADO EXITOSAMENTE para ${producto.nombre}: ${stockActual} + ${item.cantidad} = ${nuevoStock}`);
-                     
-                     // Registrar movimiento directamente
-                     await supabase
-                       .from('stock_movimientos')
-                       .insert({
-                         tenant_id: '550e8400-e29b-41d4-a716-446655440000',
-                         producto_id: producto.id,
-                         tipo_movimiento: 'ENTRADA',
-                         cantidad: item.cantidad,
-                         motivo: `Compra ${ordenCompleta.numero} - ${proveedor?.nombre || 'Proveedor'}`,
-                         referencia: ordenCompleta.numero,
-                         usuario_id: '550e8400-e29b-41d4-a716-446655440000',
-                         created_at: new Date().toISOString()
-                       });
-                   } else {
-                     console.error(`❌ Error actualizando stock para ${item.productoId}:`, updateError);
-                   }
-                 } else {
-                   console.error(`❌ Producto ${item.productoId} no encontrado para actualización directa`);
-                 }
-               }
-             } catch (directError) {
-               console.error(`❌ Error en actualización directa de ${item.productoId}:`, directError);
-             }
-           }
-        } catch (eventError) {
-          console.error('❌ Error procesando compra para inventario:', eventError);
-          // No fallar la actualización por error en evento
-        }
-      }
+      console.log(`✅ Recepción procesada. Nuevo estado: ${nuevoEstado}`);
 
       return {
         success: true,
-        message: `Orden marcada como ${estado} correctamente`,
-        data: data
+        message: 'Recepción de mercancía procesada exitosamente',
+        data: {
+          ordenId: orden.id,
+          estado: nuevoEstado,
+          totalRecibido,
+          totalPedido
+        }
       };
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error('❌ Error procesando recepción:', error);
       return {
         success: false,
-        message: error.message || 'Error al actualizar el estado'
+        error: error.message
       };
     }
   }
 
-  @Delete('ordenes/:id')
-  @ApiOperation({ summary: 'Eliminar orden de compra' })
-  @ApiResponse({ status: 200, description: 'Orden eliminada exitosamente' })
-  async deleteOrden(@Param('id') id: string) {
+  @Put(':id/cancelar')
+  async cancelarOrden(@Param('id') ordenId: string, @Body() motivoData: any) {
     try {
-      const supabase = this.supabaseService.getClient();
-
-      const { error } = await supabase
+      const { error } = await this.supabase.getClient()
         .from('ordenes_compra')
-        .delete()
-        .eq('id', id);
+        .update({
+          estado: 'CANCELADO',
+          observaciones: `${motivoData.motivo || 'Cancelado'} - Fecha: ${new Date().toLocaleDateString()}`
+        })
+        .eq('id', ordenId);
 
       if (error) throw error;
 
       return {
         success: true,
-        message: 'Orden de compra eliminada exitosamente'
+        message: 'Orden de compra cancelada exitosamente'
       };
     } catch (error) {
-      console.error('Error deleting purchase order:', error);
+      console.error('❌ Error cancelando orden:', error);
       return {
         success: false,
-        message: 'Error al eliminar orden de compra',
         error: error.message
       };
     }
@@ -656,56 +397,327 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Proveedores obtenidos exitosamente' })
   async getProveedores() {
     try {
-      const supabase = this.supabaseService.getClient();
+      console.log('🚀 [GET /api/compras/proveedores] INICIANDO...');
+      const supabase = this.supabase.getClient();
 
-      // SIMPLIFICADO: Solo obtener las columnas básicas
       const { data, error } = await supabase
         .from('proveedores')
         .select('*')
-        .limit(10);
+        .eq('activo', true)
+        .order('razon_social', { ascending: true });
 
       if (error) {
-        console.error('Error getting proveedores:', error);
-        // Devolver estructura mínima para que el frontend funcione
+        console.error('❌ [Proveedores API] ERROR SUPABASE:', error);
+        throw error;
+      }
+
+      console.log(`✅ [Proveedores API] DATOS OBTENIDOS: ${data?.length || 0} proveedores`);
+      
+      if (data && data.length > 0) {
+        console.log('🔍 [Proveedores API] PRIMER PROVEEDOR:', JSON.stringify(data[0], null, 2));
+      }
+
+      const mappedData = (data || []).map(proveedor => {
+        const mapped = {
+          id: proveedor.id,
+          nombre: proveedor.razon_social || proveedor.nombre_comercial || 'Sin nombre',
+          ruc: proveedor.ruc || 'Sin RUC',
+          contacto: proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto',
+          telefono: proveedor.telefono,
+          email: proveedor.email,
+          direccion: proveedor.direccion,
+          condiciones_pago: proveedor.condiciones_pago || 'CONTADO',
+          estado: proveedor.estado || 'ACTIVO',
+          activo: proveedor.activo
+        };
+        
+        console.log(`🔄 [Proveedores API] MAPEADO: ${mapped.ruc} - ${mapped.nombre}`);
+        return mapped;
+      });
+
+      const response = {
+        success: true,
+        data: mappedData
+      };
+
+      console.log(`📤 [Proveedores API] RESPUESTA FINAL:`, JSON.stringify(response, null, 2));
+      return response;
+
+    } catch (error) {
+      console.error('❌ [Proveedores API] ERROR TOTAL:', error);
+      const errorResponse = {
+        success: false,
+        error: error.message,
+        data: []
+      };
+      console.log(`📤 [Proveedores API] ERROR RESPONSE:`, errorResponse);
+      return errorResponse;
+    }
+  }
+
+  @Post('proveedores')
+  @ApiOperation({ summary: 'Crear nuevo proveedor' })
+  @ApiResponse({ status: 201, description: 'Proveedor creado exitosamente' })
+  async crearProveedor(@Body() proveedorData: any) {
+    try {
+      console.log('📝 [Proveedores] Creando nuevo proveedor:', proveedorData);
+
+      // Validación básica
+      if (!proveedorData.ruc || !proveedorData.razon_social) {
         return {
-          success: true,
-          data: [
-            { id: '1', nombre: 'Proveedor Demo 1', ruc: '12345678901', contacto: 'demo@ejemplo.com', activo: true },
-            { id: '2', nombre: 'Proveedor Demo 2', ruc: '10987654321', contacto: 'demo2@ejemplo.com', activo: true }
-          ]
+          success: false,
+          error: 'RUC y Razón Social son obligatorios'
         };
       }
 
-      // Si hay datos, mapear conservadoramente
-      const mappedData = (data || []).map((proveedor, index) => {
-        const campos = Object.keys(proveedor);
-        
+      // Verificar si ya existe un proveedor con el mismo RUC
+      const { data: existente, error: checkError } = await this.supabase.getClient()
+        .from('proveedores')
+        .select('id, ruc')
+        .eq('ruc', proveedorData.ruc)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = No rows found
+        throw checkError;
+      }
+
+      if (existente) {
         return {
-          id: proveedor.id || proveedor.identificacion || `temp-${index}`,
-          nombre: proveedor.nombre || proveedor.razon_social || proveedor.name || 
-                 proveedor.company_name || `Proveedor ${index + 1}`,
-          ruc: proveedor.ruc || proveedor.numero_documento || proveedor.tax_id || 'Sin RUC',
-          contacto: proveedor.contacto || proveedor.email || proveedor.telefono || 
-                   proveedor.phone || 'Sin contacto',
-          activo: proveedor.activo ?? true // Usar nullish coalescing operator
+          success: false,
+          error: `Ya existe un proveedor con RUC ${proveedorData.ruc}`
         };
-      });
+      }
+
+      // Obtener tenant_id automáticamente si no se proporciona
+      let tenant_id = proveedorData.tenant_id;
+      if (!tenant_id) {
+        const { data: tenant, error: tenantError } = await this.supabase.getClient()
+          .from('tenants')
+          .select('id')
+          .limit(1)
+          .single();
+        
+        if (tenantError || !tenant) {
+          return {
+            success: false,
+            error: 'No se pudo obtener tenant_id. Verifique la configuración.'
+          };
+        }
+        tenant_id = tenant.id;
+      }
+
+      const { data: proveedor, error } = await this.supabase.getClient()
+        .from('proveedores')
+        .insert({
+          tenant_id: tenant_id,
+          ruc: proveedorData.ruc.trim(),
+          razon_social: proveedorData.razon_social.trim(),
+          nombre_comercial: proveedorData.nombre_comercial?.trim() || proveedorData.razon_social.trim(),
+          direccion: proveedorData.direccion?.trim() || null,
+          telefono: proveedorData.telefono?.trim() || null,
+          email: proveedorData.email?.trim() || null,
+          contacto: proveedorData.contacto?.trim() || null,
+          estado: 'ACTIVO',
+          condiciones_pago: proveedorData.condiciones_pago || 'CONTADO',
+          activo: true
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ [Proveedores] Proveedor creado exitosamente:', proveedor.id);
 
       return {
         success: true,
-        data: mappedData.length > 0 ? mappedData : [
-          { id: '1', nombre: 'Proveedor Demo 1', ruc: '12345678901', contacto: 'demo@ejemplo.com', activo: true },
-          { id: '2', nombre: 'Proveedor Demo 2', ruc: '10987654321', contacto: 'demo2@ejemplo.com', activo: true }
-        ]
+        message: 'Proveedor creado exitosamente',
+        data: proveedor
       };
     } catch (error) {
-      console.error('Error getting proveedores:', error);
+      console.error('❌ [Proveedores] Error creando proveedor:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  @Put('proveedores/:id')
+  @ApiOperation({ summary: 'Actualizar proveedor existente' })
+  @ApiResponse({ status: 200, description: 'Proveedor actualizado exitosamente' })
+  async actualizarProveedor(@Param('id') proveedorId: string, @Body() proveedorData: any) {
+    try {
+      console.log('✏️ [Proveedores] Actualizando proveedor:', proveedorId, proveedorData);
+
+      // Validación básica
+      if (!proveedorData.ruc || !proveedorData.razon_social) {
+        return {
+          success: false,
+          error: 'RUC y Razón Social son obligatorios'
+        };
+      }
+
+      // Verificar si existe otro proveedor con el mismo RUC (excepto el actual)
+      const { data: existente, error: checkError } = await this.supabase.getClient()
+        .from('proveedores')
+        .select('id, ruc')
+        .eq('ruc', proveedorData.ruc)
+        .neq('id', proveedorId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = No rows found
+        throw checkError;
+      }
+
+      if (existente) {
+        return {
+          success: false,
+          error: `Ya existe otro proveedor con RUC ${proveedorData.ruc}`
+        };
+      }
+
+      const { data: proveedor, error } = await this.supabase.getClient()
+        .from('proveedores')
+        .update({
+          ruc: proveedorData.ruc.trim(),
+          razon_social: proveedorData.razon_social.trim(),
+          nombre_comercial: proveedorData.nombre_comercial?.trim() || proveedorData.razon_social.trim(),
+          direccion: proveedorData.direccion?.trim() || null,
+          telefono: proveedorData.telefono?.trim() || null,
+          email: proveedorData.email?.trim() || null,
+          contacto: proveedorData.contacto?.trim() || null,
+          condiciones_pago: proveedorData.condiciones_pago || 'CONTADO'
+        })
+        .eq('id', proveedorId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ [Proveedores] Proveedor actualizado exitosamente:', proveedor.id);
+
       return {
         success: true,
-        data: [
-          { id: '1', nombre: 'Proveedor Demo 1', ruc: '12345678901', contacto: 'demo@ejemplo.com', activo: true },
-          { id: '2', nombre: 'Proveedor Demo 2', ruc: '10987654321', contacto: 'demo2@ejemplo.com', activo: true }
-        ]
+        message: 'Proveedor actualizado exitosamente',
+        data: proveedor
+      };
+    } catch (error) {
+      console.error('❌ [Proveedores] Error actualizando proveedor:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  @Delete('proveedores/:id')
+  @ApiOperation({ summary: 'Desactivar proveedor (soft delete)' })
+  @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
+  async desactivarProveedor(@Param('id') proveedorId: string) {
+    try {
+      console.log('🗑️ [Proveedores] Desactivando proveedor:', proveedorId);
+
+      // En lugar de eliminar, desactivamos el proveedor
+      const { data: proveedor, error } = await this.supabase.getClient()
+        .from('proveedores')
+        .update({
+          activo: false,
+          estado: 'INACTIVO',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', proveedorId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ [Proveedores] Proveedor desactivado exitosamente:', proveedor.id);
+
+      return {
+        success: true,
+        message: 'Proveedor desactivado exitosamente',
+        data: proveedor
+      };
+    } catch (error) {
+      console.error('❌ [Proveedores] Error desactivando proveedor:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  @Get('reporte-compras')
+  async getReporteCompras(@Query() filtros: any) {
+    try {
+      let query = this.supabase.getClient()
+        .from('ordenes_compra')
+        .select(`
+          *,
+          proveedor:proveedores(*),
+          orden_compra_detalles(*)
+        `)
+        .order('fecha_orden', { ascending: false });
+
+      if (filtros.fechaDesde) {
+        query = query.gte('fecha_orden', filtros.fechaDesde);
+      }
+
+      if (filtros.fechaHasta) {
+        query = query.lte('fecha_orden', filtros.fechaHasta);
+      }
+
+      const { data: ordenes, error } = await query;
+
+      if (error) throw error;
+
+      // Calcular resumen
+      const resumen = {
+        totalOrdenes: ordenes?.length || 0,
+        totalMonto: ordenes?.reduce((sum, o) => sum + (o.total || 0), 0) || 0,
+        porEstado: {},
+        topProveedores: []
+      };
+
+      // Agrupar por estado
+      ordenes?.forEach(orden => {
+        const estado = orden.estado;
+        if (!resumen.porEstado[estado]) {
+          resumen.porEstado[estado] = { cantidad: 0, monto: 0 };
+        }
+        resumen.porEstado[estado].cantidad++;
+        resumen.porEstado[estado].monto += orden.total || 0;
+      });
+
+      // Top proveedores
+      const proveedoresMap = {};
+      ordenes?.forEach(orden => {
+        const proveedorNombre = orden.proveedor?.nombre || 'Sin nombre';
+        if (!proveedoresMap[proveedorNombre]) {
+          proveedoresMap[proveedorNombre] = { cantidad: 0, monto: 0 };
+        }
+        proveedoresMap[proveedorNombre].cantidad++;
+        proveedoresMap[proveedorNombre].monto += orden.total || 0;
+      });
+
+      resumen.topProveedores = Object.entries(proveedoresMap)
+        .map(([nombre, data]: [string, any]) => ({ nombre, ...data }))
+        .sort((a, b) => b.monto - a.monto)
+        .slice(0, 5);
+
+      return {
+        success: true,
+        data: {
+          ordenes: ordenes || [],
+          resumen
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error generando reporte de compras:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: { ordenes: [], resumen: {} }
       };
     }
   }
@@ -715,7 +727,7 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Productos obtenidos exitosamente' })
   async getProductos() {
     try {
-      const supabase = this.supabaseService.getClient();
+      const supabase = this.supabase.getClient();
 
       console.log('🔍 OBTENIENDO PRODUCTOS...');
 
@@ -743,6 +755,38 @@ export class ComprasController {
         success: false,
         message: 'Error al obtener productos',
         error: error.message
+      };
+    }
+  }
+
+  // IMPORTANTE: Este endpoint debe ir AL FINAL porque captura cualquier ID
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener orden específica por ID' })
+  @ApiResponse({ status: 200, description: 'Orden obtenida exitosamente' })
+  async getOrden(@Param('id') ordenId: string) {
+    try {
+      const { data: orden, error } = await this.supabase.getClient()
+        .from('ordenes_compra')
+        .select(`
+          *,
+          proveedor:proveedores(*),
+          orden_compra_detalles(*)
+        `)
+        .eq('id', ordenId)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: orden
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo orden:', error);
+      return {
+        success: false,
+        error: error.message,
+        data: null
       };
     }
   }

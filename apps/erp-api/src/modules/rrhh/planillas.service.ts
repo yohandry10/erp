@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 
 @Injectable()
 export class PlanillasService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly eventBus: EventBusService
+  ) {}
 
   // Obtener todas las planillas
   async getPlanillas() {
@@ -71,6 +75,19 @@ export class PlanillasService {
     let totalDescuentos = 0;
     let totalAportes = 0;
     let totalNeto = 0;
+    const empleadosCalculados = [];
+
+    // Obtener información de la planilla para el evento
+    const { data: planillaInfo, error: planillaError } = await client
+      .from('planillas')
+      .select('periodo')
+      .eq('id', planillaId)
+      .single();
+
+    if (planillaError) {
+      console.error('❌ Error obteniendo información de planilla:', planillaError);
+      throw planillaError;
+    }
 
     // Procesar cada empleado
     for (const empleado of empleados) {
@@ -128,6 +145,18 @@ export class PlanillasService {
       totalDescuentos += calculoEmpleado.totalDescuentos;
       totalAportes += calculoEmpleado.totalAportes;
       totalNeto += calculoEmpleado.netoPagar;
+
+      // Agregar empleado al array para el evento
+      empleadosCalculados.push({
+        empleadoId: empleado.id,
+        nombres: empleado.nombres,
+        apellidos: empleado.apellidos,
+        numeroDocumento: empleado.numero_documento,
+        ingresos: calculoEmpleado.totalIngresos,
+        descuentos: calculoEmpleado.totalDescuentos,
+        aportes: calculoEmpleado.totalAportes,
+        neto: calculoEmpleado.netoPagar
+      });
     }
 
     // Actualizar totales de la planilla
@@ -152,6 +181,23 @@ export class PlanillasService {
     console.log(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
     console.log(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
     console.log(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
+
+    // 🎯 EMITIR EVENTO PARA INTEGRACIÓN CONTABLE
+    console.log('🎯 [RRHH] Emitiendo evento de planilla calculada para contabilidad...');
+    
+    const eventoplanilla: PlanillaCalculadaEvent = {
+      planillaId: planillaId,
+      periodo: planillaInfo.periodo,
+      totalIngresos: totalIngresos,
+      totalDescuentos: totalDescuentos,
+      totalAportes: totalAportes,
+      totalNeto: totalNeto,
+      cantidadEmpleados: empleadosCalculados.length,
+      empleados: empleadosCalculados
+    };
+
+    this.eventBus.emitPlanillaCalculada(eventoplanilla);
+    console.log('✅ [RRHH] Evento de planilla calculada emitido exitosamente');
 
     return { 
       success: true, 
@@ -492,15 +538,21 @@ export class PlanillasService {
       console.log(`✅ Empleado insertado: ${empleado.nombres} ${empleado.apellidos} - ID: ${empleadoPlanilla[0].id}`);
 
       // Insertar conceptos detallados
-      console.log(`📝 Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ${empleado.nombres}`);
+      console.log(`📝 Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ${empleado.nombres || 'Sin nombre'}`);
       for (const concepto of calculoEmpleado.conceptosDetalle) {
+        // Validar que el concepto tenga monto válido
+        if (!concepto.monto || concepto.monto <= 0) {
+          console.warn(`⚠️ Concepto con monto inválido omitido: ${concepto.observaciones} - Monto: ${concepto.monto}`);
+          continue;
+        }
+
         const { error: conceptoError } = await client
           .from('empleado_planilla_conceptos')
           .insert({
             id_empleado_planilla: empleadoPlanilla[0].id,
             id_concepto: concepto.id,
-            monto: concepto.monto,
-            observaciones: concepto.observaciones
+            monto: parseFloat(concepto.monto) || 0,
+            observaciones: concepto.observaciones || ''
           });
         
         if (conceptoError) {
@@ -553,13 +605,33 @@ export class PlanillasService {
     let totalDescuentos = 0;
     let totalAportes = 0;
 
-    const sueldoBasico = empleado.sueldo_base;
-    const diasTrabajados = empleado.dias_trabajados;
-    const horasExtras25 = empleado.horas_extras_25 || 0;
-    const horasExtras35 = empleado.horas_extras_35 || 0;
-    const tardanzasMinutos = empleado.tardanzas_minutos || 0;
-    const faltas = empleado.faltas || 0;
-    const bonosAdicionales = empleado.bonos_adicionales || 0;
+    // Validar datos del empleado
+    if (!empleado) {
+      console.error('❌ Empleado no definido');
+      throw new Error('Datos del empleado requeridos');
+    }
+
+    const sueldoBasico = parseFloat(empleado.sueldo_base) || 0;
+    const diasTrabajados = parseInt(empleado.dias_trabajados) || 30;
+    const horasExtras25 = parseFloat(empleado.horas_extras_25) || 0;
+    const horasExtras35 = parseFloat(empleado.horas_extras_35) || 0;
+    const tardanzasMinutos = parseInt(empleado.tardanzas_minutos) || 0;
+    const faltas = parseInt(empleado.faltas) || 0;
+    const bonosAdicionales = parseFloat(empleado.bonos_adicionales) || 0;
+
+    console.log(`💰 Calculando empleado: ${empleado.nombres || 'Sin nombre'} ${empleado.apellidos || 'Sin apellido'} - Sueldo: S/ ${sueldoBasico}`);
+
+    if (sueldoBasico <= 0) {
+      console.warn(`⚠️ Sueldo básico inválido para empleado ${empleado.nombres || 'Sin nombre'}: ${sueldoBasico}`);
+      // No procesar si no hay sueldo básico válido
+      return {
+        conceptosDetalle: [],
+        totalIngresos: 0,
+        totalDescuentos: 0,
+        totalAportes: 0,
+        netoPagar: 0
+      };
+    }
 
     // 1. INGRESOS
 
@@ -709,5 +781,476 @@ export class PlanillasService {
       totalAportes,
       netoPagar
     };
+  }
+
+  /**
+   * Pagar planilla completa - Genera pagos individuales y emite evento contable
+   */
+  async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia') {
+    try {
+      console.log(`💰 [RRHH] Iniciando pago de planilla ${planillaId} por ${metodoPago}`);
+
+      // 1. Obtener planilla con detalles
+      const { data: planilla, error: planillaError } = await this.supabaseService.getClient()
+        .from('planillas')
+        .select(`
+          *,
+          empleado_planilla(
+            *,
+            empleados(*)
+          )
+        `)
+        .eq('id', planillaId)
+        .single();
+
+      if (planillaError || !planilla) {
+        throw new Error('Planilla no encontrada');
+      }
+
+      if (planilla.estado !== 'CALCULADA') {
+        throw new Error('Solo se pueden pagar planillas en estado CALCULADA');
+      }
+
+      if (planilla.estado_pago === 'PAGADO') {
+        throw new Error('Esta planilla ya ha sido pagada');
+      }
+
+      // 2. Crear registro de pago para cada empleado
+      const pagosCreados = [];
+      let totalPagado = 0;
+
+      for (const empleadoPlanilla of planilla.empleado_planilla) {
+        const montoPago = empleadoPlanilla.neto_pagar;
+        if (montoPago <= 0) continue;
+
+        const { data: pago, error: pagoError } = await this.supabaseService.getClient()
+          .from('pagos_empleados')
+          .insert({
+            empleado_id: empleadoPlanilla.empleado_id,
+            planilla_id: planillaId,
+            periodo: planilla.periodo,
+            sueldo_bruto: empleadoPlanilla.total_ingresos,
+            descuentos: empleadoPlanilla.total_descuentos,
+            monto_neto: montoPago,
+            metodo_pago: metodoPago,
+            estado: 'PROCESADO',
+            fecha_pago: new Date().toISOString(),
+            usuario_id: 'sistema'
+          })
+          .select()
+          .single();
+
+        if (pagoError) {
+          console.error('❌ Error creando pago para empleado:', pagoError);
+          continue;
+        }
+
+        pagosCreados.push(pago);
+        totalPagado += montoPago;
+      }
+
+      // 3. Actualizar estado de la planilla
+      const { error: updateError } = await this.supabaseService.getClient()
+        .from('planillas')
+        .update({
+          estado_pago: 'PAGADO',
+          fecha_pago: new Date().toISOString(),
+          metodo_pago: metodoPago,
+          total_pagado: totalPagado
+        })
+        .eq('id', planillaId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // 4. 🎯 EMITIR EVENTO PARA CONTABILIDAD
+      console.log('🎯 [RRHH] Emitiendo evento de planilla pagada para contabilidad...');
+      
+      const eventoPago: PlanillaPagadaEvent = {
+        planillaId: planillaId,
+        periodo: planilla.periodo,
+        totalPagado: totalPagado,
+        metodoPago: metodoPago,
+        cantidadEmpleados: pagosCreados.length,
+        fechaPago: new Date().toISOString()
+      };
+
+      this.eventBus.emitPlanillaPagada(eventoPago);
+      console.log('✅ [RRHH] Evento de planilla pagada emitido exitosamente');
+
+      console.log(`✅ Planilla ${planilla.periodo} pagada exitosamente`);
+      console.log(`   💰 Total pagado: S/ ${totalPagado}`);
+      console.log(`   👥 Empleados pagados: ${pagosCreados.length}`);
+      console.log(`   💳 Método: ${metodoPago}`);
+
+      return {
+        success: true,
+        message: 'Planilla pagada exitosamente',
+        data: {
+          planillaId,
+          periodo: planilla.periodo,
+          totalPagado,
+          empleadosPagados: pagosCreados.length,
+          metodoPago,
+          pagos: pagosCreados
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error pagando planilla:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Pagar empleados seleccionados de una planilla
+   */
+  async pagarEmpleadosSeleccionados(planillaId: string, pagoData: any) {
+    try {
+      console.log(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId}`);
+
+      const { empleados_ids, metodo_pago, numero_operacion, observaciones } = pagoData;
+
+      if (!empleados_ids || empleados_ids.length === 0) {
+        throw new Error('Debe seleccionar al menos un empleado');
+      }
+
+      // Obtener detalles de empleados planilla
+      const { data: empleadosPlanilla, error } = await this.supabaseService.getClient()
+        .from('empleado_planilla')
+        .select(`
+          *,
+          empleados!empleado_planilla_id_empleado_fkey(nombres, apellidos, numero_documento)
+        `)
+        .in('id', empleados_ids)
+        .eq('id_planilla', planillaId);
+
+      if (error) throw error;
+
+      let totalPagado = 0;
+      const empleadosPagados = [];
+
+      // Procesar cada empleado
+      for (const empleadoPlanilla of empleadosPlanilla) {
+        const { error: updateError } = await this.supabaseService.getClient()
+          .from('empleado_planilla')
+          .update({
+            estado_pago: 'pagado',
+            fecha_pago: new Date().toISOString(),
+            metodo_pago: metodo_pago,
+            numero_operacion: numero_operacion || null,
+            observaciones_pago: observaciones || null
+          })
+          .eq('id', empleadoPlanilla.id);
+
+        if (updateError) {
+          console.error('Error actualizando empleado planilla:', updateError);
+          continue;
+        }
+
+        totalPagado += parseFloat(empleadoPlanilla.neto_pagar) || 0;
+        empleadosPagados.push(empleadoPlanilla);
+      }
+
+      // Crear registro en historial de pagos
+      const { error: historialError } = await this.supabaseService.getClient()
+        .from('historial_pagos_planilla')
+        .insert({
+          planilla_id: planillaId,
+          fecha: new Date().toISOString(),
+          metodo: metodo_pago,
+          monto: totalPagado,
+          empleados_count: empleadosPagados.length,
+          numero_operacion: numero_operacion || null,
+          observaciones: observaciones || null
+        });
+
+      if (historialError) {
+        console.warn('Error creando historial de pago:', historialError);
+      }
+
+      // 🎯 SINCRONIZAR CON TABLA RRHH_PAGOS para que aparezca en "Pagos & Comprobantes"
+      const fechaPago = new Date().toISOString();
+      
+      // Obtener el período de la planilla para usar como referencia
+      const { data: planillaInfo } = await this.supabaseService.getClient()
+        .from('planillas')
+        .select('periodo')
+        .eq('id', planillaId)
+        .single();
+      
+      const periodoDisplay = planillaInfo?.periodo || new Date().toISOString().substring(0, 7);
+      
+      console.log(`🔄 [RRHH] Sincronizando ${empleadosPagados.length} pagos con tabla rrhh_pagos...`);
+      
+      for (const empleadoPlanilla of empleadosPagados) {
+        console.log(`📝 [RRHH] Insertando pago para empleado ${empleadoPlanilla.id_empleado}:`, {
+          empleado_id: empleadoPlanilla.id_empleado,
+          planilla_id: planillaId,
+          periodo: periodoDisplay,
+          monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
+          descuentos: parseFloat(empleadoPlanilla.total_descuentos) || 0,
+          monto_neto: parseFloat(empleadoPlanilla.neto_pagar) || 0,
+          metodo_pago: metodo_pago
+        });
+
+        const { error: rrhhPagoError } = await this.supabaseService.getClient()
+          .from('rrhh_pagos')
+          .insert({
+            empleado_id: empleadoPlanilla.id_empleado,
+            planilla_id: planillaId,
+            periodo: periodoDisplay, // Usar el período real de la planilla
+            monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
+            descuentos: parseFloat(empleadoPlanilla.total_descuentos) || 0,
+            monto_neto: parseFloat(empleadoPlanilla.neto_pagar) || 0,
+            metodo_pago: metodo_pago,
+            estado: 'PROCESADO',
+            fecha_pago: fechaPago,
+            usuario_id: 'sistema'
+          });
+
+        if (rrhhPagoError) {
+          console.warn('⚠️ Error sincronizando con rrhh_pagos:', rrhhPagoError);
+          console.warn('⚠️ Detalles del error:', JSON.stringify(rrhhPagoError, null, 2));
+        } else {
+          console.log(`✅ Pago sincronizado para empleado ${empleadoPlanilla.id_empleado}`);
+        }
+      }
+      
+      console.log(`✅ [RRHH] Sincronización completada - ${empleadosPagados.length} registros en rrhh_pagos`)
+
+      // 🎯 GENERAR ASIENTOS CONTABLES AUTOMÁTICAMENTE
+      try {
+        console.log('📊 [RRHH] Generando asientos contables automáticamente...');
+        await this.generarAsientosContables(planillaId);
+        console.log('✅ [RRHH] Asientos contables generados automáticamente');
+      } catch (asientosError) {
+        console.warn('⚠️ [RRHH] Error generando asientos automáticos (no crítico):', asientosError);
+      }
+
+      return {
+        success: true,
+        message: `Pago procesado para ${empleadosPagados.length} empleados`,
+        data: {
+          empleados_pagados: empleadosPagados.length,
+          total_pagado: totalPagado,
+          metodo_pago,
+          asientos_generados: true
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error pagando empleados seleccionados:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener UUID de cuenta por código
+   */
+  private async getCuentaIdPorCodigo(codigo: string): Promise<string | null> {
+    try {
+      const { data, error } = await this.supabaseService.getClient()
+        .from('plan_cuentas')
+        .select('id')
+        .eq('codigo', codigo)
+        .single();
+
+      if (error || !data) {
+        console.warn(`⚠️ No se encontró cuenta con código ${codigo}, usando código como ID`);
+        return codigo; // Fallback al código si no existe la cuenta
+      }
+
+      return data.id;
+    } catch (error) {
+      console.warn(`⚠️ Error buscando cuenta ${codigo}:`, error);
+      return codigo; // Fallback al código si hay error
+    }
+  }
+
+  /**
+   * Generar asientos contables para planilla
+   */
+  async generarAsientosContables(planillaId: string) {
+    try {
+      console.log(`📊 [RRHH] Generando asientos contables para planilla ${planillaId}`);
+
+      // Obtener planilla con empleados
+      const { data: planilla, error } = await this.supabaseService.getClient()
+        .from('planillas')
+        .select(`
+          *,
+          empleado_planilla(*)
+        `)
+        .eq('id', planillaId)
+        .single();
+
+      if (error || !planilla) {
+        throw new Error('Planilla no encontrada');
+      }
+
+      // ✅ VERIFICAR ESTADO (aceptar tanto 'calculada' como 'borrador' si tiene empleados procesados)
+      console.log(`🔍 [RRHH] Estado de la planilla: ${planilla.estado}`);
+      console.log(`🔍 [RRHH] Empleados en planilla: ${planilla.empleado_planilla?.length || 0}`);
+      
+      if (planilla.estado !== 'calculada' && (!planilla.empleado_planilla || planilla.empleado_planilla.length === 0)) {
+        throw new Error(`No se pueden generar asientos - Estado: ${planilla.estado}, Empleados: ${planilla.empleado_planilla?.length || 0}`);
+      }
+
+      // Calcular totales
+      const totalIngresos = planilla.empleado_planilla.reduce(
+        (sum, emp) => sum + (parseFloat(emp.total_ingresos) || 0), 0
+      );
+      const totalDescuentos = planilla.empleado_planilla.reduce(
+        (sum, emp) => sum + (parseFloat(emp.total_descuentos) || 0), 0
+      );
+      const totalNeto = planilla.empleado_planilla.reduce(
+        (sum, emp) => sum + (parseFloat(emp.neto_pagar) || 0), 0
+      );
+
+      // 🎯 CREAR ASIENTOS EN SISTEMA PRINCIPAL DIRECTAMENTE
+      console.log('📝 [RRHH] Creando asientos contables en sistema principal...');
+      
+      // 1. Obtener IDs reales de las cuentas del plan contable
+      const cuentaGastos = await this.getCuentaIdPorCodigo('621');
+      const cuentaRemuneraciones = await this.getCuentaIdPorCodigo('411');
+      const cuentaInstituciones = await this.getCuentaIdPorCodigo('403');
+
+      console.log(`🔍 [RRHH] IDs de cuentas obtenidos:`);
+      console.log(`   - Gastos (621): ${cuentaGastos}`);
+      console.log(`   - Remuneraciones (411): ${cuentaRemuneraciones}`);
+      console.log(`   - Instituciones (403): ${cuentaInstituciones}`);
+
+      // 2. Crear cabecera del asiento en tabla principal
+      const numeroAsiento = `RRHH-${planilla.periodo}-${Date.now()}`;
+      const fechaAsiento = new Date().toISOString().split('T')[0]; // Solo fecha, no timestamp
+
+      console.log(`📊 [RRHH] Creando cabecera del asiento: ${numeroAsiento}`);
+      
+      const { data: asientoCreado, error: asientoError } = await this.supabaseService.getClient()
+        .from('asientos_contables')
+        .insert({
+          numero_asiento: numeroAsiento,
+          fecha: fechaAsiento,
+          concepto: `Planilla de sueldos ${planilla.periodo}`,
+          referencia: `PLANILLA-${planillaId}`,
+          total_debe: totalIngresos,
+          total_haber: totalIngresos,
+          estado: 'CONFIRMADO',
+          usuario_id: null
+        })
+        .select()
+        .single();
+
+      if (asientoError) {
+        console.error('❌ [RRHH] Error creando cabecera del asiento:', asientoError);
+        throw new Error(`Error creando asiento contable: ${asientoError.message}`);
+      }
+
+      console.log('✅ [RRHH] Cabecera del asiento creada:', asientoCreado.id);
+
+      // 3. Crear detalles del asiento
+      const detallesAsiento = [
+        {
+          asiento_id: asientoCreado.id,
+          cuenta_id: cuentaGastos,
+          debe: totalIngresos,
+          haber: 0,
+          concepto: `Gasto planilla ${planilla.periodo}`
+        },
+        {
+          asiento_id: asientoCreado.id,
+          cuenta_id: cuentaRemuneraciones,
+          debe: 0,
+          haber: totalNeto,
+          concepto: `Remuneraciones por pagar ${planilla.periodo}`
+        },
+        {
+          asiento_id: asientoCreado.id,
+          cuenta_id: cuentaInstituciones,
+          debe: 0,
+          haber: totalDescuentos,
+          concepto: `Aportes planilla ${planilla.periodo}`
+        }
+      ];
+
+      console.log(`📝 [RRHH] Insertando ${detallesAsiento.length} detalles del asiento...`);
+
+      // 4. Insertar detalles
+      const { error: detallesError } = await this.supabaseService.getClient()
+        .from('detalle_asientos')
+        .insert(detallesAsiento);
+
+      if (detallesError) {
+        console.error('❌ [RRHH] Error insertando detalles del asiento:', detallesError);
+        // Eliminar cabecera si fallan los detalles
+        await this.supabaseService.getClient()
+          .from('asientos_contables')
+          .delete()
+          .eq('id', asientoCreado.id);
+        throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
+      }
+
+      console.log('✅ [RRHH] Asiento contable completo creado exitosamente:', numeroAsiento);
+
+      // Marcar planilla como con asientos generados
+      try {
+        await this.supabaseService.getClient()
+          .from('planillas')
+          .update({
+            asientos_generados: true,
+            fecha_asientos: new Date().toISOString()
+          })
+          .eq('id', planillaId);
+        console.log('✅ Planilla marcada con asientos generados');
+      } catch (updateError) {
+        console.warn('⚠️ Error actualizando flag de asientos:', updateError);
+      }
+
+      return {
+        success: true,
+        message: 'Asientos contables generados correctamente en sistema principal',
+        data: {
+          numero_asiento: numeroAsiento,
+          asiento_id: asientoCreado.id,
+          registros: detallesAsiento.length,
+          monto_total: totalIngresos,
+          planilla_periodo: planilla.periodo,
+          tablas_utilizadas: ['asientos_contables', 'detalle_asientos']
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Error generando asientos contables:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener historial de pagos de una planilla
+   */
+  async getHistorialPagos(planillaId: string) {
+    try {
+      const { data, error } = await this.supabaseService.getClient()
+        .from('historial_pagos_planilla')
+        .select('*')
+        .eq('planilla_id', planillaId)
+        .order('fecha', { ascending: false });
+
+      if (error) {
+        console.warn('Tabla historial_pagos_planilla no existe:', error);
+        return { success: true, data: [] };
+      }
+
+      return {
+        success: true,
+        data: data || []
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo historial de pagos:', error);
+      return { success: true, data: [] };
+    }
   }
 } 

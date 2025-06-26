@@ -222,4 +222,42 @@ export class CpeController {
     const user = req.user as any;
     return this.cpeService.checkOseStatus(id, user.tenant_id);
   }
+
+  @Post(':id/enviar-sunat')
+  @ApiOperation({ summary: 'Enviar CPE firmado a SUNAT manualmente' })
+  @ApiResponse({ status: 200, description: 'CPE enviado a SUNAT exitosamente' })
+  async enviarManualmenteSunat(@Param('id') id: string, @Req() req: any) {
+    console.log(`🚀 [CPE] Envío manual a SUNAT solicitado para CPE ${id}`);
+    
+    try {
+      const user = req.user || { tenant_id: 'default' };
+      
+      // Verificar que el CPE esté en estado FIRMADO
+      const cpe = await this.cpeService.findOne(id, user.tenant_id);
+      
+      if ((cpe.estado as string) !== 'FIRMADO') {
+        return {
+          success: false,
+          message: `CPE debe estar en estado FIRMADO para enviar a SUNAT. Estado actual: ${cpe.estado}`
+        };
+      }
+
+      // Enviar a SUNAT usando el método existente
+      const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
+      await this.cpeService.sendToOseManual(id, cpe.xml_firmado, fileName);
+      
+      return {
+        success: true,
+        message: 'CPE enviado a SUNAT exitosamente',
+        data: { id, estado: 'ENVIADO', timestamp: new Date() }
+      };
+
+    } catch (error) {
+      console.error(`❌ Error enviando CPE ${id} a SUNAT:`, error);
+      return {
+        success: false,
+        message: `Error enviando CPE a SUNAT: ${error.message}`
+      };
+    }
+  }
 }

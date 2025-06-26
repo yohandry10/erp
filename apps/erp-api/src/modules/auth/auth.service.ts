@@ -1,29 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+// import { JwtService } from '@nestjs/jwt';
+import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    // private readonly jwtService: JwtService,
+  ) {}
 
-  async validateUser(username: string, password: string): Promise<any> {
-    // TODO: Implementar validación real con base de datos
-    // Por ahora, permitir cualquier usuario para testing
-    return { id: 1, username, email: `${username}@example.com` };
+  async validateUser(email: string, password: string): Promise<any> {
+    // TODO: Implement actual user validation
+    const user = await this.findUserByEmail(email);
+    if (user && user.password === password) {
+      const { password, ...result } = user;
+      return result;
+    }
+    return null;
   }
 
   async login(user: any) {
-    const payload = { username: user.username, sub: user.id, email: user.email };
+    const payload = { email: user.email, sub: user.id };
     return {
-      access_token: this.jwtService.sign(payload),
-      user: user,
+      access_token: 'temporary-token', // this.jwtService.sign(payload),
     };
   }
 
-  async verifyToken(token: string) {
-    try {
-      return this.jwtService.verify(token);
-    } catch (error) {
-      return null;
-    }
+  private async findUserByEmail(email: string): Promise<any> {
+    // TODO: Implement actual user lookup
+    return null;
   }
 }

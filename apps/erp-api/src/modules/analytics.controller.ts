@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
-import { FinancialIntegrationService } from '../shared/integration/financial-integration.service';
+
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
 
 @ApiTags('analytics')
@@ -10,7 +10,7 @@ export class AnalyticsController {
   
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly financialService: FinancialIntegrationService,
+
     private readonly inventoryService: InventoryIntegrationService
   ) {}
   

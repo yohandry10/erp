@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { CreateFacturaDto, FacturaDto, EstadoCPE, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
+import { CreateFacturaDto, FacturaDto, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
 import { XmlSigner } from '@erp-suite/crypto';
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import { OseService } from '../ose/ose.service';
 
 @Injectable()
 export class CpeService {
@@ -13,6 +14,7 @@ export class CpeService {
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly eventBus: EventBusService,
+    private readonly oseService: OseService,
   ) {
     // Initialize XML signer with demo certificate
     this.xmlSigner = new XmlSigner({
@@ -47,7 +49,7 @@ export class CpeService {
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
         items: createFacturaDto.items,
-        estado: EstadoCPE.PENDIENTE,
+        estado: 'FIRMADO',
         hash: hash,
         xml_firmado: signedXml,
       };
@@ -66,8 +68,50 @@ export class CpeService {
 
       const createdCpe = Array.isArray(data) ? data[0] : data;
 
-      // TODO: Send to OSE (for now just mark as sent)
-      await this.sendToOse((createdCpe as any).id);
+      // Generar XML firmado (sin enviar a SUNAT todavía)
+      await this.prepareXmlForSunat((createdCpe as any).id, xmlContent);
+
+      // 🚀 AUTOMATIZACIÓN: ENVÍO AUTOMÁTICO A SUNAT
+      console.log('🚀 Iniciando envío automático a SUNAT...');
+      
+      try {
+        // Enviar inmediatamente a SUNAT (modo síncrono para ventas POS)
+        await this.sendToOse((createdCpe as any).id, xmlContent, `${createFacturaDto.serie}-${createFacturaDto.numero}`);
+        
+        console.log('✅ CPE enviado automáticamente a SUNAT');
+        
+        // Actualizar estado a ENVIADO
+        await this.supabaseService.getClient()
+          .from('cpe')
+          .update({ 
+            estado: 'ENVIADO',
+            fecha_envio: new Date().toISOString(),
+            envio_automatico: true
+          })
+          .eq('id', (createdCpe as any).id);
+      } catch (envioError) {
+        console.error('⚠️ Error en envío automático, quedará pendiente para reenvío:', envioError);
+        
+        // Actualizar estado a PENDIENTE_ENVIO para reintento posterior
+        await this.supabaseService.getClient()
+          .from('cpe')
+          .update({ 
+            estado: 'PENDIENTE_ENVIO',
+            error_envio: envioError.message,
+            fecha_ultimo_intento: new Date().toISOString()
+          })
+          .eq('id', (createdCpe as any).id);
+          
+        // 📨 PROGRAMAR REINTENTO AUTOMÁTICO (usando queue si está disponible)
+        console.log('📨 Programando reintento automático en 5 minutos...');
+        
+        // Emitir evento para worker de background
+        this.eventBus.emit('cpe.retry_envio', {
+          cpeId: (createdCpe as any).id,
+          intentoAnterior: 1,
+          proximoIntento: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutos
+        }, 'cpe');
+      }
 
       // Emitir evento de comprobante creado para finanzas
       const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto);
@@ -80,7 +124,7 @@ export class CpeService {
         numero: createFacturaDto.numero,
         clienteId: createFacturaDto.documento_receptor,
         total: createFacturaDto.total_venta,
-        esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
+          esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
         ventaId: undefined, // Se puede agregar referencia si viene de POS
         requiereTransporte: requiereTransporte
       });
@@ -234,68 +278,184 @@ export class CpeService {
   async resendToOse(id: string, tenantId: string) {
     const cpe = await this.findOne(id, tenantId);
     
-    // TODO: Implement real OSE resend logic
-    await this.sendToOse(id);
+    // Obtener XML firmado del CPE
+    const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
+    
+    await this.sendToOse(id, cpe.xml_firmado, fileName);
     
     return { message: 'CPE resent to OSE successfully' };
+  }
+
+  /**
+   * Enviar manualmente CPE firmado a SUNAT
+   */
+  async sendToOseManual(id: string, xmlFirmado: string, fileName: string): Promise<void> {
+    console.log(`🚀 [CPE] Enviando manualmente CPE ${id} a SUNAT...`);
+    await this.sendToOse(id, xmlFirmado, fileName);
   }
 
   async checkOseStatus(id: string, tenantId: string) {
     const cpe = await this.findOne(id, tenantId);
     
-    // TODO: Check real OSE status
+    // Consultar estado real en SUNAT
+    const response = await this.oseService.consultarEstadoCpe(
+      cpe.ruc_emisor,
+      cpe.tipo_documento,
+      cpe.serie,
+      cpe.numero.toString()
+    );
+    
+    // Actualizar estado en BD si es necesario
+    if (response.success) {
+      await this.supabaseService.update(
+        'cpe',
+        { 
+          estado: 'ACEPTADO',
+          cdr_sunat: response.cdr || 'CDR_RECEIVED',
+          updated_at: new Date().toISOString(),
+        },
+        { id: cpe.id }
+      );
+    }
+    
     return {
       id: cpe.id,
-      estado: cpe.estado,
-      message: 'Status checked successfully',
+                estado: response.success ? 'ACEPTADO' : cpe.estado,
+      codigoSunat: response.codigoRespuesta,
+      descripcionSunat: response.descripcionRespuesta,
       timestamp: new Date(),
     };
   }
 
-  private async sendToOse(cpeId: string): Promise<void> {
+  /**
+   * Preparar XML firmado para envío a SUNAT (sin enviar todavía)
+   * 
+   * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
+   * Para enviar manualmente usar el endpoint: POST /api/cpe/:id/enviar-sunat
+   */
+  private async prepareXmlForSunat(cpeId: string, xmlContent: string): Promise<void> {
     try {
-      // TODO: Implement real OSE integration
-      // For now, just update status to ENVIADO
+      console.log(`📄 [CPE] Preparando XML para CPE ${cpeId}...`);
       
-      const { error } = await this.supabaseService.update(
+      // Mostrar info del certificado
+      console.log('📜 [CPE] Certificado: DEMO MODE ACTIVO');
+      
+      // Firmar el XML con certificado real
+      const xmlSigned = this.xmlSigner.signXml(xmlContent);
+      const hash = this.xmlSigner.generateHash(xmlSigned);
+
+      // Validar la firma generada
+      const isValid = this.xmlSigner.validateSignature(xmlSigned);
+      if (!isValid) {
+        console.warn('⚠️ [CPE] La firma generada no pasó la validación');
+      }
+
+      // Actualizar CPE con XML firmado
+              console.log('🔧 [CPE] Actualizando estado a: FIRMADO');
+        await this.supabaseService.update(
         'cpe',
         { 
-          estado: EstadoCPE.ENVIADO,
+          estado: 'FIRMADO', // Estado que indica listo para SUNAT
+          hash: hash,
+          xml_firmado: xmlSigned,
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }
       );
 
-      if (error) {
-        console.error('Error updating CPE status:', error);
+      console.log(`✅ [CPE] XML firmado para CPE ${cpeId}`);
+      console.log(`📊 [CPE] Hash: ${hash}`);
+      console.log(`📊 [CPE] Firma válida: ${isValid ? '✅' : '⚠️'}`);
+      console.log(`📊 [CPE] Modo certificado: DEMO`);
+
+    } catch (error) {
+      console.error(`❌ [CPE] Error preparando XML para CPE ${cpeId}:`, error);
+      
+      // Marcar como ERROR
+      await this.supabaseService.update(
+        'cpe',
+        { 
+          estado: 'RECHAZADO',
+          error_message: `Error preparando XML: ${error.message}`,
+          updated_at: new Date().toISOString(),
+        },
+        { id: cpeId }
+      );
+    }
+  }
+
+  private async sendToOse(cpeId: string, xmlContent?: string, fileName?: string): Promise<void> {
+    try {
+      console.log(`📤 [CPE] Enviando CPE ${cpeId} a SUNAT...`);
+      
+      // Marcar como ENVIADO primero
+      await this.supabaseService.update(
+        'cpe',
+        { 
+          estado: 'ENVIADO',
+          updated_at: new Date().toISOString(),
+        },
+        { id: cpeId }
+      );
+
+      // Si no se proporciona XML, obtenerlo de la BD
+      if (!xmlContent || !fileName) {
+        const { data: cpeData, error } = await this.supabaseService.getClient()
+          .from('cpe')
+          .select('xml_firmado, ruc_emisor, tipo_documento, serie, numero')
+          .eq('id', cpeId)
+          .single();
+
+        if (error || !cpeData) {
+          throw new Error('No se pudo obtener el XML del CPE');
+        }
+
+        xmlContent = cpeData.xml_firmado;
+        fileName = `${cpeData.ruc_emisor}-${cpeData.tipo_documento}-${cpeData.serie}-${cpeData.numero}`;
       }
 
-      // Simulate OSE processing delay
-      setTimeout(async () => {
-        const { error: aceError } = await this.supabaseService.update(
+      // Enviar a SUNAT mediante OSE
+      const response = await this.oseService.enviarCpe(xmlContent, fileName);
+
+      if (response.success) {
+        console.log(`✅ [CPE] CPE ${cpeId} enviado exitosamente a SUNAT`);
+        
+        // Actualizar como ACEPTADO
+        await this.supabaseService.update(
           'cpe',
           { 
-            estado: EstadoCPE.ACEPTADO,
-            cdr_sunat: 'DEMO_CDR_CONTENT',
+            estado: 'ACEPTADO',
+            cdr_sunat: response.cdr || 'CDR_RECEIVED',
+            hash: response.hashCPE || null,
+            numero_comprobante_sunat: response.numeroComprobante,
             updated_at: new Date().toISOString(),
           },
           { id: cpeId }
         );
-
-        if (aceError) {
-          console.error('Error updating CPE to ACEPTADO:', aceError);
-        }
-      }, 5000); // Accept after 5 seconds
+      } else {
+        console.error(`❌ [CPE] Error enviando CPE ${cpeId}: ${response.descripcionRespuesta}`);
+        
+        // Marcar como RECHAZADO
+        await this.supabaseService.update(
+          'cpe',
+          { 
+            estado: 'RECHAZADO',
+            error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
+            updated_at: new Date().toISOString(),
+          },
+          { id: cpeId }
+        );
+      }
 
     } catch (error) {
-      console.error('Error sending to OSE:', error);
+      console.error(`❌ [CPE] Error técnico enviando CPE ${cpeId}:`, error);
       
-      // Update status to RECHAZADO on error
+      // Marcar como RECHAZADO por error técnico
       await this.supabaseService.update(
         'cpe',
         { 
-          estado: EstadoCPE.RECHAZADO,
-          error_message: error.message,
+          estado: 'RECHAZADO',
+          error_message: `Error técnico: ${error.message}`,
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }

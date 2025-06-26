@@ -36,88 +36,26 @@ export class SupabaseService {
   }
 
   private initMockDatabase() {
-    console.log('🔧 Inicializando base de datos mock...');
+    console.log('🔧 Inicializando base de datos mock LIMPIA...');
     
-    // Productos mock con estructura correcta
-    this.mockDatabase.set('productos', [
-      { 
-        identificación: 1,
-        código: 'PROD001', 
-        nombre: 'Laptop Dell Inspiron 15', 
-        precio: 2500.00,
-        existencias: 10,
-        categorías: 'Tecnología',
-        activo: true,
-        código_barras: 'PROD001',
-        precio_mayorista: 2200.00,
-        precio_especial: 2300.00,
-        stock_minimo: 5,
-        impuesto: 18.0,
-        'URL de la imagen': null,
-        creado_en: new Date().toISOString()
-      },
-      { 
-        identificación: 2,
-        código: 'PROD002', 
-        nombre: 'Mouse Logitech MX Master', 
-        precio: 150.00,
-        existencias: 25,
-        categorías: 'Tecnología',
-        activo: true,
-        código_barras: 'PROD002',
-        precio_mayorista: 120.00,
-        precio_especial: 140.00,
-        stock_minimo: 10,
-        impuesto: 18.0,
-        'URL de la imagen': null,
-        creado_en: new Date().toISOString()
-      },
-      { 
-        identificación: 3,
-        código: 'PROD003', 
-        nombre: 'Teclado Mecánico RGB', 
-        precio: 200.00,
-        existencias: 15,
-        categorías: 'Tecnología',
-        activo: true,
-        código_barras: 'PROD003',
-        precio_mayorista: 160.00,
-        precio_especial: 180.00,
-        stock_minimo: 8,
-        impuesto: 18.0,
-        'URL de la imagen': null,
-        creado_en: new Date().toISOString()
-      }
-    ]);
+    // PRODUCTOS LIMPIOS - SIN HARDCODEOS
+    this.mockDatabase.set('productos', []);
 
-    // Movimientos de stock mock
-    this.mockDatabase.set('movimientos_stock', [
-      {
-        id: 1,
-        producto_id: 1,
-        tipo_movimiento: 'ENTRADA',
-        cantidad: 5,
-        stock_anterior: 5,
-        stock_nuevo: 10,
-        motivo: 'Compra inicial',
-        usuario_id: 1,
-        created_at: new Date().toISOString()
-      }
-    ]);
-
-    // Otras tablas mock
+    // TODAS LAS TABLAS LIMPIAS - SIN HARDCODEOS DE MIERDA
+    this.mockDatabase.set('movimientos_stock', []);
     this.mockDatabase.set('ventas_pos', []);
     this.mockDatabase.set('detalle_ventas_pos', []);
-    this.mockDatabase.set('CPE', []);
-    this.mockDatabase.set('métodos_pago', [
-      { id: 1, codigo: 'EFECTIVO', nombre: 'Efectivo', tipo: 'EFECTIVO', requiere_referencia: false },
-      { id: 2, codigo: 'VISA', nombre: 'Tarjeta Visa', tipo: 'TARJETA', requiere_referencia: true }
-    ]);
-    this.mockDatabase.set('clientes', [
-      { id: 1, tipo_documento: 'DNI', numero_documento: '12345678', nombres: 'Juan Carlos', apellidos: 'Pérez López' }
-    ]);
+    this.mockDatabase.set('cpe', []);
+    this.mockDatabase.set('métodos_pago', []);
+    this.mockDatabase.set('clientes', []);
+    this.mockDatabase.set('cajas', []);
+    this.mockDatabase.set('cuentas_bancarias', []);
+    this.mockDatabase.set('gastos', []);
+    this.mockDatabase.set('egresos', []);
+    this.mockDatabase.set('cuentas_por_cobrar', []);
+    this.mockDatabase.set('cuentas_por_pagar', []);
 
-    console.log('✅ Base de datos mock inicializada con datos de ejemplo');
+    console.log('✅ Base de datos mock LIMPIA inicializada SIN DATOS HARDCODEADOS');
   }
 
   getClient(): SupabaseClient {

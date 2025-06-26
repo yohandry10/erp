@@ -126,4 +126,117 @@ export class GreController {
       };
     }
   }
+
+  @Post('guias/:id/reenviar')
+  @ApiOperation({ summary: 'Reenviar guía de remisión a SUNAT' })
+  @ApiResponse({ status: 200, description: 'GRE reenviada exitosamente' })
+  async reenviarGre(@Param('id') id: string) {
+    console.log(`🔄 [GRE] Reenviando GRE ${id} a SUNAT...`);
+    
+    try {
+      const resultado = await this.greService.reenviarGre(id);
+      
+      return {
+        success: resultado.success,
+        message: resultado.message,
+        data: { id, timestamp: new Date() }
+      };
+    } catch (error) {
+      console.error(`❌ Error reenviando GRE ${id}:`, error);
+      return {
+        success: false,
+        message: `Error reenviando GRE: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  @Get('guias/:id/estado-sunat')
+  @ApiOperation({ summary: 'Consultar estado de GRE en SUNAT' })
+  @ApiResponse({ status: 200, description: 'Estado consultado exitosamente' })
+  async consultarEstadoSunat(@Param('id') id: string) {
+    console.log(`🔍 [GRE] Consultando estado de GRE ${id} en SUNAT...`);
+    
+    try {
+      const estado = await this.greService.consultarEstadoGre(id);
+      
+      return {
+        success: true,
+        message: 'Estado consultado exitosamente',
+        data: estado
+      };
+    } catch (error) {
+      console.error(`❌ Error consultando estado de GRE ${id}:`, error);
+      return {
+        success: false,
+        message: `Error consultando estado: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  @Get('guias/:id/xml')
+  @ApiOperation({ summary: 'Obtener XML firmado de la GRE' })
+  @ApiResponse({ status: 200, description: 'XML obtenido exitosamente' })
+  async obtenerXmlFirmado(@Param('id') id: string, @Res() res: any) {
+    console.log(`📄 [GRE] Obteniendo XML de GRE ${id}...`);
+    
+    try {
+      // Por ahora retornamos un placeholder
+      // En el futuro, se puede implementar obtener el XML firmado de la BD
+      const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- XML firmado de GRE ${id} -->
+<DespatchAdvice>
+  <ID>GRE-${id}</ID>
+  <IssueDate>${new Date().toISOString().split('T')[0]}</IssueDate>
+  <!-- Contenido XML completo se implementará -->
+</DespatchAdvice>`;
+
+      res.setHeader('Content-Type', 'application/xml');
+      res.setHeader('Content-Disposition', `attachment; filename="GRE-${id}.xml"`);
+      
+      return res.send(xmlContent);
+    } catch (error) {
+      console.error(`❌ Error obteniendo XML de GRE ${id}:`, error);
+      return res.status(500).json({
+        success: false,
+        message: `Error obteniendo XML: ${error.message}`
+      });
+    }
+  }
+
+  @Post('guias/:id/enviar-sunat')
+  @ApiOperation({ summary: 'Enviar GRE firmada a SUNAT manualmente' })
+  @ApiResponse({ status: 200, description: 'GRE enviada a SUNAT exitosamente' })
+  async enviarManualmenteSunat(@Param('id') id: string) {
+    console.log(`🚀 [GRE] Envío manual a SUNAT solicitado para GRE ${id}`);
+    
+    try {
+      // Verificar que la GRE esté en estado FIRMADO
+      const gre = await this.greService.findGuiaById(id);
+      
+      if (gre.estado !== 'FIRMADO') {
+        return {
+          success: false,
+          message: `GRE debe estar en estado FIRMADO para enviar a SUNAT. Estado actual: ${gre.estado}`
+        };
+      }
+
+      // Enviar a SUNAT usando el método existente
+      const resultado = await this.greService.enviarManualmenteSunat(id);
+      
+      return {
+        success: resultado.success,
+        message: resultado.message,
+        data: { id, timestamp: new Date() }
+      };
+
+    } catch (error) {
+      console.error(`❌ Error enviando GRE ${id} a SUNAT:`, error);
+      return {
+        success: false,
+        message: `Error enviando GRE a SUNAT: ${error.message}`
+      };
+    }
+  }
 }
