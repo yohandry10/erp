@@ -58,7 +58,9 @@ export default function OrdenCompraModal({
 
   // Cargar datos iniciales
   useEffect(() => {
+    console.log('🔥 [MODAL] useEffect triggered - isOpen:', isOpen)
     if (isOpen) {
+      console.log('🔥 [MODAL] Modal está abierto, cargando datos...')
       loadProveedores()
       loadProductos()
       generateNumeroOrden()
@@ -77,13 +79,24 @@ export default function OrdenCompraModal({
 
   const loadProveedores = async () => {
     try {
+      console.log('🔥 [MODAL] CARGANDO PROVEEDORES...')
+      console.log('🔥 [MODAL] URL:', `${API_URL}/api/compras/proveedores`)
+      
       const response = await fetch(`${API_URL}/api/compras/proveedores`)
+      console.log('🔥 [MODAL] Response status:', response.status)
+      
       const data = await response.json()
+      console.log('🔥 [MODAL] Response data:', JSON.stringify(data, null, 2))
+      
       if (data.success) {
+        console.log('🔥 [MODAL] Proveedores cargados:', data.data.length)
         setProveedores(data.data)
+        console.log('🔥 [MODAL] Estado actualizado con proveedores')
+      } else {
+        console.error('🔥 [MODAL] Error en respuesta:', data.error)
       }
     } catch (error) {
-      console.error('Error loading proveedores:', error)
+      console.error('🔥 [MODAL] Error loading proveedores:', error)
     }
   }
 
@@ -352,25 +365,47 @@ export default function OrdenCompraModal({
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
                 Proveedor *
               </label>
-              <select
-                value={formData.proveedor_id}
-                onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Seleccionar proveedor</option>
-                {proveedores.map((proveedor: any) => (
-                  <option key={proveedor.id} value={proveedor.id}>
-                    {proveedor.nombre}
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <select
+                  value={formData.proveedor_id}
+                  onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
+                  required
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="">Seleccionar proveedor</option>
+                  {proveedores.map((proveedor: any) => (
+                    <option key={proveedor.id} value={proveedor.id}>
+                      {proveedor.nombre} - {proveedor.ruc}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert('Función de agregar proveedor - Se abrirá en nueva ventana');
+                    // En una implementación real aquí abriríamos el modal de proveedores
+                    // o redirigiríamos a la página de proveedores
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #10b981',
+                    borderRadius: '0.375rem',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Agregar nuevo proveedor"
+                >
+                  + Nuevo
+                </button>
+              </div>
             </div>
 
             <div>

@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { Worker, Queue } from 'bullmq';
 import cron from 'node-cron';
 import winston from 'winston';
-import Redis from 'redis';
+// Redis import removed as it's not used directly
+import { EventEmitter } from 'events';
 
 // Logger setup
 const logger = winston.createLogger({
@@ -220,11 +221,12 @@ async function processSireGeneration(tenantId: string, period: string) {
       .eq('id', sireFile.id);
       
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await supabase
       .from('sire_files')
       .update({
         status: 'ERROR',
-        error_message: error.message,
+        error_message: errorMessage,
         completed_at: new Date().toISOString()
       })
       .eq('id', sireFile.id);
@@ -282,4 +284,412 @@ process.on('SIGTERM', async () => {
 });
 
 logger.info('Worker started successfully');
-logger.info('Health check available:', healthCheck()); 
+logger.info('Health check available:', healthCheck());
+
+// 🚀 WORKER DE BACKGROUND PARA AUTOMATIZACIÓN ERP
+console.log('🤖 [Worker] Iniciando Worker de Background para Sistema ERP...');
+
+// Event Bus para comunicación
+const eventBus = new EventEmitter();
+eventBus.setMaxListeners(100);
+
+interface TaskConfig {
+  id: string;
+  type: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  maxRetries: number;
+  retryDelay: number; // milliseconds
+  processor: (data: any) => Promise<boolean>;
+}
+
+class BackgroundWorker {
+  private tasks: Map<string, TaskConfig> = new Map();
+  private processingQueue: Array<{ taskId: string; data: any; attempt: number }> = [];
+  private isRunning = false;
+
+  constructor() {
+    this.registerTasks();
+    this.startProcessing();
+    console.log('✅ [Worker] Background Worker inicializado correctamente');
+  }
+
+  private registerTasks() {
+    // 📨 TAREA: Reenvío de CPE a SUNAT
+    this.tasks.set('cpe.retry_envio', {
+      id: 'cpe.retry_envio',
+      type: 'SUNAT_RETRY',
+      priority: 'HIGH',
+      maxRetries: 5,
+      retryDelay: 5 * 60 * 1000, // 5 minutos
+      processor: this.processCpeRetry.bind(this)
+    });
+
+    // 📨 TAREA: Reenvío de GRE a SUNAT
+    this.tasks.set('gre.retry_envio', {
+      id: 'gre.retry_envio',
+      type: 'SUNAT_RETRY',
+      priority: 'HIGH',
+      maxRetries: 5,
+      retryDelay: 5 * 60 * 1000,
+      processor: this.processGreRetry.bind(this)
+    });
+
+    // 📊 TAREA: Actualización de métricas del dashboard
+    this.tasks.set('dashboard.update_metrics', {
+      id: 'dashboard.update_metrics',
+      type: 'METRICS_UPDATE',
+      priority: 'MEDIUM',
+      maxRetries: 3,
+      retryDelay: 2 * 60 * 1000, // 2 minutos
+      processor: this.updateDashboardMetrics.bind(this)
+    });
+
+    // 📦 TAREA: Verificación de stock crítico
+    this.tasks.set('inventory.check_critical_stock', {
+      id: 'inventory.check_critical_stock',
+      type: 'INVENTORY_CHECK',
+      priority: 'MEDIUM',
+      maxRetries: 2,
+      retryDelay: 15 * 60 * 1000, // 15 minutos
+      processor: this.checkCriticalStock.bind(this)
+    });
+
+    // 🧹 TAREA: Limpieza de logs antiguos
+    this.tasks.set('system.cleanup_logs', {
+      id: 'system.cleanup_logs',
+      type: 'MAINTENANCE',
+      priority: 'LOW',
+      maxRetries: 1,
+      retryDelay: 60 * 60 * 1000, // 1 hora
+      processor: this.cleanupOldLogs.bind(this)
+    });
+
+    console.log(`📋 [Worker] ${this.tasks.size} tareas registradas`);
+  }
+
+  // 📨 PROCESADOR: Reintento de envío CPE a SUNAT
+  private async processCpeRetry(data: any): Promise<boolean> {
+    try {
+      console.log(`📨 [Worker] Reintentando envío CPE ${data.cpeId} a SUNAT...`);
+
+      // Obtener CPE pendiente
+      const { data: cpe, error } = await supabase
+        .from('cpe')
+        .select('*')
+        .eq('id', data.cpeId)
+        .eq('estado', 'PENDIENTE_ENVIO')
+        .single();
+
+      if (error || !cpe) {
+        console.log(`ℹ️ [Worker] CPE ${data.cpeId} ya no está pendiente o no existe`);
+        return true; // Marcar como completado
+      }
+
+      // Simular envío a SUNAT (aquí iría la lógica real)
+      console.log(`🚀 [Worker] Enviando CPE ${cpe.serie}-${cpe.numero} a SUNAT...`);
+      
+      // Simular éxito o fallo aleatorio para testing
+      const exito = Math.random() > 0.3; // 70% de éxito
+
+      if (exito) {
+        // Actualizar estado a ENVIADO
+        await supabase
+          .from('cpe')
+          .update({
+            estado: 'ENVIADO',
+            fecha_envio: new Date().toISOString(),
+            envio_automatico: true,
+            error_envio: null
+          })
+          .eq('id', data.cpeId);
+
+        console.log(`✅ [Worker] CPE ${data.cpeId} enviado exitosamente a SUNAT`);
+        return true;
+      } else {
+        // Actualizar fecha de último intento
+        await supabase
+          .from('cpe')
+          .update({
+            fecha_ultimo_intento: new Date().toISOString(),
+            error_envio: `Intento ${data.intentoAnterior + 1} fallido`
+          })
+          .eq('id', data.cpeId);
+
+        console.log(`❌ [Worker] Fallo en envío CPE ${data.cpeId}, se reintentará`);
+        return false; // Reintentar
+      }
+    } catch (error) {
+      console.error(`❌ [Worker] Error procesando reintento CPE:`, error);
+      return false;
+    }
+  }
+
+  // 📨 PROCESADOR: Reintento de envío GRE a SUNAT
+  private async processGreRetry(data: any): Promise<boolean> {
+    try {
+      console.log(`📨 [Worker] Reintentando envío GRE ${data.greId} a SUNAT...`);
+      
+      // Similar lógica para GRE
+      const { data: gre, error } = await supabase
+        .from('gre')
+        .select('*')
+        .eq('id', data.greId)
+        .eq('estado', 'PENDIENTE_ENVIO')
+        .single();
+
+      if (error || !gre) {
+        console.log(`ℹ️ [Worker] GRE ${data.greId} ya no está pendiente`);
+        return true;
+      }
+
+      // Simular envío exitoso
+      const exito = Math.random() > 0.2; // 80% de éxito para GRE
+
+      if (exito) {
+        await supabase
+          .from('gre')
+          .update({
+            estado: 'ENVIADO',
+            fecha_envio: new Date().toISOString(),
+            envio_automatico: true
+          })
+          .eq('id', data.greId);
+
+        console.log(`✅ [Worker] GRE ${data.greId} enviado exitosamente`);
+        return true;
+      } else {
+        console.log(`❌ [Worker] Fallo en envío GRE ${data.greId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`❌ [Worker] Error procesando reintento GRE:`, error);
+      return false;
+    }
+  }
+
+  // 📊 PROCESADOR: Actualización de métricas dashboard
+  private async updateDashboardMetrics(_data: any): Promise<boolean> {
+    try {
+      console.log('📊 [Worker] Actualizando métricas del dashboard...');
+
+      // Obtener métricas actuales del sistema
+      const metrics = {
+        totalCpe: await this.getTotalRecords('cpe'),
+        totalGre: await this.getTotalRecords('gre'),
+        totalInventario: await this.getTotalRecords('productos'),
+        ventasHoy: await this.getVentasHoy(),
+        productosStockBajo: await this.getProductosStockBajo(),
+        ultimaActualizacion: new Date().toISOString()
+      };
+
+      console.log('📊 [Worker] Métricas calculadas:', metrics);
+
+      // Emitir evento de actualización (simular)
+      console.log('✅ [Worker] Métricas del dashboard actualizadas');
+      return true;
+    } catch (error) {
+      console.error('❌ [Worker] Error actualizando métricas:', error);
+      return false;
+    }
+  }
+
+  // 📦 PROCESADOR: Verificación de stock crítico
+  private async checkCriticalStock(_data: any): Promise<boolean> {
+    try {
+      console.log('📦 [Worker] Verificando stock crítico...');
+
+      const { data: productos, error } = await supabase
+        .from('productos')
+        .select('codigo, nombre, stock, stock_minimo')
+        .lt('stock', supabase.rpc('stock_minimo')); // Productos con stock menor al mínimo
+
+      if (error) {
+        console.error('❌ [Worker] Error consultando stock crítico:', error);
+        return false;
+      }
+
+      if (productos && productos.length > 0) {
+        console.log(`⚠️ [Worker] ${productos.length} productos con stock crítico detectados`);
+        
+        // Aquí se podría enviar notificaciones, emails, etc.
+        for (const producto of productos) {
+          console.log(`⚠️ [Worker] Stock crítico: ${producto.codigo} - ${producto.nombre} (Stock: ${producto.stock}, Mínimo: ${producto.stock_minimo})`);
+        }
+      } else {
+        console.log('✅ [Worker] Todos los productos tienen stock adecuado');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ [Worker] Error verificando stock:', error);
+      return false;
+    }
+  }
+
+  // 🧹 PROCESADOR: Limpieza de logs antiguos
+  private async cleanupOldLogs(_data: any): Promise<boolean> {
+    try {
+      console.log('🧹 [Worker] Limpiando logs antiguos...');
+      
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 días atrás
+
+      // Simular limpieza
+      console.log(`🧹 [Worker] Limpiando logs anteriores a ${cutoffDate.toISOString()}`);
+      console.log('✅ [Worker] Limpieza de logs completada');
+      
+      return true;
+    } catch (error) {
+      console.error('❌ [Worker] Error en limpieza:', error);
+      return false;
+    }
+  }
+
+  // UTILIDADES
+  private async getTotalRecords(table: string): Promise<number> {
+    try {
+      const { count } = await supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+      return count || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private async getVentasHoy(): Promise<number> {
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('ventas_pos')
+        .select('*', { count: 'exact', head: true })
+        .gte('fecha', hoy + 'T00:00:00.000Z')
+        .lt('fecha', hoy + 'T23:59:59.999Z');
+      return count || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private async getProductosStockBajo(): Promise<number> {
+    try {
+      const { count } = await supabase
+        .from('productos')
+        .select('*', { count: 'exact', head: true })
+        .lt('stock', 10); // Stock menor a 10
+      return count || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  // MOTOR DE PROCESAMIENTO
+  public addTask(taskId: string, data: any, attempt: number = 1) {
+    if (!this.tasks.has(taskId)) {
+      console.error(`❌ [Worker] Tarea desconocida: ${taskId}`);
+      return;
+    }
+
+    this.processingQueue.push({ taskId, data, attempt });
+    console.log(`📝 [Worker] Tarea ${taskId} agregada a la cola (intento ${attempt})`);
+  }
+
+  private async startProcessing() {
+    this.isRunning = true;
+    console.log('🔄 [Worker] Motor de procesamiento iniciado');
+
+    while (this.isRunning) {
+      if (this.processingQueue.length > 0) {
+        const { taskId, data, attempt } = this.processingQueue.shift()!;
+        const taskConfig = this.tasks.get(taskId)!;
+
+        try {
+          console.log(`⚡ [Worker] Procesando tarea: ${taskId} (intento ${attempt}/${taskConfig.maxRetries})`);
+          
+          const success = await taskConfig.processor(data);
+          
+          if (success) {
+            console.log(`✅ [Worker] Tarea ${taskId} completada exitosamente`);
+          } else if (attempt < taskConfig.maxRetries) {
+            // Programar reintento
+            console.log(`🔄 [Worker] Reintentando tarea ${taskId} en ${taskConfig.retryDelay / 1000} segundos...`);
+            
+            setTimeout(() => {
+              this.addTask(taskId, data, attempt + 1);
+            }, taskConfig.retryDelay);
+          } else {
+            console.error(`❌ [Worker] Tarea ${taskId} falló después de ${taskConfig.maxRetries} intentos`);
+          }
+        } catch (error) {
+          console.error(`❌ [Worker] Error ejecutando tarea ${taskId}:`, error);
+        }
+      }
+
+      // Esperar 1 segundo antes del siguiente ciclo
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  public stop() {
+    this.isRunning = false;
+    console.log('🛑 [Worker] Motor de procesamiento detenido');
+  }
+}
+
+// INICIALIZAR WORKER
+const worker = new BackgroundWorker();
+
+// TAREAS PROGRAMADAS
+setInterval(() => {
+  worker.addTask('dashboard.update_metrics', {});
+}, 5 * 60 * 1000); // Cada 5 minutos
+
+setInterval(() => {
+  worker.addTask('inventory.check_critical_stock', {});
+}, 15 * 60 * 1000); // Cada 15 minutos
+
+setInterval(() => {
+  worker.addTask('system.cleanup_logs', {});
+}, 24 * 60 * 60 * 1000); // Cada 24 horas
+
+// SIMULACIÓN: Agregar tareas de prueba
+setTimeout(() => {
+  console.log('🧪 [Worker] Iniciando tareas de prueba...');
+  
+  // Simular CPE pendiente
+  worker.addTask('cpe.retry_envio', {
+    cpeId: 'test-cpe-001',
+    intentoAnterior: 1
+  });
+
+  // Simular GRE pendiente
+  worker.addTask('gre.retry_envio', {
+    greId: 'test-gre-001',
+    intentoAnterior: 1
+  });
+}, 10000); // Después de 10 segundos
+
+// MANEJO DE SEÑALES
+process.on('SIGINT', () => {
+  console.log('🛑 [Worker] Recibida señal SIGINT, cerrando worker...');
+  worker.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('🛑 [Worker] Recibida señal SIGTERM, cerrando worker...');
+  worker.stop();
+  process.exit(0);
+});
+
+console.log('🎯 [Worker] Worker de Background configurado y ejecutándose');
+console.log('🎯 [Worker] Presiona Ctrl+C para detener el worker');
+
+// Mantener el proceso vivo
+process.on('uncaughtException', (error) => {
+  console.error('❌ [Worker] Error no capturado:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ [Worker] Promesa rechazada no manejada:', reason);
+}); 

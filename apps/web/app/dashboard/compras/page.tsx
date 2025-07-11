@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import OrdenCompraModal from '../../../components/modals/OrdenCompraModal'
+import ProveedorModal from '../../../components/modals/ProveedorModal'
 import { useToast } from '@/components/ui/use-toast'
 
 export default function ComprasPage() {
@@ -18,7 +19,9 @@ export default function ComprasPage() {
   const [proveedores, setProveedores] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isProveedorModalOpen, setIsProveedorModalOpen] = useState(false)
   const [selectedOrden, setSelectedOrden] = useState(null)
+  const [selectedProveedor, setSelectedProveedor] = useState(null)
   const [filters, setFilters] = useState({
     estado: '',
     proveedor_id: ''
@@ -121,14 +124,23 @@ export default function ComprasPage() {
 
   const loadProveedores = async () => {
     try {
+      console.log('🔥 [COMPRAS PAGE] CARGANDO PROVEEDORES...')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await fetch(`${API_URL}/api/compras/proveedores`)
+      console.log('🔥 [COMPRAS PAGE] Response status:', response.status)
+      
       const data = await response.json()
+      console.log('🔥 [COMPRAS PAGE] Response data:', JSON.stringify(data, null, 2))
+      
       if (data.success) {
+        console.log('🔥 [COMPRAS PAGE] Proveedores recibidos:', data.data.length)
         setProveedores(data.data)
+        console.log('🔥 [COMPRAS PAGE] Estado proveedores actualizado')
+      } else {
+        console.error('🔥 [COMPRAS PAGE] Error en respuesta:', data.error)
       }
     } catch (error) {
-      console.error('Error loading proveedores:', error)
+      console.error('🔥 [COMPRAS PAGE] Error loading proveedores:', error)
     }
   }
 
@@ -250,6 +262,28 @@ export default function ComprasPage() {
   const handleModalClose = () => {
     setIsModalOpen(false)
     setSelectedOrden(null)
+  }
+
+  const handleProveedorModalClose = () => {
+    setIsProveedorModalOpen(false)
+    setSelectedProveedor(null)
+  }
+
+  const handleProveedorModalSuccess = async () => {
+    console.log('🔥 [COMPRAS] PROVEEDOR CREADO - RECARGANDO TODO...')
+    
+    // RECARGAR PROVEEDORES INMEDIATAMENTE
+    await loadProveedores()
+    
+    // RECARGAR ESTADÍSTICAS TAMBIÉN
+    await loadStats()
+    
+    console.log('🔥 [COMPRAS] DATOS ACTUALIZADOS DESPUÉS DE CREAR PROVEEDOR')
+    
+    toast({
+      title: "✅ Proveedor Creado", 
+      description: "El proveedor se ha agregado correctamente"
+    })
   }
 
   const getStatusColor = (estado: string) => {
@@ -399,7 +433,7 @@ export default function ComprasPage() {
               <option value="">Todos los proveedores</option>
               {proveedores.map((proveedor: any) => (
                 <option key={proveedor.id} value={proveedor.id}>
-                  {proveedor.nombre}
+                  {proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}
                 </option>
               ))}
             </select>
@@ -409,14 +443,28 @@ export default function ComprasPage() {
         {/* Orders Table */}
         <div className="activity-card">
           {ordenes.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500 mb-4">No hay órdenes de compra registradas</p>
-              <button 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-                onClick={() => setIsModalOpen(true)}
-              >
-                Crear Primera Orden
-              </button>
+            <div className="activity-empty" style={{ padding: '3rem', textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: '4rem', 
+                marginBottom: '1rem',
+                filter: 'grayscale(0.3)',
+                opacity: 0.6
+              }}>📋</div>
+              <h3 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '600', 
+                color: 'var(--primary-700)',
+                marginBottom: '0.5rem'
+              }}>
+                Listo para gestionar compras
+              </h3>
+              <p style={{ 
+                color: 'var(--primary-500)', 
+                fontSize: '1rem',
+                marginBottom: '0'
+              }}>
+                Comienza creando tu primera orden de compra
+              </p>
             </div>
           ) : (
             <div style={{ overflow: 'auto' }}>
@@ -574,42 +622,196 @@ export default function ComprasPage() {
 
       {/* Proveedores Principales */}
       <div className="activity-section">
-        <h2 className="activity-title">Proveedores Principales</h2>
+        <div className="activity-header" style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '1.5rem',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+          padding: '1.5rem 2rem',
+          borderRadius: 'var(--border-radius-lg)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div>
+            <h2 className="activity-title" style={{ marginBottom: '0.5rem' }}>Proveedores Principales</h2>
+            <p style={{ color: 'var(--primary-400)', fontSize: '0.95rem' }}>
+              Gestiona tu red de proveedores estratégicos
+            </p>
+          </div>
+          <button 
+            className="refresh-btn"
+            onClick={() => setIsProveedorModalOpen(true)}
+            style={{
+              background: 'var(--gradient-success)',
+              fontSize: '0.95rem',
+              padding: '0.875rem 1.5rem'
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>+</span> 
+            Agregar Proveedor
+          </button>
+        </div>
+        
         <div className="activity-card">
+          {(() => {
+            console.log('🔥 [PROVEEDORES RENDER] Total proveedores:', proveedores.length)
+            console.log('🔥 [PROVEEDORES RENDER] Datos proveedores:', proveedores)
+            return null
+          })()}
+          
           {proveedores.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No hay proveedores registrados</p>
+            <div className="activity-empty" style={{ padding: '3rem', textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: '4rem', 
+                marginBottom: '1rem',
+                filter: 'grayscale(0.3)',
+                opacity: 0.6
+              }}>🏢</div>
+              <h3 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '600', 
+                color: 'var(--primary-700)',
+                marginBottom: '0.5rem'
+              }}>
+                Construye tu red de proveedores
+              </h3>
+              <p style={{ 
+                color: 'var(--primary-500)', 
+                fontSize: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                Agrega proveedores para gestionar tus compras de manera eficiente
+              </p>
+              <button 
+                className="refresh-btn"
+                onClick={() => setIsProveedorModalOpen(true)}
+                style={{
+                  background: 'var(--gradient-success)',
+                  fontSize: '0.95rem',
+                  padding: '0.875rem 1.5rem'
+                }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>+</span> 
+                Crear Primer Proveedor
+              </button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+              gap: '1.5rem',
+              padding: '1rem'
+            }}>
               {proveedores.slice(0, 6).map((proveedor: any) => (
                 <div 
                   key={proveedor.id}
+                  className="stat-card"
                   style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    padding: '1rem',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(255,255,255,0.1)'
+                    padding: '1.5rem',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onClick={() => {
+                    setSelectedProveedor(proveedor)
+                    setIsProveedorModalOpen(true)
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
-                    <h3 style={{ fontWeight: '600', color: 'white' }}>{proveedor.nombre}</h3>
-                    <span style={{
-                      background: '#10b981',
-                      color: 'white',
-                      padding: '0.2rem 0.5rem',
-                      borderRadius: '12px',
-                      fontSize: '0.7rem',
-                      fontWeight: '600'
+                  <div style={{ 
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: '60px',
+                    height: '60px',
+                    background: 'linear-gradient(135deg, var(--emerald-500), var(--emerald-600))',
+                    borderRadius: '0 0 0 60px',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
+                    padding: '0.5rem',
+                    opacity: 0.1
+                  }}>
+                    <span style={{ fontSize: '1.2rem' }}>🏢</span>
+                  </div>
+                  
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <h3 style={{ 
+                          fontWeight: '700', 
+                          color: 'var(--primary-800)',
+                          fontSize: '1.1rem',
+                          marginBottom: '0.25rem',
+                          lineHeight: '1.3'
+                        }}>
+                          {proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}
+                        </h3>
+                        <span style={{
+                          background: 'var(--gradient-success)',
+                          color: 'white',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '20px',
+                          fontSize: '0.7rem',
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}>
+                          Activo
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        fontSize: '0.9rem', 
+                        color: 'var(--primary-600)', 
+                        marginBottom: '0.4rem',
+                        fontWeight: '500'
+                      }}>
+                        <span style={{ fontSize: '1rem' }}>🆔</span>
+                        RUC: {proveedor.ruc}
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        fontSize: '0.9rem', 
+                        color: 'var(--primary-600)',
+                        fontWeight: '400'
+                      }}>
+                        <span style={{ fontSize: '1rem' }}>👤</span>
+                        {proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto'}
+                      </div>
+                    </div>
+                    
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '0.5rem',
+                      justifyContent: 'flex-end',
+                      marginTop: '1rem'
                     }}>
-                      Activo
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '0.3rem' }}>
-                    RUC: {proveedor.ruc}
-                  </div>
-                  <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>
-                    {proveedor.contacto || 'Sin contacto'}
+                      <button 
+                        className="btn-icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedProveedor(proveedor)
+                          setIsProveedorModalOpen(true)
+                        }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '600'
+                        }}
+                        title="Editar proveedor"
+                      >
+                        ✏️ Editar
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -625,6 +827,14 @@ export default function ComprasPage() {
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
         orden={selectedOrden}
+      />
+
+      {/* Modal de Proveedores */}
+      <ProveedorModal
+        isOpen={isProveedorModalOpen}
+        onClose={handleProveedorModalClose}
+        onSuccess={handleProveedorModalSuccess}
+        proveedor={selectedProveedor}
       />
     </div>
   )

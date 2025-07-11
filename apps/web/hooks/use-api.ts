@@ -5,7 +5,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useToast } from '@/components/ui/use-toast'
 
 interface ApiResponse<T> {
-  data: T
+  data?: T
   message?: string
   success: boolean
 }
@@ -18,6 +18,7 @@ interface UseApiOptions {
 export function useApi<T = any>(options: UseApiOptions = {}) {
   const [state, setState] = useState<ApiResponse<T>>({
     success: false,
+    data: undefined,
   })
   
   const supabase = createClientComponentClient()
@@ -75,9 +76,11 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       console.log('✅ Response data:', result)
       
       // Verificar success en el nivel correcto
-      const success = result.success === true || result.success === 'true'
+      // Si la respuesta es exitosa (status 200-299) y tiene data, considerarla válida
+      const hasData = result.id || result.data || Array.isArray(result)
+      const success = result.success === true || result.success === 'true' || hasData
       
-      if (!success) {
+      if (!success && result.error) {
         console.error('❌ API response indicates failure:', result)
         throw new Error(result.message || result.error || 'API call failed')
       }

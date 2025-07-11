@@ -34,11 +34,7 @@ const menuItems = [
     href: '/dashboard/documentos',
     icon: FileText
   },
-  {
-    title: '💼 Finanzas',
-    href: '/dashboard/finanzas',
-    icon: FileSpreadsheet
-  },
+
   {
     title: '📊 Contabilidad',
     href: '/dashboard/contabilidad',

@@ -17,12 +17,7 @@ export enum TipoDocumento {
   NOTA_DEBITO = '08'
 }
 
-export enum EstadoCPE {
-  PENDIENTE = 'PENDIENTE',
-  ENVIADO = 'ENVIADO',
-  ACEPTADO = 'ACEPTADO',
-  RECHAZADO = 'RECHAZADO'
-}
+export type EstadoCPE = 'PENDIENTE' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO';
 
 export class ItemFacturaDto {
   @IsString()
@@ -110,7 +105,7 @@ export class CreateFacturaDto {
 export class FacturaDto extends CreateFacturaDto {
   id: string;
   
-  @IsEnum(EstadoCPE)
+  @IsString()
   estado: EstadoCPE;
 
   @IsString()

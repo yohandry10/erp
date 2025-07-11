@@ -30,12 +30,25 @@ interface EmpleadoPlanilla extends Empleado {
   faltas: number
   sueldo_base: number
   bonos_adicionales: number
+  // Calculados en tiempo real
+  sueldo_diario: number
+  descuento_tardanzas: number
+  descuento_faltas: number
+  pago_horas_extras: number
+  sueldo_bruto_total: number
 }
 
+const DIAS_LABORABLES_MES = 30
+const HORAS_DIA = 8
+const VALOR_HORA_NORMAL = (sueldo: number) => sueldo / DIAS_LABORABLES_MES / HORAS_DIA
+
 export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaModalProps) {
+  console.log('🔥 PlanillaModal RENDERED - isOpen:', isOpen)
+  
   const { get, post } = useApi()
   const [loading, setLoading] = useState(false)
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([])
+
   
   const [formData, setFormData] = useState({
     periodo: '',
@@ -43,17 +56,19 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     fecha_inicio: '',
     fecha_fin: '',
     fecha_pago: '',
-    observaciones: ''
+    observaciones: '',
+    estado: 'borrador'
   })
 
   useEffect(() => {
+    console.log('🔥 useEffect triggered - isOpen:', isOpen)
     if (isOpen) {
-      loadEmpleados()
+      console.log('🔥 Modal OPENING - configurando período y cargando empleados')
       configurarPeriodoActual()
-      // Prevenir scroll del body
+      loadEmpleados()
       document.body.style.overflow = 'hidden'
     } else {
-      // Restaurar scroll del body
+      console.log('🔥 Modal CLOSING')
       document.body.style.overflow = 'unset'
     }
 
@@ -75,37 +90,53 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       fecha_inicio: fechaInicio.toISOString().split('T')[0],
       fecha_fin: fechaFin.toISOString().split('T')[0],
       fecha_pago: fechaPago.toISOString().split('T')[0],
-      observaciones: `Planilla mensual ${periodo}`
+      observaciones: `Planilla mensual ${periodo}`,
+      estado: 'borrador'
     })
   }
 
   const loadEmpleados = async () => {
+    console.log('🔥 loadEmpleados INICIADO')
     try {
       setLoading(true)
       
+      console.log('🔥 Haciendo GET a /api/rrhh/empleados')
       const empleadosResponse = await get('/api/rrhh/empleados')
+      console.log('🔥 Respuesta empleados:', empleadosResponse)
       
       if (empleadosResponse && empleadosResponse.success && empleadosResponse.data) {
         const empleadosActivos = empleadosResponse.data.filter(emp => emp.estado === 'activo')
+        console.log('🔥 Empleados activos encontrados:', empleadosActivos.length)
         
-        const empleadosConDatos = empleadosActivos.map(emp => ({
-          ...emp,
-          incluir: true,
-          dias_trabajados: 30,
-          horas_extras_25: 0,
-          horas_extras_35: 0,
-          tardanzas_minutos: 0,
-          faltas: 0,
-          sueldo_base: emp.contratos?.[0]?.sueldo_bruto || 0,
-          bonos_adicionales: 0
-        }))
+        const empleadosConDatos = empleadosActivos.map(emp => {
+          const sueldoBase = emp.contratos?.[0]?.sueldo_bruto || 0
+          return {
+            ...emp,
+            incluir: true,
+            dias_trabajados: DIAS_LABORABLES_MES,
+            horas_extras_25: 0,
+            horas_extras_35: 0,
+            tardanzas_minutos: 0,
+            faltas: 0,
+            sueldo_base: sueldoBase,
+            bonos_adicionales: 0,
+            // Calculados
+            sueldo_diario: sueldoBase / DIAS_LABORABLES_MES,
+            descuento_tardanzas: 0,
+            descuento_faltas: 0,
+            pago_horas_extras: 0,
+            sueldo_bruto_total: sueldoBase
+          }
+        })
         
+        console.log('🔥 Empleados procesados para planilla:', empleadosConDatos.length)
         setEmpleados(empleadosConDatos)
       } else {
+        console.error('🔥 Error en respuesta empleados:', empleadosResponse)
         throw new Error('No se pudieron cargar empleados')
       }
     } catch (error) {
-      console.error('Error cargando empleados:', error)
+      console.error('🔥 ERROR CARGANDO EMPLEADOS:', error)
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -116,29 +147,61 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     }
   }
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  const calcularValoresEmpleado = (empleado: EmpleadoPlanilla) => {
+    const sueldoDiario = empleado.sueldo_base / DIAS_LABORABLES_MES
+    const valorHoraNormal = empleado.sueldo_base / DIAS_LABORABLES_MES / HORAS_DIA
+    
+    // Descuentos por tardanzas (proporcional por minuto)
+    const descuentoTardanzas = (empleado.tardanzas_minutos * valorHoraNormal) / 60
+    
+    // Descuentos por faltas (día completo)
+    const descuentoFaltas = empleado.faltas * sueldoDiario
+    
+    // Pago por horas extras
+    const pagoHorasExtras25 = empleado.horas_extras_25 * valorHoraNormal * 1.25
+    const pagoHorasExtras35 = empleado.horas_extras_35 * valorHoraNormal * 1.35
+    const pagoHorasExtras = pagoHorasExtras25 + pagoHorasExtras35
+    
+    // Sueldo bruto total
+    const sueldoBrutoTotal = empleado.sueldo_base + empleado.bonos_adicionales + pagoHorasExtras - descuentoTardanzas - descuentoFaltas
+    
+    return {
+      sueldo_diario: sueldoDiario,
+      descuento_tardanzas: descuentoTardanzas,
+      descuento_faltas: descuentoFaltas,
+      pago_horas_extras: pagoHorasExtras,
+      sueldo_bruto_total: sueldoBrutoTotal
+    }
   }
 
   const actualizarEmpleado = (empleadoId: string, campo: string, valor: any) => {
     setEmpleados(prevEmpleados =>
-      prevEmpleados.map(emp =>
-        emp.id === empleadoId
-          ? { ...emp, [campo]: valor }
-          : emp
-      )
+      prevEmpleados.map(emp => {
+        if (emp.id === empleadoId) {
+          const empleadoActualizado = { ...emp, [campo]: valor }
+          const calculados = calcularValoresEmpleado(empleadoActualizado)
+          return { ...empleadoActualizado, ...calculados }
+        }
+        return emp
+      })
     )
   }
 
-  const empleadosSeleccionados = Array.isArray(empleados) ? empleados.filter(emp => emp.incluir) : []
-  const totalSueldosBase = empleadosSeleccionados.reduce((sum, emp) => sum + (emp.sueldo_base || 0), 0)
+  const empleadosSeleccionados = empleados.filter(emp => emp.incluir)
+  const totalPlanilla = empleadosSeleccionados.reduce((sum, emp) => sum + emp.sueldo_bruto_total, 0)
+  const totalEmpleados = empleadosSeleccionados.length
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('🔥 handleSubmit EJECUTADO')
     e.preventDefault()
     setLoading(true)
 
     try {
+      console.log('🔥 Empleados seleccionados:', empleadosSeleccionados.length)
+      console.log('🔥 Form data:', formData)
+      
       if (empleadosSeleccionados.length === 0) {
+        console.error('🔥 ERROR: No hay empleados seleccionados')
         toast({
           title: "Error",
           description: "Debe seleccionar al menos un empleado",
@@ -148,6 +211,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       }
 
       if (!formData.periodo.trim()) {
+        console.error('🔥 ERROR: No hay período')
         toast({
           title: "Error",
           description: "Ingrese el período de la planilla",
@@ -156,19 +220,24 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         return
       }
 
+      console.log('🔥 Creando planilla con data:', formData)
       // Crear planilla
       const createResponse = await post('/api/rrhh/planillas', formData)
+      console.log('🔥 Respuesta crear planilla:', createResponse)
 
       if (!createResponse) {
         throw new Error('Error creando planilla')
       }
 
+      console.log('🔥 Calculando planilla personalizada...')
       // Calcular con empleados personalizados
       const calcResponse = await post(`/api/rrhh/planillas/${createResponse.id}/calcular-personalizada`, {
         empleados: empleadosSeleccionados
       })
+      console.log('🔥 Respuesta calcular:', calcResponse)
 
       if (calcResponse && calcResponse.success) {
+        console.log('🔥 ÉXITO: Planilla creada correctamente')
         toast({
           title: "¡Éxito!",
           description: `Planilla ${formData.periodo} creada con ${calcResponse.totalEmpleados} empleados`,
@@ -181,7 +250,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       }
 
     } catch (error: any) {
-      console.error('Error:', error)
+      console.error('🔥 ERROR EN SUBMIT:', error)
       toast({
         title: "Error",
         description: error.message || "Error procesando planilla",
@@ -199,19 +268,22 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
       fecha_inicio: '',
       fecha_fin: '',
       fecha_pago: '',
-      observaciones: ''
+      observaciones: '',
+      estado: 'borrador'
     })
     setEmpleados([])
     onClose()
   }
 
   if (!isOpen) {
+    console.log('🔥 Modal NO ESTÁ ABIERTO - retornando null')
     return null
   }
   
+  console.log('🔥 Modal SÍ ESTÁ ABIERTO - renderizando contenido')
+  
   const modalContent = (
     <div 
-      className="fixed inset-0 flex items-center justify-center p-4"
       style={{
         position: 'fixed',
         top: 0,
@@ -219,58 +291,70 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         right: 0,
         bottom: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem'
+        padding: '16px',
+        zIndex: 99999
       }}
     >
       <div 
-        className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden"
         style={{
           backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           width: '100%',
-          maxWidth: '72rem',
-          maxHeight: '90vh',
+          maxWidth: '1280px',
+          maxHeight: '95vh',
           overflow: 'hidden',
-          position: 'relative'
+          zIndex: 100000
         }}
       >
+        
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-800">📋 Nueva Planilla</h2>
+        <div style={{
+          padding: '24px',
+          borderBottom: '1px solid #e5e7eb',
+          background: 'linear-gradient(to right, #eff6ff, #e0e7ff)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#1f2937',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                💰 Nueva Planilla de Sueldos
+              </h2>
+              <p style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                marginTop: '4px',
+                margin: 0
+              }}>
+                Configure el período y seleccione empleados para generar la planilla
+              </p>
+            </div>
+
             <button
               onClick={handleClose}
               style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                backgroundColor: '#dc2626',
+                backgroundColor: '#ef4444',
                 color: 'white',
                 border: 'none',
-                fontSize: '16px',
-                fontWeight: 'bold',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 10,
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'
-                e.currentTarget.style.backgroundColor = '#b91c1c'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
-                e.currentTarget.style.backgroundColor = '#dc2626'
+                fontWeight: 'bold',
+                fontSize: '16px'
               }}
             >
               ✕
@@ -279,67 +363,138 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Content */}
-        <div 
-          className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]"
-          style={{
-            padding: '1.5rem',
-            overflowY: 'auto',
-            maxHeight: 'calc(90vh - 140px)'
-          }}
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div style={{
+          padding: '24px',
+          overflowY: 'auto',
+          maxHeight: 'calc(95vh - 140px)'
+        }}>
+          <form id="planilla-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Configuración de Planilla */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-800 mb-4">⚙️ Configuración</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div style={{
+              backgroundColor: '#f9fafb',
+              padding: '16px',
+              borderRadius: '8px'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '500',
+                color: '#1f2937',
+                marginBottom: '16px',
+                margin: 0
+              }}>⚙️ Configuración</h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '16px'
+              }}>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Período</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '4px'
+                  }}>Período</label>
                   <input
                     type="text"
                     value={formData.periodo}
-                    onChange={(e) => handleInputChange('periodo', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
                     placeholder="2025-06"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '4px'
+                  }}>Fecha Inicio</label>
                   <input
                     type="date"
                     value={formData.fecha_inicio}
-                    onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '4px'
+                  }}>Fecha Fin</label>
                   <input
                     type="date"
                     value={formData.fecha_fin}
-                    onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Pago</label>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '4px'
+                  }}>Fecha Pago</label>
                   <input
                     type="date"
                     value={formData.fecha_pago}
-                    onChange={(e) => handleInputChange('fecha_pago', e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
                   />
                 </div>
               </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+              <div style={{ marginTop: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>Observaciones</label>
                 <textarea
                   value={formData.observaciones}
-                  onChange={(e) => handleInputChange('observaciones', e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
                   rows={2}
                 />
               </div>
@@ -347,217 +502,405 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
             {/* Gestión de Empleados */}
             <div>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">👥 Empleados</h3>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {/* Header de tabla */}
-                <div className="bg-gray-50 px-4 py-3 grid grid-cols-12 gap-2 text-sm font-medium text-gray-700 border-b">
-                  <div className="col-span-1">✓</div>
-                  <div className="col-span-3">Empleado</div>
-                  <div className="col-span-1">Sueldo</div>
-                  <div className="col-span-1">Días</div>
-                  <div className="col-span-1">HE 25%</div>
-                  <div className="col-span-1">HE 35%</div>
-                  <div className="col-span-1">Tardanzas</div>
-                  <div className="col-span-1">Faltas</div>
-                  <div className="col-span-2">Bonos</div>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '500',
+                color: '#1f2937',
+                marginBottom: '16px',
+                margin: 0
+              }}>👥 Empleados para Planilla</h3>
+              
+              <div style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}>
+                {/* Header con explicaciones claras */}
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  padding: '12px 16px',
+                  display: 'grid',
+                  gridTemplateColumns: '40px 200px 120px 80px 80px 80px 80px 80px 120px',
+                  gap: '8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#374151',
+                  borderBottom: '1px solid #e5e7eb'
+                }}>
+                  <div>✓</div>
+                  <div>👤 EMPLEADO</div>
+                  <div>💰 SUELDO BASE<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Mensual S/</span></div>
+                  <div>📅 DÍAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Trabajados</span></div>
+                  <div>⏰ HE 25%<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Primeras 2h</span></div>
+                  <div>⏰ HE 35%<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Siguientes</span></div>
+                  <div>⏱️ TARDANZAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Minutos</span></div>
+                  <div>❌ FALTAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Días</span></div>
+                  <div>💵 BONOS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Adicionales S/</span></div>
                 </div>
 
-                {/* Filas de empleados */}
-                <div className="max-h-80 overflow-y-auto">
-                  {(Array.isArray(empleados) ? empleados : []).map((empleado, index) => (
+                {/* Filas de empleados con explicaciones */}
+                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  {empleados.map((empleado) => {
+                    const valores = calcularValoresEmpleado(empleado)
+                    return (
                     <div 
                       key={empleado.id} 
-                      className={`px-4 py-3 grid grid-cols-12 gap-2 text-sm border-b border-gray-100 ${
-                        empleado.incluir ? 'bg-white' : 'bg-gray-50'
-                      }`}
+                      style={{
+                        padding: '12px 16px',
+                        display: 'grid',
+                        gridTemplateColumns: '40px 200px 120px 80px 80px 80px 80px 80px 120px',
+                        gap: '8px',
+                        fontSize: '13px',
+                        borderBottom: '1px solid #f3f4f6',
+                        backgroundColor: empleado.incluir ? 'white' : '#f9fafb',
+                        opacity: empleado.incluir ? 1 : 0.6
+                      }}
                     >
-                      <div className="col-span-1 flex items-center">
+                      {/* Checkbox selección */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <input
                           type="checkbox"
                           checked={empleado.incluir}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'incluir', e.target.checked)}
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                         />
                       </div>
-                      <div className="col-span-3">
-                        <div className="font-medium text-gray-900">
+                      
+                      {/* Datos del empleado */}
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '2px' }}>
                           {empleado.nombres} {empleado.apellidos}
                         </div>
-                        <div className="text-gray-500 text-xs">{empleado.puesto}</div>
+                        <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                          {empleado.puesto} • DNI: {empleado.numero_documento}
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      {/* Sueldo Base */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.sueldo_base}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'sueldo_base', parseFloat(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                           step="0.01"
+                          placeholder="0.00"
                         />
+                        <div style={{ fontSize: '10px', color: '#059669', fontWeight: '600', marginTop: '2px' }}>
+                          S/ {empleado.sueldo_base.toFixed(0)}
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      
+                      {/* Días Trabajados */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.dias_trabajados}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'dias_trabajados', parseInt(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                           max="31"
                         />
+                        <div style={{ fontSize: '10px', color: '#2563eb', fontWeight: '600', marginTop: '2px' }}>
+                          de 30 días
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      
+                      {/* Horas Extras 25% */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.horas_extras_25}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_25', parseFloat(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                           step="0.5"
                         />
+                        <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: '600', marginTop: '2px' }}>
+                          +25%
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      
+                      {/* Horas Extras 35% */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.horas_extras_35}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_35', parseFloat(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                           step="0.5"
                         />
+                        <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: '600', marginTop: '2px' }}>
+                          +35%
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      
+                      {/* Tardanzas */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.tardanzas_minutos}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'tardanzas_minutos', parseInt(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                         />
+                        <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: '600', marginTop: '2px' }}>
+                          -S/ {(empleado.tardanzas_minutos * (empleado.sueldo_base / 30 / 8) / 60).toFixed(0)}
+                        </div>
                       </div>
-                      <div className="col-span-1">
+                      
+                      {/* Faltas */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.faltas}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'faltas', parseInt(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                         />
+                        <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: '600', marginTop: '2px' }}>
+                          -S/ {(empleado.faltas * (empleado.sueldo_base / 30)).toFixed(0)}
+                        </div>
                       </div>
-                      <div className="col-span-2">
+                      
+                      {/* Bonos Adicionales */}
+                      <div style={{ textAlign: 'center' }}>
                         <input
                           type="number"
                           value={empleado.bonos_adicionales}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'bonos_adicionales', parseFloat(e.target.value) || 0)}
                           disabled={!empleado.incluir}
-                          className="w-full p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                          style={{
+                            width: '100%',
+                            padding: '4px',
+                            fontSize: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            textAlign: 'center',
+                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
+                          }}
                           min="0"
                           step="0.01"
                         />
+                        <div style={{ fontSize: '10px', color: '#059669', fontWeight: '600', marginTop: '2px' }}>
+                          Total: S/ {valores.sueldo_bruto_total.toFixed(0)}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                                      )
+                  })}
                 </div>
               </div>
 
-              {/* Resumen */}
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="text-sm text-blue-800">
-                  <strong>📊 Resumen:</strong> {empleadosSeleccionados.length} empleados seleccionados
-                  {empleadosSeleccionados.length > 0 && (
-                    <span> | Total sueldos base: S/ {totalSueldosBase.toFixed(2)}</span>
-                  )}
+              {/* Resumen Empresarial Claro */}
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                backgroundColor: '#eff6ff',
+                borderRadius: '8px',
+                border: '1px solid #3b82f6'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                  gap: '16px',
+                  textAlign: 'center'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1d4ed8' }}>
+                      {empleadosSeleccionados.length}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '500' }}>
+                      EMPLEADOS INCLUIDOS
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
+                      S/ {totalPlanilla.toFixed(0)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#047857', fontWeight: '500' }}>
+                      TOTAL BRUTO PLANILLA
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed' }}>
+                      S/ {empleadosSeleccionados.length > 0 ? (totalPlanilla / empleadosSeleccionados.length).toFixed(0) : '0'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6d28d9', fontWeight: '500' }}>
+                      PROMEDIO POR EMPLEADO
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc2626' }}>
+                      {formData.periodo}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#b91c1c', fontWeight: '500' }}>
+                      PERÍODO PLANILLA
+                    </div>
+                  </div>
                 </div>
+                
+                {empleadosSeleccionados.length > 0 && (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '8px 12px',
+                    backgroundColor: '#dcfce7',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    color: '#166534',
+                    textAlign: 'center',
+                    fontWeight: '500'
+                  }}>
+                    ✅ Planilla lista para procesar con {empleadosSeleccionados.length} empleados
+                    • Se calcularán automáticamente: AFP/ONP, ESSALUD, Impuesto 5ta categoría
+                  </div>
+                )}
               </div>
             </div>
           </form>
         </div>
 
         {/* Footer */}
-        <div 
-          style={{
-            padding: '1.5rem',
-            borderTop: '1px solid #e5e7eb',
-            backgroundColor: '#f9fafb',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '0.75rem'
-          }}
-        >
+        <div style={{
+          padding: '16px 24px',
+          borderTop: '1px solid #e5e7eb',
+          backgroundColor: '#f9fafb',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
           <button
             type="button"
             onClick={handleClose}
+            disabled={loading}
             style={{
-              padding: '12px 24px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#374151',
+              padding: '8px 24px',
+              color: '#6b7280',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
               backgroundColor: 'white',
-              border: '2px solid #d1d5db',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f3f4f6'
-              e.currentTarget.style.borderColor = '#9ca3af'
-              e.currentTarget.style.transform = 'translateY(-1px)'
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'white'
-              e.currentTarget.style.borderColor = '#d1d5db'
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1,
+              fontSize: '14px'
             }}
           >
-            ❌ Cancelar
+            Cancelar
           </button>
+          
           <button
-            onClick={handleSubmit}
-            disabled={loading || empleadosSeleccionados.length === 0}
+            type="submit"
+            form="planilla-form"
+            disabled={loading || empleadosSeleccionados.length === 0 || !formData.periodo}
             style={{
-              padding: '12px 24px',
-              fontSize: '14px',
-              fontWeight: '600',
+              padding: '8px 32px',
+              backgroundColor: loading || empleadosSeleccionados.length === 0 || !formData.periodo ? '#9ca3af' : '#2563eb',
               color: 'white',
-              backgroundColor: loading || empleadosSeleccionados.length === 0 ? '#9ca3af' : '#059669',
-              border: 'none',
               borderRadius: '8px',
-              cursor: loading || empleadosSeleccionados.length === 0 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseEnter={(e) => {
-              if (!loading && empleadosSeleccionados.length > 0) {
-                e.currentTarget.style.backgroundColor = '#047857'
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(5, 150, 105, 0.4)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!loading && empleadosSeleccionados.length > 0) {
-                e.currentTarget.style.backgroundColor = '#059669'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
-              }
+              border: 'none',
+              cursor: loading || empleadosSeleccionados.length === 0 || !formData.periodo ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '500'
             }}
           >
-            {loading ? '⏳ Procesando...' : '✅ Crear Planilla Perú'}
+            {loading ? (
+              <>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid white',
+                  borderTop: '2px solid transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                Procesando...
+              </>
+            ) : (
+              <>
+                ✅ Crear Planilla
+                <span style={{
+                  backgroundColor: '#1d4ed8',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px'
+                }}>
+                  {empleadosSeleccionados.length} empleados
+                </span>
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   )
 
-  // Usar portal para renderizar el modal en el body
-  return typeof window !== 'undefined' 
-    ? createPortal(modalContent, document.body)
-    : null
+  if (typeof window !== 'undefined') {
+    console.log('🔥 CREANDO PORTAL EN DOCUMENT.BODY')
+    console.log('🔥 document.body existe:', !!document.body)
+    return createPortal(modalContent, document.body)
+  } else {
+    console.log('🔥 Window undefined - no creando portal')
+    return null
+  }
 } 

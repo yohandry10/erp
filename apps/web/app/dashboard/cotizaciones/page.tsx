@@ -72,6 +72,11 @@ export default function CotizacionesPage() {
   const [showViewModal, setShowViewModal] = useState(false)
   const [selectedCotizacion, setSelectedCotizacion] = useState<Cotizacion | null>(null)
 
+  // Rastrear cambios en el estado del modal
+  useEffect(() => {
+    console.log('🔄 Estado del modal cambió a:', showCotizacionModal)
+  }, [showCotizacionModal])
+
   // Cargar datos iniciales
   useEffect(() => {
     loadData()
@@ -179,7 +184,10 @@ export default function CotizacionesPage() {
   }
 
   const handleCrearCotizacion = () => {
+    console.log('🔥 [CREAR COTIZACION] Botón clickeado - abriendo modal')
+    console.log('🔥 [CREAR COTIZACION] Estado actual:', { showCotizacionModal })
     setShowCotizacionModal(true)
+    console.log('🔥 [CREAR COTIZACION] Estado actualizado a true')
   }
 
   const handleCotizacionCreated = () => {
@@ -189,6 +197,10 @@ export default function CotizacionesPage() {
   const handleVerCotizacion = (cotizacion: Cotizacion) => {
     setSelectedCotizacion(cotizacion)
     setShowViewModal(true)
+  }
+
+  const handleActionsComplete = () => {
+    loadData() // Recargar datos después de cualquier acción
   }
 
   const getStatusColor = (estado: string) => {
@@ -201,10 +213,14 @@ export default function CotizacionesPage() {
         return { background: '#6b7280', color: 'white' }
       case 'ENVIADA':
         return { background: '#3b82f6', color: 'white' }
+      case 'APROBADA':
+        return { background: '#10b981', color: 'white' }
       case 'VENCIDA':
         return { background: '#dc2626', color: 'white' }
       case 'CONVERTIDA':
         return { background: '#059669', color: 'white' }
+      case 'RECHAZADA':
+        return { background: '#ef4444', color: 'white' }
       default:
         // Para cualquier estado raro, usar BORRADOR
         console.warn(`⚠️ Estado desconocido en cotización: "${estado}". Usando BORRADOR por defecto.`);
@@ -271,7 +287,12 @@ export default function CotizacionesPage() {
         </button>
         <button 
           className="refresh-btn"
-          onClick={handleCrearCotizacion}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            console.log('🎯 [BTN CLICK] Click detectado en botón Nueva Cotización')
+            handleCrearCotizacion()
+          }}
           style={{
             background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
             color: 'white',
@@ -695,9 +716,13 @@ export default function CotizacionesPage() {
     </div>
     
     {/* Modal de Cotización - Fuera del contenedor */}
+    {console.log('🚀 Rendering CotizacionModal with isOpen:', showCotizacionModal)}
     <CotizacionModal 
       isOpen={showCotizacionModal}
-      onClose={() => setShowCotizacionModal(false)}
+      onClose={() => {
+        console.log('🚪 [MODAL CLOSE] Cerrando modal de cotización')
+        setShowCotizacionModal(false)
+      }}
       onSuccess={handleCotizacionCreated}
     />
 
@@ -708,6 +733,7 @@ export default function CotizacionesPage() {
         setSelectedCotizacion(null)
       }}
       cotizacion={selectedCotizacion}
+      onActionsComplete={handleActionsComplete}
     />
     </>
   )

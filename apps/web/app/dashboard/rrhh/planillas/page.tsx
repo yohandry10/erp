@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import PlanillaModal from '@/components/modals/PlanillaModal';
+import PlanillaCalcularModal from '@/components/modals/PlanillaCalcularModal';
+import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import { useApi } from '@/hooks/use-api';
 
 const PlanillasPage = () => {
@@ -11,6 +13,11 @@ const PlanillasPage = () => {
   const [detallePlanilla, setDetallePlanilla] = useState<any[]>([]);
   const [showDetalle, setShowDetalle] = useState(false);
   const [showPlanillaModal, setShowPlanillaModal] = useState(false);
+  const [showCalcularModal, setShowCalcularModal] = useState(false);
+  const [showPagarModal, setShowPagarModal] = useState(false);
+  const [planillaSeleccionada, setPlanillaSeleccionada] = useState<any>(null);
+  
+  console.log('🔥 COMPONENTE RENDERIZADO - showPlanillaModal:', showPlanillaModal);
 
   useEffect(() => {
     loadPlanillas();
@@ -34,7 +41,9 @@ const PlanillasPage = () => {
   };
 
   const abrirModalPlanilla = () => {
+    console.log('🔥 ABRIENDO MODAL PLANILLA - llamando setShowPlanillaModal(true)');
     setShowPlanillaModal(true);
+    console.log('🔥 showPlanillaModal después de setState:', true);
   };
 
   const editarPlanilla = (planilla: any) => {
@@ -42,7 +51,60 @@ const PlanillasPage = () => {
     alert(`🚧 Función en desarrollo\n\nPronto podrás editar la planilla ${planilla?.periodo}\n\nPor ahora puedes:\n• Ver el detalle\n• Generar reportes\n• Aprobar si está calculada`);
   };
 
+  const abrirCalcularPlanilla = (planilla: any) => {
+    setPlanillaSeleccionada(planilla);
+    setShowCalcularModal(true);
+  };
+
+  const abrirPagarPlanilla = (planilla: any) => {
+    setPlanillaSeleccionada(planilla);
+    setShowPagarModal(true);
+  };
+
+  const handleCalcularSuccess = () => {
+    setShowCalcularModal(false);
+    setPlanillaSeleccionada(null);
+    loadPlanillas();
+  };
+
+  const handlePagarSuccess = () => {
+    setShowPagarModal(false);
+    setPlanillaSeleccionada(null);
+    loadPlanillas();
+  };
+
+  const generarAsientosContables = async (planillaId: string) => {
+    if (!confirm('¿Está seguro de generar los asientos contables para esta planilla?\n\nEsto creará registros en el módulo de contabilidad.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}/generar-asientos`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: S/ ${data.monto_total || '0.00'}`);
+      } else {
+        throw new Error('Error generando asientos contables');
+      }
+    } catch (error) {
+      console.error('Error generando asientos:', error);
+      alert('Error generando asientos contables: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePlanillaSuccess = () => {
+    console.log('🔥 handlePlanillaSuccess ejecutado - cerrando modal y recargando planillas');
+    setShowPlanillaModal(false);
     loadPlanillas();
   };
 
@@ -516,7 +578,7 @@ const PlanillasPage = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {/* Botón Editar - Solo para borradores */}
+                          {/* Botón Calcular - Solo para borradores */}
                           {planilla?.estado === 'borrador' && (
                             <button 
                               style={{
@@ -533,12 +595,38 @@ const PlanillasPage = () => {
                                 gap: '4px',
                                 transition: 'all 0.2s'
                               }}
-                              onClick={() => editarPlanilla(planilla)}
-                              title="Editar planilla"
+                              onClick={() => abrirCalcularPlanilla(planilla)}
+                              title="Calcular planilla detallada"
                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
                             >
-                              ✏️ Editar
+                              🧮 Calcular
+                            </button>
+                          )}
+
+                          {/* Botón Pagar - Para calculadas y aprobadas */}
+                          {(planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
+                            <button 
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                backgroundColor: '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={() => abrirPagarPlanilla(planilla)}
+                              title="Pagar planilla"
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                            >
+                              💰 Pagar
                             </button>
                           )}
                           
@@ -590,6 +678,32 @@ const PlanillasPage = () => {
                             📊 Reporte
                           </button>
                           
+                          {/* Botón Generar Asientos - Solo para calculadas */}
+                          {planilla?.estado === 'calculada' && (
+                            <button 
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                backgroundColor: '#7c3aed',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onClick={() => generarAsientosContables(planilla?.id)}
+                              title="Generar asientos contables"
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6d28d9'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
+                            >
+                              📊 Asientos
+                            </button>
+                          )}
+
                           {/* Botón Aprobar - Solo para calculadas */}
                           {planilla?.estado === 'calculada' && (
                             <button 
@@ -616,7 +730,7 @@ const PlanillasPage = () => {
                             </button>
                           )}
                           
-                          {/* Estado Cerrada - Solo visual */}
+                          {/* Estado Aprobada - Informativo */}
                           {planilla?.estado === 'aprobada' && (
                             <span style={{ 
                               background: 'var(--green-100)', 
@@ -626,7 +740,7 @@ const PlanillasPage = () => {
                               fontSize: '0.7rem',
                               fontWeight: '600'
                             }}>
-                              🔒 Cerrada
+                              ✅ Oficial
                             </span>
                           )}
                         </div>
@@ -768,10 +882,36 @@ const PlanillasPage = () => {
       )}
 
       {/* Modal de Planilla */}
+      {console.log('🔥 RENDERIZANDO MODAL - showPlanillaModal:', showPlanillaModal)}
       <PlanillaModal
         isOpen={showPlanillaModal}
-        onClose={() => setShowPlanillaModal(false)}
+        onClose={() => {
+          console.log('🔥 onClose llamado - cerrando modal')
+          setShowPlanillaModal(false)
+        }}
         onSuccess={handlePlanillaSuccess}
+      />
+
+      {/* Modal de Calcular Planilla */}
+      <PlanillaCalcularModal
+        isOpen={showCalcularModal}
+        onClose={() => {
+          setShowCalcularModal(false)
+          setPlanillaSeleccionada(null)
+        }}
+        onSuccess={handleCalcularSuccess}
+        planilla={planillaSeleccionada}
+      />
+
+      {/* Modal de Pagar Planilla */}
+      <PlanillaPagarModal
+        isOpen={showPagarModal}
+        onClose={() => {
+          setShowPagarModal(false)
+          setPlanillaSeleccionada(null)
+        }}
+        onSuccess={handlePagarSuccess}
+        planilla={planillaSeleccionada}
       />
     </div>
   );

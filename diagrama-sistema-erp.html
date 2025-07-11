@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema ERP - Diagrama de Flujo de Módulos</title>
+    <title>Sistema ERP Actualizado - Diagrama de Flujo de Módulos</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <style>
         body {
@@ -96,6 +96,17 @@
             text-align: center;
         }
         
+        .update-badge {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-left: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
         @media print {
             body { background: white; }
             .container { box-shadow: none; }
@@ -106,7 +117,8 @@
     <div class="container">
         <div class="header">
             <h1>🏢 Sistema ERP Integrado</h1>
-            <p>Diagrama de Flujo y Conexiones entre Módulos</p>
+            <span class="update-badge">✨ ACTUALIZADO 2025</span>
+            <p>Diagrama de Flujo y Conexiones entre Módulos - Con Mejoras RRHH y Configuración</p>
         </div>
         
         <div class="diagram-container">
@@ -117,6 +129,7 @@ graph TB
         WEB[Web Dashboard]
         LOGIN[Login/Auth]
         SIDEBAR[Navegación Sidebar]
+        MODALS["🎨 Modales Profesionales<br/>CSS Inline + Gradientes"]
     end
 
     %% MÓDULOS PRINCIPALES
@@ -158,11 +171,15 @@ graph TB
         PAGOS[Gestión de Pagos]
     end
 
-    subgraph "👥 MÓDULO RRHH"
-        EMPLEADOS[Gestión de Empleados]
-        PLANILLAS[Planillas Automatizadas]
-        BOLETAS[Boletas de Pago HTML]
-        RRHH_AUTO["🤖 Sistema Automatizado<br/>Un Click - Todo Calculado"]
+    subgraph "👥 MÓDULO RRHH COMPLETO"
+        EMPLEADOS[👤 Gestión de Empleados]
+        CANDIDATOS["📋 Gestión de Candidatos<br/>CVs + Reclutamiento"]
+        VACANTES["🏢 Gestión de Vacantes<br/>Proceso Hire-to-Retire"]
+        ASISTENCIA["⏰ Control de Asistencia<br/>Marcado Entrada/Salida"]
+        CONTRATOS["📄 Gestión de Contratos<br/>Renovaciones + Alertas"]
+        PLANILLAS["💰 Planillas Automatizadas<br/>Cálculos Peruanos"]
+        PAGOS_EMP["💸 Pagos Empleados<br/>Comprobantes + Control"]
+        RRHH_INTEGRATION["🔗 Integración Contable<br/>Asientos Automáticos"]
     end
 
     subgraph "📋 MÓDULO ELECTRÓNICO"
@@ -177,11 +194,12 @@ graph TB
         ARCHIVOS[Almacenamiento de Archivos]
     end
 
-    subgraph "⚙️ MÓDULO CONFIGURACIÓN"
-        USERS[Gestión de Usuarios]
-        ROLES[Control de Roles]
-        CONFIG[Configuración Empresa]
-        TENANT[Multi-tenant]
+    subgraph "⚙️ MÓDULO CONFIGURACIÓN EMPRESARIAL"
+        USERS["👥 Gestión de Usuarios<br/>Modales Profesionales"]
+        ROLES[🔐 Control de Roles]
+        CONFIG["🏢 Configuración Empresa<br/>Datos Fiscales + SUNAT"]
+        TENANT[🏬 Multi-tenant]
+        EMPRESA_DATA["📊 Datos Empresa<br/>RUC + Dirección + Logo"]
     end
 
     %% SERVICIOS DE INTEGRACIÓN
@@ -194,17 +212,20 @@ graph TB
         NOTIFICATIONS[Notification Service]
     end
 
-    %% BASE DE DATOS
-    subgraph "🗄️ SUPABASE DATABASE"
-        DB[(Base de Datos)]
+    %% BASE DE DATOS EXPANDIDA
+    subgraph "🗄️ SUPABASE DATABASE EXPANDIDA"
+        DB[(Base de Datos Principal)]
         AUTH_DB[Autenticación]
         TENANT_DB[Multi-tenant]
+        RRHH_TABLES["📊 40+ Tablas RRHH<br/>Empleados + Candidatos + Contratos<br/>Asistencias + Planillas + Pagos"]
+        EMPRESA_TABLES["🏢 Tablas Empresa<br/>Configuración + Usuarios"]
     end
 
     %% CONEXIONES PRINCIPALES
     WEB --> LOGIN
     LOGIN --> AUTH_DB
     WEB --> SIDEBAR
+    WEB --> MODALS
     SIDEBAR --> DASH
 
     %% Dashboard recibe de todos
@@ -239,12 +260,24 @@ graph TB
     STOCK --> MOVIMIENTOS
     MOVIMIENTOS --> INT_ACC
 
-    %% Flujo de RRHH Automatizado
-    EMPLEADOS --> RRHH_AUTO
-    RRHH_AUTO --> PLANILLAS
-    PLANILLAS --> BOLETAS
-    PLANILLAS --> INT_ACC
-    RRHH_AUTO -.->|"⚡ Proceso Automatizado<br/>Detecta empleados activos<br/>Calcula sueldos automáticamente"| EMPLEADOS
+    %% FLUJO RRHH COMPLETO - HIRE TO RETIRE
+    VACANTES --> CANDIDATOS
+    CANDIDATOS -.->|"📋 Proceso de Selección"| EMPLEADOS
+    EMPLEADOS --> CONTRATOS
+    CONTRATOS -.->|"📄 Alertas de Vencimiento"| EMPLEADOS
+    EMPLEADOS --> ASISTENCIA
+    ASISTENCIA -.->|"⏰ Control Diario"| PLANILLAS
+    EMPLEADOS --> PLANILLAS
+    PLANILLAS --> PAGOS_EMP
+    PLANILLAS --> RRHH_INTEGRATION
+    RRHH_INTEGRATION --> INT_ACC
+    PAGOS_EMP -.->|"💸 Comprobantes de Pago"| EMPLEADOS
+
+    %% Características Especiales RRHH
+    CANDIDATOS -.->|"🎯 Puntuación Automática CV"| VACANTES
+    ASISTENCIA -.->|"📊 Estadísticas Tiempo Real"| DASH
+    CONTRATOS -.->|"⚠️ Alertas 30 días"| NOTIFICATIONS
+    PAGOS_EMP -.->|"📄 Generación PDF"| DOCS
 
     %% Flujo Electrónico
     POS --> CPE
@@ -262,11 +295,14 @@ graph TB
     INT_FIN --> FLUJO
     INT_FIN --> PAGOS
 
-    %% Gestión de Usuarios y Configuración
+    %% Gestión de Usuarios y Configuración MEJORADA
     USERS --> ROLES
+    USERS --> MODALS
     ROLES --> AUTH_DB
+    CONFIG --> EMPRESA_DATA
     CONFIG --> TENANT
     TENANT --> TENANT_DB
+    EMPRESA_DATA -.->|"🏢 Logo + RUC + Dirección"| DASH
 
     %% Documentos
     DOCS --> ARCHIVOS
@@ -279,16 +315,23 @@ graph TB
     EVENT_BUS --> INT_DASH
     EVENT_BUS --> NOTIFICATIONS
 
-    %% Conexiones a BD
+    %% Conexiones a BD EXPANDIDAS
     DB --> POS
     DB --> INV
     DB --> COMPRAS
     DB --> ASIENTOS
-    DB --> EMPLEADOS
     DB --> CPE
     DB --> SIRE
     DB --> CLIENTES
     DB --> PROVEEDORES
+    RRHH_TABLES --> EMPLEADOS
+    RRHH_TABLES --> CANDIDATOS
+    RRHH_TABLES --> CONTRATOS
+    RRHH_TABLES --> ASISTENCIA
+    RRHH_TABLES --> PLANILLAS
+    RRHH_TABLES --> PAGOS_EMP
+    EMPRESA_TABLES --> CONFIG
+    EMPRESA_TABLES --> USERS
 
     %% Estilos
     classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
@@ -298,56 +341,86 @@ graph TB
     classDef accounting fill:#fce4ec,stroke:#880e4f,stroke-width:2px
     classDef finance fill:#e0f2f1,stroke:#004d40,stroke-width:2px
     classDef rrhh fill:#f1f8e9,stroke:#33691e,stroke-width:2px
+    classDef rrhhNew fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     classDef electronic fill:#e8eaf6,stroke:#1a237e,stroke-width:2px
     classDef integration fill:#fff8e1,stroke:#ff6f00,stroke-width:2px
     classDef database fill:#efebe9,stroke:#3e2723,stroke-width:2px
-    classDef automated fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    classDef config fill:#fce4ec,stroke:#ad1457,stroke-width:2px
+    classDef updated fill:#ffebee,stroke:#c62828,stroke-width:3px
 
-    class WEB,LOGIN,SIDEBAR frontend
+    class WEB,LOGIN,SIDEBAR,MODALS frontend
     class POS,CAJAS,SESIONES,MÉTODOS pos
     class INV,STOCK,MOVIMIENTOS inventory
     class COT,COMPRAS,CLIENTES,PROVEEDORES commercial
     class PLAN,ASIENTOS,BALANCE accounting
     class FINANZAS,FLUJO,PAGOS finance
-    class EMPLEADOS,PLANILLAS,BOLETAS rrhh
-    class RRHH_AUTO automated
+    class EMPLEADOS,PLANILLAS rrhh
+    class CANDIDATOS,VACANTES,ASISTENCIA,CONTRATOS,PAGOS_EMP,RRHH_INTEGRATION rrhhNew
     class CPE,GRE,SIRE,OSE electronic
     class INT_INV,INT_ACC,INT_FIN,INT_DASH,EVENT_BUS,NOTIFICATIONS integration
-    class DB,AUTH_DB,TENANT_DB database
+    class DB,AUTH_DB,TENANT_DB,RRHH_TABLES,EMPRESA_TABLES database
+    class USERS,ROLES,CONFIG,TENANT,EMPRESA_DATA config
+    class DOCS,ARCHIVOS updated
             </div>
         </div>
         
         <div class="info-panel">
-            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📋 Características Principales del Sistema</h2>
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📋 Características Principales del Sistema ACTUALIZADO</h2>
             
             <div class="info-grid">
                 <div class="info-card">
-                    <h3>🔄 Flujos Automatizados</h3>
+                    <h3>🆕 RRHH Completo - Hire to Retire</h3>
                     <ul>
-                        <li><strong>RRHH:</strong> Un botón crea planillas y calcula sueldos automáticamente</li>
-                        <li><strong>Compras:</strong> Creación automática de productos y actualización de stock</li>
-                        <li><strong>Ventas:</strong> Integración POS → Inventario → Contabilidad en tiempo real</li>
-                        <li><strong>Reportes:</strong> Generación automática con auto-polling cada 2 segundos</li>
+                        <li><strong>📋 Gestión de Candidatos:</strong> CVs, puntuación automática, proceso de selección</li>
+                        <li><strong>🏢 Gestión de Vacantes:</strong> Creación y seguimiento de posiciones abiertas</li>
+                        <li><strong>⏰ Control de Asistencia:</strong> Marcado entrada/salida, estadísticas tiempo real</li>
+                        <li><strong>📄 Gestión de Contratos:</strong> Alertas de vencimiento, renovaciones automáticas</li>
+                        <li><strong>💸 Pagos Empleados:</strong> Comprobantes PDF, control de pagos</li>
+                        <li><strong>🔗 Integración Contable:</strong> Asientos automáticos de planillas</li>
                     </ul>
                 </div>
                 
                 <div class="info-card">
-                    <h3>🔧 Servicios de Integración</h3>
+                    <h3>⚙️ Configuración Empresarial</h3>
                     <ul>
-                        <li><strong>Inventory Integration:</strong> Sincroniza stock entre todos los módulos</li>
-                        <li><strong>Accounting Integration:</strong> Automatiza asientos contables</li>
-                        <li><strong>Financial Integration:</strong> Gestiona flujos financieros</li>
-                        <li><strong>Dashboard Integration:</strong> Centraliza métricas y KPIs</li>
+                        <li><strong>👥 Gestión de Usuarios:</strong> Modales profesionales con CSS inline</li>
+                        <li><strong>🏢 Datos de Empresa:</strong> RUC, dirección fiscal, logo corporativo</li>
+                        <li><strong>🔐 Control de Roles:</strong> Permisos granulares por módulo</li>
+                        <li><strong>🏬 Multi-tenant:</strong> Soporte múltiples empresas</li>
+                        <li><strong>📊 Configuración SUNAT:</strong> Datos fiscales y tributarios</li>
                     </ul>
                 </div>
                 
                 <div class="info-card">
-                    <h3>📊 Módulos Principales</h3>
+                    <h3>🎨 Interfaz Profesional</h3>
                     <ul>
-                        <li><strong>POS:</strong> Punto de venta con gestión de cajas y métodos de pago</li>
-                        <li><strong>Inventario:</strong> Control completo de productos y stock</li>
-                        <li><strong>Comercial:</strong> Cotizaciones, órdenes de compra, clientes y proveedores</li>
-                        <li><strong>Electrónico:</strong> CPE, GRE, SIRE con conexión OSE/SUNAT</li>
+                        <li><strong>Modales CSS Inline:</strong> Sin dependencias externas, siempre visibles</li>
+                        <li><strong>Gradientes Corporativos:</strong> Diseño moderno y profesional</li>
+                        <li><strong>Formularios Inteligentes:</strong> Validaciones en tiempo real</li>
+                        <li><strong>Tooltips Descriptivos:</strong> Cada campo con explicación clara</li>
+                        <li><strong>Estados Visuales:</strong> Colores semánticos para cada estado</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🗄️ Base de Datos Expandida</h3>
+                    <ul>
+                        <li><strong>40+ Tablas RRHH:</strong> Estructura completa hire-to-retire</li>
+                        <li><strong>Datos Empresa:</strong> Configuración empresarial completa</li>
+                        <li><strong>Candidatos + CVs:</strong> Almacenamiento y puntuación automática</li>
+                        <li><strong>Asistencias:</strong> Control diario con cálculo de horas</li>
+                        <li><strong>Planillas Peruanas:</strong> AFP, ONP, ESSALUD automático</li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h3>🔄 Flujos Automatizados MEJORADOS</h3>
+                    <ul>
+                        <li><strong>RRHH:</strong> Proceso completo desde reclutamiento hasta pago</li>
+                        <li><strong>Candidatos:</strong> Puntuación automática de CVs basada en experiencia</li>
+                        <li><strong>Contratos:</strong> Alertas 30 días antes del vencimiento</li>
+                        <li><strong>Asistencia:</strong> Estadísticas en tiempo real del día</li>
+                        <li><strong>Planillas:</strong> Cálculos peruanos con un solo click</li>
                     </ul>
                 </div>
                 
@@ -355,16 +428,20 @@ graph TB
                     <h3>🏢 Arquitectura Empresarial</h3>
                     <ul>
                         <li><strong>Multi-tenant:</strong> Soporte para múltiples empresas</li>
-                        <li><strong>Control de Roles:</strong> Gestión granular de permisos</li>
-                        <li><strong>Reportes Profesionales:</strong> HTML corporativo en lugar de CSVs</li>
-                        <li><strong>Base de Datos:</strong> Supabase con 25+ tablas organizadas</li>
+                        <li><strong>Event Bus:</strong> Comunicación entre módulos en tiempo real</li>
+                        <li><strong>Integración Total:</strong> Todos los módulos interconectados</li>
+                        <li><strong>Reportes HTML:</strong> Profesionales en lugar de CSVs básicos</li>
+                        <li><strong>Supabase:</strong> Base de datos robusta y escalable</li>
                     </ul>
                 </div>
             </div>
         </div>
         
         <div class="footer">
-            <p>📅 Generado: <span id="fecha"></span> | Sistema ERP Integrado - Todos los módulos conectados y automatizados</p>
+            <p>📅 Actualizado: <span id="fecha"></span> | Sistema ERP Integrado - RRHH Completo + Configuración Empresarial</p>
+            <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                ✨ Nuevas características: Gestión Candidatos, Control Asistencia, Contratos Inteligentes, Modales Profesionales
+            </p>
         </div>
     </div>
 

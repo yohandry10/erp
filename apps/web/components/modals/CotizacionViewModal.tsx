@@ -15,15 +15,24 @@ interface Cotizacion {
   probabilidad: number
   items: any[]
   observaciones?: string
+  // Nuevos campos para conversión
+  fecha_aprobacion?: string
+  fecha_conversion?: string
+  fecha_rechazo?: string
+  documento_generado_id?: string
+  motivo_rechazo?: string
 }
 
 interface CotizacionViewModalProps {
   isOpen: boolean
   onClose: () => void
   cotizacion: Cotizacion | null
+  onActionsComplete?: () => void
 }
 
-export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: CotizacionViewModalProps) {
+export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onActionsComplete }: CotizacionViewModalProps) {
+  const [loading, setLoading] = React.useState(false)
+  
   if (!isOpen || !cotizacion) return null
 
   const formatCurrency = (amount: number) => {
@@ -50,10 +59,14 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
         return { background: '#6b7280', color: 'white' }
       case 'ENVIADA':
         return { background: '#3b82f6', color: 'white' }
+      case 'APROBADA':
+        return { background: '#10b981', color: 'white' }
       case 'VENCIDA':
         return { background: '#dc2626', color: 'white' }
       case 'CONVERTIDA':
         return { background: '#059669', color: 'white' }
+      case 'RECHAZADA':
+        return { background: '#ef4444', color: 'white' }
       default:
         return { background: '#6b7280', color: 'white' }
     }
@@ -80,7 +93,108 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
     }
   }
 
+  const handleAprobar = async () => {
+    try {
+      setLoading(true)
+      
+      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/aprobar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          probabilidad: 100,
+          observaciones: 'Cotización aprobada para conversión'
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert('✅ Cotización aprobada exitosamente')
+        onActionsComplete?.()
+        onClose()
+      } else {
+        alert('❌ Error: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error aprobando cotización:', error)
+      alert('❌ Error aprobando cotización')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConvertir = async () => {
+    try {
+      setLoading(true)
+      
+      const tipoDocumento = confirm('¿Generar FACTURA (Aceptar) o BOLETA (Cancelar)?') ? 'FACTURA' : 'BOLETA'
+      
+      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/convertir-en-venta`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          generar_factura: true,
+          tipo_documento: tipoDocumento,
+          metodo_pago: 'CONTADO',
+          observaciones: 'Convertido desde cotización'
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`🎉 ${result.message}`)
+        onActionsComplete?.()
+        onClose()
+      } else {
+        alert('❌ Error: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error convirtiendo cotización:', error)
+      alert('❌ Error convirtiendo cotización')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRechazar = async () => {
+    const motivo = prompt('Ingrese el motivo del rechazo:')
+    if (!motivo) return
+
+    try {
+      setLoading(true)
+      
+      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/rechazar`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ motivo })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert('✅ Cotización rechazada')
+        onActionsComplete?.()
+        onClose()
+      } else {
+        alert('❌ Error: ' + result.error)
+      }
+    } catch (error) {
+      console.error('Error rechazando cotización:', error)
+      alert('❌ Error rechazando cotización')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const vencimiento = calcularDiasVencimiento()
+  const estadoActual = cotizacion.estado?.toUpperCase()
 
   return (
     <div 
@@ -104,7 +218,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
           backgroundColor: 'white',
           borderRadius: '16px',
           width: '100%',
-          maxWidth: '800px',
+          maxWidth: '900px',
           maxHeight: '90vh',
           overflow: 'auto',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
@@ -163,9 +277,9 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
                 fontSize: '0.875rem',
                 fontWeight: '600'
               }}>
-                                  {cotizacion.estado?.toUpperCase() === 'PENDIENTE' || cotizacion.estado?.toUpperCase() === 'EN PROCESO'
-                    ? 'BORRADOR' 
-                    : (cotizacion.estado?.toUpperCase() || 'BORRADOR')}
+                {estadoActual === 'PENDIENTE' || estadoActual === 'EN PROCESO'
+                  ? 'BORRADOR' 
+                  : (estadoActual || 'BORRADOR')}
               </span>
             </div>
             
@@ -220,6 +334,43 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
             </div>
           </div>
 
+          {/* Información de seguimiento si existe */}
+          {(cotizacion.fecha_aprobacion || cotizacion.fecha_conversion || cotizacion.fecha_rechazo) && (
+            <div style={{
+              background: '#f8fafc',
+              padding: '16px',
+              borderRadius: '12px',
+              marginBottom: '24px'
+            }}>
+              <h3 style={{ margin: '0 0 12px 0', color: '#374151' }}>Seguimiento</h3>
+              {cotizacion.fecha_aprobacion && (
+                <div style={{ marginBottom: '8px', fontSize: '0.875rem' }}>
+                  <strong>Aprobada:</strong> {formatDate(cotizacion.fecha_aprobacion)}
+                </div>
+              )}
+              {cotizacion.fecha_conversion && (
+                <div style={{ marginBottom: '8px', fontSize: '0.875rem' }}>
+                  <strong>Convertida:</strong> {formatDate(cotizacion.fecha_conversion)}
+                  {cotizacion.documento_generado_id && (
+                    <span style={{ color: '#059669', marginLeft: '8px' }}>
+                      ✅ Documento generado
+                    </span>
+                  )}
+                </div>
+              )}
+              {cotizacion.fecha_rechazo && (
+                <div style={{ fontSize: '0.875rem' }}>
+                  <strong>Rechazada:</strong> {formatDate(cotizacion.fecha_rechazo)}
+                  {cotizacion.motivo_rechazo && (
+                    <div style={{ color: '#ef4444', marginTop: '4px' }}>
+                      Motivo: {cotizacion.motivo_rechazo}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Desglose financiero */}
           <div style={{
             background: '#f8fafc',
@@ -266,27 +417,106 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion }: Cot
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer con botones de acción */}
         <div style={{
-          padding: '16px 24px',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px'
+          background: '#f8fafc',
+          padding: '20px 24px',
+          borderRadius: '0 0 16px 16px',
+          borderTop: '1px solid #e5e7eb'
         }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            Cerrar
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ color: vencimiento.color, fontSize: '0.875rem', fontWeight: '600' }}>
+              {vencimiento.texto}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {/* Botones según el estado */}
+              {(estadoActual === 'BORRADOR' || estadoActual === 'ENVIADA') && (
+                <>
+                  <button
+                    onClick={handleAprobar}
+                    disabled={loading}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      opacity: loading ? 0.5 : 1
+                    }}
+                  >
+                    {loading ? '⏳' : '✅'} Aprobar
+                  </button>
+                  <button
+                    onClick={handleRechazar}
+                    disabled={loading}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      opacity: loading ? 0.5 : 1
+                    }}
+                  >
+                    {loading ? '⏳' : '❌'} Rechazar
+                  </button>
+                </>
+              )}
+              
+              {estadoActual === 'APROBADA' && (
+                <button
+                  onClick={handleConvertir}
+                  disabled={loading}
+                  style={{
+                    background: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                >
+                  {loading ? '⏳' : '🔄'} Convertir en Venta
+                </button>
+              )}
+
+              {estadoActual === 'CONVERTIDA' && (
+                <div style={{
+                  background: '#dcfce7',
+                  color: '#166534',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  ✅ Ya convertida en venta
+                </div>
+              )}
+
+              {estadoActual === 'RECHAZADA' && (
+                <div style={{
+                  background: '#fecaca',
+                  color: '#dc2626',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}>
+                  ❌ Cotización rechazada
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

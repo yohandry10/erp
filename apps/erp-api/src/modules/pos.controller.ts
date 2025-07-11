@@ -435,7 +435,7 @@ export class PosController {
             .eq('id', venta.id);
         }
 
-        // 8. Emitir evento de venta procesada para módulos integrados (incluye reducción automática de stock)
+        // 8. Emitir evento de venta procesada para módulos integrados
         this.eventBus.emitVentaProcessed({
           ventaId: venta.id,
           numeroTicket: numeroTicket,

@@ -159,51 +159,165 @@ const RrhhPage = () => {
           </div>
         </Link>
 
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
-          border: '2px solid rgba(59, 130, 246, 0.2)',
-          borderRadius: 'var(--border-radius-lg)',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          opacity: 0.6
-        }}>
-          <div style={{ fontSize: '2.5rem' }}>⏰</div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--blue-700)' }}>
-              Asistencia
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-              Próximamente - Control de horarios
-            </p>
+        <Link href="/dashboard/rrhh/asistencia" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
+            border: '2px solid rgba(59, 130, 246, 0.2)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>⏰</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--blue-700)' }}>
+                Asistencia
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                Control de horarios y marcado
+              </p>
+            </div>
           </div>
-        </div>
+        </Link>
 
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%)',
-          border: '2px solid rgba(245, 158, 11, 0.2)',
-          borderRadius: 'var(--border-radius-lg)',
-          padding: '1.5rem',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          opacity: 0.6
-        }}>
-          <div style={{ fontSize: '2.5rem' }}>📄</div>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--amber-700)' }}>
-              Contratos
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-              Próximamente - Gestión de contratos
-            </p>
+        <Link href="/dashboard/rrhh/contratos" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%)',
+            border: '2px solid rgba(245, 158, 11, 0.2)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>📄</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--amber-700)' }}>
+                Contratos
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                Gestión de contratos laborales
+              </p>
+            </div>
           </div>
-        </div>
+        </Link>
+
+        <Link href="/dashboard/rrhh/candidatos" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%)',
+            border: '2px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+            e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)';
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>📋</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--purple-700)' }}>
+                CVs & Candidatos
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                Reclutamiento y selección
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/rrhh/pagos" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.05) 100%)',
+            border: '2px solid rgba(34, 197, 94, 0.2)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+            e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.2)';
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>💳</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--green-700)' }}>
+                Pagos & Comprobantes
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                Control de pagos mensuales
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/rrhh/reportes" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
+            border: '2px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>📊</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--red-700)' }}>
+                Reportes RRHH
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                Análisis y estadísticas
+              </p>
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Estadísticas */}
@@ -322,13 +436,65 @@ const RrhhPage = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button className="btn-icon" title="Ver empleado">
+                          <button 
+                            className="btn-icon" 
+                            title="Ver empleado"
+                            onClick={() => {
+                              const detalles = `
+INFORMACIÓN DEL EMPLEADO
+Nombre: ${empleado.nombres} ${empleado.apellidos}
+Documento: ${empleado.tipo_documento} ${empleado.numero_documento}
+Email: ${empleado.email || 'No registrado'}
+Teléfono: ${empleado.telefono || 'No registrado'}
+Puesto: ${empleado.puesto || 'Sin asignar'}
+Departamento: ${empleado.departamentos?.nombre || 'Sin departamento'}
+Fecha Ingreso: ${formatDate(empleado.fecha_ingreso)}
+Salario: S/ ${empleado.salario?.toLocaleString() || '0'}
+Estado: ${empleado.estado}
+Dirección: ${empleado.direccion || 'No registrada'}
+                              `;
+                              alert(detalles);
+                            }}
+                          >
                             👁️
                           </button>
-                          <button className="btn-icon" title="Editar empleado">
+                          <button 
+                            className="btn-icon" 
+                            title="Editar empleado"
+                            onClick={() => {
+                              // Aquí abrirías el modal de edición
+                              console.log('Editando empleado:', empleado.id);
+                              alert('Función de edición en desarrollo. Use el modal principal por ahora.');
+                            }}
+                          >
                             ✏️
                           </button>
-                          <button className="btn-icon-danger" title="Eliminar empleado">
+                          <button 
+                            className="btn-icon-danger" 
+                            title="Eliminar empleado"
+                            onClick={async () => {
+                              if (confirm(`¿Está seguro de eliminar a ${empleado.nombres} ${empleado.apellidos}?`)) {
+                                try {
+                                  const response = await fetch(`http://localhost:3001/api/rrhh/empleados/${empleado.id}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                                    },
+                                  });
+                                  
+                                  if (response.ok) {
+                                    loadData(); // Recargar la lista
+                                    alert('Empleado eliminado exitosamente');
+                                  } else {
+                                    throw new Error('Error al eliminar empleado');
+                                  }
+                                } catch (error) {
+                                  console.error('Error:', error);
+                                  alert('Error al eliminar empleado');
+                                }
+                              }
+                            }}
+                          >
                             🗑️
                           </button>
                         </div>

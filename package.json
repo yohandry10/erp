@@ -23,11 +23,15 @@
     "k8s:deploy": "helm upgrade --install erp infra/helm/erp-suite"
   },
   "devDependencies": {
-    "turbo": "^1.13.4",
     "@types/node": "^20.12.7",
-    "typescript": "^5.4.5",
+    "eslint": "^8.57.0",
     "prettier": "^3.2.5",
-    "eslint": "^8.57.0"
+    "turbo": "^1.13.4",
+    "typescript": "^5.4.5"
   },
-  "packageManager": "pnpm@8.15.6"
-} 
+  "packageManager": "pnpm@8.15.6",
+  "dependencies": {
+    "@swc/helpers": "^0.5.17",
+    "next": "15.3.3"
+  }
+}

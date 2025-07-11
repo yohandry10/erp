@@ -30,6 +30,10 @@ interface DetalleCotizacion {
 }
 
 export default function CotizacionModal({ isOpen, onClose, onSuccess }: CotizacionModalProps) {
+  console.log('🎯 CotizacionModal recibido props:', { isOpen })
+  console.log('🎯 Modal renderizando con isOpen:', isOpen)
+  console.log('🎯 Elemento Dialog debe estar visible:', isOpen ? 'SÍ' : 'NO')
+
   const { get, post } = useApi()
   const [loading, setLoading] = useState(false)
   const [clientes, setClientes] = useState<Cliente[]>([])
@@ -60,6 +64,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
   ])
 
   useEffect(() => {
+    console.log('🔥 [COTIZACION MODAL] useEffect triggered - isOpen:', isOpen)
     if (isOpen) {
       loadClientes()
     }
