@@ -1,6 +1,12 @@
 import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { AccountingIntegrationService } from '../shared/integration/accounting-integration.service';
+// Remover import viejo:
+// import { AccountingIntegrationService } from '../shared/integration/accounting-integration.service';
+
+// Agregar imports nuevos:
+import { AccountingEntriesService } from '../shared/integration/accounting-entries.service';
+import { AccountingBooksService } from '../shared/integration/accounting-books.service';
+import { AccountingReportsService } from '../shared/integration/accounting-reports.service';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 
 @ApiTags('contabilidad')
@@ -8,10 +14,10 @@ import { SupabaseService } from '../shared/supabase/supabase.service';
 export class ContabilidadController {
 
   constructor(
-    private readonly accountingService: AccountingIntegrationService,
+    private readonly accountingService: AccountingBooksService,
     private readonly supabaseService: SupabaseService
   ) {
-    console.log('📚 [ContabilidadController] Inicializado con AccountingIntegrationService');
+    console.log('📚 [ContabilidadController] Inicializado con AccountingBooksService');
   }
   
   @Get('estado-resultados')
@@ -276,19 +282,47 @@ export class ContabilidadController {
   @Get('balance-comprobacion')
   @ApiOperation({ summary: 'Obtener Balance de Comprobación' })
   @ApiResponse({ status: 200, description: 'Balance de Comprobación obtenido exitosamente' })
-  getBalanceComprobacion(@Query() periodo: any) {
-    // TODO: Implement real trial balance
-    return {
-      success: true,
-      data: {
-        cuentas: [],
-        totales: {
-          totalDebe: 0,
-          totalHaber: 0,
-          diferencia: 0
-        }
-      }
-    };
+  async getBalanceComprobacion(@Query() filtros: any) {
+    try {
+      console.log('⚖️ Generando Balance de Comprobación...', filtros);
+      
+      const balanceComprobacion = await this.accountingService.getBalanceComprobacion(filtros);
+      
+      return {
+        success: true,
+        data: balanceComprobacion
+      };
+    } catch (error) {
+      console.error('❌ Error generando Balance de Comprobación:', error);
+      return {
+        success: false,
+        message: 'Error generando Balance de Comprobación',
+        data: null
+      };
+    }
+  }
+
+  @Get('kardex-valorizado')
+  @ApiOperation({ summary: 'Obtener Kardex Valorizado de Inventarios' })
+  @ApiResponse({ status: 200, description: 'Kardex Valorizado obtenido exitosamente' })
+  async getKardexValorizado(@Query() filtros: any) {
+    try {
+      console.log('📦 Generando Kardex Valorizado...', filtros);
+      
+      const kardexValorizado = await this.accountingService.getKardexValorizado(filtros);
+      
+      return {
+        success: true,
+        data: kardexValorizado
+      };
+    } catch (error) {
+      console.error('❌ Error generando Kardex Valorizado:', error);
+      return {
+        success: false,
+        message: 'Error generando Kardex Valorizado',
+        data: null
+      };
+    }
   }
 
   @Post('cierre-contable')
@@ -305,6 +339,152 @@ export class ContabilidadController {
       },
       message: 'Cierre contable realizado exitosamente'
     };
+  }
+
+  // =============================================
+  // 📋 LIBROS DE MEDIA PRIORIDAD
+  // =============================================
+
+  @Get('libro-caja-bancos')
+  @ApiOperation({ summary: 'Obtener Libro de Caja y Bancos' })
+  @ApiResponse({ status: 200, description: 'Libro de Caja y Bancos obtenido exitosamente' })
+  async getLibroCajaBancos(@Query() filtros: any) {
+    try {
+      console.log('💰 Generando Libro de Caja y Bancos...', filtros);
+      
+      const libroCajaBancos = await this.accountingService.getLibroCajaBancos(filtros);
+      
+      return {
+        success: true,
+        data: libroCajaBancos
+      };
+    } catch (error) {
+      console.error('❌ Error generando Libro de Caja y Bancos:', error);
+      return {
+        success: false,
+        message: 'Error generando Libro de Caja y Bancos',
+        data: null
+      };
+    }
+  }
+
+  @Get('registro-activos-fijos')
+  @ApiOperation({ summary: 'Obtener Registro de Activos Fijos' })
+  @ApiResponse({ status: 200, description: 'Registro de Activos Fijos obtenido exitosamente' })
+  async getRegistroActivosFijos(@Query() filtros: any) {
+    try {
+      console.log('🏦 Generando Registro de Activos Fijos...', filtros);
+      
+      const registroActivosFijos = await this.accountingService.getRegistroActivosFijos(filtros);
+      
+      return {
+        success: true,
+        data: registroActivosFijos
+      };
+    } catch (error) {
+      console.error('❌ Error generando Registro de Activos Fijos:', error);
+      return {
+        success: false,
+        message: 'Error generando Registro de Activos Fijos',
+        data: null
+      };
+    }
+  }
+
+  @Get('libro-planillas')
+  @ApiOperation({ summary: 'Obtener Libro de Planillas Oficial' })
+  @ApiResponse({ status: 200, description: 'Libro de Planillas obtenido exitosamente' })
+  async getLibroPlanillas(@Query() filtros: any) {
+    try {
+      console.log('👥 Generando Libro de Planillas...', filtros);
+      
+      const libroPlanillas = await this.accountingService.getLibroPlanillas(filtros);
+      
+      return {
+        success: true,
+        data: libroPlanillas
+      };
+    } catch (error) {
+      console.error('❌ Error generando Libro de Planillas:', error);
+      return {
+        success: false,
+        message: 'Error generando Libro de Planillas',
+        data: null
+      };
+    }
+  }
+
+  // =============================================
+  // 📱 LIBROS DE BAJA PRIORIDAD (ELECTRÓNICOS SUNAT)
+  // =============================================
+
+  @Get('libro-inventarios-balances')
+  @ApiOperation({ summary: 'Obtener Libro de Inventarios y Balances' })
+  @ApiResponse({ status: 200, description: 'Libro de Inventarios y Balances obtenido exitosamente' })
+  async getLibroInventariosBalances(@Query() filtros: any) {
+    try {
+      console.log('📦 Generando Libro de Inventarios y Balances...', filtros);
+      
+      const libroInventariosBalances = await this.accountingService.getLibroInventariosBalances(filtros);
+      
+      return {
+        success: true,
+        data: libroInventariosBalances
+      };
+    } catch (error) {
+      console.error('❌ Error generando Libro de Inventarios y Balances:', error);
+      return {
+        success: false,
+        message: 'Error generando Libro de Inventarios y Balances',
+        data: null
+      };
+    }
+  }
+
+  @Get('registro-costos')
+  @ApiOperation({ summary: 'Obtener Registro de Costos' })
+  @ApiResponse({ status: 200, description: 'Registro de Costos obtenido exitosamente' })
+  async getRegistroCostos(@Query() filtros: any) {
+    try {
+      console.log('🏭 Generando Registro de Costos...', filtros);
+      
+      const registroCostos = await this.accountingService.getRegistroCostos(filtros);
+      
+      return {
+        success: true,
+        data: registroCostos
+      };
+    } catch (error) {
+      console.error('❌ Error generando Registro de Costos:', error);
+      return {
+        success: false,
+        message: 'Error generando Registro de Costos',
+        data: null
+      };
+    }
+  }
+
+  @Get('libros-electronicos-sunat')
+  @ApiOperation({ summary: 'Obtener Libros Electrónicos SUNAT' })
+  @ApiResponse({ status: 200, description: 'Libros Electrónicos SUNAT obtenidos exitosamente' })
+  async getLibrosElectronicosSunat(@Query() filtros: any) {
+    try {
+      console.log('📱 Generando Libros Electrónicos SUNAT...', filtros);
+      
+      const librosElectronicos = await this.accountingService.getLibrosElectronicosSunat(filtros);
+      
+      return {
+        success: true,
+        data: librosElectronicos
+      };
+    } catch (error) {
+      console.error('❌ Error generando Libros Electrónicos SUNAT:', error);
+      return {
+        success: false,
+        message: 'Error generando Libros Electrónicos SUNAT',
+        data: null
+      };
+    }
   }
 
   @Get('libro-diario')
@@ -430,19 +610,11 @@ export class ContabilidadController {
     try {
       console.log('🛒 Generando Registro de Compras...', filtros);
       
-      // TODO: Implementar cuando tengas facturas de proveedores
+      const registroCompras = await this.accountingService.getRegistroCompras(filtros);
+      
       return {
         success: true,
-        data: {
-          periodo: 'Próximamente',
-          totalCompras: 0,
-          compras: [],
-          resumen: {
-            baseImponible: 0,
-            igv: 0,
-            total: 0
-          }
-        }
+        data: registroCompras
       };
     } catch (error) {
       console.error('❌ Error generando Registro de Compras:', error);
@@ -453,4 +625,77 @@ export class ContabilidadController {
       };
     }
   }
-} 
+
+  @Get('registro-consignaciones')
+  @ApiOperation({ summary: 'Obtener Registro de Consignaciones' })
+  @ApiResponse({ status: 200, description: 'Registro de Consignaciones obtenido exitosamente' })
+  async getRegistroConsignaciones(
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+    @Query('estado') estado?: string
+  ) {
+    try {
+      console.log('📋 [ContabilidadController] Obteniendo registro de consignaciones...');
+      
+      const filtros = {
+        fechaDesde,
+        fechaHasta,
+        estado
+      };
+      
+      const consignaciones = await this.accountingService.getRegistroConsignaciones(filtros);
+      
+      return {
+        success: true,
+        data: consignaciones,
+        message: 'Registro de consignaciones obtenido exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ [ContabilidadController] Error obteniendo registro de consignaciones:', error);
+      throw error;
+    }
+  }
+
+  @Post('registro-consignaciones')
+  @ApiOperation({ summary: 'Crear nueva consignación' })
+  @ApiResponse({ status: 201, description: 'Consignación creada exitosamente' })
+  async createConsignacion(@Body() consignacionData: any) {
+    try {
+      console.log('📋 [ContabilidadController] Creando nueva consignación...');
+      
+      const consignacion = await this.accountingService.createConsignacion(consignacionData);
+      
+      return {
+        success: true,
+        data: consignacion,
+        message: 'Consignación creada exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ [ContabilidadController] Error creando consignación:', error);
+      throw error;
+    }
+  }
+
+  @Post('registro-consignaciones/:id/estado')
+  @ApiOperation({ summary: 'Actualizar estado de consignación' })
+  @ApiResponse({ status: 200, description: 'Estado de consignación actualizado exitosamente' })
+  async updateEstadoConsignacion(
+    @Param('id') id: string,
+    @Body('estado') nuevoEstado: string
+  ) {
+    try {
+      console.log('📋 [ContabilidadController] Actualizando estado de consignación...');
+      
+      const consignacion = await this.accountingService.updateEstadoConsignacion(id, nuevoEstado);
+      
+      return {
+        success: true,
+        data: consignacion,
+        message: 'Estado de consignación actualizado exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ [ContabilidadController] Error actualizando estado:', error);
+      throw error;
+    }
+  }
+}

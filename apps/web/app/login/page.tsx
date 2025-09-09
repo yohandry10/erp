@@ -1,132 +1,125 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { Building2, Loader2 } from 'lucide-react'
+import { Building2, Loader2, Globe, Lock, Mail } from 'lucide-react'
+import { usePaises } from '@/hooks/use-paises'
 
-const loginStyles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-    padding: '2rem',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '28rem',
-  },
-  logoContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '2rem',
-    gap: '0.75rem',
-  },
-  title: {
-    fontSize: '2rem',
-    textAlign: 'center' as const,
-    fontWeight: '800',
-    background: 'var(--gradient-primary)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-    margin: '0',
-  },
-  description: {
-    textAlign: 'center' as const,
-    color: 'var(--primary-600)',
-    marginBottom: '0',
-  },
-  content: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1.5rem',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.75rem',
-  },
-  footer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1.5rem',
-  },
-  button: {
-    width: '100%',
-  },
-  divider: {
-    position: 'relative' as const,
-  },
-  dividerLine: {
-    position: 'absolute' as const,
-    inset: '0',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  dividerSpan: {
-    width: '100%',
-    borderTop: '1px solid rgba(203, 213, 225, 0.5)',
-  },
-  dividerText: {
-    position: 'relative' as const,
-    display: 'flex',
-    justifyContent: 'center',
-    fontSize: '0.75rem',
-    textTransform: 'uppercase' as const,
-  },
-  dividerTextSpan: {
-    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-    padding: '0 1rem',
-    color: 'var(--primary-600)',
-    fontWeight: '600',
-  },
+type Pais = {
+  id: string | number
+  nombre: string
+  codigo_fiscal?: string
+  codigo_iso?: string
 }
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClientComponentClient()
   const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const {
+    paises,
+    loading: paisesLoading,
+    getUserConfiguration,
+    updateUserConfiguration,
+    // Remover estas líneas que no existen:
+    // saveUserCountryPreference,
+    // createUserConfiguration,
+  } = usePaises()
+
+  // Establecer país por defecto (Perú) cuando carguen los países
+  useEffect(() => {
+    const list = (paises as Pais[]) || []
+    if (list.length > 0 && !selectedCountry) {
+      const peru = list.find((p) => p.codigo_iso === 'PE')
+      if (peru) {
+        setSelectedCountry(String(peru.id))
+      }
+    }
+  }, [paises, selectedCountry])
+
+  const handleLogin = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && 'preventDefault' in e) e.preventDefault()
+
+    if (!selectedCountry) {
+      toast({
+        variant: 'destructive',
+        title: 'País requerido',
+        description: 'Por favor selecciona un país antes de continuar',
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error('🚨 Supabase Auth Error:', error)
+        console.error('🚨 Error Code:', error.status)
+        console.error('🚨 Error Message:', error.message)
         toast({
-          variant: "destructive",
-          title: "Error de autenticación",
-          description: error.message,
+          variant: 'destructive',
+          title: 'Error de autenticación',
+          description: `${error.message} (Code: ${error.status})`,
         })
-      } else {
+        return
+      }
+
+      if (data.user) {
+        // Guardar/crear preferencia de país del usuario
+        const userId = data.user.id
+        
+        // Convertir selectedCountry a número
+        const paisPreferidoId = parseInt(selectedCountry, 10)
+        
+        try {
+          // Usar updateUserConfiguration que maneja tanto creación como actualización
+          await updateUserConfiguration({
+            pais_preferido_id: paisPreferidoId,
+            idioma: 'es',
+            zona_horaria: 'America/Lima'
+          })
+        } catch (configError) {
+          console.warn('Error guardando configuración de usuario:', configError)
+          // No bloquear el login si falla la configuración
+        }
+        
+        // Persistir en localStorage para uso inmediato
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('selectedCountry', selectedCountry)
+        }
+
+        const list = (paises as Pais[]) || []
+        const selectedPais = list.find((p) => String(p.id) === selectedCountry)
+
         toast({
-          title: "Bienvenido",
-          description: "Has iniciado sesión correctamente",
+          title: 'Bienvenido',
+          description: `Has iniciado sesión correctamente - ${selectedPais?.nombre ?? '—'}`,
         })
+
         router.push('/dashboard')
       }
-    } catch (error) {
+    } catch (_err) {
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Ocurrió un error inesperado",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Ocurrió un error inesperado',
       })
     } finally {
       setLoading(false)
@@ -134,90 +127,152 @@ export default function LoginPage() {
   }
 
   const handleDemoLogin = async () => {
+    if (!selectedCountry) {
+      toast({
+        variant: 'destructive',
+        title: 'País requerido',
+        description: 'Por favor selecciona un país antes de continuar',
+      })
+      return
+    }
+
     setLoading(true)
+
     // Simulación de login demo
     setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedCountry', selectedCountry)
+      }
+      const list = (paises as Pais[]) || []
+      const selectedPais = list.find((p) => String(p.id) === selectedCountry)
       toast({
-        title: "Modo Demo",
-        description: "Accediendo al sistema en modo demostración",
+        title: 'Modo Demo',
+        description: `Accediendo al sistema en modo demostración - ${selectedPais?.nombre ?? '—'}`,
       })
       router.push('/dashboard')
       setLoading(false)
     }, 1000)
   }
 
+  const paisesList = (paises as Pais[]) || []
+
   return (
-    <div style={loginStyles.container}>
-      <Card style={loginStyles.card}>
-        <CardHeader>
-          <div style={loginStyles.logoContainer}>
-            <Building2 style={{ height: '2rem', width: '2rem', color: 'var(--blue-600)' }} />
-          </div>
-          <CardTitle style={loginStyles.title}>ERP Suite</CardTitle>
-          <CardDescription style={loginStyles.description}>
-            Ingresa tus credenciales para acceder al sistema
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent style={loginStyles.content}>
-          <form onSubmit={handleLogin}>
-            <div style={loginStyles.formGroup}>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@empresa.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+    <div className="login-container">
+      <div className="login-background">
+        <div className="login-gradient-1"></div>
+        <div className="login-gradient-2"></div>
+        <div className="login-gradient-3"></div>
+      </div>
+      
+      <div className="login-card-wrapper">
+        <Card className="login-card">
+          <CardHeader className="login-header">
+            <div className="login-logo">
+              <div className="logo-icon">
+                <Building2 size={32} />
+              </div>
+              <div className="logo-text">
+                <CardTitle className="login-title">ERP Suite</CardTitle>
+                <CardDescription className="login-subtitle">
+                  Sistema Empresarial Integrado
+                </CardDescription>
+              </div>
             </div>
-            <div style={loginStyles.formGroup}>
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-          </form>
-        </CardContent>
+          </CardHeader>
 
-        <CardFooter style={loginStyles.footer}>
-          <Button
-            onClick={handleLogin}
-            disabled={loading}
-            style={loginStyles.button}
-          >
-            {loading && <Loader2 style={{ marginRight: '0.5rem', height: '1rem', width: '1rem', animation: 'spin 1s linear infinite' }} />}
-            Iniciar Sesión
-          </Button>
+          <CardContent className="login-content">
+            <form onSubmit={handleLogin} className="login-form">
+              {/* Selector de País */}
+              <div className="form-group">
+                <Label htmlFor="country" className="form-label">
+                  <Globe size={16} />
+                  País / Jurisdicción Fiscal
+                </Label>
+                <Select
+                  value={selectedCountry}
+                  onValueChange={(v) => setSelectedCountry(v)}
+                  disabled={paisesLoading}
+                >
+                  <SelectTrigger id="country" className="select-trigger">
+                    <SelectValue placeholder={paisesLoading ? 'Cargando países...' : 'Selecciona un país'} />
+                  </SelectTrigger>
+                  <SelectContent className="select-content">
+                    {paisesList.map((pais) => (
+                      <SelectItem key={String(pais.id)} value={String(pais.id)} className="select-item">
+                        <div className="country-option">
+                          <span className="country-name">{pais.nombre}</span>
+                          {pais.codigo_fiscal && (
+                            <span className="country-code">({pais.codigo_fiscal})</span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div style={loginStyles.divider}>
-            <div style={loginStyles.dividerLine}>
-              <span style={loginStyles.dividerSpan} />
-            </div>
-            <div style={loginStyles.dividerText}>
-              <span style={loginStyles.dividerTextSpan}>
-                O continúa con
-              </span>
-            </div>
-          </div>
+              <div className="form-group">
+                <Label htmlFor="email" className="form-label">
+                  <Mail size={16} />
+                  Correo Electrónico
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="username"
+                  className="form-input"
+                />
+              </div>
 
-          <Button
-            variant="outline"
-            onClick={handleDemoLogin}
-            disabled={loading}
-            style={loginStyles.button}
-          >
-            {loading && <Loader2 style={{ marginRight: '0.5rem', height: '1rem', width: '1rem', animation: 'spin 1s linear infinite' }} />}
-            Acceso Demo
-          </Button>
-        </CardFooter>
-      </Card>
+              <div className="form-group">
+                <Label htmlFor="password" className="form-label">
+                  <Lock size={16} />
+                  Contraseña
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="form-input"
+                />
+              </div>
+            </form>
+          </CardContent>
+
+          <CardFooter className="login-footer">
+            <Button
+              onClick={handleLogin}
+              disabled={loading || paisesLoading || !selectedCountry}
+              className="login-button primary"
+            >
+              {loading && <Loader2 className="button-spinner" />}
+              Iniciar Sesión
+            </Button>
+
+            <div className="divider">
+              <span className="divider-text">O continúa con</span>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={handleDemoLogin}
+              disabled={loading || paisesLoading || !selectedCountry}
+              className="login-button demo"
+            >
+              {loading && <Loader2 className="button-spinner" />}
+              Acceso Demo
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   )
-} 
+}

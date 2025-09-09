@@ -10,6 +10,9 @@ const RrhhPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Definir API_BASE_URL
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
   useEffect(() => {
     loadData();
   }, []);
@@ -19,7 +22,7 @@ const RrhhPage = () => {
       setLoading(true);
       
       // Cargar empleados
-      const empleadosResponse = await fetch('http://localhost:3001/api/rrhh/empleados', {
+      const empleadosResponse = await fetch(`${API_BASE_URL}/api/rrhh/empleados`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -39,7 +42,7 @@ const RrhhPage = () => {
       }
 
       // Cargar departamentos
-      const departamentosResponse = await fetch('http://localhost:3001/api/rrhh/departamentos', {
+      const departamentosResponse = await fetch(`${API_BASE_URL}/api/rrhh/departamentos`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -475,7 +478,7 @@ Dirección: ${empleado.direccion || 'No registrada'}
                             onClick={async () => {
                               if (confirm(`¿Está seguro de eliminar a ${empleado.nombres} ${empleado.apellidos}?`)) {
                                 try {
-                                  const response = await fetch(`http://localhost:3001/api/rrhh/empleados/${empleado.id}`, {
+                                  const response = await fetch(`${API_BASE_URL}/api/rrhh/empleados/${empleado.id}`, {
                                     method: 'DELETE',
                                     headers: {
                                       'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -519,4 +522,4 @@ Dirección: ${empleado.direccion || 'No registrada'}
   );
 };
 
-export default RrhhPage; 
+export default RrhhPage;

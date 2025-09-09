@@ -38,7 +38,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
   const loadGreData = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:3001/api/gre/guias/${documentId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/gre/guias/${documentId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'demo-token'}`,
@@ -58,7 +58,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
   const handleDownloadPdf = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/gre/guias/${documentId}/pdf`, {
+      const response = await fetch(`${API_BASE_URL}/api/gre/guias/${documentId}/pdf`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'demo-token'}`,
@@ -553,4 +553,4 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       `}</style>
     </div>
   )
-} 
+}

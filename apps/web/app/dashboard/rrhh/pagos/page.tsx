@@ -12,6 +12,9 @@ const PagosPage = () => {
   const [loading, setLoading] = useState(true);
   const api = useApi();
 
+  // Definir API_BASE_URL
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
   useEffect(() => {
     loadData();
   }, []);
@@ -71,7 +74,7 @@ const PagosPage = () => {
 
   const generarComprobante = async (pagoId: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/rrhh/pagos/${pagoId}/comprobante`, {
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/pagos/${pagoId}/comprobante`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -397,4 +400,4 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
   );
 };
 
-export default PagosPage; 
+export default PagosPage;

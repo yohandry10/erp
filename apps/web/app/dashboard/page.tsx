@@ -80,8 +80,8 @@ export default function Dashboard() {
       
       // Obtener estadísticas y actividades en paralelo
       const [statsResponse, activitiesResponse] = await Promise.all([
-        fetch('http://localhost:3001/api/dashboard/stats'),
-        fetch('http://localhost:3001/api/dashboard/activities')
+        fetch('http://localhost:3002/api/dashboard/stats'),
+        fetch('http://localhost:3002/api/dashboard/activities')
       ])
 
       if (!statsResponse.ok || !activitiesResponse.ok) {
@@ -426,4 +426,4 @@ export default function Dashboard() {
       )}
     </div>
   )
-} 
+}

@@ -1,106 +1,73 @@
-import { Module, OnModuleInit } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-
-// Módulos principales
-import { SupabaseModule } from './shared/supabase/supabase.module';
-import { IntegrationModule } from './shared/integration/integration.module';
-import { JobsModule } from './shared/jobs/jobs.module';
-
-// Módulos de negocio
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
-import { RrhhModule } from './modules/rrhh/rrhh.module';
-import { ConfiguracionModule } from './modules/configuracion.module';
+import { UsuariosModule } from './modules/usuarios/usuarios.module';
+import { SupabaseModule } from './shared/supabase/supabase.module';
+import { SecurityModule } from './shared/security/security.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { RateLimitGuard } from './shared/security/guards/rate-limit.guard';
+import { ValidationInterceptor } from './shared/security/interceptors/validation.interceptor';
+import { IntegrationModule } from './shared/integration/integration.module'; // Importar el módulo de integración
+import { ComprasModule } from './modules/compras/compras.module';
+import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module';
+import { InventarioModule } from './modules/inventario/inventario.module';
+import { ContabilidadModule } from './modules/contabilidad/contabilidad.module';
+import { DocumentosModule } from './modules/documentos/documentos.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SireModule } from './modules/sire/sire.module';
+import { OseModule } from './modules/ose/ose.module';
 import { CpeModule } from './modules/cpe/cpe.module';
 import { GreModule } from './modules/gre/gre.module';
-import { SireModule } from './modules/sire/sire.module';
-import { DocumentosModule } from './modules/documentos.module';
-
-// Controladores individuales (solo los que existen)
-import { AnalyticsController } from './modules/analytics.controller';
-import { ComprasController } from './modules/compras.controller';
-import { ContabilidadController } from './modules/contabilidad.controller';
-import { CotizacionesController } from './modules/cotizaciones.controller';
-import { DashboardController } from './modules/dashboard.controller';
-
-import { InventarioController } from './modules/inventario.controller';
-import { PosController } from './modules/pos.controller';
-import { UsuariosController } from './modules/usuarios.controller';
-
-// Servicios compartidos
-import { EventBusService } from './shared/events/event-bus.service';
-import { InventoryIntegrationService } from './shared/integration/inventory-integration.service';
-import { AccountingIntegrationService } from './shared/integration/accounting-integration.service';
-
+import { PosModule } from './modules/pos/pos.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { RrhhModule } from './modules/rrhh/rrhh.module';
+import { RetencionesModule } from './modules/retenciones/retenciones.module';
+import { PaisesModule } from './modules/paises/paises.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
     }),
+    SecurityModule,
+    AuthModule,
     SupabaseModule,
     IntegrationModule,
-    JobsModule,
-    AuthModule,
-    RrhhModule,
-    ConfiguracionModule,
+    ComprasModule,
+    CotizacionesModule,
+    InventarioModule,
+    ContabilidadModule,
+    DocumentosModule,
+    ReportsModule,
+    NotificationsModule,
+    SireModule,
+    OseModule,
     CpeModule,
     GreModule,
-    SireModule,
-    DocumentosModule,
+    PosModule,
+    AnalyticsModule,
+    DashboardModule,
+    RrhhModule,
+    RetencionesModule,
+    PaisesModule,
   ],
-  controllers: [
-    AppController,
-    AnalyticsController,
-    DashboardController,
-    PosController,
-    ComprasController,
-    CotizacionesController,
-    InventarioController,
-
-    ContabilidadController,
-    UsuariosController,
-  ],
+  controllers: [AppController],
   providers: [
     AppService,
-    EventBusService,
-    InventoryIntegrationService,
-    AccountingIntegrationService,
-
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ValidationInterceptor,
+    },
   ],
 })
-export class AppModule implements OnModuleInit {
-  constructor(
-    private readonly inventoryService: InventoryIntegrationService,
-    private readonly accountingService: AccountingIntegrationService,
-
-  ) {
-    console.log('🚀 [App] Módulo principal inicializado con todas las integraciones');
-    console.log('✅ [App] Sistema ERP con integración completa entre módulos activo');
-    console.log('🤖 [App] Procesos automáticos en background inicializados');
-    console.log('🎯 [App] EventBus expandido para comunicación crítica entre módulos');
-  }
-
-  async onModuleInit() {
-    console.log('🔥 [App] FORZANDO INICIALIZACIÓN DE SERVICIOS DE INTEGRACIÓN...');
-    
-    // FORZAR LLAMADA A MÉTODOS PARA INSTANCIAR SERVICIOS
-    try {
-      console.log('📦 [App] Forzando instanciación de InventoryIntegrationService...');
-      await this.inventoryService.getProductosStock();
-      console.log('✅ [App] InventoryIntegrationService INSTANCIADO');
-      
-      console.log('📚 [App] Forzando instanciación de AccountingIntegrationService...');
-      await this.accountingService.initializeCuentasCache();
-      console.log('✅ [App] AccountingIntegrationService INSTANCIADO');
-      
-
-      
-    } catch (error) {
-      console.error('❌ [App] Error instanciando servicios:', error);
-    }
-    
-    console.log('✅ [App] TODOS LOS SERVICIOS DE INTEGRACIÓN ESTÁN LISTOS PARA RECIBIR EVENTOS');
-  }
-}
+export class AppModule {}

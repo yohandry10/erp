@@ -12,8 +12,6 @@ export const metadata: Metadata = {
   description: 'Sistema completo para gestión tributaria con CPE, GRE y SIRE',
 }
 
-export const dynamic = 'force-dynamic'
-
 export default function RootLayout({
   children,
 }: {
@@ -32,4 +30,4 @@ export default function RootLayout({
       </body>
     </html>
   )
-} 
+}

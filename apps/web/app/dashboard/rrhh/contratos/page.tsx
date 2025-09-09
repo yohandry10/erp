@@ -10,8 +10,8 @@ const ContratosPage = () => {
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [contratoEdit, setContratoEdit] = useState(null);
-  const [contratoDetail, setContratoDetail] = useState(null);
+  const [contratoEdit, setContratoEdit] = useState<any>(null);
+  const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const api = useApi();
 
@@ -72,7 +72,8 @@ const ContratosPage = () => {
 
   const generarContrato = async (contratoId: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/rrhh/contratos/${contratoId}/generar`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/contratos/${contratoId}/generar`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -557,7 +558,7 @@ const ContratosPage = () => {
                       EMPLEADO
                     </label>
                     <div style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
-                      {getEmpleadoNombre(contratoDetail.empleado_id)}
+                      {getEmpleadoNombre(contratoDetail?.empleado_id || '')}
                     </div>
                   </div>
                   <div>
@@ -565,7 +566,7 @@ const ContratosPage = () => {
                       ID CONTRATO
                     </label>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>
-                      {contratoDetail.id}
+                      {contratoDetail?.id}
                     </div>
                   </div>
                 </div>
@@ -604,7 +605,7 @@ const ContratosPage = () => {
                       fontWeight: '600',
                       backgroundColor: contratoDetail.tipo_contrato === 'indefinido' ? '#dbeafe' : 
                                      contratoDetail.tipo_contrato === 'temporal' ? '#fed7aa' :
-                                     contratoDetail.tipo_contrato === 'practicas' ? '#e9d5ff' : '#fce7f3',
+                                     contratoDetail?.tipo_contrato === 'practicas' ? '#e9d5ff' : '#fce7f3',
                       color: contratoDetail.tipo_contrato === 'indefinido' ? '#1e40af' : 
                              contratoDetail.tipo_contrato === 'temporal' ? '#ea580c' :
                              contratoDetail.tipo_contrato === 'practicas' ? '#7c3aed' : '#be185d'
@@ -805,4 +806,4 @@ const ContratosPage = () => {
   );
 };
 
-export default ContratosPage; 
+export default ContratosPage;

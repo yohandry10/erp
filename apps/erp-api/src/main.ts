@@ -3,6 +3,9 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { SupabaseService } from './shared/supabase/supabase.service';
 import { ValidationPipe } from '@nestjs/common';
+import { SecurityService } from './shared/security/security.service';
+import helmet from 'helmet';
+import compression from 'compression';
 
 /**
  * Notifica a PostgREST para que recargue el esquema de la base de datos.
@@ -24,62 +27,70 @@ async function notifySchemaReload(supabase: SupabaseService) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
-  // Validación global de DTOs
+  // Obtener servicio de seguridad
+  const securityService = app.get(SecurityService);
+  
+  // Configurar Helmet para headers de seguridad
+  app.use(helmet(securityService.getHelmetConfig()));
+  
+  // Configurar compresión
+  app.use(compression(securityService.getCompressionConfig()));
+  
+  // Configurar trust proxy para obtener IP real (usando getHttpAdapter)
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.getInstance().set('trust proxy', 1);
+  
+  // Validación global de DTOs con configuración más estricta
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
     whitelist: true,
     forbidNonWhitelisted: true,
-    disableErrorMessages: false,
+    disableErrorMessages: process.env.NODE_ENV === 'production',
+    validateCustomDecorators: true,
+    transformOptions: {
+      enableImplicitConversion: false,
+    },
   }));
   
-  // Configuración CORS para permitir peticiones desde el frontend
-  app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'http://localhost:3001',
-      'https://localhost:3000',
-      'https://localhost:3001'
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: [
-      'Origin',
-      'X-Requested-With',
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'Cache-Control',
-      'X-HTTP-Method-Override'
-    ],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  });
+  // Configuración CORS mejorada
+  app.enableCors(securityService.getCorsConfig());
 
   // PREFIJO GLOBAL
   app.setGlobalPrefix('api');
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('ERP Suite API')
-    .setDescription('Sistema ERP completo con módulos integrados')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger documentation (solo en desarrollo)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('ERP Suite API')
+      .setDescription('Sistema ERP completo con módulos integrados')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addServer('http://localhost:3002', 'Desarrollo')
+      .build();
+    
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+  }
 
   // Forzar recarga de esquema de Supabase al iniciar
   const supabaseService = app.get(SupabaseService);
   await notifySchemaReload(supabaseService);
 
-  const port = process.env.PORT || 3001;
+  const port = process.env.PORT || 3002;
   await app.listen(port);
   
   console.log(`🚀 Servidor corriendo en puerto ${port}`);
-  console.log(`📚 Documentación disponible en http://localhost:${port}/api/docs`);
-  console.log(`🔗 CORS enabled for: http://localhost:3000`);
+  console.log(`🔒 Seguridad habilitada: Helmet, Rate Limiting, Compression`);
+  
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📚 Documentación disponible en http://localhost:${port}/api/docs`);
+  }
+  
+  console.log(`🔗 CORS configurado para entornos permitidos`);
 }
 
-bootstrap(); 
+bootstrap();

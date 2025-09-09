@@ -126,6 +126,7 @@ export interface FacturaCobradaEvent {
 export interface GastoRegistradoEvent {
   gastoId: string;
   concepto: string;
+  descripcion: string; // Add this line
   categoria: string;
   monto: number;
   proveedor?: string;
@@ -428,9 +429,11 @@ export class EventBusService {
   // ========== LISTENERS TIPADOS ==========
 
   // Ventas y facturación
-  onVentaProcessed(listener: (event: ERPEvent) => void) {
-    this.on('venta.procesada', listener);
-  }
+  // Línea 462 - Eliminar el duplicado
+  // Remover esta línea duplicada:
+  // onVentaProcessed(listener: (event: ERPEvent) => void) {
+  //   this.on('venta.procesada', listener);
+  // }
 
   onComprobanteCreadoEvent(listener: (event: ERPEvent) => void) {
     this.on('comprobante.creado', listener);
@@ -458,6 +461,10 @@ export class EventBusService {
   }
 
   // Compras
+  onVentaProcessed(listener: (event: ERPEvent) => void) {
+    this.on('venta.procesada', listener);
+  }
+
   onCompraEntregada(listener: (event: ERPEvent) => void) {
     this.on('compra.entregada', listener);
   }
@@ -519,4 +526,5 @@ export class EventBusService {
   onDashboardMetricsUpdated(listener: (event: ERPEvent) => void) {
     this.on('dashboard.metrics.updated', listener);
   }
-} 
+}
+

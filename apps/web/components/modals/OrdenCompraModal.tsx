@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -14,10 +14,11 @@ interface OrdenCompraModalProps {
 interface OrdenItem {
   id: string
   producto_id: string
-  producto_nombre: string
+  producto_nombre?: string
   cantidad: number
   precio_unitario: number
   subtotal: number
+  esNuevoProducto?: boolean
 }
 
 export default function OrdenCompraModal({ 
@@ -46,11 +47,15 @@ export default function OrdenCompraModal({
   })
 
   const [items, setItems] = useState<OrdenItem[]>([])
-  const [proveedores, setProveedores] = useState([])
-  const [productos, setProductos] = useState([])
+  const [proveedores, setProveedores] = useState<any[]>([])
+  const [productos, setProductos] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const [totales, setTotales] = useState({
+  const [totales, setTotales] = useState<{
+    subtotal: number;
+    igv: number;
+    total: number;
+  }>({
     subtotal: 0,
     igv: 0,
     total: 0
@@ -134,29 +139,28 @@ export default function OrdenCompraModal({
         fecha_orden: orden.fecha_orden,
         fecha_entrega: orden.fecha_entrega,
         moneda: orden.moneda,
-        subtotal: orden.subtotal,
-        igv: orden.igv,
-        total: orden.total,
+        subtotal: Number(orden.subtotal) || 0,
+        igv: Number(orden.igv) || 0,
+        total: Number(orden.total) || 0,
         estado: orden.estado,
         observaciones: orden.observaciones || ''
       })
       
-      // Procesar los items correctamente - ASEGURAR QUE SE PROCESAN BIEN
-      const itemsArray = Array.isArray(orden.items) ? orden.items : [];
-      console.log('📋 Items raw de orden:', JSON.stringify(orden.items, null, 2));
+      // Procesar los items correctamente
+      const itemsArray = Array.isArray(orden.items) ? orden.items : []
+      console.log('📋 Items raw de orden:', JSON.stringify(orden.items, null, 2))
       
-      const itemsToLoad = itemsArray.map((item: any, index: number) => {
-        const processedItem = {
+      const itemsToLoad: OrdenItem[] = itemsArray.map((item: any, index: number) => {
+        const processedItem: OrdenItem = {
           id: item.id || `item-${Date.now()}-${index}`,
           producto_id: item.producto_id || '',
           producto_nombre: item.producto_nombre || item.nombre || '',
-          cantidad: parseFloat(item.cantidad) || 0,
-          precio_unitario: parseFloat(item.precio_unitario) || 0,
-          subtotal: parseFloat(item.subtotal) || (parseFloat(item.cantidad) * parseFloat(item.precio_unitario)) || 0
-        };
-        
-        console.log(`📋 Item ${index} procesado:`, JSON.stringify(processedItem, null, 2));
-        return processedItem;
+          cantidad: Number(item.cantidad) || 0,
+          precio_unitario: Number(item.precio_unitario) || 0,
+          subtotal: Number(item.subtotal) || (Number(item.cantidad) * Number(item.precio_unitario)) || 0,
+        }
+        console.log(`📋 Item ${index} procesado:`, JSON.stringify(processedItem, null, 2))
+        return processedItem
       })
       
       console.log('📋 Items procesados para cargar:', JSON.stringify(itemsToLoad, null, 2))
@@ -166,7 +170,7 @@ export default function OrdenCompraModal({
 
   const calculateTotales = () => {
     const subtotal = items.reduce((sum, item) => {
-      const itemSubtotal = parseFloat(item.subtotal) || 0
+      const itemSubtotal = Number(item.subtotal) || 0
       return sum + itemSubtotal
     }, 0)
     const igv = subtotal * 0.18
@@ -178,12 +182,13 @@ export default function OrdenCompraModal({
 
   const addItem = () => {
     const newItem: OrdenItem = {
-      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ID más único
+      id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       producto_id: '',
       producto_nombre: '',
       cantidad: 1,
       precio_unitario: 0,
-      subtotal: 0
+      subtotal: 0,
+      esNuevoProducto: false,
     }
     setItems(prev => [...prev, newItem])
   }
@@ -193,7 +198,7 @@ export default function OrdenCompraModal({
     
     // Convertir valores numéricos y validar
     if (field === 'cantidad' || field === 'precio_unitario') {
-      const numValue = parseFloat(value) || 0
+      const numValue = Number(value) || 0
       newItems[index] = { ...newItems[index], [field]: numValue }
     } else {
       newItems[index] = { ...newItems[index], [field]: value }
@@ -204,14 +209,14 @@ export default function OrdenCompraModal({
       const producto = productos.find((p: any) => p.id === value)
       if (producto) {
         newItems[index].producto_nombre = producto.nombre
-        newItems[index].precio_unitario = parseFloat(producto.precio) || 0
+        newItems[index].precio_unitario = Number(producto.precio) || 0
       }
     }
 
     // Recalcular subtotal con validación
     if (field === 'cantidad' || field === 'precio_unitario') {
-      const cantidad = parseFloat(newItems[index].cantidad) || 0
-      const precio = parseFloat(newItems[index].precio_unitario) || 0
+      const cantidad = Number(newItems[index].cantidad) || 0
+      const precio = Number(newItems[index].precio_unitario) || 0
       newItems[index].subtotal = cantidad * precio
     }
 
@@ -318,21 +323,26 @@ export default function OrdenCompraModal({
           <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>
             {orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
           </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#6b7280',
-              width: '30px',
-              height: '30px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              hover: { backgroundColor: '#f3f4f6' }
+          <button 
+            onClick={onClose} 
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              fontSize: '1.5rem', 
+              cursor: 'pointer', 
+              color: '#6b7280', 
+              width: '30px', 
+              height: '30px', 
+              borderRadius: '50%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
             ×
@@ -389,8 +399,7 @@ export default function OrdenCompraModal({
                   type="button"
                   onClick={() => {
                     alert('Función de agregar proveedor - Se abrirá en nueva ventana');
-                    // En una implementación real aquí abriríamos el modal de proveedores
-                    // o redirigiríamos a la página de proveedores
+                    // Aquí abrirías el modal de proveedores o irías a su página
                   }}
                   style={{
                     padding: '0.5rem 1rem',
@@ -611,8 +620,8 @@ export default function OrdenCompraModal({
                           }}
                         />
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '500' }}>
-                        S/ {(parseFloat(item.subtotal) || 0).toFixed(2)}
+                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 500 }}>
+                        S/ {Number(item.subtotal || 0).toFixed(2)}
                       </td>
                       <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                         <button
@@ -642,15 +651,15 @@ export default function OrdenCompraModal({
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: '500' }}>Subtotal: </span>
-                    <span>S/ {(parseFloat(totales.subtotal) || 0).toFixed(2)}</span>
+                    <span style={{ fontWeight: 500 }}>Subtotal: </span>
+                    <span>S/ {Number(totales.subtotal || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: '500' }}>IGV (18%): </span>
-                    <span>S/ {(parseFloat(totales.igv) || 0).toFixed(2)}</span>
+                    <span style={{ fontWeight: 500 }}>IGV (18%): </span>
+                    <span>S/ {Number(totales.igv || 0).toFixed(2)}</span>
                   </div>
-                  <div style={{ fontSize: '1.125rem', fontWeight: '600', borderTop: '1px solid #d1d5db', paddingTop: '0.5rem' }}>
-                    <span>Total: S/ {(parseFloat(totales.total) || 0).toFixed(2)}</span>
+                  <div style={{ fontSize: '1.125rem', fontWeight: 600, borderTop: '1px solid #d1d5db', paddingTop: '0.5rem' }}>
+                    <span>Total: S/ {Number(totales.total || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -659,7 +668,7 @@ export default function OrdenCompraModal({
 
           {/* Observaciones */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
               Observaciones
             </label>
             <textarea
@@ -690,7 +699,7 @@ export default function OrdenCompraModal({
                 color: '#374151',
                 cursor: 'pointer',
                 fontSize: '0.875rem',
-                fontWeight: '500'
+                fontWeight: 500
               }}
             >
               Cancelar
@@ -706,7 +715,7 @@ export default function OrdenCompraModal({
                 borderRadius: '0.375rem',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
                 fontSize: '0.875rem',
-                fontWeight: '500'
+                fontWeight: 500
               }}
             >
               {isLoading ? 'Procesando...' : (orden ? 'Actualizar' : 'Crear')} Orden

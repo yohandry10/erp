@@ -32,84 +32,78 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     setState({ success: false, data: undefined })
 
     try {
-      // Get current session for auth token
+      // Sesión actual para el token
       const { data: { session } } = await supabase.auth.getSession()
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-      const url = `${apiUrl}${endpoint}`
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+      const url = `${API_BASE_URL}${endpoint}`
       
-      console.log('🌐 API URL:', apiUrl)
-      console.log('🔗 Full URL:', url)
-      console.log('📦 Request Options:', options)
-
-      // Default headers
+      // Headers base
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...(options.headers || {}),
       }
 
-      // Add authorization header if session exists
+      // Añadir token si existe
       if (session?.access_token) {
         (headers as Record<string, string>).Authorization = `Bearer ${session.access_token}`
-        console.log('🔐 Auth token added')
-      } else {
-        console.log('⚠️ No auth token available')
       }
 
-      console.log('📡 Making request...')
+      // Inyección automática del país (si existe en localStorage)
+      try {
+        if (typeof window !== 'undefined') {
+          const storedCountryId = window.localStorage.getItem('selectedCountry')
+          if (storedCountryId && /^\d+$/.test(storedCountryId)) {
+            // Solo lo añadimos si el caller no lo envió ya
+            if (!(headers as Record<string, string>)['x-country-id']) {
+              ;(headers as Record<string, string>)['x-country-id'] = storedCountryId
+            }
+          }
+        }
+      } catch {
+        /* no-op si localStorage no está disponible */
+      }
+
       const response = await fetch(url, {
         ...options,
         headers,
-        mode: 'cors', // Explicitly set CORS mode
+        mode: 'cors',
       })
-
-      console.log('📨 Response status:', response.status)
-      console.log('📨 Response ok:', response.ok)
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('❌ HTTP Error Response:', errorText)
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
       }
 
       const result: any = await response.json()
-      console.log('✅ Response data:', result)
       
-      // Verificar success en el nivel correcto
-      // Si la respuesta es exitosa (status 200-299) y tiene data, considerarla válida
-      const hasData = result.id || result.data || Array.isArray(result)
-      const success = result.success === true || result.success === 'true' || hasData
+      // Heurística de éxito
+      const hasData = result?.id || result?.data || Array.isArray(result)
+      const success = result?.success === true || result?.success === 'true' || hasData
       
-      if (!success && result.error) {
-        console.error('❌ API response indicates failure:', result)
+      if (!success && result?.error) {
         throw new Error(result.message || result.error || 'API call failed')
       }
 
-      // Para el estado interno, guardamos los datos
-      const responseData = result.data !== undefined ? result.data : result
+      const responseData = result?.data !== undefined ? result.data : result
       setState({ success: true, data: responseData })
       
       if (showSuccessToast) {
         toast({
-          title: "Éxito",
-          description: result.message || "Operación completada exitosamente",
+          title: 'Éxito',
+          description: result?.message || 'Operación completada exitosamente',
         })
       }
 
-      // IMPORTANTE: Devolver el objeto completo con success para que el frontend pueda verificarlo
       return result
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      console.error('❌ API call failed:', err)
-      console.error('❌ Error message:', errorMessage)
-      console.error('❌ Full error object:', err)
-      
       setState({ success: false, data: undefined })
       
       if (showErrorToast) {
         toast({
-          variant: "destructive",
-          title: "Error de API",
+          variant: 'destructive',
+          title: 'Error de API',
           description: errorMessage,
         })
       }
@@ -118,13 +112,12 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     }
   }, [supabase, toast, showErrorToast, showSuccessToast])
 
-  // Helper methods for different HTTP methods
+  // Métodos helper
   const get = useCallback((endpoint: string) => {
     return apiCall(endpoint, { method: 'GET' })
   }, [apiCall])
 
   const post = useCallback((endpoint: string, data?: any) => {
-    console.log('📤 POST request to:', endpoint, 'with data:', data)
     return apiCall(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -152,7 +145,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   }
 }
 
-// Specific hooks for common operations
+// Hooks específicos
 export function useApiCall<T = any>() {
   return useApi<T>()
 }
@@ -169,4 +162,4 @@ export function useAuthApi() {
     showErrorToast: true,
     showSuccessToast: false,
   })
-} 
+}
