@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import { EventBusService, VentaProcessedEvent, MovimientoStockEvent, CompraEntregadaEvent } from '../events/event-bus.service';
+import { EventBusService, ERPEvent, VentaProcessedEvent, MovimientoStockEvent, CompraEntregadaEvent } from '../events/event-bus.service';
 
 export interface MovimientoStock {
   id?: string;
@@ -44,18 +44,16 @@ export class InventoryIntegrationService {
   initializeEventListeners() {
     console.log('📦 [Inventario] Inicializando listeners de eventos...');
     
-    this.eventBus.onVentaProcessed(async (event) => {
-      console.log('📦 [Inventario] ¡EVENTO RECIBIDO! Procesando venta para actualizar stock...', event.data);
-      await this.procesarVentaParaInventario(event.data);
+    this.eventBus.onVentaProcessed(async (event: ERPEvent) => {
+        const data = event.data as VentaProcessedEvent;
+        await this.procesarVentaParaInventario(data);
     });
 
-    this.eventBus.onCompraEntregada(async (event) => {
-      console.log('📦 [Inventario] ¡EVENTO RECIBIDO! Procesando compra entregada para actualizar stock...', event.data);
-      await this.procesarCompraParaInventario(event.data);
+    this.eventBus.onCompraEntregada(async (event: ERPEvent) => {
+        const data = event.data as CompraEntregadaEvent;
+        await this.procesarCompraParaInventario(data);
     });
-    
-    console.log('📦 [Inventario] ¡Listeners registrados exitosamente!');
-  }
+}
 
   async procesarVentaParaInventario(venta: VentaProcessedEvent): Promise<void> {
     try {
@@ -572,4 +570,4 @@ export class InventoryIntegrationService {
       };
     }
   }
-} 
+}

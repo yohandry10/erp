@@ -2,59 +2,87 @@
 
 import { useState, useEffect } from 'react'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+
+interface Proveedor {
+  id?: number | string
+  ruc?: string
+  razon_social?: string
+  nombre?: string
+  nombre_comercial?: string
+  direccion?: string
+  telefono?: string
+  email?: string
+  contacto?: string
+  condiciones_pago?: string
+}
 
 interface ProveedorModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  proveedor?: any
+  proveedor?: Proveedor
 }
 
-export default function ProveedorModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  proveedor 
-}: ProveedorModalProps) {
-  
-  const [formData, setFormData] = useState({
-    ruc: '',
-    razon_social: '',
-    nombre_comercial: '',
-    direccion: '',
-    telefono: '',
-    email: '',
-    contacto: '',
-    condiciones_pago: 'CONTADO'
-  })
+/** Todos los campos del formulario son string para simplificar el tipado */
+type FormData = {
+  ruc: string
+  razon_social: string
+  nombre_comercial: string
+  direccion: string
+  telefono: string
+  email: string
+  contacto: string
+  condiciones_pago: string
+}
 
+/** Errores: clave = campo del formulario, valor = mensaje o undefined (sin error) */
+type FormErrors = Partial<Record<keyof FormData, string | undefined>>
+
+const INITIAL_FORM: FormData = {
+  ruc: '',
+  razon_social: '',
+  nombre_comercial: '',
+  direccion: '',
+  telefono: '',
+  email: '',
+  contacto: '',
+  condiciones_pago: 'CONTADO',
+}
+
+export default function ProveedorModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  proveedor,
+}: ProveedorModalProps) {
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [isLoading, setIsLoading] = useState(false)
-  const [errors, setErrors] = useState<any>({})
+  const [errors, setErrors] = useState<FormErrors>({})
 
   // Cargar datos del proveedor si se está editando
   useEffect(() => {
-    if (isOpen) {
-      if (proveedor) {
-        setFormData({
-          ruc: proveedor.ruc || '',
-          razon_social: proveedor.razon_social || proveedor.nombre || '',
-          nombre_comercial: proveedor.nombre_comercial || '',
-          direccion: proveedor.direccion || '',
-          telefono: proveedor.telefono || '',
-          email: proveedor.email || '',
-          contacto: proveedor.contacto || '',
-          condiciones_pago: proveedor.condiciones_pago || 'CONTADO'
-        })
-      } else {
-        resetForm()
-      }
-      setErrors({})
+    if (!isOpen) return
+
+    if (proveedor) {
+      setFormData({
+        ruc: proveedor.ruc ?? '',
+        razon_social: proveedor.razon_social ?? proveedor.nombre ?? '',
+        nombre_comercial: proveedor.nombre_comercial ?? '',
+        direccion: proveedor.direccion ?? '',
+        telefono: proveedor.telefono ?? '',
+        email: proveedor.email ?? '',
+        contacto: proveedor.contacto ?? '',
+        condiciones_pago: proveedor.condiciones_pago ?? 'CONTADO',
+      })
+    } else {
+      resetForm()
     }
+    setErrors({})
   }, [isOpen, proveedor])
 
-  const validateForm = () => {
-    const newErrors: any = {}
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
 
     if (!formData.ruc.trim()) {
       newErrors.ruc = 'RUC es obligatorio'
@@ -76,18 +104,14 @@ export default function ProveedorModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     setIsLoading(true)
-
     try {
-      const url = proveedor 
+      const url = proveedor
         ? `${API_URL}/api/compras/proveedores/${proveedor.id}`
         : `${API_URL}/api/compras/proveedores`
-      
+
       const method = proveedor ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
@@ -95,17 +119,17 @@ export default function ProveedorModal({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       })
 
       const result = await response.json()
 
-      if (result.success) {
+      if (result?.success) {
         onSuccess()
         onClose()
         resetForm()
       } else {
-        alert('Error: ' + (result.error || 'Error al procesar el proveedor'))
+        alert('Error: ' + (result?.error || 'Error al procesar el proveedor'))
       }
     } catch (error) {
       console.error('Error submitting proveedor:', error)
@@ -116,54 +140,58 @@ export default function ProveedorModal({
   }
 
   const resetForm = () => {
-    setFormData({
-      ruc: '',
-      razon_social: '',
-      nombre_comercial: '',
-      direccion: '',
-      telefono: '',
-      email: '',
-      contacto: '',
-      condiciones_pago: 'CONTADO'
-    })
+    setFormData(INITIAL_FORM)
     setErrors({})
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    // Limpiar error del campo cuando se empiece a escribir
+  /** Update helper tipado: evita errores con prev en setState */
+  const handleInputChange = <K extends keyof FormData>(field: K, value: string) => {
+    // Actualiza el valor del campo
+    setFormData(prev => ({ ...prev, [field]: value } as FormData))
+    // Limpia el error del campo si lo hubiera
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
+      setErrors(prev => ({ ...prev, [field]: undefined }))
     }
   }
 
   if (!isOpen) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '8px',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '600px',
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: 'white',
+          borderRadius: '8px',
+          padding: '2rem',
+          width: '90%',
+          maxWidth: '600px',
+          maxHeight: '90vh',
+          overflow: 'auto',
+        }}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
             {proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
           </h2>
           <button
@@ -173,7 +201,7 @@ export default function ProveedorModal({
               border: 'none',
               fontSize: '1.5rem',
               cursor: 'pointer',
-              color: '#6b7280'
+              color: '#6b7280',
             }}
           >
             ×
@@ -183,12 +211,26 @@ export default function ProveedorModal({
         <form onSubmit={handleSubmit}>
           {/* Información fiscal */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
               Información Fiscal
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '1rem',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   RUC *
                 </label>
                 <input
@@ -201,19 +243,25 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: `1px solid ${errors.ruc ? '#ef4444' : '#d1d5db'}`,
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="Ingrese RUC (11 dígitos)"
                 />
                 {errors.ruc && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.ruc}
-                  </p>
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.ruc}</p>
                 )}
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Razón Social *
                 </label>
                 <input
@@ -225,19 +273,25 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: `1px solid ${errors.razon_social ? '#ef4444' : '#d1d5db'}`,
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="Razón social completa"
                 />
                 {errors.razon_social && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.razon_social}
-                  </p>
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.razon_social}</p>
                 )}
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Nombre Comercial
                 </label>
                 <input
@@ -249,14 +303,22 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="Nombre comercial (opcional)"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Condiciones de Pago
                 </label>
                 <select
@@ -267,7 +329,7 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                 >
                   <option value="CONTADO">Contado</option>
@@ -282,12 +344,26 @@ export default function ProveedorModal({
 
           {/* Información de contacto */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
               Información de Contacto
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '1rem',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Teléfono
                 </label>
                 <input
@@ -299,14 +375,22 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="Teléfono principal"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Email
                 </label>
                 <input
@@ -318,19 +402,25 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: `1px solid ${errors.email ? '#ef4444' : '#d1d5db'}`,
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="email@ejemplo.com"
                 />
                 {errors.email && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    {errors.email}
-                  </p>
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.email}</p>
                 )}
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '0.5rem',
+                  }}
+                >
                   Persona de Contacto
                 </label>
                 <input
@@ -342,7 +432,7 @@ export default function ProveedorModal({
                     padding: '0.5rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '0.375rem',
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
                   }}
                   placeholder="Nombre del contacto"
                 />
@@ -352,7 +442,15 @@ export default function ProveedorModal({
 
           {/* Dirección */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: '#374151',
+                marginBottom: '0.5rem',
+              }}
+            >
               Dirección
             </label>
             <textarea
@@ -365,14 +463,22 @@ export default function ProveedorModal({
                 border: '1px solid #d1d5db',
                 borderRadius: '0.375rem',
                 backgroundColor: 'white',
-                resize: 'vertical'
+                resize: 'vertical',
               }}
               placeholder="Dirección completa del proveedor"
             />
           </div>
 
           {/* Botones */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #e5e7eb',
+            }}
+          >
             <button
               type="button"
               onClick={onClose}
@@ -382,7 +488,7 @@ export default function ProveedorModal({
                 borderRadius: '0.375rem',
                 backgroundColor: 'white',
                 color: '#374151',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
             >
               Cancelar
@@ -397,14 +503,14 @@ export default function ProveedorModal({
                 backgroundColor: isLoading ? '#9ca3af' : '#3b82f6',
                 color: 'white',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
-                fontWeight: '500'
+                fontWeight: 500,
               }}
             >
-              {isLoading ? 'Guardando...' : (proveedor ? 'Actualizar' : 'Crear Proveedor')}
+              {isLoading ? 'Guardando...' : proveedor ? 'Actualizar' : 'Crear Proveedor'}
             </button>
           </div>
         </form>
       </div>
     </div>
   )
-} 
+}

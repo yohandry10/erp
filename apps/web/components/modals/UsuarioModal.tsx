@@ -84,8 +84,8 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
 
     try {
       const url = isEdit 
-        ? `http://localhost:3001/api/usuarios-sistema/${usuario.id}`
-        : 'http://localhost:3001/api/usuarios-sistema/crear'
+        ? `${API_BASE_URL}/api/usuarios-sistema/${usuario.id}`
+        : `${API_BASE_URL}/api/usuarios-sistema/crear`
       
       const method = isEdit ? 'PUT' : 'POST'
 
@@ -506,4 +506,4 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
       </div>
     </div>
   )
-} 
+}

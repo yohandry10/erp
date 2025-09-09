@@ -5,8 +5,8 @@ import UsuarioModal from '@/components/modals/UsuarioModal'
 import { useToast } from "@/components/ui/use-toast"
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios] = useState([])
-  const [roles, setRoles] = useState([])
+  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [roles, setRoles] = useState<any[]>([])
   const [stats, setStats] = useState({
     totalUsuarios: 0,
     usuariosActivos: 0,
@@ -17,8 +17,11 @@ export default function UsuariosPage() {
   const [filtroRol, setFiltroRol] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [modalOpen, setModalOpen] = useState(false)
-  const [usuarioEditando, setUsuarioEditando] = useState(null)
+  const [usuarioEditando, setUsuarioEditando] = useState<any>(null)
   const { toast } = useToast()
+
+  // Definir API_BASE_URL
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
   const fetchData = async () => {
     try {
@@ -26,9 +29,9 @@ export default function UsuariosPage() {
       
       // Cargar datos en paralelo
       const [usuariosRes, rolesRes, statsRes] = await Promise.all([
-        fetch(`http://localhost:3001/api/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
-        fetch('http://localhost:3001/api/usuarios-sistema/roles'),
-        fetch('http://localhost:3001/api/usuarios-sistema/stats')
+        fetch(`${API_BASE_URL}/api/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
+        fetch(`${API_BASE_URL}/api/usuarios-sistema/roles`),
+        fetch(`${API_BASE_URL}/api/usuarios-sistema/stats`)
       ])
 
       const [usuariosData, rolesData, statsData] = await Promise.all([
@@ -77,7 +80,7 @@ export default function UsuariosPage() {
 
   const handleCambiarEstado = async (usuario: any, nuevoEstado: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios-sistema/${usuario.id}/estado`, {
+      const response = await fetch(`${API_BASE_URL}/api/usuarios-sistema/${usuario.id}/estado`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +114,7 @@ export default function UsuariosPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/usuarios-sistema/${usuario.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/usuarios-sistema/${usuario.id}`, {
         method: 'DELETE',
       })
 
@@ -540,4 +543,4 @@ export default function UsuariosPage() {
       />
     </div>
   )
-} 
+}

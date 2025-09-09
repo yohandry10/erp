@@ -80,7 +80,7 @@ const PlanillasPage = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}/generar-asientos`, {
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/generar-asientos`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -111,7 +111,7 @@ const PlanillasPage = () => {
   const verDetallePlanilla = async (planillaId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}/detalle`, {
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/detalle`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -135,7 +135,7 @@ const PlanillasPage = () => {
 
   const generarReporteProfesional = async (planillaId: string, periodo: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}/detalle`, {
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/detalle`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -917,4 +917,4 @@ const PlanillasPage = () => {
   );
 };
 
-export default PlanillasPage; 
+export default PlanillasPage;
