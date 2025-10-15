@@ -117,34 +117,103 @@ export class ConfiguracionController {
   @Get('empresa')
   @ApiOperation({ summary: 'Obtener datos de la empresa' })
   async getDatosEmpresa() {
-    return {
-      success: true,
-      data: {
-        ruc: '20000000001',
-        razonSocial: 'ERP KAME S.A.C.',
-        nombreComercial: 'ERP KAME',
-        direccion: 'Av. Tecnología 123, San Isidro, Lima',
-        telefono: '+51 1 234-5678',
-        email: 'contacto@erpkame.com',
-        representanteLegal: 'Juan Pérez García',
-        regimen: 'Régimen General',
-        actividadEconomica: 'Desarrollo de software empresarial',
-        ubigeo: '150101' // Lima - Lima - Lima
+    try {
+      const { data, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('❌ Error obteniendo configuración empresa:', error);
+        throw error;
       }
-    };
+
+      return {
+        success: true,
+        data: {
+          id: data.id,
+          ruc: data.ruc,
+          razonSocial: data.razon_social,
+          nombreComercial: data.nombre_comercial,
+          direccion: data.direccion_fiscal,
+          ubigeo: data.ubigeo,
+          departamento: data.departamento,
+          provincia: data.provincia,
+          distrito: data.distrito,
+          telefono: data.telefono,
+          email: data.email,
+          sitioWeb: data.sitio_web,
+          representanteLegal: data.representante_legal,
+          dniRepresentante: data.dni_representante,
+          regimen: data.regimen_tributario,
+          actividadEconomica: data.actividad_economica,
+          igvPorcentaje: data.igv_porcentaje,
+          retencionRentaPorcentaje: data.retencion_renta_porcentaje,
+          monedaDefecto: data.moneda_defecto,
+          logoUrl: data.logo_url
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo datos empresa:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: null
+      };
+    }
   }
 
   @Put('empresa')
   @ApiOperation({ summary: 'Actualizar datos de la empresa' })
   async updateDatosEmpresa(@Body() datosEmpresa: any) {
-    console.log('💼 Actualizando datos de empresa:', datosEmpresa);
-    
-    // TODO: Implementar actualización real en BD
-    return {
-      success: true,
-      message: 'Datos de empresa actualizados exitosamente',
-      data: datosEmpresa
-    };
+    try {
+      console.log('💼 Actualizando datos de empresa:', datosEmpresa);
+      
+      const updateData: any = {};
+      
+      if (datosEmpresa.ruc) updateData.ruc = datosEmpresa.ruc;
+      if (datosEmpresa.razonSocial) updateData.razon_social = datosEmpresa.razonSocial;
+      if (datosEmpresa.nombreComercial) updateData.nombre_comercial = datosEmpresa.nombreComercial;
+      if (datosEmpresa.direccion) updateData.direccion_fiscal = datosEmpresa.direccion;
+      if (datosEmpresa.ubigeo) updateData.ubigeo = datosEmpresa.ubigeo;
+      if (datosEmpresa.departamento) updateData.departamento = datosEmpresa.departamento;
+      if (datosEmpresa.provincia) updateData.provincia = datosEmpresa.provincia;
+      if (datosEmpresa.distrito) updateData.distrito = datosEmpresa.distrito;
+      if (datosEmpresa.telefono) updateData.telefono = datosEmpresa.telefono;
+      if (datosEmpresa.email) updateData.email = datosEmpresa.email;
+      if (datosEmpresa.sitioWeb) updateData.sitio_web = datosEmpresa.sitioWeb;
+      if (datosEmpresa.representanteLegal) updateData.representante_legal = datosEmpresa.representanteLegal;
+      if (datosEmpresa.dniRepresentante) updateData.dni_representante = datosEmpresa.dniRepresentante;
+      if (datosEmpresa.regimen) updateData.regimen_tributario = datosEmpresa.regimen;
+      if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
+      if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
+      if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
+
+      const { data, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .update(updateData)
+        .eq('tenant_id', '550e8400-e29b-41d4-a716-446655440000')
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error actualizando empresa:', error);
+        throw error;
+      }
+
+      return {
+        success: true,
+        message: 'Datos de empresa actualizados exitosamente',
+        data: data
+      };
+    } catch (error) {
+      console.error('❌ Error actualizando datos empresa:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: null
+      };
+    }
   }
 
   @Get('series')
@@ -199,36 +268,82 @@ export class ConfiguracionController {
   @Get('parametros-facturacion')
   @ApiOperation({ summary: 'Obtener parámetros de facturación' })
   async getParametrosFacturacion() {
-    return {
-      success: true,
-      data: {
-        parametros: {
-          igv: 18.00,
-          monedaDefecto: 'PEN',
-          redondeoDecimales: 2,
-          incluirIgvEnPrecio: true,
-          envioAutomaticoSunat: true,
-          generarPdfAutomatico: true,
-          enviarEmailCliente: false,
-          validarRucSunat: true,
-          usarCodigosBarra: true,
-          formatoNumeros: '#,##0.00'
+    try {
+      const { data, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: {
+          parametros: {
+            igv: data.igv_porcentaje || 18.00,
+            monedaDefecto: data.moneda_defecto || 'PEN',
+            redondeoDecimales: data.redondeo_decimales || 2,
+            incluirIgvEnPrecio: data.incluir_igv_en_precio !== false,
+            envioAutomaticoSunat: data.envio_automatico_sunat !== false,
+            generarPdfAutomatico: data.generar_pdf_automatico !== false,
+            enviarEmailCliente: data.enviar_email_cliente === true,
+            validarRucSunat: data.validar_ruc_sunat !== false,
+            usarCodigosBarra: data.usar_codigos_barra !== false,
+            formatoNumeros: data.formato_numeros || '#,##0.00'
+          }
         }
-      }
-    };
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo parámetros:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: null
+      };
+    }
   }
 
   @Put('parametros-facturacion')
   @ApiOperation({ summary: 'Actualizar parámetros de facturación' })
   async updateParametrosFacturacion(@Body() parametros: any) {
-    console.log('⚙️ Actualizando parámetros de facturación:', parametros);
-    
-    // TODO: Implementar actualización real en BD
-    return {
-      success: true,
-      message: 'Parámetros de facturación actualizados exitosamente',
-      data: parametros
-    };
+    try {
+      console.log('⚙️ Actualizando parámetros de facturación:', parametros);
+      
+      const updateData: any = {};
+      
+      if (parametros.igv !== undefined) updateData.igv_porcentaje = parametros.igv;
+      if (parametros.monedaDefecto) updateData.moneda_defecto = parametros.monedaDefecto;
+      if (parametros.redondeoDecimales !== undefined) updateData.redondeo_decimales = parametros.redondeoDecimales;
+      if (parametros.incluirIgvEnPrecio !== undefined) updateData.incluir_igv_en_precio = parametros.incluirIgvEnPrecio;
+      if (parametros.envioAutomaticoSunat !== undefined) updateData.envio_automatico_sunat = parametros.envioAutomaticoSunat;
+      if (parametros.generarPdfAutomatico !== undefined) updateData.generar_pdf_automatico = parametros.generarPdfAutomatico;
+      if (parametros.enviarEmailCliente !== undefined) updateData.enviar_email_cliente = parametros.enviarEmailCliente;
+      if (parametros.validarRucSunat !== undefined) updateData.validar_ruc_sunat = parametros.validarRucSunat;
+      if (parametros.usarCodigosBarra !== undefined) updateData.usar_codigos_barra = parametros.usarCodigosBarra;
+      if (parametros.formatoNumeros) updateData.formato_numeros = parametros.formatoNumeros;
+
+      const { data, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .update(updateData)
+        .eq('tenant_id', '550e8400-e29b-41d4-a716-446655440000')
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        message: 'Parámetros de facturación actualizados exitosamente',
+        data: data
+      };
+    } catch (error) {
+      console.error('❌ Error actualizando parámetros:', error);
+      return {
+        success: false,
+        message: error.message,
+        data: null
+      };
+    }
   }
 
   @Post('certificado/upload')

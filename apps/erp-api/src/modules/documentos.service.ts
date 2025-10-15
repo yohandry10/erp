@@ -575,17 +575,44 @@ export class DocumentosService {
   }
 
   private async obtenerSiguienteNumero(tipoDocumento: string, serie: string, tenantId?: string): Promise<string> {
+    try {
+      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
+      // Usar la función SQL optimizada con lock para concurrencia
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .rpc('obtener_siguiente_numero_serie', {
+          p_tenant_id: tenant,
+          p_tipo_documento: tipoDocumento,
+          p_serie: serie
+        });
+      
+      if (error) {
+        console.error('❌ Error obteniendo siguiente número:', error);
+        // Fallback al método manual si falla la función
+        return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenant);
+      }
+      
+      return data || '00000001';
+    } catch (error) {
+      console.error('❌ Error en obtenerSiguienteNumero:', error);
+      // Fallback al método manual
+      return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenantId || '550e8400-e29b-41d4-a716-446655440000');
+    }
+  }
+
+  // Método de respaldo en caso de que la función SQL no esté disponible
+  private async obtenerSiguienteNumeroManual(tipoDocumento: string, serie: string, tenantId: string): Promise<string> {
+    console.log('⚠️ Usando método manual para obtener número de serie');
+    
     // Obtener configuración de serie
     let query = this.supabaseService
       .getClient()
       .from('documento_series')
       .select('correlativo_actual')
       .eq('tipo_documento', tipoDocumento)
-      .eq('serie', serie);
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+      .eq('serie', serie)
+      .eq('tenant_id', tenantId);
 
     const { data: serieConfig } = await query.single();
 
@@ -596,10 +623,13 @@ export class DocumentosService {
       .getClient()
       .from('documento_series')
       .upsert({
-        tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+        tenant_id: tenantId,
         tipo_documento: tipoDocumento,
         serie: serie,
         correlativo_actual: siguienteCorrelativo,
+        activo: true
+      }, {
+        onConflict: 'tenant_id,tipo_documento,serie'
       });
 
     return siguienteCorrelativo.toString().padStart(8, '0');
