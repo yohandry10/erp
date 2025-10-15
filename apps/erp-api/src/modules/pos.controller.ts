@@ -54,27 +54,69 @@ export class PosController {
   @Post('caja/abrir')
   @ApiOperation({ summary: 'Abrir caja registradora' })
   @ApiResponse({ status: 200, description: 'Caja abierta exitosamente' })
-  abrirCaja(@Body() data: any) {
-    console.log('💰 Abriendo caja con monto:', data.montoInicial);
-    
-    // Actualizar estado de la caja
-    this.estadoCaja = {
-      estado: 'ABIERTA',
-      montoInicial: data.montoInicial || 0,
-      ventasEfectivo: 0,
-      ventasTarjeta: 0,
-      montoFinal: data.montoInicial || 0,
-      fechaApertura: new Date().toISOString(),
-      fechaCierre: null
-    };
+  async abrirCaja(@Body() data: any) {
+    try {
+      console.log('💰 Abriendo caja con monto:', data.monto_inicial);
+      
+      // Verificar si ya hay una sesión abierta
+      const { data: sesionExistente } = await this.supabase.getClient()
+        .from('sesiones_caja')
+        .select('*')
+        .eq('estado', 'ABIERTA')
+        .single();
 
-    console.log('✅ Caja abierta. Nuevo estado:', this.estadoCaja);
+      if (sesionExistente) {
+        return {
+          success: false,
+          message: 'Ya existe una sesión de caja abierta',
+          data: sesionExistente
+        };
+      }
 
-    return {
-      success: true,
-      data: this.estadoCaja,
-      message: 'Caja abierta exitosamente'
-    };
+      // Crear nueva sesión de caja EN LA BASE DE DATOS
+      const { data: nuevaSesion, error } = await this.supabase.getClient()
+        .from('sesiones_caja')
+        .insert({
+          fecha_apertura: new Date().toISOString(),
+          monto_inicial: data.monto_inicial || 0,
+          estado: 'ABIERTA',
+          total_efectivo: 0,
+          total_tarjeta: 0,
+          total_digital: 0,
+          cantidad_ventas: 0
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error insertando sesión:', error);
+        throw error;
+      }
+
+      console.log('✅ Caja abierta. Nueva sesión:', nuevaSesion.id);
+
+      return {
+        success: true,
+        data: {
+          estado: 'ABIERTA',
+          montoInicial: nuevaSesion.monto_inicial,
+          ventasEfectivo: 0,
+          ventasTarjeta: 0,
+          montoFinal: nuevaSesion.monto_inicial,
+          fechaApertura: nuevaSesion.fecha_apertura,
+          fechaCierre: null,
+          sesionId: nuevaSesion.id
+        },
+        message: 'Caja abierta exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error abriendo caja:', error);
+      return {
+        success: false,
+        message: 'Error al abrir la caja',
+        error: error.message
+      };
+    }
   }
 
   @Post('caja/cerrar')
@@ -91,59 +133,67 @@ export class PosController {
         .eq('estado', 'ABIERTA')
         .single();
 
+      console.log('📊 Resultado de búsqueda de sesión:', { 
+        sesionActiva, 
+        error: sesionError,
+        errorDetails: sesionError ? JSON.stringify(sesionError) : null
+      });
+
       if (sesionError || !sesionActiva) {
-        throw new Error('No hay sesión de caja activa');
+        console.error('❌ Error buscando sesión activa:', sesionError);
+        throw new Error(`No hay sesión de caja activa. Error: ${sesionError?.message || 'Sesión no encontrada'}`);
       }
 
-      // 2. Calcular estadísticas de ventas del día
+      // 2. Calcular estadísticas de ventas del día (simplificado)
       const { data: ventasDelDia, error: ventasError } = await this.supabase.getClient()
-        .from('ventas')
-        .select(`
-          *,
-          venta_detalles (
-            cantidad,
-            precio_unitario,
-            subtotal,
-            producto_id,
-            productos (nombre, categoria)
-          ),
-          venta_pagos (
-            monto,
-            metodos_pago (codigo, nombre, tipo)
-          )
-        `)
-        .eq('sesion_caja_id', sesionActiva.id)
-        .eq('estado', 'PAGADA');
+        .from('ventas_pos')
+        .select('*')
+        .eq('sesion_caja_id', sesionActiva.id);
 
-      if (ventasError) throw ventasError;
+      if (ventasError) {
+        console.error('❌ Error obteniendo ventas:', ventasError);
+        // Continuar sin ventas si hay error
+      }
 
-      // 3. Análisis financiero detallado
-      const analisisFinanciero = this.generarAnalisisFinanciero(ventasDelDia || []);
+      console.log(`📊 Ventas encontradas: ${ventasDelDia?.length || 0}`);
 
-      // 4. Productos más vendidos
-      const productosMasVendidos = this.calcularProductosMasVendidos(ventasDelDia || []);
+      // 3. Calcular totales de las ventas
+      const totalVentas = ventasDelDia?.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0) || 0;
+      const cantidadVentas = ventasDelDia?.length || 0;
+      
+      // Calcular por método de pago (simplificado)
+      const ventasEfectivo = ventasDelDia?.filter(v => v.metodo_pago === 'EFECTIVO').reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0) || 0;
+      const ventasTarjeta = ventasDelDia?.filter(v => v.metodo_pago === 'TARJETA').reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0) || 0;
+      const ventasDigital = ventasDelDia?.filter(v => v.metodo_pago === 'DIGITAL').reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0) || 0;
+      
+      const montoEsperado = sesionActiva.monto_inicial + totalVentas;
 
-      // 5. Análisis por método de pago
-      const analisisPagos = this.analizarMetodosPago(ventasDelDia || []);
-
-      // 6. Cerrar sesión de caja
+      // 4. Cerrar sesión de caja
+      const montoContado = data.monto_contado || montoEsperado;
+      const diferencia = montoContado - montoEsperado;
+      
       const { error: updateError } = await this.supabase.getClient()
         .from('sesiones_caja')
         .update({
           fecha_cierre: new Date().toISOString(),
-          monto_contado: data.monto_contado || sesionActiva.monto_inicial,
-          diferencia: (data.monto_contado || sesionActiva.monto_inicial) - analisisFinanciero.montoEsperado,
-          total_ventas: analisisFinanciero.totalVentas,
-          total_efectivo: analisisPagos.efectivo,
-          total_tarjeta: analisisPagos.tarjeta,
-          total_digital: analisisPagos.digital,
-          cantidad_ventas: analisisFinanciero.cantidadVentas,
+          monto_contado: montoContado,
+          diferencia: diferencia,
+          total_ventas: totalVentas,
+          total_efectivo: ventasEfectivo,
+          total_tarjeta: ventasTarjeta,
+          total_digital: ventasDigital,
+          cantidad_ventas: cantidadVentas,
           estado: 'CERRADA',
           notas: data.notas || ''
         })
         .eq('id', sesionActiva.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ Error actualizando sesión:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Sesión cerrada exitosamente');
 
       // 7. Actualizar estado en memoria
       this.estadoCaja = {
@@ -158,19 +208,18 @@ export class PosController {
           fechaApertura: sesionActiva.fecha_apertura,
           fechaCierre: new Date().toISOString(),
           montoInicial: sesionActiva.monto_inicial,
-          montoContado: data.monto_contado || sesionActiva.monto_inicial,
-          diferencia: (data.monto_contado || sesionActiva.monto_inicial) - analisisFinanciero.montoEsperado
+          montoContado: montoContado,
+          montoEsperado: montoEsperado,
+          diferencia: diferencia
         },
-        analisisFinanciero,
-        productosMasVendidos,
-        analisisPagos,
-        ventasDetalladas: ventasDelDia?.map(venta => ({
-          numero: venta.numero_ticket,
-          fecha: venta.fecha_venta,
-          total: venta.total,
-          items: venta.venta_detalles?.length || 0,
-          metodoPago: venta.venta_pagos?.[0]?.metodos_pago?.nombre || 'N/A'
-        })) || []
+        resumen: {
+          totalVentas: totalVentas,
+          cantidadVentas: cantidadVentas,
+          ventasEfectivo: ventasEfectivo,
+          ventasTarjeta: ventasTarjeta,
+          ventasDigital: ventasDigital
+        },
+        ventas: ventasDelDia || []
       };
 
       console.log('✅ Caja cerrada con análisis completo');
