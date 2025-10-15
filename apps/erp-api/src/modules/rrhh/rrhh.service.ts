@@ -775,7 +775,7 @@ export class RrhhService {
     <body>
         <div class="boleta">
             <div class="header">
-                <div class="company">CABIMAS ERP</div>
+                <div class="company">NEON SYSTEM</div>
                 <div class="title">Boleta de Pago</div>
                 <div class="periodo">Período: ${totales.mes}</div>
             </div>
