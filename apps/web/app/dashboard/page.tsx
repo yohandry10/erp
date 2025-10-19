@@ -22,6 +22,10 @@ import {
   Clock,
   Target
 } from 'lucide-react'
+import { useConfigurationStatus } from './hooks/useConfigurationStatus'
+import { ConfigurationBanner } from './components/ConfigurationBanner'
+import { ConfigurationModal } from './components/ConfigurationModal'
+import { DashboardNotificationBanners, NotificationBell } from '@/components/notifications'
 
 interface DashboardStats {
   totalCpe: number
@@ -64,6 +68,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [activities, setActivities] = useState<RecentActivity[]>([])
   const [lastUpdate, setLastUpdate] = useState<string>('')
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const { status: configStatus, isLoading: isLoadingConfig } = useConfigurationStatus()
 
   // Función para obtener datos del dashboard
   const fetchDashboardData = useCallback(async (showLoading = false) => {
@@ -125,6 +131,17 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboardData(true)
   }, [fetchDashboardData])
+
+  // Check configuration status and show modal if incomplete
+  useEffect(() => {
+    if (!isLoadingConfig && configStatus && !configStatus.isComplete) {
+      // Show modal after a short delay to avoid overwhelming the user
+      const timer = setTimeout(() => {
+        setShowConfigModal(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoadingConfig, configStatus])
 
   // Configurar actualización automática cada 30 segundos
   useEffect(() => {
@@ -207,12 +224,39 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
+      {/* Configuration Modal */}
+      {configStatus && !configStatus.isComplete && (
+        <ConfigurationModal
+          isOpen={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          missingItems={configStatus.missingItems}
+        />
+      )}
+
+      {/* Configuration Banner */}
+      {configStatus && !configStatus.isComplete && (
+        <ConfigurationBanner
+          missingItems={configStatus.missingItems}
+          completionPercentage={configStatus.completionPercentage}
+        />
+      )}
+
+      {/* Notification Bell - Fixed position top right */}
+      <div style={{
+        position: 'fixed',
+        top: '2rem',
+        right: '2rem',
+        zIndex: 1000
+      }}>
+        <NotificationBell />
+      </div>
+
       {/* Header */}
       <div className="dashboard-header">
         <div>
-          <h1 className="dashboard-title">CABIMAS ERP Business Intelligence</h1>
+          <h1 className="dashboard-title">Dashboard</h1>
           <p className="dashboard-subtitle">
-            Panel de control ejecutivo y análisis empresarial
+            Panel de control ejecutivo
             {lastUpdate && ` • Última actualización: ${lastUpdate}`}
           </p>
         </div>

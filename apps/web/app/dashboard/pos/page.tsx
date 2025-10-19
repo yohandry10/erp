@@ -74,10 +74,25 @@ interface EstadoCaja {
   montoFinal: number
 }
 
+interface ConfigurationStatus {
+  isComplete: boolean
+  completionPercentage: number
+  missingItems: string[]
+  certificate: {
+    exists: boolean
+    isValid: boolean
+    expiresAt?: Date
+  }
+  ruc: {
+    isConfigured: boolean
+    missingFields: string[]
+  }
+}
+
 export default function POSPage() {
   const api = useApi()
   const supabase = createClientComponentClient();
-  
+
   // Estados principales
   const [productos, setProductos] = useState<ProductoPOS[]>([])
   const [carrito, setCarrito] = useState<ItemVenta[]>([])
@@ -86,26 +101,27 @@ export default function POSPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [historialVentas, setHistorialVentas] = useState<any[]>([])
   const [facturaSeleccionada, setFacturaSeleccionada] = useState<any>(null)
-  
+  const [configurationStatus, setConfigurationStatus] = useState<ConfigurationStatus | null>(null)
+
   // Estados de UI
   const [busqueda, setBusqueda] = useState('')
   const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('')
   const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState<string>('')
   const [referenciaPago, setReferenciaPago] = useState('')
-  
+
   // Nuevos estados para funcionalidades avanzadas
   const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
   const [modoVentaRapida, setModoVentaRapida] = useState(false)
   const [ventaSinStock, setVentaSinStock] = useState(true)
   const [estadoVentaActual, setEstadoVentaActual] = useState<EstadoVenta>({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
   const [busquedaPorCodigoBarras, setBusquedaPorCodigoBarras] = useState('')
-  
+
   // Estados de modales
   const [mostrarModalAbrirCaja, setMostrarModalAbrirCaja] = useState(false)
   const [mostrarModalCerrarCaja, setMostrarModalCerrarCaja] = useState(false)
   const [mostrarModalPago, setMostrarModalPago] = useState(false)
-  
+
   // Estados de formularios
   const [montoInicialInput, setMontoInicialInput] = useState('')
   const [montoContadoInput, setMontoContadoInput] = useState('')
@@ -114,6 +130,8 @@ export default function POSPage() {
   const [empresaInfo, setEmpresaInfo] = useState<any | null>(null);
   const [detallesFactura, setDetallesFactura] = useState<any[]>([]);
   const [loadingFactura, setLoadingFactura] = useState<boolean>(false);
+  const [greThreshold, setGreThreshold] = useState<number>(700);
+  const [greEnabled, setGreEnabled] = useState<boolean>(true);
 
   useEffect(() => {
     cargarDatos()
@@ -128,6 +146,34 @@ export default function POSPage() {
       const productosData = productosResponse?.data || [];
       console.log('📦 Productos extraídos:', productosData);
       setProductos(productosData);
+
+      // Check configuration status
+      try {
+        const configResponse = await api.get('/api/pos/configuration-status');
+        console.log('⚙️ Configuration status:', configResponse);
+        if (configResponse?.success && configResponse?.data) {
+          setConfigurationStatus(configResponse.data);
+          
+          // Show warning if configuration is incomplete
+          if (!configResponse.data.isComplete) {
+            console.warn('⚠️ Configuración incompleta:', configResponse.data.missingItems);
+          }
+        }
+      } catch (configError) {
+        console.error('❌ Error checking configuration status:', configError);
+      }
+
+      // Fetch GRE threshold configuration
+      try {
+        const greConfigResponse = await api.get('/api/configuration/gre-thresholds');
+        console.log('📦 GRE config:', greConfigResponse);
+        if (greConfigResponse?.success && greConfigResponse?.data) {
+          setGreThreshold(greConfigResponse.data.umbralGREAutomatico || 700);
+          setGreEnabled(greConfigResponse.data.greAutomaticoHabilitado !== false);
+        }
+      } catch (greError) {
+        console.error('❌ Error fetching GRE config:', greError);
+      }
 
       // Paralelizar las demás cargas de datos
       const [
@@ -160,7 +206,7 @@ export default function POSPage() {
       } else {
         setEstadoCaja(cajaRes.data);
       }
-      
+
       if (empresaRes.error) {
         console.error("Error cargando configuración de empresa:", empresaRes.error);
       } else {
@@ -173,11 +219,11 @@ export default function POSPage() {
 
     } catch (error) {
       console.error('❌ Error general cargando POS:', error)
-      
+
       // Mostrar el error real al usuario
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       alert(`❌ ERROR CARGANDO POS\n\nDetalle: ${errorMessage}\n\nPor favor:\n1. Verifica la conexión a la base de datos\n2. Asegúrate de que existe la vista 'vista_pos_productos'\n3. Revisa los logs del servidor`);
-      
+
       // Establecer valores por defecto en caso de error total
       setProductos([])
       setMetodosPago([])
@@ -214,16 +260,16 @@ export default function POSPage() {
       console.log('🔄 Recargando productos en POS...');
       const productosResponse = await api.get('/api/pos/productos');
       console.log('📦 Respuesta de recarga:', productosResponse);
-      
+
       if (!productosResponse.success) {
         throw new Error(`API Error: ${productosResponse.message}`);
       }
-      
+
       const productosData = productosResponse?.data || [];
       console.log('📦 Productos extraídos en recarga:', productosData);
       setProductos(productosData);
       console.log(`✅ ${productosData.length} productos recargados`);
-      
+
       // Mostrar éxito si se recargaron productos
       if (productosData.length > 0) {
         alert(`✅ Se recargaron ${productosData.length} productos correctamente`);
@@ -244,7 +290,7 @@ export default function POSPage() {
 
     try {
       console.log('👁️ Cargando detalles de venta:', venta);
-      
+
       // MÉTODO 1: Intentar obtener desde detalle_ventas_pos
       let detalles = [];
       try {
@@ -258,13 +304,13 @@ export default function POSPage() {
           detalles = detallesDB;
         } else {
           console.log('⚠️ No se encontraron detalles en BD, intentando desde observaciones...');
-          
+
           // MÉTODO 2: Obtener desde observaciones (JSON)
           if (venta.observaciones) {
             try {
               const observacionesData = JSON.parse(venta.observaciones);
               console.log('📋 Datos en observaciones:', observacionesData);
-              
+
               if (observacionesData.items && Array.isArray(observacionesData.items)) {
                 detalles = observacionesData.items.map((item: any, index: number) => ({
                   id: index + 1,
@@ -282,7 +328,7 @@ export default function POSPage() {
               console.warn('⚠️ Error parseando observaciones:', parseError);
             }
           }
-          
+
           // MÉTODO 3: Fallback - crear detalles básicos
           if (detalles.length === 0) {
             console.log('⚠️ Creando detalles básicos de fallback...');
@@ -300,7 +346,7 @@ export default function POSPage() {
         }
       } catch (dbError) {
         console.warn('⚠️ Error consultando BD, usando observaciones:', dbError);
-        
+
         // Fallback a observaciones si hay error de BD
         if (venta.observaciones) {
           try {
@@ -323,7 +369,7 @@ export default function POSPage() {
 
       setDetallesFactura(detalles);
       console.log(`✅ Se cargaron ${detalles.length} detalles para la factura`);
-      
+
     } catch (error) {
       console.error("❌ Error general al cargar detalles de la factura:", error);
       setDetallesFactura([]);
@@ -335,17 +381,17 @@ export default function POSPage() {
   // Función para aplicar descuentos a un item
   const aplicarDescuentoItem = (productoId: string, descuento: Descuento) => {
     setCarrito(carrito.map(item => {
-        if (item.producto.id === productoId) {
-        const descuentoMonto = descuento.tipo === 'PORCENTAJE' 
+      if (item.producto.id === productoId) {
+        const descuentoMonto = descuento.tipo === 'PORCENTAJE'
           ? (item.precio_original * item.cantidad * descuento.valor / 100)
           : descuento.valor
-        
+
         const precioConDescuento = item.precio_original - (descuentoMonto / item.cantidad)
 
-          return {
-            ...item,
+        return {
+          ...item,
           descuento_porcentaje: descuento.tipo === 'PORCENTAJE' ? descuento.valor : 0,
-            descuento_monto: descuentoMonto,
+          descuento_monto: descuentoMonto,
           precio_unitario: Math.max(0, precioConDescuento),
           subtotal: Math.max(0, (item.precio_original * item.cantidad) - descuentoMonto)
         }
@@ -357,16 +403,16 @@ export default function POSPage() {
   // Función para obtener precio según tipo de cliente
   const obtenerPrecioProducto = (producto: ProductoPOS): number => {
     const cliente = clientes.find(c => c.id === clienteSeleccionado)
-    
+
     // Lógica de precios especiales
     if (cliente?.tipo_documento === 'RUC' && producto.precio_mayorista) {
       return producto.precio_mayorista // Precio mayorista para empresas
     }
-    
+
     if (producto.precio_especial && Math.random() > 0.7) {
       return producto.precio_especial // Precio especial aleatorio (simula promociones)
     }
-    
+
     return producto.precio_venta
   }
 
@@ -377,9 +423,20 @@ export default function POSPage() {
       return
     }
 
-    const precioFinal = obtenerPrecioProducto(producto)
+    // Validar límite de items SUNAT (max 999 items)
+    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0)
     const itemExistente = carrito.find(item => item.producto.id === producto.id)
-    
+    const nuevaCantidadTotal = itemExistente ? totalItems + 1 : totalItems + 1
+
+    if (nuevaCantidadTotal > 999) {
+      alert(
+        `❌ LÍMITE DE ITEMS EXCEDIDO\n\nSUNAT permite máximo 999 items por documento.\nActualmente tiene ${totalItems} items en el carrito.\n\nNo puede agregar más productos.`
+      )
+      return
+    }
+
+    const precioFinal = obtenerPrecioProducto(producto)
+
     if (itemExistente) {
       // Verificar que no exceda el stock (solo si no permite venta sin stock)
       if (!ventaSinStock && itemExistente.cantidad >= producto.stock_actual) {
@@ -387,25 +444,25 @@ export default function POSPage() {
         return
       }
 
-      setCarrito(carrito.map(item => 
-        item.producto.id === producto.id 
-          ? { 
-              ...item,
-              cantidad: item.cantidad + 1,
-              precio_unitario: precioFinal,
-              precio_original: producto.precio_venta,
-              descuento_porcentaje: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) / producto.precio_venta * 100) : 0,
-              descuento_monto: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) * (item.cantidad + 1)) : 0,
-              subtotal: (item.cantidad + 1) * precioFinal 
-            }
+      setCarrito(carrito.map(item =>
+        item.producto.id === producto.id
+          ? {
+            ...item,
+            cantidad: item.cantidad + 1,
+            precio_unitario: precioFinal,
+            precio_original: producto.precio_venta,
+            descuento_porcentaje: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) / producto.precio_venta * 100) : 0,
+            descuento_monto: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) * (item.cantidad + 1)) : 0,
+            subtotal: (item.cantidad + 1) * precioFinal
+          }
           : item
       ))
     } else {
       setCarrito([...carrito, {
-          producto,
-          cantidad: 1,
+        producto,
+        cantidad: 1,
         precio_unitario: precioFinal,
-          precio_original: producto.precio_venta,
+        precio_original: producto.precio_venta,
         descuento_porcentaje: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) / producto.precio_venta * 100) : 0,
         descuento_monto: precioFinal < producto.precio_venta ? (producto.precio_venta - precioFinal) : 0,
         subtotal: precioFinal
@@ -419,6 +476,19 @@ export default function POSPage() {
     if (nuevaCantidad <= 0) {
       setCarrito(carrito.filter(item => item.producto.id !== productoId))
     } else {
+      // Validar límite de items SUNAT (max 999 items)
+      const itemActual = carrito.find(item => item.producto.id === productoId)
+      const otrosItems = carrito.filter(item => item.producto.id !== productoId)
+      const totalOtrosItems = otrosItems.reduce((sum, item) => sum + item.cantidad, 0)
+      const nuevaCantidadTotal = totalOtrosItems + nuevaCantidad
+
+      if (nuevaCantidadTotal > 999) {
+        alert(
+          `❌ LÍMITE DE ITEMS EXCEDIDO\n\nSUNAT permite máximo 999 items por documento.\nCon esta cantidad tendría ${nuevaCantidadTotal} items.\n\nReduzca la cantidad o elimine otros productos.`
+        )
+        return
+      }
+
       setCarrito(carrito.map(item =>
         item.producto.id === productoId
           ? { ...item, cantidad: nuevaCantidad, subtotal: nuevaCantidad * item.precio_unitario }
@@ -436,7 +506,7 @@ export default function POSPage() {
   const procesarVenta = async () => {
     // 1. Validaciones iniciales
     if (carrito.length === 0) {
-          alert('❌ CARRITO VACÍO\nAgregue productos antes de procesar la venta')
+      alert('❌ CARRITO VACÍO\nAgregue productos antes de procesar la venta')
       return
     }
 
@@ -445,17 +515,50 @@ export default function POSPage() {
       return
     }
 
+    // 2. Validaciones SUNAT antes de procesar
+    const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0)
+    if (totalItems > 999) {
+      alert(
+        `❌ VALIDACIÓN SUNAT FALLIDA\n\nEl documento tiene ${totalItems} items.\nSUNAT permite máximo 999 items por documento.\n\nReduzca la cantidad de items antes de continuar.`
+      )
+      return
+    }
+
+    const totalVenta = calcularTotal()
+    // SUNAT limit for boletas without RUC is S/ 700
+    const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
+    const esBoletaSinRuc = clienteActual?.tipo_documento !== 'RUC'
+    
+    if (esBoletaSinRuc && totalVenta > 700) {
+      const confirmar = confirm(
+        `⚠️ ADVERTENCIA SUNAT\n\nEl monto total es S/ ${totalVenta.toFixed(2)}\n\nPara ventas mayores a S/ 700 sin RUC, se generará automáticamente una Guía de Remisión Electrónica (GRE).\n\n¿Desea continuar?`
+      )
+      if (!confirmar) {
+        return
+      }
+    }
+
+    // Check configuration status before processing
+    if (configurationStatus && !configurationStatus.isComplete) {
+      const confirmar = confirm(
+        `⚠️ CONFIGURACIÓN INCOMPLETA\n\n${!configurationStatus.certificate.isValid ? '❌ Certificado digital inválido\n' : ''}${configurationStatus.ruc.missingFields.length > 0 ? `❌ Faltan datos: ${configurationStatus.ruc.missingFields.join(', ')}\n` : ''}\nLa venta puede fallar. ¿Desea continuar de todos modos?`
+      )
+      if (!confirmar) {
+        return
+      }
+    }
+
     let resultado: any = null;
     try {
-      // 2. Cambiar estado a PENDIENTE_PAGO
+      // 3. Cambiar estado a PENDIENTE_PAGO
       setEstadoVentaActual({ estado: 'PENDIENTE_PAGO', fecha_estado: new Date().toISOString() })
 
-      // 3. Generar comprobante antes de enviar
+      // 4. Generar comprobante antes de enviar
       const comprobante = generarComprobante()
 
-      // 4. Preparar datos mejorados para envío
+      // 5. Preparar datos mejorados para envío
       const clienteActual = clientes.find(c => c.id === clienteSeleccionado);
-      
+
       const ventaData = {
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
@@ -485,14 +588,14 @@ export default function POSPage() {
       // 5. Procesar venta en backend
       console.log('📤 Enviando venta al backend...', ventaData)
       let resultado: any = null;
-      
+
       try {
         console.log('🔄 Iniciando llamada API...')
         resultado = await api.post('/api/pos/venta', ventaData)
         console.log('📨 Respuesta completa del backend:', resultado)
         console.log('📊 Tipo de respuesta:', typeof resultado)
         console.log('📋 Keys de la respuesta:', resultado ? Object.keys(resultado) : 'null/undefined')
-        
+
         if (resultado && resultado.data) {
           console.log('📦 Contenido de data:', resultado.data)
         }
@@ -508,47 +611,63 @@ export default function POSPage() {
         console.error('❌ No se recibió respuesta del backend')
         throw new Error('No se recibió respuesta del servidor')
       }
-      
+
       if (resultado && (resultado.success === true || resultado.venta_id)) {
         // 6. Cambiar estado a PAGADA
         setEstadoVentaActual({ estado: 'PAGADA', fecha_estado: new Date().toISOString() })
-        
+
         // 7. Limpiar carrito y resetear formulario
         setCarrito([])
         setReferenciaPago('')
         setDescuentoGlobal({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
-        
+
         // 8. SOLO recargar historial de ventas (NO cargar todos los datos para mantener caja abierta)
         console.log('🔄 Recargando historial de ventas...')
         await recargarHistorialVentas().catch(err => console.warn('⚠️ Error recargando historial:', err))
-        
+
         // 9. Mostrar éxito con información del comprobante y factura
         console.log('✅ Venta procesada exitosamente:', resultado)
         const ventaInfo = resultado; // Ya no está envuelto en 'data'
-        
-        // Crear mensaje mejorado con enlace a CPE
-        const mensajeExito = `✅ VENTA PROCESADA EXITOSAMENTE
+
+        // Check if GRE was created
+        const totalVenta = calcularTotal()
+        const greCreated = greEnabled && totalVenta > greThreshold
+
+        // Crear mensaje mejorado con enlace a CPE y GRE
+        let mensajeExito = `✅ VENTA PROCESADA EXITOSAMENTE
 
 📄 Ticket: ${ventaInfo.numero_ticket || comprobante.numero}
-💰 Total: S/ ${calcularTotal().toFixed(2)}
+💰 Total: S/ ${totalVenta.toFixed(2)}
 📋 Estado: ${ventaInfo.estado || 'PAGADA'}
-🧾 Factura Electrónica: ${ventaInfo.factura_electronica ? 'GENERADA' : 'PENDIENTE'}
+🧾 Factura Electrónica: ${ventaInfo.factura_electronica ? 'GENERADA' : 'PENDIENTE'}`;
 
-${ventaInfo.url_factura ? `🔗 Ver factura: ${ventaInfo.url_factura}` : ''}
+        if (greCreated) {
+          mensajeExito += `\n📦 Guía de Remisión: ${ventaInfo.gre_id ? 'GENERADA' : 'EN PROCESO'}`;
+          if (ventaInfo.gre_numero) {
+            mensajeExito += `\n   Número: ${ventaInfo.gre_numero}`;
+          }
+        }
 
-La caja permanece ABIERTA para continuar vendiendo.`;
+        mensajeExito += `\n\n${ventaInfo.url_factura ? `🔗 Ver factura: ${ventaInfo.url_factura}\n` : ''}`;
+        mensajeExito += `\nLa caja permanece ABIERTA para continuar vendiendo.`;
 
         alert(mensajeExito);
 
         // 10. Resetear estado para nueva venta (mantener caja abierta)
         setEstadoVentaActual({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
-        
-        // 11. Opcional: Abrir CPE automáticamente si está configurado
+
+        // 11. Opcional: Abrir CPE o GRE automáticamente si está configurado
         if (ventaInfo.url_factura) {
           const abrirCPE = confirm("¿Desea ver la factura electrónica generada en el módulo CPE?");
           if (abrirCPE) {
             // Abrir CPE en nueva pestaña o redirigir
             window.open('/dashboard/cpe', '_blank');
+          }
+        } else if (greCreated && ventaInfo.gre_id) {
+          const abrirGRE = confirm("¿Desea ver la Guía de Remisión generada en el módulo GRE?");
+          if (abrirGRE) {
+            // Abrir GRE en nueva pestaña
+            window.open('/dashboard/gre', '_blank');
           }
         }
       } else {
@@ -566,12 +685,12 @@ La caja permanece ABIERTA para continuar vendiendo.`;
     } catch (error) {
       // Error en el proceso - cambiar estado a CANCELADA
       setEstadoVentaActual({ estado: 'CANCELADA', fecha_estado: new Date().toISOString() })
-      
+
       console.error('❌ ERROR REAL procesando venta:', error)
-      
+
       // Mostrar error detallado y real
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      
+
       // Crear mensaje de error más detallado
       let mensajeDetallado = `❌ ERROR REAL EN VENTA
 
@@ -617,10 +736,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
   const calcularDescuentoTotal = () => {
     const descuentoItems = carrito.reduce((sum, item) => sum + item.descuento_monto, 0)
-    
+
     // Aplicar descuento global al subtotal antes de descuentos
     const subtotalOriginal = carrito.reduce((sum, item) => sum + (item.precio_original * item.cantidad), 0)
-    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE' 
+    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE'
       ? (subtotalOriginal * descuentoGlobal.valor / 100)
       : descuentoGlobal.valor
 
@@ -635,10 +754,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   const calcularTotal = () => {
     const subtotal = calcularSubtotal()
     const impuestos = calcularImpuestos()
-    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE' 
+    const descuentoGlobalMonto = descuentoGlobal.tipo === 'PORCENTAJE'
       ? (subtotal * descuentoGlobal.valor / 100)
       : descuentoGlobal.valor
-    
+
     return Math.max(0, subtotal + impuestos - descuentoGlobalMonto)
   }
 
@@ -656,7 +775,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       metodoPago: metodosPago.find(m => m.id === metodoPagoSeleccionado),
       estado: estadoVentaActual.estado
     }
-    
+
     console.log('📄 Comprobante generado:', comprobante)
     return comprobante
   }
@@ -667,17 +786,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
   const confirmarAbrirCaja = async () => {
     const montoInicial = parseFloat(montoInicialInput)
-    
+
     if (isNaN(montoInicial) || montoInicial < 0) {
       alert('❌ MONTO INVÁLIDO\nIngrese un monto inicial válido')
       return
     }
 
     try {
-      const resultado = await api.post('/api/pos/caja/abrir', { 
-        monto_inicial: montoInicial 
+      const resultado = await api.post('/api/pos/caja/abrir', {
+        monto_inicial: montoInicial
       })
-      
+
       if (resultado) {
         setEstadoCaja({
           estado: 'ABIERTA',
@@ -686,10 +805,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           ventasTarjeta: 0,
           montoFinal: montoInicial
         })
-        
+
         setMostrarModalAbrirCaja(false)
         setMontoInicialInput('')
-        
+
         alert(`🔓 ¡CAJA ABIERTA!\nCaja abierta con S/ ${montoInicial.toFixed(2)}`)
       }
     } catch (error) {
@@ -703,10 +822,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         monto_contado: parseFloat(montoContadoInput) || 0,
         notas: notasCierreInput
       })
-      
+
       if (resultado) {
         cargarDatos()
-        
+
         // Toast para cerrar caja
         alert('🔒 ¡CAJA CERRADA!\nSesión finalizada correctamente')
       }
@@ -896,10 +1015,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           )}
         </div>
       ) : (
-    <div className="dashboard-container" style={{ padding: '1rem', maxWidth: '100%' }}>
-      {/* Header del POS empresarial */}
-      <div className="dashboard-header" style={{ marginBottom: '1.5rem' }}>
-        <div>
+        <div className="dashboard-container" style={{ padding: '1rem', maxWidth: '100%' }}>
+          {/* Header del POS empresarial */}
+          <div className="dashboard-header" style={{ marginBottom: '1.5rem' }}>
+            <div>
               <h1 className="dashboard-title" style={{ fontSize: '2.5rem' }}>
                 🛒 Sistema POS Empresarial
               </h1>
@@ -908,32 +1027,116 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 <span style={{ fontWeight: '600' }}>{productos.length}</span> | En Carrito:{' '}
                 <span style={{ fontWeight: '600' }}>{carrito.length}</span>
               </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            onClick={recargarProductos}
-            className="btn"
-            style={{
-              background: 'var(--gradient-primary)',
-              color: 'white',
-              border: 'none',
-            }}
-          >
-            🔄 Sincronizar
-          </button>
-          <button
-              onClick={cerrarCaja}
-              className="btn"
-            style={{
-                background: 'var(--gradient-danger)',
-              color: 'white',
-              border: 'none',
-            }}
-          >
-              🔒 Cerrar Caja
-          </button>
-        </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={recargarProductos}
+                className="btn"
+                style={{
+                  background: 'var(--gradient-primary)',
+                  color: 'white',
+                  border: 'none',
+                }}
+              >
+                🔄 Sincronizar
+              </button>
+              <button
+                onClick={cerrarCaja}
+                className="btn"
+                style={{
+                  background: 'var(--gradient-danger)',
+                  color: 'white',
+                  border: 'none',
+                }}
+              >
+                🔒 Cerrar Caja
+              </button>
+            </div>
           </div>
+
+          {/* Configuration Warning Banner */}
+          {configurationStatus && !configurationStatus.isComplete && (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #FFF3CD 0%, #FFE69C 100%)',
+                border: '2px solid #FFC107',
+                borderRadius: 'var(--border-radius)',
+                padding: '1rem 1.5rem',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ fontSize: '2rem' }}>⚠️</div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: 0, color: '#856404', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  Configuración Incompleta
+                </h3>
+                <p style={{ margin: '0.5rem 0 0 0', color: '#856404' }}>
+                  {!configurationStatus.certificate.isValid && (
+                    <span>❌ Certificado digital inválido o vencido. </span>
+                  )}
+                  {configurationStatus.ruc.missingFields.length > 0 && (
+                    <span>
+                      ❌ Faltan datos de RUC: {configurationStatus.ruc.missingFields.join(', ')}.{' '}
+                    </span>
+                  )}
+                  Las ventas pueden fallar si no se completa la configuración.
+                </p>
+              </div>
+              <button
+                onClick={() => (window.location.href = '/dashboard/wizard')}
+                className="btn"
+                style={{
+                  background: '#FFC107',
+                  color: '#856404',
+                  border: 'none',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Completar Configuración
+              </button>
+            </div>
+          )}
+
+          {/* Certificate Expiring Warning */}
+          {configurationStatus &&
+            configurationStatus.certificate.isValid &&
+            configurationStatus.certificate.expiresAt && (
+              (() => {
+                const daysUntilExpiration = Math.floor(
+                  (new Date(configurationStatus.certificate.expiresAt).getTime() - Date.now()) /
+                    (1000 * 60 * 60 * 24)
+                );
+                return daysUntilExpiration < 30 && daysUntilExpiration > 0 ? (
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)',
+                      border: '2px solid #FF9800',
+                      borderRadius: 'var(--border-radius)',
+                      padding: '1rem 1.5rem',
+                      marginBottom: '1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                    }}
+                  >
+                    <div style={{ fontSize: '2rem' }}>⏰</div>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: 0, color: '#E65100', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                        Certificado Próximo a Vencer
+                      </h3>
+                      <p style={{ margin: '0.5rem 0 0 0', color: '#E65100' }}>
+                        Su certificado digital vence en {daysUntilExpiration} días. Renuévelo pronto para evitar
+                        interrupciones.
+                      </p>
+                    </div>
+                  </div>
+                ) : null;
+              })()
+            )}
 
           <div
             style={{
@@ -947,12 +1150,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* Filtros y Búsqueda */}
               <div className="stat-card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
-      <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem' }}>
                   <div style={{ flex: 1 }}>
-            <input
-              type="text"
+                    <input
+                      type="text"
                       placeholder="🔍 Buscar por nombre, código o código de barras..."
-              value={busqueda}
+                      value={busqueda}
                       onChange={(e) => setBusqueda(e.target.value)}
                       style={{
                         width: '100%',
@@ -964,8 +1167,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       }}
                     />
                   </div>
-            <select
-              value={categoriaFiltro}
+                  <select
+                    value={categoriaFiltro}
                     onChange={(e) => setCategoriaFiltro(e.target.value)}
                     style={{
                       padding: '1rem',
@@ -974,16 +1177,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       minWidth: '180px',
                       background: 'white',
                     }}
-            >
-              <option value="">Todas las categorías</option>
+                  >
+                    <option value="">Todas las categorías</option>
                     {categorias.map((cat) => (
                       <option key={cat} value={cat}>
                         {cat}
                       </option>
-              ))}
-            </select>
+                    ))}
+                  </select>
                 </div>
-          </div>
+              </div>
 
               {/* Panel de Herramientas Avanzadas */}
               <div className="stat-card" style={{ marginBottom: '1rem', padding: '1rem' }}>
@@ -1001,18 +1204,18 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           estadoVentaActual.estado === 'EN_PROGRESO'
                             ? 'var(--blue-100)'
                             : estadoVentaActual.estado === 'PENDIENTE_PAGO'
-                            ? 'var(--amber-100)'
-                            : estadoVentaActual.estado === 'PAGADA'
-                            ? 'var(--emerald-100)'
-                            : 'var(--red-100)',
+                              ? 'var(--amber-100)'
+                              : estadoVentaActual.estado === 'PAGADA'
+                                ? 'var(--emerald-100)'
+                                : 'var(--red-100)',
                         color:
                           estadoVentaActual.estado === 'EN_PROGRESO'
                             ? 'var(--blue-800)'
                             : estadoVentaActual.estado === 'PENDIENTE_PAGO'
-                            ? 'var(--amber-800)'
-                            : estadoVentaActual.estado === 'PAGADA'
-                            ? 'var(--emerald-800)'
-                            : 'var(--red-800)',
+                              ? 'var(--amber-800)'
+                              : estadoVentaActual.estado === 'PAGADA'
+                                ? 'var(--emerald-800)'
+                                : 'var(--red-800)',
                       }}
                     >
                       {estadoVentaActual.estado.replace('_', ' ')}
@@ -1225,14 +1428,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                                 producto.stock_actual > producto.stock_minimo
                                   ? 'var(--emerald-100)'
                                   : producto.stock_actual > 0
-                                  ? 'var(--amber-100)'
-                                  : 'var(--red-100)',
+                                    ? 'var(--amber-100)'
+                                    : 'var(--red-100)',
                               color:
                                 producto.stock_actual > producto.stock_minimo
                                   ? 'var(--emerald-800)'
                                   : producto.stock_actual > 0
-                                  ? 'var(--amber-800)'
-                                  : 'var(--red-800)',
+                                    ? 'var(--amber-800)'
+                                    : 'var(--red-800)',
                             }}
                           >
                             {producto.stock_actual} un.
@@ -1292,15 +1495,15 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   </div>
                 ) : (
                   carrito.map((item) => (
-              <div
-                key={item.producto.id}
+                    <div
+                      key={item.producto.id}
                       className="stat-card"
-                style={{
+                      style={{
                         padding: '1rem',
                         marginBottom: '1rem',
-                  display: 'flex',
+                        display: 'flex',
                         gap: '1rem',
-                  alignItems: 'center',
+                        alignItems: 'center',
                       }}
                     >
                       <div style={{ flexShrink: 0 }}>
@@ -1329,9 +1532,9 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                             }}
                           >
                             📦
-                </div>
+                          </div>
                         )}
-                </div>
+                      </div>
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <h4
                           style={{
@@ -1361,21 +1564,21 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           >
                             +
                           </button>
-                </div>
+                        </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
                           S/ {item.subtotal.toFixed(2)}
                         </p>
-                        <button 
-                          onClick={() => eliminarDelCarrito(item.producto.id)} 
+                        <button
+                          onClick={() => eliminarDelCarrito(item.producto.id)}
                           className="btn-icon-danger"
                           title="Eliminar producto del carrito"
                         >
                           🗑️
                         </button>
-                </div>
-              </div>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -1438,6 +1641,39 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     <span>TOTAL</span>
                     <span>S/ {calcularTotal().toFixed(2)}</span>
                   </div>
+
+                  {/* GRE Indicator */}
+                  {greEnabled && calcularTotal() > greThreshold && (
+                    <div
+                      style={{
+                        marginTop: '1rem',
+                        padding: '0.75rem',
+                        background: 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)',
+                        border: '2px solid #2196F3',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.25rem' }}>📦</span>
+                      <div style={{ flex: 1 }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            color: '#1565C0',
+                          }}
+                        >
+                          GRE Automática
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.7rem', color: '#1976D2' }}>
+                          Se generará Guía de Remisión (&gt; S/ {greThreshold.toFixed(2)})
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1487,12 +1723,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     {clienteActual.tipo_documento}: {clienteActual.numero_documento}
                   </div>
                 )}
-          </div>
+              </div>
 
               {/* Métodos de Pago */}
               <div
                 className="stat-card"
-              style={{
+                style={{
                   padding: '1.5rem',
                   background:
                     'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
@@ -1516,7 +1752,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       className={`btn ${metodoPagoSeleccionado === metodo.id ? 'btn-primary' : 'btn-secondary'}`}
                     >
                       {metodo.nombre}
-            </button>
+                    </button>
                   ))}
                 </div>
                 {metodoPagoActual?.requiere_referencia && (
@@ -1538,16 +1774,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
               {/* Acciones Finales */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <button
+                <button
                   onClick={procesarVenta}
                   disabled={carrito.length === 0 || !metodoPagoSeleccionado}
                   className="btn btn-primary"
-              style={{
+                  style={{
                     padding: '1.5rem',
                     fontSize: '1.25rem',
                     background: 'var(--gradient-success)',
-                color: 'white',
-                border: 'none',
+                    color: 'white',
+                    border: 'none',
                     borderRadius: '8px',
                   }}
                 >
@@ -1563,10 +1799,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   </button>
                   <button className="btn btn-secondary" style={{ flex: 1 }}>
                     Guardar
-            </button>
-          </div>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
 
             {/* Historial de Ventas Recientes */}
             <div
@@ -1581,69 +1817,69 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
             >
               <h3 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>📊 Historial de Ventas del Día</h3>
               <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
                     <tr style={{ background: 'var(--primary-100)' }}>
                       <th style={{ padding: '0.75rem', textAlign: 'left' }}>Ticket</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Cliente</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historialVentas.map((venta: any) => (
-                  <tr
-                    key={venta.id}
-                    style={{
-                      borderBottom: '1px solid var(--primary-200)',
-                      background:
-                        facturaSeleccionada?.id === venta.id ? 'var(--blue-100)' : 'transparent',
-                    }}
-                  >
-                    <td style={{ padding: '0.75rem' }}>
-                      {venta.numero_venta || venta.numero_ticket || `#${venta.id}`}
-                    </td>
-                    <td style={{ padding: '0.75rem' }}>{venta.cliente_nombre || 'General'}</td>
-                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                      S/ {parseFloat(venta.total).toFixed(2)}
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                      <span
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Cliente</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialVentas.map((venta: any) => (
+                      <tr
+                        key={venta.id}
                         style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '999px',
-                          fontSize: '0.75rem',
-                          backgroundColor:
-                            venta.estado === 'PAGADA' ? 'var(--emerald-100)' : 'var(--amber-100)',
-                          color: venta.estado === 'PAGADA' ? 'var(--emerald-800)' : 'var(--amber-800)',
+                          borderBottom: '1px solid var(--primary-200)',
+                          background:
+                            facturaSeleccionada?.id === venta.id ? 'var(--blue-100)' : 'transparent',
                         }}
                       >
-                        {venta.estado}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                      <button onClick={() => handleVerFactura(venta)} className="btn-icon">
-                        👁️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <td style={{ padding: '0.75rem' }}>
+                          {venta.numero_venta || venta.numero_ticket || `#${venta.id}`}
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>{venta.cliente_nombre || 'General'}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                          S/ {parseFloat(venta.total).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '999px',
+                              fontSize: '0.75rem',
+                              backgroundColor:
+                                venta.estado === 'PAGADA' ? 'var(--emerald-100)' : 'var(--amber-100)',
+                              color: venta.estado === 'PAGADA' ? 'var(--emerald-800)' : 'var(--amber-800)',
+                            }}
+                          >
+                            {venta.estado}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <button onClick={() => handleVerFactura(venta)} className="btn-icon">
+                            👁️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Modal de Factura Detallada */}
-      {facturaSeleccionada && (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 2000, padding: '2rem'
-        }}>
+          {/* Modal de Factura Detallada */}
+          {facturaSeleccionada && (
             <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 2000, padding: '2rem'
+            }}>
+              <div style={{
                 width: '800px',
                 maxWidth: '90vw',
                 background: 'white',
@@ -1651,172 +1887,172 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 display: 'flex',
                 flexDirection: 'column',
                 maxHeight: '90vh'
-            }}>
+              }}>
                 {/* Header del Modal */}
                 <div style={{
-                    padding: '1rem 1.5rem',
-                    borderBottom: '1px solid #e5e7eb',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                  padding: '1rem 1.5rem',
+                  borderBottom: '1px solid #e5e7eb',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
-                        Vista Previa del Comprobante
-                    </h2>
-                    <button
-                        onClick={() => setFacturaSeleccionada(null)}
-                        style={{
-                            background: 'none', border: 'none', fontSize: '1.5rem',
-                            cursor: 'pointer', color: '#6b7280'
-                        }}
-                    >
-                        &times;
-                    </button>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
+                    Vista Previa del Comprobante
+                  </h2>
+                  <button
+                    onClick={() => setFacturaSeleccionada(null)}
+                    style={{
+                      background: 'none', border: 'none', fontSize: '1.5rem',
+                      cursor: 'pointer', color: '#6b7280'
+                    }}
+                  >
+                    &times;
+                  </button>
                 </div>
 
                 {/* Contenido de la Factura (Scrollable) */}
                 <div style={{ overflowY: 'auto', padding: '2rem', fontFamily: 'sans-serif', color: '#374151' }}>
-                    {/* Encabezado del Documento */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '1.5rem' }}>
-                        <div>
-                            {empresaInfo?.logo_url ? (
-                                <img src={empresaInfo.logo_url} alt="Logo de la empresa" style={{ maxHeight: '60px', marginBottom: '1rem' }} />
-                            ) : (
-                                <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-                                    {empresaInfo?.nombre_comercial || 'Mi Empresa'}
-                                </h1>
-                            )}
-                            <p style={{ fontSize: '0.875rem' }}>{empresaInfo?.direccion || 'Dirección de la Empresa'}</p>
-                            <p style={{ fontSize: '0.875rem' }}>Email: {empresaInfo?.email || 'email@empresa.com'}</p>
-                            <p style={{ fontSize: '0.875rem' }}>Teléfono: {empresaInfo?.telefono || '987654321'}</p>
-                        </div>
-                        <div style={{
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                            textAlign: 'center',
-                            width: '250px'
-                        }}>
-                            <h2 style={{ fontSize: '1.125rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#111827' }}>
-                                R.U.C. {empresaInfo?.ruc || '20000000001'}
-                            </h2>
-                            <h3 style={{
-                                background: '#f3f4f6', padding: '0.5rem', borderRadius: '4px',
-                                fontSize: '1rem', fontWeight: '600', margin: '0.5rem 0',
-                                textTransform: 'uppercase', color: '#1f2937'
-                            }}>
-                                {facturaSeleccionada.tipo_comprobante || 'Factura de Venta'}
-                            </h3>
-                            <p style={{ fontSize: '1rem', fontWeight: 'bold', color: '#be123c' }}>
-                                N° {facturaSeleccionada.numero_venta || '001-0001'}
-                            </p>
-                        </div>
+                  {/* Encabezado del Documento */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '1.5rem' }}>
+                    <div>
+                      {empresaInfo?.logo_url ? (
+                        <img src={empresaInfo.logo_url} alt="Logo de la empresa" style={{ maxHeight: '60px', marginBottom: '1rem' }} />
+                      ) : (
+                        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
+                          {empresaInfo?.nombre_comercial || 'Mi Empresa'}
+                        </h1>
+                      )}
+                      <p style={{ fontSize: '0.875rem' }}>{empresaInfo?.direccion || 'Dirección de la Empresa'}</p>
+                      <p style={{ fontSize: '0.875rem' }}>Email: {empresaInfo?.email || 'email@empresa.com'}</p>
+                      <p style={{ fontSize: '0.875rem' }}>Teléfono: {empresaInfo?.telefono || '987654321'}</p>
                     </div>
-
-                    {/* Datos del Cliente y Venta */}
                     <div style={{
-                        borderTop: '1px solid #e5e7eb',
-                        borderBottom: '1px solid #e5e7eb',
-                        padding: '1rem 0',
-                        marginBottom: '1.5rem',
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '2rem'
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      width: '250px'
                     }}>
-                        <div>
-                            <p><strong>Cliente:</strong> {facturaSeleccionada.cliente_nombre || 'Cliente General'}</p>
-                            <p><strong>RUC/DNI:</strong> {facturaSeleccionada.cliente_documento || 'Sin documento'}</p>
-                        </div>
-                        <div>
-                            <p><strong>Fecha de Emisión:</strong> {new Date(facturaSeleccionada.fecha_venta || facturaSeleccionada.created_at).toLocaleDateString('es-PE')}</p>
-                            <p><strong>Forma de Pago:</strong> {facturaSeleccionada.metodo_pago_nombre || 'Contado'}</p>
-                        </div>
+                      <h2 style={{ fontSize: '1.125rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#111827' }}>
+                        R.U.C. {empresaInfo?.ruc || '20000000001'}
+                      </h2>
+                      <h3 style={{
+                        background: '#f3f4f6', padding: '0.5rem', borderRadius: '4px',
+                        fontSize: '1rem', fontWeight: '600', margin: '0.5rem 0',
+                        textTransform: 'uppercase', color: '#1f2937'
+                      }}>
+                        {facturaSeleccionada.tipo_comprobante || 'Factura de Venta'}
+                      </h3>
+                      <p style={{ fontSize: '1rem', fontWeight: 'bold', color: '#be123c' }}>
+                        N° {facturaSeleccionada.numero_venta || '001-0001'}
+                      </p>
                     </div>
+                  </div>
 
-                    {/* Tabla de Items */}
-                    {loadingFactura ? (
-                        <p style={{textAlign: 'center', padding: '2rem'}}>Cargando detalles...</p>
-                    ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                            <thead style={{ background: '#f9fafb' }}>
-                                <tr>
-                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>CÓDIGO</th>
-                                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>DESCRIPCIÓN</th>
-                                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>CANT.</th>
-                                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>P. UNIT.</th>
-                                    <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>TOTAL</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {detallesFactura.map(item => (
-                                    <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                        <td style={{ padding: '0.75rem' }}>{item.codigo_producto}</td>
-                                        <td style={{ padding: '0.75rem' }}>{item.descripcion}</td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.cantidad}</td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.precio_unitario.toFixed(2)}</td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.subtotal.toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                    
-                    {/* Totales */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                        <div style={{ width: '280px', fontSize: '0.875rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
-                                <span>Subtotal:</span>
-                                <strong>S/ {parseFloat(facturaSeleccionada.subtotal || 0).toFixed(2)}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
-                                <span>Descuentos:</span>
-                                <strong>- S/ {parseFloat(facturaSeleccionada.descuentos || 0).toFixed(2)}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
-                                <span>IGV (18%):</span>
-                                <strong>S/ {parseFloat(facturaSeleccionada.impuestos || 0).toFixed(2)}</strong>
-                            </div>
-                            <div style={{ 
-                                display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0.5rem',
-                                borderTop: '2px solid #d1d5db', marginTop: '0.5rem',
-                                fontSize: '1.125rem', fontWeight: 'bold', color: '#111827'
-                            }}>
-                                <span>TOTAL:</span>
-                                <span>S/ {parseFloat(facturaSeleccionada.total || 0).toFixed(2)}</span>
-                            </div>
-                        </div>
+                  {/* Datos del Cliente y Venta */}
+                  <div style={{
+                    borderTop: '1px solid #e5e7eb',
+                    borderBottom: '1px solid #e5e7eb',
+                    padding: '1rem 0',
+                    marginBottom: '1.5rem',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '2rem'
+                  }}>
+                    <div>
+                      <p><strong>Cliente:</strong> {facturaSeleccionada.cliente_nombre || 'Cliente General'}</p>
+                      <p><strong>RUC/DNI:</strong> {facturaSeleccionada.cliente_documento || 'Sin documento'}</p>
                     </div>
+                    <div>
+                      <p><strong>Fecha de Emisión:</strong> {new Date(facturaSeleccionada.fecha_venta || facturaSeleccionada.created_at).toLocaleDateString('es-PE')}</p>
+                      <p><strong>Forma de Pago:</strong> {facturaSeleccionada.metodo_pago_nombre || 'Contado'}</p>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Items */}
+                  {loadingFactura ? (
+                    <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando detalles...</p>
+                  ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead style={{ background: '#f9fafb' }}>
+                        <tr>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>CÓDIGO</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>DESCRIPCIÓN</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>CANT.</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>P. UNIT.</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>TOTAL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detallesFactura.map(item => (
+                          <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '0.75rem' }}>{item.codigo_producto}</td>
+                            <td style={{ padding: '0.75rem' }}>{item.descripcion}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.cantidad}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.precio_unitario.toFixed(2)}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.subtotal.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* Totales */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                    <div style={{ width: '280px', fontSize: '0.875rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                        <span>Subtotal:</span>
+                        <strong>S/ {parseFloat(facturaSeleccionada.subtotal || 0).toFixed(2)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                        <span>Descuentos:</span>
+                        <strong>- S/ {parseFloat(facturaSeleccionada.descuentos || 0).toFixed(2)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                        <span>IGV (18%):</span>
+                        <strong>S/ {parseFloat(facturaSeleccionada.impuestos || 0).toFixed(2)}</strong>
+                      </div>
+                      <div style={{
+                        display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0.5rem',
+                        borderTop: '2px solid #d1d5db', marginTop: '0.5rem',
+                        fontSize: '1.125rem', fontWeight: 'bold', color: '#111827'
+                      }}>
+                        <span>TOTAL:</span>
+                        <span>S/ {parseFloat(facturaSeleccionada.total || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Footer del Modal */}
                 <div style={{
-                    padding: '1rem 1.5rem',
-                    borderTop: '1px solid #e5e7eb',
-                    background: '#f9fafb',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '1rem'
+                  padding: '1rem 1.5rem',
+                  borderTop: '1px solid #e5e7eb',
+                  background: '#f9fafb',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem'
                 }}>
-                    <button
-                        onClick={() => setFacturaSeleccionada(null)}
-                        style={{
-                            padding: '0.5rem 1rem', background: 'white', border: '1px solid #d1d5db',
-                            borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
-                        }}
-                    >
-                        Cerrar
-                    </button>
-                    <button style={{
-                        padding: '0.5rem 1rem', background: '#2563eb', color: 'white',
-                        border: '1px solid #2563eb', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
-                    }}>
-                        🖨️ Imprimir
-                    </button>
+                  <button
+                    onClick={() => setFacturaSeleccionada(null)}
+                    style={{
+                      padding: '0.5rem 1rem', background: 'white', border: '1px solid #d1d5db',
+                      borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                  <button style={{
+                    padding: '0.5rem 1rem', background: '#2563eb', color: 'white',
+                    border: '1px solid #2563eb', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
+                  }}>
+                    🖨️ Imprimir
+                  </button>
                 </div>
+              </div>
             </div>
+          )}
         </div>
-    )}
-    </div>
       )}
     </>
   )

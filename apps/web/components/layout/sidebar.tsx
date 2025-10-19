@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { customAuth } from '@/lib/auth-service'
 import { useToast } from '@/components/ui/use-toast'
 import { 
   Building2, 
@@ -17,87 +17,380 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Shield,
+  LayoutDashboard,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 
-const menuItems = [
+interface MenuItem {
+  title: string
+  href?: string
+  icon: any
+  superAdminOnly?: boolean
+  permission?: {
+    modulo: string
+    accion: string
+    recurso: string
+  }
+  submenu?: MenuItem[]
+}
+
+const menuItems: MenuItem[] = [
+  {
+    title: 'Super Admin',
+    href: '/super-admin/dashboard',
+    icon: Shield,
+    superAdminOnly: true
+  },
   {
     title: 'Dashboard',
     href: '/dashboard',
-    icon: Building2
+    icon: LayoutDashboard
   },
   {
     title: 'POS',
     href: '/dashboard/pos',
-    icon: ShoppingCart
+    icon: ShoppingCart,
+    permission: {
+      modulo: 'ventas',
+      accion: 'read',
+      recurso: 'pos'
+    }
   },
   {
     title: 'Documentos',
     href: '/dashboard/documentos',
-    icon: FileText
+    icon: FileText,
+    permission: {
+      modulo: 'documentos',
+      accion: 'read',
+      recurso: 'documentos'
+    }
   },
   {
     title: 'Contabilidad',
     href: '/dashboard/contabilidad',
-    icon: FileText
+    icon: FileText,
+    permission: {
+      modulo: 'contabilidad',
+      accion: 'read',
+      recurso: 'libros'
+    }
   },
   {
     title: 'Analytics',
     href: '/dashboard/analytics',
-    icon: Download
+    icon: Download,
+    permission: {
+      modulo: 'reportes',
+      accion: 'read',
+      recurso: 'analytics'
+    }
   },
   {
     title: 'Inventario',
     href: '/dashboard/inventario',
-    icon: Package
+    icon: Package,
+    permission: {
+      modulo: 'inventario',
+      accion: 'read',
+      recurso: 'productos'
+    }
   },
   {
     title: 'CPE',
     href: '/dashboard/cpe',
-    icon: FileText
+    icon: FileText,
+    permission: {
+      modulo: 'cpe',
+      accion: 'read',
+      recurso: 'comprobantes'
+    }
   },
   {
     title: 'GRE',
     href: '/dashboard/gre',
-    icon: Truck
+    icon: Truck,
+    permission: {
+      modulo: 'gre',
+      accion: 'read',
+      recurso: 'guias'
+    }
   },
   {
     title: 'Reportes SIRE',
     href: '/dashboard/sire',
-    icon: Download
+    icon: Download,
+    permission: {
+      modulo: 'sire',
+      accion: 'read',
+      recurso: 'reportes'
+    }
   },
   {
     title: 'Compras',
     href: '/dashboard/compras',
-    icon: ShoppingCart
+    icon: ShoppingCart,
+    permission: {
+      modulo: 'compras',
+      accion: 'read',
+      recurso: 'ordenes'
+    }
   },
   {
-    title: 'Cotizaciones',
-    href: '/dashboard/cotizaciones',
-    icon: FileSpreadsheet
+    title: 'Ventas',
+    icon: FileSpreadsheet,
+    permission: {
+      modulo: 'ventas',
+      accion: 'read',
+      recurso: 'cotizaciones'
+    },
+    submenu: [
+      {
+        title: 'Clientes',
+        href: '/dashboard/ventas/clientes',
+        icon: Users,
+        permission: {
+          modulo: 'ventas',
+          accion: 'read',
+          recurso: 'clientes'
+        }
+      },
+      {
+        title: 'Cotizaciones',
+        href: '/dashboard/ventas/cotizaciones',
+        icon: FileSpreadsheet,
+        permission: {
+          modulo: 'ventas',
+          accion: 'read',
+          recurso: 'cotizaciones'
+        }
+      },
+      {
+        title: 'Pedidos',
+        href: '/dashboard/ventas/pedidos',
+        icon: ShoppingCart,
+        permission: {
+          modulo: 'ventas',
+          accion: 'read',
+          recurso: 'pedidos'
+        }
+      }
+    ]
   },
   {
     title: 'Usuarios',
     href: '/dashboard/usuarios',
-    icon: Users
+    icon: Users,
+    permission: {
+      modulo: 'admin',
+      accion: 'read',
+      recurso: 'usuarios'
+    }
   },
   {
     title: 'RRHH',
     href: '/dashboard/rrhh',
-    icon: Users
+    icon: Users,
+    permission: {
+      modulo: 'rrhh',
+      accion: 'read',
+      recurso: 'empleados'
+    }
   },
   {
     title: 'Configuración',
     href: '/dashboard/configuracion',
-    icon: Settings
+    icon: Settings,
+    permission: {
+      modulo: 'admin',
+      accion: 'read',
+      recurso: 'configuracion'
+    }
   }
 ]
+
+import { useTenant } from '@/contexts/TenantContext'
+import { usePermission } from '@/hooks/use-permission'
+
+// Component to render a single menu item with permission check
+function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
+  item: MenuItem
+  pathname: string
+  isTablet: boolean
+  isMobile: boolean
+  onClose: () => void
+}) {
+  const { isSuperAdmin } = useTenant()
+  const Icon = item.icon
+  
+  // Check if any submenu item is active
+  const isSubmenuActive = item.submenu?.some(subItem => pathname === subItem.href) || false
+  const isActive = pathname === item.href || isSubmenuActive
+  
+  // Initialize expanded state based on whether submenu is active
+  const [isExpanded, setIsExpanded] = useState(isSubmenuActive)
+  
+  // Update expanded state when pathname changes and submenu becomes active
+  useEffect(() => {
+    if (isSubmenuActive) {
+      setIsExpanded(true)
+    }
+  }, [isSubmenuActive])
+
+  // Check permission if required
+  const { hasPermission, loading } = item.permission
+    ? usePermission(item.permission.modulo, item.permission.accion, item.permission.recurso)
+    : { hasPermission: true, loading: false }
+
+  // Filter super-admin only items
+  if (item.superAdminOnly && !isSuperAdmin) {
+    return null
+  }
+
+  // Filter items based on permissions (super-admins bypass this)
+  if (item.permission && !isSuperAdmin && !loading && !hasPermission) {
+    return null
+  }
+
+  // Show loading state for items being checked
+  if (loading && item.permission) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
+          margin: '0.25rem 0',
+          borderRadius: '12px',
+          color: '#94a3b8',
+          fontSize: isTablet ? '0.85rem' : '0.9rem',
+          minHeight: '44px',
+          opacity: 0.5,
+        }}
+      >
+        <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
+        <span style={{ 
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minWidth: 0
+        }}>
+          {item.title}
+        </span>
+      </div>
+    )
+  }
+
+  // If item has submenu, render as expandable
+  if (item.submenu) {
+    return (
+      <div style={{ margin: '0.25rem 0' }}>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
+            borderRadius: '12px',
+            textDecoration: 'none',
+            color: isSubmenuActive ? 'white' : '#475569',
+            fontWeight: isSubmenuActive ? '700' : '600',
+            fontSize: isTablet ? '0.85rem' : '0.9rem',
+            transition: 'all 0.3s ease',
+            background: isSubmenuActive ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)' : 'transparent',
+            boxShadow: isSubmenuActive ? '0 8px 16px rgba(59, 130, 246, 0.3)' : 'none',
+            border: 'none',
+            cursor: 'pointer',
+            minHeight: '44px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+            <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
+            <span style={{ 
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              minWidth: 0
+            }}>
+              {item.title}
+            </span>
+          </div>
+          {isExpanded ? (
+            <ChevronDown size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+          ) : (
+            <ChevronRight size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+          )}
+        </button>
+        
+        {isExpanded && (
+          <div style={{ 
+            marginLeft: isTablet ? '1rem' : '1.5rem',
+            marginTop: '0.25rem'
+          }}>
+            {item.submenu.map((subItem) => (
+              <MenuItem
+                key={subItem.href}
+                item={subItem}
+                pathname={pathname}
+                isTablet={isTablet}
+                isMobile={isMobile}
+                onClose={onClose}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Regular menu item with link
+  return (
+    <Link
+      key={item.href}
+      href={item.href!}
+      className={`nav-item ${isActive ? 'active' : ''}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
+        margin: '0.25rem 0',
+        borderRadius: '12px',
+        textDecoration: 'none',
+        color: isActive ? 'white' : '#475569',
+        fontWeight: isActive ? '700' : '600',
+        fontSize: isTablet ? '0.85rem' : '0.9rem',
+        transition: 'all 0.3s ease',
+        background: isActive ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)' : 'transparent',
+        boxShadow: isActive ? '0 8px 16px rgba(59, 130, 246, 0.3)' : 'none',
+        transform: isActive ? 'translateY(-1px)' : 'none',
+        border: isActive ? 'none' : '1px solid transparent',
+        minHeight: '44px'
+      }}
+      onClick={onClose}
+    >
+      <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
+      <span style={{ 
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        minWidth: 0
+      }}>
+        {item.title}
+      </span>
+    </Link>
+  )
+}
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
+  const { isSuperAdmin, user } = useTenant()
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isTablet, setIsTablet] = useState(false)
@@ -123,7 +416,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
+      const { error } = await customAuth.signOut()
       if (error) {
         toast({
           variant: "destructive",
@@ -199,39 +492,20 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <div style={{ 
-          padding: isTablet ? '0 1.5rem 1.5rem 1.5rem' : '0 2rem 2rem 2rem', 
+          padding: isTablet ? '1rem 1.5rem' : '1.5rem 2rem', 
           borderBottom: '1px solid rgba(203, 213, 225, 0.3)',
           flexShrink: 0
         }}>
-          <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-            <Building2 size={isTablet ? 28 : 32} style={{ marginRight: '0.75rem', color: '#3b82f6', flexShrink: 0 }} />
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ 
-                fontSize: isTablet ? '1.25rem' : '1.5rem', 
-                fontWeight: '800', 
-                margin: 0, 
-                background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)', 
-                WebkitBackgroundClip: 'text', 
-                WebkitTextFillColor: 'transparent',
-                letterSpacing: '-0.025em',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                CABIMAS ERP
-              </h1>
-              <p style={{ 
-                fontSize: isTablet ? '0.75rem' : '0.8rem', 
-                color: '#64748b', 
-                margin: 0, 
-                fontWeight: '500',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                Sistema Empresarial
-              </p>
-            </div>
+          <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img 
+              src="/logo.png" 
+              alt="NEON SYSTEM" 
+              style={{ 
+                width: isTablet ? '140px' : '180px',
+                height: 'auto',
+                objectFit: 'contain'
+              }} 
+            />
           </Link>
         </div>
 
@@ -241,59 +515,32 @@ export default function Sidebar() {
           flex: 1,
           overflowY: 'auto'
         }}>
-          {menuItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
-            
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
-                  margin: '0.25rem 0',
-                  borderRadius: '12px',
-                  textDecoration: 'none',
-                  color: isActive ? 'white' : '#475569',
-                  fontWeight: isActive ? '700' : '600',
-                  fontSize: isTablet ? '0.85rem' : '0.9rem',
-                  transition: 'all 0.3s ease',
-                  background: isActive ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)' : 'transparent',
-                  boxShadow: isActive ? '0 8px 16px rgba(59, 130, 246, 0.3)' : 'none',
-                  transform: isActive ? 'translateY(-1px)' : 'none',
-                  border: isActive ? 'none' : '1px solid transparent',
-                  minHeight: '44px'
-                }}
-                onClick={() => isMobile && setIsOpen(false)}
-              >
-                <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-                <span style={{ 
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  minWidth: 0
-                }}>
-                  {item.title}
-                </span>
-              </Link>
-            )
-          })}
+          {menuItems.map((item) => (
+            <MenuItem
+              key={item.href || item.title}
+              item={item}
+              pathname={pathname}
+              isTablet={isTablet}
+              isMobile={isMobile}
+              onClose={() => isMobile && setIsOpen(false)}
+            />
+          ))}
         </nav>
 
         {/* User Section */}
         <div style={{ 
           padding: isTablet ? '0.75rem' : '1rem', 
           borderTop: '1px solid rgba(203, 213, 225, 0.3)',
-          flexShrink: 0
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: isTablet ? '0.75rem' : '1rem'
         }}>
+          {/* User Info Card */}
           <div style={{ 
             padding: isTablet ? '0.75rem' : '1rem', 
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%)', 
-            borderRadius: '12px', 
-            marginBottom: isTablet ? '0.75rem' : '1rem',
+            borderRadius: '12px',
             border: '1px solid rgba(59, 130, 246, 0.2)'
           }}>
             <div style={{ 
@@ -303,7 +550,7 @@ export default function Sidebar() {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
-            }}>Admin Kame</div>
+            }}>{user?.nombre || 'Usuario'}</div>
             <div style={{ 
               fontSize: isTablet ? '0.75rem' : '0.8rem', 
               color: '#64748b', 
@@ -311,9 +558,10 @@ export default function Sidebar() {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
-            }}>admin@kame.demo</div>
+            }}>{user?.email || ''}</div>
           </div>
           
+          {/* Logout Button */}
           <button
             onClick={handleLogout}
             style={{

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { customAuth } from '@/lib/auth-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,7 +25,6 @@ export default function LoginPage() {
   const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
 
   const {
@@ -64,41 +63,39 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // ✅ USAR CUSTOM AUTH SERVICE
+      const { data, error } = await customAuth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error('🚨 Supabase Auth Error:', error)
-        console.error('🚨 Error Code:', error.status)
-        console.error('🚨 Error Message:', error.message)
+        console.error('🚨 Auth Error:', error)
         toast({
           variant: 'destructive',
           title: 'Error de autenticación',
-          description: `${error.message} (Code: ${error.status})`,
+          description: error.message,
         })
         return
       }
 
-      if (data.user) {
+      if (data?.user) {
         // Guardar/crear preferencia de país del usuario
         const userId = data.user.id
         
         // Convertir selectedCountry a número
         const paisPreferidoId = parseInt(selectedCountry, 10)
         
-        try {
-          // Usar updateUserConfiguration que maneja tanto creación como actualización
-          await updateUserConfiguration({
-            pais_preferido_id: paisPreferidoId,
-            idioma: 'es',
-            zona_horaria: 'America/Lima'
-          })
-        } catch (configError) {
-          console.warn('Error guardando configuración de usuario:', configError)
-          // No bloquear el login si falla la configuración
-        }
+        // TODO: Arreglar updateUserConfiguration para usar el token del localStorage
+        // try {
+        //   await updateUserConfiguration({
+        //     pais_preferido_id: paisPreferidoId,
+        //     idioma: 'es',
+        //     zona_horaria: 'America/Lima'
+        //   })
+        // } catch (configError) {
+        //   console.warn('Error guardando configuración de usuario:', configError)
+        // }
         
         // Persistir en localStorage para uso inmediato
         if (typeof window !== 'undefined') {

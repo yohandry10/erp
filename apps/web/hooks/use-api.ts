@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useToast } from '@/components/ui/use-toast'
 
 interface ApiResponse<T> {
@@ -21,7 +20,6 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     data: undefined,
   })
   
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
   const { showErrorToast = true, showSuccessToast = false } = options
 
@@ -32,11 +30,13 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     setState({ success: false, data: undefined })
 
     try {
-      // Sesión actual para el token
-      const { data: { session } } = await supabase.auth.getSession()
+      // Obtener token del localStorage (custom auth)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
       
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const url = `${API_BASE_URL}${endpoint}`
+      // Agregar prefijo /api si el endpoint no lo tiene
+      const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`
+      const url = `${API_BASE_URL}${normalizedEndpoint}`
       
       // Headers base
       const headers: HeadersInit = {
@@ -45,8 +45,8 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       }
 
       // Añadir token si existe
-      if (session?.access_token) {
-        (headers as Record<string, string>).Authorization = `Bearer ${session.access_token}`
+      if (token) {
+        (headers as Record<string, string>).Authorization = `Bearer ${token}`
       }
 
       // Inyección automática del país (si existe en localStorage)
@@ -69,6 +69,24 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         headers,
         mode: 'cors',
       })
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          // Clear session and redirect to login
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('user')
+          window.location.href = '/login'
+        }
+        throw new Error('Unauthorized - Session expired')
+      }
+
+      // Handle 403 Forbidden - show permission error
+      if (response.status === 403) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.message || 'You do not have permission to perform this action'
+        throw new Error(errorMessage)
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -110,7 +128,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
       return null
     }
-  }, [supabase, toast, showErrorToast, showSuccessToast])
+  }, [toast, showErrorToast, showSuccessToast])
 
   // Métodos helper
   const get = useCallback((endpoint: string) => {

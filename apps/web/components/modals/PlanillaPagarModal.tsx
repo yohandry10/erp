@@ -224,7 +224,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
     </head>
     <body>
         <div class="header">
-            <div class="company">CABIMAS ERP</div>
+            <div class="company">NEON SYSTEM</div>
             <div class="title">Comprobante de Pago de Planilla</div>
             <div>Período: ${planilla.periodo}</div>
             <div>Generado: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</div>

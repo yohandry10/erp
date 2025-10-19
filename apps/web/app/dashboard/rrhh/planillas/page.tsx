@@ -199,7 +199,7 @@ const PlanillasPage = () => {
     </head>
     <body>
         <div class="header">
-            <div class="company">CABIMAS ERP</div>
+            <div class="company">NEON SYSTEM</div>
             <div class="title">Reporte de Planilla - Período ${periodo}</div>
             <div>Generado el: ${new Date().toLocaleDateString('es-PE')}</div>
         </div>
@@ -332,7 +332,7 @@ const PlanillasPage = () => {
     <body>
         <div class="boleta">
             <div class="header">
-                <div class="company">CABIMAS ERP</div>
+                <div class="company">NEON SYSTEM</div>
                 <div class="title">Boleta de Pago</div>
                 <div>Período: ${data?.planillas?.periodo || 'N/A'}</div>
             </div>
@@ -398,7 +398,7 @@ const PlanillasPage = () => {
             </div>
 
             <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #666;">
-                <p>Este documento es generado automáticamente por el Sistema ERP CABIMAS</p>
+                <p>Este documento es generado automáticamente por NEON SYSTEM</p>
                 <p>Fecha de generación: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</p>
             </div>
         </div>
