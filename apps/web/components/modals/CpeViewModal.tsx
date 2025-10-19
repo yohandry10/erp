@@ -298,7 +298,7 @@ export default function CpeViewModal({
                     <tr>
                       <td style={{ border: '1px solid #000', padding: '16px', width: '65%' }}>
                         <div style={{ textAlign: 'center' }}>
-                          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>CABIMAS ERP</h1>
+                          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>NEON SYSTEM</h1>
                           <p style={{ fontSize: '14px', margin: '4px 0' }}>Sistema Empresarial Integrado</p>
                           <p style={{ fontSize: '14px', margin: '4px 0' }}>
                             <strong>RUC:</strong> {cpeData.ruc_emisor}
@@ -589,7 +589,7 @@ export default function CpeViewModal({
                   paddingTop: '16px',
                 }}
               >
-                <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>CABIMAS ERP - Sistema Empresarial Integrado</p>
+                <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>NEON SYSTEM - Sistema Empresarial Integrado</p>
                 <p style={{ margin: '0 0 4px 0' }}>
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>

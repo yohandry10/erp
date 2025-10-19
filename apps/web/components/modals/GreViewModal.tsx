@@ -289,7 +289,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                             marginBottom: '8px',
                             margin: '0 0 8px 0'
                           }}>
-                            CABIMAS ERP
+                            NEON SYSTEM
                           </h1>
                           <p style={{ fontSize: '14px', marginBottom: '4px', margin: '4px 0' }}>
                             Sistema Empresarial Integrado
@@ -298,7 +298,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                             <strong>RUC:</strong> 12345678901
                           </p>
                           <p style={{ fontSize: '14px', marginBottom: '4px', margin: '4px 0' }}>
-                            <strong>Razón Social:</strong> CABIMAS ERP SAC
+                            <strong>Razón Social:</strong> NEON SYSTEM SAC
                           </p>
                           <p style={{ fontSize: '14px', margin: '4px 0' }}>
                             Dirección: Lima, Perú
@@ -522,7 +522,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
                 paddingTop: '16px'
               }}>
                 <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>
-                  CABIMAS ERP - Sistema Empresarial Integrado
+                  NEON SYSTEM - Sistema Empresarial Integrado
                 </p>
                 <p style={{ margin: '0 0 4px 0' }}>
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}

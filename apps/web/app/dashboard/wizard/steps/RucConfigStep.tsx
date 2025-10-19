@@ -1,0 +1,129 @@
+'use client'
+
+import React from 'react'
+import { useWizard } from '../useWizard'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Building2 } from 'lucide-react'
+
+export function RucConfigStep() {
+  const { state, updateConfiguration } = useWizard()
+
+  const handleInputChange = (field: string, value: string) => {
+    updateConfiguration({ [field]: value })
+  }
+
+  return (
+    <div style={{ padding: '1rem 0' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.75rem',
+        marginBottom: '1.5rem',
+        padding: '1rem',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderRadius: '8px',
+      }}>
+        <Building2 size={24} style={{ color: 'var(--primary-600)' }} />
+        <p style={{
+          fontSize: '0.875rem',
+          color: 'var(--primary-700)',
+          margin: 0,
+        }}>
+          Ingresa los datos de tu empresa tal como aparecen en SUNAT
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div>
+          <Label htmlFor="ruc" style={{ marginBottom: '0.5rem', display: 'block' }}>
+            RUC <span style={{ color: '#ef4444' }}>*</span>
+          </Label>
+          <Input
+            id="ruc"
+            type="text"
+            placeholder="Ej: 20123456789"
+            value={state.configuration.ruc}
+            onChange={(e) => handleInputChange('ruc', e.target.value)}
+            maxLength={11}
+            style={{
+              fontSize: '1rem',
+            }}
+          />
+          <p style={{
+            fontSize: '0.75rem',
+            color: 'var(--primary-500)',
+            marginTop: '0.25rem',
+          }}>
+            Debe tener 11 dígitos
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="razonSocial" style={{ marginBottom: '0.5rem', display: 'block' }}>
+            Razón Social <span style={{ color: '#ef4444' }}>*</span>
+          </Label>
+          <Input
+            id="razonSocial"
+            type="text"
+            placeholder="Ej: EMPRESA EJEMPLO S.A.C."
+            value={state.configuration.razonSocial}
+            onChange={(e) => handleInputChange('razonSocial', e.target.value)}
+            style={{
+              fontSize: '1rem',
+            }}
+          />
+          <p style={{
+            fontSize: '0.75rem',
+            color: 'var(--primary-500)',
+            marginTop: '0.25rem',
+          }}>
+            Nombre completo de la empresa
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="direccion" style={{ marginBottom: '0.5rem', display: 'block' }}>
+            Dirección Fiscal <span style={{ color: '#ef4444' }}>*</span>
+          </Label>
+          <Input
+            id="direccion"
+            type="text"
+            placeholder="Ej: Av. Principal 123, Lima, Lima"
+            value={state.configuration.direccion}
+            onChange={(e) => handleInputChange('direccion', e.target.value)}
+            style={{
+              fontSize: '1rem',
+            }}
+          />
+          <p style={{
+            fontSize: '0.75rem',
+            color: 'var(--primary-500)',
+            marginTop: '0.25rem',
+          }}>
+            Dirección registrada en SUNAT
+          </p>
+        </div>
+
+      </div>
+
+      <div style={{
+        marginTop: '2rem',
+        padding: '1rem',
+        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+        borderRadius: '8px',
+        border: '1px solid rgba(251, 191, 36, 0.2)',
+      }}>
+        <p style={{
+          fontSize: '0.875rem',
+          color: 'var(--warning-700)',
+          margin: 0,
+          lineHeight: '1.5',
+        }}>
+          <strong>⚠️ Importante:</strong> Asegúrate de que los datos coincidan exactamente con
+          los registrados en SUNAT para evitar rechazos en la emisión de comprobantes.
+        </p>
+      </div>
+    </div>
+  )
+}
