@@ -54,9 +54,11 @@ export class DashboardIntegrationService {
     console.log('🚀 [DashboardIntegration] Servicio inicializado');
   }
 
-  async getConsolidatedMetrics(): Promise<DashboardMetrics> {
+  async getConsolidatedMetrics(tenantId?: string): Promise<DashboardMetrics> {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     try {
-      console.log('📊 [DashboardIntegration] Consolidando métricas de todos los módulos...');
+      console.log(`📊 [DashboardIntegration] Consolidando métricas para tenant: ${currentTenantId}`);
       
       const client = this.supabase.getClient();
       
@@ -100,21 +102,21 @@ export class DashboardIntegrationService {
         // Sistema
         usuariosData
       ] = await Promise.all([
-        this.getVentasHoy(client, hoy),
-        this.getVentasMes(client, inicioMes, finMes),
-        this.getVentasMesAnterior(client, mesAnterior, finMesAnterior),
-        this.getComprasMes(client, inicioMes, finMes),
-        this.getOrdenesCompraPendientes(client),
-        this.getProductos(client),
-        this.getProductosStockBajo(client),
-        this.getMovimientosHoy(client, hoy),
-        this.getCpeDelMes(client, inicioMes, finMes),
-        this.getGreDelMes(client, inicioMes, finMes),
-        this.getSireDelMes(client, inicioMes, finMes),
-        this.getCotizacionesDelMes(client, inicioMes, finMes),
-        this.getCotizacionesPendientes(client),
-        this.getCotizacionesAceptadas(client),
-        this.getUsuarios(client)
+        this.getVentasHoy(client, hoy, currentTenantId),
+        this.getVentasMes(client, inicioMes, finMes, currentTenantId),
+        this.getVentasMesAnterior(client, mesAnterior, finMesAnterior, currentTenantId),
+        this.getComprasMes(client, inicioMes, finMes, currentTenantId),
+        this.getOrdenesCompraPendientes(client, currentTenantId),
+        this.getProductos(client, currentTenantId),
+        this.getProductosStockBajo(client, currentTenantId),
+        this.getMovimientosHoy(client, hoy, currentTenantId),
+        this.getCpeDelMes(client, inicioMes, finMes, currentTenantId),
+        this.getGreDelMes(client, inicioMes, finMes, currentTenantId),
+        this.getSireDelMes(client, inicioMes, finMes, currentTenantId),
+        this.getCotizacionesDelMes(client, inicioMes, finMes, currentTenantId),
+        this.getCotizacionesPendientes(client, currentTenantId),
+        this.getCotizacionesAceptadas(client, currentTenantId),
+        this.getUsuarios(client, currentTenantId)
       ]);
 
       // Procesar y calcular métricas
@@ -232,114 +234,144 @@ export class DashboardIntegrationService {
   }
 
   // Métodos privados para consultas específicas
-  private async getVentasHoy(client: any, hoy: Date) {
+  private async getVentasHoy(client: any, hoy: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('ventas_pos')
       .select('total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha', hoy.toISOString().split('T')[0])
       .lt('fecha', new Date(hoy.getTime() + 24*60*60*1000).toISOString().split('T')[0]);
     return data;
   }
 
-  private async getVentasMes(client: any, inicio: Date, fin: Date) {
+  private async getVentasMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('ventas_pos')
       .select('total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha', inicio.toISOString().split('T')[0])
       .lte('fecha', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getVentasMesAnterior(client: any, inicio: Date, fin: Date) {
+  private async getVentasMesAnterior(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('ventas_pos')
       .select('total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha', inicio.toISOString().split('T')[0])
       .lte('fecha', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getComprasMes(client: any, inicio: Date, fin: Date) {
+  private async getComprasMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('ordenes_compra')
       .select('total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha_orden', inicio.toISOString().split('T')[0])
       .lte('fecha_orden', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getOrdenesCompraPendientes(client: any) {
+  private async getOrdenesCompraPendientes(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('ordenes_compra')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .eq('estado', 'PENDIENTE');
     return data;
   }
 
-  private async getProductos(client: any) {
+  private async getProductos(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('productos')
-      .select('id, precio, stock, stock_minimo');
+      .select('id, precio, stock, stock_minimo')
+      .eq('tenant_id', tenantId); // ✅ Filtro de tenant
     return data;
   }
 
-  private async getProductosStockBajo(client: any) {
+  private async getProductosStockBajo(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('productos')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .lt('stock', 'stock_minimo');
     return data;
   }
 
-  private async getMovimientosHoy(client: any, hoy: Date) {
+  private async getMovimientosHoy(client: any, hoy: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('movimientos_stock')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('created_at', hoy.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getCpeDelMes(client: any, inicio: Date, fin: Date) {
+  private async getCpeDelMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('cpe')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha_emision', inicio.toISOString().split('T')[0])
       .lte('fecha_emision', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getGreDelMes(client: any, inicio: Date, fin: Date) {
+  private async getGreDelMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('gre')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha_emision', inicio.toISOString().split('T')[0])
       .lte('fecha_emision', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getSireDelMes(client: any, inicio: Date, fin: Date) {
+  private async getSireDelMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('sire_files')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('created_at', inicio.toISOString().split('T')[0])
       .lte('created_at', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getCotizacionesDelMes(client: any, inicio: Date, fin: Date) {
+  private async getCotizacionesDelMes(client: any, inicio: Date, fin: Date, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('cotizaciones')
       .select('id, total')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .gte('fecha_cotizacion', inicio.toISOString().split('T')[0])
       .lte('fecha_cotizacion', fin.toISOString().split('T')[0]);
     return data;
   }
 
-  private async getCotizacionesPendientes(client: any) {
+  private async getCotizacionesPendientes(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('cotizaciones')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .in('estado', ['PENDIENTE', 'ENVIADA']);
     return data;
   }
 
-  private async getCotizacionesAceptadas(client: any) {
+  private async getCotizacionesAceptadas(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const { data } = await client.from('cotizaciones')
       .select('id')
+      .eq('tenant_id', tenantId) // ✅ Filtro de tenant
       .eq('estado', 'ACEPTADA');
     return data;
   }
 
-  private async getUsuarios(client: any) {
-    const { data } = await client.from('usuarios')
-      .select('id');
+  private async getUsuarios(client: any, tenantId: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const { data } = await client.from('usuarios_sistema')
+      .select('id')
+      .eq('tenant_id', tenantId); // ✅ Filtro de tenant
     return data;
   }
 

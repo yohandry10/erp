@@ -194,10 +194,11 @@ export class BackgroundJobsService {
       console.log('📦 [BackgroundJobs] Verificando productos con stock bajo...');
       
       // Simular verificación en modo mock o usar Supabase real
-      if (this.supabase.isMockMode()) {
-        console.log('✅ [BackgroundJobs] Verificación de stock en modo mock - simulado');
-        return;
-      }
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      // if (this.supabase.isMockMode()) {
+      //   console.log('✅ [BackgroundJobs] Verificación de stock en modo mock - simulado');
+      //   return;
+      // }
 
       const productosQuery = this.supabase.query('productos')
         .select('*')
@@ -252,10 +253,11 @@ export class BackgroundJobsService {
     try {
       console.log('💰 [BackgroundJobs] Verificando vencimientos de pagos...');
       
-      if (this.supabase.isMockMode()) {
-        console.log('✅ [BackgroundJobs] Verificación de vencimientos en modo mock - simulado');
-        return;
-      }
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      // if (this.supabase.isMockMode()) {
+      //   console.log('✅ [BackgroundJobs] Verificación de vencimientos en modo mock - simulado');
+      //   return;
+      // }
 
       const hoy = new Date();
       const proximaSemanaNuestra = new Date();
@@ -313,7 +315,9 @@ export class BackgroundJobsService {
       mesAnterior.setMonth(mesAnterior.getMonth() - 1);
       const periodo = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
 
-      if (this.supabase.isMockMode()) {
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      const isMockMode = false; // Placeholder
+      if (isMockMode) {
         console.log(`📊 [BackgroundJobs] Generación SIRE en modo mock para periodo ${periodo}`);
         
         const eventoSire: ReporteSireGeneradoEvent = {
@@ -372,7 +376,9 @@ export class BackgroundJobsService {
       const hoy = new Date().toISOString().split('T')[0];
       const mesActual = new Date().toISOString().substring(0, 7);
 
-      if (this.supabase.isMockMode()) {
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      const isMockMode = false; // Placeholder
+      if (isMockMode) {
         // DATOS REALES EN CERO - NO MÁS HARDCODEOS DE MIERDA
         this.eventBus.emitDashboardMetricsUpdated({
           totalCpe: 0,
@@ -475,7 +481,9 @@ export class BackgroundJobsService {
     try {
       console.log('📋 [BackgroundJobs] Ejecutando inventario cíclico automático...');
       
-      if (this.supabase.isMockMode()) {
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      const isMockMode = false; // Placeholder
+      if (isMockMode) {
         console.log('📋 [BackgroundJobs] Inventario cíclico en modo mock - simulado');
         return;
       }
@@ -524,7 +532,9 @@ export class BackgroundJobsService {
 
   async procesarAsistenciasPendientes() {
     try {
-      if (this.supabase.isMockMode()) {
+      // TODO: Implement isMockMode() in SupabaseService if needed
+      const isMockMode = false; // Placeholder
+      if (isMockMode) {
         return; // Skip en modo mock
       }
 

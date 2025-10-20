@@ -150,7 +150,13 @@ export class ConfiguracionController {
           igvPorcentaje: data.igv_porcentaje,
           retencionRentaPorcentaje: data.retencion_renta_porcentaje,
           monedaDefecto: data.moneda_defecto,
-          logoUrl: data.logo_url
+          logoUrl: data.logo_url,
+          // Nuevos campos de configuración de ventas
+          tipo_empresa: data.tipo_empresa,
+          usar_flujo_logistica: data.usar_flujo_logistica,
+          gre_obligatorio: data.gre_obligatorio,
+          gre_automatico_habilitado: data.gre_automatico_habilitado,
+          umbral_gre_automatico: data.umbral_gre_automatico
         }
       };
     } catch (error) {
@@ -188,6 +194,13 @@ export class ConfiguracionController {
       if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
       if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
       if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
+      
+      // Nuevos campos de configuración de ventas
+      if (datosEmpresa.tipo_empresa) updateData.tipo_empresa = datosEmpresa.tipo_empresa;
+      if (datosEmpresa.usar_flujo_logistica !== undefined) updateData.usar_flujo_logistica = datosEmpresa.usar_flujo_logistica;
+      if (datosEmpresa.gre_obligatorio !== undefined) updateData.gre_obligatorio = datosEmpresa.gre_obligatorio;
+      if (datosEmpresa.gre_automatico_habilitado !== undefined) updateData.gre_automatico_habilitado = datosEmpresa.gre_automatico_habilitado;
+      if (datosEmpresa.umbral_gre_automatico !== undefined) updateData.umbral_gre_automatico = datosEmpresa.umbral_gre_automatico;
 
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useWizardContext } from './WizardContext'
 import { WizardConfiguration } from './types'
 
@@ -22,7 +23,19 @@ export function useWizard() {
   const loadProgress = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/progress`)
+      
+      // Obtener token de sesión de Supabase
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/progress`, { headers })
       
       if (!response.ok) {
         // Si no hay progreso guardado, simplemente continuar
@@ -69,14 +82,23 @@ export function useWizard() {
     try {
       setLoading(true)
       
+      // Obtener token de sesión
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+      
       // Backend expects pasoActual to be 1-indexed (1, 2, 3...), not 0-indexed
       const pasoActual = state.currentStep + 1
       
       const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/step`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           pasoActual,
           configuracionTemporal: {
@@ -126,8 +148,8 @@ export function useWizard() {
       }
       
       if (state.configuration.certificateFile) {
-        const fileName = state.configuration.certificateFile.name.toLowerCase()
-        if (!fileName.endsWith('.pfx') && !fileName.endsWith('.p12')) {
+        const fileName = state.configuration.certificateFile.name?.toLowerCase() || ''
+        if (fileName && !fileName.endsWith('.pfx') && !fileName.endsWith('.p12')) {
           errors.push('El archivo debe ser un certificado .pfx o .p12')
           isValid = false
         }

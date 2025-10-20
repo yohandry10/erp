@@ -21,39 +21,101 @@ export class GreService {
   private initializeEventListeners() {
     console.log('🚚 [GRE] Inicializando listeners de eventos...');
     
-    // Listener principal para eventos de transporte
-    this.eventBus.on('cpe.requiere_transporte', async (event) => {
-      console.log('🚚 [GRE] ¡EVENTO RECIBIDO! CPE requiere transporte');
-      console.log('🚚 [GRE] Evento completo:', JSON.stringify(event, null, 2));
-      try {
-        await this.evaluarCreacionAutomaticaGRE(event.data);
-      } catch (error) {
-        console.error('❌ [GRE] Error procesando evento de transporte:', error);
-      }
-    });
-
-    // También escuchar eventos de comprobante creado como respaldo
-    this.eventBus.on('comprobante.creado', async (event) => {
-      console.log('🚚 [GRE] Evento comprobante.creado recibido');
-      console.log('🚚 [GRE] Datos del comprobante:', event.data);
-      
-      if (event.data?.requiereTransporte) {
-        console.log('🚚 [GRE] Comprobante requiere transporte, creando GRE...');
+    // Listener for sale.completed event - main trigger for auto GRE
+    this.eventBus.on('sale.completed', async (event) => {
+      // Don't block sale completion - run async
+      setImmediate(async () => {
         try {
-          await this.evaluarCreacionAutomaticaGRE({
-            cpeId: event.data.cpeId,
-            clienteId: event.data.clienteId,
-            total: event.data.total,
-            productos: []
+          console.log('🚚 [GRE] Sale completed event received:', event.data?.saleId);
+          
+          const saleData = event.data;
+          if (!saleData || !saleData.tenantId || !saleData.saleId) {
+            console.warn('⚠️ [GRE] Invalid sale data in event, skipping auto GRE');
+            return;
+          }
+
+          // Evaluate if auto GRE should be created
+          const shouldCreate = await this.evaluateAutoGRECreation({
+            tenantId: saleData.tenantId,
+            saleId: saleData.saleId,
+            total: saleData.total || 0,
+            cpeId: saleData.cpeId,
           });
+
+          if (shouldCreate) {
+            console.log(`🚚 [GRE] Creating automatic GRE for sale ${saleData.saleId}`);
+            
+            const gre = await this.createAutoGREFromSale(saleData.saleId, {
+              tenantId: saleData.tenantId,
+              cpeId: saleData.cpeId,
+              clienteId: saleData.clienteId,
+              clienteNombre: saleData.clienteNombre,
+              clienteDireccion: saleData.clienteDireccion,
+              total: saleData.total,
+              productos: saleData.productos,
+            });
+
+            console.log(`✅ [GRE] Automatic GRE created: ${gre.numero} for sale ${saleData.saleId}`);
+
+            // Emit event for GRE creation
+            this.eventBus.emit('gre.auto_created', {
+              greId: gre.id,
+              greNumero: gre.numero,
+              saleId: saleData.saleId,
+              tenantId: saleData.tenantId,
+              timestamp: new Date().toISOString(),
+            });
+          } else {
+            console.log(`🚚 [GRE] Sale ${saleData.saleId} does not meet auto GRE criteria`);
+          }
         } catch (error) {
-          console.error('❌ [GRE] Error procesando comprobante creado:', error);
+          console.error('❌ [GRE] Error in sale.completed listener:', error);
+          
+          // Emit error event for notification
+          this.eventBus.emit('gre.creation_failed', {
+            saleId: event.data?.saleId,
+            tenantId: event.data?.tenantId,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+          });
         }
-      }
+      });
+    });
+    
+    // Legacy listener for backward compatibility
+    this.eventBus.on('cpe.requiere_transporte', async (event) => {
+      setImmediate(async () => {
+        try {
+          console.log('🚚 [GRE] CPE requires transport event received (legacy)');
+          await this.evaluarCreacionAutomaticaGRE(event.data);
+        } catch (error) {
+          console.error('❌ [GRE] Error processing transport event:', error);
+        }
+      });
     });
 
-    console.log('✅ [GRE] Event listeners configurados correctamente');
-    console.log('🚚 [GRE] Listeners activos:', this.eventBus['eventEmitter'].eventNames());
+    // Legacy listener for comprobante.creado
+    this.eventBus.on('comprobante.creado', async (event) => {
+      setImmediate(async () => {
+        try {
+          console.log('🚚 [GRE] Comprobante created event received (legacy)');
+          
+          if (event.data?.requiereTransporte) {
+            await this.evaluarCreacionAutomaticaGRE({
+              cpeId: event.data.cpeId,
+              clienteId: event.data.clienteId,
+              total: event.data.total,
+              productos: []
+            });
+          }
+        } catch (error) {
+          console.error('❌ [GRE] Error processing comprobante.creado:', error);
+        }
+      });
+    });
+
+    console.log('✅ [GRE] Event listeners configured successfully');
+    console.log('🚚 [GRE] Active listeners:', this.eventBus['eventEmitter'].eventNames());
   }
 
   async evaluarCreacionAutomaticaGRE(datos: any): Promise<void> {
@@ -830,5 +892,283 @@ export class GreService {
     }
 
     return tendencia;
+  }
+
+  /**
+   * Evaluate if automatic GRE creation should be triggered
+   * Requirements: 2.1, 2.2
+   */
+  async evaluateAutoGRECreation(saleData: {
+    tenantId: string;
+    saleId: string;
+    total: number;
+    cpeId?: string;
+  }): Promise<boolean> {
+    try {
+      console.log(`🚚 [GRE] Evaluating auto GRE creation for sale ${saleData.saleId}, total: S/ ${saleData.total}`);
+
+      // Get GRE threshold configuration for tenant
+      const thresholdConfig = await this.getGREThresholdConfig(saleData.tenantId);
+
+      // Check if auto GRE is enabled
+      if (!thresholdConfig.greAutomaticoHabilitado) {
+        console.log(`🚚 [GRE] Auto GRE is disabled for tenant ${saleData.tenantId}`);
+        return false;
+      }
+
+      // Check if sale amount exceeds threshold
+      const shouldCreate = saleData.total >= thresholdConfig.umbralGREAutomatico;
+
+      console.log(
+        `🚚 [GRE] Sale total S/ ${saleData.total} ${shouldCreate ? 'EXCEEDS' : 'BELOW'} threshold S/ ${thresholdConfig.umbralGREAutomatico}`
+      );
+
+      return shouldCreate;
+    } catch (error) {
+      console.error(`❌ [GRE] Error evaluating auto GRE creation:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Create automatic GRE from sale data
+   * Requirements: 2.1, 2.2, 2.3
+   */
+  async createAutoGREFromSale(
+    saleId: string,
+    saleData: {
+      tenantId: string;
+      cpeId: string;
+      clienteId: string;
+      clienteNombre?: string;
+      clienteDireccion?: string;
+      total: number;
+      productos?: any[];
+    }
+  ): Promise<GuiaRemisionResponseDto> {
+    try {
+      console.log(`🚚 [GRE] Creating automatic GRE for sale ${saleId}`);
+
+      // Calculate estimated weight
+      const pesoEstimado = this.calcularPesoEstimado(saleData.productos || [], saleData.total);
+
+      // Prepare GRE data
+      const greData: CreateGuiaRemisionDto = {
+        destinatario: saleData.clienteNombre || `Cliente ${saleData.clienteId}`,
+        direccionDestino: saleData.clienteDireccion || 'Lima, Perú - Dirección por configurar',
+        fechaTraslado: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+        modalidad: 'TRANSPORTE_PUBLICO',
+        motivo: 'VENTA',
+        pesoTotal: pesoEstimado,
+        observaciones: `GRE automática - Venta ${saleId} - Total: S/ ${saleData.total}`,
+        transportista: 'Transporte por definir',
+        placaVehiculo: null,
+        licenciaConducir: null,
+        cpeRelacionado: saleData.cpeId,
+      };
+
+      // Create GRE
+      const gre = await this.createGuia(greData);
+
+      // Update GRE to mark as automatic and link to sale
+      await this.supabaseService.getClient()
+        .from('gre_guias')
+        .update({
+          es_automatica: true,
+          venta_id: saleId,
+          motivo_creacion: 'AUTO_THRESHOLD',
+        })
+        .eq('id', gre.id);
+
+      // Link GRE with inventory movement
+      await this.linkGREWithInventory(gre.id, saleId, saleData.tenantId, {
+        productos: saleData.productos,
+        total: saleData.total,
+      });
+
+      console.log(`✅ [GRE] Automatic GRE created successfully: ${gre.numero} for sale ${saleId}`);
+
+      return gre;
+    } catch (error) {
+      console.error(`❌ [GRE] Error creating automatic GRE for sale ${saleId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Link GRE with inventory movement
+   * Requirements: 2.3, 2.6
+   */
+  async linkGREToInventoryMovement(greId: string, movementId: string): Promise<void> {
+    try {
+      console.log(`🚚 [GRE] Linking GRE ${greId} to inventory movement ${movementId}`);
+
+      const { error } = await this.supabaseService.getClient()
+        .from('gre_guias')
+        .update({
+          movimiento_inventario_id: movementId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', greId);
+
+      if (error) {
+        console.error(`❌ [GRE] Error linking GRE to inventory movement:`, error);
+        throw error;
+      }
+
+      console.log(`✅ [GRE] GRE ${greId} linked to inventory movement ${movementId}`);
+    } catch (error) {
+      console.error(`❌ [GRE] Error linking GRE to inventory movement:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get GRE threshold configuration for tenant
+   * Requirements: 2.1, 2.2, 2.6
+   */
+  async getGREThresholdConfig(tenantId: string): Promise<{
+    umbralGREAutomatico: number;
+    greAutomaticoHabilitado: boolean;
+  }> {
+    try {
+      console.log(`🚚 [GRE] Getting GRE threshold config for tenant ${tenantId}`);
+
+      const { data, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('umbral_gre_automatico, gre_automatico_habilitado')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (error) {
+        console.warn(`⚠️ [GRE] Error getting GRE config, using defaults:`, error);
+        return {
+          umbralGREAutomatico: 700.0,
+          greAutomaticoHabilitado: true,
+        };
+      }
+
+      return {
+        umbralGREAutomatico: data?.umbral_gre_automatico || 700.0,
+        greAutomaticoHabilitado: data?.gre_automatico_habilitado !== false,
+      };
+    } catch (error) {
+      console.error(`❌ [GRE] Error getting GRE threshold config:`, error);
+      // Return defaults on error
+      return {
+        umbralGREAutomatico: 700.0,
+        greAutomaticoHabilitado: true,
+      };
+    }
+  }
+
+  /**
+   * Find or create inventory movement for a sale
+   * Requirements: 2.3, 2.6
+   */
+  async findOrCreateInventoryMovement(
+    saleId: string,
+    tenantId: string,
+    saleData?: {
+      productos?: any[];
+      total?: number;
+    }
+  ): Promise<string | null> {
+    try {
+      console.log(`🚚 [GRE] Finding or creating inventory movement for sale ${saleId}`);
+
+      // First, try to find existing inventory movement for this sale
+      const { data: existingMovement, error: findError } = await this.supabaseService.getClient()
+        .from('stock_movimientos')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('referencia', `Venta ${saleId}`)
+        .limit(1)
+        .single();
+
+      if (existingMovement && !findError) {
+        console.log(`✅ [GRE] Found existing inventory movement: ${existingMovement.id}`);
+        return existingMovement.id;
+      }
+
+      // If no existing movement found, create one using the inventory service
+      if (saleData?.productos && saleData.productos.length > 0) {
+        console.log(`🚚 [GRE] Creating inventory movements for ${saleData.productos.length} products`);
+
+        // Create movements for each product in the sale
+        const movementIds: string[] = [];
+        
+        for (const producto of saleData.productos) {
+          try {
+            const movementId = await this.inventoryService.realizarMovimientoStock(
+              {
+                productoId: producto.productoId || producto.id,
+                tipoMovimiento: 'SALIDA',
+                cantidad: producto.cantidad || 1,
+                stockAnterior: 0, // Will be calculated by the service
+                stockNuevo: 0, // Will be calculated by the service
+                motivo: `Venta ${saleId}`,
+                precioUnitario: producto.precio || 0,
+                valorTotal: producto.total || 0,
+                usuarioId: 'system',
+                referencia: `Venta ${saleId}`,
+                ventaId: saleId,
+              },
+              tenantId
+            );
+
+            if (movementId) {
+              movementIds.push(movementId);
+            }
+          } catch (error) {
+            console.error(`❌ [GRE] Error creating movement for product ${producto.productoId}:`, error);
+          }
+        }
+
+        if (movementIds.length > 0) {
+          console.log(`✅ [GRE] Created ${movementIds.length} inventory movements`);
+          // Return the first movement ID as reference
+          return movementIds[0];
+        }
+      }
+
+      console.warn(`⚠️ [GRE] No inventory movement found or created for sale ${saleId}`);
+      return null;
+    } catch (error) {
+      console.error(`❌ [GRE] Error finding/creating inventory movement:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Link GRE with inventory movement and update GRE record
+   * Requirements: 2.3, 2.6
+   */
+  async linkGREWithInventory(
+    greId: string,
+    saleId: string,
+    tenantId: string,
+    saleData?: {
+      productos?: any[];
+      total?: number;
+    }
+  ): Promise<void> {
+    try {
+      console.log(`🚚 [GRE] Linking GRE ${greId} with inventory for sale ${saleId}`);
+
+      // Find or create inventory movement
+      const movementId = await this.findOrCreateInventoryMovement(saleId, tenantId, saleData);
+
+      if (movementId) {
+        // Link GRE to inventory movement
+        await this.linkGREToInventoryMovement(greId, movementId);
+        console.log(`✅ [GRE] GRE ${greId} linked to inventory movement ${movementId}`);
+      } else {
+        console.warn(`⚠️ [GRE] Could not link GRE ${greId} to inventory - no movement found/created`);
+      }
+    } catch (error) {
+      console.error(`❌ [GRE] Error linking GRE with inventory:`, error);
+      // Don't throw - this is not critical for GRE creation
+    }
   }
 }

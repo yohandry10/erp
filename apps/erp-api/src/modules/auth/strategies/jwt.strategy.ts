@@ -19,18 +19,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     try {
-      // Validar que el usuario aún existe y está activo
-      const user = await this.authService.validateToken(
-        // Necesitamos reconstruir el token para validación completa
-        // En un escenario real, esto se haría de manera diferente
-        payload
-      );
+      // ✅ MULTI-TENANT: Validar tenant_id en el payload
+      if (!payload.tenant_id) {
+        console.warn('⚠️ [JWT] Token sin tenant_id detectado');
+        throw new UnauthorizedException('Token inválido: falta tenant_id');
+      }
+
+      console.log('🔐 [JWT] Validando token - Tenant:', payload.tenant_id, 'Usuario:', payload.email, 'Super-Admin:', payload.is_super_admin || false);
       
       return {
         id: payload.sub,
         email: payload.email,
         username: payload.username,
-        roles: payload.roles || []
+        roles: payload.roles || [],
+        tenant_id: payload.tenant_id, // ✅ Incluir tenant_id en request.user
+        is_super_admin: payload.is_super_admin || false // ✅ Incluir is_super_admin en request.user
       };
     } catch (error) {
       throw new UnauthorizedException('Token inválido');

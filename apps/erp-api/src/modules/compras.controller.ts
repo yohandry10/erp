@@ -4,6 +4,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { EventBusService } from '../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('compras')
 @Controller('compras')
@@ -18,16 +19,19 @@ export class ComprasController {
   @Get('stats')
   @ApiOperation({ summary: 'Obtener estadísticas de compras' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
-  async getStats() {
+  async getStats(@Query() filtros: any) {
     try {
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const supabase = this.supabase.getClient();
 
-      console.log('📊 [Compras Stats] Obteniendo estadísticas de compras...');
+      console.log(`📊 [Compras Stats] Obteniendo estadísticas de compras para tenant: ${tenantId}`);
 
       // USAR LA MISMA CONSULTA QUE FUNCIONA EN getOrdenes
       const { data: todasLasCompras, error: comprasError } = await supabase
         .from('ordenes_compra')
         .select('*')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .order('created_at', { ascending: false });
 
       if (comprasError) {
@@ -61,6 +65,7 @@ export class ComprasController {
         const { data: proveedores } = await supabase
           .from('proveedores')
           .select('id')
+          .eq('tenant_id', tenantId) // ✅ Filtro de tenant
           .eq('activo', true);
         proveedoresActivos = proveedores?.length || 0;
       } catch (error) {
@@ -110,12 +115,15 @@ export class ComprasController {
   @Get()
   async getOrdenes(@Query() filtros: any) {
     try {
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       let query = this.supabase.getClient()
         .from('ordenes_compra')
         .select(`
           *,
           proveedor:proveedores(*)
         `)
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .order('created_at', { ascending: false });
 
       if (filtros.estado) {
@@ -151,14 +159,17 @@ export class ComprasController {
   @Get('next-number')
   @ApiOperation({ summary: 'Obtener siguiente número de orden' })
   @ApiResponse({ status: 200, description: 'Número generado exitosamente' })
-  async getNextNumber() {
+  async getNextNumber(@Query() filtros: any) {
     try {
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const supabase = this.supabase.getClient();
       
       // Obtener el último número de orden
       const { data, error } = await supabase
         .from('ordenes_compra')
         .select('numero')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .like('numero', 'OC-%')
         .order('created_at', { ascending: false })
         .limit(1);
@@ -194,7 +205,9 @@ export class ComprasController {
   @Post()
   async crearOrden(@Body() ordenData: any) {
     try {
-      console.log('🛒 Creando nueva orden de compra');
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = ordenData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`🛒 Creando nueva orden de compra para tenant: ${tenantId}`);
 
       // Calcular totales
       const subtotal = ordenData.items.reduce((sum, item) => 
@@ -206,6 +219,7 @@ export class ComprasController {
       const { data: orden, error: ordenError } = await this.supabase.getClient()
         .from('ordenes_compra')
         .insert({
+          tenant_id: tenantId, // ✅ Incluir tenant
           numero_orden: `OC-${Date.now()}`,
           proveedor_id: ordenData.proveedor_id,
           fecha_orden: new Date().toISOString(),
@@ -257,7 +271,9 @@ export class ComprasController {
   @Put(':id/recibir')
   async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
     try {
-      console.log(`📦 Procesando recepción de mercancía para orden: ${ordenId}`);
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = recepcionData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`📦 Procesando recepción de mercancía para orden: ${ordenId}, tenant: ${tenantId}`);
 
       // Obtener orden con detalles
       const { data: orden, error: ordenError } = await this.supabase.getClient()
@@ -267,6 +283,7 @@ export class ComprasController {
           orden_compra_detalles(*),
           proveedor:proveedores(*)
         `)
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .eq('id', ordenId)
         .single();
 
@@ -305,6 +322,7 @@ export class ComprasController {
       const { data: detallesActualizados } = await this.supabase.getClient()
         .from('orden_compra_detalles')
         .select('cantidad, cantidad_recibida')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .eq('orden_id', ordenId);
 
       const totalPedido = detallesActualizados?.reduce((sum, d) => sum + d.cantidad, 0) || 0;
@@ -324,6 +342,7 @@ export class ComprasController {
           estado: nuevoEstado,
           fecha_entrega: nuevoEstado === 'ENTREGADO' ? new Date().toISOString() : null
         })
+        .eq('tenant_id', tenantId) // ✅ Validar tenant
         .eq('id', ordenId);
 
       // Si la orden está completamente entregada, emitir evento para contabilidad
@@ -369,12 +388,15 @@ export class ComprasController {
   @Put(':id/cancelar')
   async cancelarOrden(@Param('id') ordenId: string, @Body() motivoData: any) {
     try {
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = motivoData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const { error } = await this.supabase.getClient()
         .from('ordenes_compra')
         .update({
           estado: 'CANCELADO',
           observaciones: `${motivoData.motivo || 'Cancelado'} - Fecha: ${new Date().toLocaleDateString()}`
         })
+        .eq('tenant_id', tenantId) // ✅ Validar tenant
         .eq('id', ordenId);
 
       if (error) throw error;
@@ -395,14 +417,14 @@ export class ComprasController {
   @Get('proveedores')
   @ApiOperation({ summary: 'Obtener lista de proveedores' })
   @ApiResponse({ status: 200, description: 'Proveedores obtenidos exitosamente' })
-  async getProveedores() {
+  async getProveedores(@CurrentTenant() tenantId: string) {
     try {
       console.log('🚀 [GET /api/compras/proveedores] INICIANDO...');
       const supabase = this.supabase.getClient();
-
       const { data, error } = await supabase
         .from('proveedores')
         .select('*')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .eq('activo', true)
         .order('razon_social', { ascending: true });
 
@@ -557,10 +579,14 @@ export class ComprasController {
         };
       }
 
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = proveedorData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      
       // Verificar si existe otro proveedor con el mismo RUC (excepto el actual)
       const { data: existente, error: checkError } = await this.supabase.getClient()
         .from('proveedores')
         .select('id, ruc')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .eq('ruc', proveedorData.ruc)
         .neq('id', proveedorId)
         .single();
@@ -588,6 +614,7 @@ export class ComprasController {
           contacto: proveedorData.contacto?.trim() || null,
           condiciones_pago: proveedorData.condiciones_pago || 'CONTADO'
         })
+        .eq('tenant_id', tenantId) // ✅ Validar tenant
         .eq('id', proveedorId)
         .select()
         .single();
@@ -613,9 +640,11 @@ export class ComprasController {
   @Delete('proveedores/:id')
   @ApiOperation({ summary: 'Desactivar proveedor (soft delete)' })
   @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
-  async desactivarProveedor(@Param('id') proveedorId: string) {
+  async desactivarProveedor(@Param('id') proveedorId: string, @Body() data: any = {}) {
     try {
-      console.log('🗑️ [Proveedores] Desactivando proveedor:', proveedorId);
+      // ✅ MULTI-TENANT: Obtener tenant_id
+      const tenantId = data.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`🗑️ [Proveedores] Desactivando proveedor: ${proveedorId}, tenant: ${tenantId}`);
 
       // En lugar de eliminar, desactivamos el proveedor
       const { data: proveedor, error } = await this.supabase.getClient()
@@ -625,6 +654,7 @@ export class ComprasController {
           estado: 'INACTIVO',
           updated_at: new Date().toISOString()
         })
+        .eq('tenant_id', tenantId) // ✅ Validar tenant
         .eq('id', proveedorId)
         .select()
         .single();

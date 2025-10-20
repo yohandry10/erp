@@ -6,14 +6,14 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function HomePage() {
   const router = useRouter()
-  
+
   useEffect(() => {
     const checkAuth = async () => {
       // Solo verificar autenticación si las variables de entorno están configuradas
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         const supabase = createClientComponentClient()
         const { data } = await supabase.auth.getSession()
-        
+
         if (data.session) {
           router.push('/dashboard')
         } else {
@@ -23,10 +23,10 @@ export default function HomePage() {
         router.push('/login')
       }
     }
-    
+
     checkAuth()
   }, [router])
-  
+
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">

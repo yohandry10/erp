@@ -31,16 +31,18 @@ export class SireService {
 
   async procesarComprobanteParaSire(comprobante: any): Promise<void> {
     try {
-      console.log(`📊 [SIRE] ¡NUEVO COMPROBANTE DETECTADO! Registrando ${comprobante.serie}-${comprobante.numero} en SIRE`);
+      // ✅ MULTI-TENANT: Obtener tenant del comprobante
+      const tenantId = comprobante.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`📊 [SIRE] ¡NUEVO COMPROBANTE DETECTADO! Registrando ${comprobante.serie}-${comprobante.numero} en SIRE para tenant: ${tenantId}`);
       console.log(`📊 [SIRE] Datos del comprobante:`, JSON.stringify(comprobante, null, 2));
       
       const periodo = new Date().toISOString().slice(0, 7); // YYYY-MM
       
       // 1. Buscar si ya existe un reporte SIRE para este período
-      let reporteSire = await this.buscarOCrearReportePeriodo(periodo, comprobante.tipoDocumento);
+      let reporteSire = await this.buscarOCrearReportePeriodo(periodo, comprobante.tipoDocumento, tenantId);
       
       // 2. Actualizar contador de registros en el reporte
-      await this.actualizarContadorRegistros(reporteSire.id);
+      await this.actualizarContadorRegistros(reporteSire.id, tenantId);
       
       // 3. Crear registro específico del comprobante en SIRE (detalle)
       await this.crearRegistroDetalleComprobante(reporteSire.id, comprobante);
@@ -53,12 +55,16 @@ export class SireService {
     }
   }
 
-  private async buscarOCrearReportePeriodo(periodo: string, tipoDocumento?: string): Promise<any> {
+  private async buscarOCrearReportePeriodo(periodo: string, tipoDocumento?: string, tenantId?: string): Promise<any> {
     try {
+      // ✅ MULTI-TENANT: Usar tenant_id
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
       // Buscar reporte existente para el período
       const { data: reporteExistente } = await this.supabaseService.getClient()
         .from('sire_files')
         .select('*')
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('periodo', periodo)
         .eq('tipo', 'REG_VEN')
         .single();
@@ -73,7 +79,7 @@ export class SireService {
       const { data: nuevoReporte, error } = await this.supabaseService.getClient()
         .from('sire_files')
         .insert({
-          tenant_id: '550e8400-e29b-41d4-a716-446655440000',
+          tenant_id: currentTenantId, // ✅ Usar tenant actual
           periodo: periodo,
           tipo: 'REG_VEN',
           filename: `SIRE_REG_VEN_${periodo}.txt`,
@@ -96,14 +102,17 @@ export class SireService {
     }
   }
 
-  private async actualizarContadorRegistros(reporteId: string): Promise<void> {
+  private async actualizarContadorRegistros(reporteId: string, tenantId?: string): Promise<void> {
     try {
+      // ✅ MULTI-TENANT: Usar tenant_id
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
       console.log(`📊 [SIRE] Actualizando contador para reporte ${reporteId}...`);
       
       // Obtener el total actual
       const { data: reporte, error: selectError } = await this.supabaseService.getClient()
         .from('sire_files')
         .select('total_registros, estado')
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('id', reporteId)
         .single();
 
@@ -380,7 +389,7 @@ export class SireService {
 
       console.log('📊 Datos devueltos por insert:', data);
 
-      let reporteCreado = Array.isArray(data) ? data[0] : data;
+      let reporteCreado = data ? (Array.isArray(data) ? data[0] : data) : null;
       
       // Si no se devolvió data, consultar el reporte recién creado
       if (!reporteCreado) {

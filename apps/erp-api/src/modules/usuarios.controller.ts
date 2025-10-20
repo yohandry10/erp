@@ -432,6 +432,87 @@ export class UsuariosController {
     }
   }
 
+  @Get('/:id/permissions')
+  @ApiOperation({ summary: 'Obtener permisos del usuario' })
+  @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
+  async getUserPermissions(@Param('id') id: string, @Req() req: any) {
+    try {
+      console.log(`🔑 Obteniendo permisos del usuario: ${id}`);
+      const user = req.user as any;
+      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+
+      // Get user's roles
+      const { data: userRoles, error: rolesError } = await this.supabaseService
+        .getClient()
+        .from('user_roles')
+        .select(`
+          role_id,
+          roles!inner (
+            id,
+            nombre
+          )
+        `)
+        .eq('usuario_sistema_id', id);
+
+      if (rolesError) {
+        console.error('❌ Error obteniendo roles del usuario:', rolesError);
+        throw rolesError;
+      }
+
+      if (!userRoles || userRoles.length === 0) {
+        console.log('⚠️ Usuario sin roles asignados');
+        return {
+          success: true,
+          data: []
+        };
+      }
+
+      // Get permissions for all user's roles
+      const roleIds = userRoles.map(ur => ur.role_id);
+      
+      const { data: rolePermissions, error: permError } = await this.supabaseService
+        .getClient()
+        .from('rol_permisos')
+        .select(`
+          permiso_id,
+          permisos!inner (
+            id,
+            modulo,
+            accion,
+            recurso,
+            descripcion
+          )
+        `)
+        .in('role_id', roleIds);
+
+      if (permError) {
+        console.error('❌ Error obteniendo permisos:', permError);
+        throw permError;
+      }
+
+      // Extract unique permissions
+      const permissions = rolePermissions?.map(rp => rp.permisos) || [];
+      const uniquePermissions = Array.from(
+        new Map(permissions.map(p => [p.id, p])).values()
+      );
+
+      console.log(`✅ ${uniquePermissions.length} permisos encontrados para el usuario`);
+
+      return {
+        success: true,
+        data: uniquePermissions
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo permisos del usuario:', error);
+      return {
+        success: false,
+        data: [],
+        error: error.message
+      };
+    }
+  }
+
   @Get('/:id')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
   @ApiResponse({ status: 200, description: 'Usuario obtenido exitosamente' })

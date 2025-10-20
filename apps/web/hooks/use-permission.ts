@@ -65,7 +65,7 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
         userPermissions = cached.permissions
       } else {
         // Fetch permissions from API
-        const response = await get(`/users/${user.id}/permissions`)
+        const response = await get(`/usuarios-sistema/${user.id}/permissions`)
         
         if (!response) {
           setHasPermission(false)
@@ -145,7 +145,7 @@ export function useUserPermissions() {
       }
 
       // Fetch from API
-      const response = await get(`/users/${user.id}/permissions`)
+      const response = await get(`/usuarios-sistema/${user.id}/permissions`)
       
       if (!response) {
         setPermissions([])

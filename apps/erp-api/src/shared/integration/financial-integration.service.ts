@@ -112,12 +112,13 @@ export class FinancialIntegrationService {
   }
 
   // 📊 CONSULTAS HISTÓRICAS COMPLETAS
-  async getDatosHistoricosCompleto(): Promise<DatosHistoricos> {
+  async getDatosHistoricosCompleto(tenantId?: string): Promise<DatosHistoricos> {
+    // ✅ MULTI-TENANT: Pasar tenant a funciones
     try {
       const [ventasMensuales, gastosMensuales, utilidadMensual] = await Promise.all([
-        this.obtenerVentasMensuales(),
-        this.obtenerGastosMensuales(),
-        this.obtenerUtilidadMensual()
+        this.obtenerVentasMensuales(tenantId),
+        this.obtenerGastosMensuales(tenantId),
+        this.obtenerUtilidadMensual(tenantId)
       ]);
 
       return {
@@ -183,10 +184,13 @@ export class FinancialIntegrationService {
     }
   }
 
-  private async obtenerVentasMensuales() {
+  private async obtenerVentasMensuales(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total, fecha')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .gte('fecha', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
       .in('estado', ['EMITIDA', 'PAGADA'])
       .order('fecha', { ascending: true });
@@ -210,10 +214,13 @@ export class FinancialIntegrationService {
     return Array.from(ventasPorMes.values());
   }
 
-  private async obtenerGastosMensuales() {
+  private async obtenerGastosMensuales(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('gastos')
       .select('monto, categoria, fecha')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .gte('fecha', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
       .order('fecha', { ascending: true });
 
@@ -234,9 +241,10 @@ export class FinancialIntegrationService {
     return Array.from(gastosPorMes.values());
   }
 
-  private async obtenerUtilidadMensual() {
-    const ventas = await this.obtenerVentasMensuales();
-    const gastos = await this.obtenerGastosMensuales();
+  private async obtenerUtilidadMensual(tenantId?: string) {
+    // ✅ MULTI-TENANT: Pasar tenant a funciones
+    const ventas = await this.obtenerVentasMensuales(tenantId);
+    const gastos = await this.obtenerGastosMensuales(tenantId);
 
     const utilidadMap = new Map();
     ventas.forEach(v => {
@@ -475,7 +483,9 @@ export class FinancialIntegrationService {
   }
 
   // 🔧 MÉTODOS EXISTENTES MEJORADOS
-  async getKPIsFinancieros(): Promise<KPIsFinancieros> {
+  async getKPIsFinancieros(tenantId?: string): Promise<KPIsFinancieros> {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    // Nota: El caché debería ser por tenant en producción
     if (this.kpisCache && this.lastKPIUpdate &&
         (new Date().getTime() - this.lastKPIUpdate.getTime()) < (this.cacheValidityMinutes * 60 * 1000)) {
       console.log('💰 Retornando KPIs desde cache');
@@ -516,11 +526,11 @@ export class FinancialIntegrationService {
         };
       } else {
         // Fallback al método original si la función SQL falla
-        return this.getKPIsFinancierosOriginal();
+        return this.getKPIsFinancierosOriginal(tenantId);
       }
     } catch (error) {
       console.error('❌ Error usando función SQL, usando método original:', error);
-      return this.getKPIsFinancierosOriginal();
+      return this.getKPIsFinancierosOriginal(tenantId);
     }
 
     this.lastKPIUpdate = new Date();
@@ -528,14 +538,15 @@ export class FinancialIntegrationService {
   }
 
   // Método original como fallback
-  private async getKPIsFinancierosOriginal(): Promise<KPIsFinancieros> {
+  private async getKPIsFinancierosOriginal(tenantId?: string): Promise<KPIsFinancieros> {
+    // ✅ MULTI-TENANT: Pasar tenant a todas las funciones
     const [efectivo, ventas30dias, gastos30dias, cuentasPorCobrar, cuentasPorPagar, inventario] = await Promise.all([
-      this.calcularEfectivoDisponible(),
-      this.calcularVentas30Dias(),
-      this.calcularGastos30Dias(),
-      this.calcularCuentasPorCobrar(),
-      this.calcularCuentasPorPagar(),
-      this.calcularValorInventario()
+      this.calcularEfectivoDisponible(tenantId),
+      this.calcularVentas30Dias(tenantId),
+      this.calcularGastos30Dias(tenantId),
+      this.calcularCuentasPorCobrar(tenantId),
+      this.calcularCuentasPorPagar(tenantId),
+      this.calcularValorInventario(tenantId)
     ]);
 
     const utilidad30dias = ventas30dias - gastos30dias;
@@ -553,66 +564,85 @@ export class FinancialIntegrationService {
       margenBruto,
       liquidez: this.evaluarLiquidez(efectivo, cuentasPorPagar),
       rentabilidad: this.evaluarRentabilidad(margenBruto),
-      crecimiento: await this.evaluarCrecimiento()
+      crecimiento: await this.evaluarCrecimiento(tenantId)
     };
   }
 
-  private async calcularEfectivoDisponible(): Promise<number> {
+  private async calcularEfectivoDisponible(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('pagos_ventas')
-      .select('monto, ventas!inner(fecha, estado)')
+      .select('monto, ventas!inner(fecha, estado, tenant_id)')
+      .eq('ventas.tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('metodo_pago', 'EFECTIVO')
       .gte('ventas.fecha', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .in('ventas.estado', ['EMITIDA', 'PAGADA']);
     return data?.reduce((sum, pago) => sum + parseFloat(pago.monto || '0'), 0) || 0;
   }
 
-  private async calcularVentas30Dias(): Promise<number> {
+  private async calcularVentas30Dias(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .gte('fecha', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .in('estado', ['EMITIDA', 'PAGADA']);
     return data?.reduce((sum, venta) => sum + parseFloat(venta.total || '0'), 0) || 0;
   }
 
-  private async calcularGastos30Dias(): Promise<number> {
+  private async calcularGastos30Dias(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('gastos')
       .select('monto')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .gte('fecha', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
     return data?.reduce((sum, gasto) => sum + parseFloat(gasto.monto || 0), 0) || 0;
   }
 
-  private async calcularCuentasPorCobrar(): Promise<number> {
+  private async calcularCuentasPorCobrar(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('cuentas_por_cobrar')
       .select('saldo_pendiente')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .neq('estado', 'COBRADA');
     return data?.reduce((sum, cuenta) => sum + parseFloat(cuenta.saldo_pendiente || 0), 0) || 0;
   }
 
-  private async calcularCuentasPorPagar(): Promise<number> {
+  private async calcularCuentasPorPagar(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('cuentas_por_pagar')
       .select('saldo_pendiente')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .neq('estado', 'PAGADA');
     return data?.reduce((sum, cuenta) => sum + parseFloat(cuenta.saldo_pendiente || 0), 0) || 0;
   }
 
-  private async calcularValorInventario(): Promise<number> {
+  private async calcularValorInventario(tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     try {
       // Intentar con la estructura de la migración de ventas primero
       const { data: dataVentas } = await this.supabase.getClient()
         .from('productos')
         .select('precio_venta, stock_actual')
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .limit(1);
       
       if (dataVentas && dataVentas.length > 0) {
         // Si funciona, usar esta estructura
         const { data } = await this.supabase.getClient()
           .from('productos')
-          .select('precio_venta, stock_actual');
+          .select('precio_venta, stock_actual')
+          .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
         return data?.reduce((sum, producto) => {
           const precio = parseFloat(producto.precio_venta || '0');
           const stock = parseFloat(producto.stock_actual || '0');
@@ -624,7 +654,8 @@ export class FinancialIntegrationService {
       try {
         const { data } = await this.supabase.getClient()
           .from('productos')
-          .select('precio, stock');
+          .select('precio, stock')
+          .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
         return data?.reduce((sum, producto) => {
           const precio = parseFloat(producto.precio || '0');
           const stock = parseFloat(producto.stock || '0');
@@ -656,15 +687,16 @@ export class FinancialIntegrationService {
     return 'CRITICA';
   }
 
-  private async evaluarCrecimiento(): Promise<string> {
+  private async evaluarCrecimiento(tenantId?: string): Promise<string> {
+    // ✅ MULTI-TENANT: Pasar tenant
     try {
       const fechaActual = new Date();
       const fechaAnterior = new Date();
       fechaAnterior.setDate(fechaAnterior.getDate() - 60);
 
       const [ventasActuales, ventasAnteriores] = await Promise.all([
-        this.calcularVentasPeriodo(fechaActual, new Date()),
-        this.calcularVentasPeriodo(fechaAnterior, fechaActual)
+        this.calcularVentasPeriodo(fechaActual, new Date(), tenantId),
+        this.calcularVentasPeriodo(fechaAnterior, fechaActual, tenantId)
       ]);
 
       if (ventasAnteriores === 0) return 'ESTABLE';
@@ -678,10 +710,13 @@ export class FinancialIntegrationService {
     }
   }
 
-  private async calcularVentasPeriodo(fechaInicio: Date, fechaFin: Date): Promise<number> {
+  private async calcularVentasPeriodo(fechaInicio: Date, fechaFin: Date, tenantId?: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .gte('fecha', fechaInicio.toISOString())
       .lte('fecha', fechaFin.toISOString())
       .in('estado', ['EMITIDA', 'PAGADA']);

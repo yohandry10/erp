@@ -5,6 +5,8 @@ import cron from 'node-cron';
 import winston from 'winston';
 // Redis import removed as it's not used directly
 import { EventEmitter } from 'events';
+import { runCertificateValidationJob } from './jobs/certificate-validation.job';
+import { runConfigurationCheckJob } from './jobs/configuration-check.job';
 
 // Logger setup
 const logger = winston.createLogger({
@@ -100,33 +102,8 @@ async function processCpeSendToOse(cpeId: string) {
     .update({ estado: 'SENDING' })
     .eq('id', cpeId);
 
-  // Mock OSE send (replace with real implementation)
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Mock success response
-  const success = Math.random() > 0.1; // 90% success rate
-  
-  if (success) {
-    await supabase
-      .from('cpe')
-      .update({ 
-        estado: 'SENT',
-        numero_ticket: `TICKET-${Date.now()}`,
-        fecha_envio: new Date().toISOString()
-      })
-      .eq('id', cpeId);
-    
-    // Schedule status check in 30 seconds
-    await cpeQueue.add('CHECK_STATUS', { cpeId }, { delay: 30000 });
-  } else {
-    await supabase
-      .from('cpe')
-      .update({ 
-        estado: 'REJECTED',
-        observaciones: 'Error en el envío al OSE'
-      })
-      .eq('id', cpeId);
-  }
+  // TODO: Implement real OSE integration
+  throw new Error('OSE integration not implemented yet');
 }
 
 async function processCpeCheckStatus(cpeId: string) {
@@ -140,32 +117,8 @@ async function processCpeCheckStatus(cpeId: string) {
     throw new Error(`CPE not found: ${cpeId}`);
   }
 
-  // Mock status check (replace with real OSE API)
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  const accepted = Math.random() > 0.05; // 95% acceptance rate
-  
-  if (accepted) {
-    await supabase
-      .from('cpe')
-      .update({ 
-        estado: 'ACCEPTED',
-        cdr_xml: '<cdr>Mock CDR Response</cdr>',
-        fecha_aceptacion: new Date().toISOString()
-      })
-      .eq('id', cpeId);
-      
-    // Generate PDF after acceptance
-    await cpeQueue.add('GENERATE_PDF', { cpeId });
-  } else {
-    await supabase
-      .from('cpe')
-      .update({ 
-        estado: 'REJECTED',
-        observaciones: 'Documento rechazado por SUNAT'
-      })
-      .eq('id', cpeId);
-  }
+  // TODO: Implement real OSE status check
+  throw new Error('OSE status check not implemented yet');
 }
 
 async function processCpeGeneratePdf(cpeId: string) {
@@ -179,21 +132,12 @@ async function processCpeGeneratePdf(cpeId: string) {
     throw new Error(`CPE not found: ${cpeId}`);
   }
 
-  // Mock PDF generation
-  const pdfContent = `PDF content for ${cpe.tipo_comprobante} ${cpe.serie}-${cpe.numero}`;
-  
-  await supabase
-    .from('cpe')
-    .update({ 
-      pdf_content: pdfContent,
-      pdf_generated_at: new Date().toISOString()
-    })
-    .eq('id', cpeId);
+  // TODO: Implement real PDF generation
+  throw new Error('PDF generation not implemented yet');
 }
 
 // SIRE Processing Function
 async function processSireGeneration(tenantId: string, period: string) {
-  // Update status to RUNNING
   const { data: sireFile } = await supabase
     .from('sire_files')
     .insert({
@@ -206,20 +150,8 @@ async function processSireGeneration(tenantId: string, period: string) {
     .single();
 
   try {
-    // Mock SIRE file generation
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    const mockData = `${period}|VENTAS|SAMPLE DATA\n`;
-    
-    await supabase
-      .from('sire_files')
-      .update({
-        status: 'COMPLETED',
-        file_content: mockData,
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', sireFile.id);
-      
+    // TODO: Implement real SIRE file generation
+    throw new Error('SIRE generation not implemented yet');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await supabase
@@ -229,7 +161,7 @@ async function processSireGeneration(tenantId: string, period: string) {
         error_message: errorMessage,
         completed_at: new Date().toISOString()
       })
-      .eq('id', sireFile.id);
+      .eq('id', sireFile!.id);
     
     throw error;
   }
@@ -372,7 +304,6 @@ class BackgroundWorker {
     try {
       console.log(`📨 [Worker] Reintentando envío CPE ${data.cpeId} a SUNAT...`);
 
-      // Obtener CPE pendiente
       const { data: cpe, error } = await supabase
         .from('cpe')
         .select('*')
@@ -382,42 +313,12 @@ class BackgroundWorker {
 
       if (error || !cpe) {
         console.log(`ℹ️ [Worker] CPE ${data.cpeId} ya no está pendiente o no existe`);
-        return true; // Marcar como completado
-      }
-
-      // Simular envío a SUNAT (aquí iría la lógica real)
-      console.log(`🚀 [Worker] Enviando CPE ${cpe.serie}-${cpe.numero} a SUNAT...`);
-      
-      // Simular éxito o fallo aleatorio para testing
-      const exito = Math.random() > 0.3; // 70% de éxito
-
-      if (exito) {
-        // Actualizar estado a ENVIADO
-        await supabase
-          .from('cpe')
-          .update({
-            estado: 'ENVIADO',
-            fecha_envio: new Date().toISOString(),
-            envio_automatico: true,
-            error_envio: null
-          })
-          .eq('id', data.cpeId);
-
-        console.log(`✅ [Worker] CPE ${data.cpeId} enviado exitosamente a SUNAT`);
         return true;
-      } else {
-        // Actualizar fecha de último intento
-        await supabase
-          .from('cpe')
-          .update({
-            fecha_ultimo_intento: new Date().toISOString(),
-            error_envio: `Intento ${data.intentoAnterior + 1} fallido`
-          })
-          .eq('id', data.cpeId);
-
-        console.log(`❌ [Worker] Fallo en envío CPE ${data.cpeId}, se reintentará`);
-        return false; // Reintentar
       }
+
+      // TODO: Implement real SUNAT integration
+      console.error('❌ [Worker] SUNAT integration not implemented yet');
+      return false;
     } catch (error) {
       console.error(`❌ [Worker] Error procesando reintento CPE:`, error);
       return false;
@@ -429,7 +330,6 @@ class BackgroundWorker {
     try {
       console.log(`📨 [Worker] Reintentando envío GRE ${data.greId} a SUNAT...`);
       
-      // Similar lógica para GRE
       const { data: gre, error } = await supabase
         .from('gre')
         .select('*')
@@ -442,25 +342,9 @@ class BackgroundWorker {
         return true;
       }
 
-      // Simular envío exitoso
-      const exito = Math.random() > 0.2; // 80% de éxito para GRE
-
-      if (exito) {
-        await supabase
-          .from('gre')
-          .update({
-            estado: 'ENVIADO',
-            fecha_envio: new Date().toISOString(),
-            envio_automatico: true
-          })
-          .eq('id', data.greId);
-
-        console.log(`✅ [Worker] GRE ${data.greId} enviado exitosamente`);
-        return true;
-      } else {
-        console.log(`❌ [Worker] Fallo en envío GRE ${data.greId}`);
-        return false;
-      }
+      // TODO: Implement real SUNAT integration for GRE
+      console.error('❌ [Worker] GRE SUNAT integration not implemented yet');
+      return false;
     } catch (error) {
       console.error(`❌ [Worker] Error procesando reintento GRE:`, error);
       return false;
@@ -652,22 +536,31 @@ setInterval(() => {
   worker.addTask('system.cleanup_logs', {});
 }, 24 * 60 * 60 * 1000); // Cada 24 horas
 
-// SIMULACIÓN: Agregar tareas de prueba
-setTimeout(() => {
-  console.log('🧪 [Worker] Iniciando tareas de prueba...');
-  
-  // Simular CPE pendiente
-  worker.addTask('cpe.retry_envio', {
-    cpeId: 'test-cpe-001',
-    intentoAnterior: 1
-  });
+// 🔐 SCHEDULED JOB: Certificate Validation (Daily at 2:00 AM)
+cron.schedule('0 2 * * *', async () => {
+  logger.info('🔐 [Cron] Running scheduled certificate validation job');
+  try {
+    await runCertificateValidationJob();
+  } catch (error) {
+    logger.error('❌ [Cron] Certificate validation job failed:', error);
+  }
+});
 
-  // Simular GRE pendiente
-  worker.addTask('gre.retry_envio', {
-    greId: 'test-gre-001',
-    intentoAnterior: 1
-  });
-}, 10000); // Después de 10 segundos
+// ⚙️ SCHEDULED JOB: Configuration Check (Daily at 3:00 AM)
+cron.schedule('0 3 * * *', async () => {
+  logger.info('⚙️ [Cron] Running scheduled configuration check job');
+  try {
+    await runConfigurationCheckJob();
+  } catch (error) {
+    logger.error('❌ [Cron] Configuration check job failed:', error);
+  }
+});
+
+logger.info('📅 [Worker] Scheduled jobs configured:');
+logger.info('   - Certificate validation: Daily at 2:00 AM');
+logger.info('   - Configuration check: Daily at 3:00 AM');
+
+// Worker is ready and waiting for real tasks
 
 // MANEJO DE SEÑALES
 process.on('SIGINT', () => {

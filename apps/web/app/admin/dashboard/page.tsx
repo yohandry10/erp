@@ -34,7 +34,7 @@ export default function AdminDashboard() {
     }
     // Super-admins should use their own dashboard
     if (!tenantLoading && isSuperAdmin) {
-      router.push('/super-admin/dashboard')
+      router.push('/superadmin/dashboard')
     }
   }, [user, isSuperAdmin, tenantLoading, router])
 

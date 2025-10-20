@@ -57,7 +57,10 @@ export class InventoryIntegrationService {
 
   async procesarVentaParaInventario(venta: VentaProcessedEvent): Promise<void> {
     try {
-      console.log(`📦 [INVENTARIO] Procesando venta ${venta.numeroTicket} para inventario`);
+      // ✅ MULTI-TENANT: Extraer tenant_id del evento
+      const tenantId = venta.tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
+      console.log(`📦 [INVENTARIO] [Tenant: ${tenantId}] Procesando venta ${venta.numeroTicket} para inventario`);
       console.log(`📦 [INVENTARIO] Datos de venta:`, JSON.stringify(venta, null, 2));
 
       for (const item of venta.items) {
@@ -75,7 +78,7 @@ export class InventoryIntegrationService {
           usuarioId: 'system',
           referencia: venta.numeroTicket,
           ventaId: venta.ventaId
-        });
+        }, tenantId); // ✅ Pasar tenant_id
       }
 
       console.log(`✅ [INVENTARIO] Stock actualizado para venta ${venta.numeroTicket}`);
@@ -86,7 +89,10 @@ export class InventoryIntegrationService {
 
   async procesarCompraParaInventario(compra: CompraEntregadaEvent): Promise<void> {
     try {
-      console.log(`📦 Procesando compra entregada ${compra.numeroOrden} para inventario`);
+      // ✅ MULTI-TENANT: Extraer tenant_id del evento
+      const tenantId = compra.tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
+      console.log(`📦 [Tenant: ${tenantId}] Procesando compra entregada ${compra.numeroOrden} para inventario`);
 
       for (const item of compra.items) {
         await this.realizarMovimientoStock({
@@ -100,7 +106,7 @@ export class InventoryIntegrationService {
           valorTotal: item.total,
           usuarioId: 'system',
           referencia: compra.numeroOrden
-        });
+        }, tenantId); // ✅ Pasar tenant_id
       }
 
       console.log(`✅ Stock actualizado para compra ${compra.numeroOrden}`);
@@ -109,11 +115,14 @@ export class InventoryIntegrationService {
     }
   }
 
-  async realizarMovimientoStock(movimiento: MovimientoStock): Promise<string | null> {
+  async realizarMovimientoStock(movimiento: MovimientoStock, tenantId?: string): Promise<string | null> {
     try {
-      console.log(`📦 Realizando movimiento: ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`);
+      // ✅ MULTI-TENANT: Usar tenant_id proporcionado o default
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
+      console.log(`📦 [Tenant: ${currentTenantId}] Realizando movimiento: ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`);
 
-      // 1. Obtener producto por ID o código
+      // 1. Obtener producto por ID o código (CON FILTRO DE TENANT)
       console.log(`🔍 Buscando producto con ID/código: ${movimiento.productoId}`);
       
       let producto = null;
@@ -122,7 +131,8 @@ export class InventoryIntegrationService {
       if (movimiento.productoId && movimiento.productoId.length > 10) {
         const { data: productoPorId, error: errorPorId } = await this.supabase.getClient()
           .from('productos')
-          .select('id, codigo, nombre, precio, stock, categoria, activo')
+          .select('id, codigo, nombre, precio, stock, categoria, activo, tenant_id')
+          .eq('tenant_id', currentTenantId) // ✅ MULTI-TENANT: Filtrar por tenant
           .eq('id', movimiento.productoId)
           .single();
 
@@ -136,7 +146,8 @@ export class InventoryIntegrationService {
       if (!producto) {
         const { data: productoPorCodigo, error: errorPorCodigo } = await this.supabase.getClient()
           .from('productos')
-          .select('id, codigo, nombre, precio, stock, categoria, activo')
+          .select('id, codigo, nombre, precio, stock, categoria, activo, tenant_id')
+          .eq('tenant_id', currentTenantId) // ✅ MULTI-TENANT: Filtrar por tenant
           .eq('codigo', movimiento.productoId)
           .single();
 
@@ -150,7 +161,8 @@ export class InventoryIntegrationService {
       if (!producto) {
         const { data: productoPorNombre, error: errorPorNombre } = await this.supabase.getClient()
           .from('productos')
-          .select('id, codigo, nombre, precio, stock, categoria, activo')
+          .select('id, codigo, nombre, precio, stock, categoria, activo, tenant_id')
+          .eq('tenant_id', currentTenantId) // ✅ MULTI-TENANT: Filtrar por tenant
           .eq('nombre', movimiento.productoId)
           .single();
 
@@ -221,7 +233,7 @@ export class InventoryIntegrationService {
       const { data: movimientoGuardado, error: movimientoError } = await this.supabase.getClient()
         .from('stock_movimientos')
         .insert({
-          tenant_id: '550e8400-e29b-41d4-a716-446655440000',
+          tenant_id: currentTenantId, // ✅ MULTI-TENANT: Usar tenant actual
           producto_id: producto.id, // Usar el ID del producto encontrado
           tipo_movimiento: movimiento.tipoMovimiento,
           cantidad: movimiento.cantidad,
@@ -259,11 +271,15 @@ export class InventoryIntegrationService {
     }
   }
 
-  async getProductosStock(): Promise<ProductoStock[]> {
+  async getProductosStock(tenantId?: string): Promise<ProductoStock[]> {
     try {
+      // ✅ MULTI-TENANT: Filtrar por tenant
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
       const { data: productos, error } = await this.supabase.getClient()
         .from('productos')
         .select('codigo, nombre, stock, stock_minimo, precio, categoria, activo')
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('activo', true)
         .order('nombre');
 
@@ -286,8 +302,11 @@ export class InventoryIntegrationService {
     }
   }
 
-  async getMovimientosStock(filtros: any = {}): Promise<any[]> {
+  async getMovimientosStock(filtros: any = {}, tenantId?: string): Promise<any[]> {
     try {
+      // ✅ MULTI-TENANT: Filtrar por tenant
+      const currentTenantId = tenantId || filtros.tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      
       let query = this.supabase.getClient()
         .from('stock_movimientos')
         .select(`
@@ -301,6 +320,7 @@ export class InventoryIntegrationService {
           usuario_id,
           created_at
         `)
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .order('created_at', { ascending: false });
 
       if (filtros.productoId) {
@@ -332,9 +352,10 @@ export class InventoryIntegrationService {
     }
   }
 
-  async getEstadisticasInventario() {
+  async getEstadisticasInventario(tenantId?: string) {
     try {
-      const productos = await this.getProductosStock();
+      // ✅ MULTI-TENANT: Pasar tenant a métodos internos
+      const productos = await this.getProductosStock(tenantId);
       
       const totalProductos = productos.length;
       const valorInventario = productos.reduce((sum, p) => sum + p.valorTotal, 0);
@@ -346,8 +367,9 @@ export class InventoryIntegrationService {
       hoy.setHours(0, 0, 0, 0);
       const movimientosHoy = await this.getMovimientosStock({
         fechaDesde: hoy.toISOString(),
-        limit: 1000
-      });
+        limit: 1000,
+        tenantId // ✅ Pasar tenantId
+      }, tenantId);
 
       const movimientosHoyCount = movimientosHoy.length;
       const entradasHoy = movimientosHoy.filter(m => m.tipo_movimiento === 'ENTRADA').length;
@@ -399,7 +421,8 @@ export class InventoryIntegrationService {
     tipoMovimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE', 
     motivo: string, 
     precioUnitario: number = 0, 
-    usuarioId: string = 'system'
+    usuarioId: string = 'system',
+    tenantId?: string
   ): Promise<string | null> {
     return await this.realizarMovimientoStock({
       productoId,
@@ -412,17 +435,19 @@ export class InventoryIntegrationService {
       valorTotal: cantidad * precioUnitario,
       usuarioId,
       referencia: motivo
-    });
+    }, tenantId);
   }
 
-  async ajustarStock(productoId: string, cantidadAjuste: number, motivo: string, usuarioId: string = 'system'): Promise<string | null> {
+  async ajustarStock(productoId: string, cantidadAjuste: number, motivo: string, usuarioId: string = 'system', tenantId?: string): Promise<string | null> {
     try {
-      console.log(`📦 Ajustando stock de ${productoId}: ${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste}`);
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`📦 [Tenant: ${currentTenantId}] Ajustando stock de ${productoId}: ${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste}`);
 
       // Obtener precio del producto para valorizar el ajuste
       const { data: producto } = await this.supabase.getClient()
         .from('productos')
         .select('precio')
+        .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('codigo', productoId)
         .single();
 
@@ -440,16 +465,17 @@ export class InventoryIntegrationService {
         valorTotal: valorAjuste,
         usuarioId,
         referencia: `AJUSTE-${Date.now()}`
-      });
+      }, currentTenantId);
     } catch (error) {
       console.error('❌ Error ajustando stock:', error);
       throw error;
     }
   }
 
-  async registrarEntrada(productoId: string, cantidad: number, precioUnitario: number, motivo: string, usuarioId: string = 'system'): Promise<string | null> {
+  async registrarEntrada(productoId: string, cantidad: number, precioUnitario: number, motivo: string, usuarioId: string = 'system', tenantId?: string): Promise<string | null> {
     try {
-      console.log(`📦 Registrando entrada: ${cantidad} unidades de ${productoId}`);
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`📦 [Tenant: ${currentTenantId}] Registrando entrada: ${cantidad} unidades de ${productoId}`);
 
       return await this.realizarMovimientoStock({
         productoId,
@@ -462,16 +488,16 @@ export class InventoryIntegrationService {
         valorTotal: cantidad * precioUnitario,
         usuarioId,
         referencia: `ENTRADA-${Date.now()}`
-      });
+      }, currentTenantId);
     } catch (error) {
       console.error('❌ Error registrando entrada:', error);
       throw error;
     }
   }
 
-  async getProductosStockCritico(): Promise<ProductoStock[]> {
+  async getProductosStockCritico(tenantId?: string): Promise<ProductoStock[]> {
     try {
-      const productos = await this.getProductosStock();
+      const productos = await this.getProductosStock(tenantId);
       return productos.filter(p => p.stockActual <= p.stockMinimo);
     } catch (error) {
       console.error('❌ Error obteniendo productos con stock crítico:', error);
@@ -479,9 +505,9 @@ export class InventoryIntegrationService {
     }
   }
 
-  async getProductosSinStock(): Promise<ProductoStock[]> {
+  async getProductosSinStock(tenantId?: string): Promise<ProductoStock[]> {
     try {
-      const productos = await this.getProductosStock();
+      const productos = await this.getProductosStock(tenantId);
       return productos.filter(p => p.stockActual <= 0);
     } catch (error) {
       console.error('❌ Error obteniendo productos sin stock:', error);
@@ -489,9 +515,10 @@ export class InventoryIntegrationService {
     }
   }
 
-  async verificarDisponibilidadStock(productosVenta: { productoId: string, cantidad: number }[]): Promise<{ disponible: boolean, faltantes: any[] }> {
+  async verificarDisponibilidadStock(productosVenta: { productoId: string, cantidad: number }[], tenantId?: string): Promise<{ disponible: boolean, faltantes: any[] }> {
     try {
-      console.log('🔍 Verificando disponibilidad de stock para:', productosVenta);
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`🔍 [Tenant: ${currentTenantId}] Verificando disponibilidad de stock para:`, productosVenta);
       const faltantes = [];
       
       for (const item of productosVenta) {
@@ -505,6 +532,7 @@ export class InventoryIntegrationService {
           const { data: productoPorId } = await this.supabase.getClient()
             .from('productos')
             .select('stock, nombre, codigo')
+            .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
             .eq('id', item.productoId)
             .single();
           
@@ -519,6 +547,7 @@ export class InventoryIntegrationService {
           const { data: productoPorCodigo } = await this.supabase.getClient()
             .from('productos')
             .select('stock, nombre, codigo')
+            .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
             .eq('codigo', item.productoId)
             .single();
           

@@ -500,9 +500,12 @@ export class ContabilidadController {
       // 2. 🎯 OBTENER ASIENTOS DE RRHH desde tabla temporal
       let asientosRrhh = [];
       try {
+        // ✅ MULTI-TENANT: Obtener tenant_id
+        const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
         const { data: rrhhAsientos, error: rrhhError } = await this.supabaseService.getClient()
           .from('asientos_contables_rrhh')
           .select('*')
+          .eq('tenant_id', tenantId) // ✅ Filtro de tenant
           .order('fecha', { ascending: false });
           
         if (!rrhhError && rrhhAsientos) {

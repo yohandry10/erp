@@ -1,9 +1,13 @@
-import { Controller, Get, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('dashboard')
 @Controller('dashboard')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class DashboardController {
   constructor(private readonly supabase: SupabaseService) {}
   
@@ -144,12 +148,11 @@ export class DashboardController {
   @Get('stats')
   @ApiOperation({ summary: 'Obtener estadísticas generales del dashboard' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
-  async getStats() {
+  async getStats(@CurrentTenant() tenantId: string) {
     try {
-      console.log('📊 [Dashboard Controller] Obteniendo métricas reales...');
+      console.log('📊 [Dashboard Controller] Obteniendo métricas para tenant:', tenantId);
       
       const client = this.supabase.getClient();
-      const tenantId = '550e8400-e29b-41d4-a716-446655440000'; // Tenant ID por defecto
       
       // Obtener fechas para filtros (misma lógica que compras.controller.ts)
       const hoy = new Date();
@@ -207,47 +210,56 @@ export class DashboardController {
         // SIRE
         sireResult
       ] = await Promise.allSettled([
-        // CPE - TODOS los registros (campos correctos: total_venta, created_at)
+        // CPE - FILTRADO POR TENANT
         client.from('cpe')
           .select('total_venta, created_at, tenant_id')
+          .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false }),
           
-        // CPE de hoy (usar created_at en lugar de fecha_emision)
+        // CPE de hoy - FILTRADO POR TENANT
         client.from('cpe')
           .select('total_venta')
+          .eq('tenant_id', tenantId)
           .gte('created_at', inicioHoy.toISOString()),
           
-        // GRE (Guías de remisión) - tabla correcta
+        // GRE - FILTRADO POR TENANT
         client.from('gre_guias')
           .select('id')
+          .eq('tenant_id', tenantId)
           .gte('created_at', inicioMes.toISOString()),
           
-        // Productos
+        // Productos - FILTRADO POR TENANT
         client.from('productos')
-          .select('id, precio, stock, stock_minimo'),
+          .select('id, precio, stock, stock_minimo')
+          .eq('tenant_id', tenantId),
           
-        // TODAS las compras (sin filtro de fecha porque son datos de prueba)
+        // Compras - FILTRADO POR TENANT
         client.from('ordenes_compra')
           .select('total, estado, fecha_orden, created_at')
+          .eq('tenant_id', tenantId)
           .order('created_at', { ascending: false }),
           
-        // Usuarios
-        client.from('usuarios')
-          .select('id'),
+        // Usuarios - FILTRADO POR TENANT
+        client.from('usuarios_sistema')
+          .select('id')
+          .eq('tenant_id', tenantId),
           
-        // Cotizaciones del mes
+        // Cotizaciones del mes - FILTRADO POR TENANT
         client.from('cotizaciones')
           .select('id, estado')
+          .eq('tenant_id', tenantId)
           .gte('created_at', inicioMes.toISOString()),
           
-        // Cotizaciones pendientes
+        // Cotizaciones pendientes - FILTRADO POR TENANT
         client.from('cotizaciones')
           .select('id')
+          .eq('tenant_id', tenantId)
           .eq('estado', 'PENDIENTE'),
           
-        // SIRE
+        // SIRE - FILTRADO POR TENANT
         client.from('sire_files')
           .select('id')
+          .eq('tenant_id', tenantId)
           .gte('created_at', inicioMes.toISOString())
       ]);
 
@@ -396,9 +408,9 @@ export class DashboardController {
   @Get('activities')
   @ApiOperation({ summary: 'Obtener actividades recientes' })
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
-  async getActivities() {
+  async getActivities(@CurrentTenant() tenantId: string) {
     try {
-      console.log('📋 [Dashboard Controller] Obteniendo actividades recientes reales...');
+      console.log('📋 [Dashboard Controller] Obteniendo actividades para tenant:', tenantId);
       
       const client = this.supabase.getClient();
       const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -410,30 +422,34 @@ export class DashboardController {
         comprasResult,
         cotizacionesResult
       ] = await Promise.allSettled([
-        // CPE recientes (campos correctos, sin fecha_emision)
+        // CPE recientes - FILTRADO POR TENANT
         client.from('cpe')
           .select('id, serie, numero, total_venta, estado, created_at')
+          .eq('tenant_id', tenantId)
           .gte('created_at', hace24h.toISOString())
           .order('created_at', { ascending: false })
           .limit(10),
           
-        // GRE recientes - tabla correcta
+        // GRE recientes - FILTRADO POR TENANT
         client.from('gre_guias')
           .select('id, numero, fecha_traslado, estado, created_at')
+          .eq('tenant_id', tenantId)
           .gte('created_at', hace24h.toISOString())
           .order('created_at', { ascending: false })
           .limit(10),
           
-        // Compras recientes
+        // Compras recientes - FILTRADO POR TENANT
         client.from('ordenes_compra')
           .select('id, numero, total, fecha_orden, estado, created_at')
+          .eq('tenant_id', tenantId)
           .gte('created_at', hace24h.toISOString())
           .order('created_at', { ascending: false })
           .limit(10),
           
-        // Cotizaciones recientes
+        // Cotizaciones recientes - FILTRADO POR TENANT
         client.from('cotizaciones')
           .select('id, numero, total, fecha_cotizacion, estado, created_at')
+          .eq('tenant_id', tenantId)
           .gte('created_at', hace24h.toISOString())
           .order('created_at', { ascending: false })
           .limit(10)

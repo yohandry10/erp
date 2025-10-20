@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
@@ -29,10 +30,36 @@ export function useConfigurationStatus() {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`${API_BASE_URL}/api/configuration/status`)
+      // Obtener token de sesión
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      }
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/configuration/status`, { headers })
       
       if (!response.ok) {
-        throw new Error('Error al verificar el estado de configuración')
+        // Si es 404 o 500, asumir que no hay configuración
+        console.warn('Configuration status not available, assuming incomplete')
+        setStatus({
+          isComplete: false,
+          completionPercentage: 0,
+          missingItems: ['Certificado digital', 'RUC', 'Razón Social', 'Dirección'],
+          certificate: {
+            exists: false,
+            isValid: false
+          },
+          ruc: {
+            isConfigured: false,
+            missingFields: ['RUC', 'Razón Social']
+          }
+        })
+        return
       }
 
       const data = await response.json()
@@ -40,7 +67,20 @@ export function useConfigurationStatus() {
       if (data.success) {
         setStatus(data.data)
       } else {
-        throw new Error(data.message || 'Error desconocido')
+        // Si hay error, asumir configuración incompleta
+        setStatus({
+          isComplete: false,
+          completionPercentage: 0,
+          missingItems: ['Certificado digital', 'RUC', 'Razón Social', 'Dirección'],
+          certificate: {
+            exists: false,
+            isValid: false
+          },
+          ruc: {
+            isConfigured: false,
+            missingFields: ['RUC', 'Razón Social']
+          }
+        })
       }
     } catch (err) {
       console.error('Error checking configuration status:', err)
