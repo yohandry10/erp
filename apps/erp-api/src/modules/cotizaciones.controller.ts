@@ -23,13 +23,15 @@ export class CotizacionesController {
       const { count: cotizacionesDelMes } = await this.supabaseService
         .getClient()
         .from('cotizaciones')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       // Contar total de cotizaciones
       const { count: totalCotizaciones } = await this.supabaseService
         .getClient()
         .from('cotizaciones')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       // Contar cotizaciones pendientes y próximas a vencer
       const hoy = new Date().toISOString().split('T')[0];
@@ -39,6 +41,7 @@ export class CotizacionesController {
         .getClient()
         .from('cotizaciones')
         .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .in('estado', ['PENDIENTE', 'ENVIADA'])
         .gte('fecha_vencimiento', hoy)
         .lte('fecha_vencimiento', proximosTresDias);
@@ -47,7 +50,8 @@ export class CotizacionesController {
       const { data: cotizacionesTodas } = await this.supabaseService
         .getClient()
         .from('cotizaciones')
-        .select('total');
+        .select('total')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       const valorCotizado = cotizacionesTodas?.reduce((sum, cot) => sum + (Number(cot.total) || 0), 0) || 0;
 
@@ -56,6 +60,7 @@ export class CotizacionesController {
         .getClient()
         .from('cotizaciones')
         .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .eq('estado', 'ACEPTADA');
 
       const tasaConversion = totalCotizaciones > 0 ? Math.round((aceptadas / totalCotizaciones) * 100) : 0;
@@ -101,6 +106,7 @@ export class CotizacionesController {
         .getClient()
         .from('cotizaciones')
         .select('*')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .order('created_at', { ascending: false });
 
       // Aplicar filtros

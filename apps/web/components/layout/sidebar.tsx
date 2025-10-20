@@ -40,7 +40,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   {
     title: 'Super Admin',
-    href: '/super-admin/dashboard',
+    href: '/superadmin/dashboard',
     icon: Shield,
     superAdminOnly: true
   },

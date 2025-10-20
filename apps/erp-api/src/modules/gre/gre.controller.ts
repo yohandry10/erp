@@ -239,4 +239,130 @@ export class GreController {
       };
     }
   }
+
+  @Post('evaluate-auto-creation')
+  @ApiOperation({ summary: 'Evaluar si una venta debe generar GRE automática' })
+  @ApiResponse({ status: 200, description: 'Evaluación completada' })
+  async evaluateAutoCreation(@Body() body: {
+    tenantId: string;
+    saleId: string;
+    total: number;
+    cpeId?: string;
+  }) {
+    console.log(`🚚 [GRE] Evaluating auto creation for sale ${body.saleId}`);
+    
+    try {
+      const shouldCreate = await this.greService.evaluateAutoGRECreation({
+        tenantId: body.tenantId,
+        saleId: body.saleId,
+        total: body.total,
+        cpeId: body.cpeId,
+      });
+
+      return {
+        success: true,
+        data: {
+          shouldCreate,
+          saleId: body.saleId,
+          total: body.total,
+          message: shouldCreate 
+            ? 'La venta cumple los criterios para GRE automática' 
+            : 'La venta no cumple los criterios para GRE automática',
+        },
+      };
+    } catch (error) {
+      console.error(`❌ Error evaluating auto GRE creation:`, error);
+      return {
+        success: false,
+        message: `Error evaluando creación automática: ${error.message}`,
+      };
+    }
+  }
+
+  @Get('auto-config')
+  @ApiOperation({ summary: 'Obtener configuración de GRE automática' })
+  @ApiResponse({ status: 200, description: 'Configuración obtenida exitosamente' })
+  async getAutoConfig(@Query('tenantId') tenantId: string) {
+    console.log(`🚚 [GRE] Getting auto config for tenant ${tenantId}`);
+    
+    try {
+      if (!tenantId) {
+        return {
+          success: false,
+          message: 'tenantId es requerido',
+        };
+      }
+
+      const config = await this.greService.getGREThresholdConfig(tenantId);
+
+      return {
+        success: true,
+        data: config,
+        message: 'Configuración obtenida exitosamente',
+      };
+    } catch (error) {
+      console.error(`❌ Error getting auto config:`, error);
+      return {
+        success: false,
+        message: `Error obteniendo configuración: ${error.message}`,
+      };
+    }
+  }
+
+  @Post('auto-config')
+  @ApiOperation({ summary: 'Actualizar configuración de GRE automática' })
+  @ApiResponse({ status: 200, description: 'Configuración actualizada exitosamente' })
+  async updateAutoConfig(@Body() body: {
+    tenantId: string;
+    umbralGREAutomatico?: number;
+    greAutomaticoHabilitado?: boolean;
+  }) {
+    console.log(`🚚 [GRE] Updating auto config for tenant ${body.tenantId}`);
+    
+    try {
+      if (!body.tenantId) {
+        return {
+          success: false,
+          message: 'tenantId es requerido',
+        };
+      }
+
+      // Update empresa_config with new thresholds
+      const updateData: any = {};
+      
+      if (body.umbralGREAutomatico !== undefined) {
+        updateData.umbral_gre_automatico = body.umbralGREAutomatico;
+      }
+      
+      if (body.greAutomaticoHabilitado !== undefined) {
+        updateData.gre_automatico_habilitado = body.greAutomaticoHabilitado;
+      }
+
+      // Use supabase service to update
+      const supabase = this.greService['supabaseService'].getClient();
+      const { error } = await supabase
+        .from('empresa_config')
+        .update(updateData)
+        .eq('tenant_id', body.tenantId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Get updated config
+      const updatedConfig = await this.greService.getGREThresholdConfig(body.tenantId);
+
+      return {
+        success: true,
+        data: updatedConfig,
+        message: 'Configuración actualizada exitosamente',
+      };
+    } catch (error) {
+      console.error(`❌ Error updating auto config:`, error);
+      return {
+        success: false,
+        message: `Error actualizando configuración: ${error.message}`,
+      };
+    }
+  }
 }

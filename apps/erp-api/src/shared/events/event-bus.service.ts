@@ -24,6 +24,7 @@ export interface VentaProcessedEvent {
     total: number;
   }>;
   cpeId?: string;
+  tenantId?: string;
 }
 
 export interface ComprobanteCreadoEvent {
@@ -63,6 +64,7 @@ export interface CompraEntregadaEvent {
     precioUnitario: number;
     total: number;
   }>;
+  tenantId?: string;
 }
 
 // EVENTOS PARA INTEGRACIONES CRÍTICAS

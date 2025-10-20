@@ -5,19 +5,50 @@ import { XmlSigner } from '@erp-suite/crypto';
 import { ConfigService } from '@nestjs/config';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { OseService } from '../ose/ose.service';
+import { ValidationService } from '../validations/validation.service';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class CpeService {
-  private xmlSigner: XmlSigner;
+  private readonly logger = new Logger(CpeService.name);
 
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly eventBus: EventBusService,
     private readonly oseService: OseService,
-  ) {
-    // Initialize XML signer with demo certificate
-    this.xmlSigner = new XmlSigner({
+    private readonly validationService: ValidationService,
+  ) {}
+
+  /**
+   * Obtiene el XmlSigner configurado para el tenant
+   * Si el tenant tiene certificado propio, lo usa. Si no, usa el certificado DEMO.
+   */
+  private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
+    try {
+      // Obtener certificado del tenant desde la BD
+      const { data: empresa, error } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('certificado_pfx, certificado_password')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (!error && empresa && empresa.certificado_pfx) {
+        console.log('🔐 Usando certificado del tenant:', tenantId);
+        
+        // Crear XmlSigner con el certificado del tenant
+        return new XmlSigner({
+          pfxBuffer: empresa.certificado_pfx, // Buffer del certificado
+          pfxPassword: empresa.certificado_password || '',
+        });
+      }
+    } catch (error) {
+      console.warn('⚠️ Error obteniendo certificado del tenant, usando DEMO:', error.message);
+    }
+
+    // Fallback: usar certificado DEMO
+    console.log('🔐 Usando certificado DEMO');
+    return new XmlSigner({
       pfxPath: this.configService.get('PFX_PATH') || '/tmp/demo.pfx',
       pfxPassword: this.configService.get('PFX_PASS') || 'demo123',
     });
@@ -25,12 +56,73 @@ export class CpeService {
 
   async create(createFacturaDto: CreateFacturaDto, tenantId: string): Promise<FacturaDto> {
     try {
+      // ===== PRE-EMISSION VALIDATIONS =====
+      this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
+
+      // 1. Validate certificate
+      const certificateValidation = await this.validationService.validateCertificate(tenantId);
+      if (!certificateValidation.isValid) {
+        this.logger.error(`Certificate validation failed: ${certificateValidation.errors.join(', ')}`);
+        throw new BadRequestException({
+          message: 'No se puede emitir el CPE: Certificado digital inválido',
+          errors: certificateValidation.errors,
+          code: 'CERT_VALIDATION_FAILED',
+        });
+      }
+
+      // Log certificate warnings (expiring soon)
+      if (certificateValidation.warnings.length > 0) {
+        this.logger.warn(`Certificate warnings: ${certificateValidation.warnings.join(', ')}`);
+      }
+
+      // 2. Validate RUC configuration
+      const rucValidation = await this.validationService.validateRucConfiguration(tenantId);
+      if (!rucValidation.isValid) {
+        this.logger.error(`RUC validation failed: ${rucValidation.errors.join(', ')}`);
+        throw new BadRequestException({
+          message: 'No se puede emitir el CPE: Configuración de RUC incompleta',
+          errors: rucValidation.errors,
+          missingFields: rucValidation.missingFields,
+          code: 'RUC_VALIDATION_FAILED',
+        });
+      }
+
+      // 3. Validate document format and SUNAT limits
+      const documentValidation = await this.validationService.validateDocumentBeforeEmission({
+        items: createFacturaDto.items || [],
+        total: createFacturaDto.total_venta,
+        serie: createFacturaDto.serie,
+        correlativo: createFacturaDto.numero?.toString(),
+        tipoDocumento: createFacturaDto.tipo_documento,
+      });
+
+      if (!documentValidation.isValid) {
+        this.logger.error(`Document validation failed: ${documentValidation.errors.length} errors`);
+        throw new BadRequestException({
+          message: 'No se puede emitir el CPE: El documento no cumple con las validaciones SUNAT',
+          errors: documentValidation.errors.map(e => e.message),
+          validationErrors: documentValidation.errors,
+          code: 'DOCUMENT_VALIDATION_FAILED',
+        });
+      }
+
+      // Log document warnings
+      if (documentValidation.warnings.length > 0) {
+        this.logger.warn(`Document warnings: ${documentValidation.warnings.map(w => w.message).join(', ')}`);
+      }
+
+      this.logger.log('✅ All pre-emission validations passed');
+      // ===== END PRE-EMISSION VALIDATIONS =====
+
+      // Obtener XmlSigner del tenant
+      const xmlSigner = await this.getXmlSigner(tenantId);
+      
       // Generate XML content
       const xmlContent = this.generateXmlContent(createFacturaDto);
       
-      // Sign XML (placeholder for now)
-      const signedXml = this.xmlSigner.signXml(xmlContent);
-      const hash = this.xmlSigner.generateHash(signedXml);
+      // Sign XML with tenant's certificate
+      const signedXml = xmlSigner.signXml(xmlContent);
+      const hash = xmlSigner.generateHash(signedXml);
 
       // Prepare data for database
       const cpeData = {
@@ -55,7 +147,11 @@ export class CpeService {
       };
 
       // Insert into database
-      const { data, error } = await this.supabaseService.insert('cpe', cpeData);
+      const { data, error } = await this.supabaseService.getClient()
+        .from('cpe')
+        .insert(cpeData)
+        .select()
+        .single();
 
       if (error) {
         console.error('Database error:', error);
@@ -69,49 +165,10 @@ export class CpeService {
       const createdCpe = Array.isArray(data) ? data[0] : data;
 
       // Generar XML firmado (sin enviar a SUNAT todavía)
-      await this.prepareXmlForSunat((createdCpe as any).id, xmlContent);
+      await this.prepareXmlForSunat((createdCpe as any).id, xmlContent, tenantId);
 
-      // 🚀 AUTOMATIZACIÓN: ENVÍO AUTOMÁTICO A SUNAT
-      console.log('🚀 Iniciando envío automático a SUNAT...');
-      
-      try {
-        // Enviar inmediatamente a SUNAT (modo síncrono para ventas POS)
-        await this.sendToOse((createdCpe as any).id, xmlContent, `${createFacturaDto.serie}-${createFacturaDto.numero}`);
-        
-        console.log('✅ CPE enviado automáticamente a SUNAT');
-        
-        // Actualizar estado a ENVIADO
-        await this.supabaseService.getClient()
-          .from('cpe')
-          .update({ 
-            estado: 'ENVIADO',
-            fecha_envio: new Date().toISOString(),
-            envio_automatico: true
-          })
-          .eq('id', (createdCpe as any).id);
-      } catch (envioError) {
-        console.error('⚠️ Error en envío automático, quedará pendiente para reenvío:', envioError);
-        
-        // Actualizar estado a PENDIENTE_ENVIO para reintento posterior
-        await this.supabaseService.getClient()
-          .from('cpe')
-          .update({ 
-            estado: 'PENDIENTE_ENVIO',
-            error_envio: envioError.message,
-            fecha_ultimo_intento: new Date().toISOString()
-          })
-          .eq('id', (createdCpe as any).id);
-          
-        // 📨 PROGRAMAR REINTENTO AUTOMÁTICO (usando queue si está disponible)
-        console.log('📨 Programando reintento automático en 5 minutos...');
-        
-        // Emitir evento para worker de background
-        this.eventBus.emit('cpe.retry_envio', {
-          cpeId: (createdCpe as any).id,
-          intentoAnterior: 1,
-          proximoIntento: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutos
-        }, 'cpe');
-      }
+      // ℹ️ NO ENVIAR AUTOMÁTICAMENTE - El usuario debe enviar manualmente desde el módulo CPE
+      console.log('ℹ️ CPE creado y firmado. Estado: FIRMADO (listo para envío manual a SUNAT)');
 
       // Emitir evento de comprobante creado para finanzas
       const requiereTransporte = this.evaluarSiRequiereTransporte(createFacturaDto);
@@ -333,19 +390,20 @@ export class CpeService {
    * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
    * Para enviar manualmente usar el endpoint: POST /api/cpe/:id/enviar-sunat
    */
-  private async prepareXmlForSunat(cpeId: string, xmlContent: string): Promise<void> {
+  private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<void> {
     try {
       console.log(`📄 [CPE] Preparando XML para CPE ${cpeId}...`);
       
-      // Mostrar info del certificado
-      console.log('📜 [CPE] Certificado: DEMO MODE ACTIVO');
+      // Obtener el XmlSigner configurado para el tenant
+      const xmlSigner = await this.getXmlSigner(tenantId);
+      console.log('📜 [CPE] Certificado configurado');
       
       // Firmar el XML con certificado real
-      const xmlSigned = this.xmlSigner.signXml(xmlContent);
-      const hash = this.xmlSigner.generateHash(xmlSigned);
+      const xmlSigned = xmlSigner.signXml(xmlContent);
+      const hash = xmlSigner.generateHash(xmlSigned);
 
       // Validar la firma generada
-      const isValid = this.xmlSigner.validateSignature(xmlSigned);
+      const isValid = xmlSigner.validateSignature(xmlSigned);
       if (!isValid) {
         console.warn('⚠️ [CPE] La firma generada no pasó la validación');
       }

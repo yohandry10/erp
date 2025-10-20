@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
@@ -28,6 +28,12 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { RrhhModule } from './modules/rrhh/rrhh.module';
 import { RetencionesModule } from './modules/retenciones/retenciones.module';
 import { PaisesModule } from './modules/paises/paises.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
+import { ValidationModule } from './modules/validations/validation.module';
+import { TenantMiddleware } from './common/middleware/tenant.middleware'; // ✅ MULTI-TENANT
+import { ClientesModule } from './modules/ventas/clientes/clientes.module';
+import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
+import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 
 @Module({
   imports: [
@@ -39,6 +45,8 @@ import { PaisesModule } from './modules/paises/paises.module';
     AuthModule,
     SupabaseModule,
     IntegrationModule,
+    UsuariosModule,
+    TenantsModule,
     ComprasModule,
     CotizacionesModule,
     InventarioModule,
@@ -56,18 +64,47 @@ import { PaisesModule } from './modules/paises/paises.module';
     RrhhModule,
     RetencionesModule,
     PaisesModule,
+    ValidationModule,
+    ClientesModule,
+    PedidosModule,
+    ReportesModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: RateLimitGuard,
-    },
+    // Rate limiter deshabilitado temporalmente
+    // {
+    //   provide: APP_GUARD,
+    //   useClass: RateLimitGuard,
+    // },
     {
       provide: APP_INTERCEPTOR,
       useClass: ValidationInterceptor,
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * ✅ MULTI-TENANT: Configure TenantMiddleware
+   * 
+   * This middleware:
+   * - Applies to all routes except auth endpoints
+   * - Runs after JwtAuthGuard (which sets request.user)
+   * - Configures database session context for RLS
+   * 
+   * Requirements: 4.2
+   */
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(TenantMiddleware)
+      .exclude(
+        // Exclude auth endpoints that don't require tenant context
+        { path: 'auth/login', method: RequestMethod.POST },
+        { path: 'auth/register', method: RequestMethod.POST },
+        { path: 'auth/refresh', method: RequestMethod.POST },
+        { path: 'auth/forgot-password', method: RequestMethod.POST },
+        { path: 'auth/reset-password', method: RequestMethod.POST },
+      )
+      .forRoutes('*'); // Apply to all other routes
+  }
+}

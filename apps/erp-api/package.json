@@ -27,6 +27,7 @@
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/postgrest-js": "^1.19.4",
     "@supabase/supabase-js": "^2.50.0",
+    "adm-zip": "^0.5.16",
     "axios": "^1.6.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",

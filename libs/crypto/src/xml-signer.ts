@@ -6,6 +6,7 @@ import * as fs from 'fs';
 
 export interface SigningOptions {
   pfxPath?: string;
+  pfxBuffer?: Buffer; // Support for certificate buffer from database
   pfxPassword?: string;
   referenceUri?: string;
   useDemoMode?: boolean; // Para testing sin certificado real
@@ -17,7 +18,7 @@ export class XmlSigner {
   private demoMode: boolean = false;
 
   constructor(private options: SigningOptions = {}) {
-    this.demoMode = options.useDemoMode || !options.pfxPath;
+    this.demoMode = options.useDemoMode || (!options.pfxPath && !options.pfxBuffer);
     this.loadCertificate();
   }
 
@@ -38,11 +39,22 @@ export class XmlSigner {
   }
 
   private loadRealCertificate(): void {
-    if (!this.options.pfxPath || !fs.existsSync(this.options.pfxPath)) {
-      throw new Error('Archivo de certificado no encontrado');
+    let pfxData: Buffer;
+
+    // Load from buffer (database) or file
+    if (this.options.pfxBuffer) {
+      console.log('📜 Cargando certificado desde buffer (base de datos)');
+      pfxData = this.options.pfxBuffer;
+    } else if (this.options.pfxPath) {
+      if (!fs.existsSync(this.options.pfxPath)) {
+        throw new Error('Archivo de certificado no encontrado');
+      }
+      console.log('📜 Cargando certificado desde archivo:', this.options.pfxPath);
+      pfxData = fs.readFileSync(this.options.pfxPath);
+    } else {
+      throw new Error('No se proporcionó pfxPath ni pfxBuffer');
     }
 
-    const pfxData = fs.readFileSync(this.options.pfxPath);
     const p12Asn1 = forge.asn1.fromDer(pfxData.toString('binary'));
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, this.options.pfxPassword || '');
     

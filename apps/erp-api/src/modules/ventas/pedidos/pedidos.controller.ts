@@ -1,0 +1,228 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../auth/current-user.decorator';
+import { PedidosService } from './pedidos.service';
+import { CreatePedidoDto, UpdatePedidoDto, ConfirmarPedidoDto, CancelarPedidoDto } from './dto';
+import { EstadoPedido } from './entities';
+
+/**
+ * PedidosController
+ * Controlador para gestionar pedidos de venta
+ * Requirements: 5.1, 5.4, 14.4, 14.5
+ */
+@ApiTags('Ventas - Pedidos')
+@ApiBearerAuth()
+@Controller('api/ventas/pedidos')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class PedidosController {
+  constructor(private readonly pedidosService: PedidosService) {}
+
+  /**
+   * GET /api/ventas/pedidos - Listar pedidos con paginación
+   * Requirements: 5.1
+   */
+  @Get()
+  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @ApiOperation({
+    summary: 'Listar pedidos',
+    description: 'Obtiene una lista paginada de pedidos con filtros opcionales',
+  })
+  @ApiResponse({ status: 200, description: 'Pedidos obtenidos exitosamente' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  async findAll(
+    @CurrentTenant() tenantId: string,
+    @Query('estado') estado?: EstadoPedido,
+    @Query('cliente_id') cliente_id?: string,
+    @Query('fecha_desde') fecha_desde?: string,
+    @Query('fecha_hasta') fecha_hasta?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.pedidosService.findAll(tenantId, {
+      estado,
+      cliente_id,
+      fecha_desde,
+      fecha_hasta,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  /**
+   * POST /api/ventas/pedidos - Crear pedido
+   * Requirements: 5.2, 14.4
+   */
+  @Post()
+  @RequirePermissions('ventas', 'pedidos', 'crear')
+  @ApiOperation({
+    summary: 'Crear pedido',
+    description: 'Crea un nuevo pedido de venta',
+  })
+  @ApiResponse({ status: 201, description: 'Pedido creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Cliente no encontrado' })
+  async create(
+    @Body() createPedidoDto: CreatePedidoDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pedidosService.create(createPedidoDto, tenantId, user?.id);
+  }
+
+  /**
+   * GET /api/ventas/pedidos/:id - Obtener pedido por ID
+   * Requirements: 5.3
+   */
+  @Get(':id')
+  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @ApiOperation({
+    summary: 'Obtener pedido',
+    description: 'Obtiene los detalles completos de un pedido específico',
+  })
+  @ApiResponse({ status: 200, description: 'Pedido obtenido exitosamente' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.pedidosService.findOne(id, tenantId);
+  }
+
+  /**
+   * PUT /api/ventas/pedidos/:id - Actualizar pedido
+   * Requirements: 5.2, 5.3
+   */
+  @Put(':id')
+  @RequirePermissions('ventas', 'pedidos', 'editar')
+  @ApiOperation({
+    summary: 'Actualizar pedido',
+    description: 'Actualiza los datos de un pedido existente (solo en estado PENDIENTE)',
+  })
+  @ApiResponse({ status: 200, description: 'Pedido actualizado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o estado no permite edición' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async update(
+    @Param('id') id: string,
+    @Body() updatePedidoDto: UpdatePedidoDto,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.pedidosService.update(id, updatePedidoDto, tenantId);
+  }
+
+  /**
+   * POST /api/ventas/pedidos/:id/confirmar - Confirmar pedido (reservar stock)
+   * Requirements: 5.5, 5.6, 14.5
+   */
+  @Post(':id/confirmar')
+  @RequirePermissions('ventas', 'pedidos', 'confirmar')
+  @ApiOperation({
+    summary: 'Confirmar pedido',
+    description: 'Confirma el pedido y reserva el stock. Puede retornar warnings si hay stock insuficiente.',
+  })
+  @ApiResponse({ status: 200, description: 'Pedido confirmado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Estado inválido para confirmar' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async confirmar(
+    @Param('id') id: string,
+    @Body() confirmarPedidoDto: ConfirmarPedidoDto,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.pedidosService.confirmarPedido(
+      id,
+      tenantId,
+      confirmarPedidoDto.forzar_confirmacion,
+    );
+  }
+
+  /**
+   * POST /api/ventas/pedidos/:id/cancelar - Cancelar pedido (liberar stock)
+   * Requirements: 12.1, 12.2, 14.5
+   */
+  @Post(':id/cancelar')
+  @RequirePermissions('ventas', 'pedidos', 'cancelar')
+  @ApiOperation({
+    summary: 'Cancelar pedido',
+    description: 'Cancela el pedido y libera las reservas de stock si aplica',
+  })
+  @ApiResponse({ status: 200, description: 'Pedido cancelado exitosamente' })
+  @ApiResponse({ status: 400, description: 'No se puede cancelar el pedido en su estado actual' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async cancelar(
+    @Param('id') id: string,
+    @Body() cancelarPedidoDto: CancelarPedidoDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pedidosService.cancelarPedido(
+      id,
+      tenantId,
+      cancelarPedidoDto.motivo,
+      user?.id,
+    );
+  }
+
+  /**
+   * POST /api/ventas/pedidos/:id/generar-factura - Generar factura desde pedido
+   * Requirements: 10.1, 14.5
+   */
+  @Post(':id/generar-factura')
+  @RequirePermissions('ventas', 'pedidos', 'generar_factura')
+  @ApiOperation({
+    summary: 'Generar factura',
+    description: 'Genera una factura electrónica desde el pedido. Puede sugerir generación de GRE.',
+  })
+  @ApiResponse({ status: 200, description: 'Factura generada exitosamente' })
+  @ApiResponse({ status: 400, description: 'Estado inválido para generar factura' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async generarFactura(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pedidosService.generarFactura(id, tenantId, user?.id);
+  }
+
+  /**
+   * GET /api/ventas/pedidos/:id/historial - Obtener historial de cambios del pedido
+   * Requirements: 27.4
+   */
+  @Get(':id/historial')
+  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @ApiOperation({
+    summary: 'Obtener historial del pedido',
+    description: 'Obtiene el timeline completo de cambios y eventos del pedido',
+  })
+  @ApiResponse({ status: 200, description: 'Historial obtenido exitosamente' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async getHistorial(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.pedidosService.getHistorial(id, tenantId);
+  }
+}

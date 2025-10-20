@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useApiCall } from '@/hooks/use-api'
 import { 
   Building2, 
   FileText, 
@@ -62,6 +63,7 @@ interface RecentActivity {
 }
 
 export default function Dashboard() {
+  const api = useApiCall()
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,34 +86,29 @@ export default function Dashboard() {
       
       console.log('📊 [Dashboard Frontend] Obteniendo datos del dashboard...')
       
-      // Obtener estadísticas y actividades en paralelo
-      const [statsResponse, activitiesResponse] = await Promise.all([
-        fetch('http://localhost:3002/api/dashboard/stats'),
-        fetch('http://localhost:3002/api/dashboard/activities')
+      // Usar api.get que maneja automáticamente la autenticación
+      const [statsResult, activitiesResult] = await Promise.all([
+        api.get('/dashboard/stats'),
+        api.get('/dashboard/activities')
       ])
 
-      if (!statsResponse.ok || !activitiesResponse.ok) {
+      if (!statsResult?.success || !activitiesResult?.success) {
         throw new Error('Error en la respuesta del servidor')
       }
 
-      const [statsData, activitiesData] = await Promise.all([
-        statsResponse.json(),
-        activitiesResponse.json()
-      ])
+      console.log('📊 [Dashboard Frontend] Estadísticas recibidas:', statsResult.data)
+      console.log('📋 [Dashboard Frontend] Actividades recibidas:', activitiesResult.data)
 
-      console.log('📊 [Dashboard Frontend] Estadísticas recibidas:', statsData.data)
-      console.log('📋 [Dashboard Frontend] Actividades recibidas:', activitiesData.data)
-
-      if (statsData.success) {
-        setStats(statsData.data)
+      if (statsResult.success) {
+        setStats(statsResult.data)
       } else {
-        throw new Error(statsData.message || 'Error al obtener estadísticas')
+        throw new Error(statsResult.message || 'Error al obtener estadísticas')
       }
 
-      if (activitiesData.success) {
-        setActivities(activitiesData.data || [])
+      if (activitiesResult.success) {
+        setActivities(activitiesResult.data || [])
       } else {
-        console.warn('⚠️ [Dashboard Frontend] Error al obtener actividades:', activitiesData.message)
+        console.warn('⚠️ [Dashboard Frontend] Error al obtener actividades:', activitiesResult.message)
         setActivities([])
       }
 
@@ -125,6 +122,7 @@ export default function Dashboard() {
       setIsLoading(false)
       setIsRefreshing(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Cargar datos iniciales

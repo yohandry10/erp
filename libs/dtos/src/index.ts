@@ -1,6 +1,8 @@
 // Auth DTOs
 export * from './auth/login.dto';
 export * from './auth/user.dto';
+export * from './auth/switch-tenant.dto';
+export * from './auth/reset-password.dto';
 
 // CPE DTOs
 export * from './cpe/factura.dto';

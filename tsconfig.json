@@ -1,23 +1,30 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": ["ES2020"],
     "module": "commonjs",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "outDir": "./dist",
+    "lib": [
+      "ES2020"
+    ],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": false,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": ".",
-    "paths": {
-      "@erp-suite/dtos": ["libs/dtos/src"],
-      "@erp-suite/crypto": ["libs/crypto/src"]
-    }
+    "emitDecoratorMetadata": true
   },
-  "exclude": ["node_modules", "dist"]
-} 
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".turbo",
+    "apps/web",
+    "apps/desktop"
+  ]
+}

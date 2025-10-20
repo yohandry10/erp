@@ -1,25 +1,26 @@
-import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
-
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('analytics')
 @Controller('analytics')
+@UseGuards(JwtAuthGuard)
 export class AnalyticsController {
   
   constructor(
     private readonly supabase: SupabaseService,
-
     private readonly inventoryService: InventoryIntegrationService
   ) {}
   
   @Get('ventas-tiempo')
   @ApiOperation({ summary: 'Gráfico de ventas en el tiempo' })
   @ApiResponse({ status: 200, description: 'Datos de ventas en el tiempo obtenidos exitosamente' })
-  async getVentasTiempo(@Query() filtros: any) {
+  async getVentasTiempo(@CurrentTenant() tenantId: string, @Query() filtros: any) {
     try {
-      console.log('📊 [Analytics] Analizando ventas por tiempo...');
+      console.log(`📊 [Analytics] [Tenant: ${tenantId}] Analizando ventas por tiempo`);
 
       // Obtener ventas de los últimos 30 días directamente
       const fechaInicio = new Date();
@@ -28,6 +29,7 @@ export class AnalyticsController {
       const { data: ventas, error: ventasError } = await this.supabase.getClient()
         .from('ventas')
         .select('fecha, total')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .gte('fecha', fechaInicio.toISOString())
         .order('fecha');
 
@@ -45,7 +47,7 @@ export class AnalyticsController {
 
       // Calcular totales
       const ventasActuales = ventas?.reduce((sum, v) => sum + parseFloat(v.total || 0), 0) || 0;
-      const ventasAnterior = await this.calcularVentasMesAnterior();
+      const ventasAnterior = await this.calcularVentasMesAnterior(tenantId);
       const crecimiento = ventasAnterior > 0 ? 
         ((ventasActuales - ventasAnterior) / ventasAnterior * 100).toFixed(1) + '%' : 
         'SIN DATOS';
@@ -103,7 +105,8 @@ export class AnalyticsController {
     }));
   }
 
-  private async calcularVentasMesAnterior(): Promise<number> {
+  private async calcularVentasMesAnterior(tenantId: string): Promise<number> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     try {
       const fechaInicio = new Date();
       fechaInicio.setDate(fechaInicio.getDate() - 60);
@@ -113,6 +116,7 @@ export class AnalyticsController {
       const { data: ventas } = await this.supabase.getClient()
         .from('ventas')
         .select('total')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .gte('fecha', fechaInicio.toISOString())
         .lte('fecha', fechaFin.toISOString());
 
@@ -126,11 +130,13 @@ export class AnalyticsController {
   @Get('deudas-clientes')
   @ApiOperation({ summary: 'Gráfico de deudas de clientes' })
   @ApiResponse({ status: 200, description: 'Datos de deudas de clientes obtenidos exitosamente' })
-  async getDeudasClientes() {
+  async getDeudasClientes(@CurrentTenant() tenantId: string, @Query() filtros: any) {
     try {
+      console.log(`📊 [Analytics] [Tenant: ${tenantId}] Analizando deudas de clientes`);
       const { data: cuentasPorCobrar, error } = await this.supabase.getClient()
         .from('cuentas_por_cobrar')
         .select('*, clientes(nombre, ruc)')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .order('fecha_vencimiento', { ascending: true });
 
       if (error) throw error;
@@ -195,14 +201,15 @@ export class AnalyticsController {
   @Get('rentabilidad-productos')
   @ApiOperation({ summary: 'Análisis de rentabilidad por productos' })
   @ApiResponse({ status: 200, description: 'Análisis de rentabilidad obtenido exitosamente' })
-  async getRentabilidadProductos() {
+  async getRentabilidadProductos(@CurrentTenant() tenantId: string, @Query() filtros: any) {
     try {
-      console.log('📊 [Analytics] Analizando rentabilidad por productos...');
+      console.log(`📊 [Analytics] [Tenant: ${tenantId}] Analizando rentabilidad por productos`);
 
       // Obtener productos con sus ventas y compras
       const { data: productos, error: productosError } = await this.supabase.getClient()
         .from('productos')
-        .select('id, codigo, nombre, precio, costo');
+        .select('id, codigo, nombre, precio, costo')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       if (productosError) {
         console.error('❌ Error obteniendo productos:', productosError);
@@ -214,7 +221,8 @@ export class AnalyticsController {
       // Obtener detalles de ventas
       const { data: ventasDetalles, error: ventasError } = await this.supabase.getClient()
         .from('venta_detalles')
-        .select('producto_id, cantidad, precio_unitario');
+        .select('producto_id, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       if (ventasError) {
         console.error('⚠️ Error obteniendo ventas:', ventasError);
@@ -223,7 +231,8 @@ export class AnalyticsController {
       // Obtener detalles de compras
       const { data: comprasDetalles, error: comprasError } = await this.supabase.getClient()
         .from('orden_compra_detalles')
-        .select('producto_id, cantidad, precio_unitario');
+        .select('producto_id, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       if (comprasError) {
         console.error('⚠️ Error obteniendo compras:', comprasError);
@@ -298,14 +307,15 @@ export class AnalyticsController {
   @Get('punto-equilibrio')
   @ApiOperation({ summary: 'Cálculo del punto de equilibrio' })
   @ApiResponse({ status: 200, description: 'Análisis de punto de equilibrio obtenido exitosamente' })
-  async getPuntoEquilibrio() {
+  async getPuntoEquilibrio(@CurrentTenant() tenantId: string, @Query() filtros: any) {
     try {
-      console.log('📊 [Analytics] Calculando punto de equilibrio...');
+      console.log(`📊 [Analytics] [Tenant: ${tenantId}] Calculando punto de equilibrio`);
 
       // Obtener productos
       const { data: productos, error: productosError } = await this.supabase.getClient()
         .from('productos')
-        .select('id, codigo, nombre, precio, costo');
+        .select('id, codigo, nombre, precio, costo')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       if (productosError) {
         console.error('❌ Error obteniendo productos:', productosError);
@@ -315,18 +325,21 @@ export class AnalyticsController {
       // Obtener detalles de ventas
       const { data: ventasDetalles } = await this.supabase.getClient()
         .from('venta_detalles')
-        .select('producto_id, cantidad, precio_unitario');
+        .select('producto_id, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       // Obtener detalles de compras
       const { data: comprasDetalles } = await this.supabase.getClient()
         .from('orden_compra_detalles')
-        .select('producto_id, cantidad, precio_unitario');
+        .select('producto_id, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId); // ✅ Filtro de tenant
 
       // Calcular costos fijos estimados (gastos operativos del último mes)
       // Como no existe la tabla costos_fijos, vamos a estimarlos desde gastos
       const { data: gastos } = await this.supabase.getClient()
         .from('gastos')
         .select('monto')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .gte('fecha', new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString());
 
       const totalCostosFijos = gastos?.reduce((sum, gasto) => sum + parseFloat(gasto.monto || 0), 0) || 10000; // Default 10,000 si no hay datos
@@ -388,10 +401,11 @@ export class AnalyticsController {
   @Get('escenarios-financieros')
   @ApiOperation({ summary: 'Simulaciones de escenarios financieros' })
   @ApiResponse({ status: 200, description: 'Escenarios financieros simulados exitosamente' })
-  async getEscenariosFinancieros(@Query('escenario') escenario: string = 'base') {
+  async getEscenariosFinancieros(@CurrentTenant() tenantId: string, @Query('escenario') escenario: string = 'base', @Query() filtros: any) {
     try {
-      const ventasActuales = await this.obtenerVentasUltimos12Meses();
-      const costosActuales = await this.obtenerCostosUltimos12Meses();
+      console.log(`📊 [Analytics] [Tenant: ${tenantId}] Simulando escenarios financieros`);
+      const ventasActuales = await this.obtenerVentasUltimos12Meses(tenantId);
+      const costosActuales = await this.obtenerCostosUltimos12Meses(tenantId);
       
       const escenarios = this.simularEscenarios(ventasActuales, costosActuales, escenario);
       
@@ -457,8 +471,8 @@ export class AnalyticsController {
     })) || [];
   }
 
-  private async obtenerVentasUltimos12Meses(): Promise<number[]> {
-    // Implementación para obtener ventas mensuales
+  private async obtenerVentasUltimos12Meses(tenantId: string): Promise<number[]> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
     const ventas = [];
     for (let i = 11; i >= 0; i--) {
       const fechaInicio = new Date();
@@ -471,6 +485,7 @@ export class AnalyticsController {
       const { data } = await this.supabase.getClient()
         .from('ventas')
         .select('total')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .gte('fecha', fechaInicio.toISOString())
         .lt('fecha', fechaFin.toISOString());
       
@@ -479,9 +494,27 @@ export class AnalyticsController {
     return ventas;
   }
 
-  private async obtenerCostosUltimos12Meses(): Promise<number[]> {
-    // Implementación similar para costos
-    return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Placeholder para implementación completa
+  private async obtenerCostosUltimos12Meses(tenantId: string): Promise<number[]> {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const costos = [];
+    for (let i = 11; i >= 0; i--) {
+      const fechaInicio = new Date();
+      fechaInicio.setMonth(fechaInicio.getMonth() - i);
+      fechaInicio.setDate(1);
+      
+      const fechaFin = new Date(fechaInicio);
+      fechaFin.setMonth(fechaFin.getMonth() + 1);
+      
+      const { data } = await this.supabase.getClient()
+        .from('gastos')
+        .select('monto')
+        .eq('tenant_id', tenantId) // ✅ Filtro de tenant
+        .gte('fecha', fechaInicio.toISOString())
+        .lt('fecha', fechaFin.toISOString());
+      
+      costos.push(data?.reduce((sum, g) => sum + parseFloat(g.monto || 0), 0) || 0);
+    }
+    return costos;
   }
 
   private simularEscenarios(ventas: number[], costos: number[], escenario: string): any {

@@ -7,10 +7,13 @@ export class RrhhService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly eventBus: EventBusService
-  ) {}
+  ) { }
 
   // ===== EMPLEADOS BÁSICOS =====
-  async getEmpleados() {
+  async getEmpleados(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     const { data, error } = await this.supabaseService.getClient()
       .from('empleados')
       .select(`
@@ -21,7 +24,8 @@ export class RrhhService {
           id,
           horarios_trabajo(*)
         )
-      `);
+      `)
+      .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
     if (error) throw error;
     return {
       success: true,
@@ -29,54 +33,74 @@ export class RrhhService {
     };
   }
 
-  async getDepartamentos() {
+  async getDepartamentos(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     const { data, error } = await this.supabaseService.getClient()
       .from('departamentos')
-      .select('*');
+      .select('*')
+      .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
     if (error) throw error;
     return data;
   }
 
-  async createEmpleado(empleadoData: any) {
+  async createEmpleado(empleadoData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id al crear
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     const { data, error } = await this.supabaseService.getClient()
       .from('empleados')
-      .insert(empleadoData)
+      .insert({
+        ...empleadoData,
+        tenant_id: currentTenantId // ✅ Incluir tenant
+      })
       .select();
     if (error) throw error;
     return data[0];
   }
 
-  async updateEmpleado(id: string, empleadoData: any) {
+  async updateEmpleado(id: string, empleadoData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant al actualizar
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     const { data, error } = await this.supabaseService.getClient()
       .from('empleados')
       .update(empleadoData)
       .eq('id', id)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
     if (error) throw error;
     return data[0];
   }
 
-  async deleteEmpleado(id: string) {
+  async deleteEmpleado(id: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant al eliminar
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     const { data, error } = await this.supabaseService.getClient()
       .from('empleados')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
     if (error) throw error;
     return { success: true, message: 'Empleado eliminado exitosamente' };
   }
 
-  async createDepartamento(departamentoData: any) {
+  async createDepartamento(departamentoData: any, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('departamentos')
-      .insert(departamentoData)
+      .insert({ ...departamentoData, tenant_id: currentTenantId })
       .select();
     if (error) throw error;
     return data[0];
   }
 
   // ===== RECLUTAMIENTO Y VACANTES =====
-  async getVacantes() {
+  async getVacantes(tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('vacantes')
       .select(`
@@ -84,59 +108,67 @@ export class RrhhService {
         departamentos(nombre),
         candidatos(count)
       `)
-      .order('created_at', { ascending: false });
+      .eq('tenant_id', currentTenantId).order('created_at', { ascending: false });
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async createVacante(vacanteData: any) {
+  async createVacante(vacanteData: any, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('vacantes')
-      .insert(vacanteData)
+      .insert({ ...vacanteData, tenant_id: currentTenantId })
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async getCandidatos(vacanteId?: string) {
+  async getCandidatos(vacanteId?: string, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     let query = this.supabaseService.getClient()
       .from('candidatos')
       .select(`
         *,
         vacantes(titulo, puesto_solicitado)
       `)
+      .eq('tenant_id', currentTenantId)
       .order('fecha_postulacion', { ascending: false });
-    
+
     if (vacanteId) {
       query = query.eq('id_vacante', vacanteId);
     }
-    
+
     const { data, error } = await query;
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async createCandidato(candidatoData: any) {
+  async createCandidato(candidatoData: any, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('candidatos')
-      .insert(candidatoData)
+      .insert({ ...candidatoData, tenant_id: currentTenantId })
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async updateEstadoCandidato(candidatoId: string, estado: string, observaciones?: string) {
+  async updateEstadoCandidato(candidatoId: string, estado: string, observaciones?: string, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('candidatos')
       .update({ estado, observaciones })
       .eq('id', candidatoId)
+      .eq('tenant_id', currentTenantId)
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
   // ===== ASISTENCIA Y TIEMPO =====
-  async registrarAsistencia(empleadoId: string, tipo: 'entrada' | 'salida') {
+  async registrarAsistencia(empleadoId: string, tipo: 'entrada' | 'salida', tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const hoy = new Date().toISOString().split('T')[0];
     const horaActual = new Date().toTimeString().split(' ')[0];
 
@@ -145,6 +177,7 @@ export class RrhhService {
       .from('asistencia')
       .select('*')
       .eq('id_empleado', empleadoId)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('fecha', hoy)
       .single();
 
@@ -152,11 +185,12 @@ export class RrhhService {
       if (registroExistente) {
         throw new Error('Ya se registró entrada para este día');
       }
-      
+
       const { data, error } = await this.supabaseService.getClient()
         .from('asistencia')
         .insert({
           id_empleado: empleadoId,
+          tenant_id: currentTenantId, // ✅ Incluir tenant
           fecha: hoy,
           hora_entrada: horaActual,
           estado: 'presente'
@@ -194,6 +228,7 @@ export class RrhhService {
           horas_trabajadas: horasTrabajadas
         })
         .eq('id', registroExistente.id)
+        .eq('tenant_id', currentTenantId) // ✅ Validar tenant
         .select();
       if (error) throw error;
 
@@ -215,13 +250,17 @@ export class RrhhService {
     }
   }
 
-  async getAsistencia(empleadoId?: string, fechaDesde?: string, fechaHasta?: string) {
+  async getAsistencia(empleadoId?: string, fechaDesde?: string, fechaHasta?: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     let query = this.supabaseService.getClient()
       .from('asistencia')
       .select(`
         *,
         empleados(nombres, apellidos, numero_documento)
       `)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .order('fecha', { ascending: false });
 
     if (empleadoId) query = query.eq('id_empleado', empleadoId);
@@ -234,13 +273,15 @@ export class RrhhService {
   }
 
   // ===== SOLICITUDES (Vacaciones, Licencias) =====
-  async getSolicitudes(empleadoId?: string, estado?: string) {
+  async getSolicitudes(empleadoId?: string, estado?: string, tenantId?: string) {
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     let query = this.supabaseService.getClient()
       .from('solicitudes')
       .select(`
         *,
         empleados(nombres, apellidos, numero_documento)
       `)
+      .eq('tenant_id', currentTenantId)
       .order('created_at', { ascending: false });
 
     if (empleadoId) query = query.eq('id_empleado', empleadoId);
@@ -251,16 +292,23 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createSolicitud(solicitudData: any) {
+  async createSolicitud(solicitudData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('solicitudes')
-      .insert(solicitudData)
+      .insert({
+        ...solicitudData,
+        tenant_id: currentTenantId // ✅ Incluir tenant
+      })
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async aprobarSolicitud(solicitudId: string, aprobadoPor: string, observaciones?: string) {
+  async aprobarSolicitud(solicitudId: string, aprobadoPor: string, observaciones?: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('solicitudes')
       .update({
@@ -270,12 +318,15 @@ export class RrhhService {
         observaciones_aprobacion: observaciones
       })
       .eq('id', solicitudId)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async rechazarSolicitud(solicitudId: string, aprobadoPor: string, observaciones: string) {
+  async rechazarSolicitud(solicitudId: string, aprobadoPor: string, observaciones: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('solicitudes')
       .update({
@@ -285,23 +336,29 @@ export class RrhhService {
         observaciones_aprobacion: observaciones
       })
       .eq('id', solicitudId)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
   // ===== BENEFICIOS =====
-  async getBeneficios() {
+  async getBeneficios(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('beneficios')
       .select('*')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('activo', true)
       .order('nombre');
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async getBeneficiosEmpleado(empleadoId: string) {
+  async getBeneficiosEmpleado(empleadoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('empleado_beneficios')
       .select(`
@@ -309,18 +366,22 @@ export class RrhhService {
         beneficios(*)
       `)
       .eq('id_empleado', empleadoId)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('estado', 'activo');
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async asignarBeneficio(empleadoId: string, beneficioId: string, fechaInicio: string) {
+  async asignarBeneficio(empleadoId: string, beneficioId: string, fechaInicio: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('empleado_beneficios')
       .insert({
         id_empleado: empleadoId,
         id_beneficio: beneficioId,
         fecha_inicio: fechaInicio,
+        tenant_id: currentTenantId, // ✅ Incluir tenant
         estado: 'activo'
       })
       .select();
@@ -329,13 +390,16 @@ export class RrhhService {
   }
 
   // ===== EVALUACIONES DE DESEMPEÑO =====
-  async getEvaluaciones(empleadoId?: string) {
+  async getEvaluaciones(empleadoId?: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     let query = this.supabaseService.getClient()
       .from('evaluaciones')
       .select(`
         *,
         empleados(nombres, apellidos, numero_documento, puesto)
       `)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .order('fecha_evaluacion', { ascending: false });
 
     if (empleadoId) query = query.eq('id_empleado', empleadoId);
@@ -345,37 +409,50 @@ export class RrhhService {
     return { success: true, data: data || [] };
   }
 
-  async createEvaluacion(evaluacionData: any) {
+  async createEvaluacion(evaluacionData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('evaluaciones')
-      .insert(evaluacionData)
+      .insert({
+        ...evaluacionData,
+        tenant_id: currentTenantId // ✅ Incluir tenant
+      })
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async updateEvaluacion(id: string, evaluacionData: any) {
+  async updateEvaluacion(id: string, evaluacionData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('evaluaciones')
       .update(evaluacionData)
       .eq('id', id)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
   // ===== CAPACITACIONES =====
-  async getCapacitaciones() {
+  async getCapacitaciones(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('capacitaciones')
       .select('*')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('activo', true)
       .order('fecha_inicio', { ascending: false });
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async getCapacitacionesEmpleado(empleadoId: string) {
+  async getCapacitacionesEmpleado(empleadoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('empleado_capacitaciones')
       .select(`
@@ -383,17 +460,21 @@ export class RrhhService {
         capacitaciones(*)
       `)
       .eq('id_empleado', empleadoId)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .order('fecha_inscripcion', { ascending: false });
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async inscribirCapacitacion(empleadoId: string, capacitacionId: string) {
+  async inscribirCapacitacion(empleadoId: string, capacitacionId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('empleado_capacitaciones')
       .insert({
         id_empleado: empleadoId,
         id_capacitacion: capacitacionId,
+        tenant_id: currentTenantId, // ✅ Incluir tenant
         estado: 'inscrito'
       })
       .select();
@@ -402,7 +483,10 @@ export class RrhhService {
   }
 
   // ===== LIQUIDACIONES =====
-  async calcularLiquidacion(empleadoId: string, motivoTerminacion: string, fechaTerminacion: string) {
+  async calcularLiquidacion(empleadoId: string, motivoTerminacion: string, fechaTerminacion: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     // Obtener datos del empleado y contrato
     const { data: empleado, error: empError } = await this.supabaseService.getClient()
       .from('empleados')
@@ -411,33 +495,34 @@ export class RrhhService {
         contratos!inner(*)
       `)
       .eq('id', empleadoId)
+      .eq('tenant_id', currentTenantId)
       .eq('contratos.estado', 'vigente')
       .single();
-    
+
     if (empError || !empleado) throw new Error('Empleado no encontrado');
-    
+
     const contrato = empleado.contratos[0];
     const sueldoMensual = parseFloat(contrato.sueldo_bruto);
-    
+
     // Calcular días trabajados en el año
     const fechaIngreso = new Date(empleado.fecha_ingreso);
     const fechaTerminacionDate = new Date(fechaTerminacion);
     const diasTrabajados = Math.floor((fechaTerminacionDate.getTime() - fechaIngreso.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     // Calcular beneficios
     const vacacionesPendientes = Math.max(0, 30 - this.calcularVacacionesUsadas(empleadoId, fechaTerminacionDate.getFullYear()));
     const diasCts = this.calcularDiasCts(fechaIngreso, fechaTerminacionDate);
     const montoCts = (sueldoMensual / 30) * diasCts;
-    
+
     let indemnizacion = 0;
     if (motivoTerminacion === 'despido') {
       // 1.5 sueldos por año trabajado
       const añosTrabajados = diasTrabajados / 365;
       indemnizacion = sueldoMensual * 1.5 * añosTrabajados;
     }
-    
+
     const totalLiquidacion = montoCts + indemnizacion + (sueldoMensual / 30 * vacacionesPendientes);
-    
+
     const { data, error } = await this.supabaseService.getClient()
       .from('liquidaciones')
       .insert({
@@ -453,22 +538,22 @@ export class RrhhService {
         estado: 'calculada'
       })
       .select();
-    
+
     if (error) throw error;
-    
+
     // Actualizar estado del empleado
     await this.supabaseService.getClient()
       .from('empleados')
       .update({ estado: 'inactivo' })
       .eq('id', empleadoId);
-    
+
     // Terminar contrato
     await this.supabaseService.getClient()
       .from('contratos')
       .update({ estado: 'terminado', fecha_fin: fechaTerminacion })
       .eq('id_empleado', empleadoId)
       .eq('estado', 'vigente');
-    
+
     return { success: true, data: data[0] };
   }
 
@@ -478,28 +563,35 @@ export class RrhhService {
   }
 
   private calcularDiasCts(fechaIngreso: Date, fechaTerminacion: Date): number {
-    const mesesTrabajados = (fechaTerminacion.getFullYear() - fechaIngreso.getFullYear()) * 12 + 
-                          (fechaTerminacion.getMonth() - fechaIngreso.getMonth());
+    const mesesTrabajados = (fechaTerminacion.getFullYear() - fechaIngreso.getFullYear()) * 12 +
+      (fechaTerminacion.getMonth() - fechaIngreso.getMonth());
     return Math.floor(mesesTrabajados * 2.5); // 30 días por año = 2.5 días por mes
   }
 
   // ===== HORARIOS =====
-  async getHorarios() {
+  async getHorarios(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('horarios_trabajo')
       .select('*')
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('activo', true)
       .order('nombre');
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async asignarHorario(empleadoId: string, horarioId: string, fechaInicio: string) {
+  async asignarHorario(empleadoId: string, horarioId: string, fechaInicio: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+
     // Desactivar horario anterior
     await this.supabaseService.getClient()
       .from('empleado_horarios')
       .update({ activo: false, fecha_fin: fechaInicio })
       .eq('id_empleado', empleadoId)
+      .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .eq('activo', true);
 
     // Asignar nuevo horario
@@ -509,6 +601,7 @@ export class RrhhService {
         id_empleado: empleadoId,
         id_horario: horarioId,
         fecha_inicio: fechaInicio,
+        tenant_id: currentTenantId, // ✅ Incluir tenant
         activo: true
       })
       .select();
@@ -517,18 +610,23 @@ export class RrhhService {
   }
 
   // ===== EXPEDIENTE =====
-  async getExpediente(empleadoId: string) {
+  async getExpediente(empleadoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('expediente_documentos')
       .select('*')
       .eq('id_empleado', empleadoId)
+      .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
       .eq('activo', true)
       .order('fecha_subida', { ascending: false });
     if (error) throw error;
     return { success: true, data: data || [] };
   }
 
-  async subirDocumento(empleadoId: string, tipoDocumento: string, nombreArchivo: string, archivoUrl: string, subidoPor: string) {
+  async subirDocumento(empleadoId: string, tipoDocumento: string, nombreArchivo: string, archivoUrl: string, subidoPor: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const { data, error } = await this.supabaseService.getClient()
       .from('expediente_documentos')
       .insert({
@@ -536,7 +634,8 @@ export class RrhhService {
         tipo_documento: tipoDocumento,
         nombre_archivo: nombreArchivo,
         archivo_url: archivoUrl,
-        subido_por: subidoPor
+        subido_por: subidoPor,
+        tenant_id: currentTenantId // ✅ Incluir tenant
       })
       .select();
     if (error) throw error;
@@ -544,9 +643,11 @@ export class RrhhService {
   }
 
   // ===== DASHBOARD Y REPORTES =====
-  async getDashboardRrhh() {
+  async getDashboardRrhh(tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
     const client = this.supabaseService.getClient();
-    
+
     // Empleados activos
     const { data: empleadosActivos } = await client
       .from('empleados')
@@ -584,13 +685,15 @@ export class RrhhService {
   }
 
   // ===== PAGOS Y COMPROBANTES =====
-  async getPagos(periodo?: string, empleadoId?: string) {
+  async getPagos(periodo?: string, empleadoId?: string, tenantId?: string) {
     try {
-      console.log('🔍 [RRHH] Obteniendo pagos desde rrhh_pagos...', { periodo, empleadoId });
-      
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      console.log('🔍 [RRHH] Obteniendo pagos desde rrhh_pagos...', { periodo, empleadoId, tenantId: currentTenantId });
+
       let query = this.supabaseService.getClient()
         .from('rrhh_pagos')
         .select('*')
+        .eq('tenant_id', currentTenantId)
         .order('created_at', { ascending: false });
 
       if (periodo) query = query.eq('periodo', periodo);
@@ -603,7 +706,7 @@ export class RrhhService {
       }
 
       console.log(`💰 [RRHH] Encontrados ${data?.length || 0} pagos en rrhh_pagos`);
-      
+
       if (!data || data.length === 0) {
         console.warn('⚠️ No hay pagos en rrhh_pagos - tabla vacía');
         return { success: true, data: [] };
@@ -616,12 +719,12 @@ export class RrhhService {
           .select('nombres, apellidos, numero_documento')
           .eq('id', pago.empleado_id)
           .single();
-        
+
         const resultado = {
           ...pago,
           empleado: empleado || { nombres: 'N/A', apellidos: 'N/A', numero_documento: 'N/A' }
         };
-        
+
         console.log(`👤 Pago procesado:`, {
           id: pago.id,
           empleado_id: pago.empleado_id,
@@ -630,7 +733,7 @@ export class RrhhService {
           estado: pago.estado,
           empleado_nombre: empleado ? `${empleado.nombres} ${empleado.apellidos}` : 'N/A'
         });
-        
+
         return resultado;
       }));
 
@@ -642,10 +745,13 @@ export class RrhhService {
     }
   }
 
-  async procesarPago(pagoId: string) {
+  async procesarPago(pagoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     const { data, error } = await this.supabaseService.getClient()
       .from('rrhh_pagos')
-      .update({ 
+      .update({
         estado: 'procesado',
         fecha_pago: new Date().toISOString().split('T')[0]
       })
@@ -655,55 +761,61 @@ export class RrhhService {
     return { success: true, data: data[0] };
   }
 
-  async generarComprobantePago(pagoId: string) {
+  async generarComprobantePago(pagoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     // Aquí iría la lógica para generar PDF del comprobante
     // Por ahora retornamos un placeholder
-    return { 
-      success: true, 
-      message: 'Generando comprobante...', 
-      download_url: `/downloads/comprobante-${pagoId}.pdf` 
+    return {
+      success: true,
+      message: 'Generando comprobante...',
+      download_url: `/downloads/comprobante-${pagoId}.pdf`
     };
   }
 
-  async generarBoletaPago(empleadoId: string, mes: string) {
+  async generarBoletaPago(empleadoId: string, mes: string, tenantId?: string) {
     try {
-      console.log(`📄 [RRHH] Generando boleta de pago para empleado ${empleadoId}, mes ${mes}`);
-      
+      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      console.log(`📄 [RRHH] Generando boleta de pago para empleado ${empleadoId}, mes ${mes}, tenant: ${currentTenantId}`);
+
       // Obtener datos del empleado
       const { data: empleado, error: empleadoError } = await this.supabaseService.getClient()
         .from('empleados')
         .select('*')
         .eq('id', empleadoId)
+        .eq('tenant_id', currentTenantId)
         .single();
-        
+
       if (empleadoError || !empleado) {
         throw new Error('Empleado no encontrado');
       }
-      
+
       // Obtener pagos del mes
       const { data: pagos, error: pagosError } = await this.supabaseService.getClient()
         .from('rrhh_pagos')
         .select('*')
         .eq('empleado_id', empleadoId)
+        .eq('tenant_id', currentTenantId)
         .like('periodo', `${mes}%`)
         .order('created_at', { ascending: false });
-        
+
       if (pagosError) {
         throw new Error('Error obteniendo pagos del empleado');
       }
-      
+
       if (!pagos || pagos.length === 0) {
         return {
           success: false,
           message: `No se encontraron pagos para el empleado en ${mes}`
         };
       }
-      
+
       // Calcular totales
       const totalBruto = pagos.reduce((sum, p) => sum + (parseFloat(p.monto_bruto) || 0), 0);
       const totalDescuentos = pagos.reduce((sum, p) => sum + (parseFloat(p.descuentos) || 0), 0);
       const totalNeto = pagos.reduce((sum, p) => sum + (parseFloat(p.monto_neto) || 0), 0);
-      
+
       // Generar HTML de la boleta
       const boletaHTML = this.generarBoletaHTML(empleado, pagos, {
         totalBruto,
@@ -711,7 +823,7 @@ export class RrhhService {
         totalNeto,
         mes
       });
-      
+
       return {
         success: true,
         data: {
@@ -723,7 +835,7 @@ export class RrhhService {
         },
         message: 'Boleta de pago generada exitosamente'
       };
-      
+
     } catch (error) {
       console.error('❌ Error generando boleta de pago:', error);
       return {
@@ -855,7 +967,10 @@ export class RrhhService {
   }
 
   // ===== CONTRATOS =====
-  async getContratos(empleadoId?: string) {
+  async getContratos(empleadoId?: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     let query = this.supabaseService.getClient()
       .from('contratos')
       .select(`
@@ -871,7 +986,10 @@ export class RrhhService {
     return data || [];
   }
 
-  async createContrato(contratoData: any) {
+  async createContrato(contratoData: any, tenantId?: string) {
+    // ✅ MULTI-TENANT: Agregar tenant_id
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     const { data, error } = await this.supabaseService.getClient()
       .from('contratos')
       .insert(contratoData)
@@ -880,7 +998,10 @@ export class RrhhService {
     return { success: true, data: data[0] };
   }
 
-  async renovarContrato(contratoId: string, meses: number) {
+  async renovarContrato(contratoId: string, meses: number, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     // Obtener contrato actual
     const { data: contrato } = await this.supabaseService.getClient()
       .from('contratos')
@@ -896,51 +1017,61 @@ export class RrhhService {
 
     const { data, error } = await this.supabaseService.getClient()
       .from('contratos')
-      .update({ 
+      .update({
         fecha_fin: fechaFin.toISOString().split('T')[0],
         estado: 'renovado',
         observaciones: `Renovado por ${meses} meses el ${new Date().toLocaleDateString()}`
       })
       .eq('id', contratoId)
       .select();
-    
+
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async finalizarContrato(contratoId: string, motivoFinalizacion: string, fechaFinalizacion: string) {
+  async finalizarContrato(contratoId: string, motivoFinalizacion: string, fechaFinalizacion: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     const { data, error } = await this.supabaseService.getClient()
       .from('contratos')
-      .update({ 
+      .update({
         estado: 'finalizado',
         fecha_fin: fechaFinalizacion,
         motivo_finalizacion: motivoFinalizacion
       })
       .eq('id', contratoId)
       .select();
-    
+
     if (error) throw error;
     return { success: true, data: data[0] };
   }
 
-  async generarContratoPDF(contratoId: string) {
+  async generarContratoPDF(contratoId: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     // Aquí iría la lógica para generar PDF del contrato
     // Por ahora retornamos un placeholder
-    return { 
-      success: true, 
-      message: 'Generando contrato...', 
-      download_url: `/downloads/contrato-${contratoId}.pdf` 
+    return {
+      success: true,
+      message: 'Generando contrato...',
+      download_url: `/downloads/contrato-${contratoId}.pdf`
     };
   }
 
   // ===== ASISTENCIAS MEJORADAS =====
-  async getAsistenciasPorFecha(fecha: string) {
+  async getAsistenciasPorFecha(fecha: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Filtrar por tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     const { data, error } = await this.supabaseService.getClient()
       .from('asistencia')
       .select(`
         *,
         empleados(nombres, apellidos, numero_documento, departamentos(nombre))
       `)
+      .eq('tenant_id', currentTenantId)
       .eq('fecha', fecha)
       .order('hora_entrada', { ascending: true });
 
@@ -948,7 +1079,10 @@ export class RrhhService {
     return data || [];
   }
 
-  async marcarAsistencia(empleadoId: string, fecha: string, tipo: 'entrada' | 'salida', hora: string) {
+  async marcarAsistencia(empleadoId: string, fecha: string, tipo: 'entrada' | 'salida', hora: string, tenantId?: string) {
+    // ✅ MULTI-TENANT: Validar tenant
+    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    
     // Buscar registro existente del día
     const { data: registroExistente } = await this.supabaseService.getClient()
       .from('asistencia')
@@ -961,7 +1095,7 @@ export class RrhhService {
       if (registroExistente) {
         throw new Error('Ya se registró entrada para este día');
       }
-      
+
       const { data, error } = await this.supabaseService.getClient()
         .from('asistencia')
         .insert({
@@ -998,41 +1132,41 @@ export class RrhhService {
 
   async debugEmpleadosContratos() {
     const client = this.supabaseService.getClient();
-    
+
     console.log('🔍 DEBUG: Verificando empleados y contratos...');
-    
+
     // Obtener empleados
     const { data: empleados, error: empleadosError } = await client
       .from('empleados')
       .select('*')
       .eq('estado', 'activo');
-    
+
     console.log('👥 Empleados activos:', empleados?.length || 0);
     if (empleados) {
       empleados.forEach(emp => {
         console.log(`  - ${emp.nombres} ${emp.apellidos} (${emp.numero_documento})`);
       });
     }
-    
+
     // Obtener contratos
     const { data: contratos, error: contratosError } = await client
       .from('contratos')
       .select('*')
       .eq('estado', 'vigente');
-    
+
     console.log('📄 Contratos vigentes:', contratos?.length || 0);
     if (contratos) {
       contratos.forEach(cont => {
         console.log(`  - Empleado ID: ${cont.id_empleado}, Sueldo: ${cont.sueldo_bruto}`);
       });
     }
-    
+
     // Obtener empleados CON contratos
     const { data: empleadosConContratos, error: joinError } = await client
       .from('empleados')
       .select('*, contratos(*)')
       .eq('estado', 'activo');
-    
+
     console.log('👥 Empleados con contratos:', empleadosConContratos?.length || 0);
     if (empleadosConContratos) {
       empleadosConContratos.forEach(emp => {
@@ -1040,7 +1174,7 @@ export class RrhhService {
         console.log(`  - ${emp.nombres}: ${contratoVigente ? 'SÍ TIENE CONTRATO' : 'NO TIENE CONTRATO'}`);
       });
     }
-    
+
     return {
       totalEmpleados: empleados?.length || 0,
       totalContratos: contratos?.length || 0,

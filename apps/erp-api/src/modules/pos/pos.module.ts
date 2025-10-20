@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
-import { PosController } from '../pos.controller';
+import { PosController } from './pos.controller';
+import { PosService } from './pos.service';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { IntegrationModule } from '../../shared/integration/integration.module';
+import { CpeModule } from '../cpe/cpe.module';
+import { ValidationModule } from '../validations/validation.module';
+import { ConfiguracionModule } from '../configuracion.module';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule],
+  imports: [SupabaseModule, IntegrationModule, CpeModule, ValidationModule, ConfiguracionModule],
   controllers: [PosController],
-  providers: [],
-  exports: []
+  providers: [PosService],
+  exports: [PosService]
 })
-export class PosModule {}
+export class PosModule { } 
