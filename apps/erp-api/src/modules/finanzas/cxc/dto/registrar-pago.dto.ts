@@ -1,0 +1,58 @@
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+
+export enum TipoMovimientoCxc {
+  PAGO = 'PAGO',
+  ANTICIPO = 'ANTICIPO',
+  DETRACCION = 'DETRACCION',
+  PERCEPCION = 'PERCEPCION',
+  RETENCION = 'RETENCION',
+}
+
+export class RegistrarPagoCxcDto {
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto debe ser numérico' })
+  @Min(0.01, { message: 'El monto debe ser mayor a cero' })
+  monto!: number;
+
+  @IsString({ message: 'La fecha de pago es requerida' })
+  fecha_pago!: string; // ISO date
+
+  @IsOptional()
+  @IsString()
+  moneda?: string;
+
+  @IsOptional()
+  @IsString()
+  metodo_pago?: string;
+
+  @IsOptional()
+  @IsString()
+  referencia?: string;
+
+  @IsOptional()
+  @IsString()
+  notas?: string;
+
+  @IsOptional()
+  @IsEnum(TipoMovimientoCxc, { message: 'Tipo de movimiento inválido' })
+  tipo?: TipoMovimientoCxc;
+
+  @IsOptional()
+  @IsBoolean()
+  aplica_retencion?: boolean;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  retencion_monto?: number;
+
+  @IsOptional()
+  @IsUUID()
+  documento_pago_id?: string;
+}

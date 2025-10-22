@@ -13,4 +13,7 @@ export interface PedidoDetalle {
   precio_unitario: number;
   subtotal: number;
   created_at: string;
+  cantidad_despachada?: number;
+  cantidad_facturada?: number;
+  estado_item?: 'PENDIENTE' | 'PARCIAL' | 'DESPACHADO' | 'FACTURADO';
 }

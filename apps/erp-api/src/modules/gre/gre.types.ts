@@ -10,6 +10,10 @@ export interface CreateGuiaRemisionDto {
   placaVehiculo?: string;
   licenciaConducir?: string;
   cpeRelacionado?: string; // ID del CPE relacionado si aplica
+  pedidoId?: string;
+  pedidoNumero?: string;
+  tenantId?: string;
+  despachosAsociados?: string[];
 }
 
 export interface GuiaRemisionResponseDto {

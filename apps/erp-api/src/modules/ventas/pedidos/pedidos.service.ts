@@ -2,8 +2,50 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
-import { CreatePedidoDto, UpdatePedidoDto } from './dto';
+import { CPEIntegrationService } from './cpe-integration.service';
+import { GREIntegrationService } from './gre-integration.service';
+import { CreatePedidoDto, UpdatePedidoDto, DecisionAprobacion } from './dto';
 import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
+import { TipoMovimientoCxc } from '../../finanzas/cxc/dto';
+import { EventBusService } from '../../../shared/events/event-bus.service';
+
+interface ConfiguracionEmpresa {
+  usar_flujo_logistica: boolean;
+  monto_maximo_sin_aprobacion?: number;
+  porcentaje_descuento_maximo?: number;
+  requiere_aprobacion_descuento?: boolean;
+  aplicar_limite_credito?: boolean;
+  dias_vencimiento_factura?: number;
+  gre_automatico_habilitado?: boolean;
+  umbral_gre_automatico?: number;
+  aplicar_retencion?: boolean;
+  retencion_tasa?: number;
+  aplicar_percepcion?: boolean;
+  percepcion_tasa?: number;
+  aplicar_detraccion?: boolean;
+  detraccion_tasa?: number;
+  detraccion_codigo?: string | null;
+}
+
+interface EvaluacionPoliticas {
+  requiereAprobacion: boolean;
+  motivos: string[];
+  estadoCredito: string;
+}
+
+interface ResumenCredito {
+  limite: number;
+  pendiente: number;
+  tieneVencidos: boolean;
+  permiteMorosidad: boolean;
+}
+
+interface AjustesTributarios {
+  retencion: number;
+  percepcion: number;
+  detraccion: number;
+  anticipo: number;
+}
 
 /**
  * PedidosService
@@ -16,6 +58,9 @@ export class PedidosService {
     private readonly supabase: SupabaseService,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
+    private readonly cpeIntegrationService: CPEIntegrationService,
+    private readonly greIntegrationService: GREIntegrationService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   /**
@@ -174,6 +219,234 @@ export class PedidosService {
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
       },
+    };
+  }
+
+  /**
+   * Obtener pedidos pendientes de aprobación
+   */
+  async listarPendientesAprobacion(
+    tenantId: string,
+  ): Promise<{ success: boolean; data: Array<PedidoVenta & { motivos: string[]; resumen_credito: ResumenCredito | null }> }> {
+    const client = this.supabase.getClient();
+
+    const { data, error } = await client
+      .from('pedidos_venta')
+      .select(
+        `
+          *,
+          clientes!inner(id, razon_social, documento_numero, limite_credito, permite_morosidad)
+        `,
+      )
+      .eq('tenant_id', tenantId)
+      .or('estado.eq.PENDIENTE_APROBACION,requiere_aprobacion.eq.true')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching aprobaciones pendientes:', error);
+      throw new BadRequestException('Error al obtener pedidos pendientes de aprobación');
+    }
+
+    const pedidos = (data || []) as (PedidoVenta & {
+      motivo_requiere_aprobacion?: string | null;
+    })[];
+
+    const enriquecidos = await Promise.all(
+      pedidos.map(async (pedido) => {
+        const motivos = pedido.motivo_requiere_aprobacion
+          ? String(pedido.motivo_requiere_aprobacion)
+              .split(';')
+              .map((motivo) => motivo.trim())
+              .filter(Boolean)
+          : [];
+
+        let resumenCredito: ResumenCredito | null = null;
+        try {
+          resumenCredito = await this.obtenerResumenCredito(pedido.cliente_id, tenantId);
+        } catch (resumenError) {
+          console.warn(
+            'No se pudo obtener resumen de crédito para cliente',
+            pedido.cliente_id,
+            resumenError,
+          );
+        }
+
+        return {
+          ...pedido,
+          motivos,
+          resumen_credito: resumenCredito,
+        };
+      }),
+    );
+
+    return {
+      success: true,
+      data: enriquecidos,
+    };
+  }
+
+  /**
+   * Obtener historial de decisiones de aprobación de un pedido
+   */
+  async obtenerHistorialAprobaciones(
+    pedidoId: string,
+    tenantId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      decision: DecisionAprobacion;
+      motivos: string[];
+      aprobado_por: string | null;
+      aprobado_en: string;
+      created_at: string;
+      aprobador: { id: string; nombres?: string | null; apellidos?: string | null; email?: string | null } | null;
+    }>
+  > {
+    const client = this.supabase.getClient();
+
+    const { data, error } = await client
+      .from('pedido_aprobaciones')
+      .select('id, decision, motivos, aprobado_por, aprobado_en, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('pedido_id', pedidoId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching historial aprobaciones:', error);
+      throw new BadRequestException('Error al obtener historial de aprobaciones del pedido');
+    }
+
+    const aprobaciones = data || [];
+
+    const aprobadoresIds = Array.from(
+      new Set(
+        aprobaciones
+          .map((aprobacion) => aprobacion.aprobado_por)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    let usuariosMap = new Map<string, any>();
+    if (aprobadoresIds.length > 0) {
+      const { data: usuarios, error: usuariosError } = await client
+        .from('usuarios_sistema')
+        .select('id, nombres, apellidos, email')
+        .in('id', aprobadoresIds);
+
+      if (usuariosError) {
+        console.warn('No se pudieron cargar usuarios aprobadores:', usuariosError);
+      } else if (usuarios) {
+        usuariosMap = new Map(usuarios.map((usuario) => [usuario.id, usuario]));
+      }
+    }
+
+    return aprobaciones.map((aprobacion) => ({
+      ...aprobacion,
+      motivos: aprobacion.motivos
+        ? String(aprobacion.motivos)
+            .split(';')
+            .map((motivo) => motivo.trim())
+            .filter(Boolean)
+        : [],
+      aprobador: aprobacion.aprobado_por ? usuariosMap.get(aprobacion.aprobado_por) ?? null : null,
+    }));
+  }
+
+  /**
+   * Resolver aprobación de pedido (aprobar o rechazar)
+   */
+  async decidirAprobacion(
+    pedidoId: string,
+    tenantId: string,
+    decision: DecisionAprobacion,
+    motivosEntrada: string[] = [],
+    userId?: string,
+    observaciones?: string,
+  ): Promise<{ success: boolean; decision: DecisionAprobacion; pedido: PedidoVenta & { detalle: PedidoDetalle[] } }> {
+    const client = this.supabase.getClient();
+    const pedido = await this.findOne(pedidoId, tenantId);
+
+    if (pedido.estado !== EstadoPedido.PENDIENTE_APROBACION && !pedido.requiere_aprobacion) {
+      throw new BadRequestException('El pedido no está pendiente de aprobación');
+    }
+
+    const motivos =
+      motivosEntrada.length > 0
+        ? motivosEntrada
+        : pedido.motivo_requiere_aprobacion
+          ? String(pedido.motivo_requiere_aprobacion)
+              .split(';')
+              .map((motivo) => motivo.trim())
+              .filter(Boolean)
+          : [];
+
+    await this.registrarDecisionAprobacion(pedidoId, tenantId, decision, motivos, userId);
+
+    if (decision === DecisionAprobacion.APROBADO && pedido.estado === EstadoPedido.PENDIENTE_APROBACION) {
+      await this.updateEstado(pedidoId, EstadoPedido.PENDIENTE, tenantId);
+    }
+
+    if (decision === DecisionAprobacion.RECHAZADO && pedido.estado !== EstadoPedido.CANCELADO) {
+      await this.updateEstado(pedidoId, EstadoPedido.CANCELADO, tenantId);
+    }
+
+    const timestamp = new Date().toISOString();
+
+    const updateData: Record<string, any> = {
+      requiere_aprobacion: false,
+      motivo_requiere_aprobacion:
+        decision === DecisionAprobacion.RECHAZADO ? motivos.join('; ') || null : null,
+      aprobado_por: userId ?? null,
+      aprobado_en: timestamp,
+      estado_credito: decision === DecisionAprobacion.APROBADO ? 'APROBADO' : 'RECHAZADO',
+      updated_at: timestamp,
+    };
+
+    if (observaciones) {
+      const nota = `[APROBACION:${decision}] ${observaciones}`;
+      updateData.notas = pedido.notas ? `${pedido.notas}\n\n${nota}` : nota;
+    }
+
+    const { error: updateError } = await client
+      .from('pedidos_venta')
+      .update(updateData)
+      .eq('id', pedidoId)
+      .eq('tenant_id', tenantId);
+
+    if (updateError) {
+      console.error('Error actualizando datos de aprobación de pedido:', updateError);
+      throw new BadRequestException('No se pudo actualizar el pedido luego de la decisión de aprobación');
+    }
+
+    const pedidoActualizado = await this.findOne(pedidoId, tenantId);
+
+    await this.registrarAuditoriaAccion(
+      pedidoId,
+      tenantId,
+      userId,
+      {
+        estado: pedidoActualizado.estado,
+        requiere_aprobacion: false,
+        estado_credito: updateData.estado_credito,
+      },
+      decision === DecisionAprobacion.APROBADO ? 'aprobar_pedido' : 'rechazar_pedido',
+    );
+
+    await this.enviarNotificacion(tenantId, {
+      type: decision === DecisionAprobacion.APROBADO ? 'PEDIDO_APROBADO' : 'PEDIDO_RECHAZADO',
+      severity: decision === DecisionAprobacion.APROBADO ? 'SUCCESS' : 'ERROR',
+      title: decision === DecisionAprobacion.APROBADO ? 'Pedido aprobado' : 'Pedido rechazado',
+      message:
+        decision === DecisionAprobacion.APROBADO
+          ? `El pedido ${pedido.numero} fue aprobado y puede continuar el flujo`
+          : `El pedido ${pedido.numero} fue rechazado. Motivos: ${motivos.join('; ')}`,
+      usuario_id: userId,
+    });
+
+    return {
+      success: true,
+      decision,
+      pedido: pedidoActualizado,
     };
   }
 
@@ -346,7 +619,16 @@ export class PedidosService {
    */
   private validarTransicionEstado(estadoActual: EstadoPedido, nuevoEstado: EstadoPedido): void {
     const transicionesValidas: Record<EstadoPedido, EstadoPedido[]> = {
-      [EstadoPedido.PENDIENTE]: [EstadoPedido.CONFIRMADO, EstadoPedido.CANCELADO],
+      [EstadoPedido.PENDIENTE]: [
+        EstadoPedido.PENDIENTE_APROBACION,
+        EstadoPedido.CONFIRMADO,
+        EstadoPedido.CANCELADO,
+      ],
+      [EstadoPedido.PENDIENTE_APROBACION]: [
+        EstadoPedido.PENDIENTE,
+        EstadoPedido.CONFIRMADO,
+        EstadoPedido.CANCELADO,
+      ],
       [EstadoPedido.CONFIRMADO]: [
         EstadoPedido.EN_PREPARACION,
         EstadoPedido.LISTO_FACTURAR,
@@ -367,6 +649,463 @@ export class PedidosService {
       throw new BadRequestException(
         `No se puede cambiar el estado de ${estadoActual} a ${nuevoEstado}`,
       );
+    }
+  }
+
+  private async obtenerConfiguracionEmpresa(tenantId: string): Promise<ConfiguracionEmpresa> {
+    const client = this.supabase.getClient();
+    const { data, error } = await client
+      .from('empresa_config')
+      .select(
+        'usar_flujo_logistica, monto_maximo_sin_aprobacion, porcentaje_descuento_maximo, requiere_aprobacion_descuento, aplicar_limite_credito, dias_vencimiento_factura, gre_automatico_habilitado, umbral_gre_automatico, aplicar_retencion, retencion_tasa, aplicar_percepcion, percepcion_tasa, aplicar_detraccion, detraccion_tasa, detraccion_codigo',
+      )
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error) {
+      console.error('Error obteniendo configuración de empresa:', error);
+      throw new BadRequestException('No se pudo obtener la configuración de la empresa');
+    }
+
+    return {
+      usar_flujo_logistica: data?.usar_flujo_logistica ?? false,
+      monto_maximo_sin_aprobacion: data?.monto_maximo_sin_aprobacion != null
+        ? Number(data.monto_maximo_sin_aprobacion)
+        : undefined,
+      porcentaje_descuento_maximo: data?.porcentaje_descuento_maximo != null
+        ? Number(data.porcentaje_descuento_maximo)
+        : undefined,
+      requiere_aprobacion_descuento: data?.requiere_aprobacion_descuento ?? false,
+      aplicar_limite_credito: data?.aplicar_limite_credito ?? false,
+      dias_vencimiento_factura: data?.dias_vencimiento_factura != null
+        ? Number(data.dias_vencimiento_factura)
+        : 30,
+      gre_automatico_habilitado: data?.gre_automatico_habilitado ?? true,
+      umbral_gre_automatico: data?.umbral_gre_automatico != null ? Number(data.umbral_gre_automatico) : undefined,
+      aplicar_retencion: data?.aplicar_retencion ?? false,
+      retencion_tasa: data?.retencion_tasa != null ? Number(data.retencion_tasa) : undefined,
+      aplicar_percepcion: data?.aplicar_percepcion ?? false,
+      percepcion_tasa: data?.percepcion_tasa != null ? Number(data.percepcion_tasa) : undefined,
+      aplicar_detraccion: data?.aplicar_detraccion ?? false,
+      detraccion_tasa: data?.detraccion_tasa != null ? Number(data.detraccion_tasa) : undefined,
+      detraccion_codigo: data?.detraccion_codigo ?? null,
+    };
+  }
+
+  private async evaluarPoliticasAprobacion(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tenantId: string,
+    config: ConfiguracionEmpresa,
+    ajustes?: AjustesTributarios,
+  ): Promise<EvaluacionPoliticas> {
+    const motivos: string[] = [];
+    let estadoCredito = 'OK';
+
+    if ((config.monto_maximo_sin_aprobacion ?? 0) > 0 && pedido.total > (config.monto_maximo_sin_aprobacion ?? 0)) {
+      motivos.push(
+        `Monto total S/ ${pedido.total.toFixed(2)} supera el límite sin aprobación (S/ ${(config.monto_maximo_sin_aprobacion ?? 0).toFixed(2)})`,
+      );
+    }
+
+    if (config.aplicar_limite_credito) {
+      const resumen = await this.obtenerResumenCredito(pedido.cliente_id, tenantId);
+      const totalComprometido = resumen.pendiente + pedido.total;
+      if (resumen.limite > 0 && totalComprometido > resumen.limite) {
+        motivos.push(
+          `Límite de crédito excedido: comprometido S/ ${totalComprometido.toFixed(2)} > límite S/ ${resumen.limite.toFixed(2)}`,
+        );
+        estadoCredito = 'BLOQUEADO';
+      }
+      if (resumen.tieneVencidos && !resumen.permiteMorosidad) {
+        motivos.push('Cliente con cuentas por cobrar vencidas');
+        estadoCredito = 'BLOQUEADO';
+      }
+    }
+
+    if (motivos.length > 0 && estadoCredito !== 'BLOQUEADO') {
+      estadoCredito = 'REVISION';
+    }
+
+    return {
+      requiereAprobacion: motivos.length > 0,
+      motivos,
+      estadoCredito,
+    };
+  }
+
+  private async obtenerResumenCredito(clienteId: string, tenantId: string): Promise<ResumenCredito> {
+    const client = this.supabase.getClient();
+
+    const { data: cliente, error: clienteError } = await client
+      .from('clientes')
+      .select('limite_credito, permite_morosidad')
+      .eq('tenant_id', tenantId)
+      .eq('id', clienteId)
+      .single();
+
+    if (clienteError) {
+      console.error('Error obteniendo información del cliente:', clienteError);
+    }
+
+    const limite = cliente?.limite_credito != null ? Number(cliente.limite_credito) : 0;
+    const permiteMorosidad = cliente?.permite_morosidad ?? false;
+
+    const { data: cuentas } = await client
+      .from('cuentas_por_cobrar')
+      .select('monto_pendiente, estado')
+      .eq('tenant_id', tenantId)
+      .eq('cliente_id', clienteId);
+
+    let pendiente = 0;
+    let tieneVencidos = false;
+
+    (cuentas || []).forEach((cuenta) => {
+      const monto = Number(cuenta.monto_pendiente || 0);
+      pendiente += monto;
+      if (cuenta.estado === 'VENCIDO') {
+        tieneVencidos = true;
+      }
+    });
+
+    return {
+      limite,
+      pendiente,
+      tieneVencidos,
+      permiteMorosidad,
+    };
+  }
+
+  private async registrarSolicitudAprobacion(
+    pedido: PedidoVenta,
+    tenantId: string,
+    motivos: string[],
+    estadoCredito: string,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
+
+    if (pedido.estado !== EstadoPedido.PENDIENTE_APROBACION) {
+      await this.updateEstado(pedido.id, EstadoPedido.PENDIENTE_APROBACION, tenantId);
+    }
+
+    await client
+      .from('pedidos_venta')
+      .update({
+        requiere_aprobacion: true,
+        motivo_requiere_aprobacion: motivos.join('; '),
+        estado_credito: estadoCredito,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', pedido.id)
+      .eq('tenant_id', tenantId);
+
+    await this.registrarAuditoriaAccion(
+      pedido.id,
+      tenantId,
+      undefined,
+      {
+        estado: EstadoPedido.PENDIENTE_APROBACION,
+        requiere_aprobacion: true,
+        estado_credito: estadoCredito,
+      },
+      'solicitud_aprobacion',
+    );
+  }
+
+  private async registrarDecisionAprobacion(
+    pedidoId: string,
+    tenantId: string,
+    decision: 'APROBADO' | 'RECHAZADO',
+    motivos: string[],
+    userId?: string,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
+
+    const { error } = await client
+      .from('pedido_aprobaciones')
+      .insert({
+        tenant_id: tenantId,
+        pedido_id: pedidoId,
+        decision,
+        motivos: motivos.join('; ') || null,
+        aprobado_por: userId ?? null,
+      });
+
+    if (error) {
+      console.error('Error registrando aprobación de pedido:', error);
+    }
+  }
+
+  private calcularAjustesTributarios(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] } & { cliente?: any; clientes?: any },
+    config: ConfiguracionEmpresa,
+    ajustes?: AjustesTributarios,
+    total: number,
+  ): AjustesTributarios {
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const cliente = (pedido as any).cliente ?? (pedido as any).clientes ?? null;
+
+    const sujetoRetencion = cliente?.sujeto_retencion ?? config.aplicar_retencion ?? false;
+    const retencionTasa = cliente?.retencion_tasa != null
+      ? Number(cliente.retencion_tasa)
+      : config.retencion_tasa != null
+        ? Number(config.retencion_tasa)
+        : 0;
+
+    const sujetoPercepcion = cliente?.sujeto_percepcion ?? config.aplicar_percepcion ?? false;
+    const percepcionTasa = cliente?.percepcion_tasa != null
+      ? Number(cliente.percepcion_tasa)
+      : config.percepcion_tasa != null
+        ? Number(config.percepcion_tasa)
+        : 0;
+
+    const sujetoDetraccion = cliente?.sujeto_detraccion ?? config.aplicar_detraccion ?? false;
+    const detraccionTasa = cliente?.detraccion_tasa != null
+      ? Number(cliente.detraccion_tasa)
+      : config.detraccion_tasa != null
+        ? Number(config.detraccion_tasa)
+        : 0;
+
+    const retencion = sujetoRetencion && retencionTasa > 0 ? round2(total * (retencionTasa / 100)) : 0;
+    const percepcion = sujetoPercepcion && percepcionTasa > 0 ? round2(total * (percepcionTasa / 100)) : 0;
+    const detraccion = sujetoDetraccion && detraccionTasa > 0 ? round2(total * (detraccionTasa / 100)) : 0;
+
+    return {
+      retencion,
+      percepcion,
+      detraccion,
+      anticipo: 0,
+    };
+  }
+  private async registrarCuentaPorCobrar(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tenantId: string,
+    factura: { factura_id: string; serie?: string; numero?: number; moneda?: string; total: number; fecha_emision?: string },
+    config: ConfiguracionEmpresa,
+    ajustes?: AjustesTributarios,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
+
+    const { data: existente } = await client
+      .from('cuentas_por_cobrar')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('documento_id', factura.factura_id)
+      .limit(1);
+
+    if (existente && existente.length > 0) {
+      return;
+    }
+
+    const diasVencimiento = config.dias_vencimiento_factura ?? 30;
+    const fechaEmisionDate = factura.fecha_emision ? new Date(factura.fecha_emision) : new Date();
+    const fechaVencimientoDate = this.addDays(fechaEmisionDate, diasVencimiento);
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+
+    const retencion = ajustes?.retencion ?? 0;
+    const percepcion = ajustes?.percepcion ?? 0;
+    const detraccion = ajustes?.detraccion ?? 0;
+    const anticipo = ajustes?.anticipo ?? 0;
+
+    const montoPendiente = round2(
+      Math.max(factura.total - retencion - detraccion - anticipo + percepcion, 0),
+    );
+
+    const estadoInicial = montoPendiente <= 0
+      ? 'CANCELADO'
+      : retencion > 0 || detraccion > 0 || anticipo > 0
+        ? 'PARCIAL'
+        : 'PENDIENTE';
+
+    const { data: cuentaInsertada, error: insertError } = await client
+      .from('cuentas_por_cobrar')
+      .insert({
+        tenant_id: tenantId,
+        cliente_id: pedido.cliente_id,
+        pedido_id: pedido.id,
+        documento_id: factura.factura_id,
+        serie: factura.serie ?? null,
+        numero: factura.numero != null ? String(factura.numero) : null,
+        fecha_emision: this.toISODate(fechaEmisionDate),
+        fecha_vencimiento: this.toISODate(fechaVencimientoDate),
+        moneda: factura.moneda ?? 'PEN',
+        monto_total: round2(factura.total),
+        monto_pendiente: montoPendiente,
+        estado: estadoInicial,
+        dias_mora: 0,
+        retencion_total: round2(retencion),
+        percepcion_total: round2(percepcion),
+        detraccion_total: round2(detraccion),
+        anticipo_total: round2(anticipo),
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('Error registrando cuenta por cobrar:', insertError);
+      throw new BadRequestException('No se pudo registrar la cuenta por cobrar');
+    }
+
+    const cuentaId = cuentaInsertada?.id;
+
+    if (cuentaId) {
+      const pagosAutomaticos: any[] = [];
+      const fechaPago = this.toISODate(fechaEmisionDate);
+      const monedaPago = factura.moneda ?? 'PEN';
+
+      if (retencion > 0) {
+        pagosAutomaticos.push({
+          tenant_id: tenantId,
+          cuenta_id: cuentaId,
+          pedido_id: pedido.id,
+          documento_id: factura.factura_id,
+          tipo: TipoMovimientoCxc.RETENCION,
+          monto: round2(retencion),
+          moneda: monedaPago,
+          fecha_pago: fechaPago,
+          metodo_pago: 'RETENCION',
+          referencia: null,
+          aplica_retencion: true,
+          retencion_monto: round2(retencion),
+        });
+      }
+
+      if (detraccion > 0) {
+        pagosAutomaticos.push({
+          tenant_id: tenantId,
+          cuenta_id: cuentaId,
+          pedido_id: pedido.id,
+          documento_id: factura.factura_id,
+          tipo: TipoMovimientoCxc.DETRACCION,
+          monto: round2(detraccion),
+          moneda: monedaPago,
+          fecha_pago: fechaPago,
+          metodo_pago: 'DETRACCION',
+          referencia: config.detraccion_codigo ?? null,
+          aplica_retencion: false,
+          retencion_monto: null,
+        });
+      }
+
+      if (anticipo > 0) {
+        pagosAutomaticos.push({
+          tenant_id: tenantId,
+          cuenta_id: cuentaId,
+          pedido_id: pedido.id,
+          documento_id: factura.factura_id,
+          tipo: TipoMovimientoCxc.ANTICIPO,
+          monto: round2(anticipo),
+          moneda: monedaPago,
+          fecha_pago: fechaPago,
+          metodo_pago: 'ANTICIPO',
+          referencia: null,
+          aplica_retencion: false,
+          retencion_monto: null,
+        });
+      }
+
+      if (pagosAutomaticos.length > 0) {
+        const { error: pagosError } = await client.from('cxc_pagos').insert(pagosAutomaticos);
+        if (pagosError) {
+          console.warn('No se pudieron registrar automáticamente los movimientos de CxC:', pagosError);
+        }
+      }
+    }
+  }
+
+  private emitirEventoVentaProcesada(
+    pedido: (PedidoVenta & { detalle: PedidoDetalle[] }) & { clientes?: any; cliente?: any },
+    factura: { factura_id: string; serie?: string; numero?: number; total: number; fecha_emision?: string; moneda?: string },
+    tenantId: string,
+  ): void {
+    if (!this.eventBus) {
+      return;
+    }
+
+    try {
+      const numeroDocumento =
+        factura.serie && factura.numero != null
+          ? `${factura.serie}-${String(factura.numero).padStart(8, '0')}`
+          : pedido.numero;
+
+      const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
+
+      this.eventBus.emitVentaProcessed({
+        ventaId: factura.factura_id,
+        numeroTicket: numeroDocumento,
+        clienteId: pedido.cliente_id,
+        clienteNombre:
+          clienteInfo?.razon_social ??
+          clienteInfo?.nombre ??
+          clienteInfo?.denominacion ??
+          'Cliente sin razón social',
+        metodoPago: 'credito',
+        subtotal: Number(pedido.subtotal ?? 0),
+        impuestos: Number(pedido.igv ?? 0),
+        total: Number(pedido.total ?? factura.total ?? 0),
+        items: (pedido.detalle ?? []).map((item) => ({
+          productoId: item.producto_id,
+          cantidad: Number(item.cantidad ?? 0),
+          precio: Number(item.precio_unitario ?? 0),
+          total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
+        })),
+        cpeId: factura.factura_id,
+        tenantId,
+      });
+    } catch (error) {
+      console.error('Error emitiendo evento de venta procesada para asientos contables:', error);
+    }
+  }
+
+  private async registrarAuditoriaAccion(
+    pedidoId: string,
+    tenantId: string,
+    userId: string | undefined,
+    newValues: Record<string, any>,
+    action: string,
+  ): Promise<void> {
+    try {
+      await this.auditService.logAction({
+        table_name: 'pedidos_venta',
+        operation: 'UPDATE',
+        record_id: pedidoId,
+        tenant_id: tenantId,
+        user_id: userId ?? undefined,
+        new_values: newValues,
+        metadata: { action },
+      });
+    } catch (error) {
+      console.warn(`⚠️ No se pudo registrar auditoría (${action})`, error);
+    }
+  }
+
+  private toISODate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
+  private addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  private redondearCantidad(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  private async enviarNotificacion(
+    tenantId: string,
+    payload: {
+      type: any;
+      severity: any;
+      title: string;
+      message: string;
+      usuario_id?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createNotification(tenantId, payload);
+    } catch (error) {
+      console.error('Error creating notification:', error);
     }
   }
 
@@ -396,25 +1135,59 @@ export class PedidosService {
   async confirmarPedido(
     id: string,
     tenantId: string,
-    forzarConfirmacion: boolean = false,
-  ): Promise<{ success: boolean; warnings?: any[] }> {
+    forzarConfirmacion = false,
+    userId?: string,
+  ): Promise<{ success: boolean; warnings?: any[]; requiere_aprobacion?: boolean; motivos?: string[]; estado_credito?: string }> {
     const client = this.supabase.getClient();
 
-    // 1. Obtener pedido con detalles
     const pedido = await this.findOne(id, tenantId);
 
-    // 2. Validar estado
-    if (pedido.estado !== EstadoPedido.PENDIENTE) {
+    if (
+      pedido.estado !== EstadoPedido.PENDIENTE &&
+      !(pedido.estado === EstadoPedido.PENDIENTE_APROBACION && forzarConfirmacion)
+    ) {
       throw new BadRequestException(
         `No se puede confirmar un pedido en estado ${pedido.estado}`,
       );
     }
 
-    // 3. Verificar stock disponible para cada producto
+    if (pedido.estado === EstadoPedido.PENDIENTE_APROBACION && !forzarConfirmacion) {
+      return {
+        success: false,
+        requiere_aprobacion: true,
+        motivos: pedido.motivo_requiere_aprobacion ? [pedido.motivo_requiere_aprobacion] : undefined,
+        estado_credito: pedido.estado_credito,
+      };
+    }
+
+    const config = await this.obtenerConfiguracionEmpresa(tenantId);
+
+    // Evaluar políticas de aprobación y crédito
+    const evaluacion = await this.evaluarPoliticasAprobacion(pedido, tenantId, config);
+
+    if (evaluacion.requiereAprobacion && !forzarConfirmacion) {
+      await this.registrarSolicitudAprobacion(pedido, tenantId, evaluacion.motivos, evaluacion.estadoCredito);
+
+      await this.enviarNotificacion(tenantId, {
+        type: 'PEDIDO_REQUIERE_APROBACION' as any,
+        severity: 'WARNING' as any,
+        title: 'Pedido requiere aprobación',
+        message: `El pedido ${pedido.numero} requiere aprobación antes de confirmar: ${evaluacion.motivos.join('; ')}`,
+        usuario_id: userId,
+      });
+
+      return {
+        success: false,
+        requiere_aprobacion: true,
+        motivos: evaluacion.motivos,
+        estado_credito: evaluacion.estadoCredito,
+      };
+    }
+
+    // Verificar stock disponible
     const stockWarnings = [];
     for (const item of pedido.detalle) {
       const stockDisponible = await this.getStockDisponible(item.producto_id, tenantId);
-
       if (stockDisponible < item.cantidad) {
         stockWarnings.push({
           producto_id: item.producto_id,
@@ -425,7 +1198,6 @@ export class PedidosService {
       }
     }
 
-    // 4. Si hay warnings y no se fuerza, retornar warnings
     if (stockWarnings.length > 0 && !forzarConfirmacion) {
       return {
         success: false,
@@ -433,9 +1205,26 @@ export class PedidosService {
       };
     }
 
-    // 5. Crear movimientos de RESERVA y actualizar stock_reservado
+    // Evitar reservas duplicadas
+    const { data: reservasExistentes } = await client
+      .from('movimientos_inventario')
+      .select('id')
+      .eq('referencia_tipo', 'PEDIDO')
+      .eq('referencia_id', id)
+      .eq('tipo', 'RESERVA')
+      .limit(1);
+
+    if (reservasExistentes && reservasExistentes.length > 0) {
+      console.log(`ℹ️ [PedidosService] Pedido ${id} ya cuenta con reservas registradas, retornando estado actual`);
+      return {
+        success: true,
+        warnings: stockWarnings.length > 0 ? stockWarnings : undefined,
+        estado_credito: evaluacion.estadoCredito,
+      };
+    }
+
+    // Crear reservas
     for (const item of pedido.detalle) {
-      // Crear movimiento de inventario tipo RESERVA
       await client.from('movimientos_inventario').insert({
         tenant_id: tenantId,
         producto_id: item.producto_id,
@@ -446,46 +1235,64 @@ export class PedidosService {
         notas: `Reserva para pedido ${pedido.numero}`,
       });
 
-      // Actualizar stock_reservado en productos
-      await client.rpc('incrementar_stock_reservado', {
+      const { error: reservaError } = await client.rpc('incrementar_stock_reservado', {
         p_producto_id: item.producto_id,
         p_cantidad: item.cantidad,
       });
+
+      if (reservaError) {
+        console.error('Error reservando stock:', reservaError);
+        throw new BadRequestException('No se pudo reservar stock para el pedido');
+      }
     }
 
-    // 6. Cambiar estado del pedido a CONFIRMADO
     await this.updateEstado(id, EstadoPedido.CONFIRMADO, tenantId);
 
-    // 7. Determinar siguiente estado según configuración
-    const { data: config } = await client
-      .from('empresa_config')
-      .select('usar_flujo_logistica')
-      .eq('tenant_id', tenantId)
-      .single();
+    const estadoCreditoFinal = forzarConfirmacion && evaluacion.requiereAprobacion
+      ? 'APROBADO_MANUAL'
+      : evaluacion.estadoCredito === 'BLOQUEADO'
+        ? 'BLOQUEADO'
+        : 'OK';
 
-    if (config && !config.usar_flujo_logistica) {
-      // Flujo simplificado: ir directo a LISTO_FACTURAR
+    await client
+      .from('pedidos_venta')
+      .update({
+        requiere_aprobacion: false,
+        motivo_requiere_aprobacion: null,
+        aprobado_por: forzarConfirmacion && evaluacion.requiereAprobacion ? userId ?? null : null,
+        aprobado_en: forzarConfirmacion && evaluacion.requiereAprobacion ? new Date().toISOString() : null,
+        estado_credito: estadoCreditoFinal,
+      })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (forzarConfirmacion && evaluacion.requiereAprobacion) {
+      await this.registrarDecisionAprobacion(id, tenantId, 'APROBADO', evaluacion.motivos, userId);
+    }
+
+    await this.registrarAuditoriaAccion(id, tenantId, userId, {
+      estado: EstadoPedido.CONFIRMADO,
+      estado_credito: estadoCreditoFinal,
+    }, 'confirmar_pedido');
+
+    if (config.usar_flujo_logistica === false) {
       await this.updateEstado(id, EstadoPedido.LISTO_FACTURAR, tenantId);
     }
 
-    // 8. Enviar notificación
-    try {
-      await this.notificationsService.createNotification(tenantId, {
-        type: 'PEDIDO_CONFIRMADO' as any,
-        severity: 'INFO' as any,
-        title: 'Pedido confirmado',
-        message: `El pedido ${pedido.numero} ha sido confirmado y el stock reservado`,
-      });
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
-    }
+    await this.enviarNotificacion(tenantId, {
+      type: 'PEDIDO_CONFIRMADO' as any,
+      severity: 'INFO' as any,
+      title: 'Pedido confirmado',
+      message: `El pedido ${pedido.numero} ha sido confirmado y el stock reservado`,
+      usuario_id: userId,
+    });
 
     console.log('✅ [PedidosService] Pedido confirmado:', id);
 
     return {
       success: true,
       warnings: stockWarnings.length > 0 ? stockWarnings : undefined,
+      estado_credito: estadoCreditoFinal,
     };
   }
 
@@ -540,11 +1347,31 @@ export class PedidosService {
         });
 
         // Decrementar stock_reservado
-        await client.rpc('decrementar_stock_reservado', {
+        const { error: liberarError } = await client.rpc('decrementar_stock_reservado', {
           p_producto_id: item.producto_id,
           p_cantidad: item.cantidad,
         });
+
+        if (liberarError) {
+          console.error('Error liberando reserva:', liberarError);
+          throw new BadRequestException('No se pudo liberar el stock reservado');
+        }
+
+        const { error: resetDetalleError } = await client
+          .from('pedidos_venta_detalle')
+          .update({
+            cantidad_despachada: 0,
+            cantidad_facturada: 0,
+            estado_item: 'PENDIENTE',
+          })
+          .eq('id', item.id);
+
+        if (resetDetalleError) {
+          console.warn('No se pudo resetear el detalle del pedido al cancelar:', resetDetalleError);
+        }
       }
+
+      await client.from('pedido_backorders').delete().eq('pedido_id', id).eq('tenant_id', tenantId);
     }
 
     // 5. Cambiar estado a CANCELADO
@@ -561,6 +1388,26 @@ export class PedidosService {
         .update({ notas: notasActualizadas })
         .eq('id', id)
         .eq('tenant_id', tenantId);
+    }
+
+    // Registrar auditoría
+    try {
+      await this.auditService.logAction({
+        table_name: 'pedidos_venta',
+        operation: 'UPDATE',
+        record_id: id,
+        tenant_id: tenantId,
+        user_id: userId ?? undefined,
+        new_values: {
+          estado: EstadoPedido.CANCELADO,
+          motivo_cancelacion: motivo ?? null,
+        },
+        metadata: {
+          action: 'cancelar_pedido',
+        },
+      });
+    } catch (auditError) {
+      console.warn('⚠️ No se pudo registrar auditoría de cancelación de pedido', auditError);
     }
 
     // 7. Notificar
@@ -603,15 +1450,33 @@ export class PedidosService {
       );
     }
 
-    // 3. Obtener configuración
-    const { data: config } = await client
-      .from('empresa_config')
-      .select('usar_flujo_logistica, gre_automatico_habilitado, umbral_gre_automatico')
-      .eq('tenant_id', tenantId)
-      .single();
+    if (pedido.factura_id) {
+      console.log(`ℹ️ [PedidosService] Pedido ${id} ya tiene factura ${pedido.factura_id}, retornando datos actuales`);
+      const sugerenciaExistente = await this.greIntegrationService.verificarSugerenciaGRE(pedido, tenantId);
+      return {
+        success: true,
+        factura_id: pedido.factura_id,
+        sugerir_gre: sugerenciaExistente.sugerir,
+      };
+    }
 
-    // 4. Si es flujo simplificado, descontar stock ahora
-    if (config && !config.usar_flujo_logistica) {
+    // 3. Obtener configuración
+    const config = await this.obtenerConfiguracionEmpresa(tenantId);
+
+    if (config.usar_flujo_logistica) {
+      const pendientesDespacho = pedido.detalle.some((item) => {
+        const total = Number(item.cantidad);
+        const despachado = Number(item.cantidad_despachada ?? 0);
+        return despachado < total;
+      });
+
+      if (pendientesDespacho) {
+        throw new BadRequestException('No se puede generar la factura: existen ítems pendientes de despacho.');
+      }
+    }
+
+    // 4. Si es flujo simplificado, descontar stock ahora (idempotente)
+    if (!config.usar_flujo_logistica) {
       for (const item of pedido.detalle) {
         // Crear movimiento de SALIDA
         await client.from('movimientos_inventario').insert({
@@ -625,82 +1490,147 @@ export class PedidosService {
         });
 
         // Descontar stock_actual y liberar reserva
-        await client.rpc('descontar_stock_y_liberar_reserva', {
+        const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
           p_producto_id: item.producto_id,
           p_cantidad: item.cantidad,
         });
+
+        if (salidaError) {
+          console.error('Error descontando stock al facturar:', salidaError);
+          throw new BadRequestException('No se pudo descontar el stock al facturar');
+        }
+
+        const { error: detalleDespachoError } = await client
+          .from('pedidos_venta_detalle')
+          .update({
+            cantidad_despachada: item.cantidad,
+            estado_item: 'DESPACHADO',
+          })
+          .eq('id', item.id);
+
+        if (detalleDespachoError) {
+          console.warn('No se pudo actualizar el detalle con la cantidad despachada al facturar:', detalleDespachoError);
+        }
       }
+
+      // En flujo simplificado no existen pendiente, aseguramos limpiar backorders
+      await client.from('pedido_backorders').delete().eq('pedido_id', id).eq('tenant_id', tenantId);
     }
 
-    // 5. Preparar datos para CPE
-    // Nota: La integración real con CPE se hará en una tarea posterior
-    // Por ahora, simulamos la creación de la factura
-    const facturaData = {
-      tenant_id: tenantId,
-      tipo_documento: '01', // Factura
-      cliente_id: pedido.cliente_id,
-      fecha_emision: new Date().toISOString().split('T')[0],
-      subtotal: pedido.subtotal,
-      igv: pedido.igv,
-      total: pedido.total,
-      estado: 'PENDIENTE',
-      created_by: userId,
-    };
+    // 5. Integrar con CPE real
+    const facturaResultado = await this.cpeIntegrationService.generarFacturaDesdePedido(pedido, tenantId);
 
-    // TODO: Integrar con CPEService cuando esté disponible
-    // const factura = await this.cpeService.generarFactura(facturaData);
-    
-    // Por ahora, creamos un registro simulado
-    const { data: factura, error: facturaError } = await client
-      .from('documentos')
-      .insert(facturaData)
-      .select()
-      .single();
+    const ajustesTributarios = this.calcularAjustesTributarios(
+      pedido as any,
+      config,
+      facturaResultado.total,
+    );
 
-    if (facturaError) {
-      console.error('Error creating factura:', facturaError);
-      throw new BadRequestException('Error al generar la factura');
-    }
-
-    // 6. Actualizar pedido con factura_id
+    // 6. Actualizar pedido con factura_id y estado
     await client
       .from('pedidos_venta')
       .update({
-        factura_id: factura.id,
+        factura_id: facturaResultado.factura_id,
         estado: EstadoPedido.FACTURADO,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('tenant_id', tenantId);
 
-    // 7. Verificar si debe sugerir GRE
-    let sugerirGRE = false;
-    if (config) {
-      if (config.gre_automatico_habilitado && pedido.total > (config.umbral_gre_automatico || 0)) {
-        sugerirGRE = true;
-      }
+    pedido.factura_id = facturaResultado.factura_id;
+
+    await this.registrarCuentaPorCobrar(
+      pedido,
+      tenantId,
+      {
+        factura_id: facturaResultado.factura_id,
+        serie: facturaResultado.serie,
+        numero: facturaResultado.numero,
+        moneda: facturaResultado.moneda,
+        total: facturaResultado.total,
+        fecha_emision: facturaResultado.fecha_emision,
+      },
+      config,
+      ajustesTributarios,
+    );
+
+    this.emitirEventoVentaProcesada(
+      pedido,
+      {
+        factura_id: facturaResultado.factura_id,
+        serie: facturaResultado.serie,
+        numero: facturaResultado.numero,
+        total: facturaResultado.total,
+        fecha_emision: facturaResultado.fecha_emision,
+        moneda: facturaResultado.moneda,
+      },
+      tenantId,
+    );
+
+    // 7. Evaluar sugerencia de GRE
+    const sugerenciaGRE = await this.greIntegrationService.verificarSugerenciaGRE(
+      {
+        ...pedido,
+        factura_id: facturaResultado.factura_id,
+      },
+      tenantId,
+    );
+
+    // 8. Registrar auditoría
+    try {
+      await this.auditService.logAction({
+        table_name: 'pedidos_venta',
+        operation: 'UPDATE',
+        record_id: id,
+        tenant_id: tenantId,
+        user_id: userId ?? undefined,
+        new_values: {
+          factura_id: facturaResultado.factura_id,
+          estado: EstadoPedido.FACTURADO,
+          estado_cpe: facturaResultado.estado,
+        },
+        metadata: {
+          action: 'generar_factura',
+        },
+      });
+    } catch (auditError) {
+      console.warn('⚠️ No se pudo registrar auditoría de generación de factura', auditError);
     }
 
-    // 8. Notificar
-    try {
-      await this.notificationsService.createNotification(tenantId, {
-        type: 'FACTURA_EMITIDA' as any,
-        severity: 'SUCCESS' as any,
-        title: 'Factura emitida',
-        message: `La factura para el pedido ${pedido.numero} ha sido emitida exitosamente`,
-        usuario_id: userId,
-      });
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
-    }
+    // 9. Notificar
+    await this.enviarNotificacion(tenantId, {
+      type: 'FACTURA_EMITIDA' as any,
+      severity: 'SUCCESS' as any,
+      title: 'Factura emitida',
+      message: `La factura para el pedido ${pedido.numero} ha sido emitida exitosamente`,
+      usuario_id: userId,
+    });
 
     console.log('✅ [PedidosService] Factura generada para pedido:', id);
 
+    try {
+      for (const item of pedido.detalle) {
+        const cantidadAFacturar = Number(item.cantidad);
+        const { error: updateDetalleFactura } = await client
+          .from('pedidos_venta_detalle')
+          .update({
+            cantidad_facturada: this.redondearCantidad(Number(item.cantidad_facturada ?? 0) + cantidadAFacturar),
+            estado_item: 'FACTURADO',
+          })
+          .eq('id', item.id);
+
+        if (updateDetalleFactura) {
+          console.warn('No se pudo actualizar cantidad_facturada del detalle', updateDetalleFactura);
+        }
+      }
+    } catch (detalleFacturaError) {
+      console.warn('No se pudo actualizar cantidades facturadas del pedido', detalleFacturaError);
+    }
+
     return {
       success: true,
-      factura_id: factura.id,
-      sugerir_gre: sugerirGRE,
+      factura_id: facturaResultado.factura_id,
+      sugerir_gre: sugerenciaGRE.sugerir,
     };
   }
 
@@ -713,7 +1643,7 @@ export class PedidosService {
 
     const { data, error } = await client
       .from('productos')
-      .select('stock_actual, stock_reservado')
+      .select('stock, stock_actual, stock_reservado')
       .eq('id', productoId)
       .eq('tenant_id', tenantId)
       .single();
@@ -723,8 +1653,8 @@ export class PedidosService {
       return 0;
     }
 
-    const stockActual = data.stock_actual || 0;
-    const stockReservado = data.stock_reservado || 0;
+    const stockActual = data.stock_actual != null ? Number(data.stock_actual) : Number(data.stock ?? 0);
+    const stockReservado = Number(data.stock_reservado ?? 0);
 
     return stockActual - stockReservado;
   }
@@ -760,6 +1690,66 @@ export class PedidosService {
     }
 
     return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+  }
+
+  /**
+   * Obtener GRE asociadas a un pedido
+   */
+  async obtenerGreAsociadas(pedidoId: string, tenantId: string) {
+    const client = this.supabase.getClient();
+
+    const { data, error } = await client
+      .from('pedido_gres')
+      .select(`
+        id,
+        estado,
+        notas,
+        creado_en,
+        gre:gre_guias (
+          id,
+          numero,
+          estado,
+          destinatario,
+          direccion_destino,
+          fecha_traslado,
+          modalidad,
+          motivo,
+          peso_total,
+          transportista,
+          placa_vehiculo,
+          licencia_conducir
+        )
+      `)
+      .eq('tenant_id', tenantId)
+      .eq('pedido_id', pedidoId)
+      .order('creado_en', { ascending: false });
+
+    if (error) {
+      throw new BadRequestException('Error al obtener las GRE asociadas al pedido');
+    }
+
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      estado: item.estado,
+      notas: item.notas ?? null,
+      creado_en: item.creado_en,
+      gre: item.gre
+        ? {
+            id: item.gre.id,
+            numero: item.gre.numero,
+            estado: item.gre.estado,
+            destinatario: item.gre.destinatario,
+            direccionDestino: item.gre.direccion_destino,
+            fechaTraslado: item.gre.fecha_traslado,
+            modalidad: item.gre.modalidad,
+            motivo: item.gre.motivo,
+            pesoTotal: item.gre.peso_total,
+            transportista: item.gre.transportista,
+            placaVehiculo: item.gre.placa_vehiculo,
+            licenciaConducir: item.gre.licencia_conducir,
+          }
+        : null,
+    }));
   }
 
   /**

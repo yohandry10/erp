@@ -25,6 +25,9 @@ interface ConfirmarPedidoResponse {
   success: boolean
   warnings?: StockWarning[]
   message?: string
+  requiere_aprobacion?: boolean
+  motivos?: string[]
+  estado_credito?: string
 }
 
 interface ConfirmarPedidoButtonProps {
@@ -52,6 +55,27 @@ export default function ConfirmarPedidoButton({
         `/ventas/pedidos/${pedidoId}/confirmar`,
         {}
       )
+
+      if (response?.requiere_aprobacion) {
+        toast({
+          title: 'Pedido pendiente de aprobación',
+          description: (() => {
+            const mensajes: string[] = []
+            if (response.motivos && response.motivos.length > 0) {
+              mensajes.push(...response.motivos)
+            }
+            if (response.estado_credito) {
+              mensajes.push(`Estado crédito: ${response.estado_credito}`)
+            }
+            return mensajes.length > 0
+              ? mensajes.join(' • ')
+              : 'El pedido requiere aprobación antes de confirmarse.'
+          })(),
+          variant: 'destructive'
+        })
+        onSuccess()
+        return
+      }
       
       if (response?.success) {
         // Check if there are stock warnings

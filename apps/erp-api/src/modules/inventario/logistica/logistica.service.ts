@@ -1,42 +1,43 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
+import { AuditService } from '../../audit/audit.service';
+import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
-import { PrepararPedidoDto, ConfirmarDespachoDto } from './dto';
+import {
+  PrepararPedidoDto,
+  ConfirmarDespachoDto,
+  ActualizarTrackingDto,
+  RegistrarEventoLogisticoDto,
+  TipoEventoLogisticoManual,
+  ReprogramarBackorderDto,
+} from './dto';
 
-/**
- * LogisticaService
- * Servicio para gestionar el flujo logístico de pedidos
- * Solo aplica cuando usar_flujo_logistica = true
- * Requirements: 9.1, 9.2, 9.6, 9.7, 21.5, 21.6, 21.7, 21.8
- */
+interface ConfigLogistica {
+  usar_flujo_logistica: boolean;
+}
+
 @Injectable()
 export class LogisticaService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly notificationsService: NotificationsService,
+    private readonly auditService: AuditService,
+    private readonly pedidoLockService: PedidoLockService,
   ) {}
 
   /**
-   * Obtener órdenes pendientes de preparación
-   * Lista pedidos en estado CONFIRMADO
-   * Requirements: 9.1, 9.2
+   * Obtiene las órdenes pendientes de preparación (pedidos confirmados)
    */
   async getOrdenesPendientes(tenantId: string): Promise<any[]> {
     const client = this.supabase.getClient();
 
-    // Verificar que el tenant usa flujo logístico
-    const { data: config } = await client
-      .from('empresa_config')
-      .select('usar_flujo_logistica')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!config || !config.usar_flujo_logistica) {
-      return []; // Si no usa flujo logístico, no hay órdenes pendientes
+    const config = await this.obtenerConfiguracion(tenantId);
+    if (!config.usar_flujo_logistica) {
+      return [];
     }
 
-    // Obtener pedidos en estado CONFIRMADO
     const { data: pedidos, error } = await client
       .from('pedidos_venta')
       .select(`
@@ -50,7 +51,7 @@ export class LogisticaService {
         created_at
       `)
       .eq('tenant_id', tenantId)
-      .eq('estado', EstadoPedido.CONFIRMADO)
+      .in('estado', [EstadoPedido.CONFIRMADO, EstadoPedido.DESPACHO_PARCIAL])
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -58,7 +59,6 @@ export class LogisticaService {
       throw new BadRequestException('Error al obtener órdenes pendientes');
     }
 
-    // Obtener cantidad de ítems por pedido
     const pedidosConItems = await Promise.all(
       (pedidos || []).map(async (pedido) => {
         const { data: detalle, error: detalleError } = await client
@@ -89,9 +89,7 @@ export class LogisticaService {
   }
 
   /**
-   * Preparar pedido
-   * Cambia estado a EN_PREPARACION
-   * Requirements: 9.3, 9.4, 9.5, 21.5
+   * Inicia la preparación de un pedido (estado EN_PREPARACION)
    */
   async prepararPedido(
     pedidoId: string,
@@ -99,96 +97,81 @@ export class LogisticaService {
     dto: PrepararPedidoDto,
     userId?: string,
   ): Promise<{ success: boolean }> {
-    const client = this.supabase.getClient();
+    const config = await this.obtenerConfiguracion(tenantId);
 
-    // Verificar que el tenant usa flujo logístico
-    const { data: config } = await client
-      .from('empresa_config')
-      .select('usar_flujo_logistica')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!config || !config.usar_flujo_logistica) {
-      throw new BadRequestException(
-        'El flujo logístico no está habilitado para este tenant',
-      );
+    if (!config.usar_flujo_logistica) {
+      throw new BadRequestException('El flujo logístico no está habilitado para este tenant');
     }
 
-    // Obtener pedido
-    const { data: pedido, error: pedidoError } = await client
-      .from('pedidos_venta')
-      .select('id, numero, estado')
-      .eq('id', pedidoId)
-      .eq('tenant_id', tenantId)
-      .single();
+    return this.pedidoLockService.runWithLock(tenantId, pedidoId, async () => {
+      const client = this.supabase.getClient();
+      const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
 
-    if (pedidoError || !pedido) {
-      throw new NotFoundException('Pedido no encontrado');
-    }
+      if (![EstadoPedido.CONFIRMADO, EstadoPedido.DESPACHO_PARCIAL].includes(pedido.estado as EstadoPedido)) {
+        throw new BadRequestException(`No se puede preparar un pedido en estado ${pedido.estado}`);
+      }
 
-    // Validar estado
-    if (pedido.estado !== EstadoPedido.CONFIRMADO) {
-      throw new BadRequestException(
-        `No se puede preparar un pedido en estado ${pedido.estado}`,
-      );
-    }
+      const timestamp = new Date().toISOString();
 
-    // Cambiar estado a EN_PREPARACION
-    const { error: updateError } = await client
-      .from('pedidos_venta')
-      .update({
-        estado: EstadoPedido.EN_PREPARACION,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', pedidoId)
-      .eq('tenant_id', tenantId);
-
-    if (updateError) {
-      console.error('Error updating pedido estado:', updateError);
-      throw new BadRequestException('Error al cambiar estado del pedido');
-    }
-
-    // Registrar notas si se proporcionaron
-    if (dto.notas) {
-      const { data: pedidoActual } = await client
+      const { error: updateError } = await client
         .from('pedidos_venta')
-        .select('notas')
+        .update({
+          estado: EstadoPedido.EN_PREPARACION,
+          tracking_estado: 'EN_PREPARACION',
+          tracking_actualizado_en: timestamp,
+          tracking_notas: dto.notas ?? null,
+          updated_at: timestamp,
+        })
         .eq('id', pedidoId)
-        .single();
+        .eq('tenant_id', tenantId);
 
-      const notasActualizadas = pedidoActual?.notas
-        ? `${pedidoActual.notas}\n\n[PREPARACIÓN] ${dto.notas}`
-        : `[PREPARACIÓN] ${dto.notas}`;
+      if (updateError) {
+        console.error('Error updating pedido estado:', updateError);
+        throw new BadRequestException('Error al cambiar estado del pedido');
+      }
 
-      await client
-        .from('pedidos_venta')
-        .update({ notas: notasActualizadas })
-        .eq('id', pedidoId);
-    }
+      if (dto.notas) {
+        const notasActualizadas = await this.concatenarNotas(
+          pedidoId,
+          tenantId,
+          `[PREPARACIÓN] ${dto.notas}`,
+        );
 
-    // Notificar
-    try {
-      await this.notificationsService.createNotification(tenantId, {
-        type: 'PEDIDO_EN_PREPARACION' as any,
-        severity: 'INFO' as any,
+        await client
+          .from('pedidos_venta')
+          .update({ notas: notasActualizadas })
+          .eq('id', pedidoId)
+          .eq('tenant_id', tenantId);
+      }
+
+      await this.registrarEventoLogistico(tenantId, pedidoId, 'PICKING', {
+        notas: dto.notas ?? null,
+        responsable: dto.responsable ?? null,
+        ubicacion: dto.ubicacion ?? null,
+        items_preparados: dto.items_preparados ?? [],
+      }, userId);
+
+      await this.registrarAuditoria(pedidoId, tenantId, userId, {
+        estado: EstadoPedido.EN_PREPARACION,
+        tracking_estado: 'EN_PREPARACION',
+      }, 'preparar_pedido');
+
+      await this.enviarNotificacion(tenantId, {
+        type: 'PEDIDO_EN_PREPARACION',
+        severity: 'INFO',
         title: 'Pedido en preparación',
         message: `El pedido ${pedido.numero} está siendo preparado en almacén`,
         usuario_id: userId,
       });
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
-    }
 
-    console.log(`✅ [LogisticaService] Pedido ${pedidoId} en preparación`);
+      console.log(`✅ [LogisticaService] Pedido ${pedidoId} en preparación`);
 
-    return { success: true };
+      return { success: true };
+    });
   }
 
   /**
-   * Marcar pedido como listo para despacho
-   * Cambia estado a LISTO_DESPACHO
-   * Requirements: 9.6, 21.6
+   * Marca un pedido como listo para despacho (LISTO_DESPACHO)
    */
   async marcarListoDespacho(
     pedidoId: string,
@@ -196,45 +179,27 @@ export class LogisticaService {
     userId?: string,
   ): Promise<{ success: boolean }> {
     const client = this.supabase.getClient();
+    const config = await this.obtenerConfiguracion(tenantId);
 
-    // Verificar que el tenant usa flujo logístico
-    const { data: config } = await client
-      .from('empresa_config')
-      .select('usar_flujo_logistica')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!config || !config.usar_flujo_logistica) {
-      throw new BadRequestException(
-        'El flujo logístico no está habilitado para este tenant',
-      );
+    if (!config.usar_flujo_logistica) {
+      throw new BadRequestException('El flujo logístico no está habilitado para este tenant');
     }
 
-    // Obtener pedido
-    const { data: pedido, error: pedidoError } = await client
-      .from('pedidos_venta')
-      .select('id, numero, estado')
-      .eq('id', pedidoId)
-      .eq('tenant_id', tenantId)
-      .single();
+    const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
 
-    if (pedidoError || !pedido) {
-      throw new NotFoundException('Pedido no encontrado');
+    if (![EstadoPedido.EN_PREPARACION, EstadoPedido.DESPACHO_PARCIAL].includes(pedido.estado as EstadoPedido)) {
+      throw new BadRequestException(`No se puede marcar como listo un pedido en estado ${pedido.estado}`);
     }
 
-    // Validar estado
-    if (pedido.estado !== EstadoPedido.EN_PREPARACION) {
-      throw new BadRequestException(
-        `No se puede marcar como listo un pedido en estado ${pedido.estado}`,
-      );
-    }
+    const timestamp = new Date().toISOString();
 
-    // Cambiar estado a LISTO_DESPACHO
     const { error: updateError } = await client
       .from('pedidos_venta')
       .update({
         estado: EstadoPedido.LISTO_DESPACHO,
-        updated_at: new Date().toISOString(),
+        tracking_estado: 'LISTO_DESPACHO',
+        tracking_actualizado_en: timestamp,
+        updated_at: timestamp,
       })
       .eq('id', pedidoId)
       .eq('tenant_id', tenantId);
@@ -244,19 +209,20 @@ export class LogisticaService {
       throw new BadRequestException('Error al cambiar estado del pedido');
     }
 
-    // Notificar
-    try {
-      await this.notificationsService.createNotification(tenantId, {
-        type: 'PEDIDO_LISTO_DESPACHO' as any,
-        severity: 'INFO' as any,
-        title: 'Pedido listo para despacho',
-        message: `El pedido ${pedido.numero} está listo para ser despachado`,
-        usuario_id: userId,
-      });
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
-    }
+    await this.registrarEventoLogistico(tenantId, pedidoId, 'PACKING', {}, userId);
+
+    await this.registrarAuditoria(pedidoId, tenantId, userId, {
+      estado: EstadoPedido.LISTO_DESPACHO,
+      tracking_estado: 'LISTO_DESPACHO',
+    }, 'marcar_listo_despacho');
+
+    await this.enviarNotificacion(tenantId, {
+      type: 'PEDIDO_LISTO_DESPACHO',
+      severity: 'INFO',
+      title: 'Pedido listo para despacho',
+      message: `El pedido ${pedido.numero} está listo para ser despachado`,
+      usuario_id: userId,
+    });
 
     console.log(`✅ [LogisticaService] Pedido ${pedidoId} listo para despacho`);
 
@@ -264,9 +230,7 @@ export class LogisticaService {
   }
 
   /**
-   * Confirmar despacho
-   * Descuenta stock real (SALIDA), libera reserva y cambia a LISTO_FACTURAR
-   * Requirements: 9.7, 21.7, 21.8
+   * Confirma el despacho del pedido. Descuenta stock y lo deja listo para facturar.
    */
   async confirmarDespacho(
     pedidoId: string,
@@ -274,119 +238,758 @@ export class LogisticaService {
     dto: ConfirmarDespachoDto,
     userId?: string,
   ): Promise<{ success: boolean }> {
+    const config = await this.obtenerConfiguracion(tenantId);
+
+    if (!config.usar_flujo_logistica) {
+      throw new BadRequestException('El flujo logístico no está habilitado para este tenant');
+    }
+
+    return this.pedidoLockService.runWithLock(tenantId, pedidoId, async () => {
+      const client = this.supabase.getClient();
+      const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
+
+      if (![EstadoPedido.LISTO_DESPACHO, EstadoPedido.DESPACHO_PARCIAL].includes(pedido.estado as EstadoPedido)) {
+        throw new BadRequestException(`No se puede confirmar despacho de un pedido en estado ${pedido.estado}`);
+      }
+
+      const { data: detalle, error: detalleError } = await client
+        .from('pedidos_venta_detalle')
+        .select('id, producto_id, descripcion, cantidad, cantidad_despachada, estado_item')
+        .eq('pedido_id', pedidoId);
+
+      if (detalleError || !detalle) {
+        throw new BadRequestException('Error al obtener detalle del pedido');
+      }
+
+      const despachoPlan = this.normalizarItemsDespachados(detalle, dto.items_despachados);
+      let totalDespachado = 0;
+      const timestamp = new Date().toISOString();
+
+      const detalleActualizado: Array<{ id: string; cantidad_despachada: number; cantidad_enviada: number; estado_item: string }> = [];
+      const despachosInsert: any[] = [];
+      const backorderUpserts: any[] = [];
+      const backorderDeletes: string[] = [];
+
+      for (const item of detalle) {
+        const cantidadTotal = Number(item.cantidad);
+        const cantidadDespachadaActual = Number(item.cantidad_despachada ?? 0);
+        const cantidadPendiente = Math.max(cantidadTotal - cantidadDespachadaActual, 0);
+        const cantidadSolicitada = despachoPlan.has(item.id)
+          ? despachoPlan.get(item.id)!
+          : (dto.items_despachados && dto.items_despachados.length > 0 ? 0 : cantidadPendiente);
+
+        if (cantidadSolicitada < 0) {
+          throw new BadRequestException(`Cantidad inválida para el item ${item.descripcion}`);
+        }
+
+        if (cantidadSolicitada === 0) {
+          continue;
+        }
+
+        if (cantidadSolicitada > cantidadPendiente) {
+          throw new BadRequestException(
+            `Cantidad solicitada (${cantidadSolicitada}) supera el saldo pendiente (${cantidadPendiente}) para ${item.descripcion}`,
+          );
+        }
+
+        await client.from('movimientos_inventario').insert({
+          tenant_id: tenantId,
+          producto_id: item.producto_id,
+          tipo: 'SALIDA',
+          cantidad: cantidadSolicitada,
+          referencia_tipo: 'PEDIDO',
+          referencia_id: pedidoId,
+          notas: `Salida por despacho de pedido ${pedido.numero}`,
+        });
+
+        const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
+          p_producto_id: item.producto_id,
+          p_cantidad: cantidadSolicitada,
+        });
+
+        if (salidaError) {
+          console.error('Error descontando stock en despacho:', salidaError);
+          throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
+        }
+
+        const nuevoDespachado = cantidadDespachadaActual + cantidadSolicitada;
+        const nuevoEstadoItem = nuevoDespachado >= cantidadTotal ? 'DESPACHADO' : 'PARCIAL';
+
+        detalleActualizado.push({
+          id: item.id,
+          cantidad_despachada: nuevoDespachado,
+          cantidad_enviada: cantidadSolicitada,
+          estado_item: nuevoEstadoItem,
+        });
+
+        despachosInsert.push({
+          tenant_id: tenantId,
+          pedido_id: pedidoId,
+          detalle_id: item.id,
+          producto_id: item.producto_id,
+          cantidad: cantidadSolicitada,
+          registrado_por: userId ?? null,
+          notas: dto.notas ?? null,
+        });
+
+        const restante = Math.max(cantidadTotal - nuevoDespachado, 0);
+        if (restante > 0) {
+          backorderUpserts.push({
+            tenant_id: tenantId,
+            pedido_id: pedidoId,
+            detalle_id: item.id,
+            producto_id: item.producto_id,
+            cantidad_comprometida: cantidadTotal,
+            cantidad_despachada: nuevoDespachado,
+            cantidad_pendiente: restante,
+            estado: nuevoEstadoItem === 'PARCIAL' ? 'PARCIAL' : 'PENDIENTE',
+            updated_at: timestamp,
+          });
+        } else {
+          backorderDeletes.push(item.id);
+        }
+
+        item.cantidad_despachada = nuevoDespachado;
+        item.estado_item = nuevoEstadoItem;
+        totalDespachado += cantidadSolicitada;
+      }
+
+      if (totalDespachado <= 0) {
+        throw new BadRequestException('Debe registrar al menos un item para despachar');
+      }
+
+      for (const update of detalleActualizado) {
+        const { error: detalleUpdateError } = await client
+          .from('pedidos_venta_detalle')
+          .update({
+            cantidad_despachada: update.cantidad_despachada,
+            estado_item: update.estado_item,
+          })
+          .eq('id', update.id);
+
+        if (detalleUpdateError) {
+          console.error('Error actualizando detalle de pedido:', detalleUpdateError);
+          throw new BadRequestException('No se pudo actualizar el detalle del pedido despachado');
+        }
+      }
+
+      if (despachosInsert.length > 0) {
+        const { error: despachosError } = await client
+          .from('pedido_despachos')
+          .insert(despachosInsert);
+        if (despachosError) {
+          console.error('Error registrando histórico de despachos:', despachosError);
+        }
+      }
+
+      if (backorderUpserts.length > 0) {
+        const { error: backorderError } = await client
+          .from('pedido_backorders')
+          .upsert(backorderUpserts, { onConflict: 'detalle_id' });
+        if (backorderError) {
+          console.error('Error actualizando backorders:', backorderError);
+          throw new BadRequestException('No se pudieron actualizar los backorders del pedido');
+        }
+      }
+
+      if (backorderDeletes.length > 0) {
+        const { error: backorderDeleteError } = await client
+          .from('pedido_backorders')
+          .delete()
+          .in('detalle_id', backorderDeletes);
+        if (backorderDeleteError) {
+          console.error('Error eliminando backorders:', backorderDeleteError);
+          throw new BadRequestException('No se pudieron sincronizar los backorders del pedido');
+        }
+      }
+
+      const allDespachado = detalle.every(
+        (itemDetalle) => Number(itemDetalle.cantidad_despachada ?? 0) >= Number(itemDetalle.cantidad),
+      );
+      const nuevoEstado = allDespachado ? EstadoPedido.LISTO_FACTURAR : EstadoPedido.DESPACHO_PARCIAL;
+
+      const { error: updateError } = await client
+        .from('pedidos_venta')
+        .update({
+          estado: nuevoEstado,
+          tracking_estado: 'EN_TRANSITO',
+          tracking_actualizado_en: timestamp,
+          tracking_notas: dto.notas ?? null,
+          updated_at: timestamp,
+        })
+        .eq('id', pedidoId)
+        .eq('tenant_id', tenantId);
+
+      if (updateError) {
+        console.error('Error updating pedido estado:', updateError);
+        throw new BadRequestException('Error al cambiar estado del pedido');
+      }
+
+      if (dto.notas) {
+        const notasActualizadas = await this.concatenarNotas(
+          pedidoId,
+          tenantId,
+          `[DESPACHO] ${dto.notas}`,
+        );
+
+        await client
+          .from('pedidos_venta')
+          .update({ notas: notasActualizadas })
+          .eq('id', pedidoId)
+          .eq('tenant_id', tenantId);
+      }
+
+      await this.registrarEventoLogistico(
+        tenantId,
+        pedidoId,
+        'DESPACHO',
+        {
+          notas: dto.notas ?? null,
+          items_despachados: detalleActualizado.map((item) => ({
+            detalle_id: item.id,
+            cantidad_enviada: item.cantidad_enviada,
+            cantidad_total_despachada: item.cantidad_despachada,
+          })),
+          bultos: dto.bultos ?? null,
+          peso_total: dto.peso_total ?? null,
+          volumen_total: dto.volumen_total ?? null,
+          transportista: dto.transportista ?? null,
+          placa: dto.placa ?? null,
+          conductor: dto.conductor ?? null,
+        },
+        userId,
+      );
+
+      await this.registrarEventoLogistico(
+        tenantId,
+        pedidoId,
+        'TRANSITO',
+        {
+          estado: 'EN_TRANSITO',
+        },
+        userId,
+      );
+
+      await this.registrarAuditoria(
+        pedidoId,
+        tenantId,
+        userId,
+        {
+          estado: nuevoEstado,
+          tracking_estado: 'EN_TRANSITO',
+        },
+        'confirmar_despacho',
+      );
+
+      if (nuevoEstado === EstadoPedido.LISTO_FACTURAR) {
+        await this.enviarNotificacion(tenantId, {
+          type: NotificationType.PEDIDO_LISTO_FACTURAR,
+          severity: NotificationSeverity.INFO,
+          title: 'Pedido listo para facturar',
+          message: `El pedido ${pedido.numero} ha sido despachado en su totalidad`,
+          usuario_id: userId,
+        });
+      } else {
+        await this.enviarNotificacion(tenantId, {
+          type: NotificationType.PEDIDO_DESPACHO_PARCIAL,
+          severity: NotificationSeverity.WARNING,
+          title: 'Pedido con despacho parcial',
+          message: `El pedido ${pedido.numero} tiene unidades pendientes de despacho`,
+          usuario_id: userId,
+        });
+      }
+
+      console.log(`✅ [LogisticaService] Despacho registrado para pedido ${pedidoId} (estado: ${nuevoEstado})`);
+
+      return { success: true };
+    });
+  }
+
+  /**
+   * Actualiza el tracking del pedido (EN_TRANSITO / ENTREGADO / INCIDENCIA)
+   */
+  async actualizarTracking(
+    pedidoId: string,
+    tenantId: string,
+    dto: ActualizarTrackingDto,
+    userId?: string,
+  ): Promise<{ success: boolean }> {
     const client = this.supabase.getClient();
 
-    // Verificar que el tenant usa flujo logístico
-    const { data: config } = await client
+    const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
+
+    const timestamp = new Date().toISOString();
+
+    const updateData: Record<string, any> = {
+      tracking_estado: dto.estado,
+      tracking_actualizado_en: timestamp,
+      tracking_notas: dto.notas ?? null,
+      updated_at: timestamp,
+    };
+
+    // Si el tracking marca ENTREGADO y el pedido ya está facturado, lo cerramos como COMPLETADO
+    if (dto.estado === 'ENTREGADO' && pedido.estado === EstadoPedido.FACTURADO) {
+      updateData.estado = EstadoPedido.COMPLETADO;
+    }
+
+    const { error: updateError } = await client
+      .from('pedidos_venta')
+      .update(updateData)
+      .eq('id', pedidoId)
+      .eq('tenant_id', tenantId);
+
+    if (updateError) {
+      console.error('Error updating tracking:', updateError);
+      throw new BadRequestException('No se pudo actualizar el tracking del pedido');
+    }
+
+    const tipoEvento =
+      dto.estado === 'ENTREGADO' ? 'ENTREGA'
+      : dto.estado === 'INCIDENCIA' ? 'TRANSITO'
+      : 'TRANSITO';
+
+    await this.registrarEventoLogistico(tenantId, pedidoId, tipoEvento, {
+      estado: dto.estado,
+      notas: dto.notas ?? null,
+    }, userId);
+
+    await this.registrarAuditoria(pedidoId, tenantId, userId, {
+      tracking_estado: dto.estado,
+      estado: updateData.estado ?? pedido.estado,
+    }, 'actualizar_tracking');
+
+    if (dto.estado === 'ENTREGADO') {
+      await this.enviarNotificacion(tenantId, {
+        type: 'PEDIDO_ENTREGADO',
+        severity: 'SUCCESS',
+        title: 'Pedido entregado',
+        message: `El pedido ${pedido.numero} fue entregado al cliente`,
+        usuario_id: userId,
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Obtener timeline de eventos logísticos registrados
+   */
+  async obtenerEventosLogisticos(
+    pedidoId: string,
+    tenantId: string,
+  ): Promise<any[]> {
+    const client = this.supabase.getClient();
+
+    const { data, error } = await client
+      .from('logistica_eventos')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('pedido_id', pedidoId)
+      .order('registrado_en', { ascending: false });
+
+    if (error) {
+      console.error('Error obteniendo eventos logísticos:', error);
+      throw new BadRequestException('No se pudieron obtener los eventos logísticos del pedido');
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Registrar evento manual de logística (picking/packing/tracking adicional)
+   */
+  async registrarEventoManual(
+    pedidoId: string,
+    tenantId: string,
+    dto: RegistrarEventoLogisticoDto,
+    userId?: string,
+  ): Promise<{ success: boolean }> {
+    const client = this.supabase.getClient();
+
+    const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
+
+    const payload = {
+      notas: dto.notas ?? null,
+      bultos: dto.bultos ?? null,
+      peso_total: dto.peso_total ?? null,
+      volumen_total: dto.volumen_total ?? null,
+      transportista: dto.transportista ?? null,
+      placa: dto.placa ?? null,
+      conductor: dto.conductor ?? null,
+      responsable: dto.responsable ?? null,
+      ubicacion: dto.ubicacion ?? null,
+      estado: dto.estado ?? null,
+      ...(dto.datos_extra ?? {}),
+    };
+
+    await this.registrarEventoLogistico(tenantId, pedidoId, dto.tipo, payload, userId);
+
+    // Actualizar tracking si aplica
+    if (dto.tipo === TipoEventoLogisticoManual.ENTREGA) {
+      const update: Record<string, any> = {
+        tracking_estado: 'ENTREGADO',
+        tracking_actualizado_en: new Date().toISOString(),
+        tracking_notas: dto.notas ?? null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (pedido.estado === EstadoPedido.FACTURADO) {
+        update.estado = EstadoPedido.COMPLETADO;
+      }
+
+      await client
+        .from('pedidos_venta')
+        .update(update)
+        .eq('id', pedidoId)
+        .eq('tenant_id', tenantId);
+    } else if (dto.estado) {
+      await client
+        .from('pedidos_venta')
+        .update({
+          tracking_estado: dto.estado,
+          tracking_actualizado_en: new Date().toISOString(),
+          tracking_notas: dto.notas ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pedidoId)
+        .eq('tenant_id', tenantId);
+    }
+
+    await this.registrarAuditoria(
+      pedidoId,
+      tenantId,
+      userId,
+      {
+        tracking_estado: dto.estado ?? undefined,
+      },
+      'registrar_evento_logistico_manual',
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Obtiene el detalle de backorders pendientes para un pedido
+   */
+  async obtenerBackorders(
+    pedidoId: string,
+    tenantId: string,
+  ): Promise<Array<Record<string, any>>> {
+    const client = this.supabase.getClient();
+
+    const { data, error } = await client
+      .from('pedido_backorders')
+      .select(`
+        id,
+        pedido_id,
+        detalle_id,
+        producto_id,
+        cantidad_comprometida,
+        cantidad_despachada,
+        cantidad_pendiente,
+        estado,
+        notas,
+        proxima_fecha_compromiso,
+        ultimo_compromiso_en,
+        prioridad,
+        created_at,
+        updated_at,
+        detalle:pedidos_venta_detalle (
+          descripcion,
+          cantidad,
+          cantidad_despachada
+        )
+      `)
+      .eq('tenant_id', tenantId)
+      .eq('pedido_id', pedidoId)
+      .order('proxima_fecha_compromiso', { ascending: true, nullsFirst: true })
+      .order('prioridad', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error obteniendo backorders:', error);
+      throw new BadRequestException('No se pudieron obtener los backorders del pedido');
+    }
+
+    return (data || []).map((item) => ({
+      id: item.id,
+      detalle_id: item.detalle_id,
+      producto_id: item.producto_id,
+      cantidad_comprometida: Number(item.cantidad_comprometida ?? 0),
+      cantidad_despachada: Number(item.cantidad_despachada ?? 0),
+      cantidad_pendiente: Number(item.cantidad_pendiente ?? 0),
+      estado: item.estado,
+      notas: item.notas ?? null,
+      prioridad: item.prioridad ?? 3,
+      proxima_fecha_compromiso: item.proxima_fecha_compromiso ?? null,
+      ultimo_compromiso_en: item.ultimo_compromiso_en ?? null,
+      descripcion: item.detalle?.descripcion ?? null,
+      cantidad_total: Number(item.detalle?.cantidad ?? 0),
+      cantidad_despachada_total: Number(item.detalle?.cantidad_despachada ?? 0),
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    }));
+  }
+
+  /**
+   * Reprograma un backorder con nueva fecha comprometida y prioridad
+   */
+  async reprogramarBackorder(
+    pedidoId: string,
+    detalleId: string,
+    tenantId: string,
+    dto: ReprogramarBackorderDto,
+    userId?: string,
+  ): Promise<{ success: boolean; data: Array<Record<string, any>> }> {
+    return this.pedidoLockService.runWithLock(tenantId, pedidoId, async () => {
+      const client = this.supabase.getClient();
+
+      const { data: backorder, error } = await client
+        .from('pedido_backorders')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('pedido_id', pedidoId)
+        .eq('detalle_id', detalleId)
+        .single();
+
+      if (error || !backorder) {
+        throw new NotFoundException('Backorder no encontrado para el detalle indicado');
+      }
+
+      const prioridad = dto.prioridad ?? backorder.prioridad ?? 3;
+      const timestamp = new Date().toISOString();
+      const notas = this.buildBackorderNota(
+        backorder.notas ?? null,
+        dto.nota,
+        dto.proxima_fecha_compromiso,
+        userId,
+      );
+
+      const { error: updateError } = await client
+        .from('pedido_backorders')
+        .update({
+          proxima_fecha_compromiso: dto.proxima_fecha_compromiso,
+          prioridad,
+          notas,
+          ultimo_compromiso_en: timestamp,
+          updated_at: timestamp,
+        })
+        .eq('id', backorder.id)
+        .eq('tenant_id', tenantId);
+
+      if (updateError) {
+        console.error('Error actualizando backorder:', updateError);
+        throw new BadRequestException('No se pudo reprogramar el backorder');
+      }
+
+      await this.registrarEventoLogistico(
+        tenantId,
+        pedidoId,
+        'BACKORDER',
+        {
+          detalle_id: detalleId,
+          proxima_fecha: dto.proxima_fecha_compromiso,
+          prioridad,
+          notas: dto.nota ?? null,
+        },
+        userId,
+      );
+
+      await this.enviarNotificacion(tenantId, {
+        type: NotificationType.BACKORDER_REPROGRAMADO,
+        severity: NotificationSeverity.WARNING,
+        title: 'Backorder reprogramado',
+        message: `Se reagendó la entrega pendiente del detalle ${detalleId} para el ${dto.proxima_fecha_compromiso}.`,
+        usuario_id: userId ?? null,
+      });
+
+      const listadoActualizado = await this.obtenerBackorders(pedidoId, tenantId);
+
+      return {
+        success: true,
+        data: listadoActualizado,
+      };
+    });
+  }
+
+  private normalizarItemsDespachados(
+    detalle: Array<{ id: string; cantidad: number; cantidad_despachada?: number }>,
+    items?: Array<any>,
+  ): Map<string, number> {
+    const plan = new Map<string, number>();
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return plan;
+    }
+
+    for (const raw of items) {
+      if (raw === null || raw === undefined) {
+        continue;
+      }
+
+      if (typeof raw === 'string') {
+        const item = detalle.find((d) => d.id === raw);
+        if (!item) {
+          continue;
+        }
+        const pendiente = Math.max(Number(item.cantidad) - Number(item.cantidad_despachada ?? 0), 0);
+        plan.set(item.id, pendiente);
+        continue;
+      }
+
+      if (typeof raw === 'object') {
+        const detalleId = raw.detalle_id ?? raw.detalleId ?? raw.id;
+        if (!detalleId) {
+          continue;
+        }
+        const item = detalle.find((d) => d.id === detalleId);
+        if (!item) {
+          continue;
+        }
+        const pendiente = Math.max(Number(item.cantidad) - Number(item.cantidad_despachada ?? 0), 0);
+        const cantidadRaw =
+          raw.cantidad ?? raw.cantidad_enviada ?? raw.cantidadDespachada ?? raw.qty ?? pendiente;
+        const cantidad = Number(cantidadRaw);
+        if (Number.isFinite(cantidad) && cantidad >= 0) {
+          plan.set(item.id, cantidad);
+        }
+      }
+    }
+
+    return plan;
+  }
+
+  // =====================================================
+  // Helpers
+  // =====================================================
+
+  private async obtenerConfiguracion(tenantId: string): Promise<ConfigLogistica> {
+    const client = this.supabase.getClient();
+    const { data, error } = await client
       .from('empresa_config')
       .select('usar_flujo_logistica')
       .eq('tenant_id', tenantId)
       .single();
 
-    if (!config || !config.usar_flujo_logistica) {
-      throw new BadRequestException(
-        'El flujo logístico no está habilitado para este tenant',
-      );
+    if (error) {
+      console.error('Error obteniendo configuración de logística:', error);
+      throw new BadRequestException('No se pudo obtener configuración logística');
     }
 
-    // Obtener pedido con detalles
-    const { data: pedido, error: pedidoError } = await client
+    return data as ConfigLogistica;
+  }
+
+  private async obtenerPedidoBasico(pedidoId: string, tenantId: string) {
+    const client = this.supabase.getClient();
+    const { data, error } = await client
       .from('pedidos_venta')
       .select('id, numero, estado')
       .eq('id', pedidoId)
       .eq('tenant_id', tenantId)
       .single();
 
-    if (pedidoError || !pedido) {
+    if (error || !data) {
       throw new NotFoundException('Pedido no encontrado');
     }
 
-    // Validar estado
-    if (pedido.estado !== EstadoPedido.LISTO_DESPACHO) {
-      throw new BadRequestException(
-        `No se puede confirmar despacho de un pedido en estado ${pedido.estado}`,
-      );
-    }
+    return data;
+  }
 
-    // Obtener detalle del pedido
-    const { data: detalle, error: detalleError } = await client
-      .from('pedidos_venta_detalle')
-      .select('*')
-      .eq('pedido_id', pedidoId);
+  private async registrarEventoLogistico(
+    tenantId: string,
+    pedidoId: string,
+    tipo: 'PICKING' | 'PACKING' | 'DESPACHO' | 'TRANSITO' | 'ENTREGA' | 'BACKORDER',
+    datos: Record<string, any>,
+    userId?: string,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
 
-    if (detalleError || !detalle) {
-      throw new BadRequestException('Error al obtener detalle del pedido');
-    }
-
-    // Descontar stock real (SALIDA) y liberar reserva para cada producto
-    for (const item of detalle) {
-      // Crear movimiento de SALIDA
-      await client.from('movimientos_inventario').insert({
+    const { error } = await client
+      .from('logistica_eventos')
+      .insert({
         tenant_id: tenantId,
-        producto_id: item.producto_id,
-        tipo: 'SALIDA',
-        cantidad: item.cantidad,
-        referencia_tipo: 'PEDIDO',
-        referencia_id: pedidoId,
-        notas: `Salida por despacho de pedido ${pedido.numero}`,
+        pedido_id: pedidoId,
+        tipo,
+        datos: datos ?? {},
+        registrado_por: userId ?? null,
       });
 
-      // Descontar stock_actual y liberar reserva
-      await client.rpc('descontar_stock_y_liberar_reserva', {
-        p_producto_id: item.producto_id,
-        p_cantidad: item.cantidad,
-      });
+    if (error) {
+      console.error(`Error registrando evento logístico ${tipo}:`, error);
     }
+  }
 
-    // Cambiar estado a LISTO_FACTURAR
-    const { error: updateError } = await client
-      .from('pedidos_venta')
-      .update({
-        estado: EstadoPedido.LISTO_FACTURAR,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', pedidoId)
-      .eq('tenant_id', tenantId);
-
-    if (updateError) {
-      console.error('Error updating pedido estado:', updateError);
-      throw new BadRequestException('Error al cambiar estado del pedido');
-    }
-
-    // Registrar notas si se proporcionaron
-    if (dto.notas) {
-      const { data: pedidoActual } = await client
-        .from('pedidos_venta')
-        .select('notas')
-        .eq('id', pedidoId)
-        .single();
-
-      const notasActualizadas = pedidoActual?.notas
-        ? `${pedidoActual.notas}\n\n[DESPACHO] ${dto.notas}`
-        : `[DESPACHO] ${dto.notas}`;
-
-      await client
-        .from('pedidos_venta')
-        .update({ notas: notasActualizadas })
-        .eq('id', pedidoId);
-    }
-
-    // Notificar a Ventas que el pedido está listo para facturar
+  private async registrarAuditoria(
+    pedidoId: string,
+    tenantId: string,
+    userId: string | undefined,
+    newValues: Record<string, any>,
+    action: string,
+  ): Promise<void> {
     try {
-      await this.notificationsService.createNotification(tenantId, {
-        type: 'PEDIDO_LISTO_FACTURAR' as any,
-        severity: 'SUCCESS' as any,
-        title: 'Pedido listo para facturar',
-        message: `El pedido ${pedido.numero} ha sido despachado y está listo para facturar`,
-        usuario_id: userId,
+      await this.auditService.logAction({
+        table_name: 'pedidos_venta',
+        operation: 'UPDATE',
+        record_id: pedidoId,
+        tenant_id: tenantId,
+        user_id: userId ?? undefined,
+        new_values: newValues,
+        metadata: { action },
       });
     } catch (error) {
+      console.warn(`⚠️ No se pudo registrar auditoría ${action}`, error);
+    }
+  }
+
+  private async enviarNotificacion(
+    tenantId: string,
+    payload: {
+      type: any;
+      severity: any;
+      title: string;
+      message: string;
+      usuario_id?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createNotification(tenantId, payload);
+    } catch (error) {
       console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
+    }
+  }
+
+  private buildBackorderNota(
+    notasActuales: string | null,
+    notaNueva: string | undefined,
+    proximaFecha: string,
+    userId?: string,
+  ): string {
+    const encabezado = `[${new Date().toISOString()}] ${userId ?? 'sistema'} -> Reprogramado al ${proximaFecha}`;
+    const cuerpo = notaNueva ? ` ${notaNueva.trim()}` : '';
+    const nuevaLinea = `${encabezado}${cuerpo}`.trim();
+
+    if (!notasActuales || notasActuales.length === 0) {
+      return nuevaLinea;
     }
 
-    console.log(`✅ [LogisticaService] Despacho confirmado para pedido ${pedidoId}`);
+    return `${notasActuales}\n${nuevaLinea}`;
+  }
 
-    return { success: true };
+  private async concatenarNotas(pedidoId: string, tenantId: string, nuevaNota: string): Promise<string> {
+    const client = this.supabase.getClient();
+    const { data } = await client
+      .from('pedidos_venta')
+      .select('notas')
+      .eq('id', pedidoId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (data?.notas) {
+      return `${data.notas}\n\n${nuevaNota}`;
+    }
+    return nuevaNota;
   }
 }
+
+
+

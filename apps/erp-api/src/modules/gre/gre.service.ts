@@ -350,6 +350,18 @@ export class GreService {
 
       console.log('✅ GRE creada exitosamente:', data);
 
+      if (greData.pedidoId) {
+        await this.registrarRelacionPedidoGre({
+          pedidoId: greData.pedidoId,
+          greId: data.id,
+          greNumero: data.numero,
+          greEstado: data.estado ?? 'BORRADOR',
+          tenantIdHint: greData.tenantId,
+          notas: greData.observaciones ?? null,
+          despachos: greData.despachosAsociados,
+        });
+      }
+
       // Generar XML UBL y firma (sin enviar a SUNAT todavía)
       await this.procesarGeneracionXML(data.id);
 
@@ -493,6 +505,79 @@ export class GreService {
   </cac:DespatchLine>
 
 </DespatchAdvice>`;
+  }
+
+  private async registrarRelacionPedidoGre(params: {
+    pedidoId: string;
+    greId: string;
+    greNumero: string;
+    greEstado: string;
+    tenantIdHint?: string;
+    notas?: string | null;
+    despachos?: string[] | undefined;
+  }): Promise<void> {
+    const client = this.supabaseService.getClient();
+
+    try {
+      const { data: pedido, error: pedidoError } = await client
+        .from('pedidos_venta')
+        .select('tenant_id, numero')
+        .eq('id', params.pedidoId)
+        .single();
+
+      if (pedidoError || !pedido) {
+        console.warn(
+          `⚠️ [GRE] No se pudo vincular GRE ${params.greId} con pedido ${params.pedidoId}: ${
+            pedidoError?.message ?? 'pedido no encontrado'
+          }`,
+        );
+        return;
+      }
+
+      const tenantId = pedido.tenant_id ?? params.tenantIdHint;
+      if (!tenantId) {
+        console.warn(
+          `⚠️ [GRE] Tenant desconocido al vincular GRE ${params.greId} con pedido ${params.pedidoId}`,
+        );
+        return;
+      }
+
+      const relacion = {
+        tenant_id: tenantId,
+        pedido_id: params.pedidoId,
+        gre_id: params.greId,
+        estado: params.greEstado ?? 'BORRADOR',
+        notas: params.notas ?? null,
+        creado_en: new Date().toISOString(),
+      };
+
+      const { error: linkError } = await client.from('pedido_gres').insert(relacion);
+      if (linkError) {
+        console.error(
+          `❌ [GRE] Error registrando relación pedido-gre (${params.pedidoId} -> ${params.greId}): ${linkError.message}`,
+        );
+      }
+
+      const { error: pedidoUpdate } = await client
+        .from('pedidos_venta')
+        .update({
+          gre_id: params.greId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', params.pedidoId)
+        .eq('tenant_id', tenantId);
+
+      if (pedidoUpdate) {
+        console.warn(
+          `⚠️ [GRE] No se pudo actualizar pedidos_venta.gre_id para ${params.pedidoId}: ${pedidoUpdate.message}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        `❌ [GRE] Error inesperado al vincular GRE ${params.greId} con pedido ${params.pedidoId}`,
+        error as Error,
+      );
+    }
   }
 
   /**
@@ -1172,3 +1257,4 @@ export class GreService {
     }
   }
 }
+

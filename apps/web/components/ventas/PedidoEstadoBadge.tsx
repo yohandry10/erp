@@ -46,6 +46,11 @@ export default function PedidoEstadoBadge({
         color: 'bg-purple-100 text-purple-800 border-purple-200',
         icon: Truck
       },
+      [EstadoPedido.DESPACHO_PARCIAL]: {
+        label: 'Despacho Parcial',
+        color: 'bg-amber-100 text-amber-800 border-amber-200',
+        icon: Truck
+      },
       [EstadoPedido.LISTO_FACTURAR]: {
         label: 'Listo para Facturar',
         color: 'bg-indigo-100 text-indigo-800 border-indigo-200',

@@ -1,19 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
+  private readonly logger = new Logger(SupabaseService.name);
+  private readonly supabaseAnonKey: string;
+  private serviceFallbackWarned = false;
 
-  constructor() {
+  constructor(private readonly tenantContext: TenantContextService) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_KEY environment variables.');
+    this.supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl || !this.supabaseAnonKey) {
+      throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.');
     }
-    
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+
+    this.supabase = createClient(supabaseUrl, this.supabaseAnonKey, {
+      global: {
+        headers: {
+          'X-Client-Info': 'erp-api',
+        },
+      },
+      fetch: async (input, init = {}) => {
+        const context = this.tenantContext.getContext();
+        const headers = new (globalThis as any).Headers(init.headers ?? {});
+
+        headers.set('apikey', this.supabaseAnonKey);
+
+        if (context?.tenantId) {
+          headers.set('X-Tenant-Id', context.tenantId);
+        }
+
+        if (context?.userId) {
+          headers.set('X-User-Id', context.userId);
+        }
+
+        const supabaseAccessToken = context?.supabaseAccessToken?.trim();
+        if (supabaseAccessToken) {
+          headers.set('Authorization', `Bearer ${supabaseAccessToken}`);
+        } else {
+          headers.set('Authorization', `Bearer ${this.supabaseAnonKey}`);
+          if (!this.serviceFallbackWarned) {
+            this.logger.warn(
+              'Ejecutando consultas con rol anónimo. Asegúrate de enviar tokens por request para reforzar RLS.',
+            );
+            this.serviceFallbackWarned = true;
+          }
+        }
+
+        init = { ...init, headers };
+
+        return (globalThis as any).fetch(input as any, init as any);
+      },
+    });
     console.log('✅ Supabase client initialized successfully');
   }
 
