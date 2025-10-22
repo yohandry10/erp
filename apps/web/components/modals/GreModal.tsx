@@ -16,14 +16,29 @@ interface CpeData {
   estado: string
 }
 
+interface PedidoContext {
+  id: string
+  numero: string
+  clienteNombre: string
+  clienteDireccion?: string | null
+  tenantId: string
+}
+
 interface GreModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (data?: any) => void
   cpeData?: CpeData | null // Datos opcionales del CPE para pre-llenar
+  pedidoContext?: PedidoContext
 }
 
-export default function GreModal({ isOpen, onClose, onSuccess, cpeData }: GreModalProps) {
+export default function GreModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  cpeData,
+  pedidoContext
+}: GreModalProps) {
   const [formData, setFormData] = useState({
     destinatario: '',
     direccionDestino: '',
@@ -62,6 +77,16 @@ export default function GreModal({ isOpen, onClose, onSuccess, cpeData }: GreMod
     }
   }, [cpeData, isOpen])
 
+  useEffect(() => {
+    if (pedidoContext && isOpen) {
+      setFormData(prev => ({
+        ...prev,
+        destinatario: prev.destinatario || pedidoContext.clienteNombre,
+        direccionDestino: pedidoContext.clienteDireccion || prev.direccionDestino
+      }))
+    }
+  }, [pedidoContext, isOpen])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -70,7 +95,9 @@ export default function GreModal({ isOpen, onClose, onSuccess, cpeData }: GreMod
     try {
       const greData = {
         ...formData,
-        pesoTotal: parseFloat(formData.pesoTotal) || 0
+        pesoTotal: parseFloat(formData.pesoTotal) || 0,
+        pedidoId: pedidoContext?.id,
+        pedidoNumero: pedidoContext?.numero,\n        tenantId: pedidoContext?.tenantId
       }
 
       console.log('🚚 Enviando datos GRE:', greData)
@@ -113,7 +140,7 @@ export default function GreModal({ isOpen, onClose, onSuccess, cpeData }: GreMod
           }, 3000)
         }
         
-        onSuccess()
+        onSuccess(result.data)
         onClose()
         // Reset form
         setFormData({
@@ -463,3 +490,4 @@ export default function GreModal({ isOpen, onClose, onSuccess, cpeData }: GreMod
     </div>
   )
 }
+

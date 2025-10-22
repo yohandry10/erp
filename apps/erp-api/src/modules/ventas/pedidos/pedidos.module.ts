@@ -10,6 +10,7 @@ import { GreModule } from '../../gre/gre.module';
 import { ValidationModule } from '../../validations/validation.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
 import { AuditModule } from '../../audit/audit.module';
+import { IntegrationModule } from '../../../shared/integration/integration.module';
 
 /**
  * PedidosModule
@@ -25,6 +26,7 @@ import { AuditModule } from '../../audit/audit.module';
     ValidationModule,
     PermissionsModule,
     AuditModule,
+    IntegrationModule,
   ],
   controllers: [PedidosController],
   providers: [PedidosService, CPEIntegrationService, GREIntegrationService],

@@ -9,10 +9,15 @@ export enum NotificationType {
   COTIZACION_CONVERTIDA = 'cotizacion_convertida',
   PEDIDO_CONFIRMADO = 'pedido_confirmado',
   PEDIDO_LISTO_DESPACHO = 'pedido_listo_despacho',
+  PEDIDO_DESPACHO_PARCIAL = 'pedido_despacho_parcial',
   PEDIDO_LISTO_FACTURAR = 'pedido_listo_facturar',
   STOCK_BAJO = 'stock_bajo',
   FACTURA_EMITIDA = 'factura_emitida',
-  GRE_GENERADA = 'gre_generada'
+  GRE_GENERADA = 'gre_generada',
+  BACKORDER_REPROGRAMADO = 'backorder_reprogramado',
+  // Integrations
+  INTEGRACION_ERROR = 'integration_error',
+  INTEGRACION_LENTA = 'integration_slow'
 }
 
 export enum NotificationSeverity {

@@ -92,9 +92,11 @@ export interface CotizacionDetalle {
 
 export enum EstadoPedido {
   PENDIENTE = 'PENDIENTE',
+  PENDIENTE_APROBACION = 'PENDIENTE_APROBACION',
   CONFIRMADO = 'CONFIRMADO',
   EN_PREPARACION = 'EN_PREPARACION',
   LISTO_DESPACHO = 'LISTO_DESPACHO',
+  DESPACHO_PARCIAL = 'DESPACHO_PARCIAL',
   LISTO_FACTURAR = 'LISTO_FACTURAR',
   FACTURADO = 'FACTURADO',
   COMPLETADO = 'COMPLETADO',
@@ -120,6 +122,11 @@ export interface PedidoVenta {
   detalle: PedidoDetalle[]
   created_at: string
   updated_at: string
+  requiere_aprobacion?: boolean
+  motivo_requiere_aprobacion?: string | null
+  estado_credito?: string
+  tracking_estado?: string
+  tracking_actualizado_en?: string | null
 }
 
 export interface PedidoDetalle {
@@ -130,4 +137,7 @@ export interface PedidoDetalle {
   cantidad: number
   precio_unitario: number
   subtotal: number
+  cantidad_despachada?: number
+  cantidad_facturada?: number
+  estado_item?: 'PENDIENTE' | 'PARCIAL' | 'DESPACHADO' | 'FACTURADO'
 }

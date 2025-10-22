@@ -6,4 +6,5 @@ export * from './role.controller';
 export * from './permissions.module';
 export * from './dto';
 export * from './ventas-permissions';
+export * from './finanzas-permissions';
 export * from './guards/permissions.guard';

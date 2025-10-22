@@ -64,6 +64,11 @@ const FLUJO_COMPLETO: TimelineStep[] = [
     description: 'Listo para despachar'
   },
   {
+    estado: EstadoPedido.DESPACHO_PARCIAL,
+    label: 'Despacho parcial',
+    description: 'Entrega parcial registrada'
+  },
+  {
     estado: EstadoPedido.LISTO_FACTURAR,
     label: 'Listo Facturar',
     description: 'Listo para facturar'

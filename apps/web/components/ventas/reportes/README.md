@@ -56,6 +56,26 @@ Este módulo implementa un sistema completo de reportes y estadísticas para el 
    - Análisis de tendencia temporal
    - Insights automáticos
 
+7. **PipelineReport.tsx**
+   - Pipeline completo desde cotización hasta facturación
+   - Conversiones porcentuales entre etapas comerciales
+   - Distribución de estados y tendencias mensuales
+
+8. **FillRateReport.tsx**
+   - Fill-rate global y OTIF del flujo logístico
+   - Métricas de SLA con pedidos sin entrega y fuera de plazo
+   - Tabla priorizada de incidentes para seguimiento operativo
+
+9. **AgingCxcReport.tsx**
+   - Aging de cuentas por cobrar agrupado por buckets de mora
+   - Ranking de clientes y documentos con mayor exposición
+   - Indicadores de concentración y riesgo de cartera
+
+10. **SunatMetricsReport.tsx**
+    - KPIs de aceptación SUNAT/OSE (rechazos, observados, pendientes)
+    - Historial de incidencias con detalles de error
+    - Tendencia mensual de estados electrónicos
+
 ### Backend (NestJS)
 
 #### Controlador
@@ -107,6 +127,8 @@ Todos los endpoints requieren el permiso: `ventas.reportes.ver`
 - ✅ **16.5**: Reporte de top clientes con mayor facturación
 - ✅ **16.6**: Métrica de lead time comercial
 - ✅ **16.7**: Filtros por rango de fechas, vendedor, cliente, estado
+- ✅ **P2 Logística**: Pipeline, fill-rate/OTIF y aging CxC listos para auditoría.
+- ✅ **KPIs SUNAT**: Tasa de rechazo, observación y seguimiento de incidencias.
 
 ## Uso
 
@@ -126,6 +148,10 @@ Usar los tabs para cambiar entre diferentes reportes:
 - Productos
 - Top Clientes
 - Lead Time
+- Pipeline
+- Fill-rate & OTIF
+- Aging CxC
+- SUNAT KPIs
 
 ### Exportación
 En el reporte de "Ventas por Cliente", hacer clic en "Exportar CSV" para descargar los datos.
@@ -155,3 +181,5 @@ En el reporte de "Ventas por Cliente", hacer clic en "Exportar CSV" para descarg
 - [ ] Filtros adicionales (vendedor, sucursal)
 - [ ] Guardado de filtros favoritos
 - [ ] Dashboard personalizable
+
+

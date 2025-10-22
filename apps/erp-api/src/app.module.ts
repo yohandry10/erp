@@ -15,6 +15,7 @@ import { ComprasModule } from './modules/compras/compras.module';
 import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ContabilidadModule } from './modules/contabilidad/contabilidad.module';
+import { CxcModule } from './modules/finanzas/cxc/cxc.module';
 import { DocumentosModule } from './modules/documentos/documentos.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -51,6 +52,7 @@ import { ReportesModule } from './modules/ventas/reportes/reportes.module';
     CotizacionesModule,
     InventarioModule,
     ContabilidadModule,
+    CxcModule,
     DocumentosModule,
     ReportsModule,
     NotificationsModule,

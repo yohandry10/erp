@@ -10,9 +10,11 @@ import { es } from 'date-fns/locale'
 
 const ESTADO_COLORS: Record<EstadoPedido, { bg: string, text: string }> = {
   [EstadoPedido.PENDIENTE]: { bg: 'rgba(234, 179, 8, 0.1)', text: '#ca8a04' },
+  [EstadoPedido.PENDIENTE_APROBACION]: { bg: 'rgba(249, 115, 22, 0.12)', text: '#c2410c' },
   [EstadoPedido.CONFIRMADO]: { bg: 'rgba(59, 130, 246, 0.1)', text: '#2563eb' },
   [EstadoPedido.EN_PREPARACION]: { bg: 'rgba(139, 92, 246, 0.1)', text: '#7c3aed' },
   [EstadoPedido.LISTO_DESPACHO]: { bg: 'rgba(99, 102, 241, 0.1)', text: '#4f46e5' },
+  [EstadoPedido.DESPACHO_PARCIAL]: { bg: 'rgba(245, 158, 11, 0.1)', text: '#b45309' },
   [EstadoPedido.LISTO_FACTURAR]: { bg: 'rgba(16, 185, 129, 0.1)', text: '#059669' },
   [EstadoPedido.FACTURADO]: { bg: 'rgba(20, 184, 166, 0.1)', text: '#0d9488' },
   [EstadoPedido.COMPLETADO]: { bg: 'rgba(156, 163, 175, 0.1)', text: '#6b7280' },
@@ -22,9 +24,11 @@ const ESTADO_COLORS: Record<EstadoPedido, { bg: string, text: string }> = {
 
 const ESTADO_LABELS: Record<EstadoPedido, string> = {
   [EstadoPedido.PENDIENTE]: 'Pendiente',
+  [EstadoPedido.PENDIENTE_APROBACION]: 'Pendiente de aprobación',
   [EstadoPedido.CONFIRMADO]: 'Confirmado',
   [EstadoPedido.EN_PREPARACION]: 'En Preparación',
   [EstadoPedido.LISTO_DESPACHO]: 'Listo Despacho',
+  [EstadoPedido.DESPACHO_PARCIAL]: 'Despacho parcial',
   [EstadoPedido.LISTO_FACTURAR]: 'Listo Facturar',
   [EstadoPedido.FACTURADO]: 'Facturado',
   [EstadoPedido.COMPLETADO]: 'Completado',
@@ -102,6 +106,58 @@ export default function PedidosPage() {
 
   const formatMonto = (monto: number) => {
     return `S/ ${monto.toFixed(2)}`
+  }
+
+  const renderEstadoCredito = (estado?: string, requiere?: boolean) => {
+    const map: Record<string, { bg: string; text: string }> = {
+      BLOQUEADO: { bg: 'rgba(239, 68, 68, 0.12)', text: '#b91c1c' },
+      REVISION: { bg: 'rgba(251, 191, 36, 0.15)', text: '#b45309' },
+      APROBADO: { bg: 'rgba(34, 197, 94, 0.12)', text: '#166534' },
+      APROBADO_MANUAL: { bg: 'rgba(34, 197, 94, 0.12)', text: '#166534' },
+      OK: { bg: 'rgba(34, 197, 94, 0.12)', text: '#166534' },
+      SIN_EVALUAR: { bg: 'rgba(148, 163, 184, 0.12)', text: '#475569' },
+    }
+
+    const normalized = (estado || 'SIN_EVALUAR').toUpperCase()
+    const style = map[normalized] || map.SIN_EVALUAR
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '9999px',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            backgroundColor: style.bg,
+            color: style.text,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          {normalized}
+        </span>
+        {requiere && (
+          <span
+            style={{
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              color: '#c2410c',
+              backgroundColor: 'rgba(249, 115, 22, 0.08)',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              padding: '0.15rem 0.5rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Requiere aprobación
+          </span>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -324,6 +380,9 @@ export default function PedidosPage() {
                       Estado
                     </th>
                     <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      Estado Crédito
+                    </th>
+                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
                       Total
                     </th>
                     <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
@@ -361,6 +420,9 @@ export default function PedidosPage() {
                         }}>
                           {ESTADO_LABELS[pedido.estado]}
                         </span>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        {renderEstadoCredito(pedido.estado_credito, pedido.requiere_aprobacion)}
                       </td>
                       <td style={{ padding: '1rem', fontSize: '0.875rem', fontWeight: '600' }}>
                         {formatMonto(pedido.total)}

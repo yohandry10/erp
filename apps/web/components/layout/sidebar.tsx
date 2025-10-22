@@ -21,7 +21,9 @@ import {
   Shield,
   LayoutDashboard,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CheckCircle,
+  DollarSign
 } from 'lucide-react'
 
 interface MenuItem {
@@ -177,6 +179,37 @@ const menuItems: MenuItem[] = [
           accion: 'read',
           recurso: 'pedidos'
         }
+      },
+      {
+        title: 'Aprobaciones',
+        href: '/dashboard/ventas/aprobaciones',
+        icon: CheckCircle,
+        permission: {
+          modulo: 'ventas',
+          accion: 'ver',
+          recurso: 'aprobaciones'
+        }
+      }
+    ]
+  },
+  {
+    title: 'Finanzas',
+    icon: DollarSign,
+    permission: {
+      modulo: 'finanzas',
+      accion: 'ver',
+      recurso: 'cxc'
+    },
+    submenu: [
+      {
+        title: 'Cuentas por Cobrar',
+        href: '/dashboard/finanzas/cxc',
+        icon: DollarSign,
+        permission: {
+          modulo: 'finanzas',
+          accion: 'ver',
+          recurso: 'cxc'
+        }
       }
     ]
   },
@@ -323,7 +356,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
           {isExpanded ? (
             <ChevronDown size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
           ) : (
-            <ChevronRight size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+            <ChevronRight,
+  CheckCircle,
+  DollarSign size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
           )}
         </button>
         

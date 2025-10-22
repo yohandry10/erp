@@ -10,6 +10,7 @@
     "start:debug": "nest start --debug --watch",
     "build": "nest build",
     "lint": "eslint src --ext .ts",
+    "test": "ts-node --transpile-only tests/run-tests.ts",
     "clean": "rmdir /s /q dist 2>nul || echo Cleaned"
   },
   "dependencies": {

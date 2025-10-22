@@ -128,6 +128,24 @@ export const VENTAS_PEDIDOS_PERMISSIONS: PermissionDefinition[] = [
 ];
 
 /**
+ * Permisos del módulo de Ventas - Aprobaciones de pedidos
+ */
+export const VENTAS_APROBACIONES_PERMISSIONS: PermissionDefinition[] = [
+  {
+    modulo: 'ventas',
+    recurso: 'aprobaciones',
+    accion: 'ver',
+    descripcion: 'Ver bandeja e historial de aprobaciones de pedidos',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'aprobaciones',
+    accion: 'resolver',
+    descripcion: 'Aprobar o rechazar pedidos pendientes de autorización',
+  },
+];
+
+/**
  * Permisos del módulo de Inventario - Logística
  * Requirements: 14.6
  */
@@ -159,6 +177,7 @@ export const ALL_VENTAS_PERMISSIONS: PermissionDefinition[] = [
   ...VENTAS_CLIENTES_PERMISSIONS,
   ...VENTAS_COTIZACIONES_PERMISSIONS,
   ...VENTAS_PEDIDOS_PERMISSIONS,
+  ...VENTAS_APROBACIONES_PERMISSIONS,
   ...INVENTARIO_LOGISTICA_PERMISSIONS,
 ];
 

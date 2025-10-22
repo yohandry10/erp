@@ -6,9 +6,11 @@
 
 export enum EstadoPedido {
   PENDIENTE = 'PENDIENTE',
+  PENDIENTE_APROBACION = 'PENDIENTE_APROBACION',
   CONFIRMADO = 'CONFIRMADO',
   EN_PREPARACION = 'EN_PREPARACION',
   LISTO_DESPACHO = 'LISTO_DESPACHO',
+  DESPACHO_PARCIAL = 'DESPACHO_PARCIAL',
   LISTO_FACTURAR = 'LISTO_FACTURAR',
   FACTURADO = 'FACTURADO',
   COMPLETADO = 'COMPLETADO',
@@ -33,4 +35,12 @@ export interface PedidoVenta {
   created_at: string;
   updated_at: string;
   created_by?: string;
+  requiere_aprobacion?: boolean;
+  motivo_requiere_aprobacion?: string | null;
+  aprobado_por?: string | null;
+  aprobado_en?: string | null;
+  estado_credito?: string;
+  tracking_estado?: string;
+  tracking_actualizado_en?: string | null;
+  tracking_notas?: string | null;
 }

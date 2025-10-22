@@ -1,15 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  Package, 
-  FileText, 
-  Download,
+import {
+  Activity,
+  BarChart3,
   Calendar,
-  DollarSign
+  Clock,
+  Download,
+  DollarSign,
+  FileText,
+  GitMerge,
+  Package,
+  ShieldAlert,
+  TrendingUp,
+  Users
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -19,6 +23,10 @@ import PedidosPorEstadoReport from '@/components/ventas/reportes/PedidosPorEstad
 import ProductosMasVendidosReport from '@/components/ventas/reportes/ProductosMasVendidosReport'
 import TopClientesReport from '@/components/ventas/reportes/TopClientesReport'
 import LeadTimeReport from '@/components/ventas/reportes/LeadTimeReport'
+import PipelineReport from '@/components/ventas/reportes/PipelineReport'
+import FillRateReport from '@/components/ventas/reportes/FillRateReport'
+import AgingCxcReport from '@/components/ventas/reportes/AgingCxcReport'
+import SunatMetricsReport from '@/components/ventas/reportes/SunatMetricsReport'
 
 interface ReportFilters {
   fechaDesde: string
@@ -53,7 +61,11 @@ export default function ReportesPage() {
     { id: 'pedidos-estado', label: 'Pedidos', icon: BarChart3 },
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'top-clientes', label: 'Top Clientes', icon: TrendingUp },
-    { id: 'lead-time', label: 'Lead Time', icon: DollarSign }
+    { id: 'lead-time', label: 'Lead Time', icon: DollarSign },
+    { id: 'pipeline', label: 'Pipeline', icon: GitMerge },
+    { id: 'fill-rate', label: 'Fill-rate & OTIF', icon: Activity },
+    { id: 'aging', label: 'Aging CxC', icon: Clock },
+    { id: 'sunat', label: 'SUNAT KPIs', icon: ShieldAlert }
   ]
 
   return (
@@ -216,6 +228,10 @@ export default function ReportesPage() {
           {activeTab === 'productos' && <ProductosMasVendidosReport filters={filters} />}
           {activeTab === 'top-clientes' && <TopClientesReport filters={filters} />}
           {activeTab === 'lead-time' && <LeadTimeReport filters={filters} />}
+          {activeTab === 'pipeline' && <PipelineReport filters={filters} />}
+          {activeTab === 'fill-rate' && <FillRateReport filters={filters} />}
+          {activeTab === 'aging' && <AgingCxcReport filters={filters} />}
+          {activeTab === 'sunat' && <SunatMetricsReport filters={filters} />}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
 import { CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
+import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
 
 /**
  * CPEIntegrationService
@@ -18,6 +19,7 @@ export class CPEIntegrationService {
     private readonly supabase: SupabaseService,
     private readonly cpeService: CpeService,
     private readonly validationService: ValidationService,
+    private readonly integrationAlerts: IntegrationAlertsService,
   ) {}
 
   /**
@@ -27,8 +29,10 @@ export class CPEIntegrationService {
   async generarFacturaDesdePedido(
     pedido: PedidoVenta & { detalle: PedidoDetalle[] },
     tenantId: string,
-  ): Promise<{ factura_id: string; estado: string; warnings?: string[] }> {
+  ): Promise<{ factura_id: string; estado: string; warnings?: string[]; serie?: string; numero?: number; moneda?: string; fecha_emision?: string; total: number }> {
     this.logger.log(`Generando factura desde pedido ${pedido.id}`);
+
+    const startedAt = Date.now();
 
     try {
       // 1. Validar que no supere 999 items (Requirement 15.3, 19.5)
@@ -77,16 +81,41 @@ export class CPEIntegrationService {
       // 7. Manejar respuestas de SUNAT (Requirement 10.7, 19.9, 19.10)
       const resultado = this.procesarRespuestaSUNAT(factura);
 
+      const durationMs = Date.now() - startedAt;
+
+      await this.registrarExitoIntegracion({
+        pedidoId: pedido.id,
+        tenantId,
+        facturaId: factura.id ?? null,
+        durationMs,
+        responseSummary: {
+          serie: factura.serie ?? facturaData.serie,
+          numero: factura.numero ?? facturaData.numero,
+          estado: resultado.estado,
+        },
+      });
+
       return {
         factura_id: factura.id,
         estado: resultado.estado,
         warnings: resultado.warnings,
+        serie: factura.serie ?? facturaData.serie,
+        numero: factura.numero ?? facturaData.numero,
+        moneda: factura.moneda ?? facturaData.moneda ?? 'PEN',
+        fecha_emision: factura.fecha_emision ?? new Date().toISOString().split('T')[0],
+        total: factura.total_venta ?? facturaData.total_venta,
       };
     } catch (error) {
       this.logger.error(`Error generando factura desde pedido ${pedido.id}:`, error);
-      
+      const durationMs = Date.now() - startedAt;
+
       // Registrar error para reintentos (Requirement 19.10)
-      await this.registrarErrorIntegracion(pedido.id, 'GENERAR_FACTURA', error.message, tenantId);
+      await this.registrarErrorIntegracion({
+        pedidoId: pedido.id,
+        tenantId,
+        errorMessage: error?.message ?? 'Error desconocido generando factura',
+        durationMs,
+      });
       
       throw error;
     }
@@ -207,7 +236,7 @@ export class CPEIntegrationService {
   private async obtenerEmpresaConfig(tenantId: string): Promise<any> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('ruc, razon_social, serie_factura, correlativo_factura')
+      .select('ruc, razon_social, serie_factura, ultimo_numero_factura')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -237,7 +266,7 @@ export class CPEIntegrationService {
   private async obtenerSerieYNumero(tenantId: string): Promise<{ serie: string; numero: number }> {
     const { data: config, error } = await this.supabase.getClient()
       .from('empresa_config')
-      .select('serie_factura, correlativo_factura')
+      .select('serie_factura, ultimo_numero_factura')
       .eq('tenant_id', tenantId)
       .single();
 
@@ -246,55 +275,62 @@ export class CPEIntegrationService {
     }
 
     const serie = config.serie_factura || 'F001';
-    const numero = (config.correlativo_factura || 0) + 1;
+    const numero = (config.ultimo_numero_factura || 0) + 1;
 
     // Actualizar correlativo
     await this.supabase.getClient()
       .from('empresa_config')
-      .update({ correlativo_factura: numero })
+      .update({ ultimo_numero_factura: numero, updated_at: new Date().toISOString() })
       .eq('tenant_id', tenantId);
 
     return { serie, numero };
   }
 
+  private async registrarExitoIntegracion(options: {
+    pedidoId: string;
+    tenantId: string;
+    facturaId: string | null;
+    durationMs: number;
+    responseSummary?: Record<string, unknown>;
+  }): Promise<void> {
+    const { pedidoId, tenantId, facturaId, durationMs, responseSummary } = options;
+
+    await this.integrationAlerts.recordSuccess({
+      tenantId,
+      servicio: 'CPE',
+      operacion: 'GENERAR_FACTURA',
+      correlacionId: pedidoId,
+      correlacionTipo: 'PEDIDO',
+      statusCode: 200,
+      durationMs,
+      responseSummary: responseSummary ?? null,
+      metadata: facturaId ? { factura_id: facturaId } : null,
+    });
+  }
+
   /**
    * Registra errores de integración para auditoría y reintentos
    * Requirements: 19.10
-   * 
-   * Nota: Si la tabla integracion_logs no existe, solo registra en logs
    */
-  private async registrarErrorIntegracion(
-    pedidoId: string,
-    operacion: string,
-    errorMessage: string,
-    tenantId: string,
-  ): Promise<void> {
-    try {
-      // Intentar registrar en base de datos si la tabla existe
-      const { error } = await this.supabase.getClient()
-        .from('integracion_logs')
-        .insert({
-          tenant_id: tenantId,
-          servicio: 'CPE',
-          operacion: operacion,
-          referencia_tipo: 'PEDIDO',
-          referencia_id: pedidoId,
-          estado: 'ERROR',
-          error_message: errorMessage,
-          created_at: new Date().toISOString(),
-        });
+  private async registrarErrorIntegracion(options: {
+    pedidoId: string;
+    tenantId: string;
+    errorMessage: string;
+    durationMs: number;
+  }): Promise<void> {
+    const { pedidoId, tenantId, errorMessage, durationMs } = options;
 
-      if (error) {
-        // Si la tabla no existe, solo registrar en logs
-        this.logger.warn(`No se pudo registrar en integracion_logs (tabla no existe): ${error.message}`);
-        this.logger.error(`[INTEGRACION_ERROR] Pedido: ${pedidoId}, Operación: ${operacion}, Error: ${errorMessage}`);
-      } else {
-        this.logger.log(`Error de integración registrado para pedido ${pedidoId}`);
-      }
-    } catch (error) {
-      this.logger.error('Error registrando log de integración:', error);
-      this.logger.error(`[INTEGRACION_ERROR] Pedido: ${pedidoId}, Operación: ${operacion}, Error: ${errorMessage}`);
-      // No lanzar error aquí para no interrumpir el flujo principal
-    }
+    await this.integrationAlerts.recordError({
+      tenantId,
+      servicio: 'CPE',
+      operacion: 'GENERAR_FACTURA',
+      correlacionId: pedidoId,
+      correlacionTipo: 'PEDIDO',
+      errorMessage,
+      durationMs,
+      metadata: {
+        source: 'CPEIntegrationService',
+      },
+    });
   }
 }

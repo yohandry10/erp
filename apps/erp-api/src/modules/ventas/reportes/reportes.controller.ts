@@ -183,4 +183,81 @@ export class ReportesController {
     );
     return { success: true, data };
   }
+
+  /**
+   * GET /api/ventas/reportes/pipeline
+   * Pipeline comercial (cotizaciones → pedidos → facturas)
+   */
+  @Get('pipeline')
+  @RequirePermissions('ventas', 'reportes', 'ver')
+  @ApiOperation({
+    summary: 'Pipeline comercial',
+    description: 'Obtiene métricas de conversión desde cotizaciones hasta facturación',
+  })
+  async getPipeline(
+    @CurrentTenant() tenantId: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const data = await this.reportesService.getPipelineVentas(tenantId, fechaDesde, fechaHasta);
+    return { success: true, data };
+  }
+
+  /**
+   * GET /api/ventas/reportes/fill-rate
+   * Fill-rate y OTIF del flujo logístico
+   */
+  @Get('fill-rate')
+  @RequirePermissions('ventas', 'reportes', 'ver')
+  @ApiOperation({
+    summary: 'Fill-rate y OTIF',
+    description:
+      'Calcula el porcentaje de pedidos entregados en cantidad completa y dentro del SLA definido',
+  })
+  async getFillRate(
+    @CurrentTenant() tenantId: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const data = await this.reportesService.getFillRateOtif(tenantId, fechaDesde, fechaHasta);
+    return { success: true, data };
+  }
+
+  /**
+   * GET /api/ventas/reportes/cxc-aging
+   * Aging de cuentas por cobrar
+   */
+  @Get('cxc-aging')
+  @RequirePermissions('ventas', 'reportes', 'ver')
+  @ApiOperation({
+    summary: 'Aging de cuentas por cobrar',
+    description: 'Distribución del saldo pendiente por rangos de mora e identificación de cuentas críticas',
+  })
+  async getAging(
+    @CurrentTenant() tenantId: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const data = await this.reportesService.getAgingCxc(tenantId, fechaDesde, fechaHasta);
+    return { success: true, data };
+  }
+
+  /**
+   * GET /api/ventas/reportes/sunat-kpis
+   * Métricas de aceptación SUNAT
+   */
+  @Get('sunat-kpis')
+  @RequirePermissions('ventas', 'reportes', 'ver')
+  @ApiOperation({
+    summary: 'KPIs SUNAT',
+    description: 'Tasas de aceptación, observación y rechazo de documentos electrónicos',
+  })
+  async getSunatKpis(
+    @CurrentTenant() tenantId: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const data = await this.reportesService.getSunatMetricas(tenantId, fechaDesde, fechaHasta);
+    return { success: true, data };
+  }
 }

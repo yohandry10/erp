@@ -16,7 +16,13 @@ import { PermissionsGuard, RequirePermissions } from '../../permissions';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { PedidosService } from './pedidos.service';
-import { CreatePedidoDto, UpdatePedidoDto, ConfirmarPedidoDto, CancelarPedidoDto } from './dto';
+import {
+  CreatePedidoDto,
+  UpdatePedidoDto,
+  ConfirmarPedidoDto,
+  CancelarPedidoDto,
+  DecidirAprobacionDto,
+} from './dto';
 import { EstadoPedido } from './entities';
 
 /**
@@ -89,6 +95,61 @@ export class PedidosController {
   }
 
   /**
+   * GET /api/ventas/pedidos/aprobaciones/pendientes - Bandeja de pedidos pendientes de aprobación
+   */
+  @Get('aprobaciones/pendientes')
+  @RequirePermissions('ventas', 'aprobaciones', 'ver')
+  @ApiOperation({
+    summary: 'Listar pedidos pendientes de aprobación',
+    description: 'Obtiene la bandeja de pedidos que requieren decisión de aprobación o rechazo',
+  })
+  @ApiResponse({ status: 200, description: 'Pendientes obtenidos exitosamente' })
+  async listarPendientesAprobacion(@CurrentTenant() tenantId: string) {
+    return this.pedidosService.listarPendientesAprobacion(tenantId);
+  }
+
+  /**
+   * GET /api/ventas/pedidos/:id/aprobaciones - Historial de aprobaciones del pedido
+   */
+  @Get(':id/aprobaciones')
+  @RequirePermissions('ventas', 'aprobaciones', 'ver')
+  @ApiOperation({
+    summary: 'Historial de aprobaciones',
+    description: 'Obtiene las decisiones registradas para el pedido (aprobaciones/rechazos)',
+  })
+  @ApiResponse({ status: 200, description: 'Historial obtenido exitosamente' })
+  async obtenerHistorialAprobaciones(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.pedidosService.obtenerHistorialAprobaciones(id, tenantId);
+  }
+
+  /**
+   * POST /api/ventas/pedidos/:id/aprobaciones/decision - Registrar decisión de aprobación
+   */
+  @Post(':id/aprobaciones/decision')
+  @RequirePermissions('ventas', 'aprobaciones', 'resolver')
+  @ApiOperation({
+    summary: 'Resolver aprobación de pedido',
+    description: 'Registra una decisión de aprobación o rechazo para el pedido pendiente',
+  })
+  @ApiResponse({ status: 200, description: 'Decisión registrada exitosamente' })
+  @ApiResponse({ status: 400, description: 'El pedido no está pendiente de aprobación' })
+  async decidirAprobacion(
+    @Param('id') id: string,
+    @Body() decidirAprobacionDto: DecidirAprobacionDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pedidosService.decidirAprobacion(
+      id,
+      tenantId,
+      decidirAprobacionDto.decision,
+      decidirAprobacionDto.motivos ?? [],
+      user?.id,
+      decidirAprobacionDto.observaciones,
+    );
+  }
+
+  /**
    * GET /api/ventas/pedidos/:id - Obtener pedido por ID
    * Requirements: 5.3
    */
@@ -148,11 +209,13 @@ export class PedidosController {
     @Param('id') id: string,
     @Body() confirmarPedidoDto: ConfirmarPedidoDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     return this.pedidosService.confirmarPedido(
       id,
       tenantId,
       confirmarPedidoDto.forzar_confirmacion,
+      user?.id,
     );
   }
 
@@ -224,5 +287,19 @@ export class PedidosController {
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async getHistorial(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     return this.pedidosService.getHistorial(id, tenantId);
+  }
+
+  /**
+   * GET /api/ventas/pedidos/:id/gres - Listar GRE asociadas al pedido
+   */
+  @Get(':id/gres')
+  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @ApiOperation({
+    summary: 'Listar GRE asociadas',
+    description: 'Obtiene las guías de remisión vinculadas al pedido',
+  })
+  async listarGresDelPedido(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    const data = await this.pedidosService.obtenerGreAsociadas(id, tenantId);
+    return { success: true, data };
   }
 }
