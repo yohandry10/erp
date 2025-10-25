@@ -35,6 +35,8 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware'; // ✅
 import { ClientesModule } from './modules/ventas/clientes/clientes.module';
 import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
 import { ReportesModule } from './modules/ventas/reportes/reportes.module';
+import { RmaModule } from './modules/ventas/rma/rma.module';
+import { SecurityDashboardModule } from './modules/security/security.module';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { ReportesModule } from './modules/ventas/reportes/reportes.module';
       envFilePath: '.env',
     }),
     SecurityModule,
+    SecurityDashboardModule,
     AuthModule,
     SupabaseModule,
     IntegrationModule,
@@ -70,6 +73,7 @@ import { ReportesModule } from './modules/ventas/reportes/reportes.module';
     ClientesModule,
     PedidosModule,
     ReportesModule,
+    RmaModule,
   ],
   controllers: [AppController],
   providers: [

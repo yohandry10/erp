@@ -9,6 +9,18 @@ export class ItemDespachadoDto {
   @IsNumber({}, { message: 'La cantidad debe ser numérica' })
   @Min(0, { message: 'La cantidad debe ser mayor o igual a cero' })
   cantidad?: number;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'almacen_id debe ser un UUID válido' })
+  almacen_id?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'ubicacion_id debe ser un UUID válido' })
+  ubicacion_id?: string;
+
+  @IsOptional()
+  @IsString()
+  lote?: string;
 }
 
 /**
@@ -20,6 +32,18 @@ export class ConfirmarDespachoDto {
   @IsOptional()
   @IsString()
   notas?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'almacen_id debe ser un UUID válido' })
+  almacen_id?: string;
+
+  @IsOptional()
+  @IsUUID('4', { message: 'ubicacion_id debe ser un UUID válido' })
+  ubicacion_id?: string;
+
+  @IsOptional()
+  @IsString()
+  lote?: string;
 
   @IsOptional()
   @IsArray()

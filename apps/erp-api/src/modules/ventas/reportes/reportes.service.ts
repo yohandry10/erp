@@ -573,22 +573,12 @@ export class ReportesService {
     fechaHasta?: string,
   ) {
     const client = this.supabase.getClient();
+    const dashboardConfig = await this.obtenerConfigDashboards(tenantId);
     const SLA_DIAS = 5;
 
-    const pedidosQuery = client
-      .from('pedidos_venta')
-      .select('id, numero, fecha, estado, tracking_estado, tracking_actualizado_en', { count: 'exact' })
-      .eq('tenant_id', tenantId);
-
-    const pedidosFiltrados = fechaDesde ? pedidosQuery.gte('fecha', fechaDesde) : pedidosQuery;
-    const pedidosResult = fechaHasta ? pedidosFiltrados.lte('fecha', fechaHasta) : pedidosFiltrados;
-
-    const { data: pedidos, error: pedidosError } = await pedidosResult;
-    if (pedidosError) throw pedidosError;
-
-    const pedidoIds = (pedidos || []).map((pedido) => pedido.id);
-    if (pedidoIds.length === 0) {
+    if (!dashboardConfig.habilitar_dashboards_otif) {
       return {
+        habilitado: false,
         resumen: {
           pedidosAnalizados: 0,
           pedidosEntregados: 0,
@@ -609,6 +599,48 @@ export class ReportesService {
           unidadesPendientes: 0,
           topPrioritarios: [],
         },
+        objetivoOtif: dashboardConfig.objetivo_otif,
+        frecuenciaActualizacion: dashboardConfig.frecuencia_actualizacion_dashboards,
+      };
+    }
+
+    const pedidosQuery = client
+      .from('pedidos_venta')
+      .select('id, numero, fecha, estado, tracking_estado, tracking_actualizado_en', { count: 'exact' })
+      .eq('tenant_id', tenantId);
+
+    const pedidosFiltrados = fechaDesde ? pedidosQuery.gte('fecha', fechaDesde) : pedidosQuery;
+    const pedidosResult = fechaHasta ? pedidosFiltrados.lte('fecha', fechaHasta) : pedidosFiltrados;
+
+    const { data: pedidos, error: pedidosError } = await pedidosResult;
+    if (pedidosError) throw pedidosError;
+
+    const pedidoIds = (pedidos || []).map((pedido) => pedido.id);
+    if (pedidoIds.length === 0) {
+      return {
+        habilitado: true,
+        resumen: {
+          pedidosAnalizados: 0,
+          pedidosEntregados: 0,
+          totalSolicitado: 0,
+          totalEntregado: 0,
+          fillRate: 0,
+          otif: 0,
+          pedidosConBackorder: 0,
+          unidadesPendientesBackorder: 0,
+        },
+        incidencias: {
+          pedidosSinEntrega: 0,
+          pedidosFueraSla: 0,
+        },
+        detalle: [],
+        backorders: {
+          pedidosConPendiente: 0,
+          unidadesPendientes: 0,
+          topPrioritarios: [],
+        },
+        objetivoOtif: dashboardConfig.objetivo_otif,
+        frecuenciaActualizacion: dashboardConfig.frecuencia_actualizacion_dashboards,
       };
     }
 
@@ -790,6 +822,7 @@ export class ReportesService {
       .slice(0, 15);
 
     return {
+      habilitado: true,
       resumen: {
         pedidosAnalizados: pedidos?.length ?? 0,
         pedidosEntregados,
@@ -812,6 +845,8 @@ export class ReportesService {
         unidadesPendientes: this.round2(unidadesBackorder),
         topPrioritarios: topBackorders,
       },
+      objetivoOtif: dashboardConfig.objetivo_otif,
+      frecuenciaActualizacion: dashboardConfig.frecuencia_actualizacion_dashboards,
     };
   }
 
@@ -953,30 +988,82 @@ export class ReportesService {
     fechaHasta?: string,
   ) {
     const client = this.supabase.getClient();
+    const dashboardConfig = await this.obtenerConfigDashboards(tenantId);
 
-    let query = client
+    if (!dashboardConfig.habilitar_dashboards_sunat) {
+      return {
+        habilitado: false,
+        total: 0,
+        aceptados: 0,
+        observados: 0,
+        rechazados: 0,
+        pendientes: 0,
+        tasaRechazo: 0,
+        tasaObservacion: 0,
+        incidencias: [],
+        tendencia: [],
+        frecuenciaActualizacion: dashboardConfig.frecuencia_actualizacion_dashboards,
+      };
+    }
+
+    let kpiQuery = client
+      .from('v_kpis_sunat_multitenant')
+      .select('periodo, aceptados, observados, rechazados, pendientes, total')
+      .eq('tenant_id', tenantId)
+      .order('periodo', { ascending: true });
+
+    if (fechaDesde) {
+      kpiQuery = kpiQuery.gte('periodo', fechaDesde);
+    }
+    if (fechaHasta) {
+      kpiQuery = kpiQuery.lte('periodo', fechaHasta);
+    }
+
+    const { data: kpis, error: kpiError } = await kpiQuery;
+    if (kpiError) {
+      throw kpiError;
+    }
+
+    let total = 0;
+    let aceptados = 0;
+    let observados = 0;
+    let rechazados = 0;
+    let pendientes = 0;
+
+    (kpis || []).forEach((row) => {
+      total += Number(row.total ?? 0);
+      aceptados += Number(row.aceptados ?? 0);
+      observados += Number(row.observados ?? 0);
+      rechazados += Number(row.rechazados ?? 0);
+      pendientes += Number(row.pendientes ?? 0);
+    });
+
+    const tendencia = (kpis || []).map((row) => ({
+      periodo: row.periodo,
+      aceptados: Number(row.aceptados ?? 0),
+      observados: Number(row.observados ?? 0),
+      rechazados: Number(row.rechazados ?? 0),
+      pendientes: Number(row.pendientes ?? 0),
+      total: Number(row.total ?? 0),
+    }));
+
+    let documentosQuery = client
       .from('documentos')
-      .select('id, serie, numero, estado, fecha_emision, error_sunat, tipo_documento', { count: 'exact' })
+      .select('id, serie, numero, estado, fecha_emision, error_sunat, tipo_documento')
       .eq('tenant_id', tenantId)
       .in('tipo_documento', ['FACTURA', 'BOLETA', 'NOTA_CREDITO']);
 
     if (fechaDesde) {
-      query = query.gte('fecha_emision', fechaDesde);
+      documentosQuery = documentosQuery.gte('fecha_emision', fechaDesde);
     }
     if (fechaHasta) {
-      query = query.lte('fecha_emision', fechaHasta);
+      documentosQuery = documentosQuery.lte('fecha_emision', fechaHasta);
     }
 
-    const { data: documentos, count: totalDocumentos, error } = await query;
-    if (error) throw error;
-
-    const estados = this.contarPorEstado(documentos, 'estado');
-    const total = totalDocumentos ?? documentos?.length ?? 0;
-    const rechazados = estados.RECHAZADO ?? 0;
-    const observados = estados.OBSERVADO ?? 0;
-    const aceptados = estados.ACEPTADO ?? 0;
-
-    const tasa = (cantidad: number) => (total > 0 ? this.round2((cantidad / total) * 100) : 0);
+    const { data: documentos, error: docError } = await documentosQuery;
+    if (docError) {
+      throw docError;
+    }
 
     const incidencias = (documentos || [])
       .filter((doc) => doc.estado === 'RECHAZADO' || doc.estado === 'OBSERVADO')
@@ -995,18 +1082,47 @@ export class ReportesService {
         tipo_documento: doc.tipo_documento,
       }));
 
-    const tendencia = this.agruparSunatPorPeriodo(documentos || []);
+    const tasa = (cantidad: number) => (total > 0 ? this.round2((cantidad / total) * 100) : 0);
 
     return {
+      habilitado: true,
       total,
       aceptados,
       observados,
       rechazados,
-      pendientes: estados.PENDIENTE ?? estados.EMITIDO ?? 0,
+      pendientes,
       tasaRechazo: tasa(rechazados),
       tasaObservacion: tasa(observados),
       incidencias,
       tendencia,
+      frecuenciaActualizacion: dashboardConfig.frecuencia_actualizacion_dashboards,
+    };
+  }
+
+  private async obtenerConfigDashboards(tenantId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('empresa_config')
+      .select(
+        'habilitar_dashboards_otif, objetivo_otif, habilitar_dashboards_sunat, frecuencia_actualizacion_dashboards',
+      )
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return {
+        habilitar_dashboards_otif: true,
+        objetivo_otif: 95,
+        habilitar_dashboards_sunat: true,
+        frecuencia_actualizacion_dashboards: 60,
+      };
+    }
+
+    return {
+      habilitar_dashboards_otif: data.habilitar_dashboards_otif ?? true,
+      objetivo_otif: data.objetivo_otif ?? 95,
+      habilitar_dashboards_sunat: data.habilitar_dashboards_sunat ?? true,
+      frecuencia_actualizacion_dashboards: data.frecuencia_actualizacion_dashboards ?? 60,
     };
   }
 

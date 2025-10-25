@@ -170,6 +170,39 @@ export const INVENTARIO_LOGISTICA_PERMISSIONS: PermissionDefinition[] = [
   },
 ];
 
+export const VENTAS_RMA_PERMISSIONS: PermissionDefinition[] = [
+  {
+    modulo: 'ventas',
+    recurso: 'rma',
+    accion: 'ver',
+    descripcion: 'Ver solicitudes de RMA y su historial',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'rma',
+    accion: 'crear',
+    descripcion: 'Registrar solicitudes de RMA y devoluciones',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'rma',
+    accion: 'aprobar',
+    descripcion: 'Aprobar o rechazar solicitudes de RMA',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'rma',
+    accion: 'recepcionar',
+    descripcion: 'Registrar la recepción física de devoluciones RMA',
+  },
+  {
+    modulo: 'ventas',
+    recurso: 'rma',
+    accion: 'generar_nota_credito',
+    descripcion: 'Generar notas de crédito asociadas a RMA',
+  },
+];
+
 /**
  * Todos los permisos del módulo de Ventas
  */
@@ -179,6 +212,7 @@ export const ALL_VENTAS_PERMISSIONS: PermissionDefinition[] = [
   ...VENTAS_PEDIDOS_PERMISSIONS,
   ...VENTAS_APROBACIONES_PERMISSIONS,
   ...INVENTARIO_LOGISTICA_PERMISSIONS,
+  ...VENTAS_RMA_PERMISSIONS,
 ];
 
 /**

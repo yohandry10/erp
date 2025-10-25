@@ -38,6 +38,27 @@ export class ConfigurationController {
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getConfigurationStatus(@CurrentUser() user?: User) {
     try {
+      // SUPER ADMINS DON'T NEED CONFIGURATION - ALWAYS RETURN COMPLETE
+      if (user?.is_super_admin === true) {
+        this.logger.log(`Super admin detected - returning complete status`);
+        return {
+          success: true,
+          data: {
+            isComplete: true,
+            completionPercentage: 100,
+            missingItems: [],
+            certificate: {
+              exists: true,
+              isValid: true,
+            },
+            ruc: {
+              isConfigured: true,
+              missingFields: [],
+            },
+          },
+        };
+      }
+
       const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       this.logger.log(`Getting configuration status for tenant: ${tenantId}`);
 

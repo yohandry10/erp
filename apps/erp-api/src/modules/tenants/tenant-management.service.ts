@@ -9,7 +9,7 @@ export class TenantManagementService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly userManagementService: UserManagementService
-  ) {}
+  ) { }
 
   /**
    * Create a new tenant with first admin user
@@ -79,7 +79,7 @@ export class TenantManagementService {
     try {
       // First, get or create the ADMIN role for this tenant
       let adminRoleId: string;
-      
+
       const { data: existingRole } = await client
         .from('roles')
         .select('id')
@@ -116,7 +116,7 @@ export class TenantManagementService {
         // Vierdes is the template tenant with base permissions (44 permisos)
         // Super-admin tenant has additional permissions (52 permisos) that should NOT be copied
         const TEMPLATE_TENANT_ID = '25593ea2-5129-42f3-a9d0-f4da8d59dc1a'; // VIERDES
-        
+
         // Get all permissions from template tenant
         const { data: templatePermissions } = await client
           .from('permisos')
@@ -245,7 +245,7 @@ export class TenantManagementService {
    */
   async getTenants(filters?: TenantFiltersDto) {
     const client = this.supabase.getClient();
-    
+
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
     const offset = (page - 1) * limit;
@@ -312,6 +312,9 @@ export class TenantManagementService {
    */
   async getTenantById(tenantId: string) {
     const client = this.supabase.getClient();
+
+    // Establecer el contexto del tenant para RLS
+    await client.rpc('app.set_tenant_context', { p_tenant_id: tenantId });
 
     const { data: tenant, error } = await client
       .from('empresa_config')
