@@ -67,6 +67,60 @@ export interface CompraEntregadaEvent {
   tenantId?: string;
 }
 
+export interface OrdenCompraAprobadaEvent {
+  ordenId: string;
+  numeroOrden: string;
+  proveedorId: string;
+  proveedorNombre: string;
+  total: number;
+  subtotal: number;
+  igv: number;
+  moneda: string;
+  fechaOrden: string;
+  fechaEntregaEsperada?: string;
+  aprobadoPor: string;
+  aprobadoEn: string;
+  diasCredito?: number;
+  items: Array<{
+    productoId: string;
+    descripcion: string;
+    cantidad: number;
+    precioUnitario: number;
+    total: number;
+  }>;
+  tenantId: string;
+}
+
+export interface RecepcionRegistradaEvent {
+  recepcionId: string;
+  numeroRecepcion: string;
+  ordenId: string;
+  numeroOrden: string;
+  proveedorId: string;
+  proveedorNombre: string;
+  proveedorRuc: string;
+  almacenId: string;
+  fechaRecepcion: string;
+  subtotal: number;
+  igv: number;
+  total: number;
+  moneda: string;
+  diasCredito?: number;
+  condicionesPago?: string;
+  items: Array<{
+    productoId: string;
+    descripcion: string;
+    cantidadRecibida: number;
+    precioUnitario: number;
+    total: number;
+    calidad: string;
+    lote?: string;
+    serie?: string;
+    ubicacionId?: string;
+  }>;
+  tenantId: string;
+}
+
 // EVENTOS PARA INTEGRACIONES CRÍTICAS
 
 export interface PlanillaCalculadaEvent {
@@ -369,6 +423,14 @@ export class EventBusService {
     this.emit('compra.entregada', data, 'compras');
   }
 
+  emitOrdenCompraAprobada(data: OrdenCompraAprobadaEvent) {
+    this.emit('orden.compra.aprobada', data, 'compras');
+  }
+
+  emitRecepcionRegistrada(data: RecepcionRegistradaEvent) {
+    this.emit('recepcion.registrada', data, 'compras');
+  }
+
   // Eventos de cotizaciones
   emitCotizacionCreada(data: CotizacionCreadaEvent) {
     this.emit('cotizacion.creada', data, 'cotizaciones');
@@ -469,6 +531,14 @@ export class EventBusService {
 
   onCompraEntregada(listener: (event: ERPEvent) => void) {
     this.on('compra.entregada', listener);
+  }
+
+  onOrdenCompraAprobada(listener: (event: ERPEvent) => void) {
+    this.on('orden.compra.aprobada', listener);
+  }
+
+  onRecepcionRegistrada(listener: (event: ERPEvent) => void) {
+    this.on('recepcion.registrada', listener);
   }
 
   // Cotizaciones

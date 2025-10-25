@@ -5,6 +5,7 @@ import { NotificationType, NotificationSeverity } from '../../notifications/noti
 import { AuditService } from '../../audit/audit.service';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
+import { AlmacenesService } from '../almacenes/almacenes.service';
 import {
   PrepararPedidoDto,
   ConfirmarDespachoDto,
@@ -16,6 +17,11 @@ import {
 
 interface ConfigLogistica {
   usar_flujo_logistica: boolean;
+  habilitar_multialmacen: boolean;
+  requiere_ubicaciones_inventario: boolean;
+  requiere_lotes_series: boolean;
+  objetivo_otif?: number | null;
+  habilitar_dashboards_otif?: boolean;
 }
 
 @Injectable()
@@ -25,6 +31,7 @@ export class LogisticaService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly pedidoLockService: PedidoLockService,
+    private readonly almacenesService: AlmacenesService,
   ) {}
 
   /**
@@ -270,6 +277,29 @@ export class LogisticaService {
       const backorderUpserts: any[] = [];
       const backorderDeletes: string[] = [];
 
+      const almacenesCache = new Set<string>();
+      const ubicacionesCache = new Set<string>();
+      let almacenPorDefecto = dto.almacen_id ?? null;
+      const ubicacionPorDefecto = dto.ubicacion_id ?? null;
+      const lotePorDefecto = dto.lote ?? null;
+
+      if (config.habilitar_multialmacen) {
+        if (almacenPorDefecto) {
+          await this.asegurarAlmacen(tenantId, almacenPorDefecto, almacenesCache);
+        } else {
+          const principal = await this.almacenesService.obtenerPrincipal(tenantId);
+          if (!principal) {
+            throw new BadRequestException('Debe configurar al menos un almacén antes de confirmar despachos.');
+          }
+          almacenPorDefecto = principal.id;
+          almacenesCache.add(principal.id);
+        }
+      }
+
+      if (config.requiere_ubicaciones_inventario && ubicacionPorDefecto) {
+        await this.validarUbicacion(tenantId, ubicacionPorDefecto, ubicacionesCache);
+      }
+
       for (const item of detalle) {
         const cantidadTotal = Number(item.cantidad);
         const cantidadDespachadaActual = Number(item.cantidad_despachada ?? 0);
@@ -292,24 +322,73 @@ export class LogisticaService {
           );
         }
 
-        await client.from('movimientos_inventario').insert({
-          tenant_id: tenantId,
-          producto_id: item.producto_id,
-          tipo: 'SALIDA',
-          cantidad: cantidadSolicitada,
-          referencia_tipo: 'PEDIDO',
-          referencia_id: pedidoId,
-          notas: `Salida por despacho de pedido ${pedido.numero}`,
-        });
+        const itemInput = this.buscarInputItem(dto.items_despachados, item.id);
+        let itemAlmacenId: string | null = null;
+        let itemUbicacionId: string | null = null;
+        let itemLote: string | null = null;
 
-        const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
-          p_producto_id: item.producto_id,
-          p_cantidad: cantidadSolicitada,
-        });
+        if (config.habilitar_multialmacen) {
+          itemAlmacenId = itemInput?.almacen_id ?? almacenPorDefecto;
 
-        if (salidaError) {
-          console.error('Error descontando stock en despacho:', salidaError);
-          throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
+          if (!itemAlmacenId) {
+            throw new BadRequestException('Debe especificar un almacén para cada despacho cuando multialmacén está habilitado.');
+          }
+
+          await this.asegurarAlmacen(tenantId, itemAlmacenId, almacenesCache);
+
+          itemUbicacionId = itemInput?.ubicacion_id ?? ubicacionPorDefecto ?? null;
+          if (config.requiere_ubicaciones_inventario && !itemUbicacionId) {
+            throw new BadRequestException('Debe especificar una ubicación de almacén para completar el despacho.');
+          }
+          await this.validarUbicacion(tenantId, itemUbicacionId, ubicacionesCache);
+
+          itemLote = itemInput?.lote ?? lotePorDefecto ?? null;
+          if (config.requiere_lotes_series && !itemLote) {
+            throw new BadRequestException('Debe especificar el lote o serie para completar el despacho.');
+          }
+
+          const { error: movimientoError } = await client.rpc('registrar_movimiento_almacen', {
+            p_producto_id: item.producto_id,
+            p_almacen_id: itemAlmacenId,
+            p_tipo: 'SALIDA',
+            p_cantidad: cantidadSolicitada,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: pedidoId,
+            p_notas: `Salida por despacho de pedido ${pedido.numero}`,
+            p_ubicacion_id: itemUbicacionId,
+            p_lote: itemLote,
+            p_fecha_expiracion: null,
+          });
+
+          if (movimientoError) {
+            console.error('Error registrando movimiento de almacén:', movimientoError);
+            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
+          }
+        } else {
+          const { error: movimientoInsertError } = await client.from('movimientos_inventario').insert({
+            tenant_id: tenantId,
+            producto_id: item.producto_id,
+            tipo: 'SALIDA',
+            cantidad: cantidadSolicitada,
+            referencia_tipo: 'PEDIDO',
+            referencia_id: pedidoId,
+            notas: `Salida por despacho de pedido ${pedido.numero}`,
+          });
+
+          if (movimientoInsertError) {
+            console.error('Error registrando movimiento de inventario:', movimientoInsertError);
+            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
+          }
+
+          const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
+            p_producto_id: item.producto_id,
+            p_cantidad: cantidadSolicitada,
+          });
+
+          if (salidaError) {
+            console.error('Error descontando stock en despacho:', salidaError);
+            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
+          }
         }
 
         const nuevoDespachado = cantidadDespachadaActual + cantidadSolicitada;
@@ -330,6 +409,9 @@ export class LogisticaService {
           cantidad: cantidadSolicitada,
           registrado_por: userId ?? null,
           notas: dto.notas ?? null,
+          almacen_id: itemAlmacenId ?? null,
+          ubicacion_id: itemUbicacionId ?? null,
+          lote: itemLote ?? null,
         });
 
         const restante = Math.max(cantidadTotal - nuevoDespachado, 0);
@@ -344,6 +426,7 @@ export class LogisticaService {
             cantidad_pendiente: restante,
             estado: nuevoEstadoItem === 'PARCIAL' ? 'PARCIAL' : 'PENDIENTE',
             updated_at: timestamp,
+            almacen_id: itemAlmacenId ?? null,
           });
         } else {
           backorderDeletes.push(item.id);
@@ -812,6 +895,49 @@ export class LogisticaService {
     });
   }
 
+  private buscarInputItem(items: Array<any> | undefined, detalleId: string) {
+    if (!Array.isArray(items)) {
+      return null;
+    }
+    return (
+      items.find((raw) => {
+        if (!raw) {
+          return false;
+        }
+        const id = raw.detalle_id ?? raw.detalleId ?? raw.id;
+        return id === detalleId;
+      }) ?? null
+    );
+  }
+
+  private async asegurarAlmacen(tenantId: string, almacenId: string | null, cache: Set<string>): Promise<void> {
+    if (!almacenId || cache.has(almacenId)) {
+      return;
+    }
+    await this.almacenesService.obtenerPorId(tenantId, almacenId);
+    cache.add(almacenId);
+  }
+
+  private async validarUbicacion(tenantId: string, ubicacionId: string | null, cache: Set<string>): Promise<void> {
+    if (!ubicacionId || cache.has(ubicacionId)) {
+      return;
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('almacen_ubicaciones')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('id', ubicacionId)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new BadRequestException('La ubicación seleccionada no existe o no pertenece al tenant.');
+    }
+
+    cache.add(ubicacionId);
+  }
+
   private normalizarItemsDespachados(
     detalle: Array<{ id: string; cantidad: number; cantidad_despachada?: number }>,
     items?: Array<any>,
@@ -867,7 +993,9 @@ export class LogisticaService {
     const client = this.supabase.getClient();
     const { data, error } = await client
       .from('empresa_config')
-      .select('usar_flujo_logistica')
+      .select(
+        'usar_flujo_logistica, habilitar_multialmacen, requiere_ubicaciones_inventario, requiere_lotes_series, objetivo_otif, habilitar_dashboards_otif',
+      )
       .eq('tenant_id', tenantId)
       .single();
 
@@ -876,7 +1004,18 @@ export class LogisticaService {
       throw new BadRequestException('No se pudo obtener configuración logística');
     }
 
-    return data as ConfigLogistica;
+    if (!data) {
+      throw new BadRequestException('No se encontró configuración logística para el tenant');
+    }
+
+    return {
+      usar_flujo_logistica: Boolean(data.usar_flujo_logistica),
+      habilitar_multialmacen: Boolean(data.habilitar_multialmacen),
+      requiere_ubicaciones_inventario: Boolean(data.requiere_ubicaciones_inventario),
+      requiere_lotes_series: Boolean(data.requiere_lotes_series),
+      objetivo_otif: data.objetivo_otif ?? null,
+      habilitar_dashboards_otif: Boolean(data.habilitar_dashboards_otif),
+    };
   }
 
   private async obtenerPedidoBasico(pedidoId: string, tenantId: string) {

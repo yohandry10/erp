@@ -373,12 +373,24 @@ export class ConfigurationService {
           certificado_pfx: certificateBuffer,
           certificado_password: config.certificatePassword,
           configuracion_completa: true,
-          // Nuevos campos de configuración de ventas
+          // Configuración de ventas
           tipo_empresa: config.tipo_empresa || 'MICRO',
           usar_flujo_logistica: config.usar_flujo_logistica !== undefined ? config.usar_flujo_logistica : false,
           gre_obligatorio: config.gre_obligatorio !== undefined ? config.gre_obligatorio : false,
           gre_automatico_habilitado: config.gre_automatico_habilitado !== undefined ? config.gre_automatico_habilitado : true,
           umbral_gre_automatico: config.umbral_gre_automatico || 700,
+          // Configuración fiscal
+          regimen_tributario: config.regimen_tributario,
+          igv_porcentaje: config.igv_porcentaje || 18,
+          retencion_renta_porcentaje: config.retencion_renta_porcentaje || 0,
+          serie_factura: config.serie_factura,
+          serie_boleta: config.serie_boleta,
+          serie_nota_credito: config.serie_nota_credito,
+          // Configuración OSE (opcional)
+          ose_url: config.ose_url,
+          ose_username: config.ose_username,
+          ose_password: config.ose_password,
+          ose_activo: config.ose_activo || false,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'tenant_id'

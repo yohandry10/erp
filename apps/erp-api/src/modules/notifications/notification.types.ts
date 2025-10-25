@@ -17,7 +17,11 @@ export enum NotificationType {
   BACKORDER_REPROGRAMADO = 'backorder_reprogramado',
   // Integrations
   INTEGRACION_ERROR = 'integration_error',
-  INTEGRACION_LENTA = 'integration_slow'
+  INTEGRACION_LENTA = 'integration_slow',
+  // Purchase orders
+  OC_REQUIERE_APROBACION = 'oc_requiere_aprobacion',
+  OC_APROBADA = 'oc_aprobada',
+  OC_RECHAZADA = 'oc_rechazada'
 }
 
 export enum NotificationSeverity {

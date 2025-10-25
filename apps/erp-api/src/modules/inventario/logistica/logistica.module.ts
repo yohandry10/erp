@@ -6,6 +6,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
 import { AuditModule } from '../../audit/audit.module';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
+import { AlmacenesModule } from '../almacenes/almacenes.module';
 
 /**
  * LogisticaModule
@@ -13,7 +14,7 @@ import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
  * Solo aplica cuando usar_flujo_logistica = true
  */
 @Module({
-  imports: [SupabaseModule, NotificationsModule, PermissionsModule, AuditModule],
+  imports: [SupabaseModule, NotificationsModule, PermissionsModule, AuditModule, AlmacenesModule],
   controllers: [LogisticaController],
   providers: [LogisticaService, PedidoLockService],
   exports: [LogisticaService],

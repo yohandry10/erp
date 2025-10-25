@@ -11,13 +11,15 @@ export class SupabaseService {
 
   constructor(private readonly tenantContext: TenantContextService) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // Usar SERVICE_ROLE_KEY para el backend (tiene permisos completos)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     this.supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-    if (!supabaseUrl || !this.supabaseAnonKey) {
-      throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.');
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
     }
 
-    this.supabase = createClient(supabaseUrl, this.supabaseAnonKey, {
+    this.supabase = createClient(supabaseUrl, serviceRoleKey, {
       global: {
         headers: {
           'X-Client-Info': 'erp-api',
@@ -27,7 +29,7 @@ export class SupabaseService {
         const context = this.tenantContext.getContext();
         const headers = new (globalThis as any).Headers(init.headers ?? {});
 
-        headers.set('apikey', this.supabaseAnonKey);
+        headers.set('apikey', process.env.SUPABASE_SERVICE_ROLE_KEY || this.supabaseAnonKey);
 
         if (context?.tenantId) {
           headers.set('X-Tenant-Id', context.tenantId);

@@ -10,6 +10,20 @@ export enum TipoMovimiento {
   TRANSFERENCIA = 'TRANSFERENCIA'
 }
 
+export interface MovimientoAlmacenParams {
+  tenantId: string;
+  productoId: string;
+  almacenId: string;
+  tipo: 'ENTRADA' | 'SALIDA' | 'RESERVA' | 'LIBERACION';
+  cantidad: number;
+  referenciaTipo: string;
+  referenciaId: string;
+  notas?: string;
+  ubicacionId?: string;
+  lote?: string;
+  fechaExpiracion?: string | null;
+}
+
 export interface MovimientoInventario {
   tenant_id: string;
   producto_id: string;
@@ -420,6 +434,65 @@ export class InventarioService {
     } catch (error) {
       console.error('❌ Error verificando disponibilidad:', error);
       throw error;
+    }
+  }
+
+  async registrarMovimientoAlmacen(params: MovimientoAlmacenParams): Promise<void> {
+    const {
+      tenantId,
+      productoId,
+      almacenId,
+      tipo,
+      cantidad,
+      referenciaTipo,
+      referenciaId,
+      notas,
+      ubicacionId,
+      lote,
+      fechaExpiracion,
+    } = params;
+
+    console.log(
+      `🏷️ [Tenant: ${tenantId}] Registrando movimiento ${tipo} de ${cantidad} unidades para producto ${productoId} en almacén ${almacenId}`,
+    );
+
+    const { error } = await this.supabase.getClient().rpc('registrar_movimiento_almacen', {
+      p_producto_id: productoId,
+      p_almacen_id: almacenId,
+      p_tipo: tipo,
+      p_cantidad: cantidad,
+      p_referencia_tipo: referenciaTipo,
+      p_referencia_id: referenciaId,
+      p_notas: notas ?? null,
+      p_ubicacion_id: ubicacionId ?? null,
+      p_lote: lote ?? null,
+      p_fecha_expiracion: fechaExpiracion ?? null,
+    });
+
+    if (error) {
+      console.error('❌ Error registrando movimiento de almacén:', error);
+      throw new BadRequestException(`No se pudo registrar el movimiento de almacén: ${error.message}`);
+    }
+  }
+
+  async registrarRetornoRma(
+    rmaItemId: string,
+    cantidad: number,
+    almacenId: string,
+    opciones?: { ubicacionId?: string; lote?: string; fechaExpiracion?: string | null },
+  ): Promise<void> {
+    const { error } = await this.supabase.getClient().rpc('rma_retorno_inventario', {
+      p_rma_item_id: rmaItemId,
+      p_cantidad: cantidad,
+      p_almacen_id: almacenId,
+      p_ubicacion_id: opciones?.ubicacionId ?? null,
+      p_lote: opciones?.lote ?? null,
+      p_fecha_expiracion: opciones?.fechaExpiracion ?? null,
+    });
+
+    if (error) {
+      console.error('❌ Error registrando retorno de RMA:', error);
+      throw new BadRequestException(`No se pudo registrar el retorno de inventario: ${error.message}`);
     }
   }
 }
