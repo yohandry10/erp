@@ -198,6 +198,18 @@ export class PermissionService {
   ): Promise<boolean> {
     const client = this.supabase.getClient();
 
+    // Check if user is SUPER_ADMIN first - they have all permissions
+    const { data: usuario, error: userError } = await client
+      .from('usuarios_sistema')
+      .select('is_super_admin')
+      .eq('id', userId)
+      .single();
+
+    if (!userError && usuario?.is_super_admin === true) {
+      console.log('✅ [PERMISSION] SUPER_ADMIN detected - granting access');
+      return true;
+    }
+
     // Generate cache key
     const cacheKey = `${userId}:${tenantId}:${modulo}:${accion}:${recurso}`;
     

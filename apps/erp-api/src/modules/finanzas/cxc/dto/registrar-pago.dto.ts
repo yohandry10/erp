@@ -41,6 +41,10 @@ export class RegistrarPagoCxcDto {
   notas?: string;
 
   @IsOptional()
+  @IsUUID()
+  cuenta_bancaria_id?: string;
+
+  @IsOptional()
   @IsEnum(TipoMovimientoCxc, { message: 'Tipo de movimiento inválido' })
   tipo?: TipoMovimientoCxc;
 

@@ -1,0 +1,96 @@
+✅ TASK COMPLETED: Presentar asientos generados
+================================================
+
+TASK: 4.14 - Validación con Contador
+SUBTASK: Presentar asientos generados
+STATUS: ✅ COMPLETADA
+FECHA: 28/10/2025
+
+ARCHIVOS CREADOS:
+-----------------
+1. presentar-asientos.ts
+   - Script de consola TypeScript
+   - Muestra los 7 tipos de asientos implementados
+   - Incluye ejemplos con montos reales
+   - Valida que todos los asientos cuadran (debe = haber)
+   - Ejecutable con: npm run presentar:asientos
+
+2. presentar-asientos.html
+   - Versión HTML interactiva
+   - Diseño profesional y responsive
+   - Ideal para presentar a contadores
+   - Listo para imprimir o exportar a PDF
+
+3. README.md
+   - Documentación de uso
+   - Instrucciones de ejecución
+   - Descripción de cada tipo de asiento
+
+4. package.json (actualizado)
+   - Agregado script: "presentar:asientos"
+
+TIPOS DE ASIENTOS PRESENTADOS:
+-------------------------------
+1. ✅ VENTA (Factura CPE)
+   - Dr 12 Clientes / Cr 70 Ventas / Cr 40 IGV
+   - Dr 69 Costo Ventas / Cr 20 Mercaderías
+
+2. ✅ COBRO CxC
+   - Dr 10 Bancos/Caja / Cr 12 Clientes
+
+3. ✅ COMPRA (Recepción)
+   - Dr 20 Mercaderías / Dr 40 IGV / Cr 42 Proveedores
+
+4. ✅ PAGO CxP
+   - Dr 42 Proveedores / Cr 10 Bancos
+
+5. ✅ AJUSTE INVENTARIO
+   - Sobrante: Dr 20 Mercaderías / Cr 76 Ingresos Diversos
+   - Faltante: Dr 68 Valuación / Cr 20 Mercaderías
+
+6. ✅ PLANILLA
+   - Dr 62 Gastos Personal / Cr 40 Tributos / Cr 41 Remuneraciones
+
+7. ✅ DEPRECIACIÓN
+   - Dr 68 Depreciación / Cr 39 Deprec. Acumulada
+
+CARACTERÍSTICAS DESTACADAS:
+---------------------------
+✅ Todos los asientos cuadran (Debe = Haber)
+✅ Clasificación según PCGE Perú
+✅ Ejemplos con montos reales
+✅ Reglas contables documentadas
+✅ Integración con eventos de dominio
+✅ Validación de período contable
+✅ Idempotencia implementada
+✅ Manejo de errores con reintentos
+
+PLAN DE CUENTAS UTILIZADO:
+--------------------------
+10 - Efectivo y Equivalentes
+12 - Cuentas por Cobrar Comerciales
+20 - Mercaderías
+39 - Depreciación Acumulada
+40 - Tributos por Pagar (IGV)
+41 - Remuneraciones por Pagar
+42 - Cuentas por Pagar Comerciales
+62 - Gastos de Personal
+68 - Valuación y Deterioro / Depreciación
+69 - Costo de Ventas
+70 - Ventas
+76 - Ingresos Diversos
+
+PRÓXIMOS PASOS:
+---------------
+1. Presentar al contador profesional
+2. Validar clasificación de cuentas
+3. Validar cálculos de estados financieros
+4. Ajustar según feedback
+5. Documentar reglas contables finales
+
+NOTAS:
+------
+- Los scripts son funcionales y ejecutables
+- La presentación HTML está lista para compartir
+- Todos los asientos están validados matemáticamente
+- Se siguió el estándar PCGE Perú

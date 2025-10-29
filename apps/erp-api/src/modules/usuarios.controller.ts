@@ -493,7 +493,7 @@ export class UsuariosController {
       // Extract unique permissions
       const permissions = rolePermissions?.map(rp => rp.permisos) || [];
       const uniquePermissions = Array.from(
-        new Map(permissions.map(p => [p.id, p])).values()
+        new Map(permissions.map((p: any) => [p.id, p])).values()
       );
 
       console.log(`✅ ${uniquePermissions.length} permisos encontrados para el usuario`);

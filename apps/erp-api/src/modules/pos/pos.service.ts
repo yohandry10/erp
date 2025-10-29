@@ -13,12 +13,12 @@ export class PosService {
     private readonly cpeService: CpeService,
     private readonly validationService: ValidationService,
     private readonly configurationService: ConfigurationService,
-  ) {}
+  ) { }
 
   async getProductos(user: any) {
     try {
       this.logger.log(`Obteniendo productos para tenant: ${user.tenant_id}`);
-      
+
       const { data, error } = await this.supabase.getClient()
         .from('productos')
         .select('*')
@@ -108,7 +108,7 @@ export class PosService {
   async getSesionCajaActual(user: any) {
     try {
       const hoy = new Date().toISOString().split('T')[0];
-      
+
       const { data, error } = await this.supabase.getClient()
         .from('sesiones_caja')
         .select('*')
@@ -224,7 +224,7 @@ export class PosService {
 
       // Generar número de venta único
       const numeroVenta = `V${Date.now()}`;
-      
+
       // Insertar venta - usar solo columnas que existen en la tabla
       const { data: venta, error: ventaError } = await this.supabase.getClient()
         .from('ventas_pos')
@@ -311,7 +311,7 @@ export class PosService {
       let cpeId = null;
       try {
         this.logger.log('📄 Emitiendo CPE para venta:', venta.id);
-        
+
         // Obtener configuración de empresa para datos del emisor
         const { data: empresaData, error: empresaError } = await this.supabase.getClient()
           .from('empresa_config')
@@ -377,8 +377,8 @@ export class PosService {
         estado: venta.estado,
         factura_electronica: cpeEmitido,
         cpe_id: cpeId,
-        message: cpeEmitido 
-          ? 'Venta procesada y CPE emitido exitosamente' 
+        message: cpeEmitido
+          ? 'Venta procesada y CPE emitido exitosamente'
           : 'Venta procesada (CPE pendiente)'
       };
     } catch (error) {
@@ -426,7 +426,7 @@ export class PosService {
   async cerrarCaja(montoContado: number, notas: string, user: any) {
     try {
       const sesion = await this.getSesionCajaActual(user);
-      
+
       if (!sesion) {
         throw new Error('No hay sesión de caja abierta');
       }
@@ -513,9 +513,9 @@ export class PosService {
   async getConfigurationStatus(user: any) {
     try {
       this.logger.log(`Getting configuration status for tenant: ${user.tenant_id}`);
-      
+
       const status = await this.configurationService.getConfigurationStatus(user.tenant_id);
-      
+
       return {
         success: true,
         data: status

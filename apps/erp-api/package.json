@@ -10,7 +10,12 @@
     "start:debug": "nest start --debug --watch",
     "build": "nest build",
     "lint": "eslint src --ext .ts",
-    "test": "ts-node --transpile-only tests/run-tests.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:legacy": "ts-node --transpile-only tests/run-tests.ts",
+    "presentar:asientos": "ts-node --transpile-only src/modules/contabilidad/scripts/presentar-asientos.ts",
     "clean": "rmdir /s /q dist 2>nul || echo Cleaned"
   },
   "dependencies": {
@@ -49,9 +54,12 @@
     "@nestjs/testing": "^10.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/compression": "^1.8.1",
+    "@types/jest": "^30.0.0",
     "@types/passport-jwt": "^4.0.1",
     "eslint": "^8.0.0",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10",
+    "ts-jest": "^29.4.5",
     "ts-node": "^10.0.0",
     "typescript": "^5.0.0"
   }

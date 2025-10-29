@@ -62,8 +62,8 @@ export class ReportesService {
       if (!acc[clienteId]) {
         acc[clienteId] = {
           cliente_id: clienteId,
-          cliente_nombre: pedido.clientes.razon_social,
-          cliente_documento: pedido.clientes.documento_numero,
+          cliente_nombre: (pedido.clientes as any).razon_social,
+          cliente_documento: (pedido.clientes as any).documento_numero,
           periodo: `${fechaDesde || 'Inicio'} - ${fechaHasta || 'Hoy'}`,
           moneda: 'PEN',
           estado: estadoFiltro || 'Todos',
@@ -139,8 +139,8 @@ export class ReportesService {
       return {
         id: cot.id,
         numero: cot.numero,
-        cliente_nombre: cot.clientes.razon_social,
-        cliente_documento: cot.clientes.documento_numero,
+        cliente_nombre: (cot.clientes as any).razon_social,
+        cliente_documento: (cot.clientes as any).documento_numero,
         fecha: cot.fecha,
         fecha_vencimiento: cot.fecha_vencimiento,
         estado: cot.estado,
@@ -324,8 +324,8 @@ export class ReportesService {
       if (!acc[clienteId]) {
         acc[clienteId] = {
           cliente_id: clienteId,
-          cliente_nombre: pedido.clientes.razon_social,
-          cliente_documento: pedido.clientes.documento_numero,
+          cliente_nombre: (pedido.clientes as any).razon_social,
+          cliente_documento: (pedido.clientes as any).documento_numero,
           total_facturacion: 0,
           cantidad_pedidos: 0,
           cantidad_facturas: 0,
@@ -348,7 +348,7 @@ export class ReportesService {
       .map((item: any) => ({
         ...item,
         ticket_promedio: Number(item.total_facturacion) / item.cantidad_pedidos,
-        porcentaje_total: totalFacturacion > 0 ? (Number(item.total_facturacion) / totalFacturacion) * 100 : 0,
+        porcentaje_total: Number(totalFacturacion) > 0 ? (Number(item.total_facturacion) / Number(totalFacturacion)) * 100 : 0,
       }))
       .sort((a: any, b: any) => Number(b.total_facturacion) - Number(a.total_facturacion))
       .slice(0, limit);
@@ -407,7 +407,7 @@ export class ReportesService {
 
     // Calcular días entre cotización y factura
     const leadTimes = pedidos.map((pedido) => {
-      const fechaCot = new Date(pedido.cotizaciones.fecha);
+      const fechaCot = new Date((pedido.cotizaciones as any).fecha);
       const fechaPed = new Date(pedido.fecha);
       const dias = Math.ceil((fechaPed.getTime() - fechaCot.getTime()) / (1000 * 60 * 60 * 24));
       return { dias, fecha: pedido.fecha };
@@ -928,12 +928,12 @@ export class ReportesService {
 
       return {
         id: cuenta.id,
-        cliente: cuenta.clientes?.razon_social ?? 'Cliente sin razón social',
+        cliente: (cuenta.clientes as any)?.razon_social ?? 'Cliente sin razón social',
         documento: [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.id,
         monto: this.round2(monto),
         diasMora: diasEnMora > 0 ? diasEnMora : 0,
         estado: cuenta.estado,
-        cliente_documento: cuenta.clientes?.documento_numero ?? null,
+        cliente_documento: (cuenta.clientes as any)?.documento_numero ?? null,
       };
     });
 
