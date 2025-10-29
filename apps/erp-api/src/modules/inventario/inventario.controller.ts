@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { AlmacenesService } from './almacenes/almacenes.service';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -16,8 +17,72 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 export class InventarioController {
   constructor(
     private readonly inventoryService: InventoryIntegrationService,
-    private readonly supabase: SupabaseService
+    private readonly supabase: SupabaseService,
+    private readonly almacenesService: AlmacenesService
   ) {}
+
+  /**
+   * Obtener almacenes activos del tenant
+   */
+  @Get('almacenes')
+  @ApiOperation({ summary: 'Listar almacenes activos' })
+  @ApiResponse({ status: 200, description: 'Almacenes listados exitosamente' })
+  async getAlmacenes(@CurrentTenant() tenantId: string) {
+    try {
+      console.log(`🏢 [Tenant: ${tenantId}] Obteniendo almacenes...`);
+      const almacenes = await this.almacenesService.listar(tenantId);
+      
+      return {
+        success: true,
+        data: almacenes
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo almacenes:', error);
+      return {
+        success: false,
+        message: 'Error al obtener almacenes: ' + error.message,
+        data: []
+      };
+    }
+  }
+
+  /**
+   * Obtener ubicaciones de un almacén
+   */
+  @Get('almacenes/:almacenId/ubicaciones')
+  @ApiOperation({ summary: 'Listar ubicaciones de un almacén' })
+  @ApiResponse({ status: 200, description: 'Ubicaciones listadas exitosamente' })
+  async getUbicaciones(
+    @CurrentTenant() tenantId: string,
+    @Param('almacenId') almacenId: string
+  ) {
+    try {
+      console.log(`📍 [Tenant: ${tenantId}] Obteniendo ubicaciones del almacén ${almacenId}...`);
+      
+      const { data, error } = await this.supabase.getClient()
+        .from('almacen_ubicaciones')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('almacen_id', almacenId)
+        .order('codigo', { ascending: true });
+
+      if (error) throw error;
+
+      console.log(`✅ ${data?.length || 0} ubicaciones obtenidas`);
+      
+      return {
+        success: true,
+        data: data || []
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo ubicaciones:', error);
+      return {
+        success: false,
+        message: 'Error al obtener ubicaciones: ' + error.message,
+        data: []
+      };
+    }
+  }
 
   /**
    * Obtener estadísticas de inventario

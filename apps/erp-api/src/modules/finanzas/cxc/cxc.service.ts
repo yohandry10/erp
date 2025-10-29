@@ -157,7 +157,36 @@ export class CxcService {
     const nuevoEstado = this.calcularEstadoCuenta(montoTotal, nuevoPendiente);
     const diasMora = nuevoPendiente > 0 ? this.calcularDiasMora(cuenta.fecha_vencimiento) : 0;
 
-    const { error: pagoError } = await client.from('cxc_pagos').insert({
+    // Si se especificó cuenta bancaria, validar que existe y la moneda coincida
+    let cuentaBancaria: any = null;
+    if (dto.cuenta_bancaria_id) {
+      const { data: cuentaBanco, error: errorCuentaBanco } = await client
+        .from('cuentas_bancarias')
+        .select('id, nombre, saldo, moneda, permite_sobregiro, activa')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cuenta_bancaria_id)
+        .maybeSingle();
+
+      if (errorCuentaBanco || !cuentaBanco) {
+        throw new BadRequestException('Cuenta bancaria no encontrada');
+      }
+
+      if (!cuentaBanco.activa) {
+        throw new BadRequestException('No se pueden registrar cobros en una cuenta bancaria inactiva');
+      }
+
+      cuentaBancaria = cuentaBanco;
+
+      // Validar que la moneda coincida
+      const monedaCuenta = dto.moneda ?? cuenta.moneda ?? 'PEN';
+      if (cuentaBanco.moneda !== monedaCuenta) {
+        throw new BadRequestException(
+          `La moneda de la cuenta bancaria (${cuentaBanco.moneda}) no coincide con la moneda del cobro (${monedaCuenta})`,
+        );
+      }
+    }
+
+    const { data: pagoRegistrado, error: pagoError } = await client.from('cxc_pagos').insert({
       tenant_id: tenantId,
       cuenta_id: cuentaId,
       pedido_id: cuenta.pedido_id ?? null,
@@ -173,11 +202,67 @@ export class CxcService {
       retencion_monto: retencionMonto,
       usuario_id: userId ?? null,
       created_at: new Date().toISOString(),
-    });
+    }).select().single();
 
-    if (pagoError) {
+    if (pagoError || !pagoRegistrado) {
       console.error('Error registrando pago de CxC:', pagoError);
       throw new BadRequestException('No se pudo registrar el pago de la cuenta por cobrar');
+    }
+
+    // Si hay cuenta bancaria, crear movimiento bancario y actualizar saldo
+    let movimientoBancario: any = null;
+    if (dto.cuenta_bancaria_id && cuentaBancaria) {
+      const clienteNombre = cuenta.clientes?.razon_social || cuenta.cliente_id;
+      const numeroDocumento = [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.documento_id;
+
+      // Crear movimiento bancario (tipo ABONO = ingreso de dinero)
+      const { data: movimiento, error: errorMovimiento } = await client
+        .from('movimientos_bancarios')
+        .insert({
+          tenant_id: tenantId,
+          cuenta_bancaria_id: dto.cuenta_bancaria_id,
+          tipo: 'ABONO',
+          monto: this.round2(montoPago),
+          fecha: dto.fecha_pago,
+          descripcion: `Cobro de cliente ${clienteNombre} - Doc: ${numeroDocumento}`,
+          referencia: dto.referencia || null,
+          metodo_pago: dto.metodo_pago,
+          cliente_id: cuenta.cliente_id,
+          cxc_id: cuentaId,
+          conciliado: false,
+          created_by: userId || null,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (errorMovimiento) {
+        console.error('Error creando movimiento bancario:', errorMovimiento);
+        // Revertir el pago registrado
+        await client.from('cxc_pagos').delete().eq('id', pagoRegistrado.id);
+        throw new BadRequestException('No se pudo crear el movimiento bancario');
+      }
+
+      movimientoBancario = movimiento;
+
+      // Actualizar saldo de la cuenta bancaria (ABONO suma al saldo)
+      const nuevoSaldoBanco = this.round2(cuentaBancaria.saldo + montoPago);
+      const { error: errorSaldoBanco } = await client
+        .from('cuentas_bancarias')
+        .update({
+          saldo: nuevoSaldoBanco,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cuenta_bancaria_id);
+
+      if (errorSaldoBanco) {
+        console.error('Error actualizando saldo de cuenta bancaria:', errorSaldoBanco);
+        // Revertir movimiento bancario y pago
+        await client.from('movimientos_bancarios').delete().eq('id', movimiento.id);
+        await client.from('cxc_pagos').delete().eq('id', pagoRegistrado.id);
+        throw new BadRequestException('No se pudo actualizar el saldo de la cuenta bancaria');
+      }
     }
 
     const acumulados = {
@@ -227,6 +312,7 @@ export class CxcService {
 
     const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
 
+    // Emitir evento PagoFactura (legacy, para compatibilidad)
     this.emitirEventoPagoFactura(
       detalleActualizado,
       {
@@ -237,6 +323,69 @@ export class CxcService {
       nuevoPendiente,
       nuevoEstado,
     );
+
+    // Emitir evento CobroRegistrado (nuevo, para integración con Contabilidad y Tesorería)
+    this.emitirEventoCobroRegistrado(
+      tenantId,
+      pagoRegistrado,
+      cuenta,
+      detalleActualizado,
+      pendienteActual,
+      nuevoPendiente,
+      nuevoEstado,
+      userId,
+    );
+
+    // Insertar en outbox_events para procesamiento asíncrono
+    const numeroDocumento =
+      [detalleActualizado.serie, detalleActualizado.numero].filter(Boolean).join('-') ||
+      detalleActualizado.documento_id ||
+      'SIN-DOC';
+
+    const clienteNombre =
+      detalleActualizado.clientes?.razon_social ||
+      cuenta.clientes?.razon_social ||
+      null;
+
+    const eventoPayload = {
+      tenant_id: tenantId,
+      cobro_id: pagoRegistrado.id,
+      cxc_id: pagoRegistrado.cuenta_id,
+      cliente_id: detalleActualizado.cliente_id,
+      cliente_nombre: clienteNombre,
+      documento_id: detalleActualizado.documento_id || null,
+      numero_documento: numeroDocumento,
+      monto: this.round2(pagoRegistrado.monto),
+      moneda: pagoRegistrado.moneda || 'PEN',
+      fecha: pagoRegistrado.fecha_pago,
+      metodo_pago: pagoRegistrado.metodo_pago || 'EFECTIVO',
+      cuenta_bancaria_id: dto.cuenta_bancaria_id || null,
+      referencia: pagoRegistrado.referencia || null,
+      notas: pagoRegistrado.notas || null,
+      saldo_anterior: this.round2(pendienteActual),
+      saldo_nuevo: this.round2(nuevoPendiente),
+      estado_anterior: cuenta.estado || 'PENDIENTE',
+      estado_nuevo: nuevoEstado,
+      movimiento_bancario_id: movimientoBancario?.id || null,
+      created_by: userId || null,
+    };
+
+    const { error: errorOutbox } = await client
+      .from('outbox_events')
+      .insert({
+        event_type: 'CobroRegistrado',
+        aggregate_type: 'CuentaPorCobrar',
+        aggregate_id: pagoRegistrado.cuenta_id,
+        event_data: eventoPayload,
+        status: 'pending',
+        retry_count: 0,
+        created_at: new Date().toISOString(),
+      });
+
+    if (errorOutbox) {
+      console.error('Error insertando evento CobroRegistrado en outbox:', errorOutbox);
+      // No fallar la operación si el evento no se pudo insertar
+    }
 
     return {
       success: true,
@@ -299,6 +448,61 @@ export class CxcService {
       });
     } catch (error) {
       console.error('Error emitiendo evento de pago de factura para contabilidad:', error);
+    }
+  }
+
+  private emitirEventoCobroRegistrado(
+    tenantId: string,
+    pagoRegistrado: any,
+    cuentaAnterior: any,
+    cuentaActualizada: any,
+    saldoAnterior: number,
+    saldoNuevo: number,
+    estadoNuevo: string,
+    userId?: string,
+  ): void {
+    if (!this.eventBus) {
+      return;
+    }
+
+    try {
+      const numeroDocumento =
+        [cuentaActualizada.serie, cuentaActualizada.numero].filter(Boolean).join('-') ||
+        cuentaActualizada.documento_id ||
+        'SIN-DOC';
+
+      const clienteNombre =
+        cuentaActualizada.clientes?.razon_social ||
+        cuentaAnterior.clientes?.razon_social ||
+        null;
+
+      const estadoAnterior = cuentaAnterior.estado || 'PENDIENTE';
+
+      this.eventBus.emitCobroRegistrado({
+        tenantId,
+        cobroId: pagoRegistrado.id,
+        cxcId: pagoRegistrado.cuenta_id,
+        clienteId: cuentaActualizada.cliente_id,
+        clienteNombre,
+        documentoId: cuentaActualizada.documento_id || null,
+        numeroDocumento,
+        monto: this.round2(pagoRegistrado.monto),
+        moneda: pagoRegistrado.moneda || 'PEN',
+        fecha: pagoRegistrado.fecha_pago,
+        metodoPago: pagoRegistrado.metodo_pago || 'EFECTIVO',
+        cuentaBancariaId: pagoRegistrado.cuenta_bancaria_id || null,
+        referencia: pagoRegistrado.referencia || null,
+        notas: pagoRegistrado.notas || null,
+        saldoAnterior: this.round2(saldoAnterior),
+        saldoNuevo: this.round2(saldoNuevo),
+        estadoAnterior,
+        estadoNuevo,
+        createdBy: userId || null,
+      });
+
+      console.log('✅ Evento CobroRegistrado emitido exitosamente');
+    } catch (error) {
+      console.error('Error emitiendo evento CobroRegistrado:', error);
     }
   }
 }

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presentación de Asientos Contables - Sistema ERP</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .summary {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        
+        .summary h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .summary ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .summary li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .summary li:last-child {
+            border-bottom: none;
+        }
+        
+        .asiento-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .asiento-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .asiento-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+        }
+        
+        .asiento-header h3 {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        
+        .asiento-body {
+            padding: 20px;
+        }
+        
+        .regla-contable {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-line;
+            border-radius: 5px;
+        }
+        
+        .ejemplo {
+            margin-top: 20px;
+        }
+        
+        .ejemplo-header {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .ejemplo-header p {
+            margin: 5px 0;
+        }
+        
+        .ejemplo-header strong {
+            color: #667eea;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0;
+        }
+        
+        thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            font-weight: 600;
+        }
+        
+        td.debe, td.haber {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        tfoot {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        tfoot td {
+            border-top: 2px solid #667eea;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .balance {
+            text-align: center;
+            padding: 15px;
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        
+        .features {
+            background: #f8f9fa;
+            padding: 30px;
+            margin-top: 40px;
+            border-radius: 8px;
+        }
+        
+        .features h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .feature-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .feature-item::before {
+            content: "✅ ";
+            color: #28a745;
+        }
+        
+        .integration {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+        }
+        
+        .integration h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        
+        .integration ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .integration li {
+            padding: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .integration li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .plan-cuentas {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 5px;
+        }
+        
+        .plan-cuentas h3 {
+            color: #0c5460;
+            margin-bottom: 15px;
+        }
+        
+        .plan-cuentas ul {
+            list-style: none;
+            padding-left: 0;
+            columns: 2;
+            column-gap: 20px;
+        }
+        
+        .plan-cuentas li {
+            padding: 5px 0;
+            break-inside: avoid;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+            
+            .asiento-card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Presentación de Asientos Contables</h1>
+            <p>Sistema ERP - Módulo de Contabilidad Integrada</p>
+        </div>
+        
+        <div class="content">
+            <div class="summary">
+                <h2>📋 Resumen de Asientos Implementados</h2>
+                <ul>
+                    <li><strong>1.</strong> Venta (Factura CPE)</li>
+                    <li><strong>2.</strong> Cobro de Cuentas por Cobrar</li>
+                    <li><strong>3.</strong> Compra (Recepción de Mercancía)</li>
+                    <li><strong>4.</strong> Pago de Cuentas por Pagar</li>
+                    <li><strong>5.</strong> Ajuste de Inventario</li>
+                    <li><strong>6.</strong> Planilla de Sueldos</li>
+                    <li><strong>7.</strong> Depreciación de Activos Fijos</li>
+                </ul>
+            </div>
+            
+            <!-- ASIENTO 1: VENTA -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>1. VENTA (Factura CPE)</h3>
+                    <p>Registro de venta de mercadería con IGV</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 12 Clientes           [total]
+  Cr 70 Ventas           [base]
+  Cr 40 IGV por Pagar    [igv]
+Dr 69 Costo de Ventas    [costo]
+  Cr 20 Mercaderías      [costo]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Venta de mercadería - Factura F001-00123</p>
+                            <p><strong>Fecha:</strong> 15/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>12 - Clientes</td>
+                                    <td class="debe">11,800.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>70 - Ventas</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">10,000.00</td>
+                                </tr>
+                                <tr>
+                                    <td>40 - IGV por Pagar</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">1,800.00</td>
+                                </tr>
+                                <tr>
+                                    <td>69 - Costo de Ventas</td>
+                                    <td class="debe">6,000.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>20 - Mercaderías</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">6,000.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>17,800.00</strong></td>
+                                    <td class="haber"><strong>17,800.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 2: COBRO -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>2. COBRO CxC</h3>
+                    <p>Registro de cobro de factura a cliente</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 10 Bancos/Caja        [monto]
+  Cr 12 Clientes         [monto]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Cobro de factura F001-00123</p>
+                            <p><strong>Fecha:</strong> 20/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>10 - Bancos/Caja</td>
+                                    <td class="debe">11,800.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>12 - Clientes</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">11,800.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>11,800.00</strong></td>
+                                    <td class="haber"><strong>11,800.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 3: COMPRA -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>3. COMPRA (Recepción)</h3>
+                    <p>Registro de compra de mercadería con IGV</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 20 Mercaderías        [costo]
+Dr 40 IGV Crédito Fiscal [igv]
+  Cr 42 Proveedores      [total]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Compra de mercadería - OC-2025-001</p>
+                            <p><strong>Fecha:</strong> 10/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>20 - Mercaderías</td>
+                                    <td class="debe">5,000.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>40 - IGV Crédito Fiscal</td>
+                                    <td class="debe">900.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>42 - Proveedores</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">5,900.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>5,900.00</strong></td>
+                                    <td class="haber"><strong>5,900.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 4: PAGO -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>4. PAGO CxP</h3>
+                    <p>Registro de pago a proveedor</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 42 Proveedores        [monto]
+  Cr 10 Bancos           [monto]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Pago a proveedor - OC-2025-001</p>
+                            <p><strong>Fecha:</strong> 25/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>42 - Proveedores</td>
+                                    <td class="debe">5,900.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>10 - Bancos</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">5,900.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>5,900.00</strong></td>
+                                    <td class="haber"><strong>5,900.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 5: AJUSTE INVENTARIO -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>5. AJUSTE INVENTARIO</h3>
+                    <p>Registro de ajuste de inventario (sobrante o faltante)</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+// Si positivo (sobrante):
+Dr 20 Mercaderías        [valor]
+  Cr 76 Ingresos Diversos [valor]
+
+// Si negativo (faltante):
+Dr 68 Valuación Activos  [valor]
+  Cr 20 Mercaderías      [valor]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Ajuste de inventario - SOBRANTE</p>
+                            <p><strong>Fecha:</strong> 31/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>20 - Mercaderías</td>
+                                    <td class="debe">500.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>76 - Ingresos Diversos</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">500.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>500.00</strong></td>
+                                    <td class="haber"><strong>500.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 6: PLANILLA -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>6. PLANILLA</h3>
+                    <p>Registro de planilla de sueldos</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 62 Gastos Personal    [sueldos + aportes]
+  Cr 40 Tributos         [aportes + retenciones]
+  Cr 41 Remuneraciones   [neto a pagar]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Planilla de sueldos - Enero 2025</p>
+                            <p><strong>Fecha:</strong> 31/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>62 - Gastos de Personal</td>
+                                    <td class="debe">15,000.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>40 - Tributos por Pagar</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">2,700.00</td>
+                                </tr>
+                                <tr>
+                                    <td>41 - Remuneraciones por Pagar</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">12,300.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>15,000.00</strong></td>
+                                    <td class="haber"><strong>15,000.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ASIENTO 7: DEPRECIACIÓN -->
+            <div class="asiento-card">
+                <div class="asiento-header">
+                    <h3>7. DEPRECIACIÓN</h3>
+                    <p>Registro de depreciación de activos fijos</p>
+                </div>
+                <div class="asiento-body">
+                    <div class="regla-contable">
+Dr 68 Depreciación       [monto]
+  Cr 39 Deprec. Acumulada [monto]
+                    </div>
+                    
+                    <div class="ejemplo">
+                        <div class="ejemplo-header">
+                            <p><strong>Concepto:</strong> Depreciación de activos fijos - Enero 2025</p>
+                            <p><strong>Fecha:</strong> 31/01/2025</p>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th style="text-align: right;">Debe</th>
+                                    <th style="text-align: right;">Haber</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>68 - Depreciación</td>
+                                    <td class="debe">1,200.00</td>
+                                    <td class="haber">-</td>
+                                </tr>
+                                <tr>
+                                    <td>39 - Depreciación Acumulada</td>
+                                    <td class="debe">-</td>
+                                    <td class="haber">1,200.00</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALES</strong></td>
+                                    <td class="debe"><strong>1,200.00</strong></td>
+                                    <td class="haber"><strong>1,200.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        
+                        <div class="balance">✅ Balance: CUADRADO</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARACTERÍSTICAS IMPLEMENTADAS -->
+            <div class="features">
+                <h2>🎯 Características Implementadas</h2>
+                <div class="features-grid">
+                    <div class="feature-item">Validación de período contable abierto</div>
+                    <div class="feature-item">Validación de balance (debe = haber)</div>
+                    <div class="feature-item">Idempotencia mediante source_event_id</div>
+                    <div class="feature-item">Generación automática de número de asiento</div>
+                    <div class="feature-item">Asignación de centro de costo</div>
+                    <div class="feature-item">Marcado de eventos como procesados</div>
+                    <div class="feature-item">Manejo de errores con reintentos</div>
+                    <div class="feature-item">Rollback automático en caso de error</div>
+                </div>
+            </div>
+            
+            <!-- INTEGRACIÓN CON EVENTOS -->
+            <div class="integration">
+                <h3>🔗 Integración con Eventos de Dominio</h3>
+                <ul>
+                    <li><strong>VentaFacturada</strong> → Asiento de Venta</li>
+                    <li><strong>CobroRegistrado</strong> → Asiento de Cobro</li>
+                    <li><strong>RecepcionRegistrada</strong> → Asiento de Compra</li>
+                    <li><strong>PagoProveedorRegistrado</strong> → Asiento de Pago</li>
+                    <li><strong>AjusteInventarioAplicado</strong> → Asiento de Ajuste</li>
+                    <li><strong>PlanillaLiquidada</strong> → Asiento de Planilla</li>
+                    <li><strong>DepreciacionGenerada</strong> → Asiento de Depreciación</li>
+                </ul>
+            </div>
+            
+            <!-- PLAN DE CUENTAS -->
+            <div class="plan-cuentas">
+                <h3>📚 Plan de Cuentas Utilizado (PCGE Perú)</h3>
+                <ul>
+                    <li><strong>10</strong> - Efectivo y Equivalentes (Caja, Bancos)</li>
+                    <li><strong>12</strong> - Cuentas por Cobrar Comerciales</li>
+                    <li><strong>20</strong> - Mercaderías</li>
+                    <li><strong>39</strong> - Depreciación Acumulada</li>
+                    <li><strong>40</strong> - Tributos por Pagar (IGV)</li>
+                    <li><strong>41</strong> - Remuneraciones por Pagar</li>
+                    <li><strong>42</strong> - Cuentas por Pagar Comerciales</li>
+                    <li><strong>62</strong> - Gastos de Personal</li>
+                    <li><strong>68</strong> - Valuación y Deterioro de Activos / Depreciación</li>
+                    <li><strong>69</strong> - Costo de Ventas</li>
+                    <li><strong>70</strong> - Ventas</li>
+                    <li><strong>76</strong> - Ingresos Diversos</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

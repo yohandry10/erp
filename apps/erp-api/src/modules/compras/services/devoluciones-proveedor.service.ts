@@ -244,24 +244,7 @@ export class DevolucionesProveedorService {
 
       // 4. Emitir evento de dominio DevolucionProveedorEmitida
       try {
-        this.eventBus.emit('devolucion.proveedor.emitida', {
-          devolucion_id: devolucionId,
-          numero: devolucion.numero,
-          proveedor_id: devolucion.proveedor_id,
-          orden_id: devolucion.orden_id,
-          total: devolucion.total,
-          items: devolucion.items.map(item => ({
-            producto_id: item.producto_id,
-            cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-            subtotal: item.subtotal,
-          })),
-          emitido_por: userId,
-          emitido_at: new Date().toISOString(),
-          tenant_id: tenantId,
-        }, 'compras');
-
-        console.log(`📢 Evento devolucion.proveedor.emitida publicado para devolución ${devolucion.numero}`);
+        await this.emitirEventoDevolucionEmitida(devolucion, tenantId, userId);
       } catch (eventError) {
         console.error('⚠️ Error publicando evento DevolucionProveedorEmitida:', eventError);
         // No fallar la operación si el evento falla
@@ -292,6 +275,98 @@ export class DevolucionesProveedorService {
     } catch (error) {
       console.error('❌ Error en emitirDevolucion:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Emite el evento DevolucionProveedorEmitida para integración con CxP y Contabilidad
+   */
+  private async emitirEventoDevolucionEmitida(
+    devolucion: any,
+    tenantId: string,
+    userId?: string
+  ): Promise<void> {
+    try {
+      console.log(`📡 [Devoluciones] Emitiendo evento DevolucionProveedorEmitida para ${devolucion.numero}`);
+
+      // Obtener información del proveedor
+      const { data: proveedor, error: proveedorError } = await this.supabase.getClient()
+        .from('proveedores')
+        .select('razon_social')
+        .eq('id', devolucion.proveedor_id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (proveedorError) {
+        console.error('❌ Error obteniendo proveedor para evento:', proveedorError);
+      }
+
+      // Obtener información de la orden
+      const { data: orden, error: ordenError } = await this.supabase.getClient()
+        .from('ordenes_compra')
+        .select('numero')
+        .eq('id', devolucion.orden_id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (ordenError) {
+        console.error('❌ Error obteniendo orden para evento:', ordenError);
+      }
+
+      // Obtener información de la recepción si existe
+      let numeroRecepcion: string | undefined;
+      if (devolucion.recepcion_id) {
+        const { data: recepcion, error: recepcionError } = await this.supabase.getClient()
+          .from('recepciones')
+          .select('numero')
+          .eq('id', devolucion.recepcion_id)
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (!recepcionError && recepcion) {
+          numeroRecepcion = recepcion.numero;
+        }
+      }
+
+      // Construir el payload del evento
+      const eventData = {
+        devolucionId: devolucion.id,
+        numeroDevolucion: devolucion.numero,
+        ordenId: devolucion.orden_id,
+        numeroOrden: orden?.numero,
+        recepcionId: devolucion.recepcion_id,
+        numeroRecepcion,
+        proveedorId: devolucion.proveedor_id,
+        proveedorNombre: proveedor?.razon_social || 'Proveedor desconocido',
+        fechaDevolucion: devolucion.fecha_devolucion,
+        motivo: devolucion.motivo,
+        subtotal: devolucion.subtotal,
+        igv: devolucion.igv,
+        total: devolucion.total,
+        moneda: 'PEN', // TODO: Obtener de la orden o configuración
+        items: devolucion.items.map(item => ({
+          productoId: item.producto_id,
+          descripcion: item.descripcion || item.producto?.nombre || 'Producto',
+          cantidad: item.cantidad,
+          precioUnitario: item.precio_unitario,
+          subtotal: item.subtotal,
+          motivoDetalle: item.motivo_detalle,
+          lote: item.lote,
+          serie: item.serie,
+        })),
+        emitidoPor: userId,
+        emitidoEn: new Date().toISOString(),
+        tenantId,
+      };
+
+      // Emitir el evento usando el método tipado
+      this.eventBus.emitDevolucionProveedorEmitida(eventData);
+
+      console.log(`✅ Evento DevolucionProveedorEmitida emitido exitosamente para ${devolucion.numero}`);
+    } catch (error) {
+      console.error('❌ Error emitiendo evento DevolucionProveedorEmitida:', error);
+      // No lanzamos el error para no bloquear la emisión de la devolución
+      // En producción, esto debería ir a un sistema de monitoreo
     }
   }
 }

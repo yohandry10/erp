@@ -121,6 +121,36 @@ export interface RecepcionRegistradaEvent {
   tenantId: string;
 }
 
+export interface DevolucionProveedorEmitidaEvent {
+  devolucionId: string;
+  numeroDevolucion: string;
+  ordenId: string;
+  numeroOrden?: string;
+  recepcionId?: string;
+  numeroRecepcion?: string;
+  proveedorId: string;
+  proveedorNombre: string;
+  fechaDevolucion: string;
+  motivo: string;
+  subtotal: number;
+  igv: number;
+  total: number;
+  moneda: string;
+  items: Array<{
+    productoId: string;
+    descripcion: string;
+    cantidad: number;
+    precioUnitario: number;
+    subtotal: number;
+    motivoDetalle?: string;
+    lote?: string;
+    serie?: string;
+  }>;
+  emitidoPor?: string;
+  emitidoEn: string;
+  tenantId: string;
+}
+
 // EVENTOS PARA INTEGRACIONES CRÍTICAS
 
 export interface PlanillaCalculadaEvent {
@@ -189,6 +219,68 @@ export interface GastoRegistradoEvent {
   metodoPago: string;
   fecha: string;
   requiereAsiento: boolean;
+}
+
+export interface PagoProveedorRegistradoEvent {
+  cxpId: string;
+  proveedorId: string;
+  proveedorNombre?: string;
+  numeroDocumento: string;
+  monto: number;
+  moneda: string;
+  fechaPago: string;
+  metodoPago: string;
+  cuentaBancariaId?: string;
+  referencia?: string;
+  observaciones?: string;
+  saldoAnterior: number;
+  saldoNuevo: number;
+  estadoAnterior: string;
+  estadoNuevo: string;
+  tenantId: string;
+  createdBy?: string;
+}
+
+export interface CobroRegistradoEvent {
+  tenantId: string;
+  cobroId: string;
+  cxcId: string;
+  clienteId: string;
+  clienteNombre?: string;
+  documentoId?: string;
+  numeroDocumento?: string;
+  monto: number;
+  moneda: string;
+  fecha: string;
+  metodoPago: string;
+  cuentaBancariaId?: string;
+  referencia?: string;
+  notas?: string;
+  saldoAnterior: number;
+  saldoNuevo: number;
+  estadoAnterior: string;
+  estadoNuevo: string;
+  createdBy?: string;
+}
+
+export interface MovimientoBancarioRegistradoEvent {
+  tenantId: string;
+  movimientoId: string;
+  cuentaBancariaId: string;
+  cuentaBancariaNombre: string;
+  tipo: 'ABONO' | 'CARGO';
+  monto: number;
+  moneda: string;
+  fecha: string;
+  descripcion: string;
+  referencia?: string;
+  metodoPago?: string;
+  proveedorId?: string;
+  proveedorNombre?: string;
+  cxpId?: string;
+  saldoAnterior: number;
+  saldoNuevo: number;
+  createdBy?: string;
 }
 
 // NUEVOS EVENTOS CRÍTICOS PARA AUTOMATIZACIÓN COMPLETA
@@ -431,6 +523,10 @@ export class EventBusService {
     this.emit('recepcion.registrada', data, 'compras');
   }
 
+  emitDevolucionProveedorEmitida(data: DevolucionProveedorEmitidaEvent) {
+    this.emit('devolucion.proveedor.emitida', data, 'compras');
+  }
+
   // Eventos de cotizaciones
   emitCotizacionCreada(data: CotizacionCreadaEvent) {
     this.emit('cotizacion.creada', data, 'cotizaciones');
@@ -478,6 +574,21 @@ export class EventBusService {
   // Eventos de gastos
   emitGastoRegistrado(data: GastoRegistradoEvent) {
     this.emit('gasto.registrado', data, 'finanzas');
+  }
+
+  // Eventos de pagos a proveedores
+  emitPagoProveedorRegistrado(data: PagoProveedorRegistradoEvent) {
+    this.emit('pago.proveedor.registrado', data, 'finanzas');
+  }
+
+  // Eventos de cobros a clientes
+  emitCobroRegistrado(data: CobroRegistradoEvent) {
+    this.emit('cobro.registrado', data, 'finanzas');
+  }
+
+  // Eventos de movimientos bancarios
+  emitMovimientoBancarioRegistrado(data: MovimientoBancarioRegistradoEvent) {
+    this.emit('movimiento.bancario.registrado', data, 'finanzas');
   }
 
   // Eventos de reportes SIRE
@@ -541,6 +652,10 @@ export class EventBusService {
     this.on('recepcion.registrada', listener);
   }
 
+  onDevolucionProveedorEmitida(listener: (event: ERPEvent) => void) {
+    this.on('devolucion.proveedor.emitida', listener);
+  }
+
   // Cotizaciones
   onCotizacionCreada(listener: (event: ERPEvent) => void) {
     this.on('cotizacion.creada', listener);
@@ -587,6 +702,14 @@ export class EventBusService {
 
   onGastoRegistrado(listener: (event: ERPEvent) => void) {
     this.on('gasto.registrado', listener);
+  }
+
+  onPagoProveedorRegistrado(listener: (event: ERPEvent) => void) {
+    this.on('pago.proveedor.registrado', listener);
+  }
+
+  onMovimientoBancarioRegistrado(listener: (event: ERPEvent) => void) {
+    this.on('movimiento.bancario.registrado', listener);
   }
 
   // SIRE

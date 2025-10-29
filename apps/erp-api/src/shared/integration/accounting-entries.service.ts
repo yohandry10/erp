@@ -10,6 +10,7 @@ import {
   GastoRegistradoEvent,
 } from '../events/event-bus.service';
 import { AsientoContable } from './accounting.interfaces';
+import { PeriodosService } from '../../modules/contabilidad/services/periodos.service';
 
 @Injectable()
 export class AccountingEntriesService {
@@ -18,6 +19,7 @@ export class AccountingEntriesService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
+    private readonly periodosService: PeriodosService,
   ) {
     this.initializeCuentasCache();
     this.initializeEventListeners();
@@ -433,6 +435,25 @@ export class AccountingEntriesService {
   }
 
   private async guardarAsientoContable(asiento: AsientoContable): Promise<string> {
+    // ✅ VALIDAR PERÍODO CONTABLE ABIERTO
+    const fechaAsiento = new Date(asiento.fecha);
+    
+    // Obtener tenant_id del contexto (asumiendo que está disponible en el asiento o en el contexto)
+    // Por ahora, intentamos obtenerlo de la sesión de Supabase
+    const { data: { user } } = await this.supabase.getClient().auth.getUser();
+    const tenantId = user?.user_metadata?.tenant_id;
+    
+    if (tenantId) {
+      try {
+        await this.periodosService.validarPeriodoAbierto(tenantId, fechaAsiento);
+      } catch (error) {
+        console.error('❌ [AccountingEntries] Error validando período:', error);
+        throw error;
+      }
+    } else {
+      console.warn('⚠️ [AccountingEntries] No se pudo obtener tenant_id para validar período');
+    }
+
     const { data: ultimoAsiento } = await this.supabase
       .getClient()
       .from('asientos_contables')

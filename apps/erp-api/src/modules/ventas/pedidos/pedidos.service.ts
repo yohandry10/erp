@@ -33,7 +33,7 @@ interface EvaluacionPoliticas {
   estadoCredito: string;
 }
 
-interface ResumenCredito {
+export interface ResumenCredito {
   limite: number;
   pendiente: number;
   tieneVencidos: boolean;
@@ -636,6 +636,7 @@ export class PedidosService {
       ],
       [EstadoPedido.EN_PREPARACION]: [EstadoPedido.LISTO_DESPACHO, EstadoPedido.CANCELADO],
       [EstadoPedido.LISTO_DESPACHO]: [EstadoPedido.LISTO_FACTURAR, EstadoPedido.CANCELADO],
+      [EstadoPedido.DESPACHO_PARCIAL]: [EstadoPedido.LISTO_FACTURAR, EstadoPedido.CANCELADO],
       [EstadoPedido.LISTO_FACTURAR]: [EstadoPedido.FACTURADO],
       [EstadoPedido.FACTURADO]: [EstadoPedido.COMPLETADO, EstadoPedido.COMPLETADO_CON_GRE],
       [EstadoPedido.COMPLETADO]: [],
@@ -838,8 +839,8 @@ export class PedidosService {
   private calcularAjustesTributarios(
     pedido: PedidoVenta & { detalle: PedidoDetalle[] } & { cliente?: any; clientes?: any },
     config: ConfiguracionEmpresa,
-    ajustes?: AjustesTributarios,
-    total: number,
+    ajustes?: AjustesTributarios | number,
+    total?: number,
   ): AjustesTributarios {
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const cliente = (pedido as any).cliente ?? (pedido as any).clientes ?? null;
@@ -1523,6 +1524,7 @@ export class PedidosService {
     const ajustesTributarios = this.calcularAjustesTributarios(
       pedido as any,
       config,
+      undefined,
       facturaResultado.total,
     );
 

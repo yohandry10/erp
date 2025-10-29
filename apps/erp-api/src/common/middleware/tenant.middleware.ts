@@ -52,8 +52,9 @@ export class TenantMiddleware implements NestMiddleware {
       if (tenantId) {
         this.logger.log(`Setting tenant context - Tenant: ${tenantId}, User: ${userId ?? 'unknown'}, Path: ${req.path}`);
 
-        // Add tenant_id to request for easy access in controllers
+        // Add tenant_id to request for easy access in controllers (both formats for compatibility)
         (req as any).tenant_id = tenantId;
+        (req as any).tenantId = tenantId; // For guards that use camelCase
         (req as any).user_id = userId;
 
         this.logger.debug(`Tenant context set - RLS policies will use tenant_id from queries`);

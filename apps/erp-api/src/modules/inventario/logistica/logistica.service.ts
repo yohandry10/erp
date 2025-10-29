@@ -806,9 +806,9 @@ export class LogisticaService {
       prioridad: item.prioridad ?? 3,
       proxima_fecha_compromiso: item.proxima_fecha_compromiso ?? null,
       ultimo_compromiso_en: item.ultimo_compromiso_en ?? null,
-      descripcion: item.detalle?.descripcion ?? null,
-      cantidad_total: Number(item.detalle?.cantidad ?? 0),
-      cantidad_despachada_total: Number(item.detalle?.cantidad_despachada ?? 0),
+      descripcion: (item.detalle as any)?.descripcion ?? null,
+      cantidad_total: Number((item.detalle as any)?.cantidad ?? 0),
+      cantidad_despachada_total: Number((item.detalle as any)?.cantidad_despachada ?? 0),
       created_at: item.created_at,
       updated_at: item.updated_at,
     }));

@@ -399,9 +399,9 @@ export class RmaService {
     const documentoData = {
       tipo_documento: 'NOTA_CREDITO',
       motivo_nota_credito: dto.motivo ?? 'DEVOLUCION DE MERCADERIA',
-      receptor_numero_doc: pedido.clientes?.documento_numero ?? '',
-      receptor_razon_social: pedido.clientes?.razon_social ?? '',
-      receptor_tipo_doc: pedido.clientes?.documento_tipo ?? '6',
+      receptor_numero_doc: (pedido.clientes as any)?.documento_numero ?? '',
+      receptor_razon_social: (pedido.clientes as any)?.razon_social ?? '',
+      receptor_tipo_doc: (pedido.clientes as any)?.documento_tipo ?? '6',
       moneda: 'PEN',
       total,
       serie: dto.serie,

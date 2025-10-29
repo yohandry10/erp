@@ -16,6 +16,10 @@ import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { ContabilidadModule } from './modules/contabilidad/contabilidad.module';
 import { CxcModule } from './modules/finanzas/cxc/cxc.module';
+import { CxpModule } from './modules/finanzas/cxp/cxp.module';
+import { TesoreriaModule } from './modules/finanzas/tesoreria/tesoreria.module';
+import { BancosModule } from './modules/finanzas/bancos/bancos.module';
+import { ConciliacionModule } from './modules/finanzas/conciliacion/conciliacion.module';
 import { DocumentosModule } from './modules/documentos/documentos.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -56,6 +60,10 @@ import { SecurityDashboardModule } from './modules/security/security.module';
     InventarioModule,
     ContabilidadModule,
     CxcModule,
+    CxpModule,
+    TesoreriaModule,
+    BancosModule,
+    ConciliacionModule,
     DocumentosModule,
     ReportsModule,
     NotificationsModule,

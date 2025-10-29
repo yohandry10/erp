@@ -102,7 +102,7 @@ export class CPEIntegrationService {
         serie: factura.serie ?? facturaData.serie,
         numero: factura.numero ?? facturaData.numero,
         moneda: factura.moneda ?? facturaData.moneda ?? 'PEN',
-        fecha_emision: factura.fecha_emision ?? new Date().toISOString().split('T')[0],
+        fecha_emision: (factura as any).fecha_emision ?? new Date().toISOString().split('T')[0],
         total: factura.total_venta ?? facturaData.total_venta,
       };
     } catch (error) {

@@ -1,4 +1,302 @@
 
-> @erp-suite/erp-api@1.0.0 build C:\Users\PC\Desktop\sistema-ventas\apps\erp-api
+> @erp-suite/erp-api@1.0.0 build C:\Users\PC\Desktop\erp\apps\erp-api
 > nest build
 
+[96msrc/modules/compras/services/ordenes-compra.service.spec.ts[0m:[93m410[0m:[93m65[0m - [91merror[0m[90m TS2345: [0mArgument of type 'undefined' is not assignable to parameter of type 'never'.
+
+[7m410[0m       eventBusService.emitOrdenCompraAprobada.mockResolvedValue(undefined);
+[7m   [0m [91m                                                                ~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m70[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m70[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m  [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m127[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m127[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m165[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m165[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m215[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m215[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m263[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m263[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts[0m:[93m306[0m:[93m11[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'occurred_at' does not exist in type 'OutboxEvent'.
+
+[7m306[0m           occurred_at: '2025-01-15T10:00:00Z',
+[7m   [0m [91m          ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/asientos-generator.service.spec.ts[0m:[93m253[0m:[93m69[0m - [91merror[0m[90m TS2345: [0mArgument of type 'Map<string, { id: string; codigo: string; nombre: string; }>' is not assignable to parameter of type 'Map<string, PlanCuenta> | Promise<Map<string, PlanCuenta>>'.
+  Type 'Map<string, { id: string; codigo: string; nombre: string; }>' is not assignable to type 'Map<string, PlanCuenta>'.
+    Type '{ id: string; codigo: string; nombre: string; }' is missing the following properties from type 'PlanCuenta': tenant_id, tipo, nivel, acepta_movimiento, estado
+
+[7m253[0m       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
+[7m   [0m [91m                                                                    ~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/periodos.service.spec.ts[0m:[93m218[0m:[93m67[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is not assignable to parameter of type 'PeriodoContable | Promise<PeriodoContable>'.
+  Type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is missing the following properties from type 'PeriodoContable': created_at, updated_at
+
+[7m218[0m       jest.spyOn(service, 'obtenerPeriodo').mockResolvedValueOnce(periodoAbierto);
+[7m   [0m [91m                                                                  ~~~~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/periodos.service.spec.ts[0m:[93m265[0m:[93m63[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is not assignable to parameter of type 'PeriodoContable | Promise<PeriodoContable>'.
+  Type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is missing the following properties from type 'PeriodoContable': created_at, updated_at
+
+[7m265[0m       jest.spyOn(service, 'obtenerPeriodo').mockResolvedValue(periodoCerrado);
+[7m   [0m [91m                                                              ~~~~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/periodos.service.spec.ts[0m:[93m286[0m:[93m63[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is not assignable to parameter of type 'PeriodoContable | Promise<PeriodoContable>'.
+  Type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is missing the following properties from type 'PeriodoContable': created_at, updated_at
+
+[7m286[0m       jest.spyOn(service, 'obtenerPeriodo').mockResolvedValue(periodoAbierto);
+[7m   [0m [91m                                                              ~~~~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/periodos.service.spec.ts[0m:[93m320[0m:[93m63[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is not assignable to parameter of type 'PeriodoContable | Promise<PeriodoContable>'.
+  Type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is missing the following properties from type 'PeriodoContable': created_at, updated_at
+
+[7m320[0m       jest.spyOn(service, 'obtenerPeriodo').mockResolvedValue(periodoAbierto);
+[7m   [0m [91m                                                              ~~~~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/services/periodos.service.spec.ts[0m:[93m362[0m:[93m67[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is not assignable to parameter of type 'PeriodoContable | Promise<PeriodoContable>'.
+  Type '{ id: string; tenant_id: string; anio: number; mes: number; estado: EstadoPeriodo; }' is missing the following properties from type 'PeriodoContable': created_at, updated_at
+
+[7m362[0m       jest.spyOn(service, 'obtenerPeriodo').mockResolvedValueOnce(periodoAbierto);
+[7m   [0m [91m                                                                  ~~~~~~~~~~~~~~[0m
+[96msrc/modules/contabilidad/utils/accounting-formatter.util.spec.ts[0m:[93m1[0m:[93m38[0m - [91merror[0m[90m TS2307: [0mCannot find module 'vitest' or its corresponding type declarations.
+
+[7m1[0m import { describe, it, expect } from 'vitest';
+[7m [0m [91m                                     ~~~~~~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos-sobregiro.spec.ts[0m:[93m66[0m:[93m58[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; saldo: number; permite_sobregiro: boolean; activa: boolean; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m66[0m       await expect(service.crearCuentaBancaria(tenantId, dto)).rejects.toThrow(
+[7m  [0m [91m                                                         ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos-sobregiro.spec.ts[0m:[93m69[0m:[93m58[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; saldo: number; permite_sobregiro: boolean; activa: boolean; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m69[0m       await expect(service.crearCuentaBancaria(tenantId, dto)).rejects.toThrow(
+[7m  [0m [91m                                                         ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos-sobregiro.spec.ts[0m:[93m105[0m:[93m66[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; saldo: number; permite_sobregiro: boolean; activa: boolean; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m105[0m       const result = await service.crearCuentaBancaria(tenantId, dto);
+[7m   [0m [91m                                                                 ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos.service.spec.ts[0m:[93m74[0m:[93m66[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; saldo: number; permite_sobregiro: boolean; activa: boolean; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m74[0m       const result = await service.crearCuentaBancaria(tenantId, dto);
+[7m  [0m [91m                                                                 ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos.service.spec.ts[0m:[93m101[0m:[93m58[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m101[0m       await expect(service.crearCuentaBancaria(tenantId, dto)).rejects.toThrow(
+[7m   [0m [91m                                                         ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos.service.spec.ts[0m:[93m104[0m:[93m58[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ nombre: string; banco: string; numero_cuenta: string; tipo_cuenta: string; moneda: string; }' is not assignable to parameter of type 'CrearCuentaBancariaDto'.
+  Types of property 'tipo_cuenta' are incompatible.
+    Type 'string' is not assignable to type 'TipoCuenta'.
+
+[7m104[0m       await expect(service.crearCuentaBancaria(tenantId, dto)).rejects.toThrow(
+[7m   [0m [91m                                                         ~~~[0m
+[96msrc/modules/finanzas/bancos/__tests__/bancos.service.spec.ts[0m:[93m383[0m:[93m84[0m - [91merror[0m[90m TS2345: [0mArgument of type '{ fecha_desde: string; fecha_hasta: string; tipo: string; page: number; limit: number; }' is not assignable to parameter of type 'ListarMovimientosQueryDto'.
+  Types of property 'tipo' are incompatible.
+    Type 'string' is not assignable to type '"ABONO" | "CARGO"'.
+
+[7m383[0m       const result = await service.obtenerMovimientosBancarios(tenantId, cuentaId, query);
+[7m   [0m [91m                                                                                   ~~~~~[0m
+[96msrc/modules/finanzas/bancos/bancos.service.ts[0m:[93m790[0m:[93m45[0m - [91merror[0m[90m TS2339: [0mProperty 'moneda' does not exist on type '{ moneda: any; }[]'.
+
+[7m790[0m       const moneda = mov.cuentas_bancarias?.moneda || 'PEN';
+[7m   [0m [91m                                            ~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m568[0m:[93m7[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'message' does not exist in type '{ success: boolean; data: any; }'.
+
+[7m568[0m       message: 'Cuenta por pagar anulada exitosamente',
+[7m   [0m [91m      ~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m693[0m:[93m48[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m693[0m         proveedor_razon_social: cxp.proveedor?.razon_social,
+[7m   [0m [91m                                               ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m694[0m:[93m39[0m - [91merror[0m[90m TS2339: [0mProperty 'ruc' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m694[0m         proveedor_ruc: cxp.proveedor?.ruc,
+[7m   [0m [91m                                      ~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m710[0m:[93m50[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m710[0m           proveedor_razon_social: cxp.proveedor?.razon_social,
+[7m   [0m [91m                                                 ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m711[0m:[93m41[0m - [91merror[0m[90m TS2339: [0mProperty 'ruc' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m711[0m           proveedor_ruc: cxp.proveedor?.ruc,
+[7m   [0m [91m                                        ~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m882[0m:[93m48[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m882[0m         proveedor_razon_social: cxp.proveedor?.razon_social,
+[7m   [0m [91m                                               ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m883[0m:[93m39[0m - [91merror[0m[90m TS2339: [0mProperty 'ruc' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m883[0m         proveedor_ruc: cxp.proveedor?.ruc,
+[7m   [0m [91m                                      ~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m884[0m:[93m41[0m - [91merror[0m[90m TS2339: [0mProperty 'email' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m884[0m         proveedor_email: cxp.proveedor?.email,
+[7m   [0m [91m                                        ~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m885[0m:[93m44[0m - [91merror[0m[90m TS2339: [0mProperty 'telefono' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m885[0m         proveedor_telefono: cxp.proveedor?.telefono,
+[7m   [0m [91m                                           ~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m887[0m:[93m34[0m - [91merror[0m[90m TS2339: [0mProperty 'numero_orden' does not exist on type '{ id: any; numero_orden: any; }[]'.
+
+[7m887[0m         orden_numero: cxp.orden?.numero_orden,
+[7m   [0m [91m                                 ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m1074[0m:[93m40[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m1074[0m           razon_social: cxp.proveedor?.razon_social,
+[7m    [0m [91m                                       ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m1075[0m:[93m31[0m - [91merror[0m[90m TS2339: [0mProperty 'ruc' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m1075[0m           ruc: cxp.proveedor?.ruc,
+[7m    [0m [91m                              ~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m1076[0m:[93m33[0m - [91merror[0m[90m TS2339: [0mProperty 'email' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m1076[0m           email: cxp.proveedor?.email,
+[7m    [0m [91m                                ~~~~~[0m
+[96msrc/modules/finanzas/cxp/cxp.service.ts[0m:[93m1077[0m:[93m36[0m - [91merror[0m[90m TS2339: [0mProperty 'telefono' does not exist on type '{ id: any; razon_social: any; ruc: any; email: any; telefono: any; }[]'.
+
+[7m1077[0m           telefono: cxp.proveedor?.telefono,
+[7m    [0m [91m                                   ~~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m145[0m:[93m61[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m145[0m             descripcion: `Pago a proveedor ${cxp.proveedor?.razon_social || cxp.proveedor_id} - Doc: ${cxp.numero_documento}`,
+[7m   [0m [91m                                                            ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m209[0m:[93m43[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m209[0m           proveedorNombre: cxp.proveedor?.razon_social,
+[7m   [0m [91m                                          ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m236[0m:[93m42[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; ruc: any; }[]'.
+
+[7m236[0m         proveedor_nombre: cxp.proveedor?.razon_social,
+[7m   [0m [91m                                         ~~~~~~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m287[0m:[93m9[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'message' does not exist in type '{ success: boolean; data: any; }'.
+
+[7m287[0m         message: 'Pago registrado exitosamente',
+[7m   [0m [91m        ~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m580[0m:[93m9[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'message' does not exist in type '{ success: boolean; data: any; }'.
+
+[7m580[0m         message: 'Lote de pagos procesado exitosamente',
+[7m   [0m [91m        ~~~~~~~[0m
+[96msrc/modules/finanzas/tesoreria/tesoreria.service.ts[0m:[93m723[0m:[93m40[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ razon_social: any; }[]'.
+
+[7m723[0m         descripcion: `${cxp.proveedor?.razon_social || 'Proveedor'} - ${cxp.numero_documento}`,
+[7m   [0m [91m                                       ~~~~~~~~~~~~[0m
+[96msrc/modules/inventario/logistica/logistica.service.ts[0m:[93m809[0m:[93m34[0m - [91merror[0m[90m TS2339: [0mProperty 'descripcion' does not exist on type '{ descripcion: any; cantidad: any; cantidad_despachada: any; }[]'.
+
+[7m809[0m       descripcion: item.detalle?.descripcion ?? null,
+[7m   [0m [91m                                 ~~~~~~~~~~~[0m
+[96msrc/modules/inventario/logistica/logistica.service.ts[0m:[93m810[0m:[93m44[0m - [91merror[0m[90m TS2339: [0mProperty 'cantidad' does not exist on type '{ descripcion: any; cantidad: any; cantidad_despachada: any; }[]'.
+
+[7m810[0m       cantidad_total: Number(item.detalle?.cantidad ?? 0),
+[7m   [0m [91m                                           ~~~~~~~~[0m
+[96msrc/modules/inventario/logistica/logistica.service.ts[0m:[93m811[0m:[93m55[0m - [91merror[0m[90m TS2339: [0mProperty 'cantidad_despachada' does not exist on type '{ descripcion: any; cantidad: any; cantidad_despachada: any; }[]'.
+
+[7m811[0m       cantidad_despachada_total: Number(item.detalle?.cantidad_despachada ?? 0),
+[7m   [0m [91m                                                      ~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/usuarios.controller.ts[0m:[93m496[0m:[93m41[0m - [91merror[0m[90m TS2339: [0mProperty 'id' does not exist on type '{ id: any; modulo: any; accion: any; recurso: any; descripcion: any; }[]'.
+Found 67 error(s).
+
+
+[7m496[0m         new Map(permissions.map(p => [p.id, p])).values()
+[7m   [0m [91m                                        ~~[0m
+[96msrc/modules/ventas/pedidos/cpe-integration.service.ts[0m:[93m105[0m:[93m32[0m - [91merror[0m[90m TS2339: [0mProperty 'fecha_emision' does not exist on type 'FacturaDto'.
+
+[7m105[0m         fecha_emision: factura.fecha_emision ?? new Date().toISOString().split('T')[0],
+[7m   [0m [91m                               ~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/pedidos/pedidos.service.ts[0m:[93m621[0m:[93m11[0m - [91merror[0m[90m TS2741: [0mProperty '[EstadoPedido.DESPACHO_PARCIAL]' is missing in type '{ PENDIENTE: (EstadoPedido.PENDIENTE_APROBACION | EstadoPedido.CONFIRMADO | EstadoPedido.CANCELADO)[]; PENDIENTE_APROBACION: (EstadoPedido.PENDIENTE | EstadoPedido.CONFIRMADO | EstadoPedido.CANCELADO)[]; ... 7 more ...; CANCELADO: undefined[]; }' but required in type 'Record<EstadoPedido, EstadoPedido[]>'.
+
+[7m621[0m     const transicionesValidas: Record<EstadoPedido, EstadoPedido[]> = {
+[7m   [0m [91m          ~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/pedidos/pedidos.service.ts[0m:[93m842[0m:[93m5[0m - [91merror[0m[90m TS1016: [0mA required parameter cannot follow an optional parameter.
+
+[7m842[0m     total: number,
+[7m   [0m [91m    ~~~~~[0m
+[96msrc/modules/ventas/pedidos/pedidos.service.ts[0m:[93m1523[0m:[93m37[0m - [91merror[0m[90m TS2554: [0mExpected 4 arguments, but got 3.
+
+[7m1523[0m     const ajustesTributarios = this.calcularAjustesTributarios(
+[7m    [0m [91m                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+  [96msrc/modules/ventas/pedidos/pedidos.service.ts[0m:[93m842[0m:[93m5[0m
+    [7m842[0m     total: number,
+    [7m   [0m [96m    ~~~~~~~~~~~~~[0m
+    An argument for 'total' was not provided.
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m65[0m:[93m43[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ id: any; razon_social: any; documento_numero: any; }[]'.
+
+[7m65[0m           cliente_nombre: pedido.clientes.razon_social,
+[7m  [0m [91m                                          ~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m66[0m:[93m46[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_numero' does not exist on type '{ id: any; razon_social: any; documento_numero: any; }[]'.
+
+[7m66[0m           cliente_documento: pedido.clientes.documento_numero,
+[7m  [0m [91m                                             ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m142[0m:[93m38[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m142[0m         cliente_nombre: cot.clientes.razon_social,
+[7m   [0m [91m                                     ~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m143[0m:[93m41[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_numero' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m143[0m         cliente_documento: cot.clientes.documento_numero,
+[7m   [0m [91m                                        ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m327[0m:[93m43[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m327[0m           cliente_nombre: pedido.clientes.razon_social,
+[7m   [0m [91m                                          ~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m328[0m:[93m46[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_numero' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m328[0m           cliente_documento: pedido.clientes.documento_numero,
+[7m   [0m [91m                                             ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m351[0m:[93m27[0m - [91merror[0m[90m TS2365: [0mOperator '>' cannot be applied to types 'unknown' and 'number'.
+
+[7m351[0m         porcentaje_total: totalFacturacion > 0 ? (Number(item.total_facturacion) / totalFacturacion) * 100 : 0,
+[7m   [0m [91m                          ~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m351[0m:[93m84[0m - [91merror[0m[90m TS2363: [0mThe right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+
+[7m351[0m         porcentaje_total: totalFacturacion > 0 ? (Number(item.total_facturacion) / totalFacturacion) * 100 : 0,
+[7m   [0m [91m                                                                                   ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m410[0m:[93m53[0m - [91merror[0m[90m TS2339: [0mProperty 'fecha' does not exist on type '{ fecha: any; }[]'.
+
+[7m410[0m       const fechaCot = new Date(pedido.cotizaciones.fecha);
+[7m   [0m [91m                                                    ~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m931[0m:[93m35[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m931[0m         cliente: cuenta.clientes?.razon_social ?? 'Cliente sin razón social',
+[7m   [0m [91m                                  ~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/reportes/reportes.service.ts[0m:[93m936[0m:[93m45[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_numero' does not exist on type '{ razon_social: any; documento_numero: any; }[]'.
+
+[7m936[0m         cliente_documento: cuenta.clientes?.documento_numero ?? null,
+[7m   [0m [91m                                            ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/rma/rma.service.ts[0m:[93m402[0m:[93m45[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_numero' does not exist on type '{ razon_social: any; documento_numero: any; documento_tipo: any; }[]'.
+
+[7m402[0m       receptor_numero_doc: pedido.clientes?.documento_numero ?? '',
+[7m   [0m [91m                                            ~~~~~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/rma/rma.service.ts[0m:[93m403[0m:[93m47[0m - [91merror[0m[90m TS2339: [0mProperty 'razon_social' does not exist on type '{ razon_social: any; documento_numero: any; documento_tipo: any; }[]'.
+
+[7m403[0m       receptor_razon_social: pedido.clientes?.razon_social ?? '',
+[7m   [0m [91m                                              ~~~~~~~~~~~~[0m
+[96msrc/modules/ventas/rma/rma.service.ts[0m:[93m404[0m:[93m43[0m - [91merror[0m[90m TS2339: [0mProperty 'documento_tipo' does not exist on type '{ razon_social: any; documento_numero: any; documento_tipo: any; }[]'.
+
+[7m404[0m       receptor_tipo_doc: pedido.clientes?.documento_tipo ?? '6',
+[7m   [0m [91m                                          ~~~~~~~~~~~~~~[0m
+[96msrc/shared/supabase/supabase.service.ts[0m:[93m28[0m:[93m7[0m - [91merror[0m[90m TS2353: [0mObject literal may only specify known properties, and 'fetch' does not exist in type 'SupabaseClientOptions<"public">'.
+
+[7m28[0m       fetch: async (input, init = {}) => {
+[7m  [0m [91m      ~~~~~[0m
+[96msrc/shared/supabase/supabase.service.ts[0m:[93m30[0m:[93m62[0m - [91merror[0m[90m TS2339: [0mProperty 'headers' does not exist on type '{}'.
+
+[7m30[0m         const headers = new (globalThis as any).Headers(init.headers ?? {});
+[7m  [0m [91m                                                             ~~~~~~~[0m
+[96msrc/modules/ventas/pedidos/pedidos.controller.ts[0m:[93m107[0m:[93m9[0m - [91merror[0m[90m TS4053: [0mReturn type of public method from exported class has or is using name 'ResumenCredito' from external module "C:/Users/PC/Desktop/erp/apps/erp-api/src/modules/ventas/pedidos/pedidos.service" but cannot be named.
+
+[7m107[0m   async listarPendientesAprobacion(@CurrentTenant() tenantId: string) {
+[7m   [0m [91m        ~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+ ELIFECYCLE  Command failed with exit code 1.

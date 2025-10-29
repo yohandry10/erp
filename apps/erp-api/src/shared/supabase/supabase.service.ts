@@ -24,37 +24,37 @@ export class SupabaseService {
         headers: {
           'X-Client-Info': 'erp-api',
         },
-      },
-      fetch: async (input, init = {}) => {
-        const context = this.tenantContext.getContext();
-        const headers = new (globalThis as any).Headers(init.headers ?? {});
+        fetch: async (input, init = {}) => {
+          const context = this.tenantContext.getContext();
+          const headers = new (globalThis as any).Headers((init as any).headers ?? {});
 
-        headers.set('apikey', process.env.SUPABASE_SERVICE_ROLE_KEY || this.supabaseAnonKey);
+          headers.set('apikey', process.env.SUPABASE_SERVICE_ROLE_KEY || this.supabaseAnonKey);
 
-        if (context?.tenantId) {
-          headers.set('X-Tenant-Id', context.tenantId);
-        }
-
-        if (context?.userId) {
-          headers.set('X-User-Id', context.userId);
-        }
-
-        const supabaseAccessToken = context?.supabaseAccessToken?.trim();
-        if (supabaseAccessToken) {
-          headers.set('Authorization', `Bearer ${supabaseAccessToken}`);
-        } else {
-          headers.set('Authorization', `Bearer ${this.supabaseAnonKey}`);
-          if (!this.serviceFallbackWarned) {
-            this.logger.warn(
-              'Ejecutando consultas con rol anónimo. Asegúrate de enviar tokens por request para reforzar RLS.',
-            );
-            this.serviceFallbackWarned = true;
+          if (context?.tenantId) {
+            headers.set('X-Tenant-Id', context.tenantId);
           }
-        }
 
-        init = { ...init, headers };
+          if (context?.userId) {
+            headers.set('X-User-Id', context.userId);
+          }
 
-        return (globalThis as any).fetch(input as any, init as any);
+          const supabaseAccessToken = context?.supabaseAccessToken?.trim();
+          if (supabaseAccessToken) {
+            headers.set('Authorization', `Bearer ${supabaseAccessToken}`);
+          } else {
+            headers.set('Authorization', `Bearer ${this.supabaseAnonKey}`);
+            if (!this.serviceFallbackWarned) {
+              this.logger.warn(
+                'Ejecutando consultas con rol anónimo. Asegúrate de enviar tokens por request para reforzar RLS.',
+              );
+              this.serviceFallbackWarned = true;
+            }
+          }
+
+          init = { ...init, headers };
+
+          return (globalThis as any).fetch(input as any, init as any);
+        },
       },
     });
     console.log('✅ Supabase client initialized successfully');

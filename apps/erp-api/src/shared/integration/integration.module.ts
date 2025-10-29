@@ -8,11 +8,13 @@ import { InventoryIntegrationService } from './inventory-integration.service';
 import { DashboardIntegrationService } from './dashboard-integration.service';
 import { FinancialIntegrationService } from './financial-integration.service';
 import { RrhhAccountingIntegrationService } from '../../modules/rrhh/rrhh-accounting-integration.service';
+import { PeriodosService } from '../../modules/contabilidad/services/periodos.service';
 
 @Module({
   imports: [SupabaseModule],
   providers: [
     EventBusService,
+    PeriodosService, // Add PeriodosService here to make it available
     AccountingEntriesService,
     AccountingBooksService,
     AccountingReportsService,
@@ -23,6 +25,7 @@ import { RrhhAccountingIntegrationService } from '../../modules/rrhh/rrhh-accoun
   ],
   exports: [
     EventBusService,
+    PeriodosService, // Export it as well
     AccountingEntriesService,
     AccountingBooksService,
     AccountingReportsService,
