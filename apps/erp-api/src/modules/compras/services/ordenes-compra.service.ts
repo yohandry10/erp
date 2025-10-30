@@ -25,7 +25,7 @@ export class OrdenesCompraService {
     private readonly eventBusService: EventBusService,
     private readonly auditService: AuditService,
     private readonly cacheInvalidation: CacheInvalidationService,
-  ) {}
+  ) { }
 
   async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string) {
     // Validar que el número de orden no exista
@@ -84,7 +84,7 @@ export class OrdenesCompraService {
     if (createDto.fecha_orden && createDto.fecha_entrega_esperada) {
       const fechaOrden = new Date(createDto.fecha_orden);
       const fechaEntrega = new Date(createDto.fecha_entrega_esperada);
-      
+
       if (fechaEntrega < fechaOrden) {
         throw new BadRequestException(
           'La fecha de entrega esperada no puede ser anterior a la fecha de orden'
@@ -147,7 +147,7 @@ export class OrdenesCompraService {
 
   async findById(id: string, tenantId: string) {
     const orden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!orden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -169,7 +169,7 @@ export class OrdenesCompraService {
   async update(id: string, updateDto: UpdateOrdenCompraDto, tenantId: string, userId?: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -243,16 +243,16 @@ export class OrdenesCompraService {
 
     // Validar fechas
     if (updateDto.fecha_orden || updateDto.fecha_entrega_esperada) {
-      const fechaOrden = updateDto.fecha_orden 
+      const fechaOrden = updateDto.fecha_orden
         ? new Date(updateDto.fecha_orden)
         : new Date(existingOrden.fecha_orden);
-      
+
       const fechaEntrega = updateDto.fecha_entrega_esperada
         ? new Date(updateDto.fecha_entrega_esperada)
-        : existingOrden.fecha_entrega_esperada 
+        : existingOrden.fecha_entrega_esperada
           ? new Date(existingOrden.fecha_entrega_esperada)
           : null;
-      
+
       if (fechaEntrega && fechaEntrega < fechaOrden) {
         throw new BadRequestException(
           'La fecha de entrega esperada no puede ser anterior a la fecha de orden'
@@ -295,7 +295,7 @@ export class OrdenesCompraService {
   async aprobar(id: string, aprobarDto: AprobarOrdenCompraDto, tenantId: string, userId?: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -372,13 +372,13 @@ export class OrdenesCompraService {
 
     // Obtener todas las aprobaciones actualizadas
     const todasLasAprobaciones = await this.ocAprobacionesRepository.findByOrdenId(id);
-    
+
     // Contar aprobaciones aprobadas
     const aprobadasCount = todasLasAprobaciones.filter(a => a.estado === 'APROBADA').length;
-    
+
     // Verificar si hay alguna aprobación rechazada
     const tieneRechazadas = await this.ocAprobacionesRepository.hasRejectedApprovals(id);
-    
+
     if (tieneRechazadas) {
       throw new BadRequestException(
         'No se puede aprobar la orden porque ya tiene aprobaciones rechazadas'
@@ -387,7 +387,7 @@ export class OrdenesCompraService {
 
     // Determinar el nuevo estado basado en las aprobaciones
     let nuevoEstado: string;
-    
+
     if (pendingCount > 0) {
       // Aún hay aprobaciones pendientes
       nuevoEstado = 'APROBACION';
@@ -451,7 +451,7 @@ export class OrdenesCompraService {
   async rechazar(id: string, rechazarDto: RechazarOrdenCompraDto, tenantId: string, userId?: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -574,7 +574,7 @@ export class OrdenesCompraService {
   async cancelar(id: string, cancelarDto: CancelarOrdenCompraDto, tenantId: string, userId?: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -688,7 +688,7 @@ export class OrdenesCompraService {
   async findRecepcionesByOrdenId(id: string, tenantId: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -702,7 +702,7 @@ export class OrdenesCompraService {
   async findAprobacionesByOrdenId(id: string, tenantId: string) {
     // Verificar que la orden existe
     const existingOrden = await this.ordenesRepository.findById(id, tenantId);
-    
+
     if (!existingOrden) {
       throw new NotFoundException(`Orden de compra con ID ${id} no encontrada`);
     }
@@ -1021,28 +1021,31 @@ export class OrdenesCompraService {
       // 🟡 MEJORA MEDIA: Manejo de errores en eventos para no bloquear operaciones críticas
       try {
         this.eventBusService.emitOrdenCompraAprobada({
-        ordenId: orden.id,
-        numeroOrden: orden.numero,
-        proveedorId: orden.proveedor_id,
-        proveedorNombre: proveedor?.razon_social || 'Proveedor desconocido',
-        total,
-        subtotal,
-        igv,
-        moneda: orden.moneda || 'PEN',
-        fechaOrden: orden.fecha_orden,
-        fechaEntregaEsperada: orden.fecha_entrega_esperada,
-        aprobadoPor: aprobadorId || 'SYSTEM',
-        aprobadoEn: new Date().toISOString(),
-        diasCredito: orden.dias_credito,
-        items,
-        tenantId
-      });
+          ordenId: orden.id,
+          numeroOrden: orden.numero,
+          proveedorId: orden.proveedor_id,
+          proveedorNombre: proveedor?.razon_social || 'Proveedor desconocido',
+          total,
+          subtotal,
+          igv,
+          moneda: orden.moneda || 'PEN',
+          fechaOrden: orden.fecha_orden,
+          fechaEntregaEsperada: orden.fecha_entrega_esperada,
+          aprobadoPor: aprobadorId || 'SYSTEM',
+          aprobadoEn: new Date().toISOString(),
+          diasCredito: orden.dias_credito,
+          items,
+          tenantId
+        });
 
-      console.log(`✅ Evento OrdenCompraAprobada emitido para orden ${orden.numero}`);
+        console.log(`✅ Evento OrdenCompraAprobada emitido para orden ${orden.numero}`);
+      } catch (error) {
+        console.error('❌ Error al emitir evento OrdenCompraAprobada:', error);
+        // 🟡 MEJORA MEDIA: No bloquear la operación principal si falla el evento
+        // El error ya está registrado en logs para monitoreo
+      }
     } catch (error) {
-      console.error('❌ Error al emitir evento OrdenCompraAprobada:', error);
-      // 🟡 MEJORA MEDIA: No bloquear la operación principal si falla el evento
-      // El error ya está registrado en logs para monitoreo
+      console.error('❌ Error al emitir evento de orden aprobada:', error);
     }
   }
 }
