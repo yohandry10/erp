@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConfigurationService } from './configuration.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { User } from '../auth/user.interface';
 import {
   SaveWizardStepDto,

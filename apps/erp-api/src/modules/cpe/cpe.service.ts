@@ -1040,10 +1040,8 @@ ${new Date().toLocaleString()}
       };
     }
   }
-}
 
   /**
-
    * Anular un comprobante CPE
    * Genera nota de crédito y emite eventos para reversión de operaciones
    */
@@ -1211,3 +1209,4 @@ ${new Date().toLocaleString()}
 
     return data && data.length > 0 ? data[0].numero + 1 : 1;
   }
+}

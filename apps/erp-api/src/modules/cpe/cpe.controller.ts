@@ -263,7 +263,6 @@ export class CpeController {
       };
     }
   }
-}
 
   /**
    * Anular un comprobante CPE
@@ -295,3 +294,4 @@ export class CpeController {
   ) {
     return this.cpeService.anularComprobante(id, anularDto.motivo, tenantId, user?.id, anularDto.tipo_nota);
   }
+}
