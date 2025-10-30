@@ -6,14 +6,13 @@ import { TenantContextService } from '../tenant/tenant-context.service';
 export class SupabaseService {
   private supabase: SupabaseClient;
   private readonly logger = new Logger(SupabaseService.name);
-  private readonly supabaseAnonKey: string;
-  private serviceFallbackWarned = false;
+  private readonly serviceRoleKey: string;
 
   constructor(private readonly tenantContext: TenantContextService) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     // Usar SERVICE_ROLE_KEY para el backend (tiene permisos completos)
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    this.supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    this.serviceRoleKey = serviceRoleKey ?? '';
 
     if (!supabaseUrl || !serviceRoleKey) {
       throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
@@ -26,12 +25,23 @@ export class SupabaseService {
         },
         fetch: async (input, init = {}) => {
           const context = this.tenantContext.getContext();
+          const tenantId = context?.tenantId ?? null;
+          const isSuperAdmin = context?.isSuperAdmin ?? false;
           const headers = new (globalThis as any).Headers((init as any).headers ?? {});
 
-          headers.set('apikey', process.env.SUPABASE_SERVICE_ROLE_KEY || this.supabaseAnonKey);
+          headers.set('apikey', this.serviceRoleKey);
 
-          if (context?.tenantId) {
-            headers.set('X-Tenant-Id', context.tenantId);
+          if (!tenantId && !isSuperAdmin) {
+            // HARDENING: sin tenant no permitimos consultas, evita fuga multi-tenant.
+            this.logger.error('SupabaseService: intento de consulta sin tenant en contexto.');
+            throw new Error('Tenant context required');
+          }
+
+          if (tenantId) {
+            headers.set('X-Tenant-Id', tenantId);
+          } else if (isSuperAdmin) {
+            // HARDENING: superadmin puede operar sin tenant explícito.
+            headers.set('X-Superadmin-Bypass', 'true');
           }
 
           if (context?.userId) {
@@ -42,13 +52,8 @@ export class SupabaseService {
           if (supabaseAccessToken) {
             headers.set('Authorization', `Bearer ${supabaseAccessToken}`);
           } else {
-            headers.set('Authorization', `Bearer ${this.supabaseAnonKey}`);
-            if (!this.serviceFallbackWarned) {
-              this.logger.warn(
-                'Ejecutando consultas con rol anónimo. Asegúrate de enviar tokens por request para reforzar RLS.',
-              );
-              this.serviceFallbackWarned = true;
-            }
+            // HARDENING: usamos service role cuando no hay token de usuario, nunca rol anon.
+            headers.set('Authorization', `Bearer ${this.serviceRoleKey}`);
           }
 
           init = { ...init, headers };
@@ -60,27 +65,42 @@ export class SupabaseService {
     console.log('✅ Supabase client initialized successfully');
   }
 
+  private ensureContext(): void {
+    const context = this.tenantContext.getContext();
+    if (!context?.tenantId && !context?.isSuperAdmin) {
+      // HARDENING: prohibir acceso sin tenant salvo superadmin.
+      this.logger.error('SupabaseService#getClient llamado sin tenant en contexto.');
+      throw new Error('Tenant context required');
+    }
+  }
+
   getClient(): SupabaseClient {
+    this.ensureContext();
     return this.supabase;
   }
 
   query(table: string) {
+    this.ensureContext();
     return this.supabase.from(table);
   }
 
   async select(table: string, columns = '*') {
+    this.ensureContext();
     return this.supabase.from(table).select(columns);
   }
 
   async insert(table: string, data: any) {
+    this.ensureContext();
     return this.supabase.from(table).insert(data);
   }
 
   async update(table: string, data: any, filters: any) {
+    this.ensureContext();
     return this.supabase.from(table).update(data).match(filters);
   }
 
   async delete(table: string, filters: any) {
+    this.ensureContext();
     return this.supabase.from(table).delete().match(filters);
   }
-} 
+}

@@ -9,12 +9,23 @@ const AsistenciaPage = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   const api = useApi();
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      // HARDENING: no consultar API RRHH cuando la función está deshabilitada.
+      setEmpleados([]);
+      setAsistencias([]);
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, [fecha]);
+  }, [fecha, rrhhEnabled]);
 
   const loadData = async () => {
+    if (!rrhhEnabled) {
+      return;
+    }
     try {
       setLoading(true);
       
@@ -61,6 +72,20 @@ const AsistenciaPage = () => {
     
     return { presentes, ausentes, completaron };
   };
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="alert alert-warning">
+          <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
+          <p className="text-sm text-gray-600">
+            {/* // HARDENING: RRHH bloqueado hasta validar cálculo legal de planillas. */}
+            Las funciones de asistencia estarán disponibles cuando el módulo de RRHH se habilite en este entorno.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = calcularEstadisticas();
 

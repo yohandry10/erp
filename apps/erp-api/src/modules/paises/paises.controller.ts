@@ -25,6 +25,8 @@ import {
 import { Request } from 'express';
 import { ApiResponseWrapper } from '../../common/decorators/api-response-wrapper.decorator';
 import { ResponseDto } from '../../common/dto/response.dto';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 /**
  * Controlador para la gestión de países y configuraciones fiscales
@@ -125,7 +127,8 @@ export class PaisesController {
    * Obtiene la configuración de país del usuario autenticado
    */
   @Get('usuario/configuracion')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('paises.usuario.read') // HARDENING: lectura de configuración requiere permiso.
   @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Obtener configuración de país del usuario actual',
@@ -149,7 +152,8 @@ export class PaisesController {
    * Actualiza la configuración de país del usuario autenticado
    */
   @Put('usuario/configuracion')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('paises.usuario.update') // HARDENING: actualización requiere permiso.
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 

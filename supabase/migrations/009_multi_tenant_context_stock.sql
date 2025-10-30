@@ -13,6 +13,9 @@ BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS app;
 
+-- Otorgar permisos de uso del esquema app (SOLO usuarios autenticados, NO anon)
+GRANT USAGE ON SCHEMA app TO postgres, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION app.current_tenant_id()
 RETURNS uuid
 LANGUAGE plpgsql
@@ -91,6 +94,145 @@ $$;
 
 COMMENT ON FUNCTION app.current_tenant_id IS 'Obtiene el tenant_id actual a partir de cabeceras o GUC app.current_tenant_id';
 COMMENT ON FUNCTION app.current_user_id IS 'Obtiene el user_id actual a partir de cabeceras o GUC app.current_user_id';
+
+-- Función SAFE que no lanza excepción (para consultas administrativas)
+CREATE OR REPLACE FUNCTION app.current_tenant_id_safe()
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $
+DECLARE
+  v_headers jsonb;
+  v_tenant text;
+BEGIN
+  BEGIN
+    v_headers := current_setting('request.headers', true)::jsonb;
+    v_tenant := COALESCE(
+      v_headers ->> 'x-tenant-id',
+      v_headers ->> 'x-tenant'
+    );
+  EXCEPTION
+    WHEN OTHERS THEN
+      v_tenant := NULL;
+  END;
+
+  IF v_tenant IS NULL OR v_tenant = '' THEN
+    BEGIN
+      v_tenant := current_setting('app.current_tenant_id', true);
+    EXCEPTION
+      WHEN OTHERS THEN
+        v_tenant := NULL;
+    END;
+  END IF;
+
+  IF v_tenant IS NULL OR v_tenant = '' THEN
+    RETURN NULL;  -- Retorna NULL en lugar de lanzar excepción
+  END IF;
+
+  RETURN v_tenant::uuid;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN NULL;
+END;
+$;
+
+COMMENT ON FUNCTION app.current_tenant_id_safe IS 'Versión segura que retorna NULL si no hay tenant context en lugar de lanzar excepción';
+
+-- Función para verificar si hay contexto de tenant
+CREATE OR REPLACE FUNCTION app.has_tenant_context()
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $
+BEGIN
+  RETURN app.current_tenant_id_safe() IS NOT NULL;
+END;
+$;
+
+COMMENT ON FUNCTION app.has_tenant_context IS 'Verifica si existe un contexto de tenant válido';
+
+-- Función para verificar si el usuario actual es superadmin
+CREATE OR REPLACE FUNCTION app.is_superadmin()
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $
+DECLARE
+  v_user_id uuid;
+  v_is_super boolean;
+BEGIN
+  v_user_id := app.current_user_id();
+  
+  IF v_user_id IS NULL THEN
+    RETURN false;
+  END IF;
+  
+  -- Verificar el campo is_super_admin en usuarios_sistema
+  SELECT COALESCE(is_super_admin, false)
+  INTO v_is_super
+  FROM usuarios_sistema
+  WHERE id = v_user_id
+  AND activo = true;
+  
+  RETURN COALESCE(v_is_super, false);
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN false;
+END;
+$;
+
+COMMENT ON FUNCTION app.is_superadmin IS 'Verifica si el usuario actual tiene rol SUPERADMIN';
+
+-- Función para logging de acceso sin tenant context
+CREATE OR REPLACE FUNCTION app.log_no_tenant_access(
+  p_table_name text,
+  p_operation text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $
+DECLARE
+  v_user_id uuid;
+BEGIN
+  v_user_id := app.current_user_id();
+  
+  INSERT INTO audit_log (
+    tenant_id,
+    user_id,
+    table_name,
+    operation,
+    old_data,
+    new_data,
+    changed_at
+  ) VALUES (
+    NULL,  -- Sin tenant
+    v_user_id,
+    p_table_name,
+    p_operation,
+    jsonb_build_object('warning', 'Access without tenant context'),
+    jsonb_build_object('is_superadmin', app.is_superadmin()),
+    NOW()
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Si falla el logging, no interrumpir la operación
+    NULL;
+END;
+$;
+
+COMMENT ON FUNCTION app.log_no_tenant_access IS 'Registra accesos a datos sin contexto de tenant para auditoría';
+
+-- Otorgar permisos de ejecución de las funciones (SOLO usuarios autenticados)
+GRANT EXECUTE ON FUNCTION app.current_tenant_id() TO postgres, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app.current_user_id() TO postgres, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app.current_tenant_id_safe() TO postgres, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app.has_tenant_context() TO postgres, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app.is_superadmin() TO postgres, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION app.log_no_tenant_access(text, text) TO postgres, authenticated, service_role;
 
 -- =====================================================
 -- FUNCIONES RPC DE INVENTARIO

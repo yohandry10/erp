@@ -19,9 +19,9 @@ export function CompletionStep() {
 
       await completeWizard()
 
-      // Redirect to dashboard after a short delay
+      // Redirect to dashboard and force reload to refresh configuration status
       setTimeout(() => {
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       }, 1500)
     } catch (err) {
       console.error('Error completing wizard:', err)

@@ -7,16 +7,22 @@ import {
   Param, 
   Query,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CotizacionesCompraService } from '../services/cotizaciones-compra.service';
 import { CreateCotizacionCompraDto } from '../dto/create-cotizacion-compra.dto';
 import { UpdateCotizacionCompraDto } from '../dto/update-cotizacion-compra.dto';
 import { CreateOrdenCompraDto } from '../dto/create-orden-compra.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 
 @ApiTags('compras/cotizaciones')
 @Controller('compras/cotizaciones')
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger cotizaciones con permisos granulares.
 export class CotizacionesCompraController {
   constructor(
     private readonly cotizacionesService: CotizacionesCompraService
@@ -29,12 +35,11 @@ export class CotizacionesCompraController {
   @ApiResponse({ status: 409, description: 'Ya existe una cotización con ese número' })
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Body() createDto: CreateCotizacionCompraDto & { tenant_id?: string }
+    @Body() createDto: CreateCotizacionCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body o usar valor por defecto para testing
-      const tenantId = createDto.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: el tenant proviene del contexto, no del body.
       const cotizacion = await this.cotizacionesService.create(createDto, tenantId);
       
       return {
@@ -61,7 +66,7 @@ export class CotizacionesCompraController {
   @ApiQuery({ name: 'limit', required: false, description: 'Límite de resultados' })
   @ApiQuery({ name: 'offset', required: false, description: 'Offset para paginación' })
   async findAll(
-    @Query('tenant_id') tenantId?: string,
+    @CurrentTenant() tenantId: string,
     @Query('estado') estado?: string,
     @Query('proveedor_id') proveedorId?: string,
     @Query('fecha_desde') fechaDesde?: string,
@@ -70,8 +75,6 @@ export class CotizacionesCompraController {
     @Query('offset') offset?: string
   ) {
     try {
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       const filters: any = {};
       
       if (estado) {
@@ -98,7 +101,7 @@ export class CotizacionesCompraController {
         filters.offset = parseInt(offset, 10);
       }
 
-      const result = await this.cotizacionesService.findAll(tenant, filters);
+      const result = await this.cotizacionesService.findAll(tenantId, filters);
       
       return {
         success: true,
@@ -121,12 +124,11 @@ export class CotizacionesCompraController {
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   async findOne(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const cotizacion = await this.cotizacionesService.findById(id, tenant);
+      // HARDENING: el tenant proviene del contexto.
+      const cotizacion = await this.cotizacionesService.findById(id, tenantId);
       
       return {
         success: true,
@@ -150,13 +152,11 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id') id: string,
-    @Body() updateDto: UpdateCotizacionCompraDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body() updateDto: UpdateCotizacionCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto
-      const tenantId = updateDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: ignoramos tenant externo; usamos contexto autenticado.
       const cotizacion = await this.cotizacionesService.update(id, updateDto, tenantId);
       
       return {
@@ -180,13 +180,11 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async enviar(
     @Param('id') id: string,
-    @Body() body: { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body() body: Record<string, any>,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto
-      const tenantId = body.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: ignoramos tenant proporcionado en body.
       const cotizacion = await this.cotizacionesService.enviar(id, tenantId);
       
       return {
@@ -210,13 +208,11 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async aprobar(
     @Param('id') id: string,
-    @Body() body: { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body() body: Record<string, any>,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto
-      const tenantId = body.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: se fuerza tenant del contexto autenticado.
       const cotizacion = await this.cotizacionesService.aprobar(id, tenantId);
       
       return {
@@ -240,13 +236,10 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.OK)
   async rechazar(
     @Param('id') id: string,
-    @Body() body: { motivo?: string; tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body() body: { motivo?: string },
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto
-      const tenantId = body.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       const cotizacion = await this.cotizacionesService.rechazar(
         id, 
         tenantId, 
@@ -275,13 +268,10 @@ export class CotizacionesCompraController {
   @HttpCode(HttpStatus.CREATED)
   async convertirAOrdenCompra(
     @Param('id') id: string,
-    @Body() body: { numero_oc: string; tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body() body: { numero_oc: string },
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto
-      const tenantId = body.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       // Validar que se proporcionó el número de OC
       if (!body.numero_oc) {
         return {

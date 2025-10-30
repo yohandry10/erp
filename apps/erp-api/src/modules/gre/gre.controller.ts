@@ -1,23 +1,27 @@
-import { Controller, Get, Post, Body, Param, Query, /* UseGuards, */ Req, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-// import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GreService } from './gre.service';
 import { CreateGuiaRemisionDto, GuiaRemisionResponseDto } from './gre.types';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 @ApiTags('gre')
 @Controller('gre')
-// @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: GRE exige permisos granulares.
 @ApiBearerAuth()
 export class GreController {
   constructor(private readonly greService: GreService) {}
 
   @Get()
+  @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Get GRE list (placeholder)' })
   findAll() {
     return this.greService.findAll();
   }
 
   @Get('guias')
+  @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Listar guías de remisión' })
   async findAllGuias(@Query() filters: any) {
     try {
@@ -42,6 +46,7 @@ export class GreController {
   }
 
   @Get('guias/:id')
+  @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Obtener una guía de remisión por ID' })
   @ApiResponse({ status: 200, description: 'Guía de remisión obtenida exitosamente' })
   async findGuiaById(@Param('id') id: string) {
@@ -68,6 +73,7 @@ export class GreController {
   }
 
   @Post('guias')
+  @RequirePermission('gre.guias.emitir')
   @ApiOperation({ summary: 'Crear nueva guía de remisión electrónica' })
   @ApiResponse({ status: 201, description: 'Guía de remisión creada exitosamente' })
   async createGuia(@Body() greData: CreateGuiaRemisionDto) {
@@ -94,6 +100,7 @@ export class GreController {
   }
 
   @Get('reporte')
+  @RequirePermission('gre.reportes.ver')
   @ApiOperation({ summary: 'Generar reporte GRE' })
   generateReport() {
     // TODO: Implement real GRE report generation
@@ -105,6 +112,7 @@ export class GreController {
   }
 
   @Get('stats')
+  @RequirePermission('gre.reportes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de GRE' })
   async getStats() {
     try {
@@ -128,6 +136,7 @@ export class GreController {
   }
 
   @Post('guias/:id/reenviar')
+  @RequirePermission('gre.guias.reenviar')
   @ApiOperation({ summary: 'Reenviar guía de remisión a SUNAT' })
   @ApiResponse({ status: 200, description: 'GRE reenviada exitosamente' })
   async reenviarGre(@Param('id') id: string) {
@@ -152,6 +161,7 @@ export class GreController {
   }
 
   @Get('guias/:id/estado-sunat')
+  @RequirePermission('gre.guias.consultar')
   @ApiOperation({ summary: 'Consultar estado de GRE en SUNAT' })
   @ApiResponse({ status: 200, description: 'Estado consultado exitosamente' })
   async consultarEstadoSunat(@Param('id') id: string) {
@@ -176,6 +186,7 @@ export class GreController {
   }
 
   @Get('guias/:id/xml')
+  @RequirePermission('gre.guias.descargar_xml')
   @ApiOperation({ summary: 'Obtener XML firmado de la GRE' })
   @ApiResponse({ status: 200, description: 'XML obtenido exitosamente' })
   async obtenerXmlFirmado(@Param('id') id: string, @Res() res: any) {
@@ -206,6 +217,7 @@ export class GreController {
   }
 
   @Post('guias/:id/enviar-sunat')
+  @RequirePermission('gre.guias.enviar')
   @ApiOperation({ summary: 'Enviar GRE firmada a SUNAT manualmente' })
   @ApiResponse({ status: 200, description: 'GRE enviada a SUNAT exitosamente' })
   async enviarManualmenteSunat(@Param('id') id: string) {
@@ -241,19 +253,22 @@ export class GreController {
   }
 
   @Post('evaluate-auto-creation')
+  @RequirePermission('gre.configuracion.evaluar')
   @ApiOperation({ summary: 'Evaluar si una venta debe generar GRE automática' })
   @ApiResponse({ status: 200, description: 'Evaluación completada' })
-  async evaluateAutoCreation(@Body() body: {
-    tenantId: string;
-    saleId: string;
-    total: number;
-    cpeId?: string;
-  }) {
+  async evaluateAutoCreation(
+    @CurrentTenant() tenantId: string,
+    @Body() body: {
+      saleId: string;
+      total: number;
+      cpeId?: string;
+    }
+  ) {
     console.log(`🚚 [GRE] Evaluating auto creation for sale ${body.saleId}`);
     
     try {
       const shouldCreate = await this.greService.evaluateAutoGRECreation({
-        tenantId: body.tenantId,
+        tenantId, // HARDENING: tenant proviene del contexto, no del cliente.
         saleId: body.saleId,
         total: body.total,
         cpeId: body.cpeId,
@@ -280,19 +295,13 @@ export class GreController {
   }
 
   @Get('auto-config')
+  @RequirePermission('gre.configuracion.ver')
   @ApiOperation({ summary: 'Obtener configuración de GRE automática' })
   @ApiResponse({ status: 200, description: 'Configuración obtenida exitosamente' })
-  async getAutoConfig(@Query('tenantId') tenantId: string) {
+  async getAutoConfig(@CurrentTenant() tenantId: string) {
     console.log(`🚚 [GRE] Getting auto config for tenant ${tenantId}`);
     
     try {
-      if (!tenantId) {
-        return {
-          success: false,
-          message: 'tenantId es requerido',
-        };
-      }
-
       const config = await this.greService.getGREThresholdConfig(tenantId);
 
       return {
@@ -310,23 +319,19 @@ export class GreController {
   }
 
   @Post('auto-config')
+  @RequirePermission('gre.configuracion.actualizar')
   @ApiOperation({ summary: 'Actualizar configuración de GRE automática' })
   @ApiResponse({ status: 200, description: 'Configuración actualizada exitosamente' })
-  async updateAutoConfig(@Body() body: {
-    tenantId: string;
-    umbralGREAutomatico?: number;
-    greAutomaticoHabilitado?: boolean;
-  }) {
-    console.log(`🚚 [GRE] Updating auto config for tenant ${body.tenantId}`);
+  async updateAutoConfig(
+    @CurrentTenant() tenantId: string,
+    @Body() body: {
+      umbralGREAutomatico?: number;
+      greAutomaticoHabilitado?: boolean;
+    }
+  ) {
+    console.log(`🚚 [GRE] Updating auto config for tenant ${tenantId}`);
     
     try {
-      if (!body.tenantId) {
-        return {
-          success: false,
-          message: 'tenantId es requerido',
-        };
-      }
-
       // Update empresa_config with new thresholds
       const updateData: any = {};
       
@@ -343,14 +348,14 @@ export class GreController {
       const { error } = await supabase
         .from('empresa_config')
         .update(updateData)
-        .eq('tenant_id', body.tenantId);
+        .eq('tenant_id', tenantId); // HARDENING: nunca usamos tenant del payload.
 
       if (error) {
         throw error;
       }
 
       // Get updated config
-      const updatedConfig = await this.greService.getGREThresholdConfig(body.tenantId);
+      const updatedConfig = await this.greService.getGREThresholdConfig(tenantId);
 
       return {
         success: true,

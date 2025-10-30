@@ -436,23 +436,139 @@ export class AsientosGeneratorService {
    */
   async generarAsientoVenta(evento: any): Promise<AsientoContable> {
     try {
-      const { tenant_id, fecha, total, base_imponible, igv, costo_ventas, centro_costo_id } = evento;
+      const { tenant_id, fecha, base_imponible, igv, centro_costo_id } = evento;
+      const totalFactura = this.round2(Number(evento.total ?? 0));
+      const ajustes = {
+        retencion: this.round2(Number(evento.ajustes?.retencion ?? 0)),
+        percepcion: this.round2(Number(evento.ajustes?.percepcion ?? 0)),
+        detraccion: this.round2(Number(evento.ajustes?.detraccion ?? 0)),
+        anticipo: this.round2(Number(evento.ajustes?.anticipo ?? 0)),
+      };
 
-      // Obtener cuentas del plan
+      if (ajustes.retencion || ajustes.percepcion || ajustes.detraccion || ajustes.anticipo) {
+        // HARDENING: reflejamos ajustes tributarios en el asiento cuando existen subcuentas configuradas.
+        this.logger.log(
+          `ℹ️ [Asientos] Venta con ajustes - Retención: ${ajustes.retencion}, Percepción: ${ajustes.percepcion}, ` +
+            `Detracción: ${ajustes.detraccion}, Anticipo aplicado: ${ajustes.anticipo}`,
+        );
+      }
+
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
         ['12', '70', '40', '69', '20']
       );
 
-      const detalles: DetalleAsiento[] = [
-        // Registro de la venta
-        { cuenta_id: cuentas.get('12')!.id, debe: total, haber: 0, concepto: 'Clientes - Venta' },
-        { cuenta_id: cuentas.get('70')!.id, debe: 0, haber: base_imponible, concepto: 'Ventas', centro_costo_id },
-        { cuenta_id: cuentas.get('40')!.id, debe: 0, haber: igv, concepto: 'IGV por Pagar' },
-        // Registro del costo
-        { cuenta_id: cuentas.get('69')!.id, debe: costo_ventas, haber: 0, concepto: 'Costo de Ventas', centro_costo_id },
-        { cuenta_id: cuentas.get('20')!.id, debe: 0, haber: costo_ventas, concepto: 'Mercaderías' }
-      ];
+      const montoPendiente = Math.max(this.round2(
+        evento.monto_pendiente != null
+          ? Number(evento.monto_pendiente)
+          : totalFactura - ajustes.retencion - ajustes.detraccion - ajustes.anticipo + ajustes.percepcion
+      ), 0);
+      const base = this.round2(Number(base_imponible ?? 0));
+      const montoIgv = this.round2(Number(igv ?? 0));
+      const costoVentas = this.round2(Number(evento.costo_ventas ?? 0));
+
+      const cuentaRetencion = ajustes.retencion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['12111', '1211', '121'],
+            keywords: ['retencion', 'retención'],
+          })
+        : null;
+      const cuentaDetraccion = ajustes.detraccion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['1041', '104', '1040'],
+            keywords: ['detraccion', 'detracción'],
+          })
+        : null;
+      const cuentaPercepcion = ajustes.percepcion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['4017', '40171', '401'],
+            keywords: ['percepcion', 'percepción'],
+          })
+        : null;
+      const cuentaAnticipos = ajustes.anticipo > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['1212', '1213', '122'],
+            keywords: ['anticipo', 'anticipos'],
+          })
+        : null;
+
+      const detalles: DetalleAsiento[] = [];
+
+      detalles.push({
+        cuenta_id: cuentas.get('12')!.id,
+        debe: montoPendiente,
+        haber: 0,
+        concepto: 'Clientes - Venta',
+        centro_costo_id,
+      });
+
+      if (ajustes.retencion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaRetencion ?? cuentas.get('12')!).id,
+          debe: ajustes.retencion,
+          haber: 0,
+          concepto: cuentaRetencion ? 'Retenciones por cobrar' : 'Clientes - Retención pendiente',
+        });
+      }
+
+      if (ajustes.detraccion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaDetraccion ?? cuentas.get('12')!).id,
+          debe: ajustes.detraccion,
+          haber: 0,
+          concepto: cuentaDetraccion ? 'Detracciones por cobrar' : 'Clientes - Detracción aplicada',
+        });
+      }
+
+      if (ajustes.anticipo > 0) {
+        detalles.push({
+          cuenta_id: (cuentaAnticipos ?? cuentas.get('12')!).id,
+          debe: ajustes.anticipo,
+          haber: 0,
+          concepto: cuentaAnticipos ? 'Aplicación de anticipo' : 'Clientes - Ajuste por anticipo',
+        });
+      }
+
+      detalles.push({
+        cuenta_id: cuentas.get('70')!.id,
+        debe: 0,
+        haber: base,
+        concepto: 'Ventas',
+        centro_costo_id,
+      });
+      detalles.push({
+        cuenta_id: cuentas.get('40')!.id,
+        debe: 0,
+        haber: montoIgv,
+        concepto: 'IGV por pagar',
+      });
+
+      if (ajustes.percepcion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaPercepcion ?? cuentas.get('40')!).id,
+          debe: 0,
+          haber: ajustes.percepcion,
+          concepto: cuentaPercepcion ? 'Percepciones por pagar' : 'IGV / Percepciones',
+        });
+      }
+
+      if (costoVentas > 0) {
+        detalles.push(
+          {
+            cuenta_id: cuentas.get('69')!.id,
+            debe: costoVentas,
+            haber: 0,
+            concepto: 'Costo de ventas',
+            centro_costo_id,
+          },
+          {
+            cuenta_id: cuentas.get('20')!.id,
+            debe: 0,
+            haber: costoVentas,
+            concepto: 'Mercaderías',
+          },
+        );
+      }
 
       return await this.generarAsiento(
         tenant_id,
@@ -467,6 +583,152 @@ export class AsientosGeneratorService {
         await this.marcarEventoComoFallido(
           evento.event_id,
           `Error generando asiento de venta: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  async generarAsientoNotaCredito(evento: any): Promise<AsientoContable> {
+    try {
+      const { tenant_id, fecha, base_imponible, igv, centro_costo_id } = evento;
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenant_id,
+        ['12', '70', '40', '69', '20']
+      );
+
+      const ajustes = {
+        retencion: this.round2(Math.abs(Number(evento.ajustes?.retencion ?? 0))),
+        percepcion: this.round2(Math.abs(Number(evento.ajustes?.percepcion ?? 0))),
+        detraccion: this.round2(Math.abs(Number(evento.ajustes?.detraccion ?? 0))),
+        anticipo: this.round2(Math.abs(Number(evento.ajustes?.anticipo ?? 0))),
+      };
+
+      const cuentaRetencion = ajustes.retencion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['12111', '1211', '121'],
+            keywords: ['retencion', 'retención'],
+          })
+        : null;
+      const cuentaDetraccion = ajustes.detraccion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['1041', '104', '1040'],
+            keywords: ['detraccion', 'detracción'],
+          })
+        : null;
+      const cuentaPercepcion = ajustes.percepcion > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['4017', '40171', '401'],
+            keywords: ['percepcion', 'percepción'],
+          })
+        : null;
+      const cuentaAnticipos = ajustes.anticipo > 0
+        ? await this.planCuentasService.buscarCuentaPorCodigoONombre(tenant_id, {
+            codigos: ['1212', '1213', '122'],
+            keywords: ['anticipo', 'anticipos'],
+          })
+        : null;
+
+      const baseAbs = this.round2(Math.abs(Number(base_imponible ?? 0)));
+      const igvAbs = this.round2(Math.abs(Number(igv ?? 0)));
+      const costoAbs = this.round2(Math.abs(Number(evento.costo_ventas ?? 0)));
+      const saldoClientes = Math.max(this.round2(
+        evento.monto_pendiente != null
+          ? Math.abs(Number(evento.monto_pendiente))
+          : Math.abs(Number(evento.total ?? 0)) - ajustes.retencion - ajustes.detraccion - ajustes.anticipo + ajustes.percepcion
+      ), 0);
+
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('70')!.id,
+          debe: baseAbs,
+          haber: 0,
+          concepto: 'Reversión de ingresos',
+          centro_costo_id,
+        },
+        {
+          cuenta_id: cuentas.get('40')!.id,
+          debe: igvAbs,
+          haber: 0,
+          concepto: 'Reversión IGV por pagar',
+        },
+      ];
+
+      if (ajustes.percepcion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaPercepcion ?? cuentas.get('40')!).id,
+          debe: ajustes.percepcion,
+          haber: 0,
+          concepto: cuentaPercepcion ? 'Reversión percepciones por pagar' : 'Reversión IGV / Percepciones',
+        });
+      }
+
+      if (costoAbs > 0) {
+        detalles.push(
+          {
+            cuenta_id: cuentas.get('20')!.id,
+            debe: costoAbs,
+            haber: 0,
+            concepto: 'Reversión inventario',
+          },
+          {
+            cuenta_id: cuentas.get('69')!.id,
+            debe: 0,
+            haber: costoAbs,
+            concepto: 'Reversión costo de ventas',
+            centro_costo_id,
+          },
+        );
+      }
+
+      detalles.push({
+        cuenta_id: cuentas.get('12')!.id,
+        debe: 0,
+        haber: saldoClientes,
+        concepto: 'Reversión clientes',
+      });
+
+      if (ajustes.retencion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaRetencion ?? cuentas.get('12')!).id,
+          debe: 0,
+          haber: ajustes.retencion,
+          concepto: cuentaRetencion ? 'Reversión retenciones por cobrar' : 'Reversión retención',
+        });
+      }
+
+      if (ajustes.detraccion > 0) {
+        detalles.push({
+          cuenta_id: (cuentaDetraccion ?? cuentas.get('12')!).id,
+          debe: 0,
+          haber: ajustes.detraccion,
+          concepto: cuentaDetraccion ? 'Reversión detracciones por cobrar' : 'Reversión detracción',
+        });
+      }
+
+      if (ajustes.anticipo > 0) {
+        detalles.push({
+          cuenta_id: (cuentaAnticipos ?? cuentas.get('12')!).id,
+          debe: 0,
+          haber: ajustes.anticipo,
+          concepto: cuentaAnticipos ? 'Reversión anticipo' : 'Reversión anticipo cliente',
+        });
+      }
+
+      return await this.generarAsiento(
+        tenant_id,
+        new Date(fecha),
+        'Nota de crédito',
+        detalles,
+        evento.referencia,
+        evento.event_id
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de nota de crédito: ${error.message}`
         );
       }
       throw error;
@@ -745,5 +1007,9 @@ export class AsientosGeneratorService {
       }
       throw error;
     }
+  }
+
+  private round2(value: number): number {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   }
 }

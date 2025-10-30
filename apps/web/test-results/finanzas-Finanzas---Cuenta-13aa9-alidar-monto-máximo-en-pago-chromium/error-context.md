@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e9]:
+      - generic [ref=e11]:
+        - img [ref=e13]
+        - generic [ref=e17]:
+          - heading "ERP Suite" [level=3] [ref=e18]
+          - paragraph [ref=e19]: Sistema Empresarial Integrado
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23] [cursor=pointer]:
+            - img [ref=e24]
+            - text: País / Jurisdicción Fiscal
+          - combobox "País / Jurisdicción Fiscal" [ref=e27]:
+            - generic:
+              - generic:
+                - generic: Perú
+            - img [ref=e28]
+          - combobox [ref=e30]
+        - generic [ref=e31]:
+          - generic [ref=e32] [cursor=pointer]:
+            - img [ref=e33]
+            - text: Correo Electrónico
+          - textbox "Correo Electrónico" [ref=e36]:
+            - /placeholder: tu@empresa.com
+        - generic [ref=e37]:
+          - generic [ref=e38] [cursor=pointer]:
+            - img [ref=e39]
+            - text: Contraseña
+          - textbox "Contraseña" [ref=e42]:
+            - /placeholder: ••••••••
+      - generic [ref=e43]:
+        - button "Iniciar Sesión" [ref=e44]
+        - generic [ref=e45]: O continúa con
+        - button "Acceso Demo" [ref=e46]
+    - region "Notifications (F8)":
+      - list
+  - alert [ref=e47]
+  - button "Open Next.js Dev Tools" [ref=e53] [cursor=pointer]:
+    - img [ref=e54]
+```

@@ -22,12 +22,24 @@ const CandidatosPage = () => {
   const [loading, setLoading] = useState(true);
   const api = useApi();
   const { toast } = useToast();
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      // HARDENING: evitar llamadas RRHH cuando el feature está deshabilitado.
+      setCandidatos([]);
+      setVacantes([]);
+      setDepartamentos([]);
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [rrhhEnabled]);
 
   const loadData = async () => {
+    if (!rrhhEnabled) {
+      return;
+    }
     try {
       setLoading(true);
       
@@ -124,6 +136,20 @@ const CandidatosPage = () => {
     
     return { total, postulantes, entrevistas, contratados };
   };
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="alert alert-warning">
+          <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
+          <p className="text-sm text-gray-600">
+            {/* // HARDENING: RRHH bloqueado hasta culminar procesos legales. */}
+            Las funciones de reclutamiento estarán disponibles cuando el módulo de RRHH se habilite en este entorno.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = calcularEstadisticas();
 

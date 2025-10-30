@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { PedidoForm, type PedidoFormData } from '@/components/ventas/PedidoForm'
+import PedidoForm, { type PedidoFormData } from '@/components/ventas/PedidoForm'
 import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'

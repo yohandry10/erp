@@ -1,0 +1,12 @@
+# Playwright test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Screenshots (keep .gitkeep but ignore actual screenshots)
+screenshots/*.png
+screenshots/*.jpg
+!screenshots/.gitkeep
+
+# Test environment
+.env.test

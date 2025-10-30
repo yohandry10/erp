@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useWizardContext } from './WizardContext'
 import { WizardConfiguration } from './types'
 
@@ -24,17 +23,39 @@ export function useWizard() {
     try {
       setLoading(true)
       
-      // Obtener token de sesión de Supabase
-      const supabase = createClientComponentClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      // Obtener token del localStorage (custom auth)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
       }
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
       }
       
+      // PRIMERO: Verificar si la configuración ya está completa
+      const statusResponse = await fetch(`${API_BASE_URL}/api/configuration/status`, { headers })
+      
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        
+        // Si la configuración está completa, marcar todos los pasos como completados y ir al último paso
+        if (statusData.success && statusData.data?.isComplete) {
+          console.log('✅ Configuration already complete, marking all steps as done')
+          
+          // Marcar todos los pasos como completados
+          state.steps.forEach((_, index) => {
+            markStepComplete(index)
+          })
+          
+          // Ir al último paso (Completado)
+          goToStep(state.steps.length - 1)
+          setLoading(false)
+          return
+        }
+      }
+      
+      // SEGUNDO: Si no está completa, cargar el progreso del wizard
       const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/progress`, { headers })
       
       if (!response.ok) {
@@ -49,6 +70,21 @@ export function useWizard() {
       if (data.success && data.data) {
         const progress = data.data
         
+        // Si el wizard está marcado como completado, ir al último paso
+        if (progress.completado) {
+          console.log('✅ Wizard marked as completed, going to final step')
+          
+          // Marcar todos los pasos como completados
+          state.steps.forEach((_, index) => {
+            markStepComplete(index)
+          })
+          
+          // Ir al último paso
+          goToStep(state.steps.length - 1)
+          setLoading(false)
+          return
+        }
+        
         // Restaurar configuración temporal si existe
         if (progress.configuracionTemporal) {
           updateConfiguration(progress.configuracionTemporal)
@@ -58,7 +94,7 @@ export function useWizard() {
         if (Array.isArray(progress.pasosCompletados)) {
           progress.pasosCompletados.forEach((stepNumber: number) => {
             const stepIndex = stepNumber - 1 // Convert from 1-indexed to 0-indexed
-            if (stepIndex >= 0 && stepIndex < 5) { // 5 steps total
+            if (stepIndex >= 0 && stepIndex < state.steps.length) {
               markStepComplete(stepIndex)
             }
           })
@@ -82,15 +118,14 @@ export function useWizard() {
     try {
       setLoading(true)
       
-      // Obtener token de sesión
-      const supabase = createClientComponentClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      // Obtener token del localStorage (custom auth)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
       }
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
       }
       
       // Backend expects pasoActual to be 1-indexed (1, 2, 3...), not 0-indexed
@@ -225,10 +260,19 @@ export function useWizard() {
     
     try {
       setLoading(true)
+      
+      // Obtener token del localStorage (custom auth)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+      
+      if (!token) {
+        throw new Error('No hay sesión activa')
+      }
+      
       const response = await fetch(`${API_BASE_URL}/api/configuration/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           configuration,
@@ -236,7 +280,8 @@ export function useWizard() {
       })
 
       if (!response.ok) {
-        throw new Error('Error al completar la configuración')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Error al completar la configuración')
       }
 
       const data = await response.json()
@@ -279,6 +324,29 @@ export function useWizard() {
         state.configuration.certificatePassword
       )
     }
+    
+    // Fiscal step requires regimen_tributario and series
+    if (currentStepData.id === 'fiscal') {
+      return !!(
+        state.configuration.regimen_tributario &&
+        state.configuration.serie_factura &&
+        state.configuration.serie_boleta
+      )
+    }
+    
+    // TODO: Descomentar cuando se reactive el paso SUNAT
+    // SUNAT step - if OSE is active, requires credentials
+    // if (currentStepData.id === 'sunat') {
+    //   if (state.configuration.ose_activo) {
+    //     return !!(
+    //       state.configuration.ose_url &&
+    //       state.configuration.ose_username &&
+    //       state.configuration.ose_password
+    //     )
+    //   }
+    //   // If OSE is not active, can proceed
+    //   return true
+    // }
     
     // Validation step requires successful validations
     if (currentStepData.id === 'validation') {

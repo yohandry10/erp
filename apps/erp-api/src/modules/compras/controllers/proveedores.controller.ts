@@ -8,16 +8,21 @@ import {
   Param, 
   Query,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProveedoresService } from '../services/proveedores.service';
 import { CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 
 @ApiTags('compras/proveedores')
 @Controller('compras/proveedores')
-// @UseGuards(JwtAuthGuard) // Descomentar cuando se implemente autenticación
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: permisos granulares para proveedores.
 export class ProveedoresController {
   constructor(private readonly proveedoresService: ProveedoresService) {}
 
@@ -28,12 +33,11 @@ export class ProveedoresController {
   @ApiResponse({ status: 409, description: 'Ya existe un proveedor con ese RUC' })
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Body() createDto: CreateProveedorDto & { tenant_id?: string }
+    @Body() createDto: CreateProveedorDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body o usar valor por defecto para testing
-      const tenantId = createDto.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: tenant proviene del contexto autenticado.
       const proveedor = await this.proveedoresService.create(createDto, tenantId);
       return {
         success: true,
@@ -60,7 +64,7 @@ export class ProveedoresController {
   @ApiQuery({ name: 'limit', required: false, description: 'Límite de resultados' })
   @ApiQuery({ name: 'offset', required: false, description: 'Offset para paginación' })
   async findAll(
-    @Query('tenant_id') tenantId?: string,
+    @CurrentTenant() tenantId: string,
     @Query('activo') activo?: string,
     @Query('search') search?: string,
     @Query('estado') estado?: string,
@@ -70,9 +74,6 @@ export class ProveedoresController {
     @Query('offset') offset?: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       const filters: any = {};
       
       if (activo !== undefined) {
@@ -103,7 +104,7 @@ export class ProveedoresController {
         filters.offset = parseInt(offset, 10);
       }
 
-      const proveedores = await this.proveedoresService.findAll(tenant, filters);
+      const proveedores = await this.proveedoresService.findAll(tenantId, filters);
       
       return {
         success: true,
@@ -125,13 +126,10 @@ export class ProveedoresController {
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   async findByRuc(
     @Param('ruc') ruc: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const proveedor = await this.proveedoresService.findByRuc(ruc, tenant);
+      const proveedor = await this.proveedoresService.findByRuc(ruc, tenantId);
       
       if (!proveedor) {
         return {
@@ -160,13 +158,10 @@ export class ProveedoresController {
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   async findOne(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const proveedor = await this.proveedoresService.findById(id, tenant);
+      const proveedor = await this.proveedoresService.findById(id, tenantId);
       return {
         success: true,
         data: proveedor
@@ -188,12 +183,10 @@ export class ProveedoresController {
   @ApiResponse({ status: 409, description: 'Ya existe otro proveedor con ese RUC' })
   async update(
     @Param('id') id: string,
-    @Body() updateDto: UpdateProveedorDto & { tenant_id?: string }
+    @Body() updateDto: UpdateProveedorDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body o usar valor por defecto para testing
-      const tenantId = updateDto.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       const proveedor = await this.proveedoresService.update(id, updateDto, tenantId);
       return {
         success: true,
@@ -214,13 +207,10 @@ export class ProveedoresController {
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
   async remove(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const proveedor = await this.proveedoresService.softDelete(id, tenant);
+      const proveedor = await this.proveedoresService.softDelete(id, tenantId);
       return {
         success: true,
         message: 'Proveedor desactivado exitosamente',

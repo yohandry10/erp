@@ -12,10 +12,17 @@ const RrhhPage = () => {
 
   // Definir API_BASE_URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      setLoading(false);
+      setEmpleados([]);
+      setDepartamentos([]);
+      return;
+    }
     loadData();
-  }, []);
+  }, [rrhhEnabled]);
 
   const loadData = async () => {
     try {
@@ -103,6 +110,17 @@ const RrhhPage = () => {
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando datos de RRHH...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="loading">
+          {/* // HARDENING: RRHH deshabilitado por feature flag. */}
+          <p>El módulo de RRHH está deshabilitado en este entorno.</p>
         </div>
       </div>
     );

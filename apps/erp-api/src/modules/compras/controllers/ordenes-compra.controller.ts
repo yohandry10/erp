@@ -8,7 +8,8 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  ValidationPipe
+  ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,10 +25,14 @@ import { AprobarOrdenCompraDto } from '../dto/aprobar-orden-compra.dto';
 import { RechazarOrdenCompraDto } from '../dto/rechazar-orden-compra.dto';
 import { CancelarOrdenCompraDto } from '../dto/cancelar-orden-compra.dto';
 import { CreateRecepcionDto } from '../dto/create-recepcion.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 
 @ApiTags('Compras - Órdenes de Compra')
 @Controller('compras/ordenes')
-// @UseGuards(JwtAuthGuard) // Descomentar cuando se implemente autenticación
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger con permisos granulares.
 export class OrdenesCompraController {
   constructor(
     private readonly ordenesCompraService: OrdenesCompraService,
@@ -35,6 +40,7 @@ export class OrdenesCompraController {
   ) {}
 
   @Post()
+  @RequirePermission('compras.ordenes.crear') // HARDENING: crear orden de compra.
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ 
     summary: 'Crear nueva orden de compra',
@@ -53,12 +59,10 @@ export class OrdenesCompraController {
     description: 'Ya existe una orden con el mismo número' 
   })
   async create(
-    @Body(ValidationPipe) createDto: CreateOrdenCompraDto & { tenant_id?: string }
+    @Body(ValidationPipe) createDto: CreateOrdenCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body o usar valor por defecto para testing
-      const tenantId = createDto.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       const orden = await this.ordenesCompraService.create(createDto, tenantId);
       return {
         success: true,
@@ -74,11 +78,11 @@ export class OrdenesCompraController {
   }
 
   @Get()
+  @RequirePermission('compras.ordenes.ver') // HARDENING: listar órdenes.
   @ApiOperation({ 
     summary: 'Listar órdenes de compra',
     description: 'Obtiene todas las órdenes de compra con filtros opcionales'
   })
-  @ApiQuery({ name: 'tenant_id', required: false, description: 'ID del tenant' })
   @ApiQuery({ name: 'estado', required: false, description: 'Filtrar por estado' })
   @ApiQuery({ name: 'proveedor_id', required: false, description: 'Filtrar por proveedor' })
   @ApiQuery({ name: 'fecha_desde', required: false, description: 'Fecha desde (YYYY-MM-DD)' })
@@ -90,7 +94,7 @@ export class OrdenesCompraController {
     description: 'Lista de órdenes de compra obtenida exitosamente' 
   })
   async findAll(
-    @Query('tenant_id') tenantId?: string,
+    @CurrentTenant() tenantId: string,
     @Query('estado') estado?: string,
     @Query('proveedor_id') proveedor_id?: string,
     @Query('fecha_desde') fecha_desde?: string,
@@ -99,10 +103,7 @@ export class OrdenesCompraController {
     @Query('offset') offset?: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const result = await this.ordenesCompraService.findAll(tenant, {
+      const result = await this.ordenesCompraService.findAll(tenantId, {
         estado,
         proveedor_id,
         fecha_desde,
@@ -127,6 +128,7 @@ export class OrdenesCompraController {
   }
 
   @Get(':id')
+  @RequirePermission('compras.ordenes.ver') // HARDENING: ver detalle de orden.
   @ApiOperation({ 
     summary: 'Obtener orden de compra por ID',
     description: 'Obtiene los detalles completos de una orden de compra específica'
@@ -141,13 +143,11 @@ export class OrdenesCompraController {
   })
   async findById(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const orden = await this.ordenesCompraService.findById(id, tenant);
+      // HARDENING: ignoramos tenant externo, usamos contexto.
+      const orden = await this.ordenesCompraService.findById(id, tenantId);
       return {
         success: true,
         data: orden
@@ -162,6 +162,7 @@ export class OrdenesCompraController {
   }
 
   @Put(':id')
+  @RequirePermission('compras.ordenes.actualizar') // HARDENING: actualizar orden.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Actualizar orden de compra',
@@ -185,13 +186,11 @@ export class OrdenesCompraController {
   })
   async update(
     @Param('id') id: string,
-    @Body(ValidationPipe) updateDto: UpdateOrdenCompraDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body(ValidationPipe) updateDto: UpdateOrdenCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto para testing
-      const tenantId = updateDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: usamos tenant del contexto, ignoramos valores externos.
       const orden = await this.ordenesCompraService.update(id, updateDto, tenantId);
       return {
         success: true,
@@ -207,6 +206,7 @@ export class OrdenesCompraController {
   }
 
   @Post(':id/aprobar')
+  @RequirePermission('compras.ordenes.aprobar') // HARDENING: aprobar orden.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Aprobar orden de compra',
@@ -226,13 +226,10 @@ export class OrdenesCompraController {
   })
   async aprobar(
     @Param('id') id: string,
-    @Body(ValidationPipe) aprobarDto: AprobarOrdenCompraDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body(ValidationPipe) aprobarDto: AprobarOrdenCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto para testing
-      const tenantId = aprobarDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       const orden = await this.ordenesCompraService.aprobar(id, aprobarDto, tenantId);
       return {
         success: true,
@@ -248,6 +245,7 @@ export class OrdenesCompraController {
   }
 
   @Post(':id/rechazar')
+  @RequirePermission('compras.ordenes.rechazar') // HARDENING: rechazar orden.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Rechazar orden de compra',
@@ -267,13 +265,11 @@ export class OrdenesCompraController {
   })
   async rechazar(
     @Param('id') id: string,
-    @Body(ValidationPipe) rechazarDto: RechazarOrdenCompraDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body(ValidationPipe) rechazarDto: RechazarOrdenCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto para testing
-      const tenantId = rechazarDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: usamos tenant del contexto para evitar fuga multi-tenant.
       const orden = await this.ordenesCompraService.rechazar(id, rechazarDto, tenantId);
       return {
         success: true,
@@ -289,6 +285,7 @@ export class OrdenesCompraController {
   }
 
   @Post(':id/cancelar')
+  @RequirePermission('compras.ordenes.cancelar') // HARDENING: cancelar orden.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Cancelar orden de compra',
@@ -308,13 +305,11 @@ export class OrdenesCompraController {
   })
   async cancelar(
     @Param('id') id: string,
-    @Body(ValidationPipe) cancelarDto: CancelarOrdenCompraDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body(ValidationPipe) cancelarDto: CancelarOrdenCompraDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto para testing
-      const tenantId = cancelarDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
+      // HARDENING: ignoramos tenant externo; usamos contexto autenticado.
       const orden = await this.ordenesCompraService.cancelar(id, cancelarDto, tenantId);
       return {
         success: true,
@@ -349,13 +344,10 @@ export class OrdenesCompraController {
   })
   async createRecepcion(
     @Param('id') ordenId: string,
-    @Body(ValidationPipe) createRecepcionDto: CreateRecepcionDto & { tenant_id?: string },
-    @Query('tenant_id') queryTenantId?: string
+    @Body(ValidationPipe) createRecepcionDto: CreateRecepcionDto,
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Obtener tenant_id del body, query o usar valor por defecto para testing
-      const tenantId = createRecepcionDto.tenant_id || queryTenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
       // Asegurar que el orden_id del DTO coincida con el parámetro de la ruta
       createRecepcionDto.orden_id = ordenId;
       
@@ -393,13 +385,10 @@ export class OrdenesCompraController {
   })
   async findRecepcionesByOrdenId(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const recepciones = await this.ordenesCompraService.findRecepcionesByOrdenId(id, tenant);
+      const recepciones = await this.ordenesCompraService.findRecepcionesByOrdenId(id, tenantId);
       return {
         success: true,
         data: recepciones,
@@ -430,13 +419,10 @@ export class OrdenesCompraController {
   })
   async findAprobacionesByOrdenId(
     @Param('id') id: string,
-    @Query('tenant_id') tenantId?: string
+    @CurrentTenant() tenantId: string
   ) {
     try {
-      // Usar tenant_id del query o valor por defecto para testing
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
-      
-      const aprobaciones = await this.ordenesCompraService.findAprobacionesByOrdenId(id, tenant);
+      const aprobaciones = await this.ordenesCompraService.findAprobacionesByOrdenId(id, tenantId);
       return {
         success: true,
         data: aprobaciones,

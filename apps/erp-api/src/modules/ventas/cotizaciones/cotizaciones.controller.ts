@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { CotizacionesService } from './cotizaciones.service';
@@ -28,7 +29,7 @@ import { EstadoCotizacion } from './entities';
 @ApiTags('Ventas - Cotizaciones')
 @ApiBearerAuth()
 @Controller('api/ventas/cotizaciones')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: cotizaciones exige permisos granulares.
 export class CotizacionesController {
   constructor(private readonly cotizacionesService: CotizacionesService) {}
 
@@ -37,7 +38,7 @@ export class CotizacionesController {
    * Requirements: 3.1
    */
   @Get()
-  @RequirePermissions('ventas', 'cotizaciones', 'ver')
+  @RequirePermission('ventas.cotizaciones.ver')
   @ApiOperation({
     summary: 'Listar cotizaciones',
     description: 'Obtiene una lista paginada de cotizaciones con filtros opcionales',
@@ -67,7 +68,7 @@ export class CotizacionesController {
    * Requirements: 3.2, 14.3
    */
   @Post()
-  @RequirePermissions('ventas', 'cotizaciones', 'crear')
+  @RequirePermission('ventas.cotizaciones.crear')
   @ApiOperation({
     summary: 'Crear cotización',
     description: 'Crea una nueva cotización en el sistema',
@@ -90,7 +91,7 @@ export class CotizacionesController {
    * Requirements: 3.4
    */
   @Get(':id')
-  @RequirePermissions('ventas', 'cotizaciones', 'ver')
+  @RequirePermission('ventas.cotizaciones.ver')
   @ApiOperation({
     summary: 'Obtener cotización',
     description: 'Obtiene los detalles de una cotización específica',
@@ -108,7 +109,7 @@ export class CotizacionesController {
    * Requirements: 3.5, 14.3
    */
   @Put(':id')
-  @RequirePermissions('ventas', 'cotizaciones', 'editar')
+  @RequirePermission('ventas.cotizaciones.editar')
   @ApiOperation({
     summary: 'Actualizar cotización',
     description: 'Actualiza los datos de una cotización existente',
@@ -131,7 +132,7 @@ export class CotizacionesController {
    * Requirements: 3.1, 14.3
    */
   @Delete(':id')
-  @RequirePermissions('ventas', 'cotizaciones', 'eliminar')
+  @RequirePermission('ventas.cotizaciones.eliminar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar cotización',
@@ -151,7 +152,7 @@ export class CotizacionesController {
    * Requirements: 4.1, 4.2, 4.3, 4.6, 14.3
    */
   @Post(':id/convertir-pedido')
-  @RequirePermissions('ventas', 'cotizaciones', 'convertir_pedido')
+  @RequirePermission('ventas.cotizaciones.convertir_pedido')
   @ApiOperation({
     summary: 'Convertir cotización a pedido',
     description: 'Convierte una cotización aprobada en un pedido de venta',
@@ -180,7 +181,7 @@ export class CotizacionesController {
    * Requirements: 27.4
    */
   @Get(':id/historial')
-  @RequirePermissions('ventas', 'cotizaciones', 'ver')
+  @RequirePermission('ventas.cotizaciones.ver')
   @ApiOperation({
     summary: 'Obtener historial de la cotización',
     description: 'Obtiene el timeline completo de cambios y eventos de la cotización',

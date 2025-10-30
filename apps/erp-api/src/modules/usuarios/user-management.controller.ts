@@ -1,11 +1,13 @@
 import { Controller, Get, Post, Put, Delete, UseGuards, Query, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
 import { UserManagementService } from './user-management.service';
 import { PermissionService } from '../permissions/permission.service';
 import { Permission } from '../permissions/types';
 import { AuditService } from '../audit/audit.service';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UserFiltersDto, CreateUserDto, UpdateUserDto, AssignRolesDto } from './dto';
 
 /**
@@ -16,7 +18,7 @@ import { UserFiltersDto, CreateUserDto, UpdateUserDto, AssignRolesDto } from './
 @ApiTags('Gestión de Usuarios')
 @ApiBearerAuth()
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: gestión de usuarios requiere permisos.
 export class UserManagementController {
   constructor(
     private readonly userManagementService: UserManagementService,
@@ -29,9 +31,11 @@ export class UserManagementController {
    * Requirements: 2.8, 9.2
    */
   @Get()
+  @RequirePermission('users.manage') // HARDENING: gestión de usuarios.
   @ApiOperation({ summary: 'Obtener lista de usuarios', description: 'Obtiene una lista paginada de usuarios filtrada por tenant' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   async getUsers(
     @CurrentTenant() tenantId: string,
     @Query() filters: UserFiltersDto,
@@ -44,9 +48,11 @@ export class UserManagementController {
    * Requirements: 2.8, 9.2
    */
   @Get(':id')
+  @RequirePermission('users.manage') // HARDENING: gestión de usuarios.
   @ApiOperation({ summary: 'Obtener usuario por ID', description: 'Obtiene los detalles de un usuario específico con sus roles' })
   @ApiResponse({ status: 200, description: 'Usuario obtenido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async getUserById(
     @CurrentTenant() tenantId: string,
@@ -60,10 +66,12 @@ export class UserManagementController {
    * Requirements: 2.1, 9.3
    */
   @Post()
+  @RequirePermission('users.manage') // HARDENING: creación usuarios.
   @ApiOperation({ summary: 'Crear nuevo usuario', description: 'Crea un nuevo usuario en el tenant actual' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 409, description: 'El email ya existe en el tenant' })
   async createUser(
     @CurrentTenant() tenantId: string,
@@ -77,10 +85,12 @@ export class UserManagementController {
    * Requirements: 2.2, 9.3
    */
   @Put(':id')
+  @RequirePermission('users.manage') // HARDENING: actualización usuarios.
   @ApiOperation({ summary: 'Actualizar usuario', description: 'Actualiza la información de un usuario existente' })
   @ApiResponse({ status: 200, description: 'Usuario actualizado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async updateUser(
     @CurrentTenant() tenantId: string,
@@ -96,9 +106,11 @@ export class UserManagementController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
+  @RequirePermission('users.manage') // HARDENING: desactivación usuarios.
   @ApiOperation({ summary: 'Eliminar usuario', description: 'Elimina un usuario del sistema' })
   @ApiResponse({ status: 200, description: 'Usuario eliminado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async deleteUser(
     @CurrentTenant() tenantId: string,
@@ -145,9 +157,11 @@ export class UserManagementController {
    * Requirements: 2.3, 9.3
    */
   @Post(':id/reset-password')
+  @RequirePermission('users.manage') // HARDENING: resetear contraseñas.
   @ApiOperation({ summary: 'Resetear contraseña', description: 'Genera un token de reseteo de contraseña para el usuario' })
   @ApiResponse({ status: 200, description: 'Token de reseteo generado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   async resetPassword(
     @CurrentTenant() tenantId: string,
@@ -178,10 +192,12 @@ export class UserManagementController {
    * Requirements: 2.5, 9.3
    */
   @Post(':id/roles')
+  @RequirePermission('users.manage') // HARDENING: asignación de roles.
   @ApiOperation({ summary: 'Asignar roles al usuario', description: 'Asigna uno o más roles a un usuario' })
   @ApiResponse({ status: 200, description: 'Roles asignados exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos suficientes' })
   @ApiResponse({ status: 404, description: 'Usuario o rol no encontrado' })
   async assignRoles(
     @CurrentTenant() tenantId: string,

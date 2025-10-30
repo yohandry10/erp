@@ -16,6 +16,11 @@ export * from './gre/guia-remision.dto';
 export * from './sire/sire-request.dto';
 export * from './sire/sire-response.dto';
 
+// Contabilidad DTOs
+export * from './contabilidad/periodo.dto';
+export * from './contabilidad/presupuesto.dto';
+export * from './contabilidad/asiento.dto';
+
 // Common DTOs
 export * from './common/pagination.dto';
 export * from './common/response.dto'; 

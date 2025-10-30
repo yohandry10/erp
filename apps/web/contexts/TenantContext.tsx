@@ -34,6 +34,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   // Extract tenant and user from custom auth session
   const extractFromToken = useCallback(async (session: { access_token: string; user: any } | null) => {
+    // Si no hay sesión, limpiar estado y salir
     if (!session?.access_token) {
       setUser(null)
       setTenant(null)
@@ -48,6 +49,26 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid JWT token')
       }
 
+      // Validar expiración del token
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.log('ℹ️ Token expirado, limpiando sesión')
+        await customAuth.signOut()
+        setUser(null)
+        setTenant(null)
+        setLoading(false)
+        return
+      }
+
+      // Validar que el token tenga tenant_id
+      if (!payload.tenant_id) {
+        console.warn('⚠️ Token sin tenant_id - usuario no puede acceder al sistema')
+        await customAuth.signOut()
+        setUser(null)
+        setTenant(null)
+        setLoading(false)
+        return
+      }
+
       // Set user from JWT payload
       const userData: User = {
         id: payload.sub,
@@ -59,17 +80,29 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       }
       setUser(userData)
 
-      // Fetch tenant details if tenant_id exists
-      if (payload.tenant_id) {
-        await fetchTenantDetails(payload.tenant_id)
+      // Set tenant from JWT payload (minimal data for regular users)
+      // Only super-admins need to fetch full tenant details via API
+      if (payload.is_super_admin) {
+        // Super-admins can fetch full tenant details
+        await fetchTenantDetails(payload.tenant_id, session.access_token)
       } else {
-        setTenant(null)
+        // Regular users: use minimal tenant data from JWT
+        setTenant({
+          id: payload.tenant_id,
+          nombre: payload.tenant_name || 'Mi Empresa',
+          email: payload.email,
+          pais: 'PE',
+          moneda: 'PEN',
+          estado: 'ACTIVO',
+        })
       }
 
       setError(null)
     } catch (err) {
       console.error('Error extracting tenant from token:', err)
       setError(err instanceof Error ? err.message : 'Failed to extract tenant information')
+      // Limpiar sesión inválida
+      await customAuth.signOut()
       setUser(null)
       setTenant(null)
     } finally {
@@ -77,29 +110,28 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Fetch tenant details from API
-  const fetchTenantDetails = async (tenantId: string) => {
+  // Fetch tenant details from API (solo para super-admins con sesión activa)
+  const fetchTenantDetails = async (tenantId: string, accessToken: string) => {
     try {
-      const { data: { session } } = await customAuth.getSession()
-      
-      if (!session?.access_token) {
-        throw new Error('No active session')
-      }
-
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
       const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       })
 
       if (!response.ok) {
-        // If tenant endpoint doesn't exist yet, create a minimal tenant object
-        console.warn('Tenant endpoint not available, using minimal tenant data')
+        // Si es 401, el token es inválido - usar datos mínimos sin warning
+        if (response.status === 401) {
+          console.log('ℹ️ Token inválido o expirado, usando datos mínimos del tenant')
+        } else {
+          console.warn(`⚠️ No se pudo obtener detalles del tenant ${tenantId} (${response.status}), usando datos mínimos`)
+        }
+        
         setTenant({
           id: tenantId,
-          nombre: 'Default Tenant',
+          nombre: 'Mi Empresa',
           email: '',
           pais: 'PE',
           moneda: 'PEN',
@@ -111,11 +143,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const tenantData = await response.json()
       setTenant(tenantData.data || tenantData)
     } catch (err) {
-      console.error('Error fetching tenant details:', err)
-      // Set minimal tenant data on error
+      // Error de red u otro - usar datos mínimos silenciosamente
+      console.log('ℹ️ No se pudo conectar con el servidor, usando datos mínimos del tenant')
       setTenant({
         id: tenantId,
-        nombre: 'Default Tenant',
+        nombre: 'Mi Empresa',
         email: '',
         pais: 'PE',
         moneda: 'PEN',

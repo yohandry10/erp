@@ -59,6 +59,12 @@ export class ContabilidadEventsListener implements OnModuleInit {
       await this.persistirEventoEnOutbox('recepcion.registrada', 'recepcion', event.data);
     });
 
+
+    // Evento de cuenta por cobrar creada
+    this.eventBus.onCuentaPorCobrarCreadaEvent(async (event: ERPEvent) => {
+      await this.persistirEventoEnOutbox('cxc.creada', 'cxc', event.data);
+    });
+
     // Evento de pago a proveedor
     this.eventBus.onPagoProveedorRegistrado(async (event: ERPEvent) => {
       await this.persistirEventoEnOutbox('pago.proveedor.registrado', 'pago', event.data);
@@ -77,7 +83,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
   ): Promise<void> {
     try {
       const eventId = uuidv4();
-      const aggregateId = eventData.ventaId || eventData.cobroId || eventData.recepcionId || eventData.pagoId || eventId;
+      const aggregateId = eventData.ventaId || eventData.cobroId || eventData.recepcionId || eventData.pagoId || eventData.cuentaId || eventData.facturaId || eventId;
 
       this.logger.log(
         `💾 [ContabilidadEventsListener] Persistiendo evento ${eventType} en outbox`
@@ -190,6 +196,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
         case 'recepcion.registrada':
         case 'RecepcionRegistrada':
           await this.handleRecepcionRegistrada(evento);
+          break;
+
+        case 'cxc.creada':
+        case 'CuentaPorCobrarCreada':
+          await this.handleCuentaPorCobrarCreada(evento);
           break;
 
         case 'pago.proveedor.registrado':
@@ -321,8 +332,17 @@ export class ContabilidadEventsListener implements OnModuleInit {
     
     // Agregar jitter aleatorio (±20%) para evitar thundering herd
     const jitter = delayMs * 0.2 * (Math.random() - 0.5);
-    
+
     return Math.floor(delayMs + jitter);
+  }
+  private ensureEventTenant(eventData: any, contexto: string): string {
+    const tenantId = eventData?.tenantId ?? eventData?.tenant_id ?? null;
+    if (!tenantId) {
+      // HARDENING: los eventos contables requieren tenant explícito.
+      this.logger.warn(`⚠️ [ContabilidadEventsListener] Evento ${contexto} sin tenantId, se aborta procesamiento`);
+      throw new Error(`Tenant ausente en evento ${contexto}`);
+    }
+    return tenantId;
   }
 
   /**
@@ -333,10 +353,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleVentaFacturada(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'venta.facturada');
       
       // Preparar datos para el generador de asientos
       const ventaData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
         total: eventData.total,
         base_imponible: eventData.subtotal || eventData.base_imponible,
@@ -344,7 +365,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         costo_ventas: eventData.costo_ventas || 0,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroTicket || eventData.numeroFactura || eventData.cpeId,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoVenta(ventaData);
@@ -361,14 +382,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleCobroRegistrado(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cobro.registrado');
       
       const cobroData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoCobro(cobroData);
@@ -379,22 +401,78 @@ export class ContabilidadEventsListener implements OnModuleInit {
   }
 
   /**
-   * Handler para eventos de recepción registrada (compra)
-   * Genera asiento: Dr 20 Mercaderías + Dr 40 IGV / Cr 42 Proveedores
+   * Handler para eventos de CxC creada
+   * Genera asiento contable de venta si aún no existe
    */
+  private async handleCuentaPorCobrarCreada(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cxc.creada');
+
+      const referencia = eventData.serie && eventData.numero
+        ? `${eventData.serie}-${eventData.numero}`
+        : eventData.facturaId || eventData.cuentaId;
+
+      const ajustes = eventData.ajustes ?? {
+        retencion: 0,
+        percepcion: 0,
+        detraccion: 0,
+        anticipo: 0,
+      };
+
+        const ventaData = {
+          tenant_id: tenantId,
+          fecha: eventData.fechaEmision || eventData.fecha || new Date().toISOString(),
+          total: eventData.montoTotal ?? eventData.total ?? 0,
+          base_imponible: eventData.subtotal ?? eventData.base_imponible ?? 0,
+          igv: eventData.impuestos ?? eventData.igv ?? 0,
+          costo_ventas: eventData.costoVentas ?? eventData.costo_ventas ?? 0,
+          centro_costo_id: eventData.centro_costo_id,
+          referencia,
+          event_id: eventData.eventId || evento.event_id,
+          monto_pendiente: eventData.montoPendiente ?? eventData.monto_pendiente ?? undefined,
+          ajustes,
+        };
+
+        const esNotaCredito =
+          (eventData.montoTotal ?? 0) < 0 ||
+        (eventData.source?.toLowerCase?.().includes('nota_credito') ?? false) ||
+        (eventData.serie?.toUpperCase?.().startsWith('NC') ?? false);
+
+        if (esNotaCredito) {
+          // HARDENING: revertimos ventas cuando la factura corresponde a una nota de crédito.
+          await this.asientosGenerator.generarAsientoNotaCredito({
+            ...ventaData,
+            total: Math.abs(ventaData.total),
+            base_imponible: Math.abs(ventaData.base_imponible),
+            igv: Math.abs(ventaData.igv),
+            costo_ventas: Math.abs(ventaData.costo_ventas ?? 0),
+            monto_pendiente: ventaData.monto_pendiente != null
+              ? Math.abs(ventaData.monto_pendiente)
+              : undefined,
+          });
+        } else {
+          await this.asientosGenerator.generarAsientoVenta(ventaData);
+        }
+      } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handleCuentaPorCobrarCreada:`, error);
+      throw error;
+    }
+  }
   private async handleRecepcionRegistrada(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'recepcion.registrada');
       
       const compraData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
         total: eventData.total,
         costo: eventData.subtotal || eventData.costo,
         igv: eventData.igv,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroRecepcion || eventData.numeroOrden,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoCompra(compraData);
@@ -411,14 +489,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handlePagoProveedor(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'pago.proveedor');
       
       const pagoData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fechaPago || eventData.fecha || new Date().toISOString(),
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoPago(pagoData);
@@ -435,15 +514,16 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleAjusteInventario(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'ajuste.inventario');
       
       const ajusteData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fecha || new Date().toISOString(),
         valor: Math.abs(eventData.valor || eventData.valorDiferencia),
         tipo: eventData.tipo || (eventData.diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'),
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.referencia || `Ajuste ${eventData.productoId}`,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoAjusteInventario(ajusteData);
@@ -460,9 +540,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handlePlanillaLiquidada(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'planilla.liquidada');
       
       const planillaData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fecha || new Date().toISOString(),
         sueldos: eventData.totalIngresos || eventData.sueldos,
         aportes: eventData.totalAportes || eventData.aportes,
@@ -470,7 +551,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         neto: eventData.totalNeto || eventData.neto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.planillaId || eventData.periodo,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoPlanilla(planillaData);
@@ -487,14 +568,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
   private async handleDepreciacion(evento: OutboxEvent): Promise<void> {
     try {
       const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'depreciacion.generada');
       
       const depreciacionData = {
-        tenant_id: eventData.tenantId || eventData.tenant_id,
+        tenant_id: tenantId,
         fecha: eventData.fecha || new Date().toISOString(),
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.activoId || eventData.referencia,
-        event_id: evento.event_id
+        event_id: eventData.eventId || evento.event_id
       };
 
       await this.asientosGenerator.generarAsientoDepreciacion(depreciacionData);
@@ -504,3 +586,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
 }
+
+
+
+
+
+
+

@@ -33,6 +33,19 @@ export interface WizardConfiguration {
   gre_obligatorio?: boolean
   gre_automatico_habilitado?: boolean
   umbral_gre_automatico?: number
+  // Configuración Fiscal
+  regimen_tributario?: 'GENERAL' | 'MYPE' | 'RER' | 'RUS'
+  igv_porcentaje?: number
+  retencion_renta_porcentaje?: number
+  // Numeración de comprobantes
+  serie_factura?: string
+  serie_boleta?: string
+  serie_nota_credito?: string
+  // Configuración SUNAT/OSE
+  ose_url?: string
+  ose_username?: string
+  ose_password?: string
+  ose_activo?: boolean
 }
 
 export interface WizardValidationResults {

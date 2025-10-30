@@ -3,28 +3,26 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Request } from 'express';
 import { NotificationsService } from './notifications/notifications.service';
 import { CreateNotificationDto, NotificationFilters } from './notifications/notification.types';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('Notifications')
 @Controller('notifications')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@ApiBearerAuth()
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
+  @RequirePermission('notifications.read') // HARDENING: lectura de notificaciones requiere permiso.
   @ApiOperation({ summary: 'Get all notifications' })
   @ApiResponse({ status: 200, description: 'Notifications retrieved successfully' })
-  async getNotifications(@Query() query: any, @Req() req: Request) {
+  async getNotifications(@Query() query: any, @CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: [],
-          error: 'Tenant ID not found'
-        };
-      }
-
+      // HARDENING: usamos tenant derivado del contexto, nunca del request body.
       const filters: NotificationFilters = {
         type: query.type,
         severity: query.severity,
@@ -48,21 +46,12 @@ export class NotificationsController {
   }
 
   @Get('unread')
+  @RequirePermission('notifications.read') // HARDENING: lectura restringida.
   @ApiOperation({ summary: 'Get unread notifications' })
   @ApiResponse({ status: 200, description: 'Unread notifications retrieved successfully' })
-  async getUnreadNotifications(@Req() req: Request) {
+  async getUnreadNotifications(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: [],
-          error: 'Tenant ID not found'
-        };
-      }
-
       const notifications = await this.notificationsService.getNotifications(tenantId, { leida: false });
 
       return {
@@ -79,21 +68,12 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
+  @RequirePermission('notifications.read') // HARDENING: conteo protegido.
   @ApiOperation({ summary: 'Get unread notifications count' })
   @ApiResponse({ status: 200, description: 'Unread count retrieved successfully' })
-  async getUnreadCount(@Req() req: Request) {
+  async getUnreadCount(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: { unread_count: 0 },
-          error: 'Tenant ID not found'
-        };
-      }
-
       const count = await this.notificationsService.getUnreadCount(tenantId, user?.id);
 
       return {
@@ -110,21 +90,16 @@ export class NotificationsController {
   }
 
   @Post()
+  @RequirePermission('notifications.create') // HARDENING: creación requiere permiso.
   @ApiOperation({ summary: 'Create new notification' })
   @ApiResponse({ status: 201, description: 'Notification created successfully' })
-  async createNotification(@Body() notificationData: CreateNotificationDto, @Req() req: Request) {
+  async createNotification(
+    @Body() notificationData: CreateNotificationDto,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: null,
-          error: 'Tenant ID not found'
-        };
-      }
-
       const notification = await this.notificationsService.createNotification(tenantId, notificationData);
 
       return {
@@ -141,21 +116,16 @@ export class NotificationsController {
   }
 
   @Put(':id/read')
+  @RequirePermission('notifications.update') // HARDENING: actualización requiere permiso.
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
-  async markAsRead(@Param('id') id: string, @Req() req: Request) {
+  async markAsRead(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: null,
-          error: 'Tenant ID not found'
-        };
-      }
-
       const notification = await this.notificationsService.markAsRead(tenantId, id);
 
       return {
@@ -172,21 +142,12 @@ export class NotificationsController {
   }
 
   @Put('mark-all-read')
+  @RequirePermission('notifications.update') // HARDENING: actualización masiva requiere permiso.
   @ApiOperation({ summary: 'Mark all notifications as read' })
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
-  async markAllAsRead(@Req() req: Request) {
+  async markAllAsRead(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          data: { updated_count: 0 },
-          error: 'Tenant ID not found'
-        };
-      }
-
       const count = await this.notificationsService.markAllAsRead(tenantId, user?.id);
 
       return {
@@ -203,20 +164,16 @@ export class NotificationsController {
   }
 
   @Delete(':id')
+  @RequirePermission('notifications.delete') // HARDENING: eliminación protegida.
   @ApiOperation({ summary: 'Delete notification' })
   @ApiResponse({ status: 200, description: 'Notification deleted successfully' })
-  async deleteNotification(@Param('id') id: string, @Req() req: Request) {
+  async deleteNotification(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id;
-
-      if (!tenantId) {
-        return {
-          success: false,
-          error: 'Tenant ID not found'
-        };
-      }
-
       await this.notificationsService.deleteNotification(tenantId, id);
 
       return {

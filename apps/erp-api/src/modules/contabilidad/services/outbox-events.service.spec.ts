@@ -290,7 +290,8 @@ describe('OutboxEventsService', () => {
         processed: 3,
         processed_today: 2,
         failed: 1,
-        dead_letter: 1
+        dead_letter: 1,
+        avg_processing_time_ms: null
       });
     });
 
@@ -311,7 +312,8 @@ describe('OutboxEventsService', () => {
         processed: 0,
         processed_today: 0,
         failed: 0,
-        dead_letter: 0
+        dead_letter: 0,
+        avg_processing_time_ms: null
       });
     });
 
@@ -331,3 +333,4 @@ describe('OutboxEventsService', () => {
     });
   });
 });
+

@@ -16,6 +16,8 @@ import { CurrentTenant } from '../../../common/decorators/current-tenant.decorat
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { RecepcionesService } from '../services/recepciones.service';
 import { CreateRecepcionDto, CerrarRecepcionDto } from '../dto';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 
 /**
  * RecepcionesController
@@ -25,7 +27,7 @@ import { CreateRecepcionDto, CerrarRecepcionDto } from '../dto';
 @ApiTags('Compras - Recepciones')
 @ApiBearerAuth()
 @Controller('api/compras/recepciones')
-// @UseGuards(JwtAuthGuard) // Temporalmente deshabilitado para testing
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: recepciones protegidas por permisos.
 export class RecepcionesController {
   constructor(private readonly recepcionesService: RecepcionesService) {}
 

@@ -1,0 +1,7 @@
+Fecha,Tipo,Monto,Descripción,Referencia
+2025-10-26,ABONO,1500.50,Transferencia recibida de cliente ABC,TRF-001
+2025-10-26,CARGO,800.00,Pago a proveedor XYZ,PAG-001
+2025-10-27,CREDITO,2500.00,Depósito en efectivo,DEP-001
+2025-10-27,DEBITO,15.50,Comisión bancaria,COM-001
+2025-10-28,INGRESO,3200.75,Transferencia recibida,TRF-002
+2025-10-28,EGRESO,450.00,Pago de servicios,PAG-002

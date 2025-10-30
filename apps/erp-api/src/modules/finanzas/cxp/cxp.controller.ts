@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { CxpService } from './cxp.service';
@@ -19,12 +20,12 @@ import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, Anular
 @ApiTags('Finanzas - Cuentas por Pagar')
 @ApiBearerAuth()
 @Controller('finanzas/cxp')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: CxP exige permisos granulares.
 export class CxpController {
   constructor(private readonly cxpService: CxpService) {}
 
   @Get()
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Listar cuentas por pagar',
     description: 'Obtiene la lista de cuentas por pagar con filtros opcionales',
@@ -39,7 +40,7 @@ export class CxpController {
   }
 
   @Get('aging')
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Reporte de aging de cuentas por pagar',
     description: 'Genera un reporte de antigüedad de cuentas por pagar, categorizando las deudas por rangos de días vencidos: 0-30, 31-60, 61-90, >90 días. Incluye totales por rango y por proveedor.',
@@ -54,7 +55,7 @@ export class CxpController {
   }
 
   @Get('vencimientos')
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Obtener próximos vencimientos de cuentas por pagar',
     description: 'Obtiene las cuentas por pagar que vencen en los próximos N días (por defecto 30 días). Incluye resumen por moneda y detalle de cada vencimiento con días restantes.',
@@ -69,7 +70,7 @@ export class CxpController {
   }
 
   @Get('proveedores-mayor-deuda')
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Obtener proveedores con mayor deuda',
     description: 'Genera un ranking de proveedores ordenados por el monto total de deuda pendiente. Incluye deuda total, cantidad de CxP y desglose por moneda. Útil para identificar proveedores prioritarios para pagos.',
@@ -84,7 +85,7 @@ export class CxpController {
   }
 
   @Get(':id')
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Obtener cuenta por pagar por ID',
     description: 'Obtiene el detalle completo de una cuenta por pagar específica',
@@ -99,7 +100,7 @@ export class CxpController {
   }
 
   @Post()
-  @RequirePermissions('finanzas', 'cxp', 'gestionar')
+  @RequirePermission('finanzas.cxp.gestionar')
   @ApiOperation({
     summary: 'Crear cuenta por pagar manual',
     description: 'Crea una cuenta por pagar de forma manual (no desde recepción)',
@@ -115,7 +116,7 @@ export class CxpController {
   }
 
   @Put(':id')
-  @RequirePermissions('finanzas', 'cxp', 'gestionar')
+  @RequirePermission('finanzas.cxp.gestionar')
   @ApiOperation({
     summary: 'Actualizar cuenta por pagar',
     description: 'Actualiza los datos de una cuenta por pagar existente. No se puede modificar si está pagada o anulada.',
@@ -133,7 +134,7 @@ export class CxpController {
   }
 
   @Post(':id/aplicar-pago')
-  @RequirePermissions('finanzas', 'cxp', 'gestionar')
+  @RequirePermission('finanzas.cxp.gestionar')
   @ApiOperation({
     summary: 'Aplicar pago a cuenta por pagar',
     description: 'Registra un pago aplicado a una cuenta por pagar, actualizando su saldo y estado. Si el saldo llega a 0, la cuenta se marca como PAGADA.',
@@ -151,7 +152,7 @@ export class CxpController {
   }
 
   @Post(':id/anular')
-  @RequirePermissions('finanzas', 'cxp', 'gestionar')
+  @RequirePermission('finanzas.cxp.gestionar')
   @ApiOperation({
     summary: 'Anular cuenta por pagar',
     description: 'Anula una cuenta por pagar. Solo se pueden anular cuentas que no tengan pagos aplicados (saldo = total). Una vez anulada, no se puede modificar ni aplicar pagos.',
@@ -169,7 +170,7 @@ export class CxpController {
   }
 
   @Get(':id/pagos')
-  @RequirePermissions('finanzas', 'cxp', 'ver')
+  @RequirePermission('finanzas.cxp.ver')
   @ApiOperation({
     summary: 'Obtener historial de pagos de una cuenta por pagar',
     description: 'Obtiene el historial completo de pagos aplicados a una cuenta por pagar específica, ordenados por fecha descendente.',

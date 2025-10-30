@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { customAuth } from '@/lib/auth-service'
+import { useTenant } from '@/contexts/TenantContext'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
@@ -24,15 +25,35 @@ export function useConfigurationStatus() {
   const [status, setStatus] = useState<ConfigurationStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { isSuperAdmin, loading: tenantLoading } = useTenant()
 
   const checkStatus = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
 
+      // SUPER ADMINS DON'T NEED CONFIGURATION - ALWAYS COMPLETE
+      if (isSuperAdmin === true) {
+        console.log('[useConfigurationStatus] Super admin detected - returning complete status')
+        setStatus({
+          isComplete: true,
+          completionPercentage: 100,
+          missingItems: [],
+          certificate: {
+            exists: true,
+            isValid: true
+          },
+          ruc: {
+            isConfigured: true,
+            missingFields: []
+          }
+        })
+        setIsLoading(false)
+        return
+      }
+
       // Obtener token de sesión
-      const supabase = createClientComponentClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await customAuth.getSession()
       
       const headers: HeadersInit = {
         'Content-Type': 'application/json'
@@ -88,11 +109,15 @@ export function useConfigurationStatus() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isSuperAdmin])
 
   useEffect(() => {
+    // Don't check status if still loading tenant data
+    if (tenantLoading) {
+      return
+    }
     checkStatus()
-  }, [checkStatus])
+  }, [checkStatus, tenantLoading, isSuperAdmin])
 
   return {
     status,

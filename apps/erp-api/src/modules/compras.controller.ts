@@ -1,28 +1,40 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { EventBusService } from '../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { TenantContextService } from '../shared/tenant/tenant-context.service';
 
 @ApiTags('compras')
 @Controller('compras')
-// @UseGuards(JwtAuthGuard) // Temporalmente deshabilitado para testing
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger endpoints globales de compras.
 export class ComprasController {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
-    private readonly inventoryIntegration: InventoryIntegrationService
+    private readonly inventoryIntegration: InventoryIntegrationService,
+    private readonly tenantContext: TenantContextService
   ) {}
+
+  private resolveTenant(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: se evita fallback inseguro de tenant.
+      throw new ForbiddenException('Tenant requerido');
+    }
+    return tenantId;
+  }
   
   @Get('stats')
   @ApiOperation({ summary: 'Obtener estadísticas de compras' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@Query() filtros: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant proviene del contexto, no de filtros externos.
       const supabase = this.supabase.getClient();
 
       console.log(`📊 [Compras Stats] Obteniendo estadísticas de compras para tenant: ${tenantId}`);
@@ -115,8 +127,7 @@ export class ComprasController {
   @Get()
   async getOrdenes(@Query() filtros: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: usar tenant del contexto.
       let query = this.supabase.getClient()
         .from('ordenes_compra')
         .select(`
@@ -161,8 +172,7 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Número generado exitosamente' })
   async getNextNumber(@Query() filtros: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: usar tenant del contexto.
       const supabase = this.supabase.getClient();
       
       // Obtener el último número de orden
@@ -205,8 +215,8 @@ export class ComprasController {
   @Post()
   async crearOrden(@Body() ordenData: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = ordenData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant siempre proviene del contexto.
+      ordenData.tenant_id = tenantId;
       console.log(`🛒 Creando nueva orden de compra para tenant: ${tenantId}`);
 
       // Calcular totales
@@ -271,8 +281,8 @@ export class ComprasController {
   @Put(':id/recibir')
   async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = recepcionData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant proviene del contexto.
+      recepcionData.tenant_id = tenantId;
       console.log(`📦 Procesando recepción de mercancía para orden: ${ordenId}, tenant: ${tenantId}`);
 
       // Obtener orden con detalles
@@ -354,6 +364,7 @@ export class ComprasController {
           proveedorNombre: orden.proveedor?.nombre || 'Proveedor',
           total: orden.total,
           fechaEntrega: new Date().toISOString(),
+          tenantId, // HARDENING: propagar tenant al evento de compras
           items: orden.orden_compra_detalles.map(item => ({
             productoId: item.producto_id,
             descripcion: item.descripcion,
@@ -388,8 +399,7 @@ export class ComprasController {
   @Put(':id/cancelar')
   async cancelarOrden(@Param('id') ordenId: string, @Body() motivoData: any) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = motivoData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant del contexto.
       const { error } = await this.supabase.getClient()
         .from('ordenes_compra')
         .update({
@@ -579,8 +589,8 @@ export class ComprasController {
         };
       }
 
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = proveedorData.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant tomado del contexto.
+      proveedorData.tenant_id = tenantId;
       
       // Verificar si existe otro proveedor con el mismo RUC (excepto el actual)
       const { data: existente, error: checkError } = await this.supabase.getClient()
@@ -642,8 +652,8 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
   async desactivarProveedor(@Param('id') proveedorId: string, @Body() data: any = {}) {
     try {
-      // ✅ MULTI-TENANT: Obtener tenant_id
-      const tenantId = data.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenant(); // HARDENING: tenant desde contexto.
+      data.tenant_id = tenantId;
       console.log(`🗑️ [Proveedores] Desactivando proveedor: ${proveedorId}, tenant: ${tenantId}`);
 
       // En lugar de eliminar, desactivamos el proveedor
@@ -680,6 +690,7 @@ export class ComprasController {
   @Get('reporte-compras')
   async getReporteCompras(@Query() filtros: any) {
     try {
+      const tenantId = this.resolveTenant(); // HARDENING: reporte limitado al tenant actual.
       let query = this.supabase.getClient()
         .from('ordenes_compra')
         .select(`
@@ -687,6 +698,7 @@ export class ComprasController {
           proveedor:proveedores(*),
           orden_compra_detalles(*)
         `)
+        .eq('tenant_id', tenantId)
         .order('fecha_orden', { ascending: false });
 
       if (filtros.fechaDesde) {
@@ -757,6 +769,7 @@ export class ComprasController {
   @ApiResponse({ status: 200, description: 'Productos obtenidos exitosamente' })
   async getProductos() {
     try {
+      const tenantId = this.resolveTenant(); // HARDENING: limitar catálogo al tenant.
       const supabase = this.supabase.getClient();
 
       console.log('🔍 OBTENIENDO PRODUCTOS...');
@@ -765,6 +778,7 @@ export class ComprasController {
       const { data, error } = await supabase
         .from('productos')
         .select('id, codigo, nombre, precio, stock, categoria, activo')
+        .eq('tenant_id', tenantId)
         .eq('activo', true)
         .order('nombre', { ascending: true });
 

@@ -5,6 +5,7 @@ export interface TenantContextSnapshot {
   tenantId?: string | null;
   userId?: string | null;
   supabaseAccessToken?: string | null;
+  isSuperAdmin?: boolean | null;
 }
 
 @Injectable()
@@ -29,6 +30,10 @@ export class TenantContextService {
 
   getSupabaseAccessToken(): string | null {
     return this.storage.getStore()?.supabaseAccessToken ?? null;
+  }
+
+  getIsSuperAdmin(): boolean {
+    return this.storage.getStore()?.isSuperAdmin ?? false;
   }
 
   setContext(partial: TenantContextSnapshot): void {

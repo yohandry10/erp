@@ -119,6 +119,62 @@ export class PlanCuentasService {
     return cuentasMap;
   }
 
+  async buscarCuentaPorCodigoONombre(
+    tenantId: string,
+    opciones: {
+      codigos?: string[];
+      keywords?: string[];
+    }
+  ): Promise<PlanCuenta | null> {
+    if (opciones.codigos && opciones.codigos.length > 0) {
+      const codigosNormalizados = opciones.codigos.map((c) => c.trim()).filter(Boolean);
+      if (codigosNormalizados.length > 0) {
+        const { data, error } = await this.supabaseService
+          .getClient()
+          .from('plan_cuentas')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('estado', 'ACTIVO')
+          .in('codigo', codigosNormalizados)
+          .order('nivel', { ascending: true })
+          .limit(1);
+
+        if (error) {
+          console.error('❌ [PlanCuentas] Error buscando por códigos:', error);
+        } else if (data && data.length > 0) {
+          return data[0] as PlanCuenta;
+        }
+      }
+    }
+
+    if (opciones.keywords && opciones.keywords.length > 0) {
+      for (const keyword of opciones.keywords) {
+        const termino = keyword.trim();
+        if (!termino) {
+          continue;
+        }
+
+        const { data, error } = await this.supabaseService
+          .getClient()
+          .from('plan_cuentas')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('estado', 'ACTIVO')
+          .ilike('nombre', `%${termino}%`)
+          .order('nivel', { ascending: true })
+          .limit(1);
+
+        if (error) {
+          console.error('❌ [PlanCuentas] Error buscando por keyword:', termino, error);
+        } else if (data && data.length > 0) {
+          return data[0] as PlanCuenta;
+        }
+      }
+    }
+
+    return null;
+  }
+
   /**
    * Obtiene todas las cuentas del plan de cuentas de un tenant
    * @param tenantId - ID del tenant

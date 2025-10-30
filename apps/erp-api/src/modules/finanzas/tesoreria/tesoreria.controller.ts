@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { TesoreriaService } from './tesoreria.service';
@@ -17,12 +18,12 @@ import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, Programaci
 @ApiTags('Finanzas - Tesorería')
 @ApiBearerAuth()
 @Controller('api/finanzas/tesoreria')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: tesorería exige permisos granulares.
 export class TesoreriaController {
   constructor(private readonly tesoreriaService: TesoreriaService) {}
 
   @Post('pagos')
-  @RequirePermissions('finanzas', 'tesoreria', 'gestionar')
+  @RequirePermission('finanzas.tesoreria.gestionar')
   @ApiOperation({
     summary: 'Registrar pago a proveedor',
     description: `Registra un pago aplicado a una cuenta por pagar. El proceso incluye:
@@ -99,7 +100,7 @@ Estados de CxP después del pago:
   }
 
   @Get('pagos')
-  @RequirePermissions('finanzas', 'tesoreria', 'ver')
+  @RequirePermission('finanzas.tesoreria.ver')
   @ApiOperation({
     summary: 'Listar pagos a proveedores',
     description: `Obtiene la lista de pagos registrados a proveedores con filtros opcionales.
@@ -171,7 +172,7 @@ Ordenamiento:
   }
 
   @Get('programacion')
-  @RequirePermissions('finanzas', 'tesoreria', 'ver')
+  @RequirePermission('finanzas.tesoreria.ver')
   @ApiOperation({
     summary: 'Obtener programación de pagos a proveedores',
     description: `Obtiene la lista de cuentas por pagar pendientes ordenadas por fecha de vencimiento.
@@ -272,7 +273,7 @@ Ordenamiento:
   }
 
   @Post('lote')
-  @RequirePermissions('finanzas', 'tesoreria', 'gestionar')
+  @RequirePermission('finanzas.tesoreria.gestionar')
   @ApiOperation({
     summary: 'Registrar pago masivo a proveedores',
     description: `Registra múltiples pagos a proveedores en una sola transacción. El proceso incluye:
@@ -373,7 +374,7 @@ Estados de CxP después del pago:
   }
 
   @Get('flujo-caja')
-  @RequirePermissions('finanzas', 'tesoreria', 'ver')
+  @RequirePermission('finanzas.tesoreria.ver')
   @ApiOperation({
     summary: 'Obtener proyección de flujo de caja',
     description: `Genera una proyección del flujo de caja basada en:

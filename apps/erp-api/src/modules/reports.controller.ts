@@ -1,20 +1,28 @@
-import { Controller, Get, Post, Query, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('reports')
 @Controller('reports')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@ApiBearerAuth()
 export class ReportsController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
   @Get('/ventas')
+  @RequirePermission('reports.ventas.read') // HARDENING: reporte de ventas protegido.
   @ApiOperation({ summary: 'Reporte de ventas' })
   @ApiResponse({ status: 200, description: 'Reporte generado exitosamente' })
-  async reporteVentas(@Req() req: any, @Query('fechaInicio') fechaInicio?: string, @Query('fechaFin') fechaFin?: string) {
+  async reporteVentas(
+    @CurrentTenant() tenantId: string,
+    @Query('fechaInicio') fechaInicio?: string,
+    @Query('fechaFin') fechaFin?: string
+  ) {
     try {
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-
       const { data, error } = await this.supabaseService
         .getClient()
         .from('ventas')
@@ -37,13 +45,11 @@ export class ReportsController {
   }
 
   @Get('/inventario')
+  @RequirePermission('reports.inventario.read') // HARDENING: reporte inventario protegido.
   @ApiOperation({ summary: 'Reporte de inventario' })
   @ApiResponse({ status: 200, description: 'Reporte generado exitosamente' })
-  async reporteInventario(@Req() req: any) {
+  async reporteInventario(@CurrentTenant() tenantId: string) {
     try {
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-
       const { data, error } = await this.supabaseService
         .getClient()
         .from('productos')

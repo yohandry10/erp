@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { 
@@ -8,19 +8,31 @@ import {
   RetencionCalculada,
   ResumenRetencionesResponse
 } from './retenciones.types';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 
 @Injectable()
 export class RetencionesService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private resolveTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: todas las operaciones de retenciones requieren tenant explícito.
+      throw new BadRequestException('Tenant requerido para operaciones de retenciones');
+    }
+    return tenantId;
+  }
 
   /**
    * Calcula la retención aplicable según la categoría y configuración
    */
   async calcularRetencion(data: CalcularRetencionDto): Promise<RetencionCalculada> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       // Verificar si el proveedor está en cuarta categoría
@@ -28,6 +40,7 @@ export class RetencionesService {
         .from('proveedores_cuarta_categoria')
         .select('*')
         .eq('proveedor_id', data.proveedor_id)
+        .eq('tenant_id', tenantId) // HARDENING: limitar búsqueda al tenant actual.
         .eq('activo', true)
         .single();
 
@@ -36,6 +49,7 @@ export class RetencionesService {
         .from('configuracion_retenciones')
         .select('*')
         .eq('categoria', data.categoria_retencion)
+        .eq('tenant_id', tenantId) // HARDENING: configuración de retenciones por tenant.
         .eq('activo', true)
         .single();
 
@@ -97,6 +111,7 @@ export class RetencionesService {
    */
   async crearRetencion(data: CreateRetencionDto): Promise<RetencionResponse> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
 
     try {
       // Validar que el cálculo sea correcto
@@ -111,12 +126,13 @@ export class RetencionesService {
       }
 
       // Generar número correlativo
-      const numeroCorrelativo = await this.generarNumeroCorrelativo(data.categoria_retencion);
+      const numeroCorrelativo = await this.generarNumeroCorrelativo(data.categoria_retencion, tenantId);
 
       // Crear registro en libro_retenciones
       const { data: retencion, error } = await client
         .from('libro_retenciones')
         .insert({
+          tenant_id: tenantId, // HARDENING: asociar retención al tenant actual.
           numero_correlativo: numeroCorrelativo,
           proveedor_id: data.proveedor_id,
           numero_comprobante: data.numero_comprobante,
@@ -149,6 +165,7 @@ export class RetencionesService {
       // Emitir evento
       this.eventBus.emit('retencion.creada', {
         type: 'retencion.creada',
+        tenantId, // HARDENING: propagar tenant en evento de retención.
         data: retencion,
         timestamp: new Date()
       });
@@ -172,6 +189,7 @@ export class RetencionesService {
     limit: number = 50
   ): Promise<{ data: RetencionResponse[]; total: number; page: number; totalPages: number }> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       let query = client
@@ -185,6 +203,7 @@ export class RetencionesService {
             tipo_documento
           )
         `, { count: 'exact' })
+        .eq('tenant_id', tenantId) // HARDENING: sólo retenciones del tenant actual.
         .order('fecha_pago', { ascending: false });
 
       // Aplicar filtros
@@ -234,6 +253,7 @@ export class RetencionesService {
    */
   async getRetencionById(id: string): Promise<RetencionResponse> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       const { data, error } = await client
@@ -250,6 +270,7 @@ export class RetencionesService {
             email
           )
         `)
+        .eq('tenant_id', tenantId) // HARDENING: restringir consulta por tenant.
         .eq('id', id)
         .single();
 
@@ -272,12 +293,14 @@ export class RetencionesService {
    */
   async anularRetencion(id: string, motivo: string): Promise<void> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       // Verificar que la retención existe y está activa
       const { data: retencionExistente } = await client
         .from('libro_retenciones')
         .select('id, estado')
+        .eq('tenant_id', tenantId) // HARDENING: validar retención dentro del tenant.
         .eq('id', id)
         .single();
 
@@ -296,6 +319,7 @@ export class RetencionesService {
           observaciones: motivo,
           updated_at: new Date().toISOString()
         })
+        .eq('tenant_id', tenantId) // HARDENING: actualización acotada al tenant.
         .eq('id', id);
 
       if (error) {
@@ -305,6 +329,7 @@ export class RetencionesService {
       // Emitir evento
       this.eventBus.emit('retencion.anulada', {
         type: 'retencion.anulada',
+        tenantId, // HARDENING: propagar tenant en eventos de retención.
         data: { id, motivo },
         timestamp: new Date()
       });
@@ -321,6 +346,7 @@ export class RetencionesService {
     fechaHasta: string
   ): Promise<ResumenRetencionesResponse> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       // Obtener totales por categoría
@@ -328,6 +354,7 @@ export class RetencionesService {
         .from('libro_retenciones')
         .select('categoria_retencion, monto_pago, monto_retencion')
         .eq('estado', 'ACTIVO')
+        .eq('tenant_id', tenantId) // HARDENING: cálculo restringido al tenant.
         .gte('fecha_pago', fechaDesde)
         .lte('fecha_pago', fechaHasta);
 
@@ -416,7 +443,7 @@ export class RetencionesService {
   /**
    * Genera número correlativo para retenciones
    */
-  private async generarNumeroCorrelativo(categoria: string): Promise<string> {
+  private async generarNumeroCorrelativo(categoria: string, tenantId: string): Promise<string> {
     const client = this.supabase.getClient();
     
     try {
@@ -427,6 +454,7 @@ export class RetencionesService {
       const { data, error } = await client
         .from('libro_retenciones')
         .select('numero_correlativo')
+        .eq('tenant_id', tenantId) // HARDENING: correlativo separado por tenant.
         .like('numero_correlativo', `${prefijo}-${año}-%`)
         .order('numero_correlativo', { ascending: false })
         .limit(1);
@@ -460,6 +488,7 @@ export class RetencionesService {
     categoria?: string
   ): Promise<any[]> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     
     try {
       let query = client
@@ -479,6 +508,7 @@ export class RetencionesService {
           )
         `)
         .eq('estado', 'ACTIVO')
+        .eq('tenant_id', tenantId) // HARDENING: exportación acotada al tenant.
         .gte('fecha_pago', fechaDesde)
         .lte('fecha_pago', fechaHasta)
         .order('fecha_pago', { ascending: true });
@@ -504,6 +534,7 @@ export class RetencionesService {
    */
   async validarConfiguracion(): Promise<{ valida: boolean; errores: string[] }> {
     const client = this.supabase.getClient();
+    const tenantId = this.resolveTenantId();
     const errores: string[] = [];
     
     try {
@@ -512,6 +543,7 @@ export class RetencionesService {
         .from('configuracion_retenciones')
         .select('*')
         .eq('categoria', 'CUARTA')
+        .eq('tenant_id', tenantId) // HARDENING: configuración por tenant.
         .eq('activo', true)
         .single();
 
@@ -524,6 +556,7 @@ export class RetencionesService {
         .from('configuracion_retenciones')
         .select('*')
         .eq('categoria', 'QUINTA')
+        .eq('tenant_id', tenantId) // HARDENING: configuración por tenant.
         .eq('activo', true)
         .single();
 

@@ -235,7 +235,7 @@ const menuItems: MenuItem[] = [
   },
   {
     title: 'Configuración',
-    href: '/dashboard/configuracion',
+    href: '/dashboard/wizard',
     icon: Settings,
     permission: {
       modulo: 'admin',
@@ -356,9 +356,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
           {isExpanded ? (
             <ChevronDown size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
           ) : (
-            <ChevronRight,
-  CheckCircle,
-  DollarSign size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+            <ChevronRight size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
           )}
         </button>
         
@@ -426,6 +424,26 @@ export default function Sidebar() {
   const router = useRouter()
   const { toast } = useToast()
   const { isSuperAdmin, user } = useTenant()
+  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+
+  const filteredMenuItems = menuItems
+    .filter((item) => {
+      // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
+      if (!posEnabled && item.href === '/dashboard/pos') return false
+      if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
+      return true
+    })
+    .map((item) => {
+      if (!rrhhEnabled && item.submenu) {
+        return {
+          ...item,
+          submenu: item.submenu?.filter((subItem) => !subItem.href?.startsWith('/dashboard/rrhh'))
+        }
+      }
+      return item
+    })
+
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isTablet, setIsTablet] = useState(false)
@@ -550,7 +568,7 @@ export default function Sidebar() {
           flex: 1,
           overflowY: 'auto'
         }}>
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <MenuItem
               key={item.href || item.title}
               item={item}

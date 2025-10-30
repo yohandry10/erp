@@ -84,7 +84,8 @@ export class AuthService {
       email: user.email,
       username: user.nombre_usuario || user.nombre,
       roles: roleNames,
-      tenant_id: user.tenant_id || '550e8400-e29b-41d4-a716-446655440000', // Default tenant
+      tenant_id: user.tenant_id,
+ // Default tenant
       is_super_admin: user.is_super_admin || false
     };
 
@@ -185,7 +186,8 @@ export class AuthService {
       email: user.email,
       username: user.nombre_usuario,
       roles: user.roles || [],
-      tenant_id: user.tenant_id || '550e8400-e29b-41d4-a716-446655440000',
+      tenant_id: user.tenant_id,
+
       is_super_admin: user.is_super_admin || false
     };
 
