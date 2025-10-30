@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RegistrarPagoCxcDto, TipoMovimientoCxc } from './dto';
 import { EventBusService, FacturaEmitidaEvent, CuentaPorCobrarCreadaEvent } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -21,6 +23,8 @@ export class CxcService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
+    private readonly auditService: AuditService,
+    private readonly retencionesValidation: RetencionesValidationService,
   ) {}
 
   private async registrarIntegrationLog(entry: {
@@ -220,6 +224,82 @@ export class CxcService {
       const cliente = await this.obtenerCliente(evento.clienteId, tenantId);
       const ajustes = this.calcularAjustesDesdeEvento(evento, cliente, config);
 
+      // 🔴 TAREA 17: Validar que los cálculos de retenciones sean correctos antes de crear CxC
+      const clienteConfig = cliente ? {
+        sujeto_retencion: cliente.sujeto_retencion,
+        retencion_tasa: cliente.retencion_tasa,
+        sujeto_percepcion: cliente.sujeto_percepcion,
+        percepcion_tasa: cliente.percepcion_tasa,
+        sujeto_detraccion: cliente.sujeto_detraccion,
+        detraccion_tasa: cliente.detraccion_tasa,
+      } : undefined;
+
+      const empresaConfig = config ? {
+        aplicar_retencion: config.aplicar_retencion,
+        retencion_tasa: config.retencion_tasa,
+        aplicar_percepcion: config.aplicar_percepcion,
+        percepcion_tasa: config.percepcion_tasa,
+        aplicar_detraccion: config.aplicar_detraccion,
+        detraccion_tasa: config.detraccion_tasa,
+      } : undefined;
+
+      const validacionAjustes = await this.retencionesValidation.validarCalculoAjustes(
+        evento.total,
+        ajustes,
+        clienteConfig,
+        empresaConfig
+      );
+
+      if (!validacionAjustes.valido) {
+        const errorMessage = `Error en cálculo de ajustes tributarios: ${validacionAjustes.errores.join('; ')}`;
+        this.logger.error(`❌ [CXC] ${errorMessage}`);
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'FINANZAS',
+          operacion: 'cxc.crear_desde_factura',
+          correlacionId: facturaId,
+          correlacionTipo: 'FACTURA',
+          status: 'ERROR',
+          requestSummary: {
+            eventId: sourceEventId,
+            idempotencyKey,
+            source: eventSource,
+          },
+          errorMessage,
+          durationMs: Date.now() - startedAt,
+        });
+        throw new BadRequestException(errorMessage);
+      }
+
+      // Validar monto pendiente calculado
+      const montoPendienteCalculado = this.round2(Math.max(evento.total - ajustes.retencion - ajustes.detraccion - ajustes.anticipo + ajustes.percepcion, 0));
+      const validacionPendiente = this.retencionesValidation.validarMontoPendiente(
+        evento.total,
+        ajustes,
+        montoPendienteCalculado
+      );
+
+      if (!validacionPendiente.valido) {
+        const errorMessage = `Error en cálculo de monto pendiente: ${validacionPendiente.error}`;
+        this.logger.error(`❌ [CXC] ${errorMessage}`);
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'FINANZAS',
+          operacion: 'cxc.crear_desde_factura',
+          correlacionId: facturaId,
+          correlacionTipo: 'FACTURA',
+          status: 'ERROR',
+          requestSummary: {
+            eventId: sourceEventId,
+            idempotencyKey,
+            source: eventSource,
+          },
+          errorMessage,
+          durationMs: Date.now() - startedAt,
+        });
+        throw new BadRequestException(errorMessage);
+      }
+
       const fechaEmision = evento.fechaEmision ? new Date(evento.fechaEmision) : new Date();
       const diasVencimiento = config?.dias_vencimiento_factura ?? 30;
       const fechaVencimiento = evento.fechaVencimiento
@@ -231,7 +311,7 @@ export class CxcService {
       const detraccion = ajustes.detraccion ?? 0;
       const anticipo = ajustes.anticipo ?? 0;
 
-      const montoPendiente = this.round2(Math.max(evento.total - retencion - detraccion - anticipo + percepcion, 0));
+      const montoPendiente = validacionPendiente.montoEsperado; // Usar el monto validado
 
       const estadoInicial =
         montoPendiente <= 0
@@ -754,6 +834,32 @@ export class CxcService {
     if (errorOutbox) {
       console.error('Error insertando evento CobroRegistrado en outbox:', errorOutbox);
       // No fallar la operación si el evento no se pudo insertar
+    }
+
+    // Registrar auditoría
+    if (userId) {
+      try {
+        await this.auditService.registrarCambio(
+          'cuentas_por_cobrar',
+          'UPDATE',
+          userId,
+          {
+            old: { monto_pendiente: pendienteActual, estado: cuenta.estado },
+            new: { monto_pendiente: nuevoPendiente, estado: nuevoEstado, dias_mora: diasMora }
+          },
+          tenantId,
+          cuentaId,
+          { 
+            accion: 'REGISTRAR_PAGO', 
+            monto: montoPago, 
+            metodo_pago: dto.metodo_pago,
+            referencia: dto.referencia,
+            tipo_movimiento: movimientoTipo
+          }
+        );
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar auditoría de pago CxC:', error);
+      }
     }
 
     return {

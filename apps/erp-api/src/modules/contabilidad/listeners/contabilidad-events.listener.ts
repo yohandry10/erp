@@ -223,6 +223,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
           await this.handleDepreciacion(evento);
           break;
 
+        case 'cpe.anulado':
+        case 'CPEAnulado':
+          await this.handleCpeAnulado(evento);
+          break;
+
         default:
           this.logger.debug(`⚠️ [ContabilidadEventsListener] Tipo de evento no manejado: ${evento.event_type}`);
           // No marcar como procesado, simplemente ignorar
@@ -335,6 +340,105 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
     return Math.floor(delayMs + jitter);
   }
+  /**
+   * 🔴 CRÍTICO FIX: Verifica que un asiento contable se haya creado correctamente en la BD
+   * Valida que el asiento exista y tenga detalles asociados
+   */
+  private async verificarAsientoCreado(
+    tenantId: string,
+    sourceEventId: string,
+    referencia?: string
+  ): Promise<any> {
+    try {
+      // Buscar asiento por source_event_id (idempotencia)
+      const { data: asiento, error: asientoError } = await this.supabaseService
+        .getClient()
+        .from('asientos_contables')
+        .select('id, numero_asiento, estado, total_debe, total_haber, referencia')
+        .eq('tenant_id', tenantId)
+        .eq('source_event_id', sourceEventId)
+        .maybeSingle();
+
+      if (asientoError) {
+        this.logger.error(
+          `❌ [ContabilidadEventsListener] Error verificando asiento para evento ${sourceEventId}:`,
+          asientoError
+        );
+        return null;
+      }
+
+      if (!asiento) {
+        // Intentar buscar por referencia si no se encontró por event_id
+        if (referencia) {
+          const { data: asientoPorRef, error: refError } = await this.supabaseService
+            .getClient()
+            .from('asientos_contables')
+            .select('id, numero_asiento, estado, total_debe, total_haber, referencia')
+            .eq('tenant_id', tenantId)
+            .eq('referencia', referencia)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!refError && asientoPorRef) {
+            this.logger.log(
+              `✅ [ContabilidadEventsListener] Asiento encontrado por referencia: ${asientoPorRef.numero_asiento}`
+            );
+            return asientoPorRef;
+          }
+        }
+
+        this.logger.warn(
+          `⚠️ [ContabilidadEventsListener] Asiento no encontrado para evento ${sourceEventId}`
+        );
+        return null;
+      }
+
+      // Verificar que el asiento tenga detalles (líneas contables)
+      const { data: detalles, error: detallesError } = await this.supabaseService
+        .getClient()
+        .from('detalle_asientos')
+        .select('id')
+        .eq('asiento_id', asiento.id)
+        .limit(1);
+
+      if (detallesError) {
+        this.logger.error(
+          `❌ [ContabilidadEventsListener] Error verificando detalles del asiento ${asiento.id}:`,
+          detallesError
+        );
+        return null;
+      }
+
+      if (!detalles || detalles.length === 0) {
+        this.logger.error(
+          `❌ [ContabilidadEventsListener] Asiento ${asiento.id} no tiene detalles asociados`
+        );
+        return null;
+      }
+
+      // Verificar que el asiento cuadre (debe = haber)
+      if (Math.abs(Number(asiento.total_debe) - Number(asiento.total_haber)) > 0.01) {
+        this.logger.error(
+          `❌ [ContabilidadEventsListener] Asiento ${asiento.id} no cuadra: Debe=${asiento.total_debe}, Haber=${asiento.total_haber}`
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `✅ [ContabilidadEventsListener] Asiento ${asiento.numero_asiento} verificado correctamente (ID: ${asiento.id}, Detalles: ${detalles.length})`
+      );
+
+      return asiento;
+    } catch (error) {
+      this.logger.error(
+        `❌ [ContabilidadEventsListener] Excepción verificando asiento para evento ${sourceEventId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
   private ensureEventTenant(eventData: any, contexto: string): string {
     const tenantId = eventData?.tenantId ?? eventData?.tenant_id ?? null;
     if (!tenantId) {
@@ -368,7 +472,45 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoVenta(ventaData);
+      const eventId = ventaData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoVenta(ventaData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          ventaData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de venta no se pudo verificar después de creación para evento ${eventId}. ` +
+            `El asiento puede no haberse guardado correctamente en la base de datos.`
+          );
+        }
+        this.logger.log(
+          `✅ [ContabilidadEventsListener] Asiento ${asientoVerificado.numero_asiento} verificado correctamente`
+        );
+      } else if (asientoCreado?.id) {
+        // Si no hay event_id pero el método retornó un asiento, verificar por ID
+        const { data: asientoVerificado } = await this.supabaseService
+          .getClient()
+          .from('asientos_contables')
+          .select('id, numero_asiento, estado')
+          .eq('id', asientoCreado.id)
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (!asientoVerificado) {
+          throw new Error(`Asiento contable ${asientoCreado.id} no encontrado en la base de datos`);
+        }
+        this.logger.log(
+          `✅ [ContabilidadEventsListener] Asiento ${asientoVerificado.numero_asiento} verificado por ID`
+        );
+      } else {
+        throw new Error('Asiento contable no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleVentaFacturada:`, error);
       throw error;
@@ -393,7 +535,25 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoCobro(cobroData);
+      const eventId = cobroData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoCobro(cobroData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          cobroData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de cobro no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de cobro no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleCobroRegistrado:`, error);
       throw error;
@@ -439,9 +599,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
         (eventData.source?.toLowerCase?.().includes('nota_credito') ?? false) ||
         (eventData.serie?.toUpperCase?.().startsWith('NC') ?? false);
 
+        const eventId = ventaData.event_id;
+
         if (esNotaCredito) {
           // HARDENING: revertimos ventas cuando la factura corresponde a una nota de crédito.
-          await this.asientosGenerator.generarAsientoNotaCredito({
+          const asientoCreado = await this.asientosGenerator.generarAsientoNotaCredito({
             ...ventaData,
             total: Math.abs(ventaData.total),
             base_imponible: Math.abs(ventaData.base_imponible),
@@ -451,8 +613,40 @@ export class ContabilidadEventsListener implements OnModuleInit {
               ? Math.abs(ventaData.monto_pendiente)
               : undefined,
           });
+
+          // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+          if (eventId) {
+            const asientoVerificado = await this.verificarAsientoCreado(
+              tenantId,
+              eventId,
+              referencia
+            );
+            if (!asientoVerificado) {
+              throw new Error(
+                `Asiento contable de nota de crédito no se pudo verificar después de creación para evento ${eventId}`
+              );
+            }
+          } else if (!asientoCreado?.id) {
+            throw new Error('Asiento contable de nota de crédito no retornó ID válido después de creación');
+          }
         } else {
-          await this.asientosGenerator.generarAsientoVenta(ventaData);
+          const asientoCreado = await this.asientosGenerator.generarAsientoVenta(ventaData);
+
+          // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+          if (eventId) {
+            const asientoVerificado = await this.verificarAsientoCreado(
+              tenantId,
+              eventId,
+              referencia
+            );
+            if (!asientoVerificado) {
+              throw new Error(
+                `Asiento contable de CxC no se pudo verificar después de creación para evento ${eventId}`
+              );
+            }
+          } else if (!asientoCreado?.id) {
+            throw new Error('Asiento contable de CxC no retornó ID válido después de creación');
+          }
         }
       } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleCuentaPorCobrarCreada:`, error);
@@ -475,7 +669,25 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoCompra(compraData);
+      const eventId = compraData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoCompra(compraData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          compraData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de recepción no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de recepción no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleRecepcionRegistrada:`, error);
       throw error;
@@ -500,7 +712,25 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoPago(pagoData);
+      const eventId = pagoData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoPago(pagoData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          pagoData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de pago no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de pago no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePagoProveedor:`, error);
       throw error;
@@ -526,7 +756,25 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoAjusteInventario(ajusteData);
+      const eventId = ajusteData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoAjusteInventario(ajusteData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          ajusteData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de ajuste no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de ajuste no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleAjusteInventario:`, error);
       throw error;
@@ -554,7 +802,25 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoPlanilla(planillaData);
+      const eventId = planillaData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoPlanilla(planillaData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          planillaData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de planilla no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de planilla no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaLiquidada:`, error);
       throw error;
@@ -579,9 +845,94 @@ export class ContabilidadEventsListener implements OnModuleInit {
         event_id: eventData.eventId || evento.event_id
       };
 
-      await this.asientosGenerator.generarAsientoDepreciacion(depreciacionData);
+      const eventId = depreciacionData.event_id;
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoDepreciacion(depreciacionData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          depreciacionData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de depreciación no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de depreciación no retornó ID válido después de creación');
+      }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handleDepreciacion:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handler para eventos de CPE anulado
+   * HARDENING E1: Revierte el asiento contable asociado al CPE anulado
+   * Genera asiento de reversión con los montos negativos
+   */
+  private async handleCpeAnulado(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'cpe.anulado');
+      
+      this.logger.log(
+        `🔄 [ContabilidadEventsListener] Revirtiendo asiento contable para CPE anulado: ${eventData.serie}-${eventData.numero}`
+      );
+
+      // Buscar el asiento original asociado al CPE
+      const referencia = eventData.serie && eventData.numero
+        ? `${eventData.serie}-${eventData.numero}`
+        : eventData.cpe_id;
+
+      // Generar asiento de reversión (montos negativos)
+      // Este asiento revierte el asiento original de venta
+      const reversoData = {
+        tenant_id: tenantId,
+        fecha: eventData.anulado_at || new Date().toISOString(),
+        total: -(eventData.total || 0), // Negativo para revertir
+        base_imponible: eventData.total ? -(eventData.total / 1.18) : 0, // Negativo
+        igv: eventData.total ? -(eventData.total - (eventData.total / 1.18)) : 0, // Negativo
+        costo_ventas: 0, // No revertir costo si no hay información
+        centro_costo_id: eventData.centro_costo_id,
+        referencia: `REV-${referencia}`, // Prefijo REV para identificar reversiones
+        event_id: eventData.eventId || evento.event_id,
+        motivo: `Reversión por anulación: ${eventData.motivo || 'Sin motivo especificado'}`
+      };
+
+      const eventId = reversoData.event_id;
+
+      // Usar generarAsientoVenta con montos negativos para revertir
+      const asientoCreado = await this.asientosGenerator.generarAsientoVenta(reversoData);
+
+      // 🔴 CRÍTICO FIX: Validar que el asiento de reversión se haya creado correctamente
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          reversoData.referencia
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de reversión (CPE anulado) no se pudo verificar después de creación para evento ${eventId}`
+          );
+        }
+        this.logger.log(
+          `✅ [ContabilidadEventsListener] Asiento de reversión ${asientoVerificado.numero_asiento} verificado correctamente`
+        );
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de reversión no retornó ID válido después de creación');
+      }
+      
+      this.logger.log(
+        `✅ [ContabilidadEventsListener] Asiento contable revertido exitosamente para CPE ${eventData.serie}-${eventData.numero}`
+      );
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handleCpeAnulado:`, error);
       throw error;
     }
   }

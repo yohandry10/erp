@@ -264,7 +264,8 @@ export class SireService {
     }
   }
 
-  async getReportes(filters: any, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
+  async getReportes(filters: any, tenantId?: string) {
+    const currentTenantId = this.ensureTenant(tenantId);
     try {
       console.log('📄 Consultando reportes SIRE para tenant:', currentTenantId, 'filters:', filters);
       
@@ -340,7 +341,8 @@ export class SireService {
     return tipoMap[tipoCorto] || tipoCorto;
   }
 
-  async generarReporte(reportData: any, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
+  async generarReporte(reportData: any, tenantId?: string) {
+    const currentTenantId = this.ensureTenant(tenantId);
     try {
       console.log('🔄 Generando reporte SIRE:', reportData, 'para tenant:', currentTenantId);
 
@@ -439,7 +441,8 @@ export class SireService {
     }
   }
 
-  async downloadReporte(id: string, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
+  async downloadReporte(id: string, tenantId?: string) {
+    const currentTenantId = this.ensureTenant(tenantId);
     try {
       console.log('📥 Descargando reporte SIRE:', id, 'para tenant:', currentTenantId);
       
@@ -668,7 +671,7 @@ export class SireService {
       return v.toString(16);
     });
   }
-}
+
   private ensureTenant(tenantId?: string): string {
     const resolvedTenant = tenantId ?? this.tenantContext.getTenantId();
     if (!resolvedTenant) {
@@ -676,3 +679,4 @@ export class SireService {
     }
     return resolvedTenant;
   }
+}

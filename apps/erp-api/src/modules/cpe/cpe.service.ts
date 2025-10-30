@@ -7,6 +7,8 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { OseService } from '../ose/ose.service';
 import { ValidationService } from '../validations/validation.service';
 import { Logger } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
+import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
 
 @Injectable()
 export class CpeService {
@@ -18,6 +20,8 @@ export class CpeService {
     private readonly eventBus: EventBusService,
     private readonly oseService: OseService,
     private readonly validationService: ValidationService,
+    private readonly auditService: AuditService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   /**
@@ -54,7 +58,7 @@ export class CpeService {
     });
   }
 
-  async create(createFacturaDto: CreateFacturaDto, tenantId: string): Promise<FacturaDto> {
+  async create(createFacturaDto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
     try {
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
@@ -204,6 +208,36 @@ export class CpeService {
         console.log(`✅ [CPE] Evento cpe.requiere_transporte emitido para CPE ${cpeId}`);
       } else {
         console.log(`ℹ️ [CPE] CPE ${cpeId} no requiere transporte (Total: S/ ${createFacturaDto.total_venta})`);
+      }
+
+      // Registrar auditoría (el userId se podría obtener del contexto si está disponible)
+      try {
+        await this.auditService.registrarCambio(
+          'cpe',
+          'INSERT',
+          userId || 'SYSTEM', // Usar userId del contexto si está disponible
+          {
+            new: {
+              tipo_documento: createFacturaDto.tipo_documento,
+              serie: createFacturaDto.serie,
+              numero: createFacturaDto.numero,
+              total_venta: createFacturaDto.total_venta,
+              estado: 'FIRMADO'
+            }
+          },
+          tenantId,
+          cpeId,
+          { accion: 'CREAR_CPE', tipo_documento: createFacturaDto.tipo_documento }
+        );
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar auditoría de creación de CPE:', error);
+      }
+
+      // Invalidar cache del dashboard automáticamente
+      try {
+        await this.cacheInvalidation.onCpeCreated(tenantId);
+      } catch (error) {
+        this.logger.warn('⚠️ No se pudo invalidar cache después de crear CPE:', error);
       }
 
       return this.mapToDto(createdCpe);
@@ -442,6 +476,13 @@ export class CpeService {
     }
   }
 
+  /**
+   * Reintentar envío de CPE (método público para SunatRetryService)
+   */
+  async retrySendToOse(cpeId: string): Promise<void> {
+    return this.sendToOse(cpeId);
+  }
+
   private async sendToOse(cpeId: string, xmlContent?: string, fileName?: string): Promise<void> {
     try {
       console.log(`📤 [CPE] Enviando CPE ${cpeId} a SUNAT...`);
@@ -493,12 +534,17 @@ export class CpeService {
       } else {
         console.error(`❌ [CPE] Error enviando CPE ${cpeId}: ${response.descripcionRespuesta}`);
         
+        // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
+        const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
+        
         // Marcar como RECHAZADO
         await this.supabaseService.update(
           'cpe',
           { 
             estado: 'RECHAZADO',
             error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
+            retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
+            next_retry_at: null,
             updated_at: new Date().toISOString(),
           },
           { id: cpeId }
@@ -508,17 +554,47 @@ export class CpeService {
     } catch (error) {
       console.error(`❌ [CPE] Error técnico enviando CPE ${cpeId}:`, error);
       
-      // Marcar como RECHAZADO por error técnico
+      // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
+      const retryCount = 0; // Primera vez que falla
       await this.supabaseService.update(
         'cpe',
         { 
           estado: 'RECHAZADO',
           error_message: `Error técnico: ${error.message}`,
+          retry_count: retryCount,
+          next_retry_at: null, // El servicio de reintentos lo programará
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }
       );
     }
+  }
+
+  /**
+   * 🔴 CRÍTICO FIX: Determina si un error de SUNAT es técnico (reintentable) o de validación (no reintentable)
+   */
+  private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string): boolean {
+    // Códigos de error técnicos de SUNAT que se pueden reintentar
+    const technicalErrorCodes = ['99', '98', '97']; // Errores técnicos genéricos
+    
+    // Si el código indica error técnico
+    if (technicalErrorCodes.includes(codigoRespuesta)) {
+      return true;
+    }
+
+    // Si el mensaje indica error técnico de red/conexión
+    const errorMessage = descripcionRespuesta?.toLowerCase() || '';
+    const technicalKeywords = [
+      'timeout',
+      'connection',
+      'network',
+      'técnico',
+      'servicio no disponible',
+      'temporalmente',
+      'unavailable',
+    ];
+
+    return technicalKeywords.some(keyword => errorMessage.includes(keyword));
   }
 
   private generateXmlContent(factura: CreateFacturaDto): string {

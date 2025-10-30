@@ -25,7 +25,48 @@ async function notifySchemaReload(supabase: SupabaseService) {
   }
 }
 
+/**
+ * A4: Validar JWT_SECRET en arranque
+ * 
+ * Valida que:
+ * 1. JWT_SECRET exista
+ * 2. Tenga mínimo 32 caracteres
+ * 3. Tenga entropía suficiente (mayúsculas, minúsculas, números, símbolos)
+ */
+async function validateCriticalSecrets(): Promise<void> {
+  const jwtSecret = process.env.JWT_SECRET;
+
+  if (!jwtSecret) {
+    throw new Error(
+      '❌ [A4] JWT_SECRET no está configurado. Configure esta variable de entorno antes de iniciar la aplicación.'
+    );
+  }
+
+  // Validar longitud mínima
+  if (jwtSecret.length < 32) {
+    throw new Error(
+      `❌ [A4] JWT_SECRET debe tener mínimo 32 caracteres. Actual: ${jwtSecret.length} caracteres.`
+    );
+  }
+
+  // Validar entropía (debe contener caracteres aleatorios, no palabras simples)
+  const hasUpperLower = /[A-Z]/.test(jwtSecret) && /[a-z]/.test(jwtSecret);
+  const hasNumber = /\d/.test(jwtSecret);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>\[\]\\\/_+\-=\[\]`~]/.test(jwtSecret);
+
+  if (!hasUpperLower || !hasNumber || !hasSpecial) {
+    throw new Error(
+      '❌ [A4] JWT_SECRET debe contener mayúsculas, minúsculas, números y caracteres especiales para mayor seguridad.'
+    );
+  }
+
+  console.log('✅ [A4] JWT_SECRET validado correctamente');
+}
+
 async function bootstrap() {
+  // ✅ A4: Validar antes de crear app
+  await validateCriticalSecrets();
+
   const app = await NestFactory.create(AppModule);
   
   // Definir puerto al inicio

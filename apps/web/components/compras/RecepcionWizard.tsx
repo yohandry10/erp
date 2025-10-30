@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Check, Package, Scan, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
 interface OrdenDetalle {
   id: string
@@ -1408,36 +1409,43 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             <ChevronRight size={16} />
           </button>
         ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#10b981',
-              color: 'white',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              opacity: submitting ? 0.5 : 1
-            }}
+          <ProtectedComponent
+            modulo="compras"
+            accion="create"
+            recurso="recepciones"
+            fallback={null}
           >
-            {submitting ? (
-              <>
-                <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Check size={16} />
-                Completar Recepción
-              </>
-            )}
-          </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#10b981',
+                color: 'white',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                opacity: submitting ? 0.5 : 1
+              }}
+            >
+              {submitting ? (
+                <>
+                  <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  Completar Recepción
+                </>
+              )}
+            </button>
+          </ProtectedComponent>
         )}
       </div>
     </div>

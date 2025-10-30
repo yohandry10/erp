@@ -6,13 +6,18 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { AuthTasksService } from './auth.tasks';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
+import { EmailModule } from '../../shared/email/email.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
     PassportModule,
     SupabaseModule,
+    EmailModule, // ✅ Email service para password reset
+    PermissionsModule, // ✅ B1: Para invalidar cache de permisos al cambiar tenant
     ScheduleModule.forRoot(),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -24,7 +29,12 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, AuthTasksService],
-  exports: [AuthService],
+  providers: [
+    AuthService, 
+    JwtStrategy, 
+    AuthTasksService,
+    JwtAuthGuard, // ✅ A3: Guard con inyección automática de AuthService
+  ],
+  exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

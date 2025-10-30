@@ -5,6 +5,7 @@ import { useApiCall } from '@/hooks/use-api'
 import CpeModal from '@/components/modals/CpeModal'
 import CpeViewModal from '@/components/modals/CpeViewModal'
 import GreModal from '@/components/modals/GreModal'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
 interface CpeDocument {
   id: string
@@ -426,38 +427,52 @@ export default function CPEPage() {
                           {/* Botón GRE - Solo para facturas y boletas ACEPTADAS */}
                           {(doc.tipoComprobante === '01' || doc.tipoComprobante === '03') && 
                            doc.estado === 'ACEPTADO' && (
-                            <button 
-                              onClick={() => openGreModal(doc)}
-                              style={{ 
-                                background: 'rgba(34, 197, 94, 0.1)', 
-                                border: '1px solid rgba(34, 197, 94, 0.2)', 
-                                padding: '0.5rem 1rem', 
-                                borderRadius: '6px', 
-                                color: '#22c55e', 
-                                cursor: 'pointer',
-                                fontSize: '0.8rem'
-                              }}
-                              title="Crear Guía de Remisión Electrónica"
+                            <ProtectedComponent
+                              modulo="gre"
+                              accion="create"
+                              recurso="guias"
+                              fallback={null}
                             >
-                              🚚 GRE
-                            </button>
+                              <button 
+                                onClick={() => openGreModal(doc)}
+                                style={{ 
+                                  background: 'rgba(34, 197, 94, 0.1)', 
+                                  border: '1px solid rgba(34, 197, 94, 0.2)', 
+                                  padding: '0.5rem 1rem', 
+                                  borderRadius: '6px', 
+                                  color: '#22c55e', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem'
+                                }}
+                                title="Crear Guía de Remisión Electrónica"
+                              >
+                                🚚 GRE
+                              </button>
+                            </ProtectedComponent>
                           )}
                           
                           {doc.estado === 'BORRADOR' && (
-                            <button 
-                              onClick={() => sendToSunat(doc.id)}
-                              style={{ 
-                                background: 'rgba(245, 158, 11, 0.1)', 
-                                border: '1px solid rgba(245, 158, 11, 0.2)', 
-                                padding: '0.5rem 1rem', 
-                                borderRadius: '6px', 
-                                color: '#f59e0b', 
-                                cursor: 'pointer',
-                                fontSize: '0.8rem'
-                              }}
+                            <ProtectedComponent
+                              modulo="cpe"
+                              accion="emitir"
+                              recurso="comprobantes"
+                              fallback={null}
                             >
-                              📤 Enviar
-                            </button>
+                              <button 
+                                onClick={() => sendToSunat(doc.id)}
+                                style={{ 
+                                  background: 'rgba(245, 158, 11, 0.1)', 
+                                  border: '1px solid rgba(245, 158, 11, 0.2)', 
+                                  padding: '0.5rem 1rem', 
+                                  borderRadius: '6px', 
+                                  color: '#f59e0b', 
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                📤 Enviar
+                              </button>
+                            </ProtectedComponent>
                           )}
                         </div>
                       </td>
@@ -472,20 +487,27 @@ export default function CPEPage() {
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
                 <h3 style={{ marginBottom: '0.5rem' }}>No hay comprobantes</h3>
                 <p style={{ marginBottom: '1.5rem' }}>Comienza creando tu primer comprobante electrónico</p>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#3b82f6',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: '600'
-                  }}
+                <ProtectedComponent
+                  modulo="cpe"
+                  accion="create"
+                  recurso="comprobantes"
+                  fallback={null}
                 >
-                  + Crear Primer CPE
-                </button>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#3b82f6',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    + Crear Primer CPE
+                  </button>
+                </ProtectedComponent>
               </div>
             )}
           </div>

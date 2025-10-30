@@ -1,7 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { EmailService } from '../../shared/email/email.service';
+import { PermissionService } from '../permissions/permission.service';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 export interface LoginDto {
   email: string;
@@ -19,9 +22,14 @@ export interface JwtPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
+    @Inject(forwardRef(() => PermissionService))
+    private readonly permissionService?: PermissionService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -33,6 +41,7 @@ export class AuthService {
 
       // Check if account is locked
       if (user.locked_until && new Date(user.locked_until) > new Date()) {
+        // ✅ A5: Este caso se registrará en el método login cuando capture la excepción
         throw new UnauthorizedException('Cuenta bloqueada temporalmente. Intente más tarde.');
       }
 
@@ -49,6 +58,7 @@ export class AuthService {
 
       // Verificar que el usuario esté activo
       if (user.estado !== 'ACTIVO') {
+        // ✅ A5: Este caso se registrará en el método login cuando capture la excepción
         throw new UnauthorizedException('Usuario inactivo');
       }
 
@@ -63,54 +73,169 @@ export class AuthService {
     }
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
+  // ✅ A5: Método para registrar intentos de login
+  private async logLoginAttempt(data: {
+    email: string;
+    ipAddress: string;
+    userAgent: string;
+    success: boolean;
+    failedReason?: string;
+    tenantId?: string | null;
+  }): Promise<void> {
+    try {
+      const client = this.supabaseService.getClient();
+      await client
+        .from('auth_login_attempts')
+        .insert({
+          user_email: data.email,
+          ip_address: data.ipAddress,
+          user_agent: data.userAgent,
+          success: data.success,
+          failed_reason: data.failedReason || null,
+          tenant_id: data.tenantId || null,
+          created_at: new Date().toISOString(),
+        });
+    } catch (error) {
+      // No bloquear el flujo si falla el registro de intentos
+      this.logger.error('Error registrando intento de login:', error);
+    }
+  }
+
+  // ✅ A5: Verificar si hay demasiados intentos fallidos recientes
+  private async checkFailedAttemptsLimit(email: string, minutesWindow: number = 15, maxAttempts: number = 5): Promise<boolean> {
+    try {
+      const client = this.supabaseService.getClient();
+      const cutoffTime = new Date();
+      cutoffTime.setMinutes(cutoffTime.getMinutes() - minutesWindow);
+
+      const { data: attempts, error } = await client
+        .from('auth_login_attempts')
+        .select('id')
+        .eq('user_email', email)
+        .eq('success', false)
+        .gte('created_at', cutoffTime.toISOString());
+
+      if (error) {
+        this.logger.error('Error verificando intentos fallidos:', error);
+        return false; // No bloquear si hay error en la consulta
+      }
+
+      return (attempts?.length || 0) >= maxAttempts;
+    } catch (error) {
+      this.logger.error('Error en checkFailedAttemptsLimit:', error);
+      return false;
+    }
+  }
+
+  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
+    // ✅ A5: Verificar límite de intentos fallidos antes de procesar
+    const hasTooManyAttempts = await this.checkFailedAttemptsLimit(loginDto.email);
+    if (hasTooManyAttempts) {
+      await this.logLoginAttempt({
+        email: loginDto.email,
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
+        success: false,
+        failedReason: 'Demasiados intentos fallidos recientes',
+        tenantId: null,
+      });
+      throw new UnauthorizedException('Demasiados intentos fallidos. Intente más tarde.');
     }
 
-    // Extract roles from user_roles join
-    const roles = user.user_roles?.map((ur: any) => ({
-      id: ur.roles?.id,
-      nombre: ur.roles?.nombre,
-      descripcion: ur.roles?.descripcion
-    })) || [];
+    try {
+      const user = await this.validateUser(loginDto.email, loginDto.password);
+      if (!user) {
+        // ✅ A5: Registrar intento fallido
+        await this.logLoginAttempt({
+          email: loginDto.email,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          success: false,
+          failedReason: 'Credenciales inválidas',
+          tenantId: null, // No sabemos el tenant si el usuario no existe
+        });
+        
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
 
-    const roleNames = roles.map((r: any) => r.nombre).filter(Boolean);
+      // Extract roles from user_roles join
+      const roles = user.user_roles?.map((ur: any) => ({
+        id: ur.roles?.id,
+        nombre: ur.roles?.nombre,
+        descripcion: ur.roles?.descripcion
+      })) || [];
 
-    // ✅ MULTI-TENANT: Incluir tenant_id y is_super_admin en el JWT
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      username: user.nombre_usuario || user.nombre,
-      roles: roleNames,
-      tenant_id: user.tenant_id,
- // Default tenant
-      is_super_admin: user.is_super_admin || false
-    };
+      const roleNames = roles.map((r: any) => r.nombre).filter(Boolean);
 
-    console.log('🔐 [AUTH] Login exitoso - Tenant:', payload.tenant_id, 'Usuario:', user.email, 'Super-Admin:', payload.is_super_admin, 'Roles:', roleNames);
-
-    // Update last access timestamp
-    await this.updateLastAccess(user.id);
-
-    // Create session
-    const sessionToken = await this.createSession(user.id, user.tenant_id);
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
+      // ✅ MULTI-TENANT: Incluir tenant_id y is_super_admin en el JWT
+      const payload: JwtPayload = {
+        sub: user.id,
         email: user.email,
-        nombre: user.nombre,
-        apellido: user.apellido,
-        nombre_usuario: user.nombre_usuario,
-        roles: roles,
+        username: user.nombre_usuario || user.nombre,
+        roles: roleNames,
         tenant_id: user.tenant_id,
         is_super_admin: user.is_super_admin || false
-      },
-      session_token: sessionToken
-    };
+      };
+
+      console.log('🔐 [AUTH] Login exitoso - Tenant:', payload.tenant_id, 'Usuario:', user.email, 'Super-Admin:', payload.is_super_admin, 'Roles:', roleNames);
+
+      // Update last access timestamp
+      await this.updateLastAccess(user.id);
+
+      // Create session
+      const sessionToken = await this.createSession(user.id, user.tenant_id);
+
+      // ✅ A5: Registrar intento exitoso
+      await this.logLoginAttempt({
+        email: loginDto.email,
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
+        success: true,
+        tenantId: user.tenant_id,
+      });
+
+      return {
+        access_token: this.jwtService.sign(payload),
+        user: {
+          id: user.id,
+          email: user.email,
+          nombre: user.nombre,
+          apellido: user.apellido,
+          nombre_usuario: user.nombre_usuario,
+          roles: roles,
+          tenant_id: user.tenant_id,
+          is_super_admin: user.is_super_admin || false
+        },
+        session_token: sessionToken
+      };
+    } catch (error) {
+      // ✅ A5: Registrar intento fallido con razón específica
+      if (error instanceof UnauthorizedException) {
+        // Obtener tenant_id si el usuario existe (para casos de cuenta bloqueada/inactiva)
+        let tenantIdForLogging: string | null = null;
+        if (error.message.includes('bloqueada') || error.message.includes('inactivo')) {
+          try {
+            const user = await this.findUserByEmail(loginDto.email);
+            if (user) {
+              tenantIdForLogging = user.tenant_id || null;
+            }
+          } catch (e) {
+            // Ignorar errores al obtener tenant_id
+          }
+        }
+
+        const failedReason = error.message || 'Error de autenticación';
+        await this.logLoginAttempt({
+          email: loginDto.email,
+          ipAddress: ipAddress || 'unknown',
+          userAgent: userAgent || 'unknown',
+          success: false,
+          failedReason,
+          tenantId: tenantIdForLogging,
+        });
+      }
+      throw error;
+    }
   }
 
   async validateToken(token: string): Promise<any> {
@@ -158,7 +283,8 @@ export class AuthService {
     }
   }
 
-  private async findUserById(id: string): Promise<any> {
+  // ✅ A3: Método público para validación de usuario en guard
+  async findUserById(id: string): Promise<any> {
     try {
       const client = this.supabaseService.getClient();
       const { data, error } = await client
@@ -259,15 +385,26 @@ export class AuthService {
   }
 
   // Password reset functionality
-  async generatePasswordResetToken(email: string): Promise<string> {
+  async generatePasswordResetToken(email: string, clientIp?: string): Promise<string> {
     try {
+      // ✅ A2: Validar que existe proveedor de email configurado
+      if (!this.emailService.isConfigured()) {
+        this.logger.error('Email service not configured - cannot send password reset');
+        throw new InternalServerErrorException(
+          'Servicio de email no configurado. No es posible enviar reset de contraseña.'
+        );
+      }
+
       const user = await this.findUserByEmail(email);
       if (!user) {
+        // ✅ SEGURIDAD: Log de intento de reset para usuario inexistente
+        this.logger.warn(
+          `Password reset attempt for non-existent user: ${email} from IP: ${clientIp || 'unknown'}`
+        );
         throw new UnauthorizedException('Usuario no encontrado');
       }
 
-      // Generate secure reset token
-      const crypto = require('crypto');
+      // Generate secure reset token (32 bytes = 64 hex characters)
       const resetToken = crypto.randomBytes(32).toString('hex');
       const hashedToken = await bcrypt.hash(resetToken, 10);
 
@@ -276,7 +413,7 @@ export class AuthService {
       expiresAt.setHours(expiresAt.getHours() + 24);
 
       const client = this.supabaseService.getClient();
-      await client
+      const { error } = await client
         .from('usuarios_sistema')
         .update({
           password_reset_token: hashedToken,
@@ -285,40 +422,80 @@ export class AuthService {
         })
         .eq('id', user.id);
 
-      console.log('🔑 [AUTH] Token de reset generado - Usuario:', user.email);
-      return resetToken; // Return unhashed token to send via email
+      if (error) {
+        this.logger.error(`Failed to store reset token for user ${user.email}:`, error);
+        throw new Error('Failed to generate reset token');
+      }
+
+      // ✅ SEGURIDAD: Log exitoso con IP
+      this.logger.log(
+        `Password reset token generated for user: ${user.email} from IP: ${clientIp || 'unknown'}, expires: ${expiresAt.toISOString()}`
+      );
+      
+      // ✅ Enviar email con el token de reset
+      const emailSent = await this.emailService.sendPasswordResetEmail(
+        user.email,
+        user.nombre || user.nombre_usuario || 'Usuario',
+        resetToken,
+        clientIp
+      );
+
+      if (!emailSent) {
+        this.logger.warn(
+          `Failed to send password reset email to ${user.email}. Token generated but not delivered.`
+        );
+        // No throw - el token sigue siendo válido incluso si el email falla
+      }
+      
+      return resetToken; // Return unhashed token (usado internamente, nunca expuesto)
     } catch (error) {
-      console.error('Error generating password reset token:', error);
+      this.logger.error('Error generating password reset token:', error);
       throw error;
     }
   }
 
-  async validatePasswordResetToken(email: string, token: string): Promise<boolean> {
+  async validatePasswordResetToken(email: string, token: string, clientIp?: string): Promise<boolean> {
     try {
       const user = await this.findUserByEmail(email);
       if (!user || !user.password_reset_token || !user.password_reset_expires) {
+        this.logger.warn(
+          `Password reset token validation failed - user not found or no token: ${email} from IP: ${clientIp || 'unknown'}`
+        );
         return false;
       }
 
       // Check if token is expired
       if (new Date(user.password_reset_expires) < new Date()) {
-        console.log('⚠️ [AUTH] Token de reset expirado - Usuario:', user.email);
+        this.logger.warn(
+          `Expired password reset token attempt for user: ${user.email} from IP: ${clientIp || 'unknown'}`
+        );
         return false;
       }
 
       // Validate token
       const isValid = await bcrypt.compare(token, user.password_reset_token);
+      
+      if (!isValid) {
+        this.logger.warn(
+          `Invalid password reset token attempt for user: ${user.email} from IP: ${clientIp || 'unknown'}`
+        );
+      }
+      
       return isValid;
     } catch (error) {
-      console.error('Error validating password reset token:', error);
+      this.logger.error('Error validating password reset token:', error);
       return false;
     }
   }
 
-  async resetPassword(email: string, token: string, newPassword: string): Promise<void> {
+  async resetPassword(email: string, token: string, newPassword: string, clientIp?: string): Promise<void> {
     try {
-      const isValid = await this.validatePasswordResetToken(email, token);
+      // Validate token first
+      const isValid = await this.validatePasswordResetToken(email, token, clientIp);
       if (!isValid) {
+        this.logger.warn(
+          `Failed password reset attempt for email: ${email} from IP: ${clientIp || 'unknown'} - Invalid or expired token`
+        );
         throw new UnauthorizedException('Token inválido o expirado');
       }
 
@@ -327,28 +504,45 @@ export class AuthService {
         throw new UnauthorizedException('Usuario no encontrado');
       }
 
-      // Hash new password
+      // ✅ SEGURIDAD: Hash de contraseña nueva (ya validada por DTO)
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       const client = this.supabaseService.getClient();
-      await client
+      
+      // Update password and clear reset token
+      const { error: updateError } = await client
         .from('usuarios_sistema')
         .update({
           password_hash: hashedPassword,
           password_reset_token: null,
           password_reset_expires: null,
-          failed_login_attempts: 0,
-          locked_until: null,
+          failed_login_attempts: 0, // Reset intentos fallidos
+          locked_until: null, // Desbloquear cuenta si estaba bloqueada
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
 
-      // Revoke all existing sessions
+      if (updateError) {
+        this.logger.error(`Failed to update password for user ${user.email}:`, updateError);
+        throw new Error('Failed to reset password');
+      }
+
+      // ✅ CRÍTICO: Revocar todas las sesiones activas por seguridad
       await this.revokeUserSessions(user.id);
 
-      console.log('✅ [AUTH] Contraseña reseteada - Usuario:', user.email);
+      // ✅ SEGURIDAD: Log exitoso del reset
+      this.logger.log(
+        `Password reset successful for user: ${user.email} from IP: ${clientIp || 'unknown'}. All sessions revoked.`
+      );
+
+      // ✅ Enviar email de confirmación (best practice de seguridad)
+      await this.emailService.sendPasswordResetConfirmationEmail(
+        user.email,
+        user.nombre || user.nombre_usuario || 'Usuario',
+        clientIp
+      );
     } catch (error) {
-      console.error('Error resetting password:', error);
+      this.logger.error(`Error resetting password for email: ${email}`, error);
       throw error;
     }
   }
@@ -404,6 +598,12 @@ export class AuthService {
           tenant_id: targetTenantId,
           timestamp: new Date().toISOString()
         });
+
+      // ✅ B1: Invalidar cache de permisos al cambiar de tenant
+      if (this.permissionService) {
+        this.permissionService.invalidateUserPermissions(userId);
+        this.logger.log(`✅ [B1] Cache de permisos invalidado para usuario ${userId} al cambiar de tenant`);
+      }
 
       console.log('🔄 [AUTH] Tenant switch - Usuario:', user.email, 'De:', user.tenant_id, 'A:', targetTenantId);
 

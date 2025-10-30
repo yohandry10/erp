@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Calendar, CreditCard, Building2, FileText } from 'lucide-react';
 
@@ -384,23 +385,30 @@ export default function PagoProveedorModal({
             >
               Cancelar
             </Button>
-            <Button
-              type="submit"
-              disabled={submitting || loading}
-              className="bg-green-600 hover:bg-green-700 text-white"
+            <ProtectedComponent
+              modulo="finanzas"
+              accion="create"
+              recurso="pagos"
+              fallback={null}
             >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Aplicar Pago
-                </>
-              )}
-            </Button>
+              <Button
+                type="submit"
+                disabled={submitting || loading}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {submitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Aplicar Pago
+                  </>
+                )}
+              </Button>
+            </ProtectedComponent>
           </DialogFooter>
         </form>
       </DialogContent>

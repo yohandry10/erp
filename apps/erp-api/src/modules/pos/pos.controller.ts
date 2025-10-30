@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard } from '../common/guards/permission.guard';
-import { RequirePermission } from '../common/decorators/require-permission.decorator';
-import { FeatureFlagGuard } from '../common/guards/feature-flag.guard';
-import { RequireFeatureFlag } from '../common/decorators/feature-flag.decorator';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
+import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { PosService } from './pos.service';
 
 @Controller('pos')
@@ -89,5 +89,17 @@ export class PosController {
   @RequirePermission('pos.read') // HARDENING: estado de configuración.
   async getConfigurationStatus(@Req() req: any) {
     return this.posService.getConfigurationStatus(req.user);
+  }
+
+  @Get('ventas-pendientes-facturacion')
+  @RequirePermission('pos.read') // HARDENING: consultar ventas pendientes de facturación.
+  async obtenerVentasPendientesFacturacion(@Req() req: any) {
+    return this.posService.obtenerVentasPendientesFacturacion(req.user);
+  }
+
+  @Post('reintentar-facturacion/:ventaId')
+  @RequirePermission('pos.vender') // HARDENING: reintentar facturación requiere permiso de venta.
+  async reintentarFacturacionVenta(@Param('ventaId') ventaId: string, @Req() req: any) {
+    return this.posService.reintentarFacturacionVenta(ventaId, req.user);
   }
 }

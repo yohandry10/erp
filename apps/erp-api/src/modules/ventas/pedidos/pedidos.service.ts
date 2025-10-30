@@ -877,6 +877,51 @@ export class PedidosService {
       anticipo: 0,
     };
   }
+  /**
+   * 🔴 CRÍTICO FIX: Emite evento VentaProcessedEvent cuando se confirma un pedido
+   * Esto asegura que todos los flujos de venta generen asientos contables, no solo cuando se genera factura
+   */
+  private async emitirEventoVentaProcesadaAlConfirmar(
+    pedido: (PedidoVenta & { detalle: PedidoDetalle[] }) & { clientes?: any; cliente?: any },
+    tenantId: string
+  ): Promise<void> {
+    if (!this.eventBus) {
+      return;
+    }
+
+    try {
+      const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
+
+      await this.eventBus.emitVentaProcessed({
+        ventaId: pedido.id,
+        numeroTicket: pedido.numero,
+        clienteId: pedido.cliente_id,
+        clienteNombre:
+          clienteInfo?.razon_social ??
+          clienteInfo?.nombre ??
+          clienteInfo?.denominacion ??
+          'Cliente sin razón social',
+        metodoPago: 'credito', // Pendiente de facturación
+        subtotal: Number(pedido.subtotal ?? 0),
+        impuestos: Number(pedido.igv ?? 0),
+        total: Number(pedido.total ?? 0),
+        items: (pedido.detalle ?? []).map((item) => ({
+          productoId: item.producto_id,
+          cantidad: Number(item.cantidad ?? 0),
+          precio: Number(item.precio_unitario ?? 0),
+          total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
+        })),
+        tenantId,
+      });
+
+      console.log(`✅ [PedidosService] Evento VentaProcessedEvent emitido al confirmar pedido ${pedido.numero}`);
+    } catch (error) {
+      console.error('❌ Error emitiendo evento de venta procesada al confirmar pedido:', error);
+      // No lanzamos error para no bloquear la confirmación del pedido
+      // El outbox pattern garantizará que el evento se procese luego
+    }
+  }
+
   private emitirEventoVentaProcesada(
     pedido: (PedidoVenta & { detalle: PedidoDetalle[] }) & { clientes?: any; cliente?: any },
     factura: { factura_id: string; serie?: string; numero?: number; total: number; fecha_emision?: string; moneda?: string },
@@ -921,6 +966,11 @@ export class PedidosService {
     }
   }
 
+  /**
+   * 🔴 CRÍTICO FIX: Emite evento VentaProcessedEvent cuando se confirma un pedido
+   * Esto asegura que todos los flujos de venta generen asientos contables, no solo cuando se genera factura
+   */
+
   private async registrarAuditoriaAccion(
     pedidoId: string,
     tenantId: string,
@@ -942,7 +992,8 @@ export class PedidosService {
       console.warn(`⚠️ No se pudo registrar auditoría (${action})`, error);
     }
   }
-\n\n  private redondearCantidad(value: number): number {
+
+  private redondearCantidad(value: number): number {
     return Math.round(value * 100) / 100;
   }
 
@@ -1019,6 +1070,24 @@ export class PedidosService {
     // Evaluar políticas de aprobación y crédito
     const evaluacion = await this.evaluarPoliticasAprobacion(pedido, tenantId, config);
 
+    // HARDENING C3: Bloquear completamente cuando crédito está bloqueado
+    // NO se puede confirmar ni con forzarConfirmacion si el crédito está bloqueado
+    if (evaluacion.estadoCredito === 'BLOQUEADO') {
+      await this.registrarSolicitudAprobacion(pedido, tenantId, evaluacion.motivos, evaluacion.estadoCredito);
+
+      await this.enviarNotificacion(tenantId, {
+        type: 'PEDIDO_BLOQUEADO_CREDITO' as any,
+        severity: 'ERROR' as any,
+        title: 'Pedido bloqueado por crédito',
+        message: `El pedido ${pedido.numero} no puede ser confirmado: ${evaluacion.motivos.join('; ')}`,
+        usuario_id: userId,
+      });
+
+      throw new BadRequestException(
+        `NO se puede confirmar el pedido. Crédito bloqueado: ${evaluacion.motivos.join('; ')}`,
+      );
+    }
+
     if (evaluacion.requiereAprobacion && !forzarConfirmacion) {
       await this.registrarSolicitudAprobacion(pedido, tenantId, evaluacion.motivos, evaluacion.estadoCredito);
 
@@ -1077,26 +1146,71 @@ export class PedidosService {
       };
     }
 
-    // Crear reservas
+    // HARDENING C1: Crear reservas usando función atómica con locks
+    // Esto previene race conditions cuando múltiples pedidos reservan el mismo producto
     for (const item of pedido.detalle) {
-      await client.from('movimientos_inventario').insert({
-        tenant_id: tenantId,
-        producto_id: item.producto_id,
-        tipo: 'RESERVA',
-        cantidad: item.cantidad,
-        referencia_tipo: 'PEDIDO',
-        referencia_id: id,
-        notas: `Reserva para pedido ${pedido.numero}`,
-      });
+      try {
+        const { data: movimientoId, error: reservaError } = await client.rpc('reservar_stock_atomico', {
+          p_producto_id: item.producto_id,
+          p_cantidad: item.cantidad,
+          p_referencia_tipo: 'PEDIDO',
+          p_referencia_id: id,
+          p_notas: `Reserva atómica para pedido ${pedido.numero}`,
+        });
 
-      const { error: reservaError } = await client.rpc('incrementar_stock_reservado', {
-        p_producto_id: item.producto_id,
-        p_cantidad: item.cantidad,
-      });
+        if (reservaError) {
+          console.error('❌ Error en reserva atómica de stock:', reservaError);
+          
+          // Si es error de stock insuficiente, retornar warning específico
+          if (reservaError.message?.includes('Stock insuficiente') || reservaError.message?.includes('insufficient')) {
+            throw new BadRequestException(
+              `Stock insuficiente para producto ${item.descripcion}. ${reservaError.message}`,
+            );
+          }
+          
+          throw new BadRequestException(
+            `No se pudo reservar stock para el producto ${item.descripcion}: ${reservaError.message}`,
+          );
+        }
 
-      if (reservaError) {
-        console.error('Error reservando stock:', reservaError);
-        throw new BadRequestException('No se pudo reservar stock para el pedido');
+        console.log(`✅ [PedidosService] Stock reservado atómicamente - Movimiento: ${movimientoId}`);
+      } catch (error) {
+        // Si falla alguna reserva, hacer rollback de las ya creadas
+        console.error('❌ Error reservando stock, iniciando rollback...', error);
+        
+        // Intentar liberar reservas ya creadas para este pedido
+        try {
+          const { data: reservasCreadas } = await client
+            .from('movimientos_inventario')
+            .select('producto_id, cantidad')
+            .eq('referencia_tipo', 'PEDIDO')
+            .eq('referencia_id', id)
+            .eq('tipo', 'RESERVA')
+            .eq('tenant_id', tenantId);
+
+          if (reservasCreadas && reservasCreadas.length > 0) {
+            for (const reserva of reservasCreadas) {
+              await client.rpc('decrementar_stock_reservado', {
+                p_producto_id: reserva.producto_id,
+                p_cantidad: reserva.cantidad,
+              });
+            }
+            
+            // Eliminar movimientos creados
+            await client
+              .from('movimientos_inventario')
+              .delete()
+              .eq('referencia_tipo', 'PEDIDO')
+              .eq('referencia_id', id)
+              .eq('tipo', 'RESERVA')
+              .eq('tenant_id', tenantId);
+          }
+        } catch (rollbackError) {
+          console.error('❌ Error en rollback de reservas:', rollbackError);
+          // Continuar con el error original
+        }
+        
+        throw error;
       }
     }
 
@@ -1128,6 +1242,11 @@ export class PedidosService {
       estado: EstadoPedido.CONFIRMADO,
       estado_credito: estadoCreditoFinal,
     }, 'confirmar_pedido');
+
+    // 🔴 CRÍTICO FIX: Emitir evento VentaProcessedEvent cuando se confirma pedido (no solo cuando se genera factura)
+    // Esto asegura que todos los flujos de venta generen asientos contables
+    const pedidoActualizado = await this.findOne(id, tenantId);
+    await this.emitirEventoVentaProcesadaAlConfirmar(pedidoActualizado, tenantId);
 
     if (config.usar_flujo_logistica === false) {
       await this.updateEstado(id, EstadoPedido.LISTO_FACTURAR, tenantId);

@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
-import { EventBusService, RecepcionRegistradaEvent } from '../../../shared/events/event-bus.service';
+import { EventBusService, RecepcionRegistradaEvent, CompraEntregadaEvent } from '../../../shared/events/event-bus.service';
 
 @Injectable()
 export class RecepcionesService {
@@ -235,8 +235,9 @@ export class RecepcionesService {
       for (const item of recepcion.items) {
         // Solo procesar items con calidad OK u OBSERVADO
         if (item.calidad === CalidadRecepcion.OK || item.calidad === CalidadRecepcion.OBSERVADO) {
-          // Crear movimiento de inventario (INGRESO_COMPRA)
-          await this.inventarioService.registrarMovimientoAlmacen({
+          // 🔴 CRÍTICO FIX (Tarea 14): Usar función atómica que garantiza que el stock se actualice correctamente
+          // Esta función RPC hace todo en una transacción: registra movimiento + actualiza stock + valida
+          const movimientoId = await this.inventarioService.registrarEntradaStockAtomico({
             tenantId,
             productoId: item.producto_id,
             almacenId: item.almacen_id,
@@ -250,7 +251,10 @@ export class RecepcionesService {
             fechaExpiracion: item.fecha_expiracion,
           });
 
-          console.log(`✅ Movimiento de inventario creado para producto ${item.producto_id}`);
+          console.log(
+            `✅ Movimiento de inventario creado atómicamente para producto ${item.producto_id} ` +
+            `(Movimiento ID: ${movimientoId})`
+          );
         }
 
         // Actualizar cantidad_recibida en orden_compra_detalles
@@ -284,6 +288,26 @@ export class RecepcionesService {
       // Actualizar estado de la orden de compra
       await this.actualizarEstadoOrden(recepcion.orden_id, tenantId);
 
+      // Obtener orden completa para eventos
+      const { data: orden, error: ordenError } = await this.supabase.getClient()
+        .from('ordenes_compra')
+        .select(`
+          *,
+          proveedor:proveedores(
+            id,
+            razon_social,
+            ruc
+          )
+        `)
+        .eq('tenant_id', tenantId)
+        .eq('id', recepcion.orden_id)
+        .single();
+
+      if (ordenError) {
+        console.error('⚠️ Error obteniendo orden para eventos:', ordenError);
+        // No bloquear el cierre de recepción si falla obtener orden
+      }
+
       // Cerrar la recepción
       const { error: cerrarError } = await this.supabase.getClient()
         .from('recepciones')
@@ -305,6 +329,13 @@ export class RecepcionesService {
 
       // Emitir evento RecepcionRegistrada para integración con CxP
       await this.emitirEventoRecepcionRegistrada(recepcionId, tenantId);
+
+      // 🔴 CRÍTICO FIX: Emitir evento CompraEntregadaEvent para contabilidad
+      if (orden) {
+        await this.emitirEventoCompraEntregada(recepcion, orden, tenantId);
+      } else {
+        console.warn('⚠️ No se pudo obtener orden para emitir evento CompraEntregadaEvent');
+      }
 
       return this.obtenerRecepcionPorId(recepcionId, tenantId);
     } catch (error) {
@@ -488,28 +519,95 @@ export class RecepcionesService {
         moneda: orden.moneda || 'PEN',
         diasCredito: orden.proveedor.dias_credito,
         condicionesPago: orden.proveedor.condiciones_pago,
-        items: recepcion.items.map(item => ({
-          productoId: item.producto_id,
-          descripcion: item.producto?.nombre || 'Producto',
-          cantidadRecibida: item.cantidad_recibida,
-          precioUnitario: 0, // TODO: Obtener precio de orden_compra_detalles
-          total: 0, // TODO: Calcular desde orden_compra_detalles
-          calidad: item.calidad,
-          lote: item.lote,
-          serie: item.serie,
-          ubicacionId: item.ubicacion_id,
+        items: await Promise.all(recepcion.items.map(async (item: any) => {
+          // Obtener precio de orden_compra_detalles
+          const { data: detalleOrden } = await this.supabase.getClient()
+            .from('orden_compra_detalles')
+            .select('precio_unitario, cantidad')
+            .eq('id', item.detalle_id)
+            .single();
+
+          const precioUnitario = detalleOrden ? Number(detalleOrden.precio_unitario || 0) : 0;
+          const total = precioUnitario * Number(item.cantidad_recibida || 0);
+
+          return {
+            productoId: item.producto_id,
+            descripcion: item.producto?.nombre || 'Producto',
+            cantidadRecibida: item.cantidad_recibida,
+            precioUnitario,
+            total,
+            calidad: item.calidad,
+            lote: item.lote,
+            serie: item.serie,
+            ubicacionId: item.ubicacion_id,
+          };
         })),
         tenantId,
       };
 
       // Emitir el evento
-      this.eventBus.emitRecepcionRegistrada(eventData);
-
-      console.log(`✅ Evento RecepcionRegistrada emitido exitosamente`);
+      // 🟡 MEJORA MEDIA: Manejo de errores en eventos para no bloquear operaciones críticas
+      try {
+        this.eventBus.emitRecepcionRegistrada(eventData);
+        console.log(`✅ Evento RecepcionRegistrada emitido exitosamente`);
+      } catch (error) {
+        console.error('❌ Error emitiendo evento RecepcionRegistrada:', error);
+        // No lanzamos el error para no bloquear el cierre de la recepción
+        // En producción, esto debería ir a un sistema de monitoreo
+      }
     } catch (error) {
       console.error('❌ Error emitiendo evento RecepcionRegistrada:', error);
       // No lanzamos el error para no bloquear el cierre de la recepción
       // En producción, esto debería ir a un sistema de monitoreo
+    }
+  }
+
+  /**
+   * 🔴 CRÍTICO FIX: Emite evento CompraEntregadaEvent para contabilidad
+   * Se llama cuando se cierra una recepción para generar asientos contables automáticos
+   */
+  private async emitirEventoCompraEntregada(
+    recepcion: any,
+    orden: any,
+    tenantId: string
+  ): Promise<void> {
+    try {
+      // Obtener items de la recepción con precios de la orden
+      const itemsWithPrices = [];
+      for (const item of recepcion.items || []) {
+        const { data: detalleOrden } = await this.supabase.getClient()
+          .from('orden_compra_detalles')
+          .select('precio_unitario, cantidad')
+          .eq('id', item.detalle_id)
+          .single();
+
+        if (detalleOrden) {
+          itemsWithPrices.push({
+            productoId: item.producto_id,
+            cantidad: item.cantidad_recibida,
+            precioUnitario: Number(detalleOrden.precio_unitario || 0),
+            total: Number(detalleOrden.precio_unitario || 0) * Number(item.cantidad_recibida || 0),
+          });
+        }
+      }
+
+      const eventData: CompraEntregadaEvent = {
+        ordenId: orden.id,
+        numeroOrden: orden.numero,
+        proveedorId: orden.proveedor?.id || orden.proveedor_id,
+        proveedorNombre: orden.proveedor?.razon_social || 'Proveedor',
+        fechaEntrega: recepcion.fecha_recepcion,
+        total: Number(orden.total || 0),
+        items: itemsWithPrices,
+        tenantId,
+      };
+
+      await this.eventBus.emitCompraEntregada(eventData);
+      console.log(`✅ Evento CompraEntregadaEvent emitido para orden ${orden.numero}`);
+    } catch (error) {
+      console.error('❌ Error emitiendo evento CompraEntregadaEvent:', error);
+      // No lanzamos el error para no bloquear el cierre de la recepción
+      // El outbox pattern garantizará que el evento se procese luego
     }
   }
 }

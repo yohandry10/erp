@@ -5,7 +5,8 @@ import {
   UseGuards,
   Request,
   Get,
-  UnauthorizedException
+  UnauthorizedException,
+  Logger
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -13,10 +14,17 @@ import { AuthService, LoginDto } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { AuthRateLimitGuard } from '../../shared/security/guards/auth-rate-limit.guard';
+import { 
+  RequestPasswordResetDto, 
+  ValidatePasswordResetDto, 
+  ResetPasswordDto 
+} from './dto';
 
 @ApiTags('Autenticación')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+  
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
@@ -26,8 +34,12 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login exitoso' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
   @ApiResponse({ status: 429, description: 'Demasiados intentos' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Request() req) {
+    // ✅ A5: Extraer IP y user-agent para registro de intentos
+    const clientIp = req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    return this.authService.login(loginDto, clientIp, userAgent);
   }
 
   @Get('profile')
@@ -88,47 +100,74 @@ export class AuthController {
 
   @Post('password-reset/request')
   @Throttle(3, 60) // 3 requests per minute
-  @ApiOperation({ summary: 'Solicitar reset de contraseña' })
-  @ApiResponse({ status: 200, description: 'Token de reset enviado' })
-  @ApiResponse({ status: 401, description: 'Usuario no encontrado' })
-  async requestPasswordReset(@Body('email') email: string) {
-    const token = await this.authService.generatePasswordResetToken(email);
-    // In production, send token via email instead of returning it
-    return {
-      message: 'Si el email existe, recibirás un enlace de reset',
-      // TODO: Remove token from response in production
-      token: process.env.NODE_ENV === 'development' ? token : undefined
-    };
+  @ApiOperation({ 
+    summary: 'Solicitar reset de contraseña',
+    description: 'Genera un token de reset y lo envía al email del usuario (si existe). Por seguridad, siempre retorna el mismo mensaje.'
+  })
+  @ApiResponse({ status: 200, description: 'Solicitud procesada. Si el email existe, recibirás un enlace de reset.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto, @Request() req) {
+    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+    
+    try {
+      await this.authService.generatePasswordResetToken(dto.email, clientIp);
+      
+      // ✅ SEGURIDAD: Siempre retornar el mismo mensaje, nunca exponer el token
+      // Esto previene enumerar usuarios válidos
+      return {
+        message: 'Si el email existe en nuestro sistema, recibirás un enlace de reset de contraseña.'
+      };
+    } catch (error) {
+      // ✅ SEGURIDAD: Log del error sin exponer detalles al cliente
+      this.logger.warn(`Password reset request failed for email: ${dto.email} from IP: ${clientIp}`);
+      
+      // Retornar mismo mensaje para no revelar si el usuario existe
+      return {
+        message: 'Si el email existe en nuestro sistema, recibirás un enlace de reset de contraseña.'
+      };
+    }
   }
 
   @Post('password-reset/validate')
   @Throttle(5, 60)
-  @ApiOperation({ summary: 'Validar token de reset' })
+  @ApiOperation({ 
+    summary: 'Validar token de reset',
+    description: 'Verifica si un token de reset es válido y no ha expirado'
+  })
   @ApiResponse({ status: 200, description: 'Token válido' })
   @ApiResponse({ status: 401, description: 'Token inválido o expirado' })
-  async validatePasswordResetToken(
-    @Body('email') email: string,
-    @Body('token') token: string
-  ) {
-    const isValid = await this.authService.validatePasswordResetToken(email, token);
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  async validatePasswordResetToken(@Body() dto: ValidatePasswordResetDto, @Request() req) {
+    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+    
+    const isValid = await this.authService.validatePasswordResetToken(dto.email, dto.token, clientIp);
     if (!isValid) {
+      this.logger.warn(`Invalid password reset token attempt for email: ${dto.email} from IP: ${clientIp}`);
       throw new UnauthorizedException('Token inválido o expirado');
     }
+    
     return { valid: true };
   }
 
   @Post('password-reset/confirm')
   @Throttle(3, 60)
-  @ApiOperation({ summary: 'Confirmar reset de contraseña' })
-  @ApiResponse({ status: 200, description: 'Contraseña actualizada' })
+  @ApiOperation({ 
+    summary: 'Confirmar reset de contraseña',
+    description: 'Cambia la contraseña del usuario usando el token de reset. Revoca todas las sesiones activas.'
+  })
+  @ApiResponse({ status: 200, description: 'Contraseña actualizada exitosamente. Todas las sesiones han sido revocadas.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o contraseña no cumple requisitos de seguridad' })
   @ApiResponse({ status: 401, description: 'Token inválido o expirado' })
-  async resetPassword(
-    @Body('email') email: string,
-    @Body('token') token: string,
-    @Body('newPassword') newPassword: string
-  ) {
-    await this.authService.resetPassword(email, token, newPassword);
-    return { message: 'Contraseña actualizada exitosamente' };
+  async resetPassword(@Body() dto: ResetPasswordDto, @Request() req) {
+    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+    
+    await this.authService.resetPassword(dto.email, dto.token, dto.newPassword, clientIp);
+    
+    this.logger.log(`Password reset successful for email: ${dto.email} from IP: ${clientIp}`);
+    
+    return { 
+      message: 'Contraseña actualizada exitosamente. Por seguridad, todas tus sesiones activas han sido cerradas. Por favor, inicia sesión nuevamente.'
+    };
   }
 
   @Post('switch-tenant')

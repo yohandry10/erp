@@ -5,9 +5,10 @@ import { IntegrationModule } from '../../shared/integration/integration.module';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { LogisticaModule } from './logistica/logistica.module';
 import { AlmacenesModule } from './almacenes/almacenes.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [IntegrationModule, SupabaseModule, LogisticaModule, AlmacenesModule],
+  imports: [IntegrationModule, SupabaseModule, LogisticaModule, AlmacenesModule, AuditModule],
   controllers: [InventarioController],
   providers: [InventarioService],
   exports: [InventarioService, LogisticaModule, AlmacenesModule]

@@ -28,6 +28,7 @@
   
   --emerald-50: #ecfdf5;
   --emerald-100: #d1fae5;
+  --emerald-400: #34d399;
   --emerald-500: #10b981;
   --emerald-600: #059669;
   --emerald-700: #047857;
@@ -35,8 +36,13 @@
   --amber-500: #f59e0b;
   --amber-600: #d97706;
   
+  --red-50: #fef2f2;
+  --red-100: #fee2e2;
+  --red-200: #fecaca;
+  --red-400: #f87171;
   --red-500: #ef4444;
   --red-600: #dc2626;
+  --red-700: #b91c1c;
   
   --success: #22c55e;
   --warning: #eab308;
@@ -1178,20 +1184,13 @@ label {
   border-left: 4px solid var(--blue-500);
 }
 
-/* Responsive para modales */
-@media (max-width: 640px) {
-  .modal-content {
-    width: 95%;
-    padding: 1.5rem;
-  }
-  
-  .modal-actions {
-    flex-direction: column;
-  }
-  
-  .modal-grid {
-    grid-template-columns: 1fr;
-  }
+/* Utilidades para estilos inline consistentes */
+.modal-overlay {
+  background: rgba(15, 23, 42, 0.8) !important; /* Usar --primary-900 con opacidad */
+}
+
+.modal-content {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%) !important;
 }
 
 /* ==============================

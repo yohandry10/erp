@@ -18,6 +18,20 @@ export class TenantManagementService {
   async createTenant(tenantData: CreateTenantDto) {
     const client = this.supabase.getClient();
 
+    // ✅ F2: Validar unicidad de RUC por país
+    const { data: existingTenantByRuc } = await client
+      .from('empresa_config')
+      .select('tenant_id, razon_social')
+      .eq('ruc', tenantData.ruc)
+      .eq('pais', tenantData.pais || 'PE')
+      .maybeSingle();
+
+    if (existingTenantByRuc) {
+      throw new ConflictException(
+        `Ya existe un tenant con RUC ${tenantData.ruc} en el país ${tenantData.pais || 'PE'}. Razón Social: ${existingTenantByRuc.razon_social}`
+      );
+    }
+
     // Validate email uniqueness
     const { data: existingTenant } = await client
       .from('empresa_config')
@@ -374,9 +388,70 @@ export class TenantManagementService {
   /**
    * Deactivate tenant and revoke all sessions
    * Requirements: 1.6
+   * 🔴 CRÍTICO FIX: Valida que el tenant tenga al menos un admin antes de desactivar
    */
   async deactivateTenant(tenantId: string) {
     const client = this.supabase.getClient();
+
+    // 🔴 CRÍTICO FIX: Validar que el tenant tenga al menos un admin activo antes de desactivar
+    // Primero obtener el ID del rol ADMIN del tenant
+    const { data: adminRole, error: roleError } = await client
+      .from('roles')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('nombre', 'ADMIN')
+      .single();
+
+    if (roleError || !adminRole) {
+      console.error('Error obteniendo rol ADMIN del tenant:', roleError);
+      throw new BadRequestException(
+        'No se puede desactivar el tenant porque no se encontró el rol ADMIN. ' +
+        'El tenant podría estar en un estado inconsistente.'
+      );
+    }
+
+    // Obtener usuarios con rol ADMIN y filtrar por tenant_id y estado en JavaScript
+    // (más robusto que filtrar relaciones anidadas en Supabase PostgREST)
+    const { data: adminUserRoles, error: adminError } = await client
+      .from('user_roles')
+      .select(`
+        usuario_sistema_id,
+        usuarios_sistema (
+          id,
+          estado,
+          tenant_id
+        )
+      `)
+      .eq('role_id', adminRole.id);
+
+    if (adminError) {
+      console.error('Error verificando admins del tenant:', adminError);
+      throw new BadRequestException('No se pudo verificar los administradores del tenant');
+    }
+
+    // Filtrar usuarios activos del tenant con rol ADMIN
+    const activeAdmins = (adminUserRoles || [])
+      .map(ur => ur.usuarios_sistema)
+      .filter((user: any) => 
+        user && 
+        user.tenant_id === tenantId && 
+        user.estado === 'ACTIVO'
+      );
+
+    const activeAdminsCount = activeAdmins.length;
+
+    if (activeAdminsCount === 0) {
+      throw new BadRequestException(
+        'No se puede desactivar el tenant porque no tiene al menos un administrador activo. ' +
+        'El tenant quedaría sin acceso administrativo y no se podría reactivar fácilmente.'
+      );
+    }
+
+    if (activeAdminsCount === 1) {
+      console.warn(
+        `⚠️ [TENANT-MGMT] Tenant ${tenantId} solo tiene 1 admin activo. Desactivar dejará al tenant sin admins.`
+      );
+    }
 
     // Update estado to 'INACTIVO'
     const { data: tenant, error } = await client
@@ -404,7 +479,7 @@ export class TenantManagementService {
       // Continue even if session revocation fails
     }
 
-    console.log('🔒 [TENANT-MGMT] Tenant desactivado y sesiones revocadas - ID:', tenantId);
+    console.log(`🔒 [TENANT-MGMT] Tenant desactivado y sesiones revocadas - ID: ${tenantId} (${activeAdminsCount} admins activos)`);
     return tenant;
   }
 

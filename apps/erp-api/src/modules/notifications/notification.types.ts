@@ -21,7 +21,8 @@ export enum NotificationType {
   // Purchase orders
   OC_REQUIERE_APROBACION = 'oc_requiere_aprobacion',
   OC_APROBADA = 'oc_aprobada',
-  OC_RECHAZADA = 'oc_rechazada'
+  OC_RECHAZADA = 'oc_rechazada',
+  OC_CANCELADA = 'oc_cancelada'
 }
 
 export enum NotificationSeverity {

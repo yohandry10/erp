@@ -17,7 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
-import { CurrentUser } from '../auth/current-user.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../auth/user.interface';
 
 @ApiTags('cpe')
@@ -38,9 +38,10 @@ export class CpeController {
   async create(
     @Body() createFacturaDto: CreateFacturaDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
   ): Promise<FacturaDto> {
     // HARDENING: usamos tenant del contexto, nunca valores de request sin validar.
-    return this.cpeService.create(createFacturaDto, tenantId);
+    return this.cpeService.create(createFacturaDto, tenantId, userId);
   }
 
   @Get()

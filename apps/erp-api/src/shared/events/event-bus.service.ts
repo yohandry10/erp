@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'events';
+import { OutboxService } from '../outbox/outbox.service';
 
 export interface ERPEvent {
   type: string;
@@ -507,12 +508,12 @@ export interface DashboardMetricsUpdatedEvent {
 export class EventBusService {
   private eventEmitter = new EventEmitter();
 
-  constructor() {
+  constructor(private readonly outboxService?: OutboxService) {
     this.eventEmitter.setMaxListeners(200); // Aumentamos el límite para más listeners
   }
 
-  // Emitir eventos
-  emit(eventType: string, data: any, module: string = 'unknown') {
+  // Emitir eventos con persistencia en outbox (Outbox Pattern)
+  async emit(eventType: string, data: any, module: string = 'unknown', tenantId?: string) {
     const event: ERPEvent = {
       type: eventType,
       data,
@@ -524,6 +525,20 @@ export class EventBusService {
     console.log(`🎯 [EventBus] Datos del evento:`, data);
     console.log(`🎯 [EventBus] Listeners registrados para ${eventType}:`, this.eventEmitter.listenerCount(eventType));
     
+    // 🔴 CRÍTICO FIX: Persistir evento en outbox antes de emitirlo
+    // Esto garantiza que el evento no se pierda si el servicio se reinicia
+    if (this.outboxService && tenantId) {
+      try {
+        await this.outboxService.persistEvent(tenantId, eventType, event.data);
+        console.log(`✅ [EventBus] Evento ${eventType} persistido en outbox`);
+      } catch (error) {
+        console.error(`❌ [EventBus] Error persistiendo evento en outbox:`, error);
+        // Continuar con emisión aunque falle persistencia (degradación controlada)
+        // El worker procesará eventos pendientes luego
+      }
+    }
+    
+    // Emitir evento en memoria (para listeners síncronos)
     this.eventEmitter.emit(eventType, event);
     
     console.log(`✅ [EventBus] Evento ${eventType} emitido exitosamente`);
@@ -538,8 +553,8 @@ export class EventBusService {
   // ========== EMISORES DE EVENTOS ==========
 
   // Eventos de ventas y facturación
-  emitVentaProcessed(data: VentaProcessedEvent) {
-    this.emit('venta.procesada', data, 'pos');
+  async emitVentaProcessed(data: VentaProcessedEvent) {
+    await this.emit('venta.procesada', data, 'ventas', data.tenantId);
   }
 
   emitComprobanteCreadoEvent(data: ComprobanteCreadoEvent) {
@@ -547,11 +562,11 @@ export class EventBusService {
   }
 
   // HARDENING: evento granular para pipeline de finanzas/contabilidad.
-  emitFacturaEmitidaEvent(data: FacturaEmitidaEvent) {
+  async emitFacturaEmitidaEvent(data: FacturaEmitidaEvent) {
     if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey) {
       throw new Error('FacturaEmitidaEvent requiere eventId, tenantId e idempotencyKey');
     }
-    this.emit('factura.emitida', data, 'ventas');
+    await this.emit('factura.emitida', data, 'ventas', data.tenantId);
   }
 
   // HARDENING: notifica creación automática de CxC.
@@ -575,8 +590,8 @@ export class EventBusService {
     this.emit('stock.movimiento', data, 'inventario');
   }
 
-  emitProductoStockBajo(data: ProductoStockBajoEvent) {
-    this.emit('producto.stock.bajo', data, 'inventario');
+  async emitProductoStockBajo(data: ProductoStockBajoEvent, tenantId?: string) {
+    await this.emit('producto.stock.bajo', data, 'inventario', tenantId);
   }
 
   emitInventarioCiclico(data: InventarioCiclicoEvent) {
@@ -585,7 +600,7 @@ export class EventBusService {
 
   // Eventos de compras
   emitCompraEntregada(data: CompraEntregadaEvent) {
-    this.emit('compra.entregada', data, 'compras');
+    this.emit('compra.entregada', data, 'compras', data.tenantId);
   }
 
   emitOrdenCompraAprobada(data: OrdenCompraAprobadaEvent) {
@@ -593,7 +608,7 @@ export class EventBusService {
   }
 
   emitRecepcionRegistrada(data: RecepcionRegistradaEvent) {
-    this.emit('recepcion.registrada', data, 'compras');
+    this.emit('recepcion.registrada', data, 'compras', data.tenantId);
   }
 
   emitDevolucionProveedorEmitida(data: DevolucionProveedorEmitidaEvent) {
