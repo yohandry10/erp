@@ -5,13 +5,17 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { DashboardMetricsService } from './dashboard/dashboard-metrics.service';
 
 @ApiTags('dashboard')
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class DashboardController {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly dashboardMetrics: DashboardMetricsService
+  ) {}
   
   @Post('seed-test-data')
   @RequirePermission('system.debug')
@@ -152,6 +156,11 @@ export class DashboardController {
         message: 'Error creando datos de prueba',
         error: error.message
       };
+    } finally {
+      // Invalidar cache después de crear datos de prueba para reflejar cambios
+      if (tenantId) {
+        await this.dashboardMetrics.invalidateTenantCache(tenantId);
+      }
     }
   }
   
@@ -161,227 +170,11 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@CurrentTenant() tenantId: string) {
     try {
-      console.log('📊 [Dashboard Controller] Obteniendo métricas para tenant:', tenantId);
-      
-      const client = this.supabase.getClient();
-      
-      // Obtener fechas para filtros (misma lógica que compras.controller.ts)
-      const hoy = new Date();
-      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      inicioMes.setHours(0, 0, 0, 0);
-      const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-      finMes.setHours(23, 59, 59, 999);
-      const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-      inicioHoy.setHours(0, 0, 0, 0);
-      
-      console.log('📅 [Dashboard] Filtros de fecha:', {
-        inicioMes: inicioMes.toISOString().split('T')[0],
-        finMes: finMes.toISOString().split('T')[0],
-        hoy: inicioHoy.toISOString().split('T')[0]
-      });
-      
-      // CONSULTA DIRECTA CPE - Igual que en el controlador CPE
-      console.log('🔍 [Dashboard] Consultando CPE directamente...');
-      const { data: cpeDirecto, error: cpeDirectoError } = await client
-        .from('cpe')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      console.log('📊 [Dashboard] CPE DIRECTO - Total encontrados:', cpeDirecto?.length);
-      console.log('📊 [Dashboard] CPE DIRECTO - Error:', cpeDirectoError);
-      
-      if (cpeDirecto && cpeDirecto.length > 0) {
-        const totalCpe = cpeDirecto.reduce((sum, cpe) => sum + (parseFloat(cpe.total_venta) || 0), 0);
-        console.log('💰 [Dashboard] CPE DIRECTO - Total suma:', totalCpe);
-        console.log('🔍 [Dashboard] CPE DIRECTO - Primer registro:', cpeDirecto[0]);
-      }
+      // Usar servicio con cache
+      const estadisticas = await this.dashboardMetrics.getStats(tenantId);
 
-      // Consultas en paralelo para obtener datos reales
-      const [
-        // CPE (Ingresos reales del mes)
-        cpeResult,
-        cpeHoyResult,
-        
-        // GRE (Guías de remisión)
-        greResult,
-        
-        // Productos e inventario
-        productosResult,
-        
-        // Compras (SIN FILTRO DE FECHA - datos de prueba tienen fechas futuras)
-        comprasTodasResult,
-        
-        // Usuarios
-        usuariosResult,
-        
-        // Cotizaciones
-        cotizacionesResult,
-        cotizacionesPendientesResult,
-        
-        // SIRE
-        sireResult
-      ] = await Promise.allSettled([
-        // CPE - FILTRADO POR TENANT
-        client.from('cpe')
-          .select('total_venta, created_at, tenant_id')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false }),
-          
-        // CPE de hoy - FILTRADO POR TENANT
-        client.from('cpe')
-          .select('total_venta')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', inicioHoy.toISOString()),
-          
-        // GRE - FILTRADO POR TENANT
-        client.from('gre_guias')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', inicioMes.toISOString()),
-          
-        // Productos - FILTRADO POR TENANT
-        client.from('productos')
-          .select('id, precio, stock, stock_minimo')
-          .eq('tenant_id', tenantId),
-          
-        // Compras - FILTRADO POR TENANT
-        client.from('ordenes_compra')
-          .select('total, estado, fecha_orden, created_at')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false }),
-          
-        // Usuarios - FILTRADO POR TENANT
-        client.from('usuarios_sistema')
-          .select('id')
-          .eq('tenant_id', tenantId),
-          
-        // Cotizaciones del mes - FILTRADO POR TENANT
-        client.from('cotizaciones')
-          .select('id, estado')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', inicioMes.toISOString()),
-          
-        // Cotizaciones pendientes - FILTRADO POR TENANT
-        client.from('cotizaciones')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('estado', 'PENDIENTE'),
-          
-        // SIRE - FILTRADO POR TENANT
-        client.from('sire_files')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', inicioMes.toISOString())
-      ]);
-
-      // Procesar resultados de forma segura con logging de errores
-      const cpeData = cpeResult.status === 'fulfilled' ? cpeResult.value.data : [];
-      const cpeHoyData = cpeHoyResult.status === 'fulfilled' ? cpeHoyResult.value.data : [];
-      const greData = greResult.status === 'fulfilled' ? greResult.value.data : [];
-      const productosData = productosResult.status === 'fulfilled' ? productosResult.value.data : [];
-      const comprasData = comprasTodasResult.status === 'fulfilled' ? comprasTodasResult.value.data : [];
-      const usuariosData = usuariosResult.status === 'fulfilled' ? usuariosResult.value.data : [];
-      const cotizacionesData = cotizacionesResult.status === 'fulfilled' ? cotizacionesResult.value.data : [];
-      const cotizacionesPendientesData = cotizacionesPendientesResult.status === 'fulfilled' ? cotizacionesPendientesResult.value.data : [];
-      const sireData = sireResult.status === 'fulfilled' ? sireResult.value.data : [];
-
-      // Log de errores si los hay
-      if (cpeResult.status === 'rejected') {
-        console.error('❌ [Dashboard] Error en consulta CPE:', cpeResult.reason);
-      } else {
-        console.log('✅ [Dashboard] CPE consulta exitosa:', { 
-          data: cpeResult.value?.data?.length, 
-          error: cpeResult.value?.error 
-        });
-      }
-      
-      if (cpeHoyResult.status === 'rejected') {
-        console.error('❌ [Dashboard] Error en consulta CPE HOY:', cpeHoyResult.reason);
-      }
-      
-      if (greResult.status === 'rejected') {
-        console.error('❌ [Dashboard] Error en consulta GRE:', greResult.reason);
-      }
-      if (sireResult.status === 'rejected') {
-        console.error('❌ [Dashboard] Error en consulta SIRE:', sireResult.reason);
-      }
-
-      // DEBUG: Logging para todos los módulos
-      console.log('🔍 [Dashboard] DEBUG Resultados de consultas:');
-      console.log('- CPE datos:', { 
-        cantidad: cpeData?.length, 
-        primeros3: cpeData?.slice(0, 3)?.map(c => ({ total_venta: c.total_venta, fecha: c.created_at })),
-        totalSuma: cpeData?.reduce((sum, c) => sum + (parseFloat(c.total_venta) || 0), 0)
-      });
-      console.log('- GRE datos:', { cantidad: greData?.length, datos: greData });
-      console.log('- SIRE datos:', { cantidad: sireData?.length, datos: sireData });
-      console.log('- Compras datos:', { cantidad: comprasData?.length, primeras3: comprasData?.slice(0, 3) });
-      console.log('- Productos datos:', { cantidad: productosData?.length });
-      console.log('- Usuarios datos:', { cantidad: usuariosData?.length });
-      console.log('- Cotizaciones datos:', { cantidad: cotizacionesData?.length });
-
-      // Calcular métricas reales (usar total_venta para CPE)
-      const ingresosMes = this.sumarTotalesCpe(cpeData); // Los ingresos reales vienen de CPE
-      const ingresosHoy = this.sumarTotalesCpe(cpeHoyData);
-      const inversionCompras = this.sumarTotales(comprasData); // TODAS las compras (datos de prueba)
-      const totalProductos = productosData?.length || 0;
-      const valorInventario = this.calcularValorInventario(productosData);
-      const productosStockBajo = this.contarProductosStockBajo(productosData);
-      const comprasPendientes = comprasData?.filter(c => c.estado === 'PENDIENTE').length || 0;
-
-      // Calcular tasa de conversión de cotizaciones
-      const totalCotizaciones = cotizacionesData?.length || 0;
-      const cotizacionesAceptadas = cotizacionesData?.filter(c => c.estado === 'ACEPTADA').length || 0;
-      const tasaConversion = totalCotizaciones > 0 ? 
-        ((cotizacionesAceptadas / totalCotizaciones) * 100) : 0;
-
-      const estadisticas = {
-        // Métricas principales (datos reales)
-        totalCpe: cpeData?.length || 0,
-        totalGre: greData?.length || 0,
-        totalSire: sireData?.length || 0,
-        totalUsers: usuariosData?.length || 0,
-        totalInventario: totalProductos,
-        totalCompras: comprasData?.length || 0, // Cantidad de compras del mes
-        totalCotizaciones: totalCotizaciones,
-        
-        // Métricas financieras (datos reales)
-        ventasMes: ingresosMes, // Los ingresos reales del mes desde CPE
-        ventasHoy: ingresosHoy, // Los ingresos de hoy desde CPE
-        comprasMes: inversionCompras, // Total invertido en compras (todas - datos de prueba)
-        valorInventario: valorInventario, // Valor calculado del inventario
-        
-        // Indicadores de gestión (datos reales)
-        productosConStockBajo: productosStockBajo, // Solo productos con stock bajo real
-        cotizacionesPendientes: cotizacionesPendientesData?.length || 0,
-        ordenesCompraPendientes: comprasPendientes,
-        movimientosHoy: 0, // Por implementar
-        
-        // Ratios y porcentajes (datos reales)
-        tasaConversionCotizaciones: Number(tasaConversion.toFixed(1)),
-        crecimientoVentas: 0, // Por implementar comparativa mes anterior
-        
-        // Metadatos
-        ultimaActualizacion: new Date().toISOString(),
-        periodoCalculado: {
-          inicio: inicioMes.toISOString().split('T')[0],
-          fin: finMes.toISOString().split('T')[0]
-        }
-      };
-
-      console.log('✅ [Dashboard Controller] Estadísticas reales obtenidas:', {
-        ingresosMes: estadisticas.ventasMes,
-        inversionCompras: estadisticas.comprasMes,
-        cantidadCompras: estadisticas.totalCompras,
-        productos: estadisticas.totalInventario,
-        productosStockBajo: estadisticas.productosConStockBajo,
-        cpe: estadisticas.totalCpe,
-        gre: estadisticas.totalGre,
-        usuarios: estadisticas.totalUsers
-      });
-
-    return {
-      success: true,
+      return {
+        success: true,
         data: estadisticas
       };
     } catch (error) {
@@ -390,23 +183,23 @@ export class DashboardController {
       // Devolver estructura por defecto en caso de error
       return {
         success: false,
-      data: {
-        totalCpe: 0,
-        totalGre: 0,
-        totalSire: 0,
-        totalUsers: 0,
-        totalInventario: 0,
-        totalCompras: 0,
-        totalCotizaciones: 0,
-        ventasMes: 0,
+        data: {
+          totalCpe: 0,
+          totalGre: 0,
+          totalSire: 0,
+          totalUsers: 0,
+          totalInventario: 0,
+          totalCompras: 0,
+          totalCotizaciones: 0,
+          ventasMes: 0,
           ventasHoy: 0,
-        comprasMes: 0,
+          comprasMes: 0,
           valorInventario: 0,
-        productosConStockBajo: 0,
-        cotizacionesPendientes: 0,
-        ordenesCompraPendientes: 0,
+          productosConStockBajo: 0,
+          cotizacionesPendientes: 0,
+          ordenesCompraPendientes: 0,
           movimientosHoy: 0,
-        tasaConversionCotizaciones: 0,
+          tasaConversionCotizaciones: 0,
           crecimientoVentas: 0,
           ultimaActualizacion: new Date().toISOString(),
           error: error.message
@@ -422,119 +215,12 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
   async getActivities(@CurrentTenant() tenantId: string) {
     try {
-      console.log('📋 [Dashboard Controller] Obteniendo actividades para tenant:', tenantId);
-      
-      const client = this.supabase.getClient();
-      const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      
-      // Obtener actividades reales de forma segura
-      const [
-        cpeResult,
-        greResult,
-        comprasResult,
-        cotizacionesResult
-      ] = await Promise.allSettled([
-        // CPE recientes - FILTRADO POR TENANT
-        client.from('cpe')
-          .select('id, serie, numero, total_venta, estado, created_at')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', hace24h.toISOString())
-          .order('created_at', { ascending: false })
-          .limit(10),
-          
-        // GRE recientes - FILTRADO POR TENANT
-        client.from('gre_guias')
-          .select('id, numero, fecha_traslado, estado, created_at')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', hace24h.toISOString())
-          .order('created_at', { ascending: false })
-          .limit(10),
-          
-        // Compras recientes - FILTRADO POR TENANT
-        client.from('ordenes_compra')
-          .select('id, numero, total, fecha_orden, estado, created_at')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', hace24h.toISOString())
-          .order('created_at', { ascending: false })
-          .limit(10),
-          
-        // Cotizaciones recientes - FILTRADO POR TENANT
-        client.from('cotizaciones')
-          .select('id, numero, total, fecha_cotizacion, estado, created_at')
-          .eq('tenant_id', tenantId)
-          .gte('created_at', hace24h.toISOString())
-          .order('created_at', { ascending: false })
-          .limit(10)
-      ]);
+      // Usar servicio con cache
+      const actividades = await this.dashboardMetrics.getActivities(tenantId);
 
-      const actividades = [];
-      
-      // Procesar CPE
-      if (cpeResult.status === 'fulfilled' && cpeResult.value.data) {
-        cpeResult.value.data.forEach(cpe => {
-          actividades.push({
-            id: `cpe-${cpe.id}`,
-            type: 'CPE',
-            description: `Factura ${cpe.serie}-${cpe.numero.toString().padStart(8, '0')}`,
-            amount: parseFloat(cpe.total_venta) || 0,
-            date: cpe.created_at,
-            status: this.mapearEstado(cpe.estado)
-          });
-        });
-      }
-
-      // Procesar GRE
-      if (greResult.status === 'fulfilled' && greResult.value.data) {
-        greResult.value.data.forEach(gre => {
-          actividades.push({
-            id: `gre-${gre.id}`,
-            type: 'GRE',
-            description: `Guía de Remisión ${gre.numero || gre.id}`,
-            amount: 0,
-            date: gre.fecha_traslado || gre.created_at,
-            status: this.mapearEstado(gre.estado)
-          });
-        });
-      }
-
-      // Procesar Compras
-      if (comprasResult.status === 'fulfilled' && comprasResult.value.data) {
-        comprasResult.value.data.forEach(compra => {
-          actividades.push({
-            id: `compra-${compra.id}`,
-            type: 'COMPRA',
-            description: `Orden de Compra ${compra.numero || compra.id}`,
-            amount: parseFloat(compra.total) || 0,
-            date: compra.fecha_orden || compra.created_at,
-            status: this.mapearEstado(compra.estado)
-          });
-        });
-      }
-
-      // Procesar Cotizaciones
-      if (cotizacionesResult.status === 'fulfilled' && cotizacionesResult.value.data) {
-        cotizacionesResult.value.data.forEach(cotizacion => {
-          actividades.push({
-            id: `cotizacion-${cotizacion.id}`,
-            type: 'COTIZACION',
-            description: `Cotización ${cotizacion.numero || cotizacion.id}`,
-            amount: parseFloat(cotizacion.total) || 0,
-            date: cotizacion.fecha_cotizacion || cotizacion.created_at,
-            status: this.mapearEstado(cotizacion.estado)
-          });
-        });
-      }
-
-      // Ordenar por fecha descendente
-      const actividadesOrdenadas = actividades
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 20);
-
-      console.log(`✅ [Dashboard Controller] ${actividadesOrdenadas.length} actividades reales obtenidas`);
-
-    return {
-      success: true,
-        data: actividadesOrdenadas
+      return {
+        success: true,
+        data: actividades
       };
     } catch (error) {
       console.error('❌ [Dashboard Controller] Error obteniendo actividades:', error);
@@ -546,51 +232,26 @@ export class DashboardController {
     }
   }
 
-  // Métodos de utilidad
-  private sumarTotales(data: any[]): number {
-    if (!Array.isArray(data)) return 0;
-    return data.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
+  @Post('cache/invalidate')
+  @RequirePermission('dashboard.stats.read')
+  @ApiOperation({ summary: 'Invalidar cache de métricas del dashboard' })
+  @ApiResponse({ status: 200, description: 'Cache invalidado exitosamente' })
+  async invalidateCache(@CurrentTenant() tenantId: string) {
+    try {
+      await this.dashboardMetrics.invalidateTenantCache(tenantId);
+      return {
+        success: true,
+        message: 'Cache de métricas invalidado exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ [Dashboard Controller] Error invalidando cache:', error);
+      return {
+        success: false,
+        message: 'Error al invalidar cache',
+        error: error.message
+      };
+    }
   }
 
-  private sumarTotalesCpe(data: any[]): number {
-    if (!Array.isArray(data)) return 0;
-    return data.reduce((sum, item) => sum + (parseFloat(item.total_venta) || 0), 0);
-  }
-
-  private calcularValorInventario(productos: any[]): number {
-    if (!Array.isArray(productos)) return 0;
-    return productos.reduce((sum, p) => 
-      sum + ((parseFloat(p.precio) || 0) * (parseFloat(p.stock) || 0)), 0);
-  }
-
-  private contarProductosStockBajo(productos: any[]): number {
-    if (!Array.isArray(productos)) return 0;
-    return productos.filter(p => 
-      parseFloat(p.stock || 0) <= parseFloat(p.stock_minimo || 0)
-    ).length;
-  }
-
-  private mapearEstado(estado: string): 'success' | 'warning' | 'error' | 'pending' {
-    if (!estado) return 'pending';
-    
-    const estadosMap = {
-      'COMPLETADO': 'success',
-      'PAGADA': 'success',
-      'ENTREGADO': 'success',
-      'ACEPTADA': 'success',
-      'ACEPTADO': 'success',
-      'EMITIDO': 'success',
-      'ENVIADO': 'success',
-      'PENDIENTE': 'warning',
-      'ENVIADA': 'warning',
-      'EN_PROCESO': 'warning',
-      'BORRADOR': 'warning',
-      'RECHAZADA': 'error',
-      'CANCELADA': 'error',
-      'ERROR': 'error'
-    };
-    
-    return estadosMap[estado.toUpperCase()] || 'pending';
-  }
 }
  

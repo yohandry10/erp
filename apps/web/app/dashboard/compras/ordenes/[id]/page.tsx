@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { 
   ArrowLeft,
   FileText,
@@ -284,8 +285,8 @@ export default function OrdenCompraDetallePage() {
               alignItems: 'center',
               gap: '0.5rem',
               padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
+              borderRadius: 'var(--border-radius)',
+              border: '1px solid var(--primary-300)',
               background: 'white',
               cursor: 'pointer',
               marginBottom: '1rem',
@@ -314,14 +315,21 @@ export default function OrdenCompraDetallePage() {
             Actualizar
           </button>
           {orden.estado === 'BORRADOR' && (
-            <button
-              onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)}
-              className="refresh-btn"
-              style={{ background: 'var(--blue-500)', color: 'white' }}
+            <ProtectedComponent
+              modulo="compras"
+              accion="update"
+              recurso="ordenes"
+              fallback={null}
             >
-              <Edit size={16} />
-              Editar
-            </button>
+              <button
+                onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)}
+                className="refresh-btn"
+                style={{ background: 'var(--blue-500)', color: 'white' }}
+              >
+                <Edit size={16} />
+                Editar
+              </button>
+            </ProtectedComponent>
           )}
           <button
             onClick={() => alert('📥 Funcionalidad de descarga próximamente')}
@@ -854,63 +862,77 @@ export default function OrdenCompraDetallePage() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button
-                  onClick={() => setShowAprobarModal(true)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'var(--emerald-500)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--emerald-600)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--emerald-500)'
-                  }}
+                <ProtectedComponent
+                  modulo="compras"
+                  accion="aprobar"
+                  recurso="ordenes_compra"
+                  fallback={null}
                 >
-                  <CheckCircle size={16} />
-                  Aprobar Orden
-                </button>
+                  <button
+                    onClick={() => setShowAprobarModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'var(--emerald-500)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--emerald-600)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--emerald-500)'
+                    }}
+                  >
+                    <CheckCircle size={16} />
+                    Aprobar Orden
+                  </button>
+                </ProtectedComponent>
 
-                <button
-                  onClick={() => setShowRechazarModal(true)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '8px',
-                    border: '1px solid var(--red-300)',
-                    background: 'white',
-                    color: 'var(--red-600)',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--red-50)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'white'
-                  }}
+                <ProtectedComponent
+                  modulo="compras"
+                  accion="rechazar"
+                  recurso="ordenes_compra"
+                  fallback={null}
                 >
-                  <XCircle size={16} />
-                  Rechazar Orden
-                </button>
+                  <button
+                    onClick={() => setShowRechazarModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid var(--red-300)',
+                      background: 'white',
+                      color: 'var(--red-600)',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--red-50)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white'
+                    }}
+                  >
+                    <XCircle size={16} />
+                    Rechazar Orden
+                  </button>
+                </ProtectedComponent>
               </div>
             </div>
           )}

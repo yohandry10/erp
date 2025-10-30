@@ -13,6 +13,25 @@ export class PermissionService {
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
+   * B1: Invalidar cache de permisos para un usuario específico
+   * Útil cuando el usuario cambia de tenant o cuando se modifican sus roles
+   */
+  invalidateUserPermissions(userId: string): void {
+    const keysToDelete: string[] = [];
+    for (const [key] of this.permissionCache) {
+      if (key.startsWith(`${userId}:`)) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    keysToDelete.forEach(key => this.permissionCache.delete(key));
+    
+    if (keysToDelete.length > 0) {
+      console.log(`✅ [PERMISSION] Cache invalidado para usuario ${userId} - ${keysToDelete.length} entradas eliminadas`);
+    }
+  }
+
+  /**
    * Get all permissions for a tenant
    * Requirements: 5.1
    */
@@ -149,6 +168,9 @@ export class PermissionService {
     }
 
     console.log('✅ [PERMISSION] Permiso asignado - Rol:', roleId, 'Permiso:', permissionId);
+
+    // 🔴 CRÍTICO FIX: Invalidar cache de permisos de usuarios con este rol
+    await this.invalidateCacheForRoleUsers(roleId, tenantId);
   }
 
   /**
@@ -183,11 +205,15 @@ export class PermissionService {
     }
 
     console.log('✅ [PERMISSION] Permiso revocado - Rol:', roleId, 'Permiso:', permissionId);
+
+    // 🔴 CRÍTICO FIX: Invalidar cache de permisos de usuarios con este rol
+    await this.invalidateCacheForRoleUsers(roleId, tenantId);
   }
 
   /**
    * Check if a user has a specific permission
    * Requirements: 5.2, 5.3
+   * HARDENING B2: Filtros explícitos por tenant_id en todas las consultas
    */
   async checkUserPermission(
     userId: string,
@@ -219,7 +245,8 @@ export class PermissionService {
       return cached.permissions.length > 0;
     }
 
-    // Query user roles
+    // HARDENING B2: Query user roles con validación explícita de tenant_id
+    // Estrategia: Primero obtener roles del usuario, luego validar que pertenezcan al tenant
     const { data: userRoles, error: rolesError } = await client
       .from('user_roles')
       .select('role_id')
@@ -238,7 +265,27 @@ export class PermissionService {
 
     const roleIds = userRoles.map(ur => ur.role_id);
 
-    // Query role permissions
+    // HARDENING B2: Validar explícitamente que los roles pertenezcan al tenant
+    const { data: validRoles, error: validRolesError } = await client
+      .from('roles')
+      .select('id')
+      .in('id', roleIds)
+      .eq('tenant_id', tenantId);
+
+    if (validRolesError) {
+      console.error('Error validating roles tenant:', validRolesError);
+      return false;
+    }
+
+    if (!validRoles || validRoles.length === 0) {
+      // Cache negative result
+      this.permissionCache.set(cacheKey, { permissions: [], timestamp: Date.now() });
+      return false;
+    }
+
+    const validRoleIds = validRoles.map(r => r.id);
+
+    // HARDENING B2: Query role permissions solo de roles válidos del tenant
     const { data: rolePermissions, error: permissionsError } = await client
       .from('rol_permisos')
       .select(`
@@ -253,7 +300,7 @@ export class PermissionService {
           activo
         )
       `)
-      .in('role_id', roleIds)
+      .in('role_id', validRoleIds)
       .eq('concedido', true);
 
     if (permissionsError) {
@@ -268,6 +315,8 @@ export class PermissionService {
       const permisos = Array.isArray(rp.permisos) ? rp.permisos : [rp.permisos];
       return permisos.some(p => {
         if (!p) return false;
+        // HARDENING B2: Validación explícita de tenant_id del permiso
+        // (Ya validamos que los roles pertenecen al tenant, ahora validamos los permisos)
         if (p.tenant_id !== tenantId) return false;
         if (p.activo !== true) return false;
         if (p.modulo !== modulo) return false;
@@ -299,11 +348,13 @@ export class PermissionService {
   /**
    * Get all permissions for a user (aggregated from all roles)
    * Requirements: 5.6
+   * HARDENING B2: Filtros explícitos por tenant_id en todas las consultas
    */
   async getUserPermissions(userId: string, tenantId: string): Promise<Permission[]> {
     const client = this.supabase.getClient();
 
-    // Query user roles
+    // HARDENING B2: Query user roles con validación explícita de tenant_id
+    // Estrategia: Primero obtener roles del usuario, luego validar que pertenezcan al tenant
     const { data: userRoles, error: rolesError } = await client
       .from('user_roles')
       .select('role_id')
@@ -320,7 +371,25 @@ export class PermissionService {
 
     const roleIds = userRoles.map(ur => ur.role_id);
 
-    // Query all permissions from user's roles
+    // HARDENING B2: Validar explícitamente que los roles pertenezcan al tenant
+    const { data: validRoles, error: validRolesError } = await client
+      .from('roles')
+      .select('id')
+      .in('id', roleIds)
+      .eq('tenant_id', tenantId);
+
+    if (validRolesError) {
+      console.error('Error validating roles tenant:', validRolesError);
+      throw new BadRequestException('Error al validar roles del usuario');
+    }
+
+    if (!validRoles || validRoles.length === 0) {
+      return [];
+    }
+
+    const validRoleIds = validRoles.map(r => r.id);
+
+    // HARDENING B2: Query all permissions from user's roles solo de roles válidos del tenant
     const { data: rolePermissions, error: permissionsError } = await client
       .from('rol_permisos')
       .select(`
@@ -337,7 +406,7 @@ export class PermissionService {
           created_at
         )
       `)
-      .in('role_id', roleIds)
+      .in('role_id', validRoleIds)
       .eq('concedido', true);
 
     if (permissionsError) {
@@ -346,6 +415,8 @@ export class PermissionService {
     }
 
     // Extract permissions and filter by tenant and active status
+    // HARDENING B2: Validación explícita de tenant_id del permiso
+    // (Ya validamos que los roles pertenecen al tenant, ahora validamos los permisos)
     const permissions = rolePermissions
       ?.map(rp => rp.permisos)
       .flat()
@@ -369,5 +440,45 @@ export class PermissionService {
     });
 
     return uniquePermissions;
+  }
+
+  /**
+   * 🔴 CRÍTICO FIX: Invalidar cache de permisos de todos los usuarios que tienen un rol específico
+   * Se llama cuando se modifican permisos de un rol para que los cambios se reflejen inmediatamente
+   */
+  private async invalidateCacheForRoleUsers(roleId: string, tenantId: string): Promise<void> {
+    const client = this.supabase.getClient();
+
+    try {
+      // Obtener todos los usuarios que tienen este rol
+      const { data: userRoles, error } = await client
+        .from('user_roles')
+        .select('usuario_sistema_id')
+        .eq('role_id', roleId);
+
+      if (error) {
+        console.error('❌ Error obteniendo usuarios del rol para invalidar cache:', error);
+        return;
+      }
+
+      if (!userRoles || userRoles.length === 0) {
+        console.log(`✅ [PERMISSION] No hay usuarios con rol ${roleId}, no se necesita invalidar cache`);
+        return;
+      }
+
+      // Invalidar cache de cada usuario
+      const userIds = userRoles.map(ur => ur.usuario_sistema_id).filter(Boolean);
+      let invalidatedCount = 0;
+
+      for (const userId of userIds) {
+        this.invalidateUserPermissions(userId);
+        invalidatedCount++;
+      }
+
+      console.log(`✅ [PERMISSION] Cache invalidado para ${invalidatedCount} usuarios con rol ${roleId}`);
+    } catch (error) {
+      console.error('❌ Error invalidando cache de usuarios del rol:', error);
+      // No lanzamos error para no bloquear la operación principal
+    }
   }
 }

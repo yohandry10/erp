@@ -1,17 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateGuiaRemisionDto, GuiaRemisionResponseDto } from './gre.types';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { OseService } from '../ose/ose.service';
+import { ValidationService } from '../validations/validation.service';
 
 @Injectable()
 export class GreService {
+  private readonly logger = new Logger(GreService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly inventoryService: InventoryIntegrationService,
-    private readonly oseService: OseService
+    private readonly oseService: OseService,
+    private readonly validationService: ValidationService,
   ) {
     console.log('🚚 [GRE] ¡Servicio GRE inicializado con integración SUNAT!');
     this.initializeEventListeners();
@@ -126,8 +130,31 @@ export class GreService {
       const clienteId = datos.clienteId;
       const total = datos.total;
       const productos = datos.productos || [];
+      let tenantId = datos.tenantId || datos.tenant_id; // Obtener tenantId de los datos
       
-      console.log(`🚚 [GRE] Datos del evento - CPE: ${cpeId}, Cliente: ${clienteId}, Total: S/ ${total}`);
+      if (!tenantId) {
+        this.logger.warn('⚠️ [GRE] No se proporcionó tenantId en evaluarCreacionAutomaticaGRE, intentando obtenerlo del CPE...');
+        // Intentar obtener tenantId del CPE si está disponible
+        if (cpeId) {
+          const { data: cpeData } = await this.supabaseService.getClient()
+            .from('comprobantes_electronicos')
+            .select('tenant_id')
+            .eq('id', cpeId)
+            .maybeSingle();
+          
+          if (cpeData?.tenant_id) {
+            tenantId = cpeData.tenant_id;
+            this.logger.log(`✅ [GRE] TenantId obtenido del CPE: ${tenantId}`);
+          }
+        }
+        
+        if (!tenantId) {
+          this.logger.error('❌ [GRE] No se pudo obtener tenantId para crear GRE automática');
+          throw new Error('No se pudo determinar el tenantId para crear la GRE');
+        }
+      }
+      
+      console.log(`🚚 [GRE] Datos del evento - CPE: ${cpeId}, Cliente: ${clienteId}, Total: S/ ${total}, Tenant: ${tenantId}`);
       
       // Buscar si el cliente tiene configuración de transporte automático
       const requiereGREAutomatica = await this.verificarConfiguracionClienteTransporte(clienteId, total);
@@ -135,7 +162,7 @@ export class GreService {
       if (requiereGREAutomatica) {
         console.log('🚚 [GRE] ✅ Cliente configurado para GRE automática, creando...');
         
-        // Crear GRE automática con datos básicos
+        // Crear GRE automática con datos básicos (con validación de certificado)
         const greAutomatica = await this.createGuia({
           destinatario: `Cliente ${clienteId}`,
           direccionDestino: 'Lima, Perú - Dirección por configurar',
@@ -148,7 +175,7 @@ export class GreService {
           placaVehiculo: null,
           licenciaConducir: null,
           cpeRelacionado: cpeId
-        });
+        }, tenantId);
         
         console.log(`✅ [GRE] GRE automática creada exitosamente:`, {
           id: greAutomatica.id,
@@ -306,12 +333,32 @@ export class GreService {
     }
   }
 
-  async createGuia(greData: CreateGuiaRemisionDto): Promise<GuiaRemisionResponseDto> {
+  async createGuia(greData: CreateGuiaRemisionDto, tenantId: string): Promise<GuiaRemisionResponseDto> {
     const supabase = this.supabaseService.getClient();
     
     try {
-      console.log('🚚 [GRE] Creando nueva guía de remisión...');
+      this.logger.log(`🚚 [GRE] Creando nueva guía de remisión para tenant: ${tenantId}`);
       console.log('🚚 [GRE] Datos recibidos:', greData);
+
+      // HARDENING E2: Validar certificado antes de generar GRE
+      this.logger.log(`🔐 [GRE] Validando certificado digital antes de generar GRE...`);
+      const certificateValidation = await this.validationService.validateCertificate(tenantId);
+      
+      if (!certificateValidation.isValid) {
+        this.logger.error(`❌ [GRE] Validación de certificado fallida: ${certificateValidation.errors.join(', ')}`);
+        throw new BadRequestException({
+          message: 'No se puede generar la GRE: Certificado digital inválido',
+          errors: certificateValidation.errors,
+          code: 'CERT_VALIDATION_FAILED',
+        });
+      }
+
+      // Log advertencias de certificado (próximo a vencer)
+      if (certificateValidation.warnings.length > 0) {
+        this.logger.warn(`⚠️ [GRE] Advertencias de certificado: ${certificateValidation.warnings.join(', ')}`);
+      }
+
+      this.logger.log(`✅ [GRE] Certificado validado exitosamente antes de generar GRE`);
 
       // Generar número correlativo
       const numeroCorrelativo = await this.generarNumeroCorrelativo();
@@ -331,6 +378,7 @@ export class GreService {
         placa_vehiculo: greData.placaVehiculo,
         licencia_conducir: greData.licenciaConducir,
         cpe_relacionado: greData.cpeRelacionado || null,
+        tenant_id: tenantId, // HARDENING: Multi-tenancy explícito
         created_at: new Date().toISOString()
       };
 
@@ -363,7 +411,7 @@ export class GreService {
       }
 
       // Generar XML UBL y firma (sin enviar a SUNAT todavía)
-      await this.procesarGeneracionXML(data.id);
+      await this.procesarGeneracionXML(data.id, tenantId);
 
       // Mapear respuesta
       return {
@@ -613,10 +661,12 @@ export class GreService {
    * 
    * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
    * Para enviar manualmente usar el endpoint: POST /api/gre/guias/:id/enviar-sunat
+   * 
+   * HARDENING E2: Valida certificado antes de firmar el XML
    */
-  private async procesarGeneracionXML(greId: string): Promise<void> {
+  private async procesarGeneracionXML(greId: string, tenantId?: string): Promise<void> {
     try {
-      console.log(`📄 [GRE] Generando XML para GRE ${greId}...`);
+      this.logger.log(`📄 [GRE] Generando XML para GRE ${greId}...`);
       
       // Obtener datos de la GRE
       const { data: greData, error } = await this.supabaseService.getClient()
@@ -627,6 +677,39 @@ export class GreService {
 
       if (error || !greData) {
         throw new Error('No se pudo obtener los datos de la GRE');
+      }
+
+      // HARDENING E2: Validar certificado antes de firmar XML (si se proporciona tenantId)
+      if (tenantId) {
+        this.logger.log(`🔐 [GRE] Validando certificado antes de firmar XML para GRE ${greId}...`);
+        const certificateValidation = await this.validationService.validateCertificate(tenantId);
+        
+        if (!certificateValidation.isValid) {
+          this.logger.error(`❌ [GRE] Validación de certificado fallida antes de firmar: ${certificateValidation.errors.join(', ')}`);
+          
+          // Marcar GRE como ERROR sin intentar firmar
+          await this.supabaseService.update(
+            'gre_guias',
+            { 
+              estado: 'ERROR',
+              error_message: `Error validando certificado antes de firmar: ${certificateValidation.errors.join(', ')}`,
+              updated_at: new Date().toISOString()
+            },
+            { id: greId }
+          );
+          
+          throw new BadRequestException({
+            message: 'No se puede firmar la GRE: Certificado digital inválido',
+            errors: certificateValidation.errors,
+            code: 'CERT_VALIDATION_FAILED',
+          });
+        }
+
+        if (certificateValidation.warnings.length > 0) {
+          this.logger.warn(`⚠️ [GRE] Advertencias de certificado: ${certificateValidation.warnings.join(', ')}`);
+        }
+
+        this.logger.log(`✅ [GRE] Certificado validado exitosamente antes de firmar XML`);
       }
 
       // Generar XML UBL
@@ -648,10 +731,10 @@ export class GreService {
         { id: greId }
       );
 
-      console.log(`✅ [GRE] XML generado y firmado para GRE ${greId} - Hash: ${hash}`);
+      this.logger.log(`✅ [GRE] XML generado y firmado para GRE ${greId} - Hash: ${hash}`);
 
     } catch (error) {
-      console.error(`❌ [GRE] Error generando XML para GRE ${greId}:`, error);
+      this.logger.error(`❌ [GRE] Error generando XML para GRE ${greId}:`, error);
       
       // Marcar como ERROR
       await this.supabaseService.update(
@@ -663,6 +746,9 @@ export class GreService {
         },
         { id: greId }
       );
+      
+      // Re-lanzar el error para que el método que llama pueda manejarlo
+      throw error;
     }
   }
 
@@ -696,6 +782,40 @@ export class GreService {
     // Generar un hash simple del XML (en producción usar crypto)
     const crypto = require('crypto');
     return crypto.createHash('sha256').update(xmlContent).digest('hex').substring(0, 32);
+  }
+
+  /**
+   * 🔴 CRÍTICO FIX: Determina si un error de SUNAT es técnico (reintentable) o de validación (no reintentable)
+   */
+  private isTechnicalError(codigoRespuesta: string, descripcionRespuesta: string): boolean {
+    // Códigos de error técnicos de SUNAT que se pueden reintentar
+    const technicalErrorCodes = ['99', '98', '97']; // Errores técnicos genéricos
+    
+    // Si el código indica error técnico
+    if (technicalErrorCodes.includes(codigoRespuesta)) {
+      return true;
+    }
+
+    // Si el mensaje indica error técnico de red/conexión
+    const errorMessage = descripcionRespuesta?.toLowerCase() || '';
+    const technicalKeywords = [
+      'timeout',
+      'connection',
+      'network',
+      'técnico',
+      'servicio no disponible',
+      'temporalmente',
+      'unavailable',
+    ];
+
+    return technicalKeywords.some(keyword => errorMessage.includes(keyword));
+  }
+
+  /**
+   * Reintentar envío de GRE (método público para SunatRetryService)
+   */
+  async retryProcesarEnvioSunat(greId: string): Promise<void> {
+    return this.procesarEnvioSunat(greId);
   }
 
   /**
@@ -751,12 +871,17 @@ export class GreService {
       } else {
         console.error(`❌ [GRE] Error enviando GRE ${greId}: ${response.descripcionRespuesta}`);
         
+        // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
+        const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
+        
         // Marcar como RECHAZADO
         await this.supabaseService.update(
           'gre_guias',
           { 
             estado: 'RECHAZADO',
             error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
+            retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
+            next_retry_at: null,
             updated_at: new Date().toISOString()
           },
           { id: greId }
@@ -766,12 +891,15 @@ export class GreService {
     } catch (error) {
       console.error(`❌ [GRE] Error técnico enviando GRE ${greId}:`, error);
       
-      // Marcar como RECHAZADO por error técnico
+      // 🔴 CRÍTICO FIX: Marcar como RECHAZADO con información de reintento
+      const retryCount = 0; // Primera vez que falla
       await this.supabaseService.update(
         'gre_guias',
         { 
           estado: 'RECHAZADO',
           error_message: `Error técnico: ${error.message}`,
+          retry_count: retryCount,
+          next_retry_at: null, // El servicio de reintentos lo programará
           updated_at: new Date().toISOString()
         },
         { id: greId }
@@ -1052,8 +1180,8 @@ export class GreService {
         cpeRelacionado: saleData.cpeId,
       };
 
-      // Create GRE
-      const gre = await this.createGuia(greData);
+      // Create GRE (with certificate validation)
+      const gre = await this.createGuia(greData, saleData.tenantId);
 
       // Update GRE to mark as automatic and link to sale
       await this.supabaseService.getClient()

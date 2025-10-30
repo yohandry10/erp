@@ -4,9 +4,10 @@ import { GreService } from './gre.service';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { IntegrationModule } from '../../shared/integration/integration.module';
 import { OseModule } from '../ose/ose.module';
+import { ValidationModule } from '../validations/validation.module';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule, OseModule],
+  imports: [SupabaseModule, IntegrationModule, OseModule, ValidationModule],
   controllers: [GreController],
   providers: [GreService],
   exports: [GreService],

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { customAuth } from '@/lib/auth-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -240,6 +241,14 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   className="form-input"
                 />
+                <div className="text-right mt-2">
+                  <Link 
+                    href="/reset-password" 
+                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
               </div>
             </form>
           </CardContent>

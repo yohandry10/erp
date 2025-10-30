@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent, InventarioCiclicoEvent } from '../events/event-bus.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
 export class BackgroundJobsService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    private readonly tenantContext: TenantContextService
   ) {
     this.initializeJobs();
   }
@@ -193,56 +195,92 @@ export class BackgroundJobsService {
     try {
       console.log('📦 [BackgroundJobs] Verificando productos con stock bajo...');
       
-      // Simular verificación en modo mock o usar Supabase real
-      // TODO: Implement isMockMode() in SupabaseService if needed
-      // if (this.supabase.isMockMode()) {
-      //   console.log('✅ [BackgroundJobs] Verificación de stock en modo mock - simulado');
-      //   return;
-      // }
+      // Obtener todos los tenants activos
+      const { data: tenants, error: tenantsError } = await this.supabase.getClient()
+        .from('tenants')
+        .select('id, nombre')
+        .eq('activo', true);
 
-      const productosQuery = this.supabase.query('productos')
-        .select('*')
-        .gt('stock_minimo', 0);
-
-      const { data: productos, error } = await productosQuery;
-
-      if (error) throw error;
-
-      if (!productos || productos.length === 0) {
-        console.log('✅ [BackgroundJobs] Todos los productos tienen stock adecuado');
+      if (tenantsError) {
+        console.error('❌ [BackgroundJobs] Error obteniendo tenants:', tenantsError);
         return;
       }
 
-      // Filtrar productos con stock bajo
-      const productosStockBajo = productos.filter(producto => 
-        parseFloat(producto.stock_actual || '0') <= parseFloat(producto.stock_minimo || '0')
-      );
-
-      if (productosStockBajo.length === 0) {
-        console.log('✅ [BackgroundJobs] Todos los productos tienen stock adecuado');
+      if (!tenants || tenants.length === 0) {
+        console.log('ℹ️ [BackgroundJobs] No hay tenants activos');
         return;
       }
 
-      console.log(`⚠️ [BackgroundJobs] Encontrados ${productosStockBajo.length} productos con stock bajo`);
+      console.log(`📦 [BackgroundJobs] Verificando stock para ${tenants.length} tenants`);
 
-      // Emitir eventos para cada producto con stock bajo
-      for (const producto of productosStockBajo) {
-        const eventoStockBajo: ProductoStockBajoEvent = {
-          productoId: producto.id,
-          codigoProducto: producto.codigo || producto.id,
-          nombreProducto: producto.nombre || 'Producto sin nombre',
-          stockActual: parseFloat(producto.stock_actual || '0'),
-          stockMinimo: parseFloat(producto.stock_minimo || '0'),
-          valorInventario: parseFloat(producto.stock_actual || '0') * parseFloat(producto.precio_venta || '0'),
-          ubicacion: producto.ubicacion,
-          proveedor: producto.proveedor_principal,
-          fechaVerificacion: new Date().toISOString()
-        };
+      let totalProductosStockBajo = 0;
 
-        this.eventBus.emitProductoStockBajo(eventoStockBajo);
+      // Procesar cada tenant con su contexto
+      for (const tenant of tenants) {
+        try {
+          // Establecer contexto de tenant para las consultas (permite operaciones multi-tenant)
+          await Promise.resolve(this.tenantContext.run(
+            {
+              tenantId: tenant.id,
+              isSuperAdmin: false, // Background jobs no son super admin
+            },
+            async () => {
+              const { data: productos, error } = await this.supabase.getClient()
+                .from('productos')
+                .select('*')
+                .eq('tenant_id', tenant.id)
+                .gt('stock_minimo', 0);
+
+              if (error) {
+                console.error(`❌ [BackgroundJobs] Error obteniendo productos para tenant ${tenant.id}:`, error);
+                return;
+              }
+
+              if (!productos || productos.length === 0) {
+                return;
+              }
+
+              // Filtrar productos con stock bajo
+              const productosStockBajo = productos.filter(producto => 
+                parseFloat(producto.stock_actual || '0') <= parseFloat(producto.stock_minimo || '0')
+              );
+
+              if (productosStockBajo.length === 0) {
+                return;
+              }
+
+              console.log(`⚠️ [BackgroundJobs] Tenant ${tenant.nombre}: ${productosStockBajo.length} productos con stock bajo`);
+
+              // Emitir eventos para cada producto con stock bajo
+              for (const producto of productosStockBajo) {
+                const eventoStockBajo: ProductoStockBajoEvent = {
+                  productoId: producto.id,
+                  codigoProducto: producto.codigo || producto.id,
+                  nombreProducto: producto.nombre || 'Producto sin nombre',
+                  stockActual: parseFloat(producto.stock_actual || '0'),
+                  stockMinimo: parseFloat(producto.stock_minimo || '0'),
+                  valorInventario: parseFloat(producto.stock_actual || '0') * parseFloat(producto.precio_venta || '0'),
+                  ubicacion: producto.ubicacion,
+                  proveedor: producto.proveedor_principal,
+                  fechaVerificacion: new Date().toISOString()
+                };
+
+                await this.eventBus.emitProductoStockBajo(eventoStockBajo, tenant.id);
+                totalProductosStockBajo++;
+              }
+            }
+          ));
+        } catch (error) {
+          console.error(`❌ [BackgroundJobs] Error procesando tenant ${tenant.id}:`, error);
+          // Continuar con otros tenants aunque uno falle
+        }
       }
 
-      console.log(`📦 [BackgroundJobs] Eventos de stock bajo emitidos para ${productosStockBajo.length} productos`);
+      if (totalProductosStockBajo === 0) {
+        console.log('✅ [BackgroundJobs] Todos los productos tienen stock adecuado');
+      } else {
+        console.log(`📦 [BackgroundJobs] Eventos de stock bajo emitidos para ${totalProductosStockBajo} productos`);
+      }
       
     } catch (error) {
       console.error('❌ [BackgroundJobs] Error verificando stock bajo:', error);

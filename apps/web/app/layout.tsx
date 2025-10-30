@@ -5,6 +5,7 @@ import { SessionProvider } from '@/components/providers/session-provider'
 import { TenantProvider } from '@/contexts/TenantContext'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as HotToaster } from 'react-hot-toast'
+import { ErrorBoundary } from '@/components/error'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,13 +23,15 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <div className="app-wrapper">
-          <SessionProvider session={null}>
-            <TenantProvider>
-              {children}
-              <Toaster />
-              <HotToaster />
-            </TenantProvider>
-          </SessionProvider>
+          <ErrorBoundary>
+            <SessionProvider session={null}>
+              <TenantProvider>
+                {children}
+                <Toaster />
+                <HotToaster />
+              </TenantProvider>
+            </SessionProvider>
+          </ErrorBoundary>
         </div>
         <div id="modal-root" />
       </body>

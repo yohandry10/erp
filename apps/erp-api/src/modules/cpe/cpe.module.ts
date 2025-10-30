@@ -6,9 +6,11 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { IntegrationModule } from '../../shared/integration/integration.module';
 import { OseModule } from '../ose/ose.module';
 import { ValidationModule } from '../validations/validation.module';
+import { AuditModule } from '../audit/audit.module';
+import { CacheModule } from '../../shared/cache/cache.module';
 
 @Module({
-  imports: [CryptoModule, SupabaseModule, IntegrationModule, OseModule, ValidationModule],
+  imports: [CryptoModule, SupabaseModule, IntegrationModule, OseModule, ValidationModule, AuditModule, CacheModule],
   controllers: [CpeController],
   providers: [CpeService],
   exports: [CpeService],

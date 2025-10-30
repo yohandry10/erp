@@ -11,6 +11,8 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
+import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 
 @Injectable()
 export class OrdenesCompraService {
@@ -20,7 +22,9 @@ export class OrdenesCompraService {
     private readonly ocAprobacionesRepository: OcAprobacionesRepository,
     private readonly supabaseService: SupabaseService,
     private readonly notificationsService: NotificationsService,
-    private readonly eventBusService: EventBusService
+    private readonly eventBusService: EventBusService,
+    private readonly auditService: AuditService,
+    private readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
   async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string) {
@@ -131,6 +135,13 @@ export class OrdenesCompraService {
       }
     }
 
+    // Invalidar cache del dashboard automáticamente
+    try {
+      await this.cacheInvalidation.onOrdenCompraCreated(tenantId);
+    } catch (error) {
+      console.warn('⚠️ No se pudo invalidar cache después de crear orden de compra:', error);
+    }
+
     return orden;
   }
 
@@ -169,6 +180,11 @@ export class OrdenesCompraService {
       throw new BadRequestException(
         `Solo se pueden editar órdenes en estado PENDIENTE o BORRADOR. Estado actual: ${existingOrden.estado}`
       );
+    }
+
+    // 🟡 MEJORA MEDIA: Validar transición de estado si se está cambiando el estado
+    if (updateDto.estado && updateDto.estado !== existingOrden.estado) {
+      this.validarTransicionEstadoOrden(existingOrden.estado, updateDto.estado);
     }
 
     // Si se actualiza el número, validar que no exista
@@ -248,6 +264,32 @@ export class OrdenesCompraService {
     const orden = await this.ordenesRepository.update(updateDto, id, tenantId, userId);
 
     return orden;
+  }
+
+  /**
+   * 🟡 MEJORA MEDIA: Validar transición de estado para órdenes de compra
+   * Implementa máquina de estados explícita con validaciones de transiciones permitidas
+   */
+  private validarTransicionEstadoOrden(estadoActual: string, nuevoEstado: string): void {
+    // Definir transiciones válidas para órdenes de compra
+    const transicionesValidas: Record<string, string[]> = {
+      'BORRADOR': ['PENDIENTE', 'APROBACION', 'ANULADA'],
+      'PENDIENTE': ['APROBACION', 'APROBADA', 'ANULADA'],
+      'APROBACION': ['PENDIENTE', 'APROBADA', 'ANULADA'],
+      'APROBADA': ['PARCIAL', 'RECIBIDA', 'ANULADA'],
+      'PARCIAL': ['RECIBIDA', 'ANULADA'],
+      'RECIBIDA': [], // Estado final, no se puede cambiar
+      'ANULADA': [], // Estado final, no se puede cambiar
+    };
+
+    const transicionesPermitidas = transicionesValidas[estadoActual] || [];
+
+    if (!transicionesPermitidas.includes(nuevoEstado)) {
+      throw new BadRequestException(
+        `No se puede cambiar el estado de la orden de compra de ${estadoActual} a ${nuevoEstado}. ` +
+        `Transiciones válidas desde ${estadoActual}: ${transicionesPermitidas.join(', ') || 'ninguna (estado final)'}`
+      );
+    }
   }
 
   async aprobar(id: string, aprobarDto: AprobarOrdenCompraDto, tenantId: string, userId?: string) {
@@ -358,6 +400,9 @@ export class OrdenesCompraService {
       nuevoEstado = 'APROBADA';
     }
 
+    // 🟡 MEJORA MEDIA: Validar transición de estado usando máquina de estados
+    this.validarTransicionEstadoOrden(existingOrden.estado, nuevoEstado);
+
     // Actualizar estado de la orden
     const orden = await this.ordenesRepository.updateEstado(
       id,
@@ -380,6 +425,26 @@ export class OrdenesCompraService {
       }
     }
 
+    // Registrar auditoría
+    if (userId) {
+      try {
+        await this.auditService.registrarCambio(
+          'ordenes_compra',
+          'UPDATE',
+          userId,
+          {
+            old: { estado: existingOrden.estado },
+            new: { estado: nuevoEstado, aprobado_at: nuevoEstado === 'APROBADA' ? new Date().toISOString() : undefined, aprobado_by: nuevoEstado === 'APROBADA' ? (aprobadorId || userId) : undefined }
+          },
+          tenantId,
+          id,
+          { accion: 'APROBAR', comentarios: aprobarDto.comentarios }
+        );
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar auditoría de aprobación:', error);
+      }
+    }
+
     return orden;
   }
 
@@ -398,6 +463,9 @@ export class OrdenesCompraService {
         `No se puede rechazar una orden en estado ${existingOrden.estado}. Estados válidos: ${rejectableStates.join(', ')}`
       );
     }
+
+    // 🟡 MEJORA MEDIA: Validar transición de estado usando máquina de estados
+    this.validarTransicionEstadoOrden(existingOrden.estado, 'ANULADA');
 
     // Obtener información del rechazador
     const rechazadorId = rechazarDto.rechazado_por_id || userId;
@@ -451,7 +519,54 @@ export class OrdenesCompraService {
       }
     );
 
-    // TODO: Emitir evento OrdenCompraRechazada para notificaciones
+    // Emitir evento OrdenCompraRechazada para notificaciones
+    try {
+      // Obtener información del proveedor para el evento
+      const { data: proveedor } = await this.supabaseService.getClient()
+        .from('proveedores')
+        .select('razon_social')
+        .eq('id', orden.proveedor_id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      // Notificar al usuario que creó la orden sobre el rechazo
+      if (orden.created_by) {
+        await this.notificationsService.createNotification(tenantId, {
+          type: NotificationType.OC_RECHAZADA,
+          severity: NotificationSeverity.ERROR,
+          title: 'Orden de Compra Rechazada',
+          message: `La orden de compra ${orden.numero} ha sido rechazada. Motivo: ${rechazarDto.motivo_rechazo}`,
+          action_url: `/dashboard/compras/ordenes/${orden.id}`,
+          action_label: 'Ver Orden',
+          usuario_id: orden.created_by
+        });
+      }
+
+      console.log(`✅ Notificación de rechazo enviada para orden ${orden.numero}`);
+    } catch (error) {
+      console.error('Error emitiendo evento de rechazo:', error);
+      // No bloquear el rechazo si falla la notificación
+    }
+
+    // Registrar auditoría
+    if (userId) {
+      try {
+        await this.auditService.registrarCambio(
+          'ordenes_compra',
+          'UPDATE',
+          userId,
+          {
+            old: { estado: existingOrden.estado },
+            new: { estado: 'ANULADA', rechazado_at: new Date().toISOString(), rechazado_by: rechazadorId || userId, motivo_rechazo: rechazarDto.motivo_rechazo }
+          },
+          tenantId,
+          id,
+          { accion: 'RECHAZAR', motivo: rechazarDto.motivo_rechazo }
+        );
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar auditoría de rechazo:', error);
+      }
+    }
 
     return orden;
   }
@@ -473,11 +588,37 @@ export class OrdenesCompraService {
       );
     }
 
-    // Validar que no haya recepciones completas
-    // Si hay recepciones parciales, se puede cancelar pero se debe notificar
+    // 🟡 MEJORA MEDIA: Validar transición de estado usando máquina de estados
+    this.validarTransicionEstadoOrden(existingOrden.estado, 'ANULADA');
+
+    // Verificar si hay recepciones y alertar al usuario
     if (existingOrden.estado === 'PARCIAL') {
-      // TODO: Verificar si hay recepciones y alertar al usuario
-      // Por ahora permitimos la cancelación
+      try {
+        // Obtener recepciones asociadas a la orden
+        const { data: recepciones } = await this.supabaseService.getClient()
+          .from('recepciones')
+          .select('id, numero, estado')
+          .eq('orden_id', id)
+          .eq('tenant_id', tenantId);
+
+        if (recepciones && recepciones.length > 0) {
+          const recepcionesActivas = recepciones.filter(r => r.estado !== 'CERRADA');
+          if (recepcionesActivas.length > 0) {
+            console.warn(
+              `⚠️ [ORDEN-COMPRA] Se está cancelando una orden con ${recepcionesActivas.length} recepción(es) parcial(es). ` +
+              `Se recomienda revisar las recepciones antes de cancelar.`
+            );
+            // Opcional: Puede lanzar una excepción si se requiere confirmación explícita
+            // throw new BadRequestException(
+            //   `No se puede cancelar la orden porque tiene ${recepcionesActivas.length} recepción(es) parcial(es). ` +
+            //   `Por favor, cierre o cancele las recepciones primero.`
+            // );
+          }
+        }
+      } catch (error) {
+        console.error('Error verificando recepciones:', error);
+        // No bloquear la cancelación si falla la verificación
+      }
     }
 
     // Actualizar estado a ANULADA
@@ -493,9 +634,53 @@ export class OrdenesCompraService {
       }
     );
 
-    // TODO: Si hay recepciones parciales, crear devoluciones automáticas
-    // TODO: Liberar stock reservado si aplica
-    // TODO: Emitir evento OrdenCompraCancelada para notificaciones
+    // Verificar si hay recepciones parciales y crear devoluciones automáticas si es necesario
+    // Nota: Por ahora solo notificamos. La creación de devoluciones automáticas puede ser implementada más adelante
+    try {
+      const { data: recepciones } = await this.supabaseService.getClient()
+        .from('recepciones')
+        .select('id, numero, estado')
+        .eq('orden_id', id)
+        .eq('tenant_id', tenantId)
+        .in('estado', ['BORRADOR', 'CERRADA']);
+
+      if (recepciones && recepciones.length > 0) {
+        console.warn(
+          `⚠️ [ORDEN-COMPRA] La orden ${orden.numero} tiene ${recepciones.length} recepción(es) asociada(s). ` +
+          `Se recomienda revisar si se requiere crear devoluciones automáticas.`
+        );
+        // TODO: Implementar creación automática de devoluciones cuando el módulo esté listo
+        // await this.devolucionesService.crearDevolucionesAutomaticas(id, tenantId, userId);
+      }
+    } catch (error) {
+      console.error('Error verificando recepciones para devoluciones:', error);
+    }
+
+    // Liberar stock reservado si aplica
+    // Nota: Por ahora las órdenes de compra no reservan stock automáticamente
+    // Esta funcionalidad puede ser implementada cuando se requiera gestión de stock reservado
+    // TODO: Implementar liberación de stock reservado cuando se implemente la reserva de stock
+
+    // Emitir evento OrdenCompraCancelada para notificaciones
+    try {
+      // Notificar al usuario que creó la orden sobre la cancelación
+      if (orden.created_by) {
+        await this.notificationsService.createNotification(tenantId, {
+          type: NotificationType.OC_CANCELADA,
+          severity: NotificationSeverity.WARNING,
+          title: 'Orden de Compra Cancelada',
+          message: `La orden de compra ${orden.numero} ha sido cancelada. Motivo: ${cancelarDto.motivo_cancelacion || 'Sin motivo especificado'}`,
+          action_url: `/dashboard/compras/ordenes/${orden.id}`,
+          action_label: 'Ver Orden',
+          usuario_id: orden.created_by
+        });
+      }
+
+      console.log(`✅ Notificación de cancelación enviada para orden ${orden.numero}`);
+    } catch (error) {
+      console.error('Error emitiendo evento de cancelación:', error);
+      // No bloquear la cancelación si falla la notificación
+    }
 
     return orden;
   }
@@ -833,7 +1018,9 @@ export class OrdenesCompraService {
       })) || [];
 
       // Emitir evento
-      this.eventBusService.emitOrdenCompraAprobada({
+      // 🟡 MEJORA MEDIA: Manejo de errores en eventos para no bloquear operaciones críticas
+      try {
+        this.eventBusService.emitOrdenCompraAprobada({
         ordenId: orden.id,
         numeroOrden: orden.numero,
         proveedorId: orden.proveedor_id,
@@ -853,8 +1040,9 @@ export class OrdenesCompraService {
 
       console.log(`✅ Evento OrdenCompraAprobada emitido para orden ${orden.numero}`);
     } catch (error) {
-      console.error('Error al emitir evento OrdenCompraAprobada:', error);
-      throw error;
+      console.error('❌ Error al emitir evento OrdenCompraAprobada:', error);
+      // 🟡 MEJORA MEDIA: No bloquear la operación principal si falla el evento
+      // El error ya está registrado en logs para monitoreo
     }
   }
 }

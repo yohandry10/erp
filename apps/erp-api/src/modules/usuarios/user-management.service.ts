@@ -3,16 +3,24 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateUserDto, UpdateUserDto, UserFiltersDto } from './dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { AuditService } from '../audit/audit.service';
+import { EmailService } from '../../shared/email/email.service';
+import { PermissionService } from '../permissions/permission.service';
 
 @Injectable()
 export class UserManagementService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly auditService: AuditService,
+    private readonly emailService: EmailService,
+    private readonly permissionService: PermissionService
+  ) {}
 
   /**
    * Create a new user with tenant isolation
    * Requirements: 2.1, 6.1
    */
-  async createUser(tenantId: string, userData: CreateUserDto) {
+  async createUser(tenantId: string, userData: CreateUserDto, userId?: string) {
     const client = this.supabase.getClient();
 
     // Validate email uniqueness within tenant
@@ -62,8 +70,42 @@ export class UserManagementService {
       await this.assignRoles(tenantId, newUser.id, userData.roles);
     }
 
-    // TODO: Send activation email with credentials
-    console.log('📧 [USER-MGMT] Email de activación pendiente - Usuario:', userData.email, 'Password temporal:', password);
+    // Send activation email with credentials
+    try {
+      const userName = `${userData.nombre} ${userData.apellido}`.trim() || userData.email;
+      await this.emailService.sendUserActivationEmail(
+        userData.email,
+        userName,
+        password
+      );
+      console.log('✅ [USER-MGMT] Email de activación enviado - Usuario:', userData.email);
+    } catch (error) {
+      console.error('❌ [USER-MGMT] Error enviando email de activación:', error);
+      // No bloquear la creación del usuario si falla el email
+    }
+
+    // Registrar auditoría
+    try {
+      await this.auditService.registrarCambio(
+        'usuarios_sistema',
+        'INSERT',
+        userId || 'SYSTEM', // Usar userId del contexto si está disponible
+        {
+          new: {
+            email: userData.email,
+            nombre: userData.nombre,
+            apellido: userData.apellido,
+            cargo: userData.cargo,
+            estado: 'ACTIVO'
+          }
+        },
+        tenantId,
+        newUser.id,
+        { accion: 'CREAR_USUARIO', roles: userData.roles }
+      );
+    } catch (error) {
+      console.warn('⚠️ No se pudo registrar auditoría de creación de usuario:', error);
+    }
 
     const { password_hash, ...userWithoutPassword } = newUser;
     return {
@@ -76,13 +118,13 @@ export class UserManagementService {
    * Update user information
    * Requirements: 2.2
    */
-  async updateUser(tenantId: string, userId: string, userData: UpdateUserDto) {
+  async updateUser(tenantId: string, userId: string, userData: UpdateUserDto, updatedByUserId?: string) {
     const client = this.supabase.getClient();
 
     // Validate user belongs to tenant
     const { data: existingUser } = await client
       .from('usuarios_sistema')
-      .select('id')
+      .select('*')
       .eq('id', userId)
       .eq('tenant_id', tenantId)
       .single();
@@ -106,6 +148,25 @@ export class UserManagementService {
     if (error) {
       console.error('Error updating user:', error);
       throw new BadRequestException('Error al actualizar usuario');
+    }
+
+    // Registrar auditoría
+    try {
+      const { password_hash: _, ...existingUserWithoutPassword } = existingUser;
+      await this.auditService.registrarCambio(
+        'usuarios_sistema',
+        'UPDATE',
+        updatedByUserId || 'SYSTEM', // Usar userId del contexto si está disponible
+        {
+          old: existingUserWithoutPassword,
+          new: { ...userData, updated_at: new Date().toISOString() }
+        },
+        tenantId,
+        userId,
+        { accion: 'ACTUALIZAR_USUARIO' }
+      );
+    } catch (error) {
+      console.warn('⚠️ No se pudo registrar auditoría de actualización de usuario:', error);
     }
 
     const { password_hash, ...userWithoutPassword } = updatedUser;
@@ -296,6 +357,15 @@ export class UserManagementService {
     }
 
     console.log('✅ [USER-MGMT] Roles asignados - Usuario:', userId, 'Roles:', newRoleIds);
+
+    // 🟡 MEJORA MEDIA: Invalidar cache de permisos para reflejar cambios inmediatamente
+    try {
+      this.permissionService.invalidateUserPermissions(userId);
+      console.log('✅ [USER-MGMT] Cache de permisos invalidado para usuario:', userId);
+    } catch (error) {
+      console.warn('⚠️ [USER-MGMT] Error invalidando cache de permisos:', error);
+      // No bloquear la asignación de roles si falla la invalidación de cache
+    }
   }
 
   /**
@@ -330,6 +400,15 @@ export class UserManagementService {
     }
 
     console.log('✅ [USER-MGMT] Roles removidos - Usuario:', userId, 'Roles:', roleIds);
+
+    // 🟡 MEJORA MEDIA: Invalidar cache de permisos para reflejar cambios inmediatamente
+    try {
+      this.permissionService.invalidateUserPermissions(userId);
+      console.log('✅ [USER-MGMT] Cache de permisos invalidado para usuario:', userId);
+    } catch (error) {
+      console.warn('⚠️ [USER-MGMT] Error invalidando cache de permisos:', error);
+      // No bloquear la remoción de roles si falla la invalidación de cache
+    }
   }
 
   /**
@@ -436,8 +515,28 @@ export class UserManagementService {
       throw new BadRequestException('Error al resetear contraseña');
     }
 
-    // TODO: Send password reset email
-    console.log('📧 [USER-MGMT] Email de reset pendiente - Usuario:', user.email, 'Token:', resetToken);
+    // Send password reset email
+    try {
+      // Obtener nombre completo del usuario desde la tabla usuarios_sistema
+      const { data: usuarioCompleto } = await client
+        .from('usuarios_sistema')
+        .select('nombre, apellido')
+        .eq('id', userId)
+        .single();
+      
+      const userName = usuarioCompleto 
+        ? `${usuarioCompleto.nombre || ''} ${usuarioCompleto.apellido || ''}`.trim() || user.email
+        : user.email;
+      await this.emailService.sendPasswordResetEmail(
+        user.email,
+        userName,
+        resetToken
+      );
+      console.log('✅ [USER-MGMT] Email de reset enviado - Usuario:', user.email);
+    } catch (error) {
+      console.error('❌ [USER-MGMT] Error enviando email de reset:', error);
+      // No bloquear el reset si falla el email
+    }
 
     return {
       message: 'Token de reset generado exitosamente',

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import UsuarioModal from '@/components/modals/UsuarioModal'
 import { useToast } from "@/components/ui/use-toast"
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -184,9 +185,11 @@ export default function UsuariosPage() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-3 text-lg">Cargando usuarios...</span>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+            <span style={{ marginLeft: '0.75rem', fontSize: '1.125rem', color: 'var(--primary-700)' }}>Cargando usuarios...</span>
+          </div>
         </div>
       </div>
     )
@@ -198,9 +201,16 @@ export default function UsuariosPage() {
       <div className="dashboard-header">
         <h1 className="dashboard-title">Gestión de Usuarios</h1>
         <p className="dashboard-subtitle">Administra usuarios, roles y permisos del sistema</p>
-        <button className="refresh-btn" onClick={handleNuevoUsuario}>
-          + Nuevo Usuario
-        </button>
+        <ProtectedComponent
+          modulo="admin"
+          accion="create"
+          recurso="usuarios"
+          fallback={null}
+        >
+          <button className="refresh-btn" onClick={handleNuevoUsuario}>
+            + Nuevo Usuario
+          </button>
+        </ProtectedComponent>
       </div>
 
       {/* Quick Stats */}
@@ -286,14 +296,33 @@ export default function UsuariosPage() {
         {/* Users Table */}
         <div className="activity-card">
           {usuarios.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No hay usuarios registrados en el sistema</p>
-              <button 
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                onClick={handleNuevoUsuario}
+            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+              <p style={{ color: 'var(--primary-500)', marginBottom: '1rem' }}>No hay usuarios registrados en el sistema</p>
+              <ProtectedComponent
+                modulo="admin"
+                accion="create"
+                recurso="usuarios"
+                fallback={null}
               >
-                Crear primer usuario
-              </button>
+                <button 
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--blue-600)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.875rem'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--blue-700)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--blue-600)'}
+                  onClick={handleNuevoUsuario}
+                >
+                  Crear primer usuario
+                </button>
+              </ProtectedComponent>
             </div>
           ) : (
             <div style={{ overflow: 'auto' }}>
@@ -380,51 +409,65 @@ export default function UsuariosPage() {
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            <button 
-                              onClick={() => handleEditarUsuario(usuario)}
-                              style={{ 
-                                background: 'rgba(59, 130, 246, 0.1)', 
-                                border: '1px solid rgba(59, 130, 246, 0.2)', 
-                                padding: '0.5rem 1rem', 
-                                borderRadius: '6px', 
-                                color: '#3b82f6', 
-                                cursor: 'pointer',
-                                fontSize: '0.8rem'
-                              }}
+                            <ProtectedComponent
+                              modulo="admin"
+                              accion="update"
+                              recurso="usuarios"
+                              fallback={null}
                             >
-                              Editar
-                            </button>
-                            {usuario.estado === 'ACTIVO' ? (
                               <button 
-                                onClick={() => handleCambiarEstado(usuario, 'INACTIVO')}
+                                onClick={() => handleEditarUsuario(usuario)}
                                 style={{ 
-                                  background: 'rgba(239, 68, 68, 0.1)', 
-                                  border: '1px solid rgba(239, 68, 68, 0.2)', 
+                                  background: 'rgba(59, 130, 246, 0.1)', 
+                                  border: '1px solid rgba(59, 130, 246, 0.2)', 
                                   padding: '0.5rem 1rem', 
                                   borderRadius: '6px', 
-                                  color: '#ef4444', 
+                                  color: '#3b82f6', 
                                   cursor: 'pointer',
                                   fontSize: '0.8rem'
                                 }}
                               >
-                                Desactivar
+                                Editar
                               </button>
-                            ) : (
-                              <button 
-                                onClick={() => handleCambiarEstado(usuario, 'ACTIVO')}
-                                style={{ 
-                                  background: 'rgba(16, 185, 129, 0.1)', 
-                                  border: '1px solid rgba(16, 185, 129, 0.2)', 
-                                  padding: '0.5rem 1rem', 
-                                  borderRadius: '6px', 
-                                  color: '#10b981', 
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem'
-                                }}
-                              >
-                                Activar
-                              </button>
-                            )}
+                            </ProtectedComponent>
+                            <ProtectedComponent
+                              modulo="admin"
+                              accion="update"
+                              recurso="usuarios"
+                              fallback={null}
+                            >
+                              {usuario.estado === 'ACTIVO' ? (
+                                <button 
+                                  onClick={() => handleCambiarEstado(usuario, 'INACTIVO')}
+                                  style={{ 
+                                    background: 'rgba(239, 68, 68, 0.1)', 
+                                    border: '1px solid rgba(239, 68, 68, 0.2)', 
+                                    padding: '0.5rem 1rem', 
+                                    borderRadius: '6px', 
+                                    color: '#ef4444', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem'
+                                  }}
+                                >
+                                  Desactivar
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleCambiarEstado(usuario, 'ACTIVO')}
+                                  style={{ 
+                                    background: 'rgba(16, 185, 129, 0.1)', 
+                                    border: '1px solid rgba(16, 185, 129, 0.2)', 
+                                    padding: '0.5rem 1rem', 
+                                    borderRadius: '6px', 
+                                    color: '#10b981', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem'
+                                  }}
+                                >
+                                  Activar
+                                </button>
+                              )}
+                            </ProtectedComponent>
                           </div>
                         </td>
                       </tr>

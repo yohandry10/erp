@@ -62,7 +62,7 @@ export class TenantManagementController {
   @ApiOperation({ summary: 'Obtener tenant del usuario actual', description: 'Obtiene los detalles del tenant del usuario autenticado' })
   @ApiResponse({ status: 200, description: 'Tenant obtenido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
-  async getCurrentUserTenant(@CurrentTenant() tenantId?: string, @Req() req: any) {
+  async getCurrentUserTenant(@Req() req: any, @CurrentTenant() tenantId?: string) {
     const currentTenantId = tenantId ?? req.user?.tenant_id;
     if (!currentTenantId) { throw new ForbiddenException('Tenant no asociado a la sesión actual'); }
     return this.tenantManagementService.getTenantById(currentTenantId);
@@ -90,8 +90,7 @@ export class TenantManagementController {
       throw new ForbiddenException('No tienes permisos para ver este tenant');
     }
     
-    if (!currentTenantId) { throw new ForbiddenException('Tenant no asociado a la sesión actual'); }
-    return this.tenantManagementService.getTenantById(currentTenantId);
+    return this.tenantManagementService.getTenantById(tenantId);
   }
 
   /**
@@ -99,6 +98,8 @@ export class TenantManagementController {
    * Requirements: 1.2, 1.3, 9.1
    */
   @Post()
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden crear tenants
+  @RequirePermission('tenants.manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Crear nuevo tenant', description: 'Crea un nuevo tenant con su primer usuario administrador' })
   @ApiResponse({ status: 201, description: 'Tenant creado exitosamente' })
@@ -115,6 +116,8 @@ export class TenantManagementController {
    * Requirements: 1.1, 9.1
    */
   @Put(':id')
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden actualizar tenants
+  @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Actualizar tenant', description: 'Actualiza la información de un tenant existente' })
   @ApiResponse({ status: 200, description: 'Tenant actualizado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -133,6 +136,8 @@ export class TenantManagementController {
    * Requirements: 1.1, 9.1
    */
   @Post(':id/activate')
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden activar tenants
+  @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Activar tenant', description: 'Activa un tenant y habilita el acceso de sus usuarios' })
   @ApiResponse({ status: 200, description: 'Tenant activado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -147,6 +152,8 @@ export class TenantManagementController {
    * Requirements: 1.6, 9.1
    */
   @Post(':id/deactivate')
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden desactivar tenants
+  @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Desactivar tenant', description: 'Desactiva un tenant y revoca todas las sesiones activas de sus usuarios' })
   @ApiResponse({ status: 200, description: 'Tenant desactivado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -161,6 +168,8 @@ export class TenantManagementController {
    * Requirements: 1.4, 9.1
    */
   @Get(':id/users')
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden ver usuarios de otros tenants
+  @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Obtener usuarios del tenant', description: 'Obtiene todos los usuarios de un tenant específico' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -175,6 +184,8 @@ export class TenantManagementController {
    * Requirements: 1.4, 9.1
    */
   @Get(':id/stats')
+  @UseGuards(SuperAdminGuard, PermissionGuard) // ✅ F1: Solo super-admins pueden ver estadísticas de otros tenants
+  @RequirePermission('tenants.manage')
   @ApiOperation({ summary: 'Obtener estadísticas del tenant', description: 'Obtiene estadísticas de uso del tenant (usuarios activos, almacenamiento, etc.)' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })

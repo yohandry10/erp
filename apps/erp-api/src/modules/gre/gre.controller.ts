@@ -5,6 +5,7 @@ import { GreService } from './gre.service';
 import { CreateGuiaRemisionDto, GuiaRemisionResponseDto } from './gre.types';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 @ApiTags('gre')
 @Controller('gre')
@@ -76,11 +77,14 @@ export class GreController {
   @RequirePermission('gre.guias.emitir')
   @ApiOperation({ summary: 'Crear nueva guía de remisión electrónica' })
   @ApiResponse({ status: 201, description: 'Guía de remisión creada exitosamente' })
-  async createGuia(@Body() greData: CreateGuiaRemisionDto) {
+  async createGuia(
+    @Body() greData: CreateGuiaRemisionDto,
+    @CurrentTenant() tenantId: string,
+  ) {
     console.log('📦 Recibiendo datos para crear GRE:', greData);
     
     try {
-      const nuevaGuia = await this.greService.createGuia(greData);
+      const nuevaGuia = await this.greService.createGuia(greData, tenantId);
       
       console.log('✅ GRE creada exitosamente:', nuevaGuia);
       

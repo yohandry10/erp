@@ -43,6 +43,9 @@ import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 import { RmaModule } from './modules/ventas/rma/rma.module';
 import { SecurityDashboardModule } from './modules/security/security.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { OutboxModule } from './shared/outbox/outbox.module';
+import { SunatRetryModule } from './modules/sunat-retry/sunat-retry.module';
+import { CacheModule } from './shared/cache/cache.module';
 
 @Module({
   imports: [
@@ -56,6 +59,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
     SupabaseModule,
     PermissionsModule,
     IntegrationModule,
+    CacheModule, // ✅ Cache distribuido con Redis
     UsuariosModule,
     TenantsModule,
     ComprasModule,
@@ -85,6 +89,8 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
     PedidosModule,
     ReportesModule,
     RmaModule,
+    OutboxModule, // 🔴 CRÍTICO: Módulo de outbox pattern para eventos persistentes
+    SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
   ],
   controllers: [AppController],
   providers: [

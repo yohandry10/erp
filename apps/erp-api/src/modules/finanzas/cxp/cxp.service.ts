@@ -2,12 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService, PagoProveedorRegistradoEvent } from '../../../shared/events/event-bus.service';
 import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto } from './dto';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 @Injectable()
 export class CxpService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
+    private readonly retencionesValidation: RetencionesValidationService,
   ) {}
 
   async crearCuentaPorPagar(
@@ -51,6 +53,45 @@ export class CxpService {
         `El total (${dto.total}) no coincide con subtotal + IGV (${totalCalculado})`,
       );
     }
+
+    // 🔴 TAREA 17: Validar cálculos de retenciones si se implementan en el futuro
+    // Nota: Actualmente CxP no tiene campos de retenciones, pero esta validación
+    // prepara el código para cuando se agreguen estos campos
+    // Si en el futuro se agregan retenciones/percepciones/detracciones a CxP,
+    // descomentar y completar esta validación:
+    /*
+    if (dto.retencion || dto.percepcion || dto.detraccion) {
+      const proveedor = await this.obtenerProveedor(dto.proveedor_id, tenantId);
+      const empresaConfig = await this.retencionesValidation.obtenerConfiguracionEmpresa(tenantId);
+      
+      const ajustes = {
+        retencion: dto.retencion ?? 0,
+        percepcion: dto.percepcion ?? 0,
+        detraccion: dto.detraccion ?? 0,
+        anticipo: dto.anticipo ?? 0,
+      };
+      
+      const validacion = await this.retencionesValidation.validarCalculoAjustes(
+        dto.total,
+        ajustes,
+        proveedor ? {
+          sujeto_retencion: proveedor.sujeto_retencion,
+          retencion_tasa: proveedor.retencion_tasa,
+          sujeto_percepcion: proveedor.sujeto_percepcion,
+          percepcion_tasa: proveedor.percepcion_tasa,
+          sujeto_detraccion: proveedor.sujeto_detraccion,
+          detraccion_tasa: proveedor.detraccion_tasa,
+        } : undefined,
+        empresaConfig
+      );
+      
+      if (!validacion.valido) {
+        throw new BadRequestException(
+          `Error en cálculo de ajustes tributarios: ${validacion.errores.join('; ')}`
+        );
+      }
+    }
+    */
 
     // Calcular fecha de vencimiento según condiciones de pago
     const condicionesPago = dto.condiciones_pago ?? 'CONTADO';
@@ -382,7 +423,7 @@ export class CxpService {
     if (dto.cuenta_bancaria_id) {
       const { data: cuentaBancaria, error: errorCuenta } = await client
         .from('cuentas_bancarias')
-        .select('id, nombre, saldo, permite_sobregiro, activa')
+        .select('id, nombre, saldo, moneda, permite_sobregiro, activa')
         .eq('tenant_id', tenantId)
         .eq('id', dto.cuenta_bancaria_id)
         .maybeSingle();
@@ -393,6 +434,13 @@ export class CxpService {
 
       if (!cuentaBancaria.activa) {
         throw new BadRequestException('No se pueden registrar pagos desde una cuenta bancaria inactiva');
+      }
+
+      // 🔴 CRÍTICO FIX: Validar que la moneda coincida con la CxP
+      if (cuentaBancaria.moneda !== cxp.moneda) {
+        throw new BadRequestException(
+          `La moneda de la cuenta bancaria (${cuentaBancaria.moneda}) no coincide con la moneda de la CxP (${cxp.moneda})`,
+        );
       }
 
       // ✅ VALIDAR SALDO BANCARIO: Verificar que hay fondos suficientes

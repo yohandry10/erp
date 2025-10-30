@@ -7,6 +7,7 @@ import * as z from 'zod'
 import { ChevronLeft, ChevronRight, Check, FileText, Package, Eye, Plus, Trash2, Calendar, Building2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { Proveedor } from '@/types/compras'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
 // Validation schemas
 const step1Schema = z.object({
@@ -507,23 +508,30 @@ export function OCWizard({
             <ChevronRight size={16} />
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleFinalSubmit}
-            disabled={isLoading}
-            className="refresh-btn"
-            style={{
-              padding: '0.75rem 1.5rem',
-              opacity: isLoading ? 0.7 : 1,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+          <ProtectedComponent
+            modulo="compras"
+            accion="create"
+            recurso="ordenes"
+            fallback={null}
           >
-            <Check size={16} />
-            {isLoading ? 'Guardando...' : 'Crear Orden de Compra'}
-          </button>
+            <button
+              type="button"
+              onClick={handleFinalSubmit}
+              disabled={isLoading}
+              className="refresh-btn"
+              style={{
+                padding: '0.75rem 1.5rem',
+                opacity: isLoading ? 0.7 : 1,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Check size={16} />
+              {isLoading ? 'Guardando...' : 'Crear Orden de Compra'}
+            </button>
+          </ProtectedComponent>
         )}
       </div>
     </div>

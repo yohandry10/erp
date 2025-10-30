@@ -242,6 +242,16 @@ const menuItems: MenuItem[] = [
       accion: 'read',
       recurso: 'configuracion'
     }
+  },
+  {
+    title: 'Auditoría',
+    href: '/dashboard/audit-logs',
+    icon: Shield,
+    permission: {
+      modulo: 'security',
+      accion: 'read',
+      recurso: 'audit'
+    }
   }
 ]
 
@@ -298,7 +308,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
           padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
           margin: '0.25rem 0',
           borderRadius: '12px',
-          color: '#94a3b8',
+          color: 'var(--primary-400)',
           fontSize: isTablet ? '0.85rem' : '0.9rem',
           minHeight: '44px',
           opacity: 0.5,
@@ -331,12 +341,12 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
             padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
             borderRadius: '12px',
             textDecoration: 'none',
-            color: isSubmenuActive ? 'white' : '#475569',
+            color: isSubmenuActive ? 'white' : 'var(--primary-600)',
             fontWeight: isSubmenuActive ? '700' : '600',
             fontSize: isTablet ? '0.85rem' : '0.9rem',
             transition: 'all 0.3s ease',
-            background: isSubmenuActive ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)' : 'transparent',
-            boxShadow: isSubmenuActive ? '0 8px 16px rgba(59, 130, 246, 0.3)' : 'none',
+            background: isSubmenuActive ? 'var(--gradient-primary)' : 'transparent',
+            boxShadow: isSubmenuActive ? 'var(--shadow-lg)' : 'none',
             border: 'none',
             cursor: 'pointer',
             minHeight: '44px'
@@ -394,12 +404,12 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
         margin: '0.25rem 0',
         borderRadius: '12px',
         textDecoration: 'none',
-        color: isActive ? 'white' : '#475569',
+        color: isActive ? 'white' : 'var(--primary-600)',
         fontWeight: isActive ? '700' : '600',
         fontSize: isTablet ? '0.85rem' : '0.9rem',
         transition: 'all 0.3s ease',
-        background: isActive ? 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)' : 'transparent',
-        boxShadow: isActive ? '0 8px 16px rgba(59, 130, 246, 0.3)' : 'none',
+        background: isActive ? 'var(--gradient-primary)' : 'transparent',
+        boxShadow: isActive ? 'var(--shadow-lg)' : 'none',
         transform: isActive ? 'translateY(-1px)' : 'none',
         border: isActive ? 'none' : '1px solid transparent',
         minHeight: '44px'
@@ -508,17 +518,17 @@ export default function Sidebar() {
           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
           backdropFilter: 'blur(20px) saturate(180%)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
-          borderRadius: '12px',
+          borderRadius: 'var(--border-radius)',
           padding: '0.75rem',
           cursor: 'pointer',
           display: isMobile ? 'flex' : 'none',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+          boxShadow: 'var(--shadow-lg)',
           transition: 'all 0.3s ease'
         }}
       >
-        {isOpen ? <X size={20} style={{ color: '#475569' }} /> : <Menu size={20} style={{ color: '#475569' }} />}
+        {isOpen ? <X size={20} style={{ color: 'var(--primary-600)' }} /> : <Menu size={20} style={{ color: 'var(--primary-600)' }} />}
       </button>
 
       {/* Sidebar */}
@@ -539,14 +549,14 @@ export default function Sidebar() {
           zIndex: 1001,
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
-          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+          boxShadow: 'var(--shadow-2xl)',
           WebkitOverflowScrolling: 'touch'
         }}
       >
         {/* Logo */}
         <div style={{ 
           padding: isTablet ? '1rem 1.5rem' : '1.5rem 2rem', 
-          borderBottom: '1px solid rgba(203, 213, 225, 0.3)',
+          borderBottom: '1px solid var(--primary-200)',
           flexShrink: 0
         }}>
           <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -583,7 +593,7 @@ export default function Sidebar() {
         {/* User Section */}
         <div style={{ 
           padding: isTablet ? '0.75rem' : '1rem', 
-          borderTop: '1px solid rgba(203, 213, 225, 0.3)',
+          borderTop: '1px solid var(--primary-200)',
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -593,20 +603,20 @@ export default function Sidebar() {
           <div style={{ 
             padding: isTablet ? '0.75rem' : '1rem', 
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%)', 
-            borderRadius: '12px',
+            borderRadius: 'var(--border-radius)',
             border: '1px solid rgba(59, 130, 246, 0.2)'
           }}>
             <div style={{ 
               fontSize: isTablet ? '0.85rem' : '0.9rem', 
               fontWeight: '700', 
-              color: '#1e293b',
+              color: 'var(--primary-800)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>{user?.nombre || 'Usuario'}</div>
             <div style={{ 
               fontSize: isTablet ? '0.75rem' : '0.8rem', 
-              color: '#64748b', 
+              color: 'var(--primary-500)', 
               fontWeight: '500',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -624,9 +634,9 @@ export default function Sidebar() {
               width: '100%',
               padding: isTablet ? '0.5rem' : '0.75rem 1rem',
               background: 'transparent',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '8px',
-              color: '#dc2626',
+              border: '1px solid var(--red-200)',
+              borderRadius: 'var(--border-radius)',
+              color: 'var(--red-600)',
               fontSize: isTablet ? '0.85rem' : '0.9rem',
               fontWeight: '600',
               cursor: 'pointer',
@@ -650,7 +660,7 @@ export default function Sidebar() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
+            background: 'rgba(15, 23, 42, 0.8)',
             zIndex: 1000,
             backdropFilter: 'blur(4px)'
           }}

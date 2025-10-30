@@ -1,9 +1,13 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { CacheInvalidationService } from '../shared/cache/cache-invalidation.service';
 
 @Injectable()
 export class DocumentosService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly cacheInvalidation: CacheInvalidationService,
+  ) {}
 
   // ========== ESTADÍSTICAS ==========
   async getStats(tenantId?: string) {
@@ -301,6 +305,15 @@ export class DocumentosService {
       await this.registrarAuditoria(documento.id, 'CREADO', userId, 'Documento creado', tenantId);
 
       console.log('✅ Documento creado exitosamente:', documento.id);
+
+      // Invalidar cache del dashboard automáticamente
+      if (tenantId) {
+        try {
+          await this.cacheInvalidation.onDocumentoCreated(tenantId);
+        } catch (error) {
+          console.warn('⚠️ No se pudo invalidar cache después de crear documento:', error);
+        }
+      }
 
       return {
         success: true,

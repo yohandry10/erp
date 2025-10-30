@@ -22,9 +22,11 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuditModule } from '../audit/audit.module';
+import { CacheModule } from '../../shared/cache/cache.module';
 
 @Module({
-  imports: [SupabaseModule, NotificationsModule],
+  imports: [SupabaseModule, NotificationsModule, AuditModule, CacheModule],
   controllers: [
     // More specific routes must come first to avoid being caught by catch-all routes
     RecepcionesController,

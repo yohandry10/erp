@@ -7,6 +7,7 @@ import { PermissionService } from '../permissions/permission.service';
 import { Permission } from '../permissions/types';
 import { AuditService } from '../audit/audit.service';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { UserFiltersDto, CreateUserDto, UpdateUserDto, AssignRolesDto } from './dto';
 
@@ -76,8 +77,9 @@ export class UserManagementController {
   async createUser(
     @CurrentTenant() tenantId: string,
     @Body() createUserDto: CreateUserDto,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.userManagementService.createUser(tenantId, createUserDto);
+    return this.userManagementService.createUser(tenantId, createUserDto, userId);
   }
 
   /**
@@ -96,8 +98,9 @@ export class UserManagementController {
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
     @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser('id') updatedByUserId?: string,
   ) {
-    return this.userManagementService.updateUser(tenantId, userId, updateUserDto);
+    return this.userManagementService.updateUser(tenantId, userId, updateUserDto, updatedByUserId);
   }
 
   /**
@@ -166,6 +169,7 @@ export class UserManagementController {
   async resetPassword(
     @CurrentTenant() tenantId: string,
     @Param('id') userId: string,
+    @CurrentUser('id') currentUserId?: string,
   ) {
     return this.userManagementService.resetPassword(tenantId, userId);
   }
