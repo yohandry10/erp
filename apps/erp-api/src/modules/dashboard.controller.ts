@@ -1,25 +1,35 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
 @ApiTags('dashboard')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class DashboardController {
   constructor(private readonly supabase: SupabaseService) {}
   
   @Post('seed-test-data')
+  @RequirePermission('system.debug')
   @ApiOperation({ summary: 'Crear datos de prueba para CPE y GRE' })
   @ApiResponse({ status: 200, description: 'Datos de prueba creados exitosamente' })
-  async seedTestData() {
+  async seedTestData(@CurrentTenant() tenantId?: string) {
     try {
+      // HARDENING: bloquear ejecución en producción.
+      if (process.env.NODE_ENV === 'production') {
+        throw new ForbiddenException('Endpoint restringido en producción');
+      }
+
       console.log('🌱 [Dashboard] Creando datos de prueba...');
       
       const client = this.supabase.getClient();
-      const tenantId = '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new ForbiddenException('Tenant requerido para datos de prueba');
+      }
       
       // Crear datos de prueba para CPE
       const cpeData = [
@@ -146,6 +156,7 @@ export class DashboardController {
   }
   
   @Get('stats')
+  @RequirePermission('dashboard.stats.read') // HARDENING: métrica protegida por permiso granular.
   @ApiOperation({ summary: 'Obtener estadísticas generales del dashboard' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@CurrentTenant() tenantId: string) {
@@ -406,6 +417,7 @@ export class DashboardController {
   }
 
   @Get('activities')
+  @RequirePermission('dashboard.activities.read') // HARDENING: lista de actividades protegida.
   @ApiOperation({ summary: 'Obtener actividades recientes' })
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
   async getActivities(@CurrentTenant() tenantId: string) {

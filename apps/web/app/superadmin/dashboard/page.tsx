@@ -197,6 +197,33 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="activity-section">
+        <h2 className="activity-title">Acciones Rápidas</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          <button
+            onClick={() => router.push('/superadmin/dashboard/security')}
+            className="activity-item"
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
+              border: '2px solid rgba(239, 68, 68, 0.2)',
+              cursor: 'pointer',
+              textAlign: 'left'
+            }}
+          >
+            <span style={{ fontSize: '2rem' }}>🔒</span>
+            <div>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                Dashboard de Seguridad
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: 'var(--primary-500)' }}>
+                Monitoreo RLS y alertas
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* Tenant Management */}
       <CrearTenants />
     </div>

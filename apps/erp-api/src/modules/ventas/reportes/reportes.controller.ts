@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { ReportesService } from './reportes.service';
 
@@ -18,7 +19,7 @@ import { ReportesService } from './reportes.service';
 @ApiTags('Ventas - Reportes')
 @ApiBearerAuth()
 @Controller('api/ventas/reportes')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: reportes exige permisos granulares.
 export class ReportesController {
   constructor(private readonly reportesService: ReportesService) {}
 
@@ -28,7 +29,7 @@ export class ReportesController {
    * Requirements: 16.1
    */
   @Get('ventas-por-cliente')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Reporte de ventas por cliente',
     description: 'Obtiene ventas agrupadas por cliente con totales y estadísticas',
@@ -57,7 +58,7 @@ export class ReportesController {
    * Requirements: 16.2
    */
   @Get('cotizaciones-pendientes')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Reporte de cotizaciones pendientes',
     description: 'Obtiene cotizaciones que requieren seguimiento',
@@ -84,7 +85,7 @@ export class ReportesController {
    * Requirements: 16.3
    */
   @Get('pedidos-por-estado')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Dashboard de pedidos por estado',
     description: 'Obtiene distribución de pedidos según su estado',
@@ -111,7 +112,7 @@ export class ReportesController {
    * Requirements: 16.4
    */
   @Get('productos-mas-vendidos')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Reporte de productos más vendidos',
     description: 'Obtiene ranking de productos por unidades e importe',
@@ -138,7 +139,7 @@ export class ReportesController {
    * Requirements: 16.5
    */
   @Get('top-clientes')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Reporte de top clientes',
     description: 'Obtiene clientes con mayor volumen de ventas',
@@ -165,7 +166,7 @@ export class ReportesController {
    * Requirements: 16.6
    */
   @Get('lead-time')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Reporte de lead time comercial',
     description: 'Calcula tiempo promedio desde cotización hasta factura',
@@ -189,7 +190,7 @@ export class ReportesController {
    * Pipeline comercial (cotizaciones → pedidos → facturas)
    */
   @Get('pipeline')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Pipeline comercial',
     description: 'Obtiene métricas de conversión desde cotizaciones hasta facturación',
@@ -208,7 +209,7 @@ export class ReportesController {
    * Fill-rate y OTIF del flujo logístico
    */
   @Get('fill-rate')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Fill-rate y OTIF',
     description:
@@ -228,7 +229,7 @@ export class ReportesController {
    * Aging de cuentas por cobrar
    */
   @Get('cxc-aging')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'Aging de cuentas por cobrar',
     description: 'Distribución del saldo pendiente por rangos de mora e identificación de cuentas críticas',
@@ -247,7 +248,7 @@ export class ReportesController {
    * Métricas de aceptación SUNAT
    */
   @Get('sunat-kpis')
-  @RequirePermissions('ventas', 'reportes', 'ver')
+  @RequirePermission('ventas.reportes.ver')
   @ApiOperation({
     summary: 'KPIs SUNAT',
     description: 'Tasas de aceptación, observación y rechazo de documentos electrónicos',

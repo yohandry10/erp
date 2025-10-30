@@ -1,20 +1,31 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Req, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
 @ApiTags('usuarios-sistema')
 @Controller('usuarios-sistema')
 export class UsuariosController {
   constructor(private readonly supabaseService: SupabaseService) {}
 
+  private resolveTenantOrThrow(req: any): string {
+    const tenantId = req?.user?.tenant_id;
+    if (!tenantId) {
+      // HARDENING: no permitir defaults ni tenants ajenos.
+      throw new BadRequestException('Tenant requerido en la sesión actual');
+    }
+    return tenantId;
+  }
+
   @Get('/')
+  @RequirePermission('usuarios', 'read', 'usuarios')
   @ApiOperation({ summary: 'Obtener todos los usuarios del sistema' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
   async getUsuarios(@Req() req: any, @Query('rol') rol?: string, @Query('estado') estado?: string) {
     try {
       console.log('👥 Obteniendo usuarios del sistema...');
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       let query = this.supabaseService
         .getClient()
@@ -66,13 +77,14 @@ export class UsuariosController {
   }
 
   @Get('/stats')
+  @RequirePermission('usuarios', 'read', 'estadisticas')
   @ApiOperation({ summary: 'Obtener estadísticas de usuarios' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@Req() req: any) {
     try {
       console.log('📊 Obteniendo estadísticas de usuarios...');
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Total usuarios
       const { count: totalUsuarios } = await this.supabaseService
@@ -129,13 +141,14 @@ export class UsuariosController {
   }
 
   @Get('/roles')
+  @RequirePermission('usuarios', 'read', 'roles')
   @ApiOperation({ summary: 'Obtener todos los roles disponibles' })
   @ApiResponse({ status: 200, description: 'Lista de roles obtenida exitosamente' })
   async getRoles(@Req() req: any) {
     try {
       console.log('🔑 Obteniendo roles del sistema...');
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data: roles, error } = await this.supabaseService
         .getClient()
@@ -183,6 +196,7 @@ export class UsuariosController {
   }
 
   @Post('/crear')
+  @RequirePermission('usuarios', 'create', 'usuarios')
   @ApiOperation({ summary: 'Crear nuevo usuario del sistema' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   async crearUsuario(@Body() usuarioData: any, @Req() req: any) {
@@ -191,7 +205,7 @@ export class UsuariosController {
       console.log('📋 Datos recibidos:', JSON.stringify(usuarioData, null, 2));
 
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Validar datos requeridos
       if (!usuarioData.nombre || !usuarioData.email || !usuarioData.rol_id) {
@@ -279,13 +293,14 @@ export class UsuariosController {
   }
 
   @Put('/:id')
+  @RequirePermission('usuarios', 'update', 'usuarios')
   @ApiOperation({ summary: 'Actualizar usuario del sistema' })
   @ApiResponse({ status: 200, description: 'Usuario actualizado exitosamente' })
   async actualizarUsuario(@Param('id') id: string, @Body() usuarioData: any, @Req() req: any) {
     try {
       console.log(`✏️ Actualizando usuario: ${id}`);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Verificar que el usuario existe
       const { data: usuarioExistente } = await this.supabaseService
@@ -344,13 +359,14 @@ export class UsuariosController {
   }
 
   @Put('/:id/estado')
+  @RequirePermission('usuarios', 'update', 'estado')
   @ApiOperation({ summary: 'Cambiar estado de usuario (activar/desactivar)' })
   @ApiResponse({ status: 200, description: 'Estado actualizado exitosamente' })
   async cambiarEstado(@Param('id') id: string, @Body() estadoData: { estado: string }, @Req() req: any) {
     try {
       console.log(`🔄 Cambiando estado de usuario ${id} a ${estadoData.estado}`);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data: usuarioActualizado, error } = await this.supabaseService
         .getClient()
@@ -388,13 +404,14 @@ export class UsuariosController {
   }
 
   @Delete('/:id')
+  @RequirePermission('usuarios', 'delete', 'usuarios')
   @ApiOperation({ summary: 'Eliminar usuario del sistema' })
   @ApiResponse({ status: 200, description: 'Usuario eliminado exitosamente' })
   async eliminarUsuario(@Param('id') id: string, @Req() req: any) {
     try {
       console.log(`🗑️ Eliminando usuario: ${id}`);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Eliminar relaciones de rol primero
       await this.supabaseService
@@ -433,13 +450,14 @@ export class UsuariosController {
   }
 
   @Get('/:id/permissions')
+  @RequirePermission('usuarios', 'read', 'permisos')
   @ApiOperation({ summary: 'Obtener permisos del usuario' })
   @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
   async getUserPermissions(@Param('id') id: string, @Req() req: any) {
     try {
       console.log(`🔑 Obteniendo permisos del usuario: ${id}`);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Get user's roles
       const { data: userRoles, error: rolesError } = await this.supabaseService
@@ -514,13 +532,14 @@ export class UsuariosController {
   }
 
   @Get('/:id')
+  @RequirePermission('usuarios', 'read', 'usuarios')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
   @ApiResponse({ status: 200, description: 'Usuario obtenido exitosamente' })
   async getUsuario(@Param('id') id: string, @Req() req: any) {
     try {
       console.log(`👤 Obteniendo usuario: ${id}`);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data: usuario, error } = await this.supabaseService
         .getClient()

@@ -10,6 +10,8 @@ import { AccountingReportsService } from '../shared/integration/accounting-repor
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant, CurrentUser, SuperAdminGuard } from '../common';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CreatePeriodoDto, PeriodoResponseDto, CreatePresupuestoDto, UpdatePresupuestoDto, PresupuestoResponseDto, ListarAsientosQueryDto, AsientoResponseDto, CreateAsientoManualDto } from '@erp-suite/dtos';
 import { PeriodosService } from './contabilidad/services/periodos.service';
 import { EstadosFinancierosService } from './contabilidad/services/estados-financieros.service';
@@ -21,7 +23,7 @@ import { AsientosGeneratorService } from './contabilidad/services/asientos-gener
 
 @ApiTags('contabilidad')
 @Controller('contabilidad')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: permisos granulares obligatorios.
 export class ContabilidadController {
 
   constructor(
@@ -43,6 +45,7 @@ export class ContabilidadController {
   // =============================================
 
   @Post('periodos')
+  @RequirePermission('contabilidad.periodos.crear') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Crear nuevo período contable' })
   @ApiResponse({ 
     status: 201, 
@@ -78,6 +81,7 @@ export class ContabilidadController {
   }
 
   @Get('periodos')
+  @RequirePermission('contabilidad.periodos.read') // HARDENING: lectura de periodos.
   @ApiOperation({ summary: 'Obtener todos los períodos contables del tenant' })
   @ApiResponse({ 
     status: 200, 
@@ -103,6 +107,7 @@ export class ContabilidadController {
   }
 
   @Get('periodos/:id')
+  @RequirePermission('contabilidad.periodos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener un período contable específico por ID' })
   @ApiResponse({ 
     status: 200, 
@@ -147,6 +152,7 @@ export class ContabilidadController {
   }
 
   @Get('periodos/:id/validar-cierre')
+  @RequirePermission('contabilidad.periodos.validar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Validar si un período puede ser cerrado' })
   @ApiResponse({ 
     status: 200, 
@@ -204,6 +210,7 @@ export class ContabilidadController {
   }
 
   @Post('periodos/:id/cerrar')
+  @RequirePermission('contabilidad.periodos.cerrar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Cerrar un período contable' })
   @ApiResponse({ 
     status: 200, 
@@ -259,6 +266,7 @@ export class ContabilidadController {
   }
 
   @Post('periodos/:id/reabrir')
+  @RequirePermission('contabilidad.periodos.reabrir') // HARDENING: permisos granulares.
   @UseGuards(SuperAdminGuard)
   @ApiOperation({ summary: 'Reabrir un período contable cerrado (solo superadmin)' })
   @ApiResponse({ 
@@ -317,6 +325,7 @@ export class ContabilidadController {
   }
 
   @Post('periodos/:id/bloquear')
+  @RequirePermission('contabilidad.periodos.bloquear') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Bloquear un período contable' })
   @ApiResponse({ 
     status: 200, 
@@ -374,6 +383,7 @@ export class ContabilidadController {
   // =============================================
 
   @Post('presupuestos')
+  @RequirePermission('contabilidad.presupuestos.crear') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Crear nuevo presupuesto por centro de costo, cuenta y período' })
   @ApiResponse({ 
     status: 201, 
@@ -410,6 +420,7 @@ export class ContabilidadController {
   }
 
   @Get('presupuestos')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Listar presupuestos con filtros opcionales' })
   @ApiResponse({ 
     status: 200, 
@@ -454,6 +465,7 @@ export class ContabilidadController {
   }
 
   @Get('presupuestos/:id')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener un presupuesto específico por ID' })
   @ApiResponse({ 
     status: 200, 
@@ -488,6 +500,7 @@ export class ContabilidadController {
   }
 
   @Put('presupuestos/:id')
+  @RequirePermission('contabilidad.presupuestos.actualizar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Actualizar un presupuesto existente' })
   @ApiResponse({ 
     status: 200, 
@@ -530,6 +543,7 @@ export class ContabilidadController {
   }
 
   @Delete('presupuestos/:id')
+  @RequirePermission('contabilidad.presupuestos.eliminar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Eliminar un presupuesto existente' })
   @ApiResponse({ 
     status: 200, 
@@ -568,6 +582,7 @@ export class ContabilidadController {
   }
 
   @Get('presupuestos/centro/:centroId/periodo/:periodoId')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener presupuestos por centro de costo y período' })
   @ApiResponse({ 
     status: 200, 
@@ -717,6 +732,7 @@ export class ContabilidadController {
   }
 
   @Get('presupuestos/comparacion/:periodoId')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener comparación de presupuesto vs real para todos los centros de costo en un período' })
   @ApiResponse({ 
     status: 200, 
@@ -841,6 +857,7 @@ export class ContabilidadController {
   }
 
   @Post('presupuestos/:id/actualizar-ejecucion')
+  @RequirePermission('contabilidad.presupuestos.ejecucion') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Actualizar la ejecución presupuestal de un presupuesto específico' })
   @ApiResponse({ 
     status: 200, 
@@ -883,6 +900,7 @@ export class ContabilidadController {
   }
 
   @Post('presupuestos/periodo/:periodoId/actualizar-ejecucion')
+  @RequirePermission('contabilidad.presupuestos.ejecucion') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Actualizar la ejecución presupuestal de todos los presupuestos de un período' })
   @ApiResponse({ 
     status: 200, 
@@ -934,6 +952,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('presupuestos/alertas')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener todas las alertas de sobregiro presupuestal activas' })
   @ApiResponse({ 
     status: 200, 
@@ -995,6 +1014,7 @@ export class ContabilidadController {
   }
 
   @Get('presupuestos/alertas/resumen')
+  @RequirePermission('contabilidad.presupuestos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener resumen de alertas agrupadas por nivel de severidad' })
   @ApiResponse({ 
     status: 200, 
@@ -1058,6 +1078,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('centros-costo')
+  @RequirePermission('contabilidad.centros_costo.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Listar todos los centros de costo del tenant' })
   @ApiResponse({ 
     status: 200, 
@@ -1082,6 +1103,7 @@ export class ContabilidadController {
   }
 
   @Get('centros-costo/:id')
+  @RequirePermission('contabilidad.centros_costo.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener un centro de costo específico por ID' })
   @ApiResponse({ 
     status: 200, 
@@ -1111,6 +1133,7 @@ export class ContabilidadController {
   }
 
   @Post('centros-costo')
+  @RequirePermission('contabilidad.centros_costo.crear') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Crear nuevo centro de costo' })
   @ApiResponse({ 
     status: 201, 
@@ -1146,6 +1169,7 @@ export class ContabilidadController {
   }
 
   @Put('centros-costo/:id')
+  @RequirePermission('contabilidad.centros_costo.actualizar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Actualizar un centro de costo existente' })
   @ApiResponse({ 
     status: 200, 
@@ -1185,6 +1209,7 @@ export class ContabilidadController {
   }
 
   @Get('centros-costo/:id/asientos')
+  @RequirePermission('contabilidad.centros_costo.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener asientos contables por centro de costo' })
   @ApiResponse({ 
     status: 200, 
@@ -1285,6 +1310,7 @@ export class ContabilidadController {
   }
 
   @Get('centros-costo/:id/reporte-gastos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener reporte de gastos por centro de costo' })
   @ApiResponse({ 
     status: 200, 
@@ -1390,6 +1416,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('estados/balance-comprobacion')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance de Comprobación por período' })
   @ApiResponse({ 
     status: 200, 
@@ -1467,6 +1494,7 @@ export class ContabilidadController {
   }
   
   @Get('estados/estado-resultados')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Estado de Resultados (P&L) por período' })
   @ApiResponse({ 
     status: 200, 
@@ -1537,6 +1565,7 @@ export class ContabilidadController {
   }
 
   @Get('estados/balance-general')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance General por período' })
   @ApiResponse({ 
     status: 200, 
@@ -1611,6 +1640,7 @@ export class ContabilidadController {
   }
 
   @Get('estados/balance-comprobacion/formatted')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance de Comprobación formateado según estándares contables' })
   @ApiResponse({ 
     status: 200, 
@@ -1680,6 +1710,7 @@ export class ContabilidadController {
   }
 
   @Get('estados/estado-resultados/formatted')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Estado de Resultados formateado según estándares contables' })
   @ApiResponse({ 
     status: 200, 
@@ -1749,6 +1780,7 @@ export class ContabilidadController {
   }
 
   @Get('estados/balance-general/formatted')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance General formateado según estándares contables' })
   @ApiResponse({ 
     status: 200, 
@@ -1818,6 +1850,7 @@ export class ContabilidadController {
   }
 
   @Post('estados/refrescar')
+  @RequirePermission('contabilidad.reportes.actualizar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Refrescar vistas materializadas de estados financieros' })
   @ApiResponse({ 
     status: 200, 
@@ -1986,6 +2019,7 @@ export class ContabilidadController {
   }
 
   @Get('balance-general')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance General (legacy endpoint - usar /estados/balance-general)' })
   @ApiResponse({ status: 200, description: 'Balance General obtenido exitosamente' })
   async getBalanceGeneral(
@@ -2054,6 +2088,7 @@ export class ContabilidadController {
   }
 
   @Get('flujo-efectivo')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Estado de Flujo de Efectivo' })
   @ApiResponse({ status: 200, description: 'Flujo de Efectivo obtenido exitosamente' })
   getFlujoEfectivo(@Query() periodo: any) {
@@ -2089,6 +2124,7 @@ export class ContabilidadController {
   }
 
   @Get('plan-cuentas')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Plan de Cuentas' })
   @ApiResponse({ status: 200, description: 'Plan de Cuentas obtenido exitosamente' })
   async getPlanCuentas() {
@@ -2111,6 +2147,7 @@ export class ContabilidadController {
   }
 
   @Get('ratios-financieros')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Ratios Financieros' })
   @ApiResponse({ status: 200, description: 'Ratios Financieros obtenidos exitosamente' })
   getRatiosFinancieros() {
@@ -2145,6 +2182,7 @@ export class ContabilidadController {
   }
 
   @Post('asiento-contable')
+  @RequirePermission('contabilidad.asientos.crear') // HARDENING: creación manual de asiento.
   @ApiOperation({ summary: 'Crear nuevo asiento contable manual' })
   @ApiResponse({ 
     status: 201, 
@@ -2185,6 +2223,7 @@ export class ContabilidadController {
   }
 
   @Get('asientos-contables')
+  @RequirePermission('contabilidad.asientos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener listado de asientos contables con filtros' })
   @ApiResponse({ 
     status: 200, 
@@ -2224,6 +2263,7 @@ export class ContabilidadController {
   }
 
   @Get('asientos-contables/:id')
+  @RequirePermission('contabilidad.asientos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener un asiento contable específico por ID' })
   @ApiResponse({ 
     status: 200, 
@@ -2254,6 +2294,7 @@ export class ContabilidadController {
   }
 
   @Get('libro-mayor/:cuentaCodigo')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener libro mayor de una cuenta específica' })
   @ApiResponse({ status: 200, description: 'Libro mayor obtenido exitosamente' })
   async getLibroMayor(@Param('cuentaCodigo') cuentaCodigo: string, @Query() filtros: any) {
@@ -2277,6 +2318,7 @@ export class ContabilidadController {
   }
 
   @Get('libro-mayor-completo')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener libro mayor de todas las cuentas con movimientos' })
   @ApiResponse({ status: 200, description: 'Libro mayor completo obtenido exitosamente' })
   async getLibroMayorCompleto(@Query() filtros: any) {
@@ -2300,6 +2342,7 @@ export class ContabilidadController {
   }
 
   @Get('balance-comprobacion')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Balance de Comprobación (legacy endpoint - usar /estados/balance-comprobacion)' })
   @ApiResponse({ status: 200, description: 'Balance de Comprobación obtenido exitosamente' })
   async getBalanceComprobacion(
@@ -2379,6 +2422,7 @@ export class ContabilidadController {
   }
 
   @Get('kardex-valorizado')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Kardex Valorizado de Inventarios' })
   @ApiResponse({ status: 200, description: 'Kardex Valorizado obtenido exitosamente' })
   async getKardexValorizado(@Query() filtros: any) {
@@ -2402,6 +2446,7 @@ export class ContabilidadController {
   }
 
   @Post('cierre-contable')
+  @RequirePermission('contabilidad.cierre.ejecutar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Realizar cierre contable del período' })
   @ApiResponse({ status: 200, description: 'Cierre contable realizado exitosamente' })
   realizarCierreContable(@Body() cierreData: any) {
@@ -2422,6 +2467,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('libro-caja-bancos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Libro de Caja y Bancos' })
   @ApiResponse({ status: 200, description: 'Libro de Caja y Bancos obtenido exitosamente' })
   async getLibroCajaBancos(@Query() filtros: any) {
@@ -2445,6 +2491,7 @@ export class ContabilidadController {
   }
 
   @Get('registro-activos-fijos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Registro de Activos Fijos' })
   @ApiResponse({ status: 200, description: 'Registro de Activos Fijos obtenido exitosamente' })
   async getRegistroActivosFijos(@Query() filtros: any) {
@@ -2468,6 +2515,7 @@ export class ContabilidadController {
   }
 
   @Get('libro-planillas')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Libro de Planillas Oficial' })
   @ApiResponse({ status: 200, description: 'Libro de Planillas obtenido exitosamente' })
   async getLibroPlanillas(@Query() filtros: any) {
@@ -2495,6 +2543,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('libro-inventarios-balances')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Libro de Inventarios y Balances' })
   @ApiResponse({ status: 200, description: 'Libro de Inventarios y Balances obtenido exitosamente' })
   async getLibroInventariosBalances(@Query() filtros: any) {
@@ -2518,6 +2567,7 @@ export class ContabilidadController {
   }
 
   @Get('registro-costos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Registro de Costos' })
   @ApiResponse({ status: 200, description: 'Registro de Costos obtenido exitosamente' })
   async getRegistroCostos(@Query() filtros: any) {
@@ -2541,6 +2591,7 @@ export class ContabilidadController {
   }
 
   @Get('libros-electronicos-sunat')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Libros Electrónicos SUNAT' })
   @ApiResponse({ status: 200, description: 'Libros Electrónicos SUNAT obtenidos exitosamente' })
   async getLibrosElectronicosSunat(@Query() filtros: any) {
@@ -2564,20 +2615,25 @@ export class ContabilidadController {
   }
 
   @Get('libro-diario')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Libro Diario (Registro cronológico de asientos)' })
   @ApiResponse({ status: 200, description: 'Libro Diario obtenido exitosamente' })
-  async getLibroDiario(@Query() filtros: any) {
+  async getLibroDiario(
+    @CurrentTenant() tenantId: string,
+    @Query() filtros: any
+  ) {
     try {
       console.log('📖 Generando Libro Diario...', filtros);
       
+      // HARDENING: forzamos uso del tenant actual para toda consulta.
+      const filtrosConTenant = { ...filtros, tenant_id: tenantId };
+
       // 1. Obtener asientos contables principales
-      const asientos = await this.accountingService.getAsientosContables(filtros);
+      const asientos = await this.accountingService.getAsientosContables(filtrosConTenant);
       
       // 2. 🎯 OBTENER ASIENTOS DE RRHH desde tabla temporal
       let asientosRrhh = [];
       try {
-        // ✅ MULTI-TENANT: Obtener tenant_id
-        const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
         const { data: rrhhAsientos, error: rrhhError } = await this.supabaseService.getClient()
           .from('asientos_contables_rrhh')
           .select('*')
@@ -2660,6 +2716,7 @@ export class ContabilidadController {
   }
 
   @Get('registro-ventas')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Registro de Ventas (Libro de Ventas e Ingresos)' })
   @ApiResponse({ status: 200, description: 'Registro de Ventas obtenido exitosamente' })
   async getRegistroVentas(@Query() filtros: any) {
@@ -2683,6 +2740,7 @@ export class ContabilidadController {
   }
 
   @Get('registro-compras')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Registro de Compras' })
   @ApiResponse({ status: 200, description: 'Registro de Compras obtenido exitosamente' })
   async getRegistroCompras(@Query() filtros: any) {
@@ -2706,6 +2764,7 @@ export class ContabilidadController {
   }
 
   @Get('registro-consignaciones')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Registro de Consignaciones' })
   @ApiResponse({ status: 200, description: 'Registro de Consignaciones obtenido exitosamente' })
   async getRegistroConsignaciones(
@@ -2736,6 +2795,7 @@ export class ContabilidadController {
   }
 
   @Post('registro-consignaciones')
+  @RequirePermission('contabilidad.consignaciones.crear') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Crear nueva consignación' })
   @ApiResponse({ status: 201, description: 'Consignación creada exitosamente' })
   async createConsignacion(@Body() consignacionData: any) {
@@ -2756,6 +2816,7 @@ export class ContabilidadController {
   }
 
   @Post('registro-consignaciones/:id/estado')
+  @RequirePermission('contabilidad.consignaciones.actualizar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Actualizar estado de consignación' })
   @ApiResponse({ status: 200, description: 'Estado de consignación actualizado exitosamente' })
   async updateEstadoConsignacion(
@@ -2783,6 +2844,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('eventos/estadisticas')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener estadísticas de eventos (pendientes, procesados, fallidos, procesados hoy)' })
   @ApiResponse({ 
     status: 200, 
@@ -2835,6 +2897,7 @@ export class ContabilidadController {
   }
 
   @Get('eventos/fallidos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener lista de eventos fallidos' })
   @ApiResponse({ status: 200, description: 'Eventos fallidos obtenidos exitosamente' })
   async getEventosFallidos(
@@ -2862,6 +2925,7 @@ export class ContabilidadController {
   }
 
   @Get('eventos/dead-letter')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener lista de eventos en dead letter (fallidos permanentemente)' })
   @ApiResponse({ status: 200, description: 'Eventos dead letter obtenidos exitosamente' })
   async getEventosDeadLetter(
@@ -2889,6 +2953,7 @@ export class ContabilidadController {
   }
 
   @Post('eventos/:eventId/reintentar')
+  @RequirePermission('contabilidad.eventos.reintentar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Reintentar un evento fallido' })
   @ApiResponse({ status: 200, description: 'Evento reiniciado exitosamente' })
   async reintentarEvento(
@@ -2916,6 +2981,7 @@ export class ContabilidadController {
   }
 
   @Get('eventos/estadisticas-fallidos')
+  @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener estadísticas detalladas de eventos fallidos por tipo' })
   @ApiResponse({ status: 200, description: 'Estadísticas de eventos fallidos obtenidas exitosamente' })
   async getEstadisticasEventosFallidos(@CurrentTenant() tenantId: string) {
@@ -2948,6 +3014,7 @@ export class ContabilidadController {
   // =============================================
 
   @Get('asientos')
+  @RequirePermission('contabilidad.asientos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Listar asientos contables con filtros opcionales' })
   @ApiResponse({ 
     status: 200, 
@@ -3005,6 +3072,7 @@ export class ContabilidadController {
   }
 
   @Get('asientos/estadisticas/por-tipo')
+  @RequirePermission('contabilidad.asientos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener estadísticas de asientos generados por tipo de evento' })
   @ApiResponse({ 
     status: 200, 
@@ -3055,6 +3123,7 @@ export class ContabilidadController {
   }
 
   @Get('asientos/:id')
+  @RequirePermission('contabilidad.asientos.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener un asiento contable específico por ID con sus detalles' })
   @ApiResponse({ 
     status: 200, 

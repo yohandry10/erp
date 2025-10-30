@@ -19,6 +19,7 @@ describe('CxcService - CobroRegistrado Event', () => {
       single: jest.fn(),
       maybeSingle: jest.fn(),
     };
+    mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

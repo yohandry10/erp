@@ -192,7 +192,7 @@ class AuthService {
   async setSession(session: { access_token: string; refresh_token?: string }): Promise<{ data: { session: Session | null }; error: Error | null }> {
     try {
       // Validar el token con el backend
-      const response = await fetch(`${API_URL}/api/auth/me`, {
+      const response = await fetch(`${API_URL}/api/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },

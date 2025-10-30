@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, X, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useTenant } from '@/contexts/TenantContext'
 
 interface ConfigurationBannerProps {
   missingItems: string[]
@@ -12,9 +13,19 @@ interface ConfigurationBannerProps {
 
 export function ConfigurationBanner({ missingItems, completionPercentage }: ConfigurationBannerProps) {
   const router = useRouter()
+  const { tenant } = useTenant()
   const [isDismissed, setIsDismissed] = useState(false)
   
   const isComplete = completionPercentage === 100
+  const storageKey = `config-banner-dismissed-${tenant?.id || 'default'}`
+
+  // Cargar estado de localStorage al montar
+  useEffect(() => {
+    const dismissed = localStorage.getItem(storageKey)
+    if (dismissed === 'true') {
+      setIsDismissed(true)
+    }
+  }, [storageKey])
 
   if (isDismissed) {
     return null
@@ -112,6 +123,8 @@ export function ConfigurationBanner({ missingItems, completionPercentage }: Conf
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          // Guardar en localStorage que el usuario cerró el banner
+          localStorage.setItem(storageKey, 'true')
           setIsDismissed(true)
         }}
         style={{

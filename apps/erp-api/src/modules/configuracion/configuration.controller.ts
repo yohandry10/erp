@@ -36,7 +36,10 @@ export class ConfigurationController {
   @ApiOperation({ summary: 'Get configuration status' })
   @ApiResponse({ status: 200, description: 'Configuration status retrieved successfully' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getConfigurationStatus(@CurrentUser() user?: User) {
+  async getConfigurationStatus(
+    @CurrentUser() user?: User,
+    @CurrentTenant() tenantId?: string,
+  ) {
     try {
       // SUPER ADMINS DON'T NEED CONFIGURATION - ALWAYS RETURN COMPLETE
       if (user?.is_super_admin === true) {
@@ -59,7 +62,16 @@ export class ConfigurationController {
         };
       }
 
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para consultar configuración',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
       this.logger.log(`Getting configuration status for tenant: ${tenantId}`);
 
       const status = await this.configurationService.getConfigurationStatus(tenantId);
@@ -90,9 +102,20 @@ export class ConfigurationController {
   @ApiResponse({ status: 200, description: 'Wizard progress retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Wizard progress not found' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getWizardProgress(@CurrentUser() user?: User) {
+  async getWizardProgress(
+    @CurrentUser() user?: User,
+    @CurrentTenant() tenantId?: string,
+  ) {
     try {
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para consultar progreso',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
       this.logger.log(`Getting wizard progress for tenant: ${tenantId}`);
 
       const progress = await this.configurationService.getWizardProgress(tenantId);
@@ -141,9 +164,18 @@ export class ConfigurationController {
   async saveWizardStep(
     @CurrentUser() user: User | undefined,
     @Body() stepData: SaveWizardStepDto,
+    @CurrentTenant() tenantId?: string,
   ) {
     try {
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para guardar progreso',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
       this.logger.log(`Saving wizard step for tenant: ${tenantId}, step: ${stepData.pasoActual}`);
 
       if (!stepData.pasoActual || stepData.pasoActual < 1) {
@@ -200,9 +232,18 @@ export class ConfigurationController {
   async completeConfiguration(
     @CurrentUser() user: User | undefined,
     @Body() body: { configuration: any },
+    @CurrentTenant() tenantId?: string,
   ) {
     try {
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para completar configuración',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
       this.logger.log(`Completing configuration for tenant: ${tenantId}`);
       this.logger.log(`Configuration data received:`, body.configuration);
 
@@ -254,9 +295,18 @@ export class ConfigurationController {
   async updateGREThresholds(
     @CurrentUser() user: User | undefined,
     @Body() thresholds: UpdateGREThresholdsDto,
+    @CurrentTenant() tenantId?: string,
   ) {
     try {
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para actualizar umbrales',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
       this.logger.log(`Updating GRE thresholds for tenant: ${tenantId}`);
 
       // Validate threshold value
@@ -303,9 +353,20 @@ export class ConfigurationController {
   @ApiOperation({ summary: 'Get GRE thresholds' })
   @ApiResponse({ status: 200, description: 'GRE thresholds retrieved successfully' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getGREThresholds(@CurrentUser() user?: User) {
+  async getGREThresholds(
+    @CurrentUser() user?: User,
+    @CurrentTenant() tenantId?: string,
+  ) {
     try {
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para obtener umbrales',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
       this.logger.log(`Getting GRE thresholds for tenant: ${tenantId}`);
 
       const thresholds = await this.configurationService.getGREThresholds(tenantId);

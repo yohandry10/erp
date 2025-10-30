@@ -274,7 +274,11 @@ export default function PedidoDetallePage() {
     }
   }
 
-  const handleGreRegistrada = () => {\n    setGreModalOpen(false)\n    loadGreAsociadas()\n    loadPedido()\n  }
+  const handleGreRegistrada = () => {
+    setGreModalOpen(false)
+    loadGreAsociadas()
+    loadPedido()
+  }
 
   const updateBackorderDraft = (
     detalleId: string,
@@ -332,7 +336,9 @@ export default function PedidoDetallePage() {
     } finally {
       setReprogramandoBackorder(null)
     }
-  }  const loadHistorialAprobaciones = async () => {
+  }
+  
+  const loadHistorialAprobaciones = async () => {
     try {
       setCargandoHistorial(true)
       const response = await get(`/ventas/pedidos/${pedidoId}/aprobaciones`)

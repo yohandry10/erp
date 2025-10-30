@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import {
   EventBusService,
@@ -11,15 +11,19 @@ import {
 } from '../events/event-bus.service';
 import { AsientoContable } from './accounting.interfaces';
 import { PeriodosService } from '../../modules/contabilidad/services/periodos.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 @Injectable()
 export class AccountingEntriesService {
+  // HARDENING: usamos Logger para centralizar trazas y Map por tenant para evitar fugas.
+  private readonly logger = new Logger(AccountingEntriesService.name);
   private cuentasCache: Map<string, string> = new Map();
 
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly periodosService: PeriodosService,
+    private readonly tenantContext: TenantContextService,
   ) {
     this.initializeCuentasCache();
     this.initializeEventListeners();
@@ -28,27 +32,46 @@ export class AccountingEntriesService {
   // 🔓 Hacerla pública para poder llamarla desde app.module.ts
   async initializeCuentasCache(): Promise<void> {
     try {
+      const context = this.tenantContext.getContext();
+      const tenantId = context?.tenantId ?? null;
+      if (!tenantId) {
+        // HARDENING: evitamos inicializar cache global sin tenant para no mezclar planes contables.
+        this.logger.warn('⚠️ [AccountingEntries] Cache de cuentas no inicializado: tenant ausente.');
+        return;
+      }
+
       const { data: cuentas, error } = await this.supabase
         .getClient()
         .from('plan_cuentas')
         .select('id, codigo, nombre')
-        .eq('acepta_movimiento', true);
+        .eq('acepta_movimiento', true)
+        .eq('tenant_id', tenantId);
 
       if (error) throw error;
 
       cuentas?.forEach((cuenta: any) => {
-        this.cuentasCache.set(cuenta.codigo, cuenta.id);
+        const cacheKey = `${tenantId}:${cuenta.codigo}`;
+        this.cuentasCache.set(cacheKey, cuenta.id);
       });
 
-      console.log(`✅ Cache de cuentas inicializado: ${this.cuentasCache.size} cuentas`);
+      this.logger.log(
+        `✅ [AccountingEntries] Cache de cuentas inicializado para tenant ${tenantId}: ${cuentas?.length ?? 0} cuentas`,
+      );
     } catch (error) {
-      console.error('❌ Error inicializando cache de cuentas:', error);
+      this.logger.error('❌ [AccountingEntries] Error inicializando cache de cuentas:', error);
     }
   }
 
   private async getCuentaId(codigo: string): Promise<string> {
-    if (this.cuentasCache.has(codigo)) {
-      return this.cuentasCache.get(codigo)!;
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: prevenir lecturas de cuentas sin tenant contextual.
+      throw new Error('Tenant requerido para resolver cuentas contables');
+    }
+
+    const cacheKey = `${tenantId}:${codigo}`;
+    if (this.cuentasCache.has(cacheKey)) {
+      return this.cuentasCache.get(cacheKey)!;
     }
 
     const { data: cuenta, error } = await this.supabase
@@ -57,52 +80,53 @@ export class AccountingEntriesService {
       .select('id')
       .eq('codigo', codigo)
       .eq('acepta_movimiento', true)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (error || !cuenta) {
       throw new Error(`Cuenta ${codigo} no encontrada o no acepta movimientos`);
     }
 
-    this.cuentasCache.set(codigo, cuenta.id);
+    this.cuentasCache.set(cacheKey, cuenta.id);
     return cuenta.id;
   }
 
   private initializeEventListeners() {
-    console.log('🎧 [AccountingEntriesService] Registrando listeners de eventos...');
+    this.logger.log('🎧 [AccountingEntriesService] Registrando listeners de eventos...');
 
     this.eventBus.onVentaProcessed(async (event: ERPEvent) => {
       const data = event.data as VentaProcessedEvent;
-      console.log(`📊 [Contabilidad] Procesando asiento de venta: ${data.ventaId}`);
+      this.logger.log(`📊 [Contabilidad] Procesando asiento de venta: ${data.ventaId}`);
       const asientoId = await this.procesarAsientoVenta(data);
-      if (asientoId) console.log(`✅ [Contabilidad] Asiento de venta creado: ${asientoId}`);
+      if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de venta creado: ${asientoId}`);
     });
 
     this.eventBus.onCompraEntregada(async (event: ERPEvent) => {
       const data = event.data as CompraEntregadaEvent;
-      console.log(`📊 [Contabilidad] Procesando asiento de compra: ${data.ordenId}`);
+      this.logger.log(`📊 [Contabilidad] Procesando asiento de compra: ${data.ordenId}`);
       const asientoId = await this.procesarAsientoCompra(data);
-      if (asientoId) console.log(`✅ [Contabilidad] Asiento de compra creado: ${asientoId}`);
+      if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de compra creado: ${asientoId}`);
     });
 
     this.eventBus.onMovimientoStock(async (event: ERPEvent) => {
       const data = event.data as MovimientoStockEvent;
-      console.log(`📊 [Contabilidad] Procesando asiento de movimiento stock: ${data.productoId}`);
+      this.logger.log(`📊 [Contabilidad] Procesando asiento de movimiento stock: ${data.productoId}`);
       const asientoId = await this.procesarAsientoMovimientoStock(data);
-      if (asientoId) console.log(`✅ [Contabilidad] Asiento de movimiento stock creado: ${asientoId}`);
+      if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de movimiento stock creado: ${asientoId}`);
     });
 
     this.eventBus.onGastoRegistrado(async (event: ERPEvent) => {
       const data = event.data as GastoRegistradoEvent;
-      console.log(`📊 [Contabilidad] Procesando asiento de gasto: ${data.gastoId}`);
+      this.logger.log(`📊 [Contabilidad] Procesando asiento de gasto: ${data.gastoId}`);
       const asientoId = await this.procesarAsientoGasto(data);
-      if (asientoId) console.log(`✅ [Contabilidad] Asiento de gasto creado: ${asientoId}`);
+      if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de gasto creado: ${asientoId}`);
     });
 
     this.eventBus.onPagoFactura(async (event: ERPEvent) => {
       const data = event.data as PagoFacturaEvent;
-      console.log(`📊 [Contabilidad] Procesando asiento de pago factura: ${data.facturaId}`);
+      this.logger.log(`📊 [Contabilidad] Procesando asiento de pago factura: ${data.facturaId}`);
       const asientoId = await this.procesarAsientoPagoFactura(data);
-      if (asientoId) console.log(`✅ [Contabilidad] Asiento de pago factura creado: ${asientoId}`);
+      if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de pago factura creado: ${asientoId}`);
     });
   }
 
@@ -437,21 +461,18 @@ export class AccountingEntriesService {
   private async guardarAsientoContable(asiento: AsientoContable): Promise<string> {
     // ✅ VALIDAR PERÍODO CONTABLE ABIERTO
     const fechaAsiento = new Date(asiento.fecha);
-    
-    // Obtener tenant_id del contexto (asumiendo que está disponible en el asiento o en el contexto)
-    // Por ahora, intentamos obtenerlo de la sesión de Supabase
-    const { data: { user } } = await this.supabase.getClient().auth.getUser();
-    const tenantId = user?.user_metadata?.tenant_id;
-    
-    if (tenantId) {
-      try {
-        await this.periodosService.validarPeriodoAbierto(tenantId, fechaAsiento);
-      } catch (error) {
-        console.error('❌ [AccountingEntries] Error validando período:', error);
-        throw error;
-      }
-    } else {
-      console.warn('⚠️ [AccountingEntries] No se pudo obtener tenant_id para validar período');
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: bloqueamos creación de asientos si el tenant no está en el contexto.
+      this.logger.error('❌ [AccountingEntries] Intento de crear asiento sin tenant.');
+      throw new Error('Tenant requerido para registrar asientos contables');
+    }
+
+    try {
+      await this.periodosService.validarPeriodoAbierto(tenantId, fechaAsiento);
+    } catch (error) {
+      this.logger.error('❌ [AccountingEntries] Error validando período:', error);
+      throw error;
     }
 
     const { data: ultimoAsiento } = await this.supabase
@@ -475,6 +496,7 @@ export class AccountingEntriesService {
       .getClient()
       .from('asientos_contables')
       .insert({
+        tenant_id: tenantId, // HARDENING: cada asiento queda ligado al tenant autenticado.
         numero_asiento: numeroAsiento,
         fecha: asiento.fecha,
         concepto: asiento.concepto,
@@ -503,22 +525,35 @@ export class AccountingEntriesService {
 
     if (errorDetalles) throw errorDetalles;
 
-    console.log(`✅ Asiento contable creado: ${numeroAsiento} (ID: ${asientoCreado.id})`);
+    this.logger.log(`✅ [AccountingEntries] Asiento ${numeroAsiento} creado para tenant ${tenantId} (ID: ${asientoCreado.id})`);
     return asientoCreado.id;
   }
 
   // Métodos utilitarios públicos
   async getPlanCuentas() {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: evitamos exponer plan contable sin tenant.
+      throw new Error('Tenant requerido para consultar plan de cuentas');
+    }
+
     const { data, error } = await this.supabase
       .getClient()
       .from('plan_cuentas')
       .select('*')
+      .eq('tenant_id', tenantId)
       .order('codigo');
     if (error) throw error;
     return data;
   }
 
   async getAsientosContables(filtros: any = {}) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      // HARDENING: consultas contables requieren tenant explícito.
+      throw new Error('Tenant requerido para listar asientos contables');
+    }
+
     const { fechaDesde, fechaHasta, estado } = filtros;
 
     let query = this.supabase
@@ -536,6 +571,7 @@ export class AccountingEntriesService {
         )
       `,
       )
+      .eq('tenant_id', tenantId)
       .order('fecha', { ascending: false })
       .order('numero_asiento', { ascending: false });
 

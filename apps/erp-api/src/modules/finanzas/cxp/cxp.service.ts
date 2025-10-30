@@ -378,17 +378,40 @@ export class CxpService {
       );
     }
 
-    // Si se especificó cuenta bancaria, validar que existe
+    // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
     if (dto.cuenta_bancaria_id) {
       const { data: cuentaBancaria, error: errorCuenta } = await client
         .from('cuentas_bancarias')
-        .select('id, nombre, saldo')
+        .select('id, nombre, saldo, permite_sobregiro, activa')
         .eq('tenant_id', tenantId)
         .eq('id', dto.cuenta_bancaria_id)
         .maybeSingle();
 
       if (errorCuenta || !cuentaBancaria) {
         throw new BadRequestException('Cuenta bancaria no encontrada');
+      }
+
+      if (!cuentaBancaria.activa) {
+        throw new BadRequestException('No se pueden registrar pagos desde una cuenta bancaria inactiva');
+      }
+
+      // ✅ VALIDAR SALDO BANCARIO: Verificar que hay fondos suficientes
+      const saldoActual = Number(cuentaBancaria.saldo || 0);
+      const permiteSobregiro = cuentaBancaria.permite_sobregiro || false;
+
+      if (!permiteSobregiro && saldoActual < dto.monto) {
+        throw new BadRequestException(
+          `Saldo insuficiente en la cuenta bancaria "${cuentaBancaria.nombre}". ` +
+          `Disponible: ${saldoActual.toFixed(2)}, Requerido: ${dto.monto.toFixed(2)}`
+        );
+      }
+
+      // Si permite sobregiro pero el saldo resultante sería muy negativo, alertar
+      if (permiteSobregiro && (saldoActual - dto.monto) < -10000) {
+        console.warn(
+          `⚠️ [CxP] Pago generará sobregiro significativo en cuenta ${cuentaBancaria.nombre}: ` +
+          `Saldo actual: ${saldoActual}, Pago: ${dto.monto}, Saldo resultante: ${saldoActual - dto.monto}`
+        );
       }
     }
 

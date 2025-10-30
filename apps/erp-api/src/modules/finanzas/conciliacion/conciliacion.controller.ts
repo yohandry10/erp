@@ -9,7 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { ConciliacionService } from './conciliacion.service';
@@ -18,12 +19,12 @@ import { CrearConciliacionDto, ListarConciliacionesDto, ImportarCsvDto, MatchAut
 @ApiTags('Finanzas - Conciliación')
 @ApiBearerAuth()
 @Controller('api/finanzas/conciliacion')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: conciliación bancaria requiere permisos granulares.
 export class ConciliacionController {
   constructor(private readonly conciliacionService: ConciliacionService) {}
 
   @Get()
-  @RequirePermissions('finanzas', 'conciliacion', 'ver')
+  @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
     summary: 'Listar conciliaciones bancarias',
     description: 'Obtiene la lista de conciliaciones bancarias con filtros opcionales por cuenta bancaria, estado y período.',
@@ -37,7 +38,7 @@ export class ConciliacionController {
   }
 
   @Get(':id')
-  @RequirePermissions('finanzas', 'conciliacion', 'ver')
+  @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
     summary: 'Obtener conciliación por ID',
     description: 'Obtiene los detalles completos de una conciliación bancaria específica, incluyendo información de la cuenta bancaria asociada.',
@@ -52,7 +53,7 @@ export class ConciliacionController {
   }
 
   @Post()
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Crear período de conciliación',
     description: 'Crea un nuevo período de conciliación bancaria. Calcula automáticamente el saldo inicial (movimientos anteriores a fecha_desde) y saldo final (movimientos hasta fecha_hasta). Valida que no exista otra conciliación para el mismo período y cuenta.',
@@ -69,7 +70,7 @@ export class ConciliacionController {
   }
 
   @Post(':id/importar-csv')
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Importar extracto bancario CSV',
     description: 'Importa un extracto bancario en formato CSV. Soporta múltiples formatos de bancos peruanos (BCP, BBVA, Interbank, Scotiabank) y un formato genérico. Parsea los movimientos, los normaliza y los almacena como movimientos de extracto. Actualiza el saldo del banco en la conciliación y calcula la diferencia con el saldo según libros.',
@@ -86,7 +87,7 @@ export class ConciliacionController {
   }
 
   @Post(':id/match-automatico')
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Ejecutar match automático de movimientos',
     description: 'Ejecuta el proceso de conciliación automática entre los movimientos del sistema y los movimientos del extracto bancario. Intenta hacer match por: 1) Referencia exacta (número de operación), 2) Monto exacto + fecha con tolerancia configurable (±N días). Los movimientos que hacen match se marcan como conciliados automáticamente.',
@@ -103,7 +104,7 @@ export class ConciliacionController {
   }
 
   @Post(':id/marcar-item')
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Marcar match manual entre movimiento del sistema y extracto',
     description: 'Permite realizar una conciliación manual entre un movimiento del sistema y un movimiento del extracto bancario. Valida que ambos movimientos existan, no estén conciliados, pertenezcan a la misma cuenta y sean del mismo tipo (ABONO/CARGO). Registra la diferencia si existe.',
@@ -120,7 +121,7 @@ export class ConciliacionController {
   }
 
   @Get(':id/diferencias')
-  @RequirePermissions('finanzas', 'conciliacion', 'ver')
+  @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
     summary: 'Obtener reporte de diferencias de conciliación',
     description: 'Genera un reporte detallado de las diferencias entre los movimientos del sistema y los movimientos del extracto bancario. Incluye totales por tipo (abonos/cargos), movimientos conciliados vs pendientes, y porcentaje de conciliación. Útil para revisar el estado antes de cerrar la conciliación.',
@@ -135,7 +136,7 @@ export class ConciliacionController {
   }
 
   @Post(':id/cerrar')
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Cerrar conciliación bancaria',
     description: 'Cierra una conciliación bancaria después de validar que todos los ítems han sido procesados. Valida que: 1) Se haya importado un extracto bancario, 2) Todos los movimientos estén conciliados (o se fuerce el cierre). Marca todos los movimientos conciliados como definitivos, genera un reporte de diferencias y bloquea futuras modificaciones. Una vez cerrada, la conciliación no puede ser modificada.',
@@ -158,7 +159,7 @@ export class ConciliacionController {
   }
 
   @Get('pendientes')
-  @RequirePermissions('finanzas', 'conciliacion', 'ver')
+  @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
     summary: 'Obtener conciliaciones pendientes',
     description: 'Obtiene la lista de conciliaciones bancarias que están pendientes de completar (estado ABIERTA o EN_PROCESO). Incluye información de la cuenta bancaria, período, saldos y porcentaje de avance de conciliación. Útil para monitorear el estado de las conciliaciones en curso.',
@@ -171,7 +172,7 @@ export class ConciliacionController {
   }
 
   @Get('plantillas-csv')
-  @RequirePermissions('finanzas', 'conciliacion', 'ver')
+  @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
     summary: 'Listar plantillas CSV disponibles',
     description: 'Obtiene la lista de todas las plantillas CSV configuradas para importar extractos bancarios. Incluye plantillas predefinidas para bancos peruanos (BCP, BBVA, Interbank, Scotiabank) y plantillas personalizadas registradas.',
@@ -182,7 +183,7 @@ export class ConciliacionController {
   }
 
   @Post('plantillas-csv')
-  @RequirePermissions('finanzas', 'conciliacion', 'gestionar')
+  @RequirePermission('finanzas.conciliacion.gestionar')
   @ApiOperation({
     summary: 'Registrar plantilla CSV personalizada',
     description: 'Registra una nueva plantilla CSV personalizada para importar extractos bancarios de bancos no soportados por defecto. Permite definir el formato de columnas, separadores, formato de fecha y otras configuraciones específicas del banco.',

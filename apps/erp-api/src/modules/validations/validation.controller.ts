@@ -3,9 +3,9 @@ import {
   Get,
   Post,
   Body,
-  Req,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { ValidationService } from './validation.service';
@@ -18,15 +18,20 @@ import {
   DocumentValidationResult,
   ValidationStatusResponse,
 } from './validation.types';
-import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 @ApiTags('validations')
 @Controller('validations')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: validaciones requieren permisos.
 export class ValidationController {
   constructor(private readonly validationService: ValidationService) {}
 
   @Post('certificate')
+  @RequirePermission('validations.run') // HARDENING: ejecutar validaciones.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Validate certificate for tenant' })
   @ApiResponse({
@@ -35,14 +40,14 @@ export class ValidationController {
   })
   async validateCertificate(
     @Body() dto: ValidateCertificateDto,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ): Promise<CertificateValidationResult> {
-    const user = req.user as any;
-    const tenantId = dto.tenantId || user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+    // HARDENING: ignoramos tenantId enviado por el cliente.
     return this.validationService.validateCertificate(tenantId);
   }
 
   @Post('ruc')
+  @RequirePermission('validations.run') // HARDENING: ejecutar validaciones.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Validate RUC configuration for tenant' })
   @ApiResponse({
@@ -51,14 +56,13 @@ export class ValidationController {
   })
   async validateRuc(
     @Body() dto: ValidateRucDto,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ): Promise<RucValidationResult> {
-    const user = req.user as any;
-    const tenantId = dto.tenantId || user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
     return this.validationService.validateRucConfiguration(tenantId);
   }
 
   @Post('document')
+  @RequirePermission('validations.run') // HARDENING: ejecutar validaciones.
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Validate document before emission' })
   @ApiResponse({
@@ -72,14 +76,15 @@ export class ValidationController {
   }
 
   @Get('status')
+  @RequirePermission('validations.run') // HARDENING: consultar estado de validaciones.
   @ApiOperation({ summary: 'Get overall validation status for tenant' })
   @ApiResponse({
     status: 200,
     description: 'Overall validation status',
   })
-  async getValidationStatus(@Req() req: Request): Promise<ValidationStatusResponse> {
-    const user = req.user as any;
-    const tenantId = user?.tenant_id;
+  async getValidationStatus(
+    @CurrentTenant() tenantId: string,
+  ): Promise<ValidationStatusResponse> {
     return this.validationService.getValidationStatus(tenantId);
   }
 }

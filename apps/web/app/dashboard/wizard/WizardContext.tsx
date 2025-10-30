@@ -57,6 +57,21 @@ const initialState: WizardState = {
       isRequired: true,
     },
     {
+      id: 'fiscal',
+      title: 'Configuración Fiscal',
+      description: 'Parámetros tributarios y numeración',
+      isComplete: false,
+      isRequired: true,
+    },
+    // TODO: Descomentar cuando se tenga acceso a credenciales OSE para pruebas
+    // {
+    //   id: 'sunat',
+    //   title: 'Configuración SUNAT',
+    //   description: 'Conexión con OSE',
+    //   isComplete: false,
+    //   isRequired: true,
+    // },
+    {
       id: 'validation',
       title: 'Validación',
       description: 'Verificación de configuración',
@@ -80,6 +95,18 @@ const initialState: WizardState = {
     gre_obligatorio: false,
     gre_automatico_habilitado: true,
     umbral_gre_automatico: 700,
+    // Configuración Fiscal
+    regimen_tributario: undefined,
+    igv_porcentaje: 18,
+    retencion_renta_porcentaje: 0,
+    serie_factura: '',
+    serie_boleta: '',
+    serie_nota_credito: '',
+    // Configuración SUNAT
+    ose_url: '',
+    ose_username: '',
+    ose_password: '',
+    ose_activo: false,
   },
   validationResults: {},
   isLoading: false,
@@ -95,7 +122,16 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     
     case 'NEXT_STEP':
       if (state.currentStep < state.steps.length - 1) {
-        return { ...state, currentStep: state.currentStep + 1, error: null }
+        // Mark current step as complete before moving to next
+        const updatedSteps = state.steps.map((step, index) =>
+          index === state.currentStep ? { ...step, isComplete: true } : step
+        )
+        return { 
+          ...state, 
+          currentStep: state.currentStep + 1, 
+          steps: updatedSteps,
+          error: null 
+        }
       }
       return state
     

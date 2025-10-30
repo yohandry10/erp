@@ -121,6 +121,58 @@ export interface RecepcionRegistradaEvent {
   tenantId: string;
 }
 
+export interface FacturaEmitidaEvent {
+  eventId: string;
+  tenantId: string;
+  pedidoId: string;
+  cpeId: string;
+  facturaId?: string;
+  serie: string;
+  numero: number;
+  clienteId: string;
+  subtotal: number;
+  impuestos: number;
+  total: number;
+  moneda: string;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  idempotencyKey: string;
+  source: string;
+  ajustes?: {
+    retencion: number;
+    percepcion: number;
+    detraccion: number;
+    anticipo: number;
+  };
+  costoVentas?: number;
+}
+
+export interface CuentaPorCobrarCreadaEvent {
+  eventId: string;
+  tenantId: string;
+  cuentaId: string;
+  facturaId: string;
+  serie?: string;
+  numero?: string;
+  clienteId: string;
+  montoTotal: number;
+  montoPendiente: number;
+  moneda: string;
+  subtotal?: number;
+  impuestos?: number;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  idempotencyKey?: string;
+  source?: string;
+  costoVentas?: number;
+  ajustes?: {
+    retencion: number;
+    percepcion: number;
+    detraccion: number;
+    anticipo: number;
+  };
+}
+
 export interface DevolucionProveedorEmitidaEvent {
   devolucionId: string;
   numeroDevolucion: string;
@@ -187,12 +239,17 @@ export interface PlanillaPagadaEvent {
 }
 
 export interface PagoFacturaEvent {
+  eventId: string;
+  tenantId: string;
+  cxcId: string;
   facturaId: string;
   cpeId?: string;
   numeroFactura: string;
   clienteId: string;
   montoPagado: number;
+  moneda: string;
   metodoPago: string;
+  cuentaBancariaId?: string | null;
   fechaPago: string;
   saldoPendiente: number;
   estadoPago: 'PARCIAL' | 'COMPLETO';
@@ -489,6 +546,22 @@ export class EventBusService {
     this.emit('comprobante.creado', data, 'cpe');
   }
 
+  // HARDENING: evento granular para pipeline de finanzas/contabilidad.
+  emitFacturaEmitidaEvent(data: FacturaEmitidaEvent) {
+    if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey) {
+      throw new Error('FacturaEmitidaEvent requiere eventId, tenantId e idempotencyKey');
+    }
+    this.emit('factura.emitida', data, 'ventas');
+  }
+
+  // HARDENING: notifica creación automática de CxC.
+  emitCuentaPorCobrarCreadaEvent(data: CuentaPorCobrarCreadaEvent) {
+    if (!data?.eventId || !data?.tenantId || !data?.cuentaId) {
+      throw new Error('CuentaPorCobrarCreadaEvent requiere eventId, tenantId y cuentaId');
+    }
+    this.emit('cxc.creada', data, 'finanzas');
+  }
+
   emitComprobanteEnviadoSunat(data: ComprobanteEnviadoSunatEvent) {
     this.emit('comprobante.enviado.sunat', data, 'cpe');
   }
@@ -560,6 +633,9 @@ export class EventBusService {
 
   // Eventos financieros
   emitPagoFactura(data: PagoFacturaEvent) {
+    if (!data?.eventId || !data?.tenantId || !data?.cxcId) {
+      throw new Error('PagoFacturaEvent requiere eventId, tenantId y cxcId');
+    }
     this.emit('factura.pago', data, 'finanzas');
   }
 
@@ -612,6 +688,14 @@ export class EventBusService {
 
   onComprobanteCreadoEvent(listener: (event: ERPEvent) => void) {
     this.on('comprobante.creado', listener);
+  }
+
+  onFacturaEmitidaEvent(listener: (event: ERPEvent) => void) {
+    this.on('factura.emitida', listener);
+  }
+
+  onCuentaPorCobrarCreadaEvent(listener: (event: ERPEvent) => void) {
+    this.on('cxc.creada', listener);
   }
 
   onComprobanteEnviadoSunat(listener: (event: ERPEvent) => void) {

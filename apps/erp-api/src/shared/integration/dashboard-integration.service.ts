@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService } from '../events/event-bus.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 export interface DashboardMetrics {
   // Métricas principales
@@ -49,14 +50,23 @@ export interface ActivityItem {
 export class DashboardIntegrationService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    private readonly tenantContext: TenantContextService,
   ) {
     console.log('🚀 [DashboardIntegration] Servicio inicializado');
+  }
+  private resolveTenantId(tenantId?: string): string {
+    const contextTenant = tenantId ?? this.tenantContext.getTenantId();
+    if (!contextTenant) {
+      // HARDENING: impedir métricas globales sin tenant.
+      throw new BadRequestException('Tenant requerido para consolidar métricas');
+    }
+    return contextTenant;
   }
 
   async getConsolidatedMetrics(tenantId?: string): Promise<DashboardMetrics> {
     // ✅ MULTI-TENANT: Agregar tenant_id
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     try {
       console.log(`📊 [DashboardIntegration] Consolidando métricas para tenant: ${currentTenantId}`);
       

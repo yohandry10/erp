@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { NotificationBanner, BannerNotification } from './NotificationBanner'
 import { useApi } from '@/hooks/use-api'
+import { useTenant } from '@/contexts/TenantContext'
 
 interface ConfigurationStatus {
   isComplete: boolean
@@ -23,10 +24,30 @@ interface ConfigurationStatus {
 export function DashboardNotificationBanners() {
   const [banners, setBanners] = useState<BannerNotification[]>([])
   const { get } = useApi({ showErrorToast: false })
+  const { isSuperAdmin, user, loading } = useTenant()
 
   useEffect(() => {
+    // Don't fetch if still loading user data
+    if (loading) {
+      console.log('[DashboardNotificationBanners] Still loading user data...')
+      return
+    }
+
+    console.log('[DashboardNotificationBanners] Component mounted, checking user...')
+    console.log('[DashboardNotificationBanners] isSuperAdmin from context:', isSuperAdmin)
+    console.log('[DashboardNotificationBanners] user from context:', user)
+
     const fetchConfigurationStatus = async () => {
       try {
+        // SUPER ADMINS DON'T NEED CONFIGURATION WIZARD - SKIP ENTIRELY
+        if (isSuperAdmin === true) {
+          console.log('[DashboardNotificationBanners] ✅ SUPERADMIN DETECTED - SKIPPING ALL BANNERS')
+          setBanners([])
+          return
+        }
+
+        console.log('[DashboardNotificationBanners] Not superadmin, fetching config status...')
+
         const response = await get('/api/configuration/status')
         if (response) {
           const status: ConfigurationStatus = response.data || response
@@ -86,18 +107,18 @@ export function DashboardNotificationBanners() {
           const dismissedBanners = JSON.parse(
             localStorage.getItem('dismissedBanners') || '[]'
           )
-          
+
           const filteredBanners = newBanners.filter(banner => {
             if (!banner.persistent || !banner.dismissible) return true
-            
+
             const dismissed = dismissedBanners.find((d: any) => d.id === banner.id)
             if (!dismissed) return true
-            
+
             // Re-show persistent banners after 24 hours
             const dismissedAt = new Date(dismissed.dismissedAt)
             const now = new Date()
             const hoursSinceDismissed = (now.getTime() - dismissedAt.getTime()) / (1000 * 60 * 60)
-            
+
             return hoursSinceDismissed > 24
           })
 
@@ -109,12 +130,12 @@ export function DashboardNotificationBanners() {
     }
 
     fetchConfigurationStatus()
-    
+
     // Refresh every 5 minutes
     const interval = setInterval(fetchConfigurationStatus, 5 * 60 * 1000)
-    
+
     return () => clearInterval(interval)
-  }, [])
+  }, [isSuperAdmin, loading])
 
   const handleDismiss = (id: string) => {
     setBanners(prev => prev.filter(b => b.id !== id))

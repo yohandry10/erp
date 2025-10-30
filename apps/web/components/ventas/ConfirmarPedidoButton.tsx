@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { usePermission } from '@/hooks/use-permission'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,6 +41,7 @@ export default function ConfirmarPedidoButton({
   onSuccess
 }: ConfirmarPedidoButtonProps) {
   const { post } = useApi()
+  const { hasPermission, loading: permissionLoading } = usePermission('ventas', 'confirmar', 'pedidos')
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showWarningDialog, setShowWarningDialog] = useState(false)
@@ -47,6 +49,20 @@ export default function ConfirmarPedidoButton({
   const [confirming, setConfirming] = useState(false)
 
   const handleConfirm = async () => {
+    if (permissionLoading) {
+      return
+    }
+
+    if (!hasPermission) {
+      // HARDENING: UI bloquea confirmación sin permiso.
+      toast({
+        title: 'Permiso requerido',
+        description: 'No cuenta con el permiso ventas.pedidos.confirmar.',
+        variant: 'destructive'
+      })
+      return
+    }
+
     try {
       setConfirming(true)
       setShowConfirmDialog(false)
@@ -126,12 +142,18 @@ export default function ConfirmarPedidoButton({
     <>
       <Button
         onClick={() => setShowConfirmDialog(true)}
-        disabled={confirming}
+        disabled={confirming || permissionLoading || !hasPermission}
         className="bg-green-600 hover:bg-green-700"
       >
         <CheckCircle className="w-4 h-4 mr-2" />
         {confirming ? 'Confirmando...' : 'Confirmar Pedido'}
       </Button>
+      {!permissionLoading && !hasPermission && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {/* // HARDENING: la confirmación requiere permiso ventas.pedidos.confirmar. */}
+          No tiene autorización para confirmar pedidos en este entorno.
+        </p>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

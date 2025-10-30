@@ -5,24 +5,30 @@ import {
   Body,
   Param,
   Query,
-  // UseGuards,
-  Req,
+  UseGuards,
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 // import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CpeService } from './cpe.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto } from '@erp-suite/dtos';
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { User } from '../auth/user.interface';
 
 @ApiTags('cpe')
 @Controller('cpe')
-// @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: CPE requiere autenticación + permisos específicos.
 @ApiBearerAuth()
 export class CpeController {
   constructor(private readonly cpeService: CpeService) {}
 
   @Post()
+  @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({ summary: 'Crear y enviar comprobante CPE' })
   @ApiResponse({
     status: 201,
@@ -31,30 +37,28 @@ export class CpeController {
   })
   async create(
     @Body() createFacturaDto: CreateFacturaDto,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ): Promise<FacturaDto> {
-    const user = req.user as any;
-    return this.cpeService.create(createFacturaDto, user.tenant_id);
+    // HARDENING: usamos tenant del contexto, nunca valores de request sin validar.
+    return this.cpeService.create(createFacturaDto, tenantId);
   }
 
   @Get()
+  @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Listar CPEs con paginación' })
   async findAll(
     @Query() paginationDto: PaginationDto,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ) {
-    const user = req.user as any;
-    const tenantId = user?.tenant_id || 'mock-tenant';
     return this.cpeService.findAll(paginationDto, tenantId);
   }
 
   @Get('stats')
+  @RequirePermission('cpe.reportes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de CPE' })
-  async getStats(@Req() req: Request) {
+  async getStats(@CurrentTenant() tenantId: string) {
     try {
       console.log('📊 Calculando estadísticas CPE...');
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       return await this.cpeService.getStatsFromDatabase(tenantId);
     } catch (error) {
       console.error('❌ Error calculando stats CPE:', error);
@@ -71,12 +75,14 @@ export class CpeController {
   }
 
   @Get('comprobantes')
+  @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Listar comprobantes CPE' })
-  async getComprobantes(@Query() filters: any, @Req() req: Request) {
+  async getComprobantes(
+    @Query() filters: any,
+    @CurrentTenant() tenantId: string,
+  ) {
     try {
       console.log('📄 Cargando comprobantes CPE desde BD...');
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       return await this.cpeService.getComprobantesFromDatabase(filters, tenantId);
     } catch (error) {
       console.error('❌ Error cargando comprobantes CPE:', error);
@@ -89,15 +95,14 @@ export class CpeController {
   }
 
   @Get('comprobantes/:id')
+  @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener datos del CPE' })
   async getCpeData(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ) {
     try {
       console.log(`📄 Obteniendo datos CPE: ${id}`);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       
       const cpeData = await this.cpeService.getCpeById(id, tenantId);
       
@@ -116,17 +121,15 @@ export class CpeController {
   }
 
   @Get('comprobantes/:id/pdf')
+  @RequirePermission('cpe.comprobantes.descargar_pdf')
   @ApiOperation({ summary: 'Descargar PDF del CPE' })
   async downloadPdf(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ) {
     try {
       console.log(`📄 Generando PDF para CPE: ${id}`);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       const pdfBuffer = await this.cpeService.generatePdf(id, tenantId);
       
       res.set({
@@ -147,16 +150,14 @@ export class CpeController {
   }
 
   @Post('comprobantes/:id/enviar-sunat')
+  @RequirePermission('cpe.comprobantes.enviar')
   @ApiOperation({ summary: 'Enviar CPE a SUNAT' })
   async enviarSunat(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ) {
     try {
       console.log(`📡 Enviando CPE a SUNAT: ${id}`);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       const result = await this.cpeService.resendToOse(id, tenantId);
       
       return {
@@ -175,25 +176,24 @@ export class CpeController {
   }
 
   @Get(':id')
+  @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener CPE por ID' })
   async findOne(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ): Promise<any> {
-    const user = req.user as any;
-    const tenantId = user?.tenant_id || 'mock-tenant';
     return this.cpeService.findOne(id, tenantId);
   }
 
   @Get(':id/xml')
+  @RequirePermission('cpe.comprobantes.descargar_xml')
   @ApiOperation({ summary: 'Descargar XML firmado del CPE' })
   async downloadXml(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
     @Res() res: Response,
   ) {
-    const user = req.user as any;
-    const xmlContent = await this.cpeService.getSignedXml(id, user.tenant_id);
+    const xmlContent = await this.cpeService.getSignedXml(id, tenantId);
     
     res.set({
       'Content-Type': 'application/xml',
@@ -204,36 +204,38 @@ export class CpeController {
   }
 
   @Post(':id/resend')
+  @RequirePermission('cpe.comprobantes.reenviar')
   @ApiOperation({ summary: 'Reenviar CPE a OSE/SUNAT' })
   async resend(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ) {
-    const user = req.user as any;
-    return this.cpeService.resendToOse(id, user.tenant_id);
+    return this.cpeService.resendToOse(id, tenantId);
   }
 
   @Get(':id/status')
+  @RequirePermission('cpe.comprobantes.consultar')
   @ApiOperation({ summary: 'Consultar estado del CPE en OSE' })
   async checkStatus(
     @Param('id') id: string,
-    @Req() req: Request,
+    @CurrentTenant() tenantId: string,
   ) {
-    const user = req.user as any;
-    return this.cpeService.checkOseStatus(id, user.tenant_id);
+    return this.cpeService.checkOseStatus(id, tenantId);
   }
 
   @Post(':id/enviar-sunat')
+  @RequirePermission('cpe.comprobantes.enviar')
   @ApiOperation({ summary: 'Enviar CPE firmado a SUNAT manualmente' })
   @ApiResponse({ status: 200, description: 'CPE enviado a SUNAT exitosamente' })
-  async enviarManualmenteSunat(@Param('id') id: string, @Req() req: any) {
+  async enviarManualmenteSunat(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
     console.log(`🚀 [CPE] Envío manual a SUNAT solicitado para CPE ${id}`);
     
     try {
-      const user = req.user || { tenant_id: 'default' };
-      
       // Verificar que el CPE esté en estado FIRMADO
-      const cpe = await this.cpeService.findOne(id, user.tenant_id);
+      const cpe = await this.cpeService.findOne(id, tenantId);
       
       if ((cpe.estado as string) !== 'FIRMADO') {
         return {
@@ -261,3 +263,34 @@ export class CpeController {
     }
   }
 }
+
+  /**
+   * Anular un comprobante CPE
+   * Genera nota de crédito y revierte operaciones relacionadas
+   */
+  @Post(':id/anular')
+  @RequirePermission('cpe.comprobantes.anular')
+  @ApiOperation({ 
+    summary: 'Anular comprobante CPE',
+    description: 'Anula un comprobante electrónico generando nota de crédito y revirtiendo operaciones'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CPE anulado exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El CPE no puede ser anulado en su estado actual',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'CPE no encontrado',
+  })
+  async anularCPE(
+    @Param('id') id: string,
+    @Body() anularDto: { motivo: string; tipo_nota?: string },
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.cpeService.anularComprobante(id, anularDto.motivo, tenantId, user?.id, anularDto.tipo_nota);
+  }

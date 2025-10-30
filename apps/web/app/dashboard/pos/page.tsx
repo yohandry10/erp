@@ -90,6 +90,19 @@ interface ConfigurationStatus {
 }
 
 export default function POSPage() {
+  const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
+  if (!posEnabled) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">POS no disponible</h1>
+        {/* // HARDENING: POS deshabilitado por feature flag. */}
+        <p className="text-slate-600 mt-2">
+          El módulo POS está deshabilitado en este entorno.
+        </p>
+      </div>
+    )
+  }
+
   const api = useApi()
   const supabase = createClientComponentClient();
 

@@ -1,40 +1,28 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-// import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { DocumentosService } from './documentos.service';
 import { Request } from 'express';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('Documentos')
 @Controller('documentos')
-// @UseGuards(JwtAuthGuard)  // Temporalmente deshabilitado para desarrollo
-// @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@ApiBearerAuth()
 export class DocumentosController {
   constructor(private readonly documentosService: DocumentosService) {}
 
   // ========== GESTIÓN DE DOCUMENTOS ==========
   @Get('stats')
+  @RequirePermission('documentos.stats.read') // HARDENING: métricas de documentos requieren permiso explícito.
   @ApiOperation({ summary: 'Get documents statistics' })
   @ApiResponse({ status: 200, description: 'Documents statistics retrieved successfully' })
-  async getStats(@Req() req: Request) {
+  async getStats(@CurrentTenant() tenantId: string) {
     try {
-      console.log('📊 Endpoint documentos stats llamado');
-      const user = req.user as any;
-      
-      // Por ahora, vamos a probar SIN filtro de tenant para ver si es ese el problema
-      console.log('🔍 Usuario detectado:', user);
-      
-      // Intentar primero sin tenant_id para diagnosticar
-      const resultSinTenant = await this.documentosService.getStats(null);
-      console.log('📊 Resultado SIN tenant_id:', resultSinTenant);
-      
-      // Si funciona sin tenant, intentar con tenant
-      if (resultSinTenant.success) {
-        const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-        console.log('🔍 Intentando con tenant_id:', tenantId);
-        return await this.documentosService.getStats(tenantId);
-      }
-      
-      return resultSinTenant;
+      // HARDENING: siempre usamos el tenant del contexto, sin valores por defecto.
+      return await this.documentosService.getStats(tenantId);
     } catch (error) {
       console.error('❌ Error en endpoint documentos stats:', error);
       return {
@@ -53,13 +41,13 @@ export class DocumentosController {
   }
 
   @Get('lista')
+  @RequirePermission('documentos.read') // HARDENING: listado protegido por permiso de lectura.
   @ApiOperation({ summary: 'Get documents list' })
   @ApiResponse({ status: 200, description: 'Documents list retrieved successfully' })
-  async getDocumentos(@Query() filters: any, @Req() req: Request) {
+  async getDocumentos(@Query() filters: any, @CurrentTenant() tenantId: string) {
     try {
       console.log('📄 Endpoint documentos lista llamado con filtros:', filters);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000'; // Default tenant for development
+      // HARDENING: se utiliza el tenant del contexto exclusivamente.
       return await this.documentosService.getDocumentos(filters, tenantId);
     } catch (error) {
       console.error('❌ Error en endpoint documentos lista:', error);
@@ -72,13 +60,12 @@ export class DocumentosController {
   }
 
   @Get(':id')
+  @RequirePermission('documentos.read') // HARDENING: lectura individual protegida.
   @ApiOperation({ summary: 'Get document by ID' })
   @ApiResponse({ status: 200, description: 'Document retrieved successfully' })
-  async getDocumento(@Param('id') id: string, @Req() req: Request) {
+  async getDocumento(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     try {
       console.log('📄 Endpoint obtener documento:', id);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       return await this.documentosService.getDocumento(id, tenantId);
     } catch (error) {
       console.error('❌ Error obteniendo documento:', error);
@@ -91,15 +78,19 @@ export class DocumentosController {
   }
 
   @Post('crear')
+  @RequirePermission('documentos.create') // HARDENING: creación limitada a usuarios autorizados.
   @ApiOperation({ summary: 'Create new document' })
   @ApiResponse({ status: 201, description: 'Document created successfully' })
-  async crearDocumento(@Body() documentoData: any, @Req() req: Request) {
+  async crearDocumento(
+    @Body() documentoData: any,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       console.log('📝 Creando nuevo documento:', documentoData.tipo_documento);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const userId = user?.id;
-      
+      // HARDENING: el tenant proviene del contexto y no del payload.
       return await this.documentosService.crearDocumento(documentoData, tenantId, userId);
     } catch (error) {
       console.error('❌ Error creando documento:', error);
@@ -112,13 +103,18 @@ export class DocumentosController {
   }
 
   @Put(':id')
+  @RequirePermission('documentos.update') // HARDENING: actualización restringida.
   @ApiOperation({ summary: 'Update document' })
   @ApiResponse({ status: 200, description: 'Document updated successfully' })
-  async actualizarDocumento(@Param('id') id: string, @Body() documentoData: any, @Req() req: Request) {
+  async actualizarDocumento(
+    @Param('id') id: string,
+    @Body() documentoData: any,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       console.log('📝 Actualizando documento:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const userId = user?.id;
       
       return await this.documentosService.actualizarDocumento(id, documentoData, tenantId, userId);
@@ -134,14 +130,15 @@ export class DocumentosController {
 
   // ========== FACTURACIÓN ELECTRÓNICA ==========
   @Post(':id/generar-xml')
+  @RequirePermission('documentos.generate_xml') // HARDENING: generación de XML requiere permiso específico.
   @ApiOperation({ summary: 'Generate XML for electronic invoice' })
   @ApiResponse({ status: 200, description: 'XML generated successfully' })
-  async generarXML(@Param('id') id: string, @Req() req: Request) {
+  async generarXML(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string
+  ) {
     try {
       console.log('🔧 Generando XML para documento:', id);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.generarXML(id, tenantId);
     } catch (error) {
       console.error('❌ Error generando XML:', error);
@@ -154,13 +151,17 @@ export class DocumentosController {
   }
 
   @Post(':id/enviar-sunat')
+  @RequirePermission('documentos.enviar_sunat') // HARDENING: envío a SUNAT requiere permiso.
   @ApiOperation({ summary: 'Send document to SUNAT' })
   @ApiResponse({ status: 200, description: 'Document sent to SUNAT successfully' })
-  async enviarSUNAT(@Param('id') id: string, @Req() req: Request) {
+  async enviarSUNAT(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       console.log('📡 Enviando documento a SUNAT:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const userId = user?.id;
       
       return await this.documentosService.enviarSUNAT(id, tenantId, userId);
@@ -175,14 +176,15 @@ export class DocumentosController {
   }
 
   @Get(':id/descargar-pdf')
+  @RequirePermission('documentos.download') // HARDENING: descargas controladas por permiso.
   @ApiOperation({ summary: 'Download document PDF' })
   @ApiResponse({ status: 200, description: 'PDF downloaded successfully' })
-  async descargarPDF(@Param('id') id: string, @Req() req: Request) {
+  async descargarPDF(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string
+  ) {
     try {
       console.log('📥 Descargando PDF documento:', id);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.generarPDF(id, tenantId);
     } catch (error) {
       console.error('❌ Error descargando PDF:', error);
@@ -195,14 +197,15 @@ export class DocumentosController {
   }
 
   @Get(':id/descargar-xml')
+  @RequirePermission('documentos.download') // HARDENING: descargas controladas por permiso.
   @ApiOperation({ summary: 'Download document XML' })
   @ApiResponse({ status: 200, description: 'XML downloaded successfully' })
-  async descargarXML(@Param('id') id: string, @Req() req: Request) {
+  async descargarXML(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string
+  ) {
     try {
       console.log('📥 Descargando XML documento:', id);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.descargarXML(id, tenantId);
     } catch (error) {
       console.error('❌ Error descargando XML:', error);
@@ -216,9 +219,10 @@ export class DocumentosController {
 
   // ========== VALIDACIONES ==========
   @Post('validar-ruc')
+  @RequirePermission('documentos.validations.run') // HARDENING: validaciones externas requieren permiso.
   @ApiOperation({ summary: 'Validate RUC with SUNAT' })
   @ApiResponse({ status: 200, description: 'RUC validated successfully' })
-  async validarRUC(@Body() data: { ruc: string }, @Req() req: Request) {
+  async validarRUC(@Body() data: { ruc: string }) {
     try {
       console.log('🔍 Validando RUC:', data.ruc);
       return await this.documentosService.validarRUC(data.ruc);
@@ -233,9 +237,10 @@ export class DocumentosController {
   }
 
   @Post('validar-documento')
+  @RequirePermission('documentos.validations.run') // HARDENING: validación previa protegida.
   @ApiOperation({ summary: 'Validate document data before sending' })
   @ApiResponse({ status: 200, description: 'Document validated successfully' })
-  async validarDocumento(@Body() documentoData: any, @Req() req: Request) {
+  async validarDocumento(@Body() documentoData: any) {
     try {
       console.log('✅ Validando documento antes de envío');
       return await this.documentosService.validarDocumento(documentoData);
@@ -251,14 +256,12 @@ export class DocumentosController {
 
   // ========== SERIES Y CONFIGURACIÓN ==========
   @Get('config/series')
+  @RequirePermission('documentos.series.read') // HARDENING: configuración de series requiere permiso de lectura.
   @ApiOperation({ summary: 'Get document series configuration' })
   @ApiResponse({ status: 200, description: 'Series configuration retrieved successfully' })
-  async getSeries(@Req() req: Request) {
+  async getSeries(@CurrentTenant() tenantId: string) {
     try {
       console.log('📋 Obteniendo configuración de series');
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.getSeries(tenantId);
     } catch (error) {
       console.error('❌ Error obteniendo series:', error);
@@ -271,14 +274,15 @@ export class DocumentosController {
   }
 
   @Post('config/series')
+  @RequirePermission('documentos.series.write') // HARDENING: modificación de series requiere permiso de escritura.
   @ApiOperation({ summary: 'Create new document series' })
   @ApiResponse({ status: 201, description: 'Series created successfully' })
-  async crearSerie(@Body() serieData: any, @Req() req: Request) {
+  async crearSerie(
+    @Body() serieData: any,
+    @CurrentTenant() tenantId: string
+  ) {
     try {
       console.log('📋 Creando nueva serie:', serieData);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.crearSerie(serieData, tenantId);
     } catch (error) {
       console.error('❌ Error creando serie:', error);
@@ -292,14 +296,15 @@ export class DocumentosController {
 
   // ========== AUDITORÍA ==========
   @Get(':id/auditoria')
+  @RequirePermission('documentos.audit.read') // HARDENING: auditoría restringida.
   @ApiOperation({ summary: 'Get document audit log' })
   @ApiResponse({ status: 200, description: 'Audit log retrieved successfully' })
-  async getAuditoria(@Param('id') id: string, @Req() req: Request) {
+  async getAuditoria(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string
+  ) {
     try {
       console.log('📋 Obteniendo auditoría documento:', id);
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      
       return await this.documentosService.getAuditoria(id, tenantId);
     } catch (error) {
       console.error('❌ Error obteniendo auditoría:', error);
@@ -313,13 +318,18 @@ export class DocumentosController {
 
   // ========== ANULACIÓN ==========
   @Post(':id/anular')
+  @RequirePermission('documentos.cancel') // HARDENING: anulación controlada.
   @ApiOperation({ summary: 'Cancel/void document' })
   @ApiResponse({ status: 200, description: 'Document cancelled successfully' })
-  async anularDocumento(@Param('id') id: string, @Body() data: { motivo: string }, @Req() req: Request) {
+  async anularDocumento(
+    @Param('id') id: string,
+    @Body() data: { motivo: string },
+    @CurrentTenant() tenantId: string,
+    @Req() req: Request
+  ) {
     try {
       console.log('❌ Anulando documento:', id, 'motivo:', data.motivo);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
       const userId = user?.id;
       
       return await this.documentosService.anularDocumento(id, data.motivo, tenantId, userId);

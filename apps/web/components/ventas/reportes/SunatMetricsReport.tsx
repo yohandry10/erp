@@ -5,7 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
-import { Check, FileWarning, Loader2, TriangleAlert } from 'lucide-react'
+import { Check, FileWarning, Loader2, AlertTriangle } from 'lucide-react'
 
 interface SunatIncidencia {
   id: string
@@ -158,7 +158,7 @@ export default function SunatMetricsReport({ filters }: Props) {
         <Card className="bg-rose-500 text-white">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2">
-              <TriangleAlert className="h-5 w-5" />
+              <AlertTriangle className="h-5 w-5" />
               Tasa de rechazo
             </CardTitle>
             <CardDescription className="text-rose-100">

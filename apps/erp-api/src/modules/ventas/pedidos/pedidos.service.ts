@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
@@ -6,7 +7,6 @@ import { CPEIntegrationService } from './cpe-integration.service';
 import { GREIntegrationService } from './gre-integration.service';
 import { CreatePedidoDto, UpdatePedidoDto, DecisionAprobacion } from './dto';
 import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
-import { TipoMovimientoCxc } from '../../finanzas/cxc/dto';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 
 interface ConfiguracionEmpresa {
@@ -877,142 +877,6 @@ export class PedidosService {
       anticipo: 0,
     };
   }
-  private async registrarCuentaPorCobrar(
-    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
-    tenantId: string,
-    factura: { factura_id: string; serie?: string; numero?: number; moneda?: string; total: number; fecha_emision?: string },
-    config: ConfiguracionEmpresa,
-    ajustes?: AjustesTributarios,
-  ): Promise<void> {
-    const client = this.supabase.getClient();
-
-    const { data: existente } = await client
-      .from('cuentas_por_cobrar')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('documento_id', factura.factura_id)
-      .limit(1);
-
-    if (existente && existente.length > 0) {
-      return;
-    }
-
-    const diasVencimiento = config.dias_vencimiento_factura ?? 30;
-    const fechaEmisionDate = factura.fecha_emision ? new Date(factura.fecha_emision) : new Date();
-    const fechaVencimientoDate = this.addDays(fechaEmisionDate, diasVencimiento);
-    const round2 = (value: number) => Math.round(value * 100) / 100;
-
-    const retencion = ajustes?.retencion ?? 0;
-    const percepcion = ajustes?.percepcion ?? 0;
-    const detraccion = ajustes?.detraccion ?? 0;
-    const anticipo = ajustes?.anticipo ?? 0;
-
-    const montoPendiente = round2(
-      Math.max(factura.total - retencion - detraccion - anticipo + percepcion, 0),
-    );
-
-    const estadoInicial = montoPendiente <= 0
-      ? 'CANCELADO'
-      : retencion > 0 || detraccion > 0 || anticipo > 0
-        ? 'PARCIAL'
-        : 'PENDIENTE';
-
-    const { data: cuentaInsertada, error: insertError } = await client
-      .from('cuentas_por_cobrar')
-      .insert({
-        tenant_id: tenantId,
-        cliente_id: pedido.cliente_id,
-        pedido_id: pedido.id,
-        documento_id: factura.factura_id,
-        serie: factura.serie ?? null,
-        numero: factura.numero != null ? String(factura.numero) : null,
-        fecha_emision: this.toISODate(fechaEmisionDate),
-        fecha_vencimiento: this.toISODate(fechaVencimientoDate),
-        moneda: factura.moneda ?? 'PEN',
-        monto_total: round2(factura.total),
-        monto_pendiente: montoPendiente,
-        estado: estadoInicial,
-        dias_mora: 0,
-        retencion_total: round2(retencion),
-        percepcion_total: round2(percepcion),
-        detraccion_total: round2(detraccion),
-        anticipo_total: round2(anticipo),
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      console.error('Error registrando cuenta por cobrar:', insertError);
-      throw new BadRequestException('No se pudo registrar la cuenta por cobrar');
-    }
-
-    const cuentaId = cuentaInsertada?.id;
-
-    if (cuentaId) {
-      const pagosAutomaticos: any[] = [];
-      const fechaPago = this.toISODate(fechaEmisionDate);
-      const monedaPago = factura.moneda ?? 'PEN';
-
-      if (retencion > 0) {
-        pagosAutomaticos.push({
-          tenant_id: tenantId,
-          cuenta_id: cuentaId,
-          pedido_id: pedido.id,
-          documento_id: factura.factura_id,
-          tipo: TipoMovimientoCxc.RETENCION,
-          monto: round2(retencion),
-          moneda: monedaPago,
-          fecha_pago: fechaPago,
-          metodo_pago: 'RETENCION',
-          referencia: null,
-          aplica_retencion: true,
-          retencion_monto: round2(retencion),
-        });
-      }
-
-      if (detraccion > 0) {
-        pagosAutomaticos.push({
-          tenant_id: tenantId,
-          cuenta_id: cuentaId,
-          pedido_id: pedido.id,
-          documento_id: factura.factura_id,
-          tipo: TipoMovimientoCxc.DETRACCION,
-          monto: round2(detraccion),
-          moneda: monedaPago,
-          fecha_pago: fechaPago,
-          metodo_pago: 'DETRACCION',
-          referencia: config.detraccion_codigo ?? null,
-          aplica_retencion: false,
-          retencion_monto: null,
-        });
-      }
-
-      if (anticipo > 0) {
-        pagosAutomaticos.push({
-          tenant_id: tenantId,
-          cuenta_id: cuentaId,
-          pedido_id: pedido.id,
-          documento_id: factura.factura_id,
-          tipo: TipoMovimientoCxc.ANTICIPO,
-          monto: round2(anticipo),
-          moneda: monedaPago,
-          fecha_pago: fechaPago,
-          metodo_pago: 'ANTICIPO',
-          referencia: null,
-          aplica_retencion: false,
-          retencion_monto: null,
-        });
-      }
-
-      if (pagosAutomaticos.length > 0) {
-        const { error: pagosError } = await client.from('cxc_pagos').insert(pagosAutomaticos);
-        if (pagosError) {
-          console.warn('No se pudieron registrar automáticamente los movimientos de CxC:', pagosError);
-        }
-      }
-    }
-  }
-
   private emitirEventoVentaProcesada(
     pedido: (PedidoVenta & { detalle: PedidoDetalle[] }) & { clientes?: any; cliente?: any },
     factura: { factura_id: string; serie?: string; numero?: number; total: number; fecha_emision?: string; moneda?: string },
@@ -1078,18 +942,7 @@ export class PedidosService {
       console.warn(`⚠️ No se pudo registrar auditoría (${action})`, error);
     }
   }
-
-  private toISODate(date: Date): string {
-    return date.toISOString().split('T')[0];
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-  }
-
-  private redondearCantidad(value: number): number {
+\n\n  private redondearCantidad(value: number): number {
     return Math.round(value * 100) / 100;
   }
 
@@ -1528,6 +1381,11 @@ export class PedidosService {
       facturaResultado.total,
     );
 
+    const costoVentasEstimado = (pedido.detalle ?? []).reduce(
+      (sum, item) => sum + Number((item as any).costo_unitario ?? 0) * Number(item.cantidad ?? 0),
+      0,
+    );
+
     // 6. Actualizar pedido con factura_id y estado
     await client
       .from('pedidos_venta')
@@ -1541,20 +1399,38 @@ export class PedidosService {
 
     pedido.factura_id = facturaResultado.factura_id;
 
-    await this.registrarCuentaPorCobrar(
-      pedido,
+    const facturaEventId = uuidv4();
+    const facturaSerie = facturaResultado.serie ?? 'SIN-SERIE';
+    const facturaNumero = facturaResultado.numero ?? 0;
+    const facturaMoneda = facturaResultado.moneda ?? 'PEN';
+    const fechaEmisionFactura =
+      facturaResultado.fecha_emision ?? new Date().toISOString().split('T')[0];
+    const diasVencimiento = config?.dias_vencimiento_factura ?? 30;
+    const fechaVencimientoDate = new Date(fechaEmisionFactura);
+    fechaVencimientoDate.setDate(fechaVencimientoDate.getDate() + diasVencimiento);
+    const fechaVencimientoFactura = fechaVencimientoDate.toISOString().split('T')[0];
+
+    // HARDENING: hook de integración financiera multi-tenant e idempotente.
+    this.eventBus.emitFacturaEmitidaEvent({
+      eventId: facturaEventId,
       tenantId,
-      {
-        factura_id: facturaResultado.factura_id,
-        serie: facturaResultado.serie,
-        numero: facturaResultado.numero,
-        moneda: facturaResultado.moneda,
-        total: facturaResultado.total,
-        fecha_emision: facturaResultado.fecha_emision,
-      },
-      config,
-      ajustesTributarios,
-    );
+      pedidoId: pedido.id,
+      cpeId: facturaResultado.factura_id,
+      facturaId: facturaResultado.factura_id,
+      serie: facturaSerie,
+      numero: facturaNumero,
+      clienteId: pedido.cliente_id,
+      subtotal: Number(pedido.subtotal ?? 0),
+      impuestos: Number(pedido.igv ?? 0),
+      total: Number(facturaResultado.total ?? pedido.total ?? 0),
+      moneda: facturaMoneda,
+      fechaEmision: fechaEmisionFactura,
+      fechaVencimiento: fechaVencimientoFactura,
+      idempotencyKey: `factura:${tenantId}:${facturaResultado.factura_id}`,
+      source: 'ventas',
+      ajustes: ajustesTributarios,
+      costoVentas: Number(costoVentasEstimado) || 0,
+    });
 
     this.emitirEventoVentaProcesada(
       pedido,
@@ -1851,3 +1727,10 @@ export class PedidosService {
     };
   }
 }
+
+
+
+
+
+
+

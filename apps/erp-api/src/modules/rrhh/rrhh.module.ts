@@ -5,6 +5,7 @@ import { PlanillasService } from './planillas.service';
 import { RrhhAccountingIntegrationService } from './rrhh-accounting-integration.service';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 
 @Module({
   imports: [SupabaseModule],
@@ -13,7 +14,8 @@ import { EventBusService } from '../../shared/events/event-bus.service';
     RrhhService, 
     PlanillasService,
     RrhhAccountingIntegrationService,
-    EventBusService
+    EventBusService,
+    FeatureFlagGuard
   ],
   exports: [
     RrhhService, 

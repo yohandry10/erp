@@ -5,6 +5,27 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { CalidadRecepcion } from '../dto';
 
+const createSupabaseClientMock = () => {
+  const client: any = {
+    from: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn(),
+    update: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+  };
+
+  client.queueEqBuilder = () => client.eq.mockImplementationOnce(() => client);
+  client.queueEqPromise = (response: any) =>
+    client.eq.mockImplementationOnce(() => Promise.resolve(response));
+  client.queueSingle = (response: any) =>
+    client.single.mockResolvedValueOnce(response);
+
+  return client;
+};
+
 /**
  * Integration tests for Recepciones <-> Inventario
  * 
@@ -95,48 +116,40 @@ describe('RecepcionesService - Inventario Integration', () => {
       const mockDetalles = [mockDetalle];
 
       // Mock Supabase calls
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       // Mock obtenerRecepcionPorId
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
       // Mock detalle query
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
       // Mock update detalle
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Mock detalles query for actualizarEstadoOrden
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
       // Mock update orden
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Mock cerrar recepcion
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Mock orden query for evento
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder(); // eq tenant_id
+      mockSupabaseClient.queueEqBuilder(); // eq id
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0001',
@@ -213,41 +226,33 @@ describe('RecepcionesService - Inventario Integration', () => {
 
       const mockDetalles = [mockDetalle];
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0002',
@@ -324,41 +329,33 @@ describe('RecepcionesService - Inventario Integration', () => {
 
       const mockDetalles = [mockDetalle];
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.update.mockResolvedValueOnce({
-        error: null,
-      });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0003',
@@ -428,32 +425,33 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
       ];
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
-      const updateSpy = jest.fn().mockResolvedValue({ error: null });
-      mockSupabaseClient.update.mockImplementation(updateSpy);
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0004',
@@ -481,7 +479,7 @@ describe('RecepcionesService - Inventario Integration', () => {
       );
 
       // Assert - verify cantidad_recibida was updated to 10 (3 + 7)
-      expect(updateSpy).toHaveBeenCalledWith(
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
           cantidad_recibida: 10,
         })
@@ -527,32 +525,33 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
       ];
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
-      const updateSpy = jest.fn().mockResolvedValue({ error: null });
-      mockSupabaseClient.update.mockImplementation(updateSpy);
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0005',
@@ -580,7 +579,7 @@ describe('RecepcionesService - Inventario Integration', () => {
       );
 
       // Assert - verify orden status was updated to RECIBIDA
-      expect(updateSpy).toHaveBeenCalledWith(
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
           estado: 'RECIBIDA',
         })
@@ -626,32 +625,33 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
       ];
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
       jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: mockDetalle,
         error: null,
       });
 
-      const updateSpy = jest.fn().mockResolvedValue({ error: null });
-      mockSupabaseClient.update.mockImplementation(updateSpy);
+      mockSupabaseClient.queueEqPromise({ error: null });
 
-      mockSupabaseClient.select.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqPromise({
         data: mockDetalles,
         error: null,
       });
 
-      mockSupabaseClient.single.mockResolvedValueOnce({
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({
         data: {
           id: mockOrdenId,
           numero: 'OC-2025-0006',
@@ -679,7 +679,7 @@ describe('RecepcionesService - Inventario Integration', () => {
       );
 
       // Assert - verify orden status was updated to PARCIAL
-      expect(updateSpy).toHaveBeenCalledWith(
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
         expect.objectContaining({
           estado: 'PARCIAL',
         })
@@ -740,26 +740,23 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
       };
 
-      const mockSupabaseClient = {
-        from: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn(),
-        update: jest.fn().mockReturnThis(),
-      };
-
+      const mockSupabaseClient = createSupabaseClientMock();
       (supabaseService.getClient as jest.Mock).mockReturnValue(mockSupabaseClient);
 
-      jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId')
-        .mockResolvedValueOnce(mockRecepcion)
-        .mockResolvedValueOnce(mockRecepcion);
+      jest.spyOn(recepcionesService as any, 'obtenerRecepcionPorId').mockResolvedValue(mockRecepcion);
 
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: mockDetalle, error: null })
-        .mockResolvedValueOnce({ data: mockOrden, error: null });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({ data: mockDetalle, error: null });
 
-      mockSupabaseClient.update.mockResolvedValue({ error: null });
-      mockSupabaseClient.select.mockResolvedValue({ data: mockDetalles, error: null });
+      mockSupabaseClient.queueEqPromise({ error: null });
+      mockSupabaseClient.queueEqPromise({ data: mockDetalles, error: null });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueSingle({ data: mockOrden, error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(

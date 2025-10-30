@@ -97,7 +97,8 @@ export default function GreModal({
         ...formData,
         pesoTotal: parseFloat(formData.pesoTotal) || 0,
         pedidoId: pedidoContext?.id,
-        pedidoNumero: pedidoContext?.numero,\n        tenantId: pedidoContext?.tenantId
+        pedidoNumero: pedidoContext?.numero,
+        tenantId: pedidoContext?.tenantId
       }
 
       console.log('🚚 Enviando datos GRE:', greData)

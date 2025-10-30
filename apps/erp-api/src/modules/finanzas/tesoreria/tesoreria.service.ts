@@ -460,14 +460,18 @@ export class TesoreriaService {
 
     // Calcular días hasta vencimiento y clasificar por urgencia
     const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoyUTC = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
     const dataEnriquecida = (data || []).map((cxp) => {
       const fechaVencimiento = new Date(cxp.fecha_vencimiento);
-      fechaVencimiento.setHours(0, 0, 0, 0);
-      
-      const diasHastaVencimiento = Math.ceil(
-        (fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+      const fechaVencimientoUTC = Date.UTC(
+        fechaVencimiento.getFullYear(),
+        fechaVencimiento.getMonth(),
+        fechaVencimiento.getDate()
+      );
+
+      const diasHastaVencimiento = Math.floor(
+        (fechaVencimientoUTC - hoyUTC) / (1000 * 60 * 60 * 24)
       );
 
       let urgencia: string;

@@ -1,10 +1,12 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Delete } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AlmacenesService } from './almacenes/almacenes.service';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -13,7 +15,8 @@ import { AlmacenesService } from './almacenes/almacenes.service';
  */
 @ApiTags('inventario')
 @Controller('inventario')
-@UseGuards(JwtAuthGuard) // Requiere autenticación
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: inventario requiere permisos granulares.
+@ApiBearerAuth()
 export class InventarioController {
   constructor(
     private readonly inventoryService: InventoryIntegrationService,
@@ -25,6 +28,7 @@ export class InventarioController {
    * Obtener almacenes activos del tenant
    */
   @Get('almacenes')
+  @RequirePermission('inventario.almacenes.read') // HARDENING: listado de almacenes requiere permiso.
   @ApiOperation({ summary: 'Listar almacenes activos' })
   @ApiResponse({ status: 200, description: 'Almacenes listados exitosamente' })
   async getAlmacenes(@CurrentTenant() tenantId: string) {
@@ -50,6 +54,7 @@ export class InventarioController {
    * Obtener ubicaciones de un almacén
    */
   @Get('almacenes/:almacenId/ubicaciones')
+  @RequirePermission('inventario.almacenes.read') // HARDENING: ubicaciones protegidas.
   @ApiOperation({ summary: 'Listar ubicaciones de un almacén' })
   @ApiResponse({ status: 200, description: 'Ubicaciones listadas exitosamente' })
   async getUbicaciones(
@@ -88,6 +93,7 @@ export class InventarioController {
    * Obtener estadísticas de inventario
    */
   @Get('stats')
+  @RequirePermission('inventario.stats.read') // HARDENING: estadísticas requieren permiso.
   @ApiOperation({ summary: 'Obtener estadísticas de inventario' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@CurrentTenant() tenantId: string) {
@@ -155,6 +161,7 @@ export class InventarioController {
    * Obtener todos los productos del tenant actual
    */
   @Get('productos')
+  @RequirePermission('inventario.productos.read') // HARDENING: listado de productos requiere permiso.
   @ApiOperation({ summary: 'Listar productos de inventario' })
   @ApiResponse({ status: 200, description: 'Productos listados exitosamente' })
   async getProductos(@CurrentTenant() tenantId: string, @Query() query: any) {
@@ -196,6 +203,7 @@ export class InventarioController {
    * Crear nuevo producto
    */
   @Post('productos')
+  @RequirePermission('inventario.productos.create') // HARDENING: creación de productos restringida.
   @ApiOperation({ summary: 'Crear nuevo producto' })
   @ApiResponse({ status: 201, description: 'Producto creado exitosamente' })
   async createProducto(@CurrentTenant() tenantId: string, @Body() productData: any) {
@@ -283,6 +291,7 @@ export class InventarioController {
    * Obtener movimientos de stock del tenant actual
    */
   @Get('movimientos')
+  @RequirePermission('inventario.movimientos.read') // HARDENING: historial de movimientos protegido.
   @ApiOperation({ summary: 'Listar movimientos de inventario' })
   @ApiResponse({ status: 200, description: 'Movimientos listados exitosamente' })
   async getMovimientos(
@@ -329,6 +338,7 @@ export class InventarioController {
    * Realizar un movimiento de stock
    */
   @Post('movimientos')
+  @RequirePermission('inventario.movimientos.create') // HARDENING: creación de movimientos limitada.
   async realizarMovimiento(
     @CurrentTenant() tenantId: string,
     @Body() movimiento: any
@@ -341,6 +351,7 @@ export class InventarioController {
    * Obtener producto específico por ID
    */
   @Get('productos/:id')
+  @RequirePermission('inventario.productos.read') // HARDENING: lectura individual protegida.
   @ApiOperation({ summary: 'Obtener producto por ID' })
   @ApiResponse({ status: 200, description: 'Producto obtenido exitosamente' })
   async getProducto(
@@ -383,6 +394,7 @@ export class InventarioController {
    * Eliminar producto por ID
    */
   @Delete('productos/:id')
+  @RequirePermission('inventario.productos.delete') // HARDENING: eliminación controlada por permiso.
   @ApiOperation({ summary: 'Eliminar producto por ID' })
   @ApiResponse({ status: 200, description: 'Producto eliminado exitosamente' })
   async deleteProducto(@CurrentTenant() tenantId: string, @Param('id') id: string) {

@@ -241,7 +241,7 @@ export class DocumentosService {
       const empresaConfig = await this.obtenerConfigEmpresa(tenantId);
 
       const nuevoDocumento = {
-        tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+        tenant_id: tenantId,
         tipo_documento: documentoData.tipo_documento,
         serie: documentoData.serie || this.getSerieDefault(documentoData.tipo_documento),
         numero: siguienteNumero,
@@ -319,7 +319,7 @@ export class DocumentosService {
   private async crearDetallesDocumento(documentoId: string, detalles: any[], tenantId?: string) {
     const detallesConId = detalles.map((detalle, index) => ({
       documento_id: documentoId,
-      tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+      tenant_id: tenantId,
       orden: index + 1,
       codigo_producto: detalle.codigo_producto,
       descripcion: detalle.descripcion,
@@ -576,7 +576,7 @@ export class DocumentosService {
 
   private async obtenerSiguienteNumero(tipoDocumento: string, serie: string, tenantId?: string): Promise<string> {
     try {
-      const tenant = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      const tenant = tenantId;
       
       // Usar la función SQL optimizada con lock para concurrencia
       const { data, error } = await this.supabaseService
@@ -597,7 +597,7 @@ export class DocumentosService {
     } catch (error) {
       console.error('❌ Error en obtenerSiguienteNumero:', error);
       // Fallback al método manual
-      return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenantId || '550e8400-e29b-41d4-a716-446655440000');
+      return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenantId);
     }
   }
 
@@ -758,7 +758,7 @@ export class DocumentosService {
       .from('documento_auditoria')
       .insert({
         documento_id: documentoId,
-        tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+        tenant_id: tenantId,
         accion: accion,
         usuario_id: usuarioId,
         detalles_cambio: detalles,
@@ -802,7 +802,7 @@ export class DocumentosService {
   async crearSerie(serieData: any, tenantId?: string) {
     try {
       const nuevaSerie = {
-        tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+        tenant_id: tenantId,
         tipo_documento: serieData.tipo_documento,
         serie: serieData.serie,
         correlativo_actual: 0,

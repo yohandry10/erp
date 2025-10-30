@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService } from '../events/event-bus.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 export interface KPIsFinancieros {
   efectivoDisponible: number;
@@ -82,9 +83,18 @@ export class FinancialIntegrationService {
 
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    private readonly tenantContext: TenantContextService,
   ) {
     this.initializeEventListeners();
+  }
+  private resolveTenantId(tenantId?: string): string {
+    const contextTenant = tenantId ?? this.tenantContext.getTenantId();
+    if (!contextTenant) {
+      // HARDENING: toda consulta financiera requiere tenant definido.
+      throw new BadRequestException('Tenant requerido para métricas financieras');
+    }
+    return contextTenant;
   }
 
   private initializeEventListeners() {
@@ -113,12 +123,13 @@ export class FinancialIntegrationService {
 
   // 📊 CONSULTAS HISTÓRICAS COMPLETAS
   async getDatosHistoricosCompleto(tenantId?: string): Promise<DatosHistoricos> {
+    const currentTenantId = this.resolveTenantId(tenantId);
     // ✅ MULTI-TENANT: Pasar tenant a funciones
     try {
       const [ventasMensuales, gastosMensuales, utilidadMensual] = await Promise.all([
-        this.obtenerVentasMensuales(tenantId),
-        this.obtenerGastosMensuales(tenantId),
-        this.obtenerUtilidadMensual(tenantId)
+        this.obtenerVentasMensuales(currentTenantId),
+        this.obtenerGastosMensuales(currentTenantId),
+        this.obtenerUtilidadMensual(currentTenantId),
       ]);
 
       return {
@@ -186,7 +197,7 @@ export class FinancialIntegrationService {
 
   private async obtenerVentasMensuales(tenantId?: string) {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total, fecha')
@@ -216,7 +227,7 @@ export class FinancialIntegrationService {
 
   private async obtenerGastosMensuales(tenantId?: string) {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('gastos')
       .select('monto, categoria, fecha')
@@ -570,7 +581,7 @@ export class FinancialIntegrationService {
 
   private async calcularEfectivoDisponible(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('pagos_ventas')
       .select('monto, ventas!inner(fecha, estado, tenant_id)')
@@ -583,7 +594,7 @@ export class FinancialIntegrationService {
 
   private async calcularVentas30Dias(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total')
@@ -595,7 +606,7 @@ export class FinancialIntegrationService {
 
   private async calcularGastos30Dias(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('gastos')
       .select('monto')
@@ -606,7 +617,7 @@ export class FinancialIntegrationService {
 
   private async calcularCuentasPorCobrar(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('cuentas_por_cobrar')
       .select('saldo_pendiente')
@@ -617,7 +628,7 @@ export class FinancialIntegrationService {
 
   private async calcularCuentasPorPagar(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('cuentas_por_pagar')
       .select('saldo_pendiente')
@@ -628,7 +639,7 @@ export class FinancialIntegrationService {
 
   private async calcularValorInventario(tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     try {
       // Intentar con la estructura de la migración de ventas primero
       const { data: dataVentas } = await this.supabase.getClient()
@@ -712,7 +723,7 @@ export class FinancialIntegrationService {
 
   private async calcularVentasPeriodo(fechaInicio: Date, fechaFin: Date, tenantId?: string): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
-    const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+    const currentTenantId = this.resolveTenantId(tenantId);
     const { data } = await this.supabase.getClient()
       .from('ventas')
       .select('total')

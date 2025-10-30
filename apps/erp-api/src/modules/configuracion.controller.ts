@@ -1,15 +1,30 @@
-import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus, UseGuards, ForbiddenException, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { OseService } from './ose/ose.service';
+import { isProduction } from '../common/feature-flags';
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
 @ApiTags('configuracion')
 @Controller('configuracion')
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger configuración con permisos.
 export class ConfiguracionController {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly oseService: OseService
   ) {}
+
+  private resolveTenantOrThrow(req: any): string {
+    const tenantId = req?.user?.tenant_id;
+    if (!tenantId) {
+      // HARDENING: se requiere tenant en contexto; sin defaults.
+      throw new ForbiddenException('Tenant requerido en la sesión actual');
+    }
+    return tenantId;
+  }
 
   @Get()
   @ApiOperation({ summary: 'Obtener configuraciones del sistema' })
@@ -116,11 +131,12 @@ export class ConfiguracionController {
 
   @Get('empresa')
   @ApiOperation({ summary: 'Obtener datos de la empresa' })
-  async getDatosEmpresa() {
+  async getDatosEmpresa(@CurrentTenant() tenantId: string) {
     try {
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')
         .select('*')
+        .eq('tenant_id', tenantId)
         .single();
 
       if (error) {
@@ -171,7 +187,7 @@ export class ConfiguracionController {
 
   @Put('empresa')
   @ApiOperation({ summary: 'Actualizar datos de la empresa' })
-  async updateDatosEmpresa(@Body() datosEmpresa: any) {
+  async updateDatosEmpresa(@Body() datosEmpresa: any, @CurrentTenant() tenantId: string) {
     try {
       console.log('💼 Actualizando datos de empresa:', datosEmpresa);
       
@@ -205,7 +221,7 @@ export class ConfiguracionController {
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')
         .update(updateData)
-        .eq('tenant_id', '550e8400-e29b-41d4-a716-446655440000')
+        .eq('tenant_id', tenantId) // HARDENING: aplicar tenant del contexto.
         .select()
         .single();
 
@@ -318,7 +334,7 @@ export class ConfiguracionController {
 
   @Put('parametros-facturacion')
   @ApiOperation({ summary: 'Actualizar parámetros de facturación' })
-  async updateParametrosFacturacion(@Body() parametros: any) {
+  async updateParametrosFacturacion(@Body() parametros: any, @CurrentTenant() tenantId: string) {
     try {
       console.log('⚙️ Actualizando parámetros de facturación:', parametros);
       
@@ -338,7 +354,7 @@ export class ConfiguracionController {
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')
         .update(updateData)
-        .eq('tenant_id', '550e8400-e29b-41d4-a716-446655440000')
+        .eq('tenant_id', tenantId) // HARDENING: actualizar solo registros del tenant.
         .select()
         .single();
 
@@ -378,9 +394,15 @@ export class ConfiguracionController {
   }
 
   @Get('test-integracion')
+  @RequirePermission('system.debug')
   @ApiOperation({ summary: 'Probar integración completa (CPE + GRE + SUNAT)' })
   async testIntegracionCompleta() {
     try {
+      // HARDENING: restringir en producción.
+      if (isProduction()) {
+        throw new ForbiddenException('Endpoint restringido en producción');
+      }
+
       console.log('🧪 Iniciando test de integración completa...');
 
       const resultados = {
@@ -451,9 +473,14 @@ export class ConfiguracionController {
   }
 
   @Get('test-firma-xml')
+  @RequirePermission('system.debug')
   @ApiOperation({ summary: 'Probar firma XML sin enviar a SUNAT (GET)' })
   async testFirmaXmlGet() {
     try {
+      if (isProduction()) {
+        throw new ForbiddenException('Endpoint restringido en producción');
+      }
+
       console.log('🔐 [CONFIG] Probando firma XML (GET request)...');
       
       // XML de prueba por defecto
@@ -620,9 +647,14 @@ export class ConfiguracionController {
   }
 
   @Post('test-firma-xml')
+  @RequirePermission('system.debug')
   @ApiOperation({ summary: 'Probar firma XML sin enviar a SUNAT (POST con XML personalizado)' })
   async testFirmaXml(@Body() body: { xmlContent?: string }) {
     try {
+      if (isProduction()) {
+        throw new ForbiddenException('Endpoint restringido en producción');
+      }
+
       console.log('🔐 [CONFIG] Probando firma XML...');
       
       // XML de prueba si no se proporciona uno

@@ -2,14 +2,20 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query } fro
 import { RrhhService } from './rrhh.service';
 import { PlanillasService } from './planillas.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentTenant } from '../../common'; // ✅ MULTI-TENANT
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
+import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 
 /**
  * ✅ MULTI-TENANT: Controlador de RRHH con soporte multi-tenant
  * Todos los endpoints filtran automáticamente por tenant
  */
 @Controller('rrhh')
-@UseGuards(JwtAuthGuard) // ✅ Requiere autenticación
+@UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard) // HARDENING: autenticación, permisos y feature flag.
+@RequireFeatureFlag('rrhh')
+@RequirePermission('rrhh.access')
 export class RrhhController {
   constructor(
     private readonly rrhhService: RrhhService,

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
+import { usePermission } from '@/hooks/use-permission'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,8 +40,8 @@ export default function GenerarFacturaButton({
   onSuccess,
   config
 }: GenerarFacturaButtonProps) {
-  const router = useRouter()
   const { post } = useApi()
+  const { hasPermission, loading: permissionLoading } = usePermission('ventas', 'emitir', 'facturacion')
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showGREModal, setShowGREModal] = useState(false)
@@ -49,6 +49,20 @@ export default function GenerarFacturaButton({
   const [generating, setGenerating] = useState(false)
 
   const handleGenerate = async () => {
+    if (permissionLoading) {
+      return
+    }
+
+    if (!hasPermission) {
+      // HARDENING: UI respeta permisos de facturación.
+      toast({
+        title: 'Permiso requerido',
+        description: 'No cuenta con el permiso ventas.facturacion.emitir para generar facturas.',
+        variant: 'destructive'
+      })
+      return
+    }
+
     try {
       setGenerating(true)
       setShowConfirmDialog(false)
@@ -108,12 +122,18 @@ export default function GenerarFacturaButton({
     <>
       <Button
         onClick={() => setShowConfirmDialog(true)}
-        disabled={generating}
+        disabled={generating || permissionLoading || !hasPermission}
         className="bg-blue-600 hover:bg-blue-700"
-      >
+        >
         <FileText className="w-4 h-4 mr-2" />
         {generating ? 'Generando...' : 'Generar Factura'}
       </Button>
+      {!permissionLoading && !hasPermission && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {/* // HARDENING: UI respeta permisos granular de facturación. */}
+          No tiene autorización para emitir facturas en este tenant.
+        </p>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

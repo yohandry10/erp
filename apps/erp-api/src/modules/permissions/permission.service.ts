@@ -262,16 +262,29 @@ export class PermissionService {
     }
 
     // Check if any role has the required permission
+    const normalizedRequestedResource = recurso || '__global__';
+
     const hasPermission = rolePermissions?.some(rp => {
       const permisos = Array.isArray(rp.permisos) ? rp.permisos : [rp.permisos];
-      return permisos.some(p =>
-        p &&
-        p.tenant_id === tenantId &&
-        p.modulo === modulo &&
-        p.accion === accion &&
-        p.recurso === recurso &&
-        p.activo === true
-      );
+      return permisos.some(p => {
+        if (!p) return false;
+        if (p.tenant_id !== tenantId) return false;
+        if (p.activo !== true) return false;
+        if (p.modulo !== modulo) return false;
+        if (p.accion !== accion) return false;
+
+        // HARDENING: habilita llaves globales como comodín.
+        const permisoRecurso = p.recurso || '__global__';
+        if (normalizedRequestedResource === '__global__') {
+          return permisoRecurso === '__global__' || permisoRecurso === '*';
+        }
+
+        return (
+          permisoRecurso === normalizedRequestedResource ||
+          permisoRecurso === '__global__' ||
+          permisoRecurso === '*'
+        );
+      });
     }) || false;
 
     // Cache result

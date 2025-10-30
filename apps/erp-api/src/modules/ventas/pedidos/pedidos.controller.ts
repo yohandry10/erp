@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { PedidosService } from './pedidos.service';
@@ -33,7 +34,7 @@ import { EstadoPedido } from './entities';
 @ApiTags('Ventas - Pedidos')
 @ApiBearerAuth()
 @Controller('api/ventas/pedidos')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: exigir permisos granulares en pedidos.
 export class PedidosController {
   constructor(private readonly pedidosService: PedidosService) {}
 
@@ -42,7 +43,7 @@ export class PedidosController {
    * Requirements: 5.1
    */
   @Get()
-  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @RequirePermission('ventas.pedidos.ver')
   @ApiOperation({
     summary: 'Listar pedidos',
     description: 'Obtiene una lista paginada de pedidos con filtros opcionales',
@@ -76,7 +77,7 @@ export class PedidosController {
    * Requirements: 5.2, 14.4
    */
   @Post()
-  @RequirePermissions('ventas', 'pedidos', 'crear')
+  @RequirePermission('ventas.pedidos.crear')
   @ApiOperation({
     summary: 'Crear pedido',
     description: 'Crea un nuevo pedido de venta',
@@ -98,7 +99,7 @@ export class PedidosController {
    * GET /api/ventas/pedidos/aprobaciones/pendientes - Bandeja de pedidos pendientes de aprobación
    */
   @Get('aprobaciones/pendientes')
-  @RequirePermissions('ventas', 'aprobaciones', 'ver')
+  @RequirePermission('ventas.pedidos_aprobaciones.ver')
   @ApiOperation({
     summary: 'Listar pedidos pendientes de aprobación',
     description: 'Obtiene la bandeja de pedidos que requieren decisión de aprobación o rechazo',
@@ -112,7 +113,7 @@ export class PedidosController {
    * GET /api/ventas/pedidos/:id/aprobaciones - Historial de aprobaciones del pedido
    */
   @Get(':id/aprobaciones')
-  @RequirePermissions('ventas', 'aprobaciones', 'ver')
+  @RequirePermission('ventas.pedidos_aprobaciones.ver')
   @ApiOperation({
     summary: 'Historial de aprobaciones',
     description: 'Obtiene las decisiones registradas para el pedido (aprobaciones/rechazos)',
@@ -126,7 +127,7 @@ export class PedidosController {
    * POST /api/ventas/pedidos/:id/aprobaciones/decision - Registrar decisión de aprobación
    */
   @Post(':id/aprobaciones/decision')
-  @RequirePermissions('ventas', 'aprobaciones', 'resolver')
+  @RequirePermission('ventas.pedidos_aprobaciones.resolver')
   @ApiOperation({
     summary: 'Resolver aprobación de pedido',
     description: 'Registra una decisión de aprobación o rechazo para el pedido pendiente',
@@ -154,7 +155,7 @@ export class PedidosController {
    * Requirements: 5.3
    */
   @Get(':id')
-  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @RequirePermission('ventas.pedidos.ver')
   @ApiOperation({
     summary: 'Obtener pedido',
     description: 'Obtiene los detalles completos de un pedido específico',
@@ -172,7 +173,7 @@ export class PedidosController {
    * Requirements: 5.2, 5.3
    */
   @Put(':id')
-  @RequirePermissions('ventas', 'pedidos', 'editar')
+  @RequirePermission('ventas.pedidos.editar')
   @ApiOperation({
     summary: 'Actualizar pedido',
     description: 'Actualiza los datos de un pedido existente (solo en estado PENDIENTE)',
@@ -195,7 +196,7 @@ export class PedidosController {
    * Requirements: 5.5, 5.6, 14.5
    */
   @Post(':id/confirmar')
-  @RequirePermissions('ventas', 'pedidos', 'confirmar')
+  @RequirePermission('ventas.pedidos.confirmar')
   @ApiOperation({
     summary: 'Confirmar pedido',
     description: 'Confirma el pedido y reserva el stock. Puede retornar warnings si hay stock insuficiente.',
@@ -224,7 +225,7 @@ export class PedidosController {
    * Requirements: 12.1, 12.2, 14.5
    */
   @Post(':id/cancelar')
-  @RequirePermissions('ventas', 'pedidos', 'cancelar')
+  @RequirePermission('ventas.pedidos.cancelar')
   @ApiOperation({
     summary: 'Cancelar pedido',
     description: 'Cancela el pedido y libera las reservas de stock si aplica',
@@ -253,7 +254,7 @@ export class PedidosController {
    * Requirements: 10.1, 14.5
    */
   @Post(':id/generar-factura')
-  @RequirePermissions('ventas', 'pedidos', 'generar_factura')
+  @RequirePermission('ventas.pedidos.generar_factura')
   @ApiOperation({
     summary: 'Generar factura',
     description: 'Genera una factura electrónica desde el pedido. Puede sugerir generación de GRE.',
@@ -276,7 +277,7 @@ export class PedidosController {
    * Requirements: 27.4
    */
   @Get(':id/historial')
-  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @RequirePermission('ventas.pedidos.ver_historial')
   @ApiOperation({
     summary: 'Obtener historial del pedido',
     description: 'Obtiene el timeline completo de cambios y eventos del pedido',
@@ -293,7 +294,7 @@ export class PedidosController {
    * GET /api/ventas/pedidos/:id/gres - Listar GRE asociadas al pedido
    */
   @Get(':id/gres')
-  @RequirePermissions('ventas', 'pedidos', 'ver')
+  @RequirePermission('ventas.pedidos.ver_gre')
   @ApiOperation({
     summary: 'Listar GRE asociadas',
     description: 'Obtiene las guías de remisión vinculadas al pedido',

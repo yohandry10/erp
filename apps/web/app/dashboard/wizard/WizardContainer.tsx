@@ -14,6 +14,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
     nextStep,
     previousStep,
     loadProgress,
+    saveStepProgress,
     canGoNext,
   } = useWizard()
 
@@ -22,6 +23,21 @@ export function WizardContainer({ children }: WizardContainerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleNextStep = async () => {
+    try {
+      // Save current step progress before moving to next
+      const currentStepData = state.steps[state.currentStep]
+      await saveStepProgress(currentStepData.id, state.configuration)
+
+      // Move to next step
+      nextStep()
+    } catch (error) {
+      console.error('Error saving step progress:', error)
+      // Still move to next step even if save fails
+      nextStep()
+    }
+  }
+
   const currentStepData = state.steps[state.currentStep]
   const progress = ((state.currentStep + 1) / state.steps.length) * 100
 
@@ -29,7 +45,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
     <div className="dashboard-container">
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* Progress Section */}
-        <div style={{ 
+        <div style={{
           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
           backdropFilter: 'blur(20px) saturate(180%)',
           borderRadius: 'var(--border-radius-xl)',
@@ -38,14 +54,14 @@ export function WizardContainer({ children }: WizardContainerProps) {
           boxShadow: 'var(--shadow-xl)',
           border: '1px solid rgba(255, 255, 255, 0.3)',
         }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '1rem'
           }}>
-            <span style={{ 
-              fontSize: '0.875rem', 
+            <span style={{
+              fontSize: '0.875rem',
               fontWeight: '700',
               color: 'var(--primary-700)',
               textTransform: 'uppercase',
@@ -53,7 +69,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
             }}>
               Paso {state.currentStep + 1} de {state.steps.length}
             </span>
-            <span style={{ 
+            <span style={{
               fontSize: '1.25rem',
               fontWeight: '700',
               color: 'var(--amber-600)'
@@ -61,7 +77,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
               {Math.round(progress)}%
             </span>
           </div>
-          
+
           {/* Progress Bar */}
           <div style={{
             width: '100%',
@@ -107,8 +123,8 @@ export function WizardContainer({ children }: WizardContainerProps) {
                   background: index === state.currentStep
                     ? 'var(--gradient-primary)'
                     : step.isComplete
-                    ? 'var(--gradient-success)'
-                    : 'var(--primary-100)',
+                      ? 'var(--gradient-success)'
+                      : 'var(--primary-100)',
                   color: index === state.currentStep || step.isComplete
                     ? 'white'
                     : 'var(--primary-500)',
@@ -191,39 +207,42 @@ export function WizardContainer({ children }: WizardContainerProps) {
           {!state.isLoading && (
             <div style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: state.currentStep === state.steps.length - 1 ? 'flex-start' : 'space-between',
               marginTop: '2.5rem',
               paddingTop: '2rem',
               borderTop: '1px solid var(--primary-200)',
               gap: '1rem'
             }}>
-              <button
-                className="btn btn-secondary"
-                onClick={previousStep}
-                disabled={state.currentStep === 0}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}
-              >
-                <ChevronLeft size={20} />
-                Anterior
-              </button>
+              {state.currentStep > 0 && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={previousStep}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <ChevronLeft size={20} />
+                  Anterior
+                </button>
+              )}
 
-              <button
-                className="btn btn-primary"
-                onClick={nextStep}
-                disabled={!canGoNext() || state.currentStep === state.steps.length - 1}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}
-              >
-                Siguiente
-                <ChevronRight size={20} />
-              </button>
+              {state.currentStep < state.steps.length - 1 && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleNextStep}
+                  disabled={!canGoNext()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  Siguiente
+                  <ChevronRight size={20} />
+                </button>
+              )}
             </div>
           )}
         </div>

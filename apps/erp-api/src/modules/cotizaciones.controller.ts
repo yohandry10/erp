@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Query, Param, Req, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, Req, UseGuards, HttpCode, HttpStatus, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { Request } from 'express';
@@ -8,14 +8,22 @@ import { Request } from 'express';
 export class CotizacionesController {
   constructor(private readonly supabaseService: SupabaseService) {}
   
+  private resolveTenantOrThrow(req: Request): string {
+    const tenantId = (req.user as any)?.tenant_id;
+    if (!tenantId) {
+      // HARDENING: evitar defaults o tenant arbitrario desde el cliente.
+      throw new ForbiddenException('Tenant requerido en la sesión actual');
+    }
+    return tenantId;
+  }
+  
   @Get('stats')
   @ApiOperation({ summary: 'Obtener estadísticas de cotizaciones' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@Req() req: Request) {
     try {
       console.log('📊 Calculando estadísticas de cotizaciones');
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Contar cotizaciones del mes actual
       const ahora = new Date();
@@ -100,7 +108,7 @@ export class CotizacionesController {
     try {
       console.log('📄 Consultando cotizaciones con filtros:', filters);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       let query = this.supabaseService
         .getClient()
@@ -159,7 +167,7 @@ export class CotizacionesController {
     try {
       console.log('👥 Consultando clientes principales');
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Obtener estadísticas por cliente
       const { data, error } = await this.supabaseService
@@ -252,9 +260,7 @@ export class CotizacionesController {
       console.log('📝 Creando nueva cotización');
       console.log('📋 Datos recibidos:', JSON.stringify(cotizacionData, null, 2));
       
-      const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-      const userId = user?.id;
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Validar datos requeridos
       if (!cotizacionData.cliente_id || !cotizacionData.items || !cotizacionData.total) {
@@ -338,7 +344,7 @@ export class CotizacionesController {
     try {
       console.log('📝 Actualizando cotización:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data, error } = await this.supabaseService
         .getClient()
@@ -378,7 +384,7 @@ export class CotizacionesController {
     try {
       console.log('📄 Obteniendo cotización:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data, error } = await this.supabaseService
         .getClient()
@@ -426,7 +432,7 @@ export class CotizacionesController {
     try {
       console.log('✅ Aprobando cotización:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // Actualizar estado a APROBADA
       const { data: cotizacion, error } = await this.supabaseService
@@ -480,7 +486,7 @@ export class CotizacionesController {
     try {
       console.log('🔄 Iniciando conversión de cotización a venta:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       // 1. Obtener cotización completa
       const { data: cotizacion, error: errorCotizacion } = await this.supabaseService
@@ -673,7 +679,7 @@ export class CotizacionesController {
     try {
       console.log('❌ Rechazando cotización:', id);
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data: cotizacion, error } = await this.supabaseService
         .getClient()
@@ -715,7 +721,7 @@ export class CotizacionesController {
   async puedeConvertir(@Param('id') id: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const tenantId = user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.resolveTenantOrThrow(req);
 
       const { data: cotizacion, error } = await this.supabaseService
         .getClient()

@@ -1,13 +1,16 @@
-import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
 @ApiTags('analytics')
 @Controller('analytics')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@ApiBearerAuth()
 export class AnalyticsController {
   
   constructor(
@@ -16,6 +19,7 @@ export class AnalyticsController {
   ) {}
   
   @Get('ventas-tiempo')
+  @RequirePermission('analytics.ventas.read') // HARDENING: acceso al análisis de ventas requiere permiso.
   @ApiOperation({ summary: 'Gráfico de ventas en el tiempo' })
   @ApiResponse({ status: 200, description: 'Datos de ventas en el tiempo obtenidos exitosamente' })
   async getVentasTiempo(@CurrentTenant() tenantId: string, @Query() filtros: any) {
@@ -128,6 +132,7 @@ export class AnalyticsController {
   }
 
   @Get('deudas-clientes')
+  @RequirePermission('analytics.cobranza.read') // HARDENING: reporte de cuentas por cobrar protegido.
   @ApiOperation({ summary: 'Gráfico de deudas de clientes' })
   @ApiResponse({ status: 200, description: 'Datos de deudas de clientes obtenidos exitosamente' })
   async getDeudasClientes(@CurrentTenant() tenantId: string, @Query() filtros: any) {
@@ -199,6 +204,7 @@ export class AnalyticsController {
   }
 
   @Get('rentabilidad-productos')
+  @RequirePermission('analytics.rentabilidad.read') // HARDENING: análisis sensible de rentabilidad.
   @ApiOperation({ summary: 'Análisis de rentabilidad por productos' })
   @ApiResponse({ status: 200, description: 'Análisis de rentabilidad obtenido exitosamente' })
   async getRentabilidadProductos(@CurrentTenant() tenantId: string, @Query() filtros: any) {
@@ -305,6 +311,7 @@ export class AnalyticsController {
   }
 
   @Get('punto-equilibrio')
+  @RequirePermission('analytics.finanzas.read') // HARDENING: cálculo financiero restringido.
   @ApiOperation({ summary: 'Cálculo del punto de equilibrio' })
   @ApiResponse({ status: 200, description: 'Análisis de punto de equilibrio obtenido exitosamente' })
   async getPuntoEquilibrio(@CurrentTenant() tenantId: string, @Query() filtros: any) {
@@ -399,6 +406,7 @@ export class AnalyticsController {
   }
 
   @Get('escenarios-financieros')
+  @RequirePermission('analytics.finanzas.read') // HARDENING: simulaciones financieras restringidas.
   @ApiOperation({ summary: 'Simulaciones de escenarios financieros' })
   @ApiResponse({ status: 200, description: 'Escenarios financieros simulados exitosamente' })
   async getEscenariosFinancieros(@CurrentTenant() tenantId: string, @Query('escenario') escenario: string = 'base', @Query() filtros: any) {

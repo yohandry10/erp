@@ -14,12 +14,23 @@ const ContratosPage = () => {
   const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const api = useApi();
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      // HARDENING: evitar llamadas a RRHH cuando la función está deshabilitada.
+      setContratos([]);
+      setEmpleados([]);
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [rrhhEnabled]);
 
   const loadData = async () => {
+    if (!rrhhEnabled) {
+      return;
+    }
     try {
       setLoading(true);
       
@@ -157,6 +168,20 @@ const ContratosPage = () => {
     const dias = Math.ceil((fin.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
     return dias;
   };
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="alert alert-warning">
+          <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
+          <p className="text-sm text-gray-600">
+            {/* // HARDENING: contratos bloqueados hasta finalizar validaciones legales. */}
+            La gestión de contratos estará disponible cuando el módulo de RRHH se habilite en este entorno.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = calcularEstadisticas();
 

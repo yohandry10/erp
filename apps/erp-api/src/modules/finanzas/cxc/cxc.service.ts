@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { RegistrarPagoCxcDto, TipoMovimientoCxc } from './dto';
-import { EventBusService } from '../../../shared/events/event-bus.service';
+import { EventBusService, FacturaEmitidaEvent, CuentaPorCobrarCreadaEvent } from '../../../shared/events/event-bus.service';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -15,10 +16,45 @@ interface ListarCxcFilters {
 
 @Injectable()
 export class CxcService {
+  private readonly logger = new Logger(CxcService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
   ) {}
+
+  private async registrarIntegrationLog(entry: {
+    tenantId: string;
+    servicio: string;
+    operacion: string;
+    correlacionId: string | null;
+    correlacionTipo: string;
+    status: 'SUCCESS' | 'ERROR' | 'PENDING' | 'TIMEOUT';
+    requestSummary?: Record<string, any>;
+    responseSummary?: Record<string, any>;
+    errorMessage?: string;
+    durationMs?: number;
+  }): Promise<void> {
+    try {
+      await this.supabase
+        .getClient()
+        .from('integration_logs')
+        .insert({
+          tenant_id: entry.tenantId,
+          servicio: entry.servicio,
+          operacion: entry.operacion,
+          correlacion_id: entry.correlacionId,
+          correlacion_tipo: entry.correlacionTipo,
+          status: entry.status,
+          request_summary: entry.requestSummary ?? null,
+          response_summary: entry.responseSummary ?? null,
+          error_message: entry.errorMessage ?? null,
+          duration_ms: entry.durationMs ?? null,
+        });
+    } catch (error) {
+      this.logger.error('❌ [CXC] Error registrando integration_log:', error);
+    }
+  }
 
   async listarCuentasPorCobrar(
     tenantId: string,
@@ -92,7 +128,321 @@ export class CxcService {
       },
     };
   }
+  async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<void> {
+    const tenantId = evento.tenantId;
+    const facturaId = evento.cpeId ?? evento.facturaId;
+    if (!tenantId || !facturaId) {
+      // HARDENING: sin tenant o identificación fiscal no procesamos para evitar fugas.
+      this.logger.warn('⚠️ [CXC] Evento de factura emitida sin tenant o cpeId/facturaId, se ignora.');
+      return;
+    }
 
+    const client = this.supabase.getClient();
+    const startedAt = Date.now();
+    const idempotencyKey = evento.idempotencyKey ?? `factura:${tenantId}:${facturaId}`;
+    const eventSource = evento.source ?? 'ventas';
+    const sourceEventId = evento.eventId ?? uuidv4();
+    let cuentaId: string | null = null;
+
+    try {
+      const { data: existentePorKey, error: idempotencyError } = await client
+        .from('cuentas_por_cobrar')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('idempotency_key', idempotencyKey)
+        .limit(1);
+
+      if (idempotencyError) {
+        this.logger.error('❌ [CXC] Error verificando idempotencia de CxC:', idempotencyError);
+        throw new BadRequestException('No se pudo validar la idempotencia de la cuenta por cobrar');
+      }
+
+      if (existentePorKey && existentePorKey.length > 0) {
+        this.logger.log(`ℹ️ [CXC] Evento idempotente ${idempotencyKey} ya procesado, se omite duplicado.`);
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'FINANZAS',
+          operacion: 'cxc.crear_desde_factura',
+          correlacionId: facturaId,
+          correlacionTipo: 'FACTURA',
+          status: 'SUCCESS',
+          requestSummary: {
+            eventId: sourceEventId,
+            idempotencyKey,
+            source: eventSource,
+          },
+          responseSummary: {
+            skipped: true,
+            motivo: 'duplicate_idempotency_key',
+          },
+          durationMs: Date.now() - startedAt,
+        });
+        return;
+      }
+
+      const { data: existente, error: existenteError } = await client
+        .from('cuentas_por_cobrar')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('documento_id', facturaId)
+        .limit(1);
+
+      if (existenteError) {
+        this.logger.error('❌ [CXC] Error verificando existencia de CxC:', existenteError);
+        throw new BadRequestException('No se pudo validar la cuenta por cobrar existente');
+      }
+
+      if (existente && existente.length > 0) {
+        this.logger.log(`ℹ️ [CXC] Ya existe cuenta por cobrar para factura ${facturaId}, no se duplica.`);
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'FINANZAS',
+          operacion: 'cxc.crear_desde_factura',
+          correlacionId: facturaId,
+          correlacionTipo: 'FACTURA',
+          status: 'SUCCESS',
+          requestSummary: {
+            eventId: sourceEventId,
+            idempotencyKey,
+            source: eventSource,
+          },
+          responseSummary: {
+            skipped: true,
+            motivo: 'existing_documento_id',
+            cuentaId: existente[0].id,
+          },
+          durationMs: Date.now() - startedAt,
+        });
+        return;
+      }
+
+      const config = await this.obtenerConfiguracionEmpresa(tenantId);
+      const cliente = await this.obtenerCliente(evento.clienteId, tenantId);
+      const ajustes = this.calcularAjustesDesdeEvento(evento, cliente, config);
+
+      const fechaEmision = evento.fechaEmision ? new Date(evento.fechaEmision) : new Date();
+      const diasVencimiento = config?.dias_vencimiento_factura ?? 30;
+      const fechaVencimiento = evento.fechaVencimiento
+        ? new Date(evento.fechaVencimiento)
+        : this.addDays(fechaEmision, diasVencimiento);
+
+      const retencion = ajustes.retencion ?? 0;
+      const percepcion = ajustes.percepcion ?? 0;
+      const detraccion = ajustes.detraccion ?? 0;
+      const anticipo = ajustes.anticipo ?? 0;
+
+      const montoPendiente = this.round2(Math.max(evento.total - retencion - detraccion - anticipo + percepcion, 0));
+
+      const estadoInicial =
+        montoPendiente <= 0
+          ? 'CANCELADO'
+          : retencion > 0 || detraccion > 0 || anticipo > 0
+            ? 'PARCIAL'
+            : 'PENDIENTE';
+
+      const numeroSerie = evento.serie ?? null;
+      const numeroCorrelativo = evento.numero != null ? String(evento.numero).padStart(8, '0') : null;
+
+      const { data: cuentaInsertada, error: insertError } = await client
+        .from('cuentas_por_cobrar')
+        .insert({
+          tenant_id: tenantId,
+          cliente_id: evento.clienteId,
+          pedido_id: evento.pedidoId ?? null,
+          documento_id: facturaId,
+          serie: numeroSerie,
+          numero: numeroCorrelativo,
+          fecha_emision: this.toISODate(fechaEmision),
+          fecha_vencimiento: this.toISODate(fechaVencimiento),
+          moneda: evento.moneda ?? 'PEN',
+          monto_total: this.round2(evento.total),
+          monto_pendiente: montoPendiente,
+          estado: estadoInicial,
+          dias_mora: 0,
+          retencion_total: this.round2(retencion),
+          percepcion_total: this.round2(percepcion),
+          detraccion_total: this.round2(detraccion),
+          anticipo_total: this.round2(anticipo),
+          event_id: sourceEventId,
+          idempotency_key: idempotencyKey,
+          event_source: eventSource,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        if ((insertError as any)?.code === '23505') {
+          this.logger.log(`ℹ️ [CXC] CxC duplicada detectada por constraint para factura ${facturaId}, se omite`);
+          await this.registrarIntegrationLog({
+            tenantId,
+            servicio: 'FINANZAS',
+            operacion: 'cxc.crear_desde_factura',
+            correlacionId: facturaId,
+            correlacionTipo: 'FACTURA',
+            status: 'SUCCESS',
+            requestSummary: {
+              eventId: sourceEventId,
+              idempotencyKey,
+              source: eventSource,
+            },
+            responseSummary: {
+              skipped: true,
+              motivo: 'unique_violation',
+            },
+            durationMs: Date.now() - startedAt,
+          });
+          return;
+        }
+        this.logger.error('❌ [CXC] Error registrando cuenta por cobrar:', insertError);
+        throw new BadRequestException('No se pudo registrar la cuenta por cobrar');
+      }
+
+      cuentaId = cuentaInsertada?.id ?? null;
+
+      if (cuentaId) {
+        const movimientos: any[] = [];
+        const fechaPago = this.toISODate(fechaEmision);
+        const monedaPago = evento.moneda ?? 'PEN';
+
+        if (retencion > 0) {
+          movimientos.push({
+            tenant_id: tenantId,
+            cuenta_id: cuentaId,
+            pedido_id: evento.pedidoId ?? null,
+            documento_id: facturaId,
+            tipo: TipoMovimientoCxc.RETENCION,
+            monto: this.round2(retencion),
+            moneda: monedaPago,
+            fecha_pago: fechaPago,
+            metodo_pago: 'RETENCION',
+            referencia: null,
+            aplica_retencion: true,
+            retencion_monto: this.round2(retencion),
+          });
+        }
+
+        if (detraccion > 0) {
+          movimientos.push({
+            tenant_id: tenantId,
+            cuenta_id: cuentaId,
+            pedido_id: evento.pedidoId ?? null,
+            documento_id: facturaId,
+            tipo: TipoMovimientoCxc.DETRACCION,
+            monto: this.round2(detraccion),
+            moneda: monedaPago,
+            fecha_pago: fechaPago,
+            metodo_pago: 'DETRACCION',
+            referencia: config?.detraccion_codigo ?? null,
+            aplica_retencion: false,
+            retencion_monto: null,
+          });
+        }
+
+        if (anticipo > 0) {
+          movimientos.push({
+            tenant_id: tenantId,
+            cuenta_id: cuentaId,
+            pedido_id: evento.pedidoId ?? null,
+            documento_id: facturaId,
+            tipo: TipoMovimientoCxc.ANTICIPO,
+            monto: this.round2(anticipo),
+            moneda: monedaPago,
+            fecha_pago: fechaPago,
+            metodo_pago: 'ANTICIPO',
+            referencia: null,
+            aplica_retencion: false,
+            retencion_monto: null,
+          });
+        }
+
+        if (movimientos.length > 0) {
+          const { error: pagosError } = await client.from('cxc_pagos').insert(movimientos);
+          if (pagosError) {
+            this.logger.warn('⚠️ [CXC] No se pudieron registrar movimientos automáticos de CxC:', pagosError);
+          }
+        }
+      }
+
+      if (!cuentaId) {
+        this.logger.warn(`⚠️ [CXC] No se obtuvo ID de cuenta por cobrar para factura ${facturaId}`);
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'FINANZAS',
+          operacion: 'cxc.crear_desde_factura',
+          correlacionId: facturaId,
+          correlacionTipo: 'FACTURA',
+          status: 'ERROR',
+          requestSummary: {
+            eventId: sourceEventId,
+            idempotencyKey,
+            source: eventSource,
+          },
+          errorMessage: 'No se obtuvo ID de la CxC insertada',
+          durationMs: Date.now() - startedAt,
+        });
+        return;
+      }
+
+      const cxcEventId = sourceEventId;
+
+      this.eventBus.emitCuentaPorCobrarCreadaEvent({
+        eventId: cxcEventId,
+        tenantId,
+        cuentaId,
+        facturaId,
+        serie: numeroSerie ?? undefined,
+        numero: numeroCorrelativo ?? undefined,
+        clienteId: evento.clienteId,
+        montoTotal: this.round2(evento.total),
+        montoPendiente,
+        moneda: evento.moneda ?? 'PEN',
+        subtotal: this.round2(evento.subtotal ?? 0),
+        impuestos: this.round2(evento.impuestos ?? (evento.total - (evento.subtotal ?? 0))),
+        fechaEmision: this.toISODate(fechaEmision),
+        fechaVencimiento: this.toISODate(fechaVencimiento),
+        idempotencyKey,
+        source: eventSource,
+        costoVentas: evento.costoVentas ?? 0,
+        ajustes,
+      } as CuentaPorCobrarCreadaEvent);
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'FINANZAS',
+        operacion: 'cxc.crear_desde_factura',
+        correlacionId: facturaId,
+        correlacionTipo: 'FACTURA',
+        status: 'SUCCESS',
+        requestSummary: {
+          eventId: sourceEventId,
+          idempotencyKey,
+          source: eventSource,
+        },
+        responseSummary: { cuentaId },
+        durationMs: Date.now() - startedAt,
+      });
+
+      this.logger.log(`✅ [CXC] Cuenta por cobrar registrada para factura ${facturaId}`);
+    } catch (error) {
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'FINANZAS',
+        operacion: 'cxc.crear_desde_factura',
+        correlacionId: facturaId,
+        correlacionTipo: 'FACTURA',
+        status: 'ERROR',
+        requestSummary: {
+          eventId: sourceEventId,
+          idempotencyKey,
+          source: eventSource,
+        },
+        responseSummary: cuentaId ? { cuentaId } : undefined,
+        errorMessage: error?.message ?? 'Error creando cuenta por cobrar',
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
+  }
   async obtenerCuentaPorCobrar(
     tenantId: string,
     cuentaId: string,
@@ -182,6 +532,23 @@ export class CxcService {
       if (cuentaBanco.moneda !== monedaCuenta) {
         throw new BadRequestException(
           `La moneda de la cuenta bancaria (${cuentaBanco.moneda}) no coincide con la moneda del cobro (${monedaCuenta})`,
+        );
+      }
+    }
+
+    // ✅ IDEMPOTENCIA: Validar que no exista un pago duplicado con la misma referencia
+    if (dto.referencia) {
+      const { data: pagoDuplicado } = await client
+        .from('cxc_pagos')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('cuenta_id', cuentaId)
+        .eq('referencia', dto.referencia)
+        .maybeSingle();
+
+      if (pagoDuplicado) {
+        throw new BadRequestException(
+          `Ya existe un pago registrado con la referencia "${dto.referencia}". Use una referencia única.`
         );
       }
     }
@@ -314,7 +681,9 @@ export class CxcService {
 
     // Emitir evento PagoFactura (legacy, para compatibilidad)
     this.emitirEventoPagoFactura(
+      tenantId,
       detalleActualizado,
+      cuentaId,
       {
         monto: this.round2(montoPago),
         metodo: dto.metodo_pago ?? undefined,
@@ -393,6 +762,86 @@ export class CxcService {
     };
   }
 
+  private async obtenerConfiguracionEmpresa(tenantId: string): Promise<any> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('empresa_config')
+      .select('dias_vencimiento_factura, detraccion_codigo, aplicar_retencion, retencion_tasa, aplicar_percepcion, percepcion_tasa, aplicar_detraccion, detraccion_tasa')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error) {
+      this.logger.warn(`⚠️ [CXC] No se pudo obtener configuración de empresa para ${tenantId}: ${error.message}`);
+      return {};
+    }
+
+    return data || {};
+  }
+
+  private async obtenerCliente(clienteId: string, tenantId: string): Promise<any> {
+    if (!clienteId) {
+      return null;
+    }
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('clientes')
+      .select('id, razon_social, sujeto_retencion, retencion_tasa, sujeto_percepcion, percepcion_tasa, sujeto_detraccion, detraccion_tasa')
+      .eq('id', clienteId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error) {
+      this.logger.warn(`⚠️ [CXC] No se pudo obtener cliente ${clienteId} para tenant ${tenantId}: ${error.message}`);
+      return null;
+    }
+
+    return data;
+  }
+
+  private calcularAjustesDesdeEvento(
+    evento: FacturaEmitidaEvent,
+    cliente: any,
+    config: any,
+  ): { retencion: number; percepcion: number; detraccion: number; anticipo: number } {
+    if (evento.ajustes) {
+      return {
+        retencion: this.round2(evento.ajustes.retencion || 0),
+        percepcion: this.round2(evento.ajustes.percepcion || 0),
+        detraccion: this.round2(evento.ajustes.detraccion || 0),
+        anticipo: this.round2(evento.ajustes.anticipo || 0),
+      };
+    }
+
+    const total = this.round2(evento.total);
+    const sujetoRetencion = cliente?.sujeto_retencion ?? config?.aplicar_retencion ?? false;
+    const retencionTasa = cliente?.retencion_tasa ?? config?.retencion_tasa ?? 0;
+    const sujetoPercepcion = cliente?.sujeto_percepcion ?? config?.aplicar_percepcion ?? false;
+    const percepcionTasa = cliente?.percepcion_tasa ?? config?.percepcion_tasa ?? 0;
+    const sujetoDetraccion = cliente?.sujeto_detraccion ?? config?.aplicar_detraccion ?? false;
+    const detraccionTasa = cliente?.detraccion_tasa ?? config?.detraccion_tasa ?? 0;
+
+    const retencion = sujetoRetencion && retencionTasa > 0 ? this.round2(total * (Number(retencionTasa) / 100)) : 0;
+    const percepcion = sujetoPercepcion && percepcionTasa > 0 ? this.round2(total * (Number(percepcionTasa) / 100)) : 0;
+    const detraccion = sujetoDetraccion && detraccionTasa > 0 ? this.round2(total * (Number(detraccionTasa) / 100)) : 0;
+
+    return {
+      retencion,
+      percepcion,
+      detraccion,
+      anticipo: 0,
+    };
+  }
+
+  private addDays(date: Date, days: number): Date {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  private toISODate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
   private calcularEstadoCuenta(
     total: number,
     pendiente: number,
@@ -423,7 +872,9 @@ export class CxcService {
   }
 
   private emitirEventoPagoFactura(
+    tenantId: string,
     cuenta: any,
+    cuentaId: string,
     pago: { monto: number; metodo?: string; fecha: string },
     saldoPendiente: number,
     estadoCuenta: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO',
@@ -435,13 +886,26 @@ export class CxcService {
     try {
       const numeroFactura =
         [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || cuenta.documento_id;
+      const tenantFromContext = tenantId || cuenta.tenant_id || cuenta.tenantId || null;
+
+      if (!tenantFromContext) {
+        // HARDENING: sin tenant no generamos evento de pago.
+        console.warn('⚠️ [CXC] Pago de factura sin tenantId, se omite evento contable');
+        return;
+      }
 
       this.eventBus.emitPagoFactura({
+        eventId: uuidv4(),
+        tenantId: tenantFromContext,
+        cxcId: cuentaId,
         facturaId: cuenta.documento_id,
+        cpeId: cuenta.documento_id,
         numeroFactura,
         clienteId: cuenta.cliente_id,
         montoPagado: this.round2(pago.monto),
+        moneda: cuenta.moneda || 'PEN',
         metodoPago: pago.metodo ?? 'desconocido',
+        cuentaBancariaId: cuenta.cuenta_bancaria_id ?? null,
         fechaPago: pago.fecha,
         saldoPendiente: this.round2(saldoPendiente),
         estadoPago: estadoCuenta === 'CANCELADO' ? 'COMPLETO' : 'PARCIAL',
@@ -506,3 +970,12 @@ export class CxcService {
     }
   }
 }
+
+
+
+
+
+
+
+
+

@@ -10,7 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { LogisticaService } from './logistica.service';
@@ -31,7 +32,7 @@ import {
 @ApiTags('Inventario - Logística')
 @ApiBearerAuth()
 @Controller('api/inventario/logistica')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: logística exige permisos granulares.
 export class LogisticaController {
   constructor(private readonly logisticaService: LogisticaService) {}
 
@@ -41,7 +42,7 @@ export class LogisticaController {
    * Requirements: 9.2, 21.1, 21.2
    */
   @Get('ordenes-pendientes')
-  @RequirePermissions('inventario', 'logistica', 'ver')
+  @RequirePermission('inventario.logistica.ver')
   @ApiOperation({
     summary: 'Listar órdenes pendientes de preparación',
     description: 'Obtiene la lista de pedidos confirmados que están esperando preparación en almacén',
@@ -59,7 +60,7 @@ export class LogisticaController {
    * Requirements: 9.3, 9.4, 9.5, 21.3, 21.4
    */
   @Post(':pedidoId/preparar')
-  @RequirePermissions('inventario', 'logistica', 'preparar')
+  @RequirePermission('inventario.logistica.preparar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Preparar pedido',
@@ -90,7 +91,7 @@ export class LogisticaController {
    * Requirements: 9.6, 21.6
    */
   @Post(':pedidoId/marcar-listo')
-  @RequirePermissions('inventario', 'logistica', 'preparar')
+  @RequirePermission('inventario.logistica.preparar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Marcar pedido como listo para despacho',
@@ -116,7 +117,7 @@ export class LogisticaController {
    * Requirements: 9.7, 21.7, 21.8
    */
   @Post(':pedidoId/confirmar-despacho')
-  @RequirePermissions('inventario', 'logistica', 'despachar')
+  @RequirePermission('inventario.logistica.despachar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Confirmar despacho de pedido',
@@ -146,7 +147,7 @@ export class LogisticaController {
    * Obtiene el listado de backorders pendientes para seguimiento
    */
   @Get(':pedidoId/backorders')
-  @RequirePermissions('inventario', 'logistica', 'ver')
+  @RequirePermission('inventario.logistica.ver')
   @ApiOperation({
     summary: 'Listar backorders del pedido',
     description: 'Devuelve las líneas pendientes con su prioridad y próxima fecha comprometida.',
@@ -165,7 +166,7 @@ export class LogisticaController {
    * Reprograma un backorder con nueva fecha y prioridad
    */
   @Post(':pedidoId/backorders/:detalleId/reprogramar')
-  @RequirePermissions('inventario', 'logistica', 'despachar')
+  @RequirePermission('inventario.logistica.despachar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reprogramar backorder',
@@ -195,7 +196,7 @@ export class LogisticaController {
    * Actualiza el estado de tracking (EN_TRANSITO / ENTREGADO / INCIDENCIA)
    */
   @Post(':pedidoId/tracking')
-  @RequirePermissions('inventario', 'logistica', 'despachar')
+  @RequirePermission('inventario.logistica.despachar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Actualizar tracking del pedido',
@@ -224,7 +225,7 @@ export class LogisticaController {
    * GET /api/inventario/logistica/:pedidoId/eventos - Obtener timeline de eventos logísticos
    */
   @Get(':pedidoId/eventos')
-  @RequirePermissions('inventario', 'logistica', 'ver')
+  @RequirePermission('inventario.logistica.ver')
   @ApiOperation({
     summary: 'Obtener eventos logísticos',
     description: 'Lista los eventos de picking/packing/despacho/tracking registrados para el pedido',
@@ -241,7 +242,7 @@ export class LogisticaController {
    * POST /api/inventario/logistica/:pedidoId/eventos - Registrar evento logístico manual
    */
   @Post(':pedidoId/eventos')
-  @RequirePermissions('inventario', 'logistica', 'preparar')
+  @RequirePermission('inventario.logistica.preparar')
   @ApiOperation({
     summary: 'Registrar evento logístico manual',
     description:

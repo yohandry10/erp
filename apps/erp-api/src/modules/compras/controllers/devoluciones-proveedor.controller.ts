@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
@@ -24,7 +26,7 @@ import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor
 @ApiTags('Compras - Devoluciones')
 @ApiBearerAuth()
 @Controller('compras/devoluciones')
-// @UseGuards(JwtAuthGuard) // Temporalmente deshabilitado para testing
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: permisos granulares en devoluciones.
 export class DevolucionesProveedorController {
   constructor(private readonly devolucionesService: DevolucionesProveedorService) {}
 
@@ -61,10 +63,10 @@ export class DevolucionesProveedorController {
   @ApiResponse({ status: 200, description: 'Devoluciones obtenidas exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   async obtenerDevoluciones(
+    @CurrentTenant() tenantId: string,
     @Query() filtros: any,
   ) {
-    // ✅ MULTI-TENANT: Obtener tenant_id de query params o header para testing
-    const tenantId = filtros.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+    // HARDENING: ignoramos tenant_id externo, usamos contexto autenticado.
     return this.devolucionesService.obtenerDevoluciones(tenantId, filtros);
   }
 
@@ -81,10 +83,10 @@ export class DevolucionesProveedorController {
   @ApiResponse({ status: 404, description: 'Devolución no encontrada' })
   async obtenerDevolucionPorId(
     @Param('id') devolucionId: string,
+    @CurrentTenant() tenantId: string,
     @Query() query: any,
   ) {
-    // ✅ MULTI-TENANT: Obtener tenant_id de query params para testing
-    const tenantId = query.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+    // HARDENING: se fuerza tenant del contexto; query solo aporta otros filtros.
     return this.devolucionesService.obtenerDevolucionPorId(devolucionId, tenantId);
   }
 
@@ -103,11 +105,11 @@ export class DevolucionesProveedorController {
   @ApiResponse({ status: 404, description: 'Devolución no encontrada' })
   async emitirDevolucion(
     @Param('id') devolucionId: string,
+    @CurrentTenant() tenantId: string,
     @Query() query: any,
     @CurrentUser() user: any,
   ) {
-    // ✅ MULTI-TENANT: Obtener tenant_id de query params para testing
-    const tenantId = query.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+    // HARDENING: tenant se obtiene del contexto autenticado.
     return this.devolucionesService.emitirDevolucion(devolucionId, tenantId, user?.id);
   }
 }

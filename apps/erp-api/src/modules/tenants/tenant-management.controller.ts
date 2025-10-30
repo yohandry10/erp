@@ -14,6 +14,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { TenantManagementService } from './tenant-management.service';
 import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto } from './dto';
@@ -29,7 +32,7 @@ import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto } from './dto';
 @ApiTags('Gestión de Tenants (Super-Admin)')
 @ApiBearerAuth()
 @Controller('tenants')
-@UseGuards(JwtAuthGuard, SuperAdminGuard)
+@UseGuards(JwtAuthGuard)
 export class TenantManagementController {
   constructor(
     private readonly tenantManagementService: TenantManagementService,
@@ -39,7 +42,9 @@ export class TenantManagementController {
    * GET /tenants - Get all tenants with filters and pagination
    * Requirements: 1.4, 9.1
    */
+  @UseGuards(SuperAdminGuard, PermissionGuard)
   @Get()
+  @RequirePermission('tenants.manage') // HARDENING: solo usuarios autorizados gestionan tenants.
   @ApiOperation({ summary: 'Obtener todos los tenants', description: 'Obtiene una lista paginada de todos los tenants del sistema (solo super-admin)' })
   @ApiResponse({ status: 200, description: 'Lista de tenants obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -57,9 +62,10 @@ export class TenantManagementController {
   @ApiOperation({ summary: 'Obtener tenant del usuario actual', description: 'Obtiene los detalles del tenant del usuario autenticado' })
   @ApiResponse({ status: 200, description: 'Tenant obtenido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
-  async getCurrentUserTenant(@Req() req: any) {
-    const tenantId = req.user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
-    return this.tenantManagementService.getTenantById(tenantId);
+  async getCurrentUserTenant(@CurrentTenant() tenantId?: string, @Req() req: any) {
+    const currentTenantId = tenantId ?? req.user?.tenant_id;
+    if (!currentTenantId) { throw new ForbiddenException('Tenant no asociado a la sesión actual'); }
+    return this.tenantManagementService.getTenantById(currentTenantId);
   }
 
   /**
@@ -76,7 +82,7 @@ export class TenantManagementController {
   @ApiResponse({ status: 403, description: 'Acceso denegado - Solo puedes ver tu propio tenant o ser super-admin' })
   @ApiResponse({ status: 404, description: 'Tenant no encontrado' })
   async getTenantById(@Param('id') tenantId: string, @Req() req: any) {
-    const userTenantId = req.user?.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+    const userTenantId = req.user?.tenant_id;
     const isSuperAdmin = req.user?.is_super_admin || false;
     
     // Permitir si es el tenant del usuario o si es super admin
@@ -84,7 +90,8 @@ export class TenantManagementController {
       throw new ForbiddenException('No tienes permisos para ver este tenant');
     }
     
-    return this.tenantManagementService.getTenantById(tenantId);
+    if (!currentTenantId) { throw new ForbiddenException('Tenant no asociado a la sesión actual'); }
+    return this.tenantManagementService.getTenantById(currentTenantId);
   }
 
   /**

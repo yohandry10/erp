@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { ClientesService } from './clientes.service';
@@ -27,7 +28,7 @@ import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 @ApiTags('Ventas - Clientes')
 @ApiBearerAuth()
 @Controller('api/ventas/clientes')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: clientes exige permisos granulares.
 export class ClientesController {
   constructor(private readonly clientesService: ClientesService) {}
 
@@ -36,7 +37,7 @@ export class ClientesController {
    * Requirements: 1.1, 1.7, 24.1, 24.2
    */
   @Get()
-  @RequirePermissions('ventas', 'clientes', 'ver')
+  @RequirePermission('ventas.clientes.ver')
   @ApiOperation({
     summary: 'Listar clientes',
     description: 'Obtiene una lista paginada de clientes con filtros opcionales',
@@ -64,7 +65,7 @@ export class ClientesController {
    * Requirements: 1.2, 14.1
    */
   @Post()
-  @RequirePermissions('ventas', 'clientes', 'crear')
+  @RequirePermission('ventas.clientes.crear')
   @ApiOperation({
     summary: 'Crear cliente',
     description: 'Crea un nuevo cliente en el sistema',
@@ -87,7 +88,7 @@ export class ClientesController {
    * Requirements: 1.6, 24.3
    */
   @Get(':id')
-  @RequirePermissions('ventas', 'clientes', 'ver')
+  @RequirePermission('ventas.clientes.ver')
   @ApiOperation({
     summary: 'Obtener cliente',
     description: 'Obtiene los detalles de un cliente específico',
@@ -105,7 +106,7 @@ export class ClientesController {
    * Requirements: 1.8, 14.1
    */
   @Put(':id')
-  @RequirePermissions('ventas', 'clientes', 'editar')
+  @RequirePermission('ventas.clientes.editar')
   @ApiOperation({
     summary: 'Actualizar cliente',
     description: 'Actualiza los datos de un cliente existente',
@@ -129,7 +130,7 @@ export class ClientesController {
    * Requirements: 1.8, 14.1
    */
   @Delete(':id')
-  @RequirePermissions('ventas', 'clientes', 'eliminar')
+  @RequirePermission('ventas.clientes.eliminar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar cliente',
@@ -149,7 +150,7 @@ export class ClientesController {
    * Requirements: 1.4, 19.3
    */
   @Post('validar-ruc')
-  @RequirePermissions('ventas', 'clientes', 'validar_ruc')
+  @RequirePermission('ventas.clientes.validar_ruc')
   @ApiOperation({
     summary: 'Validar RUC',
     description: 'Valida un RUC con la API de SUNAT',

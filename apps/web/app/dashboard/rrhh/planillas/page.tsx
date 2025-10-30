@@ -7,6 +7,7 @@ import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import { useApi } from '@/hooks/use-api';
 
 const PlanillasPage = () => {
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
   const { get } = useApi();
   const [planillas, setPlanillas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +21,21 @@ const PlanillasPage = () => {
   console.log('🔥 COMPONENTE RENDERIZADO - showPlanillaModal:', showPlanillaModal);
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      // HARDENING: evitar montar planillas cuando RRHH está deshabilitado.
+      setPlanillas([]);
+      setLoading(false);
+      return;
+    }
     loadPlanillas();
-  }, []);
+  }, [rrhhEnabled]);
 
   const loadPlanillas = async () => {
+    if (!rrhhEnabled) {
+      setPlanillas([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const response = await get('/api/rrhh/planillas');
@@ -423,12 +435,36 @@ const PlanillasPage = () => {
     }
   };
 
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="alert alert-warning">
+          <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
+          <p className="text-sm text-gray-600">
+            {/* // HARDENING: bloquear planillas cuando RRHH no está habilitado. */}
+            Las funciones de planilla estarán disponibles cuando el módulo de RRHH se active en este entorno.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="dashboard-container">
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando planillas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="loading">
+          <p>El módulo de RRHH está deshabilitado en este entorno.</p>
         </div>
       </div>
     );

@@ -10,6 +10,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { RateLimitGuard } from './shared/security/guards/rate-limit.guard';
 import { ValidationInterceptor } from './shared/security/interceptors/validation.interceptor';
+import { PermissionGuard } from './common/guards/permission.guard';
 import { IntegrationModule } from './shared/integration/integration.module'; // Importar el módulo de integración
 import { ComprasModule } from './modules/compras/compras.module';
 import { CotizacionesModule } from './modules/cotizaciones/cotizaciones.module';
@@ -41,6 +42,7 @@ import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
 import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 import { RmaModule } from './modules/ventas/rma/rma.module';
 import { SecurityDashboardModule } from './modules/security/security.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 
 @Module({
   imports: [
@@ -52,6 +54,7 @@ import { SecurityDashboardModule } from './modules/security/security.module';
     SecurityDashboardModule,
     AuthModule,
     SupabaseModule,
+    PermissionsModule,
     IntegrationModule,
     UsuariosModule,
     TenantsModule,
@@ -86,6 +89,13 @@ import { SecurityDashboardModule } from './modules/security/security.module';
   controllers: [AppController],
   providers: [
     AppService,
+    // ✅ SECURITY: PermissionGuard aplicado globalmente
+    // Valida permisos en endpoints con @RequirePermission()
+    // Si no hay @RequirePermission(), permite acceso (solo requiere autenticación)
+    {
+      provide: APP_GUARD,
+      useClass: PermissionGuard,
+    },
     // Rate limiter deshabilitado temporalmente
     // {
     //   provide: APP_GUARD,

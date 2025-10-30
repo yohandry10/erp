@@ -9,7 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard, RequirePermissions } from '../../permissions';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { CxcService } from './cxc.service';
@@ -18,12 +19,12 @@ import { RegistrarPagoCxcDto } from './dto';
 @ApiTags('Finanzas - Cuentas por Cobrar')
 @ApiBearerAuth()
 @Controller('api/finanzas/cxc')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: CxC exige permisos granulares.
 export class CxcController {
   constructor(private readonly cxcService: CxcService) {}
 
   @Get()
-  @RequirePermissions('finanzas', 'cxc', 'ver')
+  @RequirePermission('finanzas.cxc.ver')
   @ApiOperation({
     summary: 'Listar cuentas por cobrar',
     description: 'Obtiene la bandeja de cuentas por cobrar con filtros opcionales',
@@ -56,7 +57,7 @@ export class CxcController {
   }
 
   @Get(':id')
-  @RequirePermissions('finanzas', 'cxc', 'ver')
+  @RequirePermission('finanzas.cxc.ver')
   @ApiOperation({
     summary: 'Detalle de cuenta por cobrar',
     description: 'Obtiene el detalle completo de una cuenta por cobrar, incluyendo pagos registrados',
@@ -67,7 +68,7 @@ export class CxcController {
   }
 
   @Post(':id/pagos')
-  @RequirePermissions('finanzas', 'cxc', 'gestionar')
+  @RequirePermission('finanzas.cxc.gestionar')
   @ApiOperation({
     summary: 'Registrar pago/anticipo',
     description:

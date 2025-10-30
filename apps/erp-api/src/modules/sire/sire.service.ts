@@ -1,12 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 
 @Injectable()
 export class SireService {
   constructor(
     private readonly supabaseService: SupabaseService,
-    private readonly eventBus: EventBusService
+    private readonly eventBus: EventBusService,
+    private readonly tenantContext: TenantContextService,
   ) {
     console.log('📊 [SIRE] ¡Servicio SIRE inicializado!');
     this.initializeEventListeners();
@@ -32,7 +34,7 @@ export class SireService {
   async procesarComprobanteParaSire(comprobante: any): Promise<void> {
     try {
       // ✅ MULTI-TENANT: Obtener tenant del comprobante
-      const tenantId = comprobante.tenant_id || '550e8400-e29b-41d4-a716-446655440000';
+      const tenantId = this.ensureTenant(comprobante.tenant_id || comprobante.tenantId);
       console.log(`📊 [SIRE] ¡NUEVO COMPROBANTE DETECTADO! Registrando ${comprobante.serie}-${comprobante.numero} en SIRE para tenant: ${tenantId}`);
       console.log(`📊 [SIRE] Datos del comprobante:`, JSON.stringify(comprobante, null, 2));
       
@@ -58,7 +60,7 @@ export class SireService {
   private async buscarOCrearReportePeriodo(periodo: string, tipoDocumento?: string, tenantId?: string): Promise<any> {
     try {
       // ✅ MULTI-TENANT: Usar tenant_id
-      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      const currentTenantId = this.ensureTenant(tenantId);
       
       // Buscar reporte existente para el período
       const { data: reporteExistente } = await this.supabaseService.getClient()
@@ -105,7 +107,7 @@ export class SireService {
   private async actualizarContadorRegistros(reporteId: string, tenantId?: string): Promise<void> {
     try {
       // ✅ MULTI-TENANT: Usar tenant_id
-      const currentTenantId = tenantId || '550e8400-e29b-41d4-a716-446655440000';
+      const currentTenantId = this.ensureTenant(tenantId);
       console.log(`📊 [SIRE] Actualizando contador para reporte ${reporteId}...`);
       
       // Obtener el total actual
@@ -183,7 +185,8 @@ export class SireService {
 
   async getStats(tenantId?: string) {
     try {
-      console.log('📊 Calculando estadísticas SIRE para tenant:', tenantId);
+      const currentTenantId = this.ensureTenant(tenantId);
+      console.log('📊 Calculando estadísticas SIRE para tenant:', currentTenantId);
       
       // Get current month's statistics
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
@@ -196,9 +199,7 @@ export class SireService {
         .gte('created_at', `${currentMonth}-01`)
         .lt('created_at', `${this.getNextMonth(currentMonth)}-01`);
 
-      if (tenantId) {
-        queryMes = queryMes.eq('tenant_id', tenantId);
-      }
+      queryMes = queryMes.eq('tenant_id', currentTenantId);
 
       const { count: reportesDelMes } = await queryMes;
 
@@ -208,9 +209,7 @@ export class SireService {
         .from('sire_files')
         .select('total_registros');
 
-      if (tenantId) {
-        queryRegistros = queryRegistros.eq('tenant_id', tenantId);
-      }
+      queryRegistros = queryRegistros.eq('tenant_id', currentTenantId);
 
       const { data: reportes } = await queryRegistros;
       const registrosTotales = reportes?.reduce((sum, reporte) => sum + (reporte.total_registros || 0), 0) || 0;
@@ -222,9 +221,7 @@ export class SireService {
         .select('*', { count: 'exact', head: true })
         .eq('estado', 'ENVIADO');
 
-      if (tenantId) {
-        queryEnviados = queryEnviados.eq('tenant_id', tenantId);
-      }
+      queryEnviados = queryEnviados.eq('tenant_id', currentTenantId);
 
       const { count: enviadosASunat } = await queryEnviados;
 
@@ -235,9 +232,7 @@ export class SireService {
         .select('*', { count: 'exact', head: true })
         .in('estado', ['GENERADO', 'GENERANDO', 'PENDIENTE']);
 
-      if (tenantId) {
-        queryPendientes = queryPendientes.eq('tenant_id', tenantId);
-      }
+      queryPendientes = queryPendientes.eq('tenant_id', currentTenantId);
 
       const { count: pendientes } = await queryPendientes;
 
@@ -269,9 +264,9 @@ export class SireService {
     }
   }
 
-  async getReportes(filters: any, tenantId?: string) {
+  async getReportes(filters: any, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
     try {
-      console.log('📄 Consultando reportes SIRE para tenant:', tenantId, 'filters:', filters);
+      console.log('📄 Consultando reportes SIRE para tenant:', currentTenantId, 'filters:', filters);
       
       let query = this.supabaseService
         .getClient()
@@ -345,9 +340,9 @@ export class SireService {
     return tipoMap[tipoCorto] || tipoCorto;
   }
 
-  async generarReporte(reportData: any, tenantId?: string) {
+  async generarReporte(reportData: any, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
     try {
-      console.log('🔄 Generando reporte SIRE:', reportData, 'para tenant:', tenantId);
+      console.log('🔄 Generando reporte SIRE:', reportData, 'para tenant:', currentTenantId);
 
       // Validate required fields based on real table structure
       if (!reportData.tipoReporte || !reportData.periodo) {
@@ -368,7 +363,7 @@ export class SireService {
       const periodoCorto = reportData.periodo.substring(0, 10); // Asegurar que periodo no exceda 10 chars
       
       const nuevoReporte = {
-        tenant_id: tenantId || '550e8400-e29b-41d4-a716-446655440000',
+        tenant_id: currentTenantId,
         periodo: periodoCorto,
         tipo: tipoCorto,
         filename: `SIRE_${tipoCorto}_${periodoCorto}.txt`,
@@ -399,7 +394,7 @@ export class SireService {
           .getClient()
           .from('sire_files')
           .select('*')
-          .eq('tenant_id', tenantId || '550e8400-e29b-41d4-a716-446655440000')
+          .eq('tenant_id', tenantId)
           .eq('tipo', tipoCorto)
           .eq('periodo', periodoCorto)
           .order('created_at', { ascending: false })
@@ -444,9 +439,9 @@ export class SireService {
     }
   }
 
-  async downloadReporte(id: string, tenantId?: string) {
+  async downloadReporte(id: string, tenantId?: string) {\n    const currentTenantId = this.ensureTenant(tenantId);
     try {
-      console.log('📥 Descargando reporte SIRE:', id, 'para tenant:', tenantId);
+      console.log('📥 Descargando reporte SIRE:', id, 'para tenant:', currentTenantId);
       
       let query = this.supabaseService
         .getClient()
@@ -674,3 +669,10 @@ export class SireService {
     });
   }
 }
+  private ensureTenant(tenantId?: string): string {
+    const resolvedTenant = tenantId ?? this.tenantContext.getTenantId();
+    if (!resolvedTenant) {
+      throw new BadRequestException('[SIRE] Tenant requerido para esta operación');
+    }
+    return resolvedTenant;
+  }

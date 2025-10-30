@@ -14,12 +14,24 @@ const PagosPage = () => {
 
   // Definir API_BASE_URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
+    if (!rrhhEnabled) {
+      // HARDENING: evitar solicitudes de RRHH cuando la función está deshabilitada.
+      setPagos([]);
+      setEmpleados([]);
+      setPlanillas([]);
+      setLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [rrhhEnabled]);
 
   const loadData = async () => {
+    if (!rrhhEnabled) {
+      return;
+    }
     try {
       setLoading(true);
       
@@ -137,6 +149,20 @@ const PagosPage = () => {
     const periodos = [...new Set(pagos.map(p => p.periodo))];
     return periodos.sort().reverse();
   };
+
+  if (!rrhhEnabled) {
+    return (
+      <div className="dashboard-container">
+        <div className="alert alert-warning">
+          <h1 className="text-xl font-semibold">RRHH deshabilitado</h1>
+          <p className="text-sm text-gray-600">
+            {/* // HARDENING: pagos RRHH bloqueados hasta completar la validación legal. */}
+            El seguimiento de pagos de planilla estará disponible cuando el módulo de RRHH se habilite en este entorno.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = calcularEstadisticas();
 

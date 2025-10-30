@@ -965,3 +965,173 @@ ${new Date().toLocaleString()}
     }
   }
 }
+
+  /**
+
+   * Anular un comprobante CPE
+   * Genera nota de crédito y emite eventos para reversión de operaciones
+   */
+  async anularComprobante(
+    cpeId: string,
+    motivo: string,
+    tenantId: string,
+    userId?: string,
+    tipoNota: string = '01' // 01 = Anulación de la operación
+  ): Promise<any> {
+    const client = this.supabaseService.getClient();
+
+    // 1. Obtener el CPE a anular
+    const { data: cpe, error: cpeError } = await client
+      .from('comprobantes_electronicos')
+      .select('*')
+      .eq('id', cpeId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (cpeError || !cpe) {
+      throw new NotFoundException('Comprobante electrónico no encontrado');
+    }
+
+    // 2. Validar que el CPE puede ser anulado
+    if (cpe.estado === 'ANULADO') {
+      throw new BadRequestException('El comprobante ya está anulado');
+    }
+
+    if (cpe.estado !== 'ACEPTADO' && cpe.estado !== 'ENVIADO') {
+      throw new BadRequestException(
+        `No se puede anular un comprobante en estado ${cpe.estado}. ` +
+        `Solo se pueden anular comprobantes ACEPTADOS o ENVIADOS.`
+      );
+    }
+
+    // 3. Generar nota de crédito
+    console.log(`📝 [CPE] Generando nota de crédito para CPE ${cpeId}...`);
+    
+    const notaCreditoData = {
+      tipo_documento: 'NOTA_CREDITO',
+      serie: cpe.serie.replace('F', 'FC'), // FC001 para notas de crédito
+      numero: await this.obtenerSiguienteNumeroNotaCredito(tenantId, cpe.serie.replace('F', 'FC')),
+      documento_referencia_tipo: cpe.tipo_documento,
+      documento_referencia_serie: cpe.serie,
+      documento_referencia_numero: cpe.numero,
+      tipo_nota_credito: tipoNota,
+      motivo_nota: motivo,
+      ruc_emisor: cpe.ruc_emisor,
+      razon_social_emisor: cpe.razon_social_emisor,
+      tipo_documento_receptor: cpe.tipo_documento_receptor,
+      documento_receptor: cpe.documento_receptor,
+      razon_social_receptor: cpe.razon_social_receptor,
+      moneda: cpe.moneda,
+      total_gravadas: -cpe.total_gravadas, // Negativo para revertir
+      total_igv: -cpe.total_igv,
+      total_venta: -cpe.total_venta,
+      tenant_id: tenantId,
+      estado: 'BORRADOR',
+      created_by: userId,
+    };
+
+    const { data: notaCredito, error: notaError } = await client
+      .from('comprobantes_electronicos')
+      .insert(notaCreditoData)
+      .select()
+      .single();
+
+    if (notaError) {
+      console.error('Error creando nota de crédito:', notaError);
+      throw new BadRequestException('No se pudo crear la nota de crédito');
+    }
+
+    // 4. Actualizar estado del CPE original
+    const { error: updateError } = await client
+      .from('comprobantes_electronicos')
+      .update({
+        estado: 'ANULADO',
+        nota_credito_id: notaCredito.id,
+        motivo_anulacion: motivo,
+        anulado_por: userId,
+        anulado_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', cpeId)
+      .eq('tenant_id', tenantId);
+
+    if (updateError) {
+      console.error('Error actualizando estado del CPE:', updateError);
+      throw new BadRequestException('No se pudo anular el comprobante');
+    }
+
+    // 5. Emitir evento CPEAnulado para que otros módulos reviertan operaciones
+    // Este evento será escuchado por:
+    // - Contabilidad: Revertir asiento contable
+    // - Finanzas: Liberar CxC
+    // - Inventario: Restaurar stock (si aplica)
+    try {
+      await client
+        .from('outbox_events')
+        .insert({
+          tenant_id: tenantId,
+          event_type: 'cpe.anulado',
+          aggregate_type: 'cpe',
+          aggregate_id: cpeId,
+          event_data: {
+            cpe_id: cpeId,
+            nota_credito_id: notaCredito.id,
+            serie: cpe.serie,
+            numero: cpe.numero,
+            total: cpe.total_venta,
+            motivo: motivo,
+            anulado_por: userId,
+            anulado_at: new Date().toISOString(),
+          },
+          status: 'PENDING',
+          created_at: new Date().toISOString(),
+        });
+
+      console.log(`✅ [CPE] Evento CPEAnulado emitido para CPE ${cpeId}`);
+    } catch (error) {
+      console.error('Error emitiendo evento CPEAnulado:', error);
+      // No fallar la anulación si el evento no se puede emitir
+    }
+
+    console.log(`✅ [CPE] Comprobante ${cpe.serie}-${cpe.numero} anulado exitosamente`);
+
+    return {
+      success: true,
+      message: 'Comprobante anulado exitosamente',
+      cpe_anulado: {
+        id: cpeId,
+        serie: cpe.serie,
+        numero: cpe.numero,
+        estado: 'ANULADO',
+      },
+      nota_credito: {
+        id: notaCredito.id,
+        serie: notaCredito.serie,
+        numero: notaCredito.numero,
+        estado: notaCredito.estado,
+      },
+    };
+  }
+
+  /**
+   * Obtiene el siguiente número de nota de crédito
+   */
+  private async obtenerSiguienteNumeroNotaCredito(tenantId: string, serie: string): Promise<number> {
+    const client = this.supabaseService.getClient();
+    
+    const { data, error } = await client
+      .from('comprobantes_electronicos')
+      .select('numero')
+      .eq('tenant_id', tenantId)
+      .eq('serie', serie)
+      .eq('tipo_documento', 'NOTA_CREDITO')
+      .order('numero', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Error obteniendo último número de nota de crédito:', error);
+      return 1;
+    }
+
+    return data && data.length > 0 ? data[0].numero + 1 : 1;
+  }
