@@ -49,8 +49,8 @@ export class TenantManagementController {
   @ApiResponse({ status: 200, description: 'Lista de tenants obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Acceso denegado - Se requieren privilegios de super-administrador' })
-  async getTenants(@Query() filters: TenantFiltersDto) {
-    return this.tenantManagementService.getTenants(filters);
+  async getTenants(@Query() filters: TenantFiltersDto, @Req() req: any) {
+    return this.tenantManagementService.getTenants(filters, req.user);
   }
 
   /**

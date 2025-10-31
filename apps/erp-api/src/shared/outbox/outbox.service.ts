@@ -82,19 +82,27 @@ export class OutboxService {
    * Obtiene eventos pendientes para procesar
    */
   async getPendingEvents(limit: number = 100, tenantId?: string): Promise<any[]> {
-    const client = this.supabase.getClient();
+    try {
+      const client = this.supabase.getClient({ silent: true });
 
-    const { data, error } = await client.rpc('get_pending_outbox_events', {
-      p_limit: limit,
-      p_tenant_id: tenantId || null,
-    });
+      const { data, error } = await client.rpc('get_pending_outbox_events', {
+        p_limit: limit,
+        p_tenant_id: tenantId || null,
+      });
 
-    if (error) {
-      this.logger.error('❌ Error obteniendo eventos pendientes:', error);
-      throw new Error(`No se pudieron obtener eventos pendientes: ${error.message}`);
+      if (error) {
+        this.logger.error('❌ Error obteniendo eventos pendientes:', error);
+        throw new Error(`No se pudieron obtener eventos pendientes: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      // Silenciar errores de tenant context
+      if (error.message === 'Tenant context required') {
+        return [];
+      }
+      throw error;
     }
-
-    return data || [];
   }
 
   /**

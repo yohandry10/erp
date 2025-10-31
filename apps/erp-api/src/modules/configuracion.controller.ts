@@ -133,15 +133,28 @@ export class ConfiguracionController {
   @ApiOperation({ summary: 'Obtener datos de la empresa' })
   async getDatosEmpresa(@CurrentTenant() tenantId: string) {
     try {
+      console.log('🏢 [CurrentTenant] Tenant extraído:', tenantId);
+      
+      // ✅ FIX: Usar maybeSingle() en lugar de single() para evitar error PGRST301
+      // maybeSingle() no requiere clave primaria y maneja correctamente 0 o 1 resultados
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')
         .select('*')
         .eq('tenant_id', tenantId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error obteniendo configuración empresa:', error);
         throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ No se encontró configuración para tenant:', tenantId);
+        return {
+          success: false,
+          message: 'No se encontró configuración de empresa para este tenant',
+          data: null
+        };
       }
 
       return {
@@ -296,14 +309,24 @@ export class ConfiguracionController {
 
   @Get('parametros-facturacion')
   @ApiOperation({ summary: 'Obtener parámetros de facturación' })
-  async getParametrosFacturacion() {
+  async getParametrosFacturacion(@CurrentTenant() tenantId: string) {
     try {
+      // ✅ FIX: Agregar filtro por tenant_id y usar maybeSingle()
       const { data, error } = await this.supabaseService.getClient()
         .from('empresa_config')
         .select('*')
-        .single();
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
       if (error) throw error;
+      
+      if (!data) {
+        return {
+          success: false,
+          message: 'No se encontró configuración de empresa',
+          data: null
+        };
+      }
 
       return {
         success: true,

@@ -5,24 +5,58 @@ import {
   CreateNotificationDto,
   NotificationFilters,
   NotificationType,
-  NotificationSeverity
+  NotificationSeverity,
 } from './notification.types';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
+
+type AuthenticatedUser = { id?: string; is_super_admin?: boolean };
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
 
-  /**
-   * Create a new notification
-   */
+  private async withTenantContext<T>(
+    tenantId: string,
+    user: AuthenticatedUser | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    if (!tenantId) {
+      throw new Error('Tenant no identificado para notificaciones');
+    }
+
+    const existing = this.tenantContext.getContext();
+    if (existing?.tenantId === tenantId) {
+      await this.supabaseService.prepareTenantContext();
+      return operation();
+    }
+
+    return this.tenantContext.run(
+      {
+        tenantId,
+        userId: user?.id ?? null,
+        supabaseAccessToken: null,
+        isSuperAdmin: user?.is_super_admin ?? false,
+      },
+      async () => {
+        await this.supabaseService.prepareTenantContext();
+        return operation();
+      },
+    );
+  }
+
   async createNotification(
     tenantId: string,
-    notificationData: CreateNotificationDto
+    notificationData: CreateNotificationDto,
+    user?: AuthenticatedUser,
   ): Promise<Notification> {
-    try {
-      const { data, error } = await this.supabaseService.getClient()
+    return this.withTenantContext(tenantId, user, async () => {
+      const { data, error } = await this.supabaseService
+        .getClient()
         .from('notificaciones')
         .insert({
           tenant_id: tenantId,
@@ -34,7 +68,7 @@ export class NotificationsService {
           action_url: notificationData.action_url,
           action_label: notificationData.action_label,
           leida: false,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -46,21 +80,17 @@ export class NotificationsService {
 
       this.logger.log(`Notification created: ${notificationData.type} for tenant ${tenantId}`);
       return this.mapToNotification(data);
-    } catch (error) {
-      this.logger.error(`Failed to create notification: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Get notifications with optional filtering
-   */
   async getNotifications(
     tenantId: string,
-    filters?: NotificationFilters
+    filters: NotificationFilters | undefined,
+    user?: AuthenticatedUser,
   ): Promise<Notification[]> {
-    try {
-      let query = this.supabaseService.getClient()
+    return this.withTenantContext(tenantId, user, async () => {
+      let query = this.supabaseService
+        .getClient()
         .from('notificaciones')
         .select('*')
         .eq('tenant_id', tenantId)
@@ -83,25 +113,23 @@ export class NotificationsService {
       }
 
       const { data, error } = await query;
-
       if (error) {
         this.logger.error(`Error fetching notifications: ${error.message}`, error);
         throw error;
       }
 
       return (data || []).map(item => this.mapToNotification(item));
-    } catch (error) {
-      this.logger.error(`Failed to get notifications: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Get unread notifications count
-   */
-  async getUnreadCount(tenantId: string, usuarioId?: string): Promise<number> {
-    try {
-      let query = this.supabaseService.getClient()
+  async getUnreadCount(
+    tenantId: string,
+    usuarioId?: string,
+    user?: AuthenticatedUser,
+  ): Promise<number> {
+    return this.withTenantContext(tenantId, user, async () => {
+      let query = this.supabaseService
+        .getClient()
         .from('notificaciones')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
@@ -112,32 +140,27 @@ export class NotificationsService {
       }
 
       const { count, error } = await query;
-
       if (error) {
         this.logger.error(`Error fetching unread count: ${error.message}`, error);
         throw error;
       }
 
       return count || 0;
-    } catch (error) {
-      this.logger.error(`Failed to get unread count: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Mark a notification as read
-   */
   async markAsRead(
     tenantId: string,
-    notificationId: string
+    notificationId: string,
+    user?: AuthenticatedUser,
   ): Promise<Notification> {
-    try {
-      const { data, error } = await this.supabaseService.getClient()
+    return this.withTenantContext(tenantId, user, async () => {
+      const { data, error } = await this.supabaseService
+        .getClient()
         .from('notificaciones')
         .update({
           leida: true,
-          leida_at: new Date().toISOString()
+          leida_at: new Date().toISOString(),
         })
         .eq('id', notificationId)
         .eq('tenant_id', tenantId)
@@ -151,22 +174,22 @@ export class NotificationsService {
 
       this.logger.log(`Notification ${notificationId} marked as read`);
       return this.mapToNotification(data);
-    } catch (error) {
-      this.logger.error(`Failed to mark notification as read: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Mark all notifications as read for a tenant
-   */
-  async markAllAsRead(tenantId: string, usuarioId?: string): Promise<number> {
-    try {
-      let query = this.supabaseService.getClient()
+  async markAllAsRead(
+    tenantId: string,
+    usuarioId?: string,
+    user?: AuthenticatedUser,
+  ): Promise<number> {
+    const effectiveUser = user ?? { id: usuarioId };
+    return this.withTenantContext(tenantId, effectiveUser, async () => {
+      let query = this.supabaseService
+        .getClient()
         .from('notificaciones')
         .update({
           leida: true,
-          leida_at: new Date().toISOString()
+          leida_at: new Date().toISOString(),
         })
         .eq('tenant_id', tenantId)
         .eq('leida', false);
@@ -176,7 +199,6 @@ export class NotificationsService {
       }
 
       const { data, error } = await query.select();
-
       if (error) {
         this.logger.error(`Error marking all notifications as read: ${error.message}`, error);
         throw error;
@@ -185,21 +207,17 @@ export class NotificationsService {
       const count = data?.length || 0;
       this.logger.log(`${count} notifications marked as read for tenant ${tenantId}`);
       return count;
-    } catch (error) {
-      this.logger.error(`Failed to mark all notifications as read: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Delete a notification
-   */
   async deleteNotification(
     tenantId: string,
-    notificationId: string
+    notificationId: string,
+    user?: AuthenticatedUser,
   ): Promise<void> {
-    try {
-      const { error } = await this.supabaseService.getClient()
+    return this.withTenantContext(tenantId, user, async () => {
+      const { error } = await this.supabaseService
+        .getClient()
         .from('notificaciones')
         .delete()
         .eq('id', notificationId)
@@ -211,15 +229,9 @@ export class NotificationsService {
       }
 
       this.logger.log(`Notification ${notificationId} deleted`);
-    } catch (error) {
-      this.logger.error(`Failed to delete notification: ${error.message}`, error);
-      throw error;
-    }
+    });
   }
 
-  /**
-   * Helper method to map database record to Notification interface
-   */
   private mapToNotification(data: any): Notification {
     return {
       id: data.id,
@@ -233,7 +245,7 @@ export class NotificationsService {
       action_label: data.action_label,
       leida: data.leida,
       created_at: new Date(data.created_at),
-      leida_at: data.leida_at ? new Date(data.leida_at) : undefined
+      leida_at: data.leida_at ? new Date(data.leida_at) : undefined,
     };
   }
 }

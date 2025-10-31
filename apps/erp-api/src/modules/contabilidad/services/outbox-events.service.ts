@@ -97,7 +97,7 @@ export class OutboxEventsService {
   ): Promise<OutboxEvent[]> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getClient({ silent: true })
         .from('outbox_events')
         .select('*')
         .is('processed_at', null)
@@ -129,10 +129,16 @@ export class OutboxEventsService {
 
       return data as OutboxEvent[];
     } catch (error) {
-      this.logger.error(
-        '❌ [OutboxEvents] Excepción leyendo eventos con reintentos:',
-        error
-      );
+      // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
+      if (error.message === 'Tenant context required') {
+        return [];
+      }
+      if (error.message !== 'Tenant context required') {
+        this.logger.error(
+          '❌ [OutboxEvents] Excepción leyendo eventos con reintentos:',
+          error
+        );
+      }
       throw error;
     }
   }

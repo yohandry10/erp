@@ -8,7 +8,7 @@ import { EventBusService } from '../../../shared/events/event-bus.service';
 @Module({
   imports: [SupabaseModule, PermissionsModule],
   controllers: [TesoreriaController],
-  providers: [TesoreriaService, EventBusService],
+  providers: [TesoreriaService],
   exports: [TesoreriaService],
 })
 export class TesoreriaModule {}

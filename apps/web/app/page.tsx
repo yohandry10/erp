@@ -2,24 +2,28 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { customAuth } from '@/lib/auth-service'
 
 export default function HomePage() {
   const router = useRouter()
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Solo verificar autenticación si las variables de entorno están configuradas
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        const supabase = createClientComponentClient()
-        const { data } = await supabase.auth.getSession()
+      console.log('🏠 [HomePage] Verificando autenticación...')
+      
+      try {
+        // Usar customAuth en lugar de Supabase
+        const { data } = await customAuth.getSession()
 
-        if (data.session) {
+        if (data.session && data.session.access_token) {
+          console.log('✅ [HomePage] Usuario autenticado, redirigiendo a dashboard')
           router.push('/dashboard')
         } else {
+          console.log('ℹ️ [HomePage] No hay sesión, redirigiendo a login')
           router.push('/login')
         }
-      } else {
+      } catch (error) {
+        console.error('❌ [HomePage] Error verificando autenticación:', error)
         router.push('/login')
       }
     }

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { OseService } from '../ose/ose.service';
@@ -6,33 +7,49 @@ import { CpeService } from '../cpe/cpe.service';
 import { GreService } from '../gre/gre.service';
 
 /**
- * Servicio para manejar reintentos automáticos de comunicación con SUNAT
- * Implementa cola de reintentos con backoff exponencial para errores técnicos
+ * Servicio para manejar reintentos MANUALES de comunicación con SUNAT
+ * Los reintentos automáticos están DESHABILITADOS por defecto
+ * Para habilitar reintentos automáticos, configurar SUNAT_AUTO_RETRY_ENABLED=true
  */
 @Injectable()
 export class SunatRetryService implements OnModuleInit {
   private readonly logger = new Logger(SunatRetryService.name);
   private isProcessing = false;
   private readonly MAX_RETRIES = 5;
-  private readonly MAX_RETRY_AGE_HOURS = 24; // No reintentar documentos más antiguos de 24 horas
+  private readonly MAX_RETRY_AGE_HOURS = 24;
+  private readonly autoRetryEnabled: boolean;
 
   constructor(
     private readonly supabase: SupabaseService,
     private readonly oseService: OseService,
     private readonly cpeService: CpeService,
     private readonly greService: GreService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // Reintentos automáticos DESHABILITADOS por defecto
+    this.autoRetryEnabled = this.configService.get<string>('SUNAT_AUTO_RETRY_ENABLED') === 'true';
+  }
 
   onModuleInit() {
-    this.logger.log('🚀 [SunatRetry] Servicio de reintentos SUNAT iniciado');
+    if (this.autoRetryEnabled) {
+      this.logger.log('🚀 [SunatRetry] Servicio de reintentos AUTOMÁTICOS habilitado');
+    } else {
+      this.logger.log('ℹ️ [SunatRetry] Servicio de reintentos MANUALES (automáticos deshabilitados)');
+    }
   }
 
   /**
-   * 🔴 CRÍTICO FIX: Procesa documentos rechazados por errores técnicos para reintento
-   * Se ejecuta cada 5 minutos
+   * Procesa documentos rechazados por errores técnicos para reintento
+   * SOLO se ejecuta si SUNAT_AUTO_RETRY_ENABLED=true
+   * Por defecto está DESHABILITADO
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async processPendingRetries(): Promise<void> {
+    // Si los reintentos automáticos están deshabilitados, no hacer nada
+    if (!this.autoRetryEnabled) {
+      return;
+    }
+
     if (this.isProcessing) {
       this.logger.debug('⏳ [SunatRetry] Ya hay un proceso en ejecución, saltando...');
       return;

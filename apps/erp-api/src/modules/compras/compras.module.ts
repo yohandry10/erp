@@ -49,7 +49,6 @@ import { CacheModule } from '../../shared/cache/cache.module';
     OcAprobacionesRepository,
     DevolucionesProveedorRepository,
     InventarioService,
-    EventBusService,
     InventoryIntegrationService,
   ],
   exports: [
@@ -58,7 +57,6 @@ import { CacheModule } from '../../shared/cache/cache.module';
     CotizacionesCompraService,
     OrdenesCompraService,
     DevolucionesProveedorService,
-    EventBusService,
     InventoryIntegrationService,
   ]
 })

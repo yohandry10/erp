@@ -9,7 +9,6 @@ import { EventBusService } from '../../shared/events/event-bus.service';
   controllers: [RetencionesController],
   providers: [
     RetencionesService,
-    EventBusService
   ],
   exports: [RetencionesService]
 })

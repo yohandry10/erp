@@ -40,12 +40,31 @@ class AuthService {
 
   private loadSession() {
     try {
+      console.log('🔄 [AuthService] Cargando sesión desde localStorage...');
+      
+      // Diagnóstico completo de localStorage
+      if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        const allKeys = Object.keys(localStorage);
+        console.log('🔍 [AuthService] Diagnóstico localStorage:', {
+          allKeys: allKeys,
+          hasAccessToken: localStorage.getItem('access_token') !== null,
+          hasUser: localStorage.getItem('user') !== null,
+          localStorageSize: localStorage.length
+        });
+      }
+      
       const token = localStorage.getItem('access_token');
+      
+      console.log('🔍 [AuthService] Token encontrado:', token ? `SÍ (${token.length} caracteres)` : 'NO');
       
       if (token) {
         // Decodificar el JWT para obtener los datos actuales
         try {
           const base64Url = token.split('.')[1];
+          if (!base64Url) {
+            throw new Error('Token JWT inválido: no tiene formato correcto (partes separadas por puntos)');
+          }
+          
           const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
           const jsonPayload = decodeURIComponent(
             atob(base64)
@@ -54,6 +73,26 @@ class AuthService {
               .join('')
           );
           const payload = JSON.parse(jsonPayload);
+          
+          // Verificar expiración
+          if (payload.exp) {
+            const expirationDate = new Date(payload.exp * 1000);
+            const now = new Date();
+            const isExpired = payload.exp * 1000 < Date.now();
+            
+            console.log('🕐 [AuthService] Información de expiración del token:', {
+              expirationDate: expirationDate.toISOString(),
+              now: now.toISOString(),
+              isExpired: isExpired,
+              expiresIn: isExpired ? 'EXPIRADO' : `${Math.round((payload.exp * 1000 - Date.now()) / 1000 / 60)} minutos`
+            });
+            
+            if (isExpired) {
+              console.warn('⚠️ [AuthService] Token expirado, limpiando sesión');
+              this.clearSession();
+              return;
+            }
+          }
           
           // Crear usuario desde el JWT, no desde localStorage
           const user = {
@@ -68,27 +107,115 @@ class AuthService {
           };
           
           this.session = { access_token: token, user };
+          console.log('✅ [AuthService] Sesión cargada exitosamente:', {
+            userId: user.id,
+            email: user.email,
+            tenantId: user.tenant_id
+          });
           
           // Actualizar localStorage con datos correctos del JWT
           localStorage.setItem('user', JSON.stringify(user));
         } catch (decodeError) {
-          console.error('Error decoding JWT:', decodeError);
+          console.error('❌ [AuthService] Error decoding JWT:', decodeError);
+          console.error('❌ [AuthService] Token problemático (primeros 50 caracteres):', token.substring(0, 50));
+          console.error('❌ [AuthService] Esto podría indicar que el token fue corrompido o nunca se guardó correctamente');
           this.clearSession();
         }
+      } else {
+        console.log('ℹ️ [AuthService] No hay token en localStorage');
+        console.log('💡 [AuthService] Posibles causas:');
+        console.log('   1. El usuario nunca completó el login');
+        console.log('   2. El token fue limpiado por otra parte del código');
+        console.log('   3. El localStorage fue limpiado manualmente o por el navegador');
+        console.log('   4. Problema de timing: el componente se montó antes de que el token se guardara');
       }
     } catch (error) {
-      console.error('Error loading session:', error);
-      this.clearSession();
+      console.error('❌ [AuthService] Error loading session:', error);
+      console.error('❌ [AuthService] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error?.constructor?.name
+      });
+      // Solo limpiar si realmente hay un error crítico
+      // No limpiar si simplemente no hay token (eso es normal si el usuario no está logueado)
+      if (error instanceof Error && error.message.includes('localStorage')) {
+        console.error('❌ [AuthService] Error crítico con localStorage - puede estar deshabilitado o bloqueado');
+        this.clearSession();
+      }
     }
   }
 
   private saveSession(session: Session) {
-    this.session = session;
-    localStorage.setItem('access_token', session.access_token);
-    localStorage.setItem('user', JSON.stringify(session.user));
+    console.log('💾 [AuthService] Guardando sesión:', {
+      hasToken: !!session.access_token,
+      tokenLength: session.access_token?.length,
+      userId: session.user?.id,
+      userEmail: session.user?.email,
+      tenantId: session.user?.tenant_id,
+    });
     
-    // También guardar en cookie para el middleware
-    document.cookie = `access_token=${session.access_token}; path=/; max-age=28800`; // 8 horas
+    // ✅ CRÍTICO: Guardar en memoria PRIMERO
+    this.session = session;
+    
+    // Verificar que estamos en el navegador
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        // ✅ Guardar token y usuario
+        localStorage.setItem('access_token', session.access_token);
+        localStorage.setItem('user', JSON.stringify(session.user));
+        
+        // ✅ CRÍTICO: Forzar sincronización del localStorage
+        // Algunos navegadores hacen esto de forma asíncrona
+        const forceSync = localStorage.getItem('access_token');
+        
+        console.log('✅ [AuthService] Token guardado en localStorage');
+        
+        // Verificar inmediatamente que se guardó correctamente
+        const savedToken = localStorage.getItem('access_token');
+        const savedUser = localStorage.getItem('user');
+        
+        if (!savedToken || savedToken !== session.access_token) {
+          console.error('❌ [AuthService] CRÍTICO: Token no se guardó correctamente en localStorage');
+          console.error('❌ [AuthService] Token esperado:', session.access_token.substring(0, 50));
+          console.error('❌ [AuthService] Token guardado:', savedToken?.substring(0, 50) || 'NULL');
+          throw new Error('Failed to save token to localStorage');
+        }
+        
+        console.log('🔍 [AuthService] Verificación exitosa:', {
+          tokenSaved: !!savedToken,
+          userSaved: !!savedUser,
+          tokenMatches: savedToken === session.access_token
+        });
+      } catch (error) {
+        console.error('❌ [AuthService] Error guardando en localStorage:', error);
+        // Re-throw para que el login maneje el error
+        throw error;
+      }
+      
+      // También guardar en cookie para el middleware (con SameSite y Secure)
+      try {
+        const cookieOptions = [
+          `access_token=${session.access_token}`,
+          'path=/',
+          'max-age=28800', // 8 horas
+          'SameSite=Lax', // Permitir en requests del mismo sitio
+          // No usar Secure en desarrollo local (solo en HTTPS)
+          ...(window.location.protocol === 'https:' ? ['Secure'] : [])
+        ].join('; ');
+        
+        document.cookie = cookieOptions;
+        console.log('✅ [AuthService] Token guardado en cookie:', {
+          hasCookie: document.cookie.includes('access_token'),
+          cookieLength: document.cookie.length
+        });
+      } catch (error) {
+        console.error('❌ [AuthService] Error guardando cookie:', error);
+        // No throw - la cookie es opcional
+      }
+    } else {
+      console.error('❌ [AuthService] localStorage no disponible - ejecutando en servidor?');
+      throw new Error('localStorage not available');
+    }
     
     this.notifyListeners();
   }
@@ -113,6 +240,8 @@ class AuthService {
    */
   async signInWithPassword(credentials: { email: string; password: string }): Promise<{ data: { user: User; session: Session } | null; error: Error | null }> {
     try {
+      console.log('🔐 [AuthService] Intentando login:', credentials.email);
+      
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -121,8 +250,11 @@ class AuthService {
         body: JSON.stringify(credentials),
       });
 
+      console.log('📡 [AuthService] Respuesta del servidor:', response.status, response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Error de autenticación' }));
+        console.error('❌ [AuthService] Error en login:', errorData);
         return {
           data: null,
           error: new Error(errorData.message || 'Credenciales inválidas'),
@@ -130,20 +262,37 @@ class AuthService {
       }
 
       const loginData: LoginResponse = await response.json();
+      console.log('✅ [AuthService] Login exitoso - Datos recibidos:', {
+        hasToken: !!loginData.access_token,
+        tokenPreview: loginData.access_token?.substring(0, 20) + '...',
+        userId: loginData.user?.id,
+        userEmail: loginData.user?.email,
+        tenantId: loginData.user?.tenant_id,
+      });
+      
+      if (!loginData.access_token) {
+        console.error('❌ [AuthService] CRÍTICO: Backend no devolvió access_token');
+        return {
+          data: null,
+          error: new Error('Error: No se recibió token de autenticación'),
+        };
+      }
       
       const session: Session = {
         access_token: loginData.access_token,
         user: loginData.user,
       };
 
+      console.log('📝 [AuthService] Llamando a saveSession...');
       this.saveSession(session);
+      console.log('📝 [AuthService] saveSession completado');
 
       return {
         data: { user: loginData.user, session },
         error: null,
       };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ [AuthService] Login error:', error);
       return {
         data: null,
         error: error instanceof Error ? error : new Error('Error de conexión'),
@@ -180,6 +329,47 @@ class AuthService {
    * Obtener sesión actual
    */
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
+    // Si no hay sesión en memoria, intentar cargar desde localStorage
+    if (!this.session && typeof window !== 'undefined') {
+      console.log('🔄 [AuthService] getSession: No hay sesión en memoria, recargando...');
+      this.loadSession();
+    }
+    
+    // Verificar que el token aún existe en localStorage
+    if (this.session && typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('access_token');
+      if (!storedToken || storedToken !== this.session.access_token) {
+        console.warn('⚠️ [AuthService] Token en memoria no coincide con localStorage, recargando...');
+        console.warn('⚠️ [AuthService] Detalles:', {
+          hasSessionInMemory: !!this.session,
+          hasTokenInMemory: !!this.session?.access_token,
+          hasTokenInStorage: !!storedToken,
+          tokensMatch: storedToken === this.session.access_token
+        });
+        this.loadSession();
+      }
+    }
+    
+    const result = {
+      hasSession: !!this.session,
+      hasToken: !!this.session?.access_token,
+      userId: this.session?.user?.id,
+      userEmail: this.session?.user?.email,
+      tenantId: this.session?.user?.tenant_id
+    };
+    
+    console.log('📤 [AuthService] getSession retornando:', result);
+    
+    // Si no hay sesión, agregar información adicional para diagnóstico
+    if (!this.session && typeof window !== 'undefined') {
+      const tokenInStorage = localStorage.getItem('access_token');
+      console.log('🔍 [AuthService] Diagnóstico adicional - No hay sesión pero:', {
+        hasTokenInStorage: !!tokenInStorage,
+        tokenLength: tokenInStorage?.length || 0,
+        localStorageKeys: Object.keys(localStorage)
+      });
+    }
+    
     return {
       data: { session: this.session },
       error: null,

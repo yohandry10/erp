@@ -30,23 +30,87 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     setState({ success: false, data: undefined })
 
     try {
-      // Obtener token del localStorage (custom auth)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+      // ✅ CRÍTICO: Obtener token del localStorage (custom auth)
+      let token: string | null = null
+      
+      if (typeof window !== 'undefined') {
+        try {
+          token = localStorage.getItem('access_token')
+          
+          // Debug solo en desarrollo
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 [useApi] Token status:', {
+              hasToken: !!token,
+              tokenLength: token?.length || 0,
+              endpoint: endpoint
+            })
+          }
+        } catch (localStorageError) {
+          console.error('❌ [useApi] Error accediendo localStorage:', localStorageError)
+        }
+      }
+      
+      if (!token && typeof window !== 'undefined') {
+        console.error('❌ [useApi] CRÍTICO: No se encontró token de autenticación en localStorage')
+        console.error('❌ [useApi] Endpoint solicitado:', endpoint)
+        console.error('❌ [useApi] Esto causará un 401 Unauthorized')
+        
+        // Intentar cargar sesión desde authService como fallback
+        try {
+          console.log('🔄 [useApi] Intentando recuperar token desde authService...')
+          const { customAuth } = await import('@/lib/auth-service')
+          const { data } = await customAuth.getSession()
+          console.log('🔍 [useApi] Respuesta de getSession:', {
+            hasData: !!data,
+            hasSession: !!data?.session,
+            hasToken: !!data?.session?.access_token
+          })
+          
+          if (data?.session?.access_token) {
+            console.log('✅ [useApi] Token recuperado desde authService')
+            token = data.session.access_token
+            // Guardar inmediatamente para próximas requests
+            localStorage.setItem('access_token', token)
+            console.log('✅ [useApi] Token guardado en localStorage')
+          } else {
+            console.warn('⚠️ [useApi] authService tampoco tiene token - usuario no autenticado')
+            // Redirigir al login si estamos en el cliente y no estamos ya en login
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              console.log('🔄 [useApi] Redirigiendo al login...')
+              window.location.href = '/login'
+              // Retornar null para evitar continuar con la request
+              return null
+            }
+          }
+        } catch (authError) {
+          console.error('❌ [useApi] Error recuperando token desde authService:', authError)
+          // Redirigir al login en caso de error también
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            console.log('🔄 [useApi] Error al recuperar token, redirigiendo al login...')
+            window.location.href = '/login'
+            return null
+          }
+        }
+      }
       
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
       // Agregar prefijo /api si el endpoint no lo tiene
       const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`
       const url = `${API_BASE_URL}${normalizedEndpoint}`
       
-      // Headers base
-      const headers: HeadersInit = {
+      // Headers base - convertir options.headers a objeto plano si es necesario
+      const optionsHeaders = options.headers instanceof Headers 
+        ? Object.fromEntries(options.headers.entries())
+        : (options.headers || {})
+      
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(options.headers || {}),
+        ...optionsHeaders,
       }
 
-      // Añadir token si existe
+      // Añadir token si existe (tiene prioridad sobre headers proporcionados)
       if (token) {
-        (headers as Record<string, string>).Authorization = `Bearer ${token}`
+        headers.Authorization = `Bearer ${token}`
       }
 
       // Inyección automática del país (si existe en localStorage)
@@ -55,8 +119,8 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           const storedCountryId = window.localStorage.getItem('selectedCountry')
           if (storedCountryId && /^\d+$/.test(storedCountryId)) {
             // Solo lo añadimos si el caller no lo envió ya
-            if (!(headers as Record<string, string>)['x-country-id']) {
-              ;(headers as Record<string, string>)['x-country-id'] = storedCountryId
+            if (!headers['x-country-id']) {
+              headers['x-country-id'] = storedCountryId
             }
           }
         }
@@ -64,16 +128,23 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         /* no-op si localStorage no está disponible */
       }
 
+      // Excluir headers de options para evitar conflictos
+      const { headers: _, ...restOptions } = options
+      
       const response = await fetch(url, {
-        ...options,
+        ...restOptions,
         headers,
         mode: 'cors',
       })
 
       // Handle 401 Unauthorized - redirect to login
       if (response.status === 401) {
-        if (typeof window !== 'undefined') {
-          // Clear session and redirect to login
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ [useApi] 401 Unauthorized - Endpoint:', url);
+        }
+        
+        // Limpiar sesión y redirigir al login
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           localStorage.removeItem('access_token')
           localStorage.removeItem('user')
           window.location.href = '/login'

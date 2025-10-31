@@ -83,7 +83,8 @@ export class AuthService {
     tenantId?: string | null;
   }): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('auth_login_attempts')
         .insert({
@@ -104,7 +105,8 @@ export class AuthService {
   // ✅ A5: Verificar si hay demasiados intentos fallidos recientes
   private async checkFailedAttemptsLimit(email: string, minutesWindow: number = 15, maxAttempts: number = 5): Promise<boolean> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       const cutoffTime = new Date();
       cutoffTime.setMinutes(cutoffTime.getMinutes() - minutesWindow);
 
@@ -253,7 +255,8 @@ export class AuthService {
 
   private async findUserByEmail(email: string): Promise<any> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       
       // Primero obtener el usuario
       const { data: user, error: userError } = await client
@@ -286,7 +289,8 @@ export class AuthService {
   // ✅ A3: Método público para validación de usuario en guard
   async findUserById(id: string): Promise<any> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público para validación de tokens
+      const client = this.supabaseService.getPublicClient();
       const { data, error } = await client
         .from('usuarios_sistema')
         .select('*')
@@ -325,7 +329,8 @@ export class AuthService {
   // Failed login attempt tracking
   private async incrementFailedLoginAttempts(userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       const user = await this.findUserById(userId);
       
       if (!user) return;
@@ -355,7 +360,8 @@ export class AuthService {
 
   private async resetFailedLoginAttempts(userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('usuarios_sistema')
         .update({
@@ -371,7 +377,8 @@ export class AuthService {
 
   private async updateLastAccess(userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('usuarios_sistema')
         .update({
@@ -412,7 +419,8 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque password reset NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       const { error } = await client
         .from('usuarios_sistema')
         .update({
@@ -507,7 +515,8 @@ export class AuthService {
       // ✅ SEGURIDAD: Hash de contraseña nueva (ya validada por DTO)
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque password reset NO tiene tenant context
+      const client = this.supabaseService.getPublicClient();
       
       // Update password and clear reset token
       const { error: updateError } = await client
@@ -560,8 +569,8 @@ export class AuthService {
         throw new UnauthorizedException('Solo super-admins pueden cambiar de tenant');
       }
 
-      // Validate target tenant exists
-      const client = this.supabaseService.getClient();
+      // Validate target tenant exists - usar cliente público para validación
+      const client = this.supabaseService.getPublicClient();
       const { data: tenant, error } = await client
         .from('tenants')
         .select('id, nombre, estado')
@@ -629,7 +638,8 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 8); // 8 hours session
 
-      const client = this.supabaseService.getClient();
+      // Usar cliente público porque el login NO tiene tenant context aún
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('user_sessions')
         .insert({
@@ -650,7 +660,8 @@ export class AuthService {
 
   async validateSession(sessionToken: string): Promise<boolean> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público para validación de sesiones
+      const client = this.supabaseService.getPublicClient();
       const { data: session, error } = await client
         .from('user_sessions')
         .select('*')
@@ -682,7 +693,8 @@ export class AuthService {
 
   async revokeSession(sessionToken: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público para revocar sesiones
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('user_sessions')
         .delete()
@@ -694,7 +706,8 @@ export class AuthService {
 
   async revokeUserSessions(userId: string): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público para revocar sesiones
+      const client = this.supabaseService.getPublicClient();
       await client
         .from('user_sessions')
         .delete()
@@ -708,7 +721,8 @@ export class AuthService {
 
   async cleanupExpiredSessions(): Promise<void> {
     try {
-      const client = this.supabaseService.getClient();
+      // Usar cliente público para limpieza de sesiones
+      const client = this.supabaseService.getPublicClient();
       const { data, error } = await client
         .from('user_sessions')
         .delete()

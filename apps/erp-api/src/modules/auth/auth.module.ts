@@ -35,6 +35,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
     AuthTasksService,
     JwtAuthGuard, // ✅ A3: Guard con inyección automática de AuthService
   ],
-  exports: [AuthService, JwtAuthGuard],
+  exports: [AuthService, JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

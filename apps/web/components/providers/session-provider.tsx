@@ -1,8 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { Session } from '@supabase/supabase-js'
+import { customAuth, Session } from '@/lib/auth-service'
 
 type SessionContextType = {
   session: Session | null
@@ -29,11 +28,18 @@ export function SessionProvider({
 
   useEffect(() => {
     try {
-      const supabase = createClientComponentClient()
+      console.log('🔐 [SessionProvider] Inicializando...')
       
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((event, session) => {
+      // Cargar sesión inicial
+      customAuth.getSession().then(({ data }) => {
+        console.log('🔐 [SessionProvider] Sesión inicial:', data.session ? 'Autenticado' : 'No autenticado')
+        setSession(data.session)
+        setLoading(false)
+      })
+      
+      // Escuchar cambios en la autenticación
+      const { data: { subscription } } = customAuth.onAuthStateChange((event, session) => {
+        console.log('🔐 [SessionProvider] Cambio de autenticación:', event, session ? 'Autenticado' : 'No autenticado')
         setSession(session)
         setLoading(false)
         setError(null)
@@ -41,7 +47,7 @@ export function SessionProvider({
 
       return () => subscription.unsubscribe()
     } catch (err) {
-      console.error('Error initializing auth:', err)
+      console.error('❌ [SessionProvider] Error initializing auth:', err)
       setError('Error de conexión con el sistema de autenticación')
       setLoading(false)
     }

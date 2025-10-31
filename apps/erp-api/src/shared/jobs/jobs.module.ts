@@ -5,7 +5,7 @@ import { EventBusService } from '../events/event-bus.service';
 
 @Module({
   imports: [SupabaseModule],
-  providers: [BackgroundJobsService, EventBusService],
+  providers: [BackgroundJobsService],
   exports: [BackgroundJobsService],
 })
 export class JobsModule {} 

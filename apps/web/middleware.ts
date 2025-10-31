@@ -2,26 +2,17 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
+  // ✅ SIMPLIFICADO: Solo agregar headers, no hacer redirecciones
+  // Las redirecciones se manejan en los componentes client-side
+  // Esto previene race conditions con localStorage y cookies
+  
   const res = NextResponse.next()
   
-  // Check if user is authenticated using custom auth (token in cookie or header)
-  const token = req.cookies.get('access_token')?.value || 
-                req.headers.get('authorization')?.replace('Bearer ', '')
-
-  const isAuthPage = req.nextUrl.pathname.startsWith('/login')
-  const isDashboardPage = req.nextUrl.pathname.startsWith('/dashboard')
-
-  // If user is not authenticated and trying to access dashboard
-  if (!token && isDashboardPage) {
-    const redirectUrl = new URL('/login', req.url)
-    redirectUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  // If user is authenticated and trying to access login page
-  if (token && isAuthPage) {
-    const redirectTo = req.nextUrl.searchParams.get('redirectTo') || '/dashboard'
-    return NextResponse.redirect(new URL(redirectTo, req.url))
+  // Pasar el token si existe en las cookies al header para el backend
+  const token = req.cookies.get('access_token')?.value
+  
+  if (token) {
+    res.headers.set('x-auth-token', token)
   }
 
   return res

@@ -43,19 +43,44 @@ export class SecurityService {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    // fallback razonable para dev
-    if (allowedOrigins.length === 0) {
-      allowedOrigins.push(
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'https://localhost:3000',
-        'https://localhost:3001'
-      );
+    // fallback razonable para dev - permitir todos los puertos comunes de Next.js
+    const defaultOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+      'http://localhost:3002',
+      'http://127.0.0.1:3002',
+      'https://localhost:3000',
+      'https://localhost:3001',
+      'https://localhost:3002'
+    ];
+
+    // En desarrollo, usar función dinámica para permitir cualquier localhost
+    const originFunction = process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0
+      ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+          // Permitir requests sin origin (ej: Postman, mobile apps)
+          if (!origin) {
+            return callback(null, true);
+          }
+          // Permitir cualquier localhost en desarrollo
+          if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/)) {
+            return callback(null, true);
+          }
+          // También permitir los orígenes por defecto
+          if (defaultOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+          callback(null, false);
+        }
+      : allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+
+    if (process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
+      console.log('🌐 [CORS] Modo desarrollo: permitiendo localhost en cualquier puerto');
     }
 
     return {
-      origin: allowedOrigins,
+      origin: originFunction,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
       allowedHeaders: [
         'Origin',

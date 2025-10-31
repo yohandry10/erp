@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { customAuth } from '@/lib/auth-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -81,12 +80,32 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
+        console.log('✅ [LoginPage] Login exitoso, verificando token guardado...')
+
+        // ✅ CRÍTICO: Esperar a que el token esté realmente guardado en localStorage
+        // Esto previene race conditions donde el dashboard se monta antes de que el token esté disponible
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Verificar que el token se guardó correctamente
+        const savedToken = localStorage.getItem('access_token')
+        if (!savedToken) {
+          console.error('❌ [LoginPage] CRÍTICO: Token no se guardó en localStorage')
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Error guardando sesión. Por favor intenta nuevamente.',
+          })
+          return
+        }
+
+        console.log('✅ [LoginPage] Token verificado en localStorage')
+
         // Guardar/crear preferencia de país del usuario
         const userId = data.user.id
-        
+
         // Convertir selectedCountry a número
         const paisPreferidoId = parseInt(selectedCountry, 10)
-        
+
         // TODO: Arreglar updateUserConfiguration para usar el token del localStorage
         // try {
         //   await updateUserConfiguration({
@@ -97,7 +116,7 @@ export default function LoginPage() {
         // } catch (configError) {
         //   console.warn('Error guardando configuración de usuario:', configError)
         // }
-        
+
         // Persistir en localStorage para uso inmediato
         if (typeof window !== 'undefined') {
           localStorage.setItem('selectedCountry', selectedCountry)
@@ -111,6 +130,7 @@ export default function LoginPage() {
           description: `Has iniciado sesión correctamente - ${selectedPais?.nombre ?? '—'}`,
         })
 
+        console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
         router.push('/dashboard')
       }
     } catch (_err) {
@@ -161,7 +181,7 @@ export default function LoginPage() {
         <div className="login-gradient-2"></div>
         <div className="login-gradient-3"></div>
       </div>
-      
+
       <div className="login-card-wrapper">
         <Card className="login-card">
           <CardHeader className="login-header">
@@ -241,14 +261,6 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   className="form-input"
                 />
-                <div className="text-right mt-2">
-                  <Link 
-                    href="/reset-password" 
-                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </Link>
-                </div>
               </div>
             </form>
           </CardContent>

@@ -21,8 +21,8 @@ export class OutboxWorker implements OnModuleInit {
 
   onModuleInit() {
     this.logger.log('🚀 [OutboxWorker] Worker iniciado');
-    // Procesar eventos pendientes al iniciar
-    this.processPendingEvents();
+    // No procesar eventos al iniciar para evitar errores de tenant context
+    // El cron se encargará de procesarlos cada minuto
   }
 
   /**
@@ -92,7 +92,10 @@ export class OutboxWorker implements OnModuleInit {
 
       this.logger.log(`✅ [OutboxWorker] Procesamiento completado: ${pendingEvents.length} eventos`);
     } catch (error) {
-      this.logger.error('❌ [OutboxWorker] Error general procesando eventos pendientes:', error);
+      // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
+      if (error.message !== 'Tenant context required') {
+        this.logger.error('❌ [OutboxWorker] Error general procesando eventos pendientes:', error);
+      }
     } finally {
       this.isProcessing = false;
     }

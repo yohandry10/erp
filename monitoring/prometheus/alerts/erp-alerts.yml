@@ -1,0 +1,146 @@
+# Reglas de Alertas para ERP Suite
+groups:
+  - name: erp_api_alerts
+    interval: 30s
+    rules:
+      # Alerta: API caída
+      - alert: ERPApiDown
+        expr: up{job="erp-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "ERP API está caída"
+          description: "La API ERP no responde desde hace {{ $value }} minutos"
+
+      # Alerta: Alta tasa de errores HTTP
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(erp_http_request_errors_total[5m])) 
+            / 
+            sum(rate(erp_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Alta tasa de errores HTTP"
+          description: "Tasa de errores HTTP es {{ $value | humanizePercentage }} en los últimos 5 minutos"
+
+      # Alerta: Latencia alta
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(erp_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Latencia alta en API"
+          description: "P95 de latencia es {{ $value }}s en los últimos 5 minutos"
+
+      # Alerta: Uso alto de memoria
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            process_resident_memory_bytes{job="erp-api"} 
+            / 
+            1024 / 1024 / 1024
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Uso alto de memoria"
+          description: "La API está usando {{ $value }}GB de memoria"
+
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # Alerta: Queries lentas
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(erp_db_query_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Queries de base de datos lentas"
+          description: "P95 de duración de queries es {{ $value }}s"
+
+      # Alerta: Errores de base de datos
+      - alert: DatabaseErrors
+        expr: rate(erp_db_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Errores en base de datos"
+          description: "{{ $value }} errores por segundo en la base de datos"
+
+  - name: business_alerts
+    interval: 1m
+    rules:
+      # Alerta: Caída en creación de órdenes
+      - alert: LowOrderCreationRate
+        expr: |
+          rate(erp_ordenes_compra_creadas_total[1h]) < 0.01
+        for: 30m
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "Baja tasa de creación de órdenes"
+          description: "Solo {{ $value }} órdenes por segundo en la última hora"
+
+      # Alerta: Spike en errores de facturación
+      - alert: InvoiceErrorSpike
+        expr: |
+          rate(erp_facturas_emitidas_total{estado="error"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Aumento en errores de facturación"
+          description: "{{ $value }} errores de facturación por segundo"
+
+  - name: redis_alerts
+    interval: 30s
+    rules:
+      # Alerta: Redis caído
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis está caído"
+          description: "El servicio de Redis no responde"
+
+      # Alerta: Baja tasa de cache hits
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            sum(rate(erp_cache_hits_total[5m]))
+            /
+            (sum(rate(erp_cache_hits_total[5m])) + sum(rate(erp_cache_misses_total[5m])))
+          ) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Baja tasa de cache hits"
+          description: "Tasa de cache hits es {{ $value | humanizePercentage }}"
