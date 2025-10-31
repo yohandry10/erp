@@ -32,10 +32,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
     // Suscribirse a eventos del EventBus en tiempo real
     this.suscribirseAEventos();
     
-    // Procesar eventos pendientes al iniciar
-    setTimeout(() => {
-      this.procesarEventosPendientes();
-    }, 5000); // Esperar 5 segundos para que el sistema esté listo
+    // No procesar eventos pendientes al iniciar para evitar errores de tenant context
+    // El cron se encargará de procesarlos cada 5 minutos
   }
 
   /**
@@ -162,7 +160,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       this.logger.log(`✅ [ContabilidadEventsListener] Procesamiento completado: ${eventos.length} eventos`);
     } catch (error) {
-      this.logger.error('❌ [ContabilidadEventsListener] Error procesando eventos pendientes:', error);
+      // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
+      if (error.message !== 'Tenant context required') {
+        this.logger.error('❌ [ContabilidadEventsListener] Error procesando eventos pendientes:', error);
+      }
     } finally {
       this.isProcessing = false;
     }

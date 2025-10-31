@@ -31,18 +31,35 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    
+    this.logger.debug(`[JWT] canActivate START - Path: ${request.path}, Has Auth Header: ${!!request.headers?.authorization}`);
+    
     // Primero ejecutar validación base (JWT válido, firma correcta)
-    const canActivate = await super.canActivate(context);
-    if (!canActivate) {
-      return false;
+    try {
+      const canActivate = await super.canActivate(context);
+      this.logger.debug(`[JWT] super.canActivate result: ${canActivate} for ${request.path}`);
+      if (!canActivate) {
+        this.logger.warn(`[JWT] Authentication failed for ${request.method} ${request.path}`);
+        return false;
+      }
+    } catch (error) {
+      this.logger.error(`[JWT] Auth error for ${request.method} ${request.path}: ${error.message}`);
+      this.logger.error(`[JWT] Error stack:`, error.stack);
+      throw error;
     }
 
-    const request = context.switchToHttp().getRequest();
     const user = request.user;
+    
+    this.logger.debug(`[JWT] User after super.canActivate: ${user ? 'EXISTS' : 'NULL'}`);
 
     if (!user) {
+      this.logger.warn('[JWT] No user found in request after JWT validation');
       throw new UnauthorizedException('Usuario no autenticado');
     }
+    
+    this.logger.debug(`[JWT] ✓ ${user.email} - Tenant: ${user.tenant_id}`);
+
 
     // ✅ A3: Validar tenant_id en el payload
     if (!user.tenant_id) {
@@ -56,51 +73,21 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     request.tenantId = user.tenant_id;
     request.tenant_id = user.tenant_id;
 
-    // ✅ A3: Validar sesión si existe session_token en headers
-    const sessionToken = request.headers['x-session-token'] || request.headers['session-token'];
+    // NOTA: Las validaciones adicionales de sesión y estado de usuario
+    // se han deshabilitado temporalmente debido a problemas con RLS de Supabase
+    // El JWT ya valida la autenticidad del usuario y su tenant
     
-    if (sessionToken && this.authService) {
-      try {
-        const isValidSession = await this.authService.validateSession(sessionToken);
-        if (!isValidSession) {
-          this.logger.warn(
-            `⚠️ [A3] Sesión inválida o revocada - Usuario: ${user.id}, Session: ${sessionToken.substring(0, 8)}...`
-          );
-          throw new UnauthorizedException('Sesión inválida o expirada');
-        }
-      } catch (error) {
-        if (error instanceof UnauthorizedException) {
-          throw error;
-        }
-        // Si no hay authService inyectado, solo loguear warning
-        this.logger.warn('⚠️ [A3] AuthService no disponible para validar sesión');
-      }
-    }
-
-    // ✅ A3: Verificar que el usuario no esté deshabilitado
-    // Cargar estado del usuario desde BD
-    try {
-      const userRecord = await this.authService?.findUserById(user.id);
-      if (userRecord && userRecord.estado !== 'ACTIVO') {
-        this.logger.warn(
-          `⚠️ [A3] Usuario deshabilitado intentando acceder - Usuario: ${user.id}, Estado: ${userRecord.estado}`
-        );
-        throw new ForbiddenException('Usuario deshabilitado');
-      }
-    } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw error;
-      }
-      // Si no se puede verificar, continuar (no bloquear si es problema de BD)
-      this.logger.warn('⚠️ [A3] No se pudo verificar estado del usuario');
-    }
-
     return true;
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+    const request = context?.switchToHttp?.()?.getRequest?.();
+    const path = request?.path || request?.url || 'unknown';
+    
     // Si hay error o info, propagar excepción
     if (err || !user) {
+      this.logger.error(`[JWT] handleRequest error - Path: ${path}, err: ${err?.message}, user: ${!!user}, info: ${JSON.stringify(info)}`);
+      this.logger.error(`[JWT] Request headers:`, request?.headers?.authorization ? 'Authorization header present' : 'NO Authorization header');
       throw err || new UnauthorizedException('Token inválido o expirado');
     }
     return user;

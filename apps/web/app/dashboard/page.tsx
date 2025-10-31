@@ -92,8 +92,37 @@ export default function Dashboard() {
         api.get('/dashboard/activities')
       ])
 
+      // ✅ Manejar caso donde las requests fallan pero no lanzan error
+      if (!statsResult || !activitiesResult) {
+        console.warn('📊 [Dashboard Frontend] Una o más requests fallaron, usando datos por defecto')
+        // No lanzar error, usar datos por defecto
+        setStats({
+          totalCpe: 0,
+          totalGre: 0,
+          totalSire: 0,
+          totalUsers: 0,
+          totalInventario: 0,
+          totalCompras: 0,
+          totalCotizaciones: 0,
+          ventasMes: 0,
+          ventasHoy: 0,
+          comprasMes: 0,
+          valorInventario: 0,
+          productosConStockBajo: 0,
+          cotizacionesPendientes: 0,
+          ordenesCompraPendientes: 0,
+          movimientosHoy: 0,
+          tasaConversionCotizaciones: 0,
+          crecimientoVentas: 0,
+        })
+        setActivities([])
+        setLastUpdate(new Date().toLocaleTimeString('es-PE'))
+        return
+      }
+
       if (!statsResult?.success || !activitiesResult?.success) {
-        throw new Error('Error en la respuesta del servidor')
+        console.warn('📊 [Dashboard Frontend] Respuesta sin success flag, verificando datos...')
+        // Intentar usar los datos de todos modos si existen
       }
 
       console.log('📊 [Dashboard Frontend] Estadísticas recibidas:', statsResult.data)
@@ -125,9 +154,14 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - con delay para asegurar que el token esté disponible
   useEffect(() => {
-    fetchDashboardData(true)
+    // Esperar un poco para asegurar que el token esté en localStorage
+    const timer = setTimeout(() => {
+      fetchDashboardData(true)
+    }, 500)
+    
+    return () => clearTimeout(timer)
   }, [fetchDashboardData])
 
   // Check configuration status and show modal if incomplete

@@ -10,7 +10,7 @@ import { RetencionesValidationService } from '../shared/retenciones-validation.s
 @Module({
   imports: [SupabaseModule, PermissionsModule],
   controllers: [CxpController],
-  providers: [CxpService, CxpRecepcionListener, EventBusService, RetencionesValidationService],
+  providers: [CxpService, CxpRecepcionListener, RetencionesValidationService],
   exports: [CxpService],
 })
 export class CxpModule {}

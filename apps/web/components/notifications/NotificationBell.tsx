@@ -24,10 +24,19 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const fetchUnreadCount = async () => {
     try {
       const response = await get('/api/notifications/unread')
-      if (response?.count !== undefined) {
-        setUnreadCount(response.count)
+      if (response?.success) {
+        const data = response.data
+        if (Array.isArray(data)) {
+          setUnreadCount(data.length)
+        } else if (typeof data === 'object' && data !== null && typeof data.unread_count === 'number') {
+          setUnreadCount(data.unread_count)
+        } else {
+          setUnreadCount(0)
+        }
       } else if (Array.isArray(response)) {
         setUnreadCount(response.length)
+      } else {
+        setUnreadCount(0)
       }
     } catch (error) {
       console.error('Error fetching unread count:', error)

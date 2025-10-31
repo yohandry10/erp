@@ -93,7 +93,7 @@ interface ErrorFallbackProps {
   onReset: () => void
 }
 
-function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps) {
+export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps) {
   const errorMessage = error?.message || 'Ha ocurrido un error inesperado'
   const errorStack = error?.stack || errorInfo?.componentStack || 'No hay información adicional disponible'
 

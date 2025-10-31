@@ -19,13 +19,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     try {
+      // Verificar expiración
+      if (payload.exp) {
+        const now = Math.floor(Date.now() / 1000);
+        const expiresIn = payload.exp - now;
+        if (expiresIn <= 0) {
+          throw new UnauthorizedException('Token expirado');
+        }
+      }
+      
       // ✅ MULTI-TENANT: Validar tenant_id en el payload
       if (!payload.tenant_id) {
-        console.warn('⚠️ [JWT] Token sin tenant_id detectado');
+        console.warn('⚠️ [JWT Strategy] Token sin tenant_id detectado');
         throw new UnauthorizedException('Token inválido: falta tenant_id');
       }
-
-      console.log('🔐 [JWT] Validando token - Tenant:', payload.tenant_id, 'Usuario:', payload.email, 'Super-Admin:', payload.is_super_admin || false);
       
       return {
         id: payload.sub,
@@ -36,6 +43,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         is_super_admin: payload.is_super_admin || false // ✅ Incluir is_super_admin en request.user
       };
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      console.error('❌ [JWT Strategy] Error validando token:', error.message);
       throw new UnauthorizedException('Token inválido');
     }
   }

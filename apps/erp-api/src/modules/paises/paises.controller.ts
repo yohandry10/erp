@@ -41,10 +41,11 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 export class PaisesController {
   constructor(private readonly paisesService: PaisesService) {}
 
-  // ========== ENDPOINTS PÚBLICOS ==========
+  // ========== ENDPOINTS PÚBLICOS (Datos de catálogo) ==========
   
   /**
    * Obtiene la lista completa de países disponibles en el sistema
+   * Endpoint público para datos de catálogo
    */
   @Get()
   @ApiOperation({ 
@@ -63,6 +64,7 @@ export class PaisesController {
 
   /**
    * Obtiene la configuración fiscal específica de un país por su código ISO
+   * Endpoint público para datos de catálogo
    */
   @Get(':codigo/configuracion-fiscal')
   @ApiOperation({ 
@@ -83,6 +85,7 @@ export class PaisesController {
 
   /**
    * Obtiene los libros contables requeridos por la jurisdicción fiscal
+   * Endpoint público para datos de catálogo
    */
   @Get(':codigo/libros-requeridos')
   @ApiOperation({ 
@@ -103,6 +106,7 @@ export class PaisesController {
 
   /**
    * Obtiene la configuración completa del país para renderizado dinámico de UI
+   * Endpoint público para datos de catálogo
    */
   @Get(':id/configuracion')
   @ApiOperation({ 
@@ -182,6 +186,7 @@ export class PaisesController {
   
   /**
    * Valida un documento empresarial según las reglas del país
+   * Endpoint público para validaciones de catálogo
    */
   @Get(':codigo/validar-documento/:documento')
   @ApiOperation({ 

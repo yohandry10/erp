@@ -21,10 +21,10 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
     setLoading(true)
     try {
       const response = await get('/api/notifications')
-      if (Array.isArray(response)) {
-        setNotifications(response)
-      } else if (response?.data && Array.isArray(response.data)) {
+      if (response?.success && Array.isArray(response.data)) {
         setNotifications(response.data)
+      } else if (Array.isArray(response)) {
+        setNotifications(response)
       } else {
         setNotifications([])
       }

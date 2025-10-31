@@ -28,7 +28,7 @@ export class PaisesService {
       this.logger.log('🌍 Obteniendo lista de países...');
       
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('paises')
         .select('*')
         .eq('activo', true)
@@ -52,7 +52,7 @@ export class PaisesService {
       this.logger.log(`🌍 Obteniendo país por código: ${codigoIso}`);
       
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('paises')
         .select('*')
         .eq('codigo_iso', codigoIso.toUpperCase())
@@ -78,7 +78,7 @@ export class PaisesService {
       this.logger.log(`⚖️ Obteniendo configuración fiscal para país: ${paisId}`);
       
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('configuracion_fiscal')
         .select(`
           *,
@@ -110,7 +110,7 @@ export class PaisesService {
       this.logger.log(`⚖️ Obteniendo configuración fiscal por código: ${codigoIso}`);
       
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('configuracion_fiscal')
         .select(`
           *,
@@ -305,7 +305,7 @@ export class PaisesService {
       
       // Obtener información básica del país
       const { data: paisData, error: paisError } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('paises')
         .select('*')
         .eq('id', paisId)
@@ -322,7 +322,7 @@ export class PaisesService {
 
       // Obtener tipos de documentos
       const { data: tiposDocumentos, error: docError } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('tipos_documentos_fiscales')
         .select('*')
         .eq('pais_id', paisId)
@@ -336,7 +336,7 @@ export class PaisesService {
 
       // Obtener tipos de impuestos
       const { data: tiposImpuestos, error: impError } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('tipos_impuestos')
         .select('*')
         .eq('pais_id', paisId)

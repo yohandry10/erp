@@ -30,7 +30,7 @@ export class NotificationsController {
         usuario_id: query.usuario_id
       };
 
-      const notifications = await this.notificationsService.getNotifications(tenantId, filters);
+      const notifications = await this.notificationsService.getNotifications(tenantId, filters, user);
 
       return {
         success: true,
@@ -52,7 +52,7 @@ export class NotificationsController {
   async getUnreadNotifications(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const notifications = await this.notificationsService.getNotifications(tenantId, { leida: false });
+      const notifications = await this.notificationsService.getNotifications(tenantId, { leida: false }, user);
 
       return {
         success: true,
@@ -74,7 +74,7 @@ export class NotificationsController {
   async getUnreadCount(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const count = await this.notificationsService.getUnreadCount(tenantId, user?.id);
+      const count = await this.notificationsService.getUnreadCount(tenantId, user?.id, user);
 
       return {
         success: true,
@@ -100,7 +100,7 @@ export class NotificationsController {
   ) {
     try {
       const user = req.user as any;
-      const notification = await this.notificationsService.createNotification(tenantId, notificationData);
+      const notification = await this.notificationsService.createNotification(tenantId, notificationData, user);
 
       return {
         success: true,
@@ -126,7 +126,7 @@ export class NotificationsController {
   ) {
     try {
       const user = req.user as any;
-      const notification = await this.notificationsService.markAsRead(tenantId, id);
+      const notification = await this.notificationsService.markAsRead(tenantId, id, user);
 
       return {
         success: true,
@@ -148,7 +148,7 @@ export class NotificationsController {
   async markAllAsRead(@CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
-      const count = await this.notificationsService.markAllAsRead(tenantId, user?.id);
+      const count = await this.notificationsService.markAllAsRead(tenantId, user?.id, user);
 
       return {
         success: true,
@@ -174,7 +174,7 @@ export class NotificationsController {
   ) {
     try {
       const user = req.user as any;
-      await this.notificationsService.deleteNotification(tenantId, id);
+      await this.notificationsService.deleteNotification(tenantId, id, user);
 
       return {
         success: true,

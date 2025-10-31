@@ -27,7 +27,6 @@ import { EventBusService } from '../../shared/events/event-bus.service';
     PresupuestosService,
     CentrosCostoService,
     ContabilidadEventsListener,
-    EventBusService,
     {
       provide: 'EstadosFinancierosService',
       useExisting: EstadosFinancierosService

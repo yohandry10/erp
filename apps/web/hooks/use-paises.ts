@@ -46,10 +46,22 @@ export function usePaises() {
       setLoading(true)
       setError(null)
       
-      const response = await get('/api/paises')
+      // Hacer petición directa sin autenticación (endpoint público)
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+      const response = await fetch(`${API_BASE_URL}/api/paises`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
       
-      if (response?.success && response.data) {
-        setPaises(response.data)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          setPaises(data.data)
+        } else {
+          throw new Error('Error al obtener países')
+        }
       } else {
         throw new Error('Error al obtener países')
       }

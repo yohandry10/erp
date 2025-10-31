@@ -2,6 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Unauthor
 import { Reflector } from '@nestjs/core';
 import { PERMISSION_KEY, ParsedPermission } from '../decorators/require-permission.decorator';
 import { PermissionService } from '../../modules/permissions/permission.service';
+import * as jwt from 'jsonwebtoken';
 
 /**
  * HARDENING: Guard centralizado que valida permisos granulares contra la tabla
@@ -25,14 +26,51 @@ export class PermissionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    let user = request.user;
 
     if (!user) {
-      throw new UnauthorizedException('Usuario no autenticado');
+      const authHeader = request.headers?.authorization;
+      if (typeof authHeader !== 'string') {
+        throw new UnauthorizedException('Usuario no autenticado');
+      }
+
+      const [scheme, token] = authHeader.split(' ');
+      if (scheme?.toLowerCase() !== 'bearer' || !token) {
+        throw new UnauthorizedException('Usuario no autenticado');
+      }
+
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new UnauthorizedException('Usuario no autenticado');
+      }
+
+      try {
+        const payload = jwt.verify(token, jwtSecret) as Record<string, any>;
+        user = {
+          id: payload.sub,
+          email: payload.email,
+          username: payload.username,
+          roles: payload.roles || [],
+          tenant_id: payload.tenant_id,
+          is_super_admin: payload.is_super_admin || false,
+        };
+        request.user = user;
+      } catch (error) {
+        throw new UnauthorizedException('Usuario no autenticado');
+      }
     }
 
     if (user.is_super_admin) {
       return true;
+    }
+
+    if (!user.tenant_id) {
+      throw new UnauthorizedException('Tenant no identificado en token');
+    }
+
+    if (!request.tenantId) {
+      request.tenantId = user.tenant_id;
+      request.tenant_id = user.tenant_id;
     }
 
     const tenantId = request.tenantId || user.tenant_id;

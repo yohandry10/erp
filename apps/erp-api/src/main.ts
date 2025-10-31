@@ -1,3 +1,24 @@
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+
+// Forzar carga del .env - buscar en múltiples ubicaciones
+const possiblePaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '..', '.env'),
+  path.resolve(__dirname, '..', '..', '.env'),
+];
+
+let envPath = '';
+for (const p of possiblePaths) {
+  if (fs.existsSync(p)) {
+    envPath = p;
+    break;
+  }
+}
+
+dotenv.config({ path: envPath });
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -14,7 +35,8 @@ import compression from 'compression';
  */
 async function notifySchemaReload(supabase: SupabaseService) {
   try {
-    const client = supabase.getClient();
+    // Usar cliente público porque no hay tenant context en el arranque
+    const client = supabase.getPublicClient();
     if (client) {
       console.log('📢 Notificando a PostgREST para recargar el esquema...');
       await client.rpc('pgrst_reload_schema');

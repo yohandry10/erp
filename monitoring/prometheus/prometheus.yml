@@ -1,0 +1,70 @@
+# Configuración de Prometheus para ERP Suite
+global:
+  scrape_interval: 15s # Intervalo de scraping por defecto
+  evaluation_interval: 15s # Intervalo de evaluación de reglas
+  external_labels:
+    cluster: 'erp-suite'
+    environment: 'development'
+
+# Configuración de Alertmanager (opcional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Reglas de alertas
+rule_files:
+  - 'alerts/*.yml'
+
+# Configuración de scraping
+scrape_configs:
+  # Métricas de Prometheus mismo
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Métricas de la API ERP
+  - job_name: 'erp-api'
+    metrics_path: '/api/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+        labels:
+          service: 'erp-api'
+          app: 'backend'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Métricas del Worker
+  - job_name: 'erp-worker'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['worker:3003']
+        labels:
+          service: 'worker'
+          app: 'background-jobs'
+    scrape_interval: 15s
+
+  # Métricas de Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          app: 'cache'
+
+  # Métricas de PostgreSQL (Supabase)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          app: 'database'
+
+  # Node Exporter para métricas del sistema
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          app: 'system'

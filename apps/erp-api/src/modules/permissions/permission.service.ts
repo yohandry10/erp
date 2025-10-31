@@ -225,11 +225,12 @@ export class PermissionService {
     const client = this.supabase.getClient();
 
     // Check if user is SUPER_ADMIN first - they have all permissions
+    // ✅ FIX: Usar maybeSingle() para evitar error PGRST301
     const { data: usuario, error: userError } = await client
       .from('usuarios_sistema')
       .select('is_super_admin')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (!userError && usuario?.is_super_admin === true) {
       console.log('✅ [PERMISSION] SUPER_ADMIN detected - granting access');

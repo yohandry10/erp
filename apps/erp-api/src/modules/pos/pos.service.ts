@@ -7,6 +7,7 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { CxcService } from '../finanzas/cxc/cxc.service';
 import { v4 as uuidv4 } from 'uuid';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 
 @Injectable()
 export class PosService {
@@ -14,6 +15,7 @@ export class PosService {
 
   constructor(
     private readonly supabase: SupabaseService,
+    private readonly tenantContext: TenantContextService,
     private readonly cpeService: CpeService,
     private readonly validationService: ValidationService,
     private readonly configurationService: ConfigurationService,
@@ -22,138 +24,193 @@ export class PosService {
     private readonly cxcService: CxcService,
   ) { }
 
+  private async runWithTenantContext<T>(user: any, operation: () => Promise<T>): Promise<T> {
+    if (!user?.tenant_id) {
+      this.logger.error('❌ [POS] Usuario sin tenant_id al intentar ejecutar operación POS');
+      throw new Error('Tenant no identificado en la sesión POS');
+    }
+
+    const existing = this.tenantContext.getContext();
+    if (existing?.tenantId === user.tenant_id) {
+      await this.supabase.prepareTenantContext();
+      return operation();
+    }
+
+    return await this.tenantContext.run(
+      {
+        tenantId: user.tenant_id,
+        userId: user.id ?? null,
+        supabaseAccessToken: null,
+        isSuperAdmin: user.is_super_admin ?? false,
+      },
+      async () => {
+        await this.supabase.prepareTenantContext();
+        return operation();
+      },
+    );
+  }
+
   async getProductos(user: any) {
-    try {
-      this.logger.log(`Obteniendo productos para tenant: ${user.tenant_id}`);
+    return this.runWithTenantContext(user, async () => {
+      try {
+        this.logger.log(`Obteniendo productos POS para tenant: ${user.tenant_id}`);
 
-      const { data, error } = await this.supabase.getClient()
-        .from('productos')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .eq('activo', true)
-        .order('nombre', { ascending: true });
+        const { data, error } = await this.supabase.getClient()
+          .from('vista_pos_productos')
+          .select('*')
+          .eq('activo', true)
+          .order('nombre', { ascending: true });
 
-      if (error) {
-        this.logger.error('Error en query productos:', error);
+        if (error) {
+          this.logger.error('Error en query vista_pos_productos:', error);
+          throw error;
+        }
+
+        this.logger.log(`Productos POS encontrados: ${data?.length || 0}`);
+
+        return {
+          success: true,
+          data: data || [],
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo productos POS:', error);
         throw error;
       }
-
-      this.logger.log(`Productos encontrados: ${data?.length || 0}`);
-
-      return {
-        success: true,
-        data: data || []
-      };
-    } catch (error) {
-      this.logger.error('Error obteniendo productos:', error);
-      throw error;
-    }
+    });
   }
 
   async getClientes(user: any) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('clientes')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .eq('activo', true)
-        .order('razon_social', { ascending: true });
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const { data, error } = await this.supabase.getClient()
+          .from('clientes')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .eq('activo', true)
+          .order('razon_social', { ascending: true });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return {
-        success: true,
-        data: data || []
-      };
-    } catch (error) {
-      this.logger.error('Error obteniendo clientes:', error);
-      throw error;
-    }
+        return {
+          success: true,
+          data: data || [],
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo clientes POS:', error);
+        throw error;
+      }
+    });
   }
 
   async getMetodosPago(user: any) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('metodos_pago')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .eq('activo', true)
-        .order('nombre', { ascending: true });
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const { data, error } = await this.supabase.getClient()
+          .from('metodos_pago')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .eq('activo', true)
+          .order('nombre', { ascending: true });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return {
-        success: true,
-        data: data || []
-      };
-    } catch (error) {
-      this.logger.error('Error obteniendo métodos de pago:', error);
-      throw error;
-    }
+        return {
+          success: true,
+          data: data || [],
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo métodos de pago POS:', error);
+        throw error;
+      }
+    });
   }
 
   async getEmpresaConfig(user: any) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('empresas')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .single();
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const { data, error } = await this.supabase.getClient()
+          .from('empresa_config')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .maybeSingle();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return {
-        success: true,
-        data: data
-      };
-    } catch (error) {
-      this.logger.error('Error obteniendo configuración de empresa:', error);
-      return { success: true, data: null };
-    }
+        return {
+          success: true,
+          data: data ?? null,
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo configuración de empresa para POS:', error);
+        return { success: true, data: null };
+      }
+    });
   }
 
   async getSesionCajaActual(user: any) {
-    try {
-      const hoy = new Date().toISOString().split('T')[0];
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const hoy = new Date().toISOString().split('T')[0];
 
-      const { data, error } = await this.supabase.getClient()
-        .from('sesiones_caja')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .eq('usuario_id', user.id)
-        .gte('fecha_apertura', `${hoy}T00:00:00`)
-        .lte('fecha_apertura', `${hoy}T23:59:59`)
-        .is('fecha_cierre', null)
-        .single();
+        const { data, error } = await this.supabase.getClient()
+          .from('sesiones_caja')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .eq('usuario_id', user.id)
+          .gte('fecha_apertura', `${hoy}T00:00:00`)
+          .lte('fecha_apertura', `${hoy}T23:59:59`)
+          .is('fecha_cierre', null)
+          .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+        if (error && error.code !== 'PGRST116') throw error;
 
-      return data;
-    } catch (error) {
-      this.logger.error('Error obteniendo sesión de caja:', error);
-      return null;
-    }
+        return {
+          success: true,
+          data: data ?? null,
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo sesión de caja POS:', error);
+        return {
+          success: false,
+          data: null,
+          message: error.message || 'Error obteniendo sesión de caja',
+        };
+      }
+    });
   }
 
   async getVentasRecientes(user: any) {
-    try {
-      const { data, error } = await this.supabase.getClient()
-        .from('ventas_pos')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .order('fecha_venta', { ascending: false })
-        .limit(50);
+    return this.runWithTenantContext(user, async () => {
+      try {
+        const { data, error } = await this.supabase.getClient()
+          .from('ventas_pos')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .order('fecha', { ascending: false })
+          .limit(50);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return data || [];
-    } catch (error) {
-      this.logger.error('Error obteniendo ventas recientes:', error);
-      return [];
-    }
+        return {
+          success: true,
+          data: data || [],
+        };
+      } catch (error) {
+        this.logger.error('Error obteniendo ventas recientes POS:', error);
+        return {
+          success: false,
+          data: [],
+          message: error.message || 'Error obteniendo ventas recientes',
+        };
+      }
+    });
   }
 
   async procesarVenta(ventaData: any, user: any) {
+    return this.runWithTenantContext(user, () => this.procesarVentaInternal(ventaData, user));
+  }
+
+  private async procesarVentaInternal(ventaData: any, user: any) {
     try {
       this.logger.log('Procesando venta:', JSON.stringify(ventaData, null, 2));
 
@@ -328,7 +385,8 @@ export class PosService {
       }
 
       // Actualizar sesión de caja
-      const sesionCaja = await this.getSesionCajaActual(user);
+      const sesionCajaResult = await this.getSesionCajaActual(user);
+      const sesionCaja = sesionCajaResult?.success ? sesionCajaResult.data : null;
       if (sesionCaja) {
         const metodo = ventaData.metodo_pago_id;
         const updateData: any = {};
@@ -595,6 +653,10 @@ export class PosService {
   }
 
   async abrirCaja(montoInicial: number, user: any) {
+    return this.runWithTenantContext(user, () => this.abrirCajaInternal(montoInicial, user));
+  }
+
+  private async abrirCajaInternal(montoInicial: number, user: any) {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('sesiones_caja')
@@ -622,8 +684,13 @@ export class PosService {
   }
 
   async cerrarCaja(montoContado: number, notas: string, user: any) {
+    return this.runWithTenantContext(user, () => this.cerrarCajaInternal(montoContado, notas, user));
+  }
+
+  private async cerrarCajaInternal(montoContado: number, notas: string, user: any) {
     try {
-      const sesion = await this.getSesionCajaActual(user);
+      const sesionResult = await this.getSesionCajaActual(user);
+      const sesion = sesionResult?.success ? sesionResult.data : null;
 
       if (!sesion) {
         throw new Error('No hay sesión de caja abierta');
@@ -653,6 +720,10 @@ export class PosService {
   }
 
   async getDetallesVenta(ventaId: string, user: any) {
+    return this.runWithTenantContext(user, () => this.getDetallesVentaInternal(ventaId, user));
+  }
+
+  private async getDetallesVentaInternal(ventaId: string, user: any) {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('detalle_ventas_pos')
@@ -662,14 +733,25 @@ export class PosService {
 
       if (error) throw error;
 
-      return data || [];
+      return {
+        success: true,
+        data: data || [],
+      };
     } catch (error) {
       this.logger.error('Error obteniendo detalles de venta:', error);
-      return [];
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Error obteniendo detalles de venta',
+      };
     }
   }
 
   async configurarCertificado(certificadoBase64: string, password: string, user: any) {
+    return this.runWithTenantContext(user, () => this.configurarCertificadoInternal(certificadoBase64, password, user));
+  }
+
+  private async configurarCertificadoInternal(certificadoBase64: string, password: string, user: any) {
     try {
       this.logger.log('📄 Configurando certificado para tenant:', user.tenant_id);
 
@@ -709,6 +791,10 @@ export class PosService {
   }
 
   async getConfigurationStatus(user: any) {
+    return this.runWithTenantContext(user, () => this.getConfigurationStatusInternal(user));
+  }
+
+  private async getConfigurationStatusInternal(user: any) {
     try {
       this.logger.log(`Getting configuration status for tenant: ${user.tenant_id}`);
 
@@ -777,6 +863,10 @@ export class PosService {
    * 🔴 TAREA 12: Reintentar facturación de una venta POS pendiente
    */
   async reintentarFacturacionVenta(ventaId: string, user: any): Promise<{ success: boolean; cpe_id?: string; message: string }> {
+    return this.runWithTenantContext(user, () => this.reintentarFacturacionVentaInternal(ventaId, user));
+  }
+
+  private async reintentarFacturacionVentaInternal(ventaId: string, user: any): Promise<{ success: boolean; cpe_id?: string; message: string }> {
     try {
       // Obtener venta pendiente
       const { data: venta, error: ventaError } = await this.supabase.getClient()
@@ -857,10 +947,14 @@ export class PosService {
    * 🔴 TAREA 12: Obtener ventas pendientes de facturación
    */
   async obtenerVentasPendientesFacturacion(user: any, limit: number = 50): Promise<any[]> {
+    return this.runWithTenantContext(user, () => this.obtenerVentasPendientesFacturacionInternal(user, limit));
+  }
+
+  private async obtenerVentasPendientesFacturacionInternal(user: any, limit: number = 50): Promise<any[]> {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('ventas_pos')
-        .select('id, numero_venta, numero_ticket, cliente_nombre, total, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha_venta')
+        .select('id, numero_venta, numero_ticket, cliente_nombre, total, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha')
         .eq('tenant_id', user.tenant_id)
         .eq('cpe_pendiente', true)
         .order('ultimo_intento_facturacion', { ascending: false })

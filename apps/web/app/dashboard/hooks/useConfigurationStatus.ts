@@ -52,21 +52,29 @@ export function useConfigurationStatus() {
         return
       }
 
-      // Obtener token de sesión
-      const { data: { session } } = await customAuth.getSession()
+      // ✅ Verificar que haya token antes de hacer la request
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
       
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      }
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`
+      if (!token) {
+        console.warn('[useConfigurationStatus] No token available, skipping check')
+        setIsLoading(false)
+        return
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/configuration/status`, { headers })
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/configuration/status`, { 
+        headers,
+        mode: 'cors',
+        credentials: 'include'
+      })
       
       if (!response.ok) {
         // Si es 404 o 500, asumir que no hay configuración
-        console.warn('Configuration status not available, assuming incomplete')
+        console.warn('[useConfigurationStatus] Configuration status not available, assuming incomplete')
         setStatus({
           isComplete: false,
           completionPercentage: 0,
@@ -104,8 +112,22 @@ export function useConfigurationStatus() {
         })
       }
     } catch (err) {
-      console.error('Error checking configuration status:', err)
+      console.error('[useConfigurationStatus] Error checking configuration status:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
+      // En caso de error, asumir configuración incompleta en lugar de fallar
+      setStatus({
+        isComplete: false,
+        completionPercentage: 0,
+        missingItems: ['Certificado digital', 'RUC', 'Razón Social', 'Dirección'],
+        certificate: {
+          exists: false,
+          isValid: false
+        },
+        ruc: {
+          isConfigured: false,
+          missingFields: ['RUC', 'Razón Social']
+        }
+      })
     } finally {
       setIsLoading(false)
     }

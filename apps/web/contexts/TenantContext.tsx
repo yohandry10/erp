@@ -82,29 +82,83 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       // Set tenant from JWT payload (minimal data for regular users)
       // Only super-admins need to fetch full tenant details via API
+      // IMPORTANTE: Establecer datos mínimos primero para evitar que el componente quede sin tenant
+      const minimalTenant = {
+        id: payload.tenant_id,
+        nombre: payload.tenant_name || 'Mi Empresa',
+        email: payload.email,
+        pais: 'PE',
+        moneda: 'PEN',
+        estado: 'ACTIVO',
+      }
+      setTenant(minimalTenant)
+      
       if (payload.is_super_admin) {
-        // Super-admins can fetch full tenant details
-        await fetchTenantDetails(payload.tenant_id, session.access_token)
-      } else {
-        // Regular users: use minimal tenant data from JWT
-        setTenant({
-          id: payload.tenant_id,
-          nombre: payload.tenant_name || 'Mi Empresa',
-          email: payload.email,
-          pais: 'PE',
-          moneda: 'PEN',
-          estado: 'ACTIVO',
+        // Super-admins can fetch full tenant details (opcional, no bloquea si falla)
+        // Hacer esto de forma no bloqueante - si falla, ya tenemos datos mínimos
+        fetchTenantDetails(payload.tenant_id, session.access_token).catch((fetchError) => {
+          // No hacer nada - ya tenemos datos mínimos establecidos arriba
+          console.warn('⚠️ [TenantContext] No se pudo obtener detalles completos del tenant, usando datos mínimos:', fetchError)
         })
       }
 
       setError(null)
     } catch (err) {
-      console.error('Error extracting tenant from token:', err)
-      setError(err instanceof Error ? err.message : 'Failed to extract tenant information')
-      // Limpiar sesión inválida
-      await customAuth.signOut()
-      setUser(null)
-      setTenant(null)
+      console.error('❌ [TenantContext] Error extracting tenant from token:', err)
+      
+      const errorMessage = err instanceof Error ? err.message : 'Failed to extract tenant information'
+      setError(errorMessage)
+      
+      // Solo hacer signOut si el error indica que la sesión es realmente inválida
+      // (por ejemplo, JWT malformado, token expirado, etc.)
+      // NO limpiar sesión por errores de red o 404 en fetchTenantDetails
+      if (errorMessage.includes('JWT') || errorMessage.includes('expired') || errorMessage.includes('invalid token') || errorMessage.includes('Token')) {
+        console.warn('⚠️ [TenantContext] Sesión inválida detectada (error crítico), limpiando...')
+        await customAuth.signOut()
+        setUser(null)
+        setTenant(null)
+      } else {
+        // Para otros errores (red, 404, etc.), usar datos mínimos y continuar
+        // NO limpiar la sesión por errores no críticos
+        console.warn('⚠️ [TenantContext] Error no crítico, usando datos mínimos del tenant')
+        console.warn('⚠️ [TenantContext] NO se limpiará la sesión - esto permite que el usuario continúe')
+        
+        // Intentar establecer datos mínimos si tenemos información del payload
+        // (puede que payload esté disponible aunque haya habido un error en fetchTenantDetails)
+        try {
+          if (session?.access_token) {
+            // Intentar decodificar el token de nuevo para obtener datos mínimos
+            const parts = session.access_token.split('.')
+            if (parts.length === 3) {
+              const decoded = JSON.parse(atob(parts[1]))
+              if (decoded.tenant_id) {
+                setTenant({
+                  id: decoded.tenant_id,
+                  nombre: 'Mi Empresa',
+                  email: decoded.email || '',
+                  pais: 'PE',
+                  moneda: 'PEN',
+                  estado: 'ACTIVO',
+                })
+                setUser({
+                  id: decoded.sub,
+                  email: decoded.email,
+                  nombre: decoded.username || decoded.email?.split('@')[0] || 'Usuario',
+                  tenant_id: decoded.tenant_id,
+                  is_super_admin: decoded.is_super_admin || false,
+                  roles: decoded.roles || [],
+                })
+              }
+            }
+          }
+        } catch (decodeError) {
+          console.error('❌ [TenantContext] Error decodificando token para datos mínimos:', decodeError)
+          // Si no podemos obtener datos mínimos, entonces sí hacer signOut
+          await customAuth.signOut()
+          setUser(null)
+          setTenant(null)
+        }
+      }
     } finally {
       setLoading(false)
     }

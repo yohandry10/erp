@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 import { UserManagementService } from '../usuarios/user-management.service';
 import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto } from './dto';
 import * as crypto from 'crypto';
@@ -8,7 +9,8 @@ import * as crypto from 'crypto';
 export class TenantManagementService {
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly userManagementService: UserManagementService
+    private readonly userManagementService: UserManagementService,
+    private readonly tenantContext: TenantContextService,
   ) { }
 
   /**
@@ -257,67 +259,80 @@ export class TenantManagementService {
    * Get all tenants with filters and pagination
    * Requirements: 1.4
    */
-  async getTenants(filters?: TenantFiltersDto) {
-    const client = this.supabase.getClient();
+  async getTenants(filters?: TenantFiltersDto, user?: any) {
+    const execute = async () => {
+      await this.supabase.prepareTenantContext();
 
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 50;
-    const offset = (page - 1) * limit;
+      const client = this.supabase.getClient();
 
-    // Query all tenants (no tenant filter for super-admin)
-    let query = client
-      .from('empresa_config')
-      .select('tenant_id, razon_social, nombre_comercial, ruc, email, direccion_fiscal, telefono, pais, moneda_defecto, estado, plan, fecha_inicio, fecha_fin, created_at, updated_at', { count: 'exact' });
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 50;
+      const offset = (page - 1) * limit;
 
-    // Apply search filter (search by nombre or email)
-    if (filters?.search) {
-      query = query.or(`nombre.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
-    }
+      let query = client
+        .from('empresa_config')
+        .select('tenant_id, razon_social, nombre_comercial, ruc, email, direccion_fiscal, telefono, pais, moneda_defecto, estado, plan, fecha_inicio, fecha_fin, created_at, updated_at', { count: 'exact' });
 
-    // Apply estado filter
-    if (filters?.estado) {
-      query = query.eq('estado', filters.estado);
-    }
-
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching tenants:', error);
-      throw new BadRequestException('Error al obtener tenants');
-    }
-
-    // Map empresa_config fields to tenant fields
-    const mappedData = (data || []).map(tenant => ({
-      id: tenant.tenant_id,
-      razon_social: tenant.razon_social,
-      nombre_comercial: tenant.nombre_comercial,
-      ruc: tenant.ruc,
-      email: tenant.email,
-      direccion: tenant.direccion_fiscal,
-      telefono: tenant.telefono,
-      pais: tenant.pais,
-      moneda: tenant.moneda_defecto,
-      estado: tenant.estado,
-      plan: tenant.plan,
-      fecha_inicio: tenant.fecha_inicio,
-      fecha_fin: tenant.fecha_fin,
-      created_at: tenant.created_at,
-      updated_at: tenant.updated_at
-    }));
-
-    return {
-      success: true,
-      data: mappedData,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+      if (filters?.search) {
+        query = query.or(`razon_social.ilike.%${filters.search}%,nombre_comercial.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
       }
+
+      if (filters?.estado) {
+        query = query.eq('estado', filters.estado);
+      }
+
+      query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Error fetching tenants:', error);
+        throw new BadRequestException('Error al obtener tenants');
+      }
+
+      const mappedData = (data || []).map(tenant => ({
+        id: tenant.tenant_id,
+        razon_social: tenant.razon_social,
+        nombre_comercial: tenant.nombre_comercial,
+        ruc: tenant.ruc,
+        email: tenant.email,
+        direccion: tenant.direccion_fiscal,
+        telefono: tenant.telefono,
+        pais: tenant.pais,
+        moneda: tenant.moneda_defecto,
+        estado: tenant.estado,
+        plan: tenant.plan,
+        fecha_inicio: tenant.fecha_inicio,
+        fecha_fin: tenant.fecha_fin,
+        created_at: tenant.created_at,
+        updated_at: tenant.updated_at,
+      }));
+
+      return {
+        success: true,
+        data: mappedData,
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit),
+        },
+      };
     };
+
+    if (user?.is_super_admin) {
+      return this.tenantContext.run(
+        {
+          tenantId: null,
+          userId: user.id ?? user.sub ?? null,
+          supabaseAccessToken: null,
+          isSuperAdmin: true,
+        },
+        execute,
+      );
+    }
+
+    return execute();
   }
 
   /**
@@ -327,17 +342,92 @@ export class TenantManagementService {
   async getTenantById(tenantId: string) {
     const client = this.supabase.getClient();
 
-    // Establecer el contexto del tenant para RLS
-    await client.rpc('app.set_tenant_context', { p_tenant_id: tenantId });
+    // NOTA: app.set_tenant_context() no funciona porque Supabase PostgREST no mantiene sesión
+    // La política RLS debe permitir acceso cuando el backend filtra por tenant_id explícitamente
+    // Intentar establecer contexto (puede fallar silenciosamente)
+    try {
+      await client.rpc('app.set_tenant_context', { p_tenant_id: tenantId });
+    } catch (rpcError) {
+      // Ignorar error - RLS debería funcionar de todas formas
+    }
 
-    const { data: tenant, error } = await client
+    console.log(`[TenantService] Buscando tenant ${tenantId} en empresa_config...`);
+    
+    // Intentar primero con select('*') - a veces PostgREST tiene problemas con campos específicos
+    let { data: tenants, error } = await client
       .from('empresa_config')
-      .select('tenant_id, razon_social, nombre_comercial, ruc, email, direccion_fiscal, telefono, pais, moneda_defecto, estado, plan, fecha_inicio, fecha_fin, created_at, updated_at')
-      .eq('tenant_id', tenantId)
-      .single();
+      .select('*')
+      .eq('tenant_id', tenantId);
+    
+    // Si hay error PGRST301, intentar con cliente público directamente
+    if (error && error.code === 'PGRST301') {
+      console.warn(`[TenantService] ⚠️ Error PGRST301 detectado, intentando con cliente público...`);
+      
+      const publicClient = this.supabase.getPublicClient();
+      const altQuery = await publicClient
+        .from('empresa_config')
+        .select('*')
+        .eq('tenant_id', tenantId);
+      
+      if (!altQuery.error && altQuery.data) {
+        console.log(`[TenantService] ✅ Query alternativa exitosa con cliente público`);
+        tenants = altQuery.data;
+        error = null;
+      }
+    }
+    
+    // Extraer el primer elemento del array (o null si no hay resultados)
+    let tenant = tenants && tenants.length > 0 ? tenants[0] : null;
 
-    if (error || !tenant) {
-      throw new NotFoundException('Tenant no encontrado');
+    // Si falla por RLS (policy violation), intentar con cliente público como fallback
+    // Esto es necesario porque SERVICE_ROLE_KEY debería bypasear RLS pero a veces no lo hace
+    if (error && (error.code === '42501' || error.code === 'P0001' || error.message?.includes('policy') || error.message?.includes('permission') || error.message?.includes('RLS'))) {
+      console.warn(`[TenantService] ⚠️ RLS bloqueó acceso (${error.code}), intentando con cliente público como fallback...`);
+      console.warn(`[TenantService] Error original: ${error.message}`);
+      
+      const publicClient = this.supabase.getPublicClient();
+      const fallbackResult = await publicClient
+        .from('empresa_config')
+        .select('*')
+        .eq('tenant_id', tenantId);
+      
+      // Extraer el primer elemento del array del fallback
+      const fallbackTenant = fallbackResult.data && fallbackResult.data.length > 0 ? fallbackResult.data[0] : null;
+      
+      if (!fallbackResult.error && fallbackTenant) {
+        console.log(`[TenantService] ✅ Fallback exitoso - usando cliente público (SERVICE_ROLE_KEY bypass RLS)`);
+        tenant = fallbackTenant;
+        error = null;
+      } else {
+        console.error(`[TenantService] ❌ Fallback también falló:`, fallbackResult.error);
+      }
+    }
+
+    if (error) {
+      console.error('[TenantService] ❌ Error de Supabase obteniendo tenant:', error);
+      console.error('[TenantService] ❌ Error code:', error.code);
+      console.error('[TenantService] ❌ Error message:', error.message);
+      console.error('[TenantService] ❌ Error details:', JSON.stringify(error, null, 2));
+      console.error('[TenantService] ❌ Error hint:', error.hint);
+      
+      // Si es error de RLS o permiso, dar mensaje más específico
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('policy')) {
+        console.error('[TenantService] ⚠️ ERROR DE RLS: La política RLS está bloqueando el acceso');
+        throw new NotFoundException(`Tenant no encontrado: Acceso bloqueado por RLS. Verificar políticas RLS en empresa_config. Error: ${error.message}`);
+      }
+      
+      throw new NotFoundException(`Tenant no encontrado: ${error.message || 'Error desconocido'}`);
+    }
+
+    console.log(`[TenantService] ✅ Query exitosa. Tenant encontrado:`, tenant ? 'SÍ' : 'NO');
+    
+    if (!tenant) {
+      console.error(`[TenantService] ⚠️ No existe registro en empresa_config con tenant_id: ${tenantId}`);
+      console.error(`[TenantService] 💡 Esto puede indicar que:`);
+      console.error(`[TenantService]    1. El tenant existe pero no tiene configuración de empresa creada`);
+      console.error(`[TenantService]    2. RLS está bloqueando el acceso y el fallback no funcionó`);
+      console.error(`[TenantService]    3. El tenant_id es incorrecto`);
+      throw new NotFoundException(`Tenant no encontrado: No existe registro en empresa_config con tenant_id ${tenantId}`);
     }
 
     // Map empresa_config fields to tenant fields

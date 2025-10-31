@@ -2,9 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
-import {
-  createClientComponentClient
-} from "@supabase/auth-helpers-nextjs";
 // import { showSuccessToast } from '@/components/ui/success-toast'
 // import { showErrorToast } from '@/components/ui/error-toast'
 
@@ -104,7 +101,6 @@ export default function POSPage() {
   }
 
   const api = useApi()
-  const supabase = createClientComponentClient();
 
   // Estados principales
   const [productos, setProductos] = useState<ProductoPOS[]>([])
@@ -188,42 +184,64 @@ export default function POSPage() {
         console.error('❌ Error fetching GRE config:', greError);
       }
 
-      // Paralelizar las demás cargas de datos
+      // Paralelizar las demás cargas de datos usando API backend (asegura contexto multi-tenant)
       const [
         clientesRes,
         metodosPagoRes,
-        cajaRes,
-        empresaRes
+        sesionCajaRes,
+        empresaRes,
+        ventasRecientesRes,
       ] = await Promise.all([
-        supabase.from('clientes').select('*'),
-        supabase.from('metodos_pago').select('*'),
-        supabase.from('cajas').select('*').single(),
-        supabase.from('empresa_config').select('*').single()
+        api.get('/api/pos/clientes'),
+        api.get('/api/pos/metodos-pago'),
+        api.get('/api/pos/sesion-caja'),
+        api.get('/api/pos/empresa-config'),
+        api.get('/api/pos/ventas-recientes'),
       ]);
 
-      if (clientesRes.error) throw clientesRes.error;
-      setClientes(clientesRes.data || []);
+      if (clientesRes?.success) {
+        setClientes(clientesRes.data || []);
+      } else {
+        console.warn('⚠️ No se pudieron cargar clientes POS');
+        setClientes([]);
+      }
 
-      if (metodosPagoRes.error) throw metodosPagoRes.error;
-      setMetodosPago(metodosPagoRes.data || []);
+      if (metodosPagoRes?.success) {
+        setMetodosPago(metodosPagoRes.data || []);
+      } else {
+        console.warn('⚠️ No se pudieron cargar métodos de pago POS');
+        setMetodosPago([]);
+      }
 
-      if (cajaRes.error) {
-        console.warn("No se encontró caja, usando estado por defecto 'CERRADA'");
+      if (sesionCajaRes?.success && sesionCajaRes.data) {
+        setEstadoCaja({
+          estado: sesionCajaRes.data.estado || 'ABIERTA',
+          montoInicial: sesionCajaRes.data.monto_inicial || 0,
+          ventasEfectivo: sesionCajaRes.data.total_efectivo || 0,
+          ventasTarjeta: sesionCajaRes.data.total_tarjeta || 0,
+          montoFinal: sesionCajaRes.data.monto_contado || 0,
+        });
+      } else {
+        console.warn("No se encontró caja abierta, usando estado por defecto 'CERRADA'");
         setEstadoCaja({
           estado: 'CERRADA',
           montoInicial: 0,
           ventasEfectivo: 0,
           ventasTarjeta: 0,
-          montoFinal: 0
+          montoFinal: 0,
         });
-      } else {
-        setEstadoCaja(cajaRes.data);
       }
 
-      if (empresaRes.error) {
-        console.error("Error cargando configuración de empresa:", empresaRes.error);
-      } else {
+      if (empresaRes?.success) {
         setEmpresaInfo(empresaRes.data);
+      } else {
+        setEmpresaInfo(null);
+      }
+
+      if (ventasRecientesRes?.success) {
+        setHistorialVentas(ventasRecientesRes.data || []);
+      } else {
+        setHistorialVentas([]);
       }
 
       await recargarHistorialVentas();
@@ -248,20 +266,13 @@ export default function POSPage() {
 
   const recargarHistorialVentas = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase
-        .from('ventas_pos')
-        .select('*')
-        .order('created_at', {
-          ascending: false
-        })
-        .limit(10);
+      const ventasRes = await api.get('/api/pos/ventas-recientes');
+      if (!ventasRes?.success) {
+        throw new Error(ventasRes?.message || 'Error cargando historial');
+      }
 
-      if (error) throw error;
-      console.log(`✅ Historial cargado: ${data?.length || 0} ventas encontradas`);
-      setHistorialVentas(data || []);
+      console.log(`✅ Historial cargado: ${ventasRes.data?.length || 0} ventas encontradas`);
+      setHistorialVentas(ventasRes.data || []);
     } catch (error) {
       console.error('❌ Error recargando historial de ventas:', error);
       setHistorialVentas([]);
@@ -304,79 +315,51 @@ export default function POSPage() {
     try {
       console.log('👁️ Cargando detalles de venta:', venta);
 
-      // MÉTODO 1: Intentar obtener desde detalle_ventas_pos
-      let detalles = [];
-      try {
-        const { data: detallesDB, error: errorDetalles } = await supabase
-          .from('detalle_ventas_pos')
-          .select('*')
-          .eq('venta_id', venta.id);
+      // Intentar obtener detalles desde API POS
+      let detalles: any[] = [];
+      const detallesResponse = await api.post(`/api/pos/detalles-venta/${venta.id}`, { venta_id: venta.id });
 
-        if (!errorDetalles && detallesDB && detallesDB.length > 0) {
-          console.log('✅ Detalles encontrados en BD:', detallesDB);
-          detalles = detallesDB;
-        } else {
-          console.log('⚠️ No se encontraron detalles en BD, intentando desde observaciones...');
+      if (detallesResponse?.success && Array.isArray(detallesResponse.data) && detallesResponse.data.length > 0) {
+        detalles = detallesResponse.data;
+        console.log('✅ Detalles obtenidos desde API POS:', detalles);
+      } else {
+        console.log('⚠️ No se encontraron detalles en API, intentando reconstruir desde observaciones...');
 
-          // MÉTODO 2: Obtener desde observaciones (JSON)
-          if (venta.observaciones) {
-            try {
-              const observacionesData = JSON.parse(venta.observaciones);
-              console.log('📋 Datos en observaciones:', observacionesData);
-
-              if (observacionesData.items && Array.isArray(observacionesData.items)) {
-                detalles = observacionesData.items.map((item: any, index: number) => ({
-                  id: index + 1,
-                  venta_id: venta.id,
-                  codigo_producto: item.producto?.codigo || item.producto_id || 'N/A',
-                  nombre_producto: item.producto?.nombre || 'Producto',
-                  cantidad: item.cantidad || 1,
-                  precio_unitario: item.precio_unitario || 0,
-                  descuento: item.descuento_monto || 0,
-                  total_parcial: item.subtotal || 0
-                }));
-                console.log('✅ Detalles extraídos de observaciones:', detalles);
-              }
-            } catch (parseError) {
-              console.warn('⚠️ Error parseando observaciones:', parseError);
-            }
-          }
-
-          // MÉTODO 3: Fallback - crear detalles básicos
-          if (detalles.length === 0) {
-            console.log('⚠️ Creando detalles básicos de fallback...');
-            detalles = [{
-              id: 1,
-              venta_id: venta.id,
-              codigo_producto: 'N/A',
-              nombre_producto: 'Ver detalles en backend',
-              cantidad: 1,
-              precio_unitario: venta.total || 0,
-              descuento: 0,
-              total_parcial: venta.total || 0
-            }];
-          }
-        }
-      } catch (dbError) {
-        console.warn('⚠️ Error consultando BD, usando observaciones:', dbError);
-
-        // Fallback a observaciones si hay error de BD
+        // Fallback: usar observaciones almacenadas en la venta
         if (venta.observaciones) {
           try {
             const observacionesData = JSON.parse(venta.observaciones);
-            if (observacionesData.items) {
+            if (observacionesData.items && Array.isArray(observacionesData.items)) {
               detalles = observacionesData.items.map((item: any, index: number) => ({
                 id: index + 1,
-                codigo_producto: item.producto?.codigo || 'N/A',
+                venta_id: venta.id,
+                codigo_producto: item.producto?.codigo || item.producto_id || 'N/A',
                 nombre_producto: item.producto?.nombre || 'Producto',
                 cantidad: item.cantidad || 1,
                 precio_unitario: item.precio_unitario || 0,
-                total_parcial: item.subtotal || 0
+                descuento: item.descuento_monto || 0,
+                total_parcial: item.subtotal || 0,
               }));
+              console.log('✅ Detalles reconstruidos desde observaciones:', detalles);
             }
           } catch (parseError) {
-            console.warn('Error parseando observaciones:', parseError);
+            console.warn('⚠️ Error parseando observaciones:', parseError);
           }
+        }
+
+        // Último fallback: crear detalle básico
+        if (detalles.length === 0) {
+          console.log('⚠️ Creando detalles básicos de fallback...');
+          detalles = [{
+            id: 1,
+            venta_id: venta.id,
+            codigo_producto: 'N/A',
+            nombre_producto: 'Ver detalles en backend',
+            cantidad: 1,
+            precio_unitario: venta.total || 0,
+            descuento: 0,
+            total_parcial: venta.total || 0,
+          }];
         }
       }
 
@@ -1977,7 +1960,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       <p><strong>RUC/DNI:</strong> {facturaSeleccionada.cliente_documento || 'Sin documento'}</p>
                     </div>
                     <div>
-                      <p><strong>Fecha de Emisión:</strong> {new Date(facturaSeleccionada.fecha_venta || facturaSeleccionada.created_at).toLocaleDateString('es-PE')}</p>
+                      <p><strong>Fecha de Emisión:</strong> {new Date(facturaSeleccionada.fecha || facturaSeleccionada.created_at).toLocaleDateString('es-PE')}</p>
                       <p><strong>Forma de Pago:</strong> {facturaSeleccionada.metodo_pago_nombre || 'Contado'}</p>
                     </div>
                   </div>
