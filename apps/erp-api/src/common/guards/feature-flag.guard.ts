@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { FEATURE_FLAG_METADATA, FeatureFlagKey } from '../decorators/feature-flag.decorator';
-import { FEATURE_POS_ENABLED, FEATURE_RRHH_ENABLED } from '../feature-flags';
+import { FEATURE_POS_ENABLED, FEATURE_RRHH_ENABLED, FEATURE_INVENTARIO_ENABLED } from '../feature-flags';
 
 // HARDENING: Guard que bloquea módulos con feature flags deshabilitados.
 @Injectable()
@@ -31,6 +31,11 @@ export class FeatureFlagGuard implements CanActivate {
       case 'pos':
         if (!FEATURE_POS_ENABLED) {
           throw new ServiceUnavailableException('POS no habilitado en este entorno');
+        }
+        break;
+      case 'inventario':
+        if (!FEATURE_INVENTARIO_ENABLED) {
+          throw new ServiceUnavailableException('Inventario no habilitado en este entorno');
         }
         break;
       default:

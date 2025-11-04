@@ -4,6 +4,7 @@ import { DevolucionesProveedorRepository } from '../repositories/devoluciones-pr
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
 import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
 @Injectable()
 export class DevolucionesProveedorService {
@@ -12,6 +13,7 @@ export class DevolucionesProveedorService {
     private readonly devolucionesRepository: DevolucionesProveedorRepository,
     private readonly inventarioService: InventarioService,
     private readonly eventBus: EventBusService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -72,8 +74,13 @@ export class DevolucionesProveedorService {
         subtotal += itemSubtotal;
       }
 
-      const igv = subtotal * 0.18; // 18% IGV
-      const total = subtotal + igv;
+      // ✅ CORRECCIÓN SRP: Usar TaxCalculatorService centralizado
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      const igv = taxResult.igv;
+      const total = taxResult.total;
 
       // Generar número de devolución
       const numero = await this.devolucionesRepository.generarNumeroDevolucion(tenantId);

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
@@ -7,6 +7,9 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AlmacenesService } from './almacenes/almacenes.service';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { InventarioService } from './inventario.service';
+import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
+import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -15,13 +18,16 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
  */
 @ApiTags('inventario')
 @Controller('inventario')
-@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: inventario requiere permisos granulares.
+@UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard) // HARDENING: inventario requiere permisos granulares + feature flags.
+@RequireFeatureFlag('inventario') // HARDENING: bloquea el módulo si la bandera de inventario está deshabilitada.
 @ApiBearerAuth()
 export class InventarioController {
+  private readonly logger = new Logger(InventarioController.name); // HARDENING: centraliza trazabilidad por módulo.
   constructor(
     private readonly inventoryService: InventoryIntegrationService,
     private readonly supabase: SupabaseService,
-    private readonly almacenesService: AlmacenesService
+    private readonly almacenesService: AlmacenesService,
+    private readonly inventarioService: InventarioService,
   ) {}
 
   /**
@@ -33,7 +39,7 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Almacenes listados exitosamente' })
   async getAlmacenes(@CurrentTenant() tenantId: string) {
     try {
-      console.log(`🏢 [Tenant: ${tenantId}] Obteniendo almacenes...`);
+      this.logger.log(`🏢 [Tenant: ${tenantId}] Obteniendo almacenes...`); // HARDENING: reemplaza console.log para auditoría multitenant.
       const almacenes = await this.almacenesService.listar(tenantId);
       
       return {
@@ -41,10 +47,10 @@ export class InventarioController {
         data: almacenes
       };
     } catch (error) {
-      console.error('❌ Error obteniendo almacenes:', error);
+      this.logger.error('❌ Error obteniendo almacenes', error as Error); // HARDENING: utiliza Logger Nest para errores.
       return {
         success: false,
-        message: 'Error al obtener almacenes: ' + error.message,
+        message: 'Error al obtener almacenes: ' + (error as Error).message,
         data: []
       };
     }
@@ -62,7 +68,7 @@ export class InventarioController {
     @Param('almacenId') almacenId: string
   ) {
     try {
-      console.log(`📍 [Tenant: ${tenantId}] Obteniendo ubicaciones del almacén ${almacenId}...`);
+      this.logger.log(`📍 [Tenant: ${tenantId}] Obteniendo ubicaciones del almacén ${almacenId}...`); // HARDENING: traza accesos a estructuras de inventario.
       
       const { data, error } = await this.supabase.getClient()
         .from('almacen_ubicaciones')
@@ -71,22 +77,95 @@ export class InventarioController {
         .eq('almacen_id', almacenId)
         .order('codigo', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      console.log(`✅ ${data?.length || 0} ubicaciones obtenidas`);
+      this.logger.log(`✅ ${data?.length || 0} ubicaciones obtenidas`); // HARDENING: confirma operación exitosa para auditoría.
       
       return {
         success: true,
         data: data || []
       };
     } catch (error) {
-      console.error('❌ Error obteniendo ubicaciones:', error);
+      this.logger.error('❌ Error obteniendo ubicaciones', error as Error);
       return {
         success: false,
-        message: 'Error al obtener ubicaciones: ' + error.message,
+        message: 'Error al obtener ubicaciones: ' + (error as Error).message,
         data: []
       };
     }
+  }
+
+  /**
+   * Listar recepciones con filtros básicos
+   */
+  @Get('recepciones')
+  @RequirePermission('inventario.ingresos.write') // HARDENING: solo usuarios autorizados pueden gestionar recepciones.
+  @ApiOperation({ summary: 'Listar recepciones de compra' })
+  @ApiResponse({ status: 200, description: 'Recepciones listadas exitosamente' })
+  async listarRecepciones(
+    @CurrentTenant() tenantId: string,
+    @Query('estado') estado?: string,
+    @Query('almacenId') almacenId?: string,
+    @Query('search') search?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('page') pageParam?: string,
+    @Query('limit') limitParam?: string,
+  ) {
+    const page = pageParam ? parseInt(pageParam, 10) : undefined;
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+
+    return this.inventarioService.listarRecepciones(tenantId, {
+      estado,
+      almacenId,
+      search,
+      desde,
+      hasta,
+      page,
+      limit,
+    });
+  }
+
+  /**
+   * Obtener detalle de una recepción
+   */
+  @Get('recepciones/:id')
+  @RequirePermission('inventario.ingresos.write')
+  @ApiOperation({ summary: 'Detalle de recepción' })
+  @ApiResponse({ status: 200, description: 'Detalle obtenido exitosamente' })
+  async obtenerRecepcionDetalle(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+  ) {
+    return this.inventarioService.obtenerRecepcionPorId(tenantId, id);
+  }
+
+  /**
+   * Obtener kardex valorizado (entradas) del inventario
+   */
+  @Get('kardex')
+  @RequirePermission('inventario.kardex.read')
+  @ApiOperation({ summary: 'Consultar kardex valorizado' })
+  @ApiResponse({ status: 200, description: 'Kardex obtenido correctamente' })
+  async obtenerKardex(
+    @CurrentTenant() tenantId: string,
+    @Query('productoId') productoId?: string,
+    @Query('almacenId') almacenId?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('limit') limitParam?: string,
+  ) {
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+
+    return this.inventarioService.obtenerKardexValorizado(tenantId, {
+      productoId,
+      almacenId,
+      desde,
+      hasta,
+      limit,
+    });
   }
 
   /**
@@ -98,7 +177,7 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@CurrentTenant() tenantId: string) {
     try {
-      console.log(`📊 [Tenant: ${tenantId}] Obteniendo estadísticas de inventario...`);
+      this.logger.log(`📊 [Tenant: ${tenantId}] Obteniendo estadísticas de inventario...`); // HARDENING: trazabilidad de métricas sensibles.
       
       const client = this.supabase.getClient();
       if (!client) {
@@ -144,7 +223,7 @@ export class InventarioController {
         }
       };
     } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
+      this.logger.error('❌ Error obteniendo estadísticas', error as Error);
       return {
         success: true,
         data: {
@@ -166,7 +245,7 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Productos listados exitosamente' })
   async getProductos(@CurrentTenant() tenantId: string, @Query() query: any) {
     try {
-      console.log(`📦 [Tenant: ${tenantId}] Obteniendo productos del inventario...`);
+      this.logger.log(`📦 [Tenant: ${tenantId}] Obteniendo productos del inventario...`); // HARDENING: añade trazabilidad a listados sensibles.
       
       const client = this.supabase.getClient();
       let supaQuery = client.from('productos').select('*').eq('tenant_id', tenantId);
@@ -181,19 +260,21 @@ export class InventarioController {
 
       const { data, error } = await supaQuery.order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      console.log(`✅ ${data?.length || 0} productos obtenidos`);
+      this.logger.log(`✅ ${data?.length || 0} productos obtenidos`); // HARDENING: confirma operación para auditoría.
       
       return { 
         success: true, 
         data: data || [] 
       };
     } catch (error) {
-      console.error('❌ Error obteniendo productos:', error);
+      this.logger.error('❌ Error obteniendo productos', error as Error);
       return { 
         success: false, 
-        message: 'Error al obtener productos: ' + error.message,
+        message: 'Error al obtener productos: ' + (error as Error).message,
         data: [] 
       };
     }
@@ -208,7 +289,7 @@ export class InventarioController {
   @ApiResponse({ status: 201, description: 'Producto creado exitosamente' })
   async createProducto(@CurrentTenant() tenantId: string, @Body() productData: any) {
     try {
-      console.log(`🆕 [Tenant: ${tenantId}] Creando nuevo producto:`, productData);
+      this.logger.log(`🆕 [Tenant: ${tenantId}] Creando nuevo producto: ${productData?.codigo ?? 'sin-codigo'}`); // HARDENING: evita volsado de objetos completos y mantiene rastro.
 
       if (!productData.codigo || !productData.nombre || !productData.categoria) {
         return {
@@ -267,11 +348,11 @@ export class InventarioController {
               created_at: new Date().toISOString()
             }]);
         } catch (movError) {
-          console.warn('⚠️ No se pudo registrar movimiento inicial:', movError.message);
+          this.logger.warn(`⚠️ No se pudo registrar movimiento inicial: ${(movError as Error).message}`); // HARDENING: mantiene registro de inconsistencias iniciales.
         }
       }
 
-      console.log('✅ Producto creado exitosamente:', insertedProduct.id);
+      this.logger.log(`✅ Producto creado exitosamente: ${insertedProduct.id}`); // HARDENING: confirma alta.
 
       return {
         success: true,
@@ -279,10 +360,10 @@ export class InventarioController {
         message: 'Producto creado exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error creando producto:', error);
+      this.logger.error('❌ Error creando producto', error as Error);
       return {
         success: false,
-        message: 'Error al crear el producto: ' + error.message
+        message: 'Error al crear el producto: ' + (error as Error).message
       };
     }
   }
@@ -299,7 +380,7 @@ export class InventarioController {
     @Query() query: any
   ) {
     try {
-      console.log(`📊 [Tenant: ${tenantId}] Obteniendo movimientos de inventario...`);
+      this.logger.log(`📊 [Tenant: ${tenantId}] Obteniendo movimientos de inventario...`); // HARDENING: monitorea consultas a trazabilidad de stock.
       
       const limit = query.limit ? parseInt(query.limit) : 50;
       const client = this.supabase.getClient();
@@ -312,21 +393,21 @@ export class InventarioController {
         .limit(limit);
 
       if (error) {
-        console.warn('⚠️ Error consultando movimientos:', error);
+        this.logger.warn(`⚠️ Error consultando movimientos: ${(error as Error).message}`);
         return { 
           success: true, 
           data: []
         };
       }
 
-      console.log(`✅ ${data?.length || 0} movimientos obtenidos`);
+      this.logger.log(`✅ ${data?.length || 0} movimientos obtenidos`); // HARDENING: confirma resultado.
       
       return { 
         success: true, 
         data: data || [] 
       };
     } catch (error) {
-      console.error('❌ Error obteniendo movimientos:', error);
+      this.logger.error('❌ Error obteniendo movimientos', error as Error);
       return { 
         success: true,
         data: [] 
@@ -343,7 +424,7 @@ export class InventarioController {
     @CurrentTenant() tenantId: string,
     @Body() movimiento: any
   ) {
-    console.log(`📦 [Inventario] Realizando movimiento para tenant: ${tenantId}`);
+    this.logger.log(`📦 [Inventario] Realizando movimiento para tenant: ${tenantId}`); // HARDENING: monitorea movimientos críticos.
     return this.inventoryService.realizarMovimientoStock(movimiento, tenantId);
   }
 
@@ -359,7 +440,7 @@ export class InventarioController {
     @Param('id') id: string
   ) {
     try {
-      console.log(`🔍 [Tenant: ${tenantId}] Obteniendo producto por ID:`, id);
+      this.logger.log(`🔍 [Tenant: ${tenantId}] Obteniendo producto por ID: ${id}`); // HARDENING: evita logs sin contexto tenant.
       
       const { data, error } = await this.supabase.getClient()
         .from('productos')
@@ -368,7 +449,9 @@ export class InventarioController {
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       if (!data) {
         return {
@@ -382,7 +465,7 @@ export class InventarioController {
         data
       };
     } catch (error) {
-      console.error('Error obteniendo producto:', error);
+      this.logger.error('Error obteniendo producto', error as Error);
       return {
         success: false,
         message: 'Error al obtener el producto'
@@ -399,7 +482,7 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Producto eliminado exitosamente' })
   async deleteProducto(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     try {
-      console.log(`🗑️ [Tenant: ${tenantId}] Eliminando producto por ID:`, id);
+      this.logger.log(`🗑️ [Tenant: ${tenantId}] Eliminando producto por ID: ${id}`); // HARDENING: registra operaciones destructivas.
       
       const { data: producto, error: findError } = await this.supabase.getClient()
         .from('productos')
@@ -445,7 +528,9 @@ export class InventarioController {
           .eq('tenant_id', tenantId)
           .eq('id', id);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          throw deleteError;
+        }
 
         return {
           success: true,
@@ -454,10 +539,10 @@ export class InventarioController {
         };
       }
     } catch (error) {
-      console.error('❌ Error eliminando producto:', error);
+      this.logger.error('❌ Error eliminando producto', error as Error);
       return {
         success: false,
-        message: 'Error al eliminar el producto: ' + error.message
+        message: 'Error al eliminar el producto: ' + (error as Error).message
       };
     }
   }

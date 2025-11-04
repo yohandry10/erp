@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react'
 import OrdenCompraModal from '../../../components/modals/OrdenCompraModal'
 import ProveedorModal from '../../../components/modals/ProveedorModal'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/use-toast'
+import { useApi } from '@/hooks/use-api'
 
 type AnyRecord = Record<string, any>
 
 export default function ComprasPage() {
   const { toast } = useToast()
+  const { get, delete: del, put } = useApi()
 
   const [ordenes, setOrdenes] = useState<any[]>([])
   const [stats, setStats] = useState({
@@ -33,6 +36,21 @@ export default function ComprasPage() {
     proveedor_id: '',
   })
 
+  // Estado para diálogos de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  })
+
   // DEBUG: Observar cambios en el estado del modal
   useEffect(() => {
     console.log('🔄 Estado del modal cambió a:', isModalOpen)
@@ -47,8 +65,6 @@ export default function ComprasPage() {
     loadOrdenes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters])
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
   const loadData = async () => {
     try {
@@ -69,25 +85,14 @@ export default function ComprasPage() {
   const loadStats = async () => {
     try {
       const timestamp = Date.now()
-      console.log('📊 [Frontend] Cargando stats desde:', `${API_URL}/api/compras/stats?_t=${timestamp}`)
+      console.log('📊 [Frontend] Cargando stats...')
 
-      const response = await fetch(`${API_URL}/api/compras/stats?_t=${timestamp}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      })
+      // ✅ Usar useApi en lugar de fetch directo
+      const data = await get(`/compras/stats?_t=${timestamp}`)
 
-      console.log('📊 [Frontend] Response status:', response.status)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
       console.log('📊 [Frontend] Stats recibidas:', data)
 
-      if (data.success && data.data) {
+      if (data?.success && data?.data) {
         setStats(data.data)
         console.log('📊 [Frontend] Stats actualizadas en estado:', data.data)
         console.log('💰 [Frontend] Monto total que debería mostrarse:', data.data.montoTotalMes)
@@ -115,9 +120,10 @@ export default function ComprasPage() {
       if (filters.estado) queryParams.append('estado', filters.estado)
       if (filters.proveedor_id) queryParams.append('proveedor_id', filters.proveedor_id)
 
-      const response = await fetch(`${API_URL}/api/compras/ordenes?${queryParams.toString()}`)
-      const data = await response.json()
-      if (data.success) {
+      // ✅ Usar useApi en lugar de fetch directo
+      const data = await get(`/compras/ordenes?${queryParams.toString()}`)
+      
+      if (data?.success) {
         setOrdenes(data.data)
       }
     } catch (error) {
@@ -128,18 +134,18 @@ export default function ComprasPage() {
   const loadProveedores = async () => {
     try {
       console.log('🔥 [COMPRAS PAGE] CARGANDO PROVEEDORES...')
-      const response = await fetch(`${API_URL}/api/compras/proveedores`)
-      console.log('🔥 [COMPRAS PAGE] Response status:', response.status)
-
-      const data = await response.json()
+      
+      // ✅ Usar useApi en lugar de fetch directo
+      const data = await get('/compras/proveedores')
+      
       console.log('🔥 [COMPRAS PAGE] Response data:', JSON.stringify(data, null, 2))
 
-      if (data.success) {
+      if (data?.success) {
         console.log('🔥 [COMPRAS PAGE] Proveedores recibidos:', data.data.length)
         setProveedores(data.data)
         console.log('🔥 [COMPRAS PAGE] Estado proveedores actualizado')
       } else {
-        console.error('🔥 [COMPRAS PAGE] Error en respuesta:', data.error)
+        console.error('🔥 [COMPRAS PAGE] Error en respuesta:', data?.error)
       }
     } catch (error) {
       console.error('🔥 [COMPRAS PAGE] Error loading proveedores:', error)
@@ -152,84 +158,81 @@ export default function ComprasPage() {
   }
 
   const handleDeleteOrden = async (id: string) => {
-    if (!confirm('¿Está seguro que desea eliminar esta orden de compra?')) {
-      return
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Eliminar Orden de Compra',
+      message: '¿Está seguro que desea eliminar esta orden de compra?\n\nEsta acción no se puede deshacer.',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          // ✅ Usar useApi en lugar de fetch directo
+          const data = await del(`/compras/ordenes/${id}`)
 
-    try {
-      const response = await fetch(`${API_URL}/api/compras/ordenes/${id}`, {
-        method: 'DELETE',
-      })
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: 'Éxito',
-          description: 'Orden eliminada correctamente',
-        })
-        loadOrdenes()
-        loadStats()
-      } else {
-        throw new Error(data.message || 'Error al eliminar')
+          if (data?.success) {
+            toast({
+              title: 'Éxito',
+              description: 'Orden eliminada correctamente',
+            })
+            loadOrdenes()
+            loadStats()
+          } else {
+            throw new Error(data?.message || 'Error al eliminar')
+          }
+        } catch (error) {
+          console.error('Error deleting orden:', error)
+          toast({
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Error al eliminar la orden',
+            variant: 'destructive',
+          })
+        }
       }
-    } catch (error) {
-      console.error('Error deleting orden:', error)
-      toast({
-        title: 'Error',
-        description: 'Error al eliminar la orden',
-        variant: 'destructive',
-      })
-    }
+    })
   }
 
   const handleMarcarEntregado = async (id: string) => {
-    if (
-      !confirm(
-        '¿Marcar esta orden como entregada?\n\nEsto actualizará automáticamente:\n• Stock de productos\n• Registros contables\n• Cuentas por pagar'
-      )
-    ) {
-      return
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Marcar Orden como Entregada',
+      message: '¿Marcar esta orden como entregada?\n\nEsto actualizará automáticamente:\n• Stock de productos\n• Registros contables\n• Cuentas por pagar',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          // ✅ Usar useApi en lugar de fetch directo
+          const result = await put(`/compras/ordenes/${id}/estado`, {
+            estado: 'ENTREGADO'
+          })
 
-    try {
-      const response = await fetch(`${API_URL}/api/compras/ordenes/${id}/estado`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ estado: 'ENTREGADO' }),
-      })
+          if (result?.success) {
+            toast({
+              title: '✅ Orden Entregada',
+              description:
+                '🔄 Actualizaciones automáticas realizadas:\n• Stock actualizado\n• Asientos contables creados\n• Cuentas por pagar registradas',
+            })
 
-      const result = await response.json()
+            await Promise.all([loadOrdenes(), loadStats()])
 
-      if (result.success) {
-        toast({
-          title: '✅ Orden Entregada',
-          description:
-            '🔄 Actualizaciones automáticas realizadas:\n• Stock actualizado\n• Asientos contables creados\n• Cuentas por pagar registradas',
-        })
-
-        await Promise.all([loadOrdenes(), loadStats()])
-
-        // Actualización optimista
-        setOrdenes((prev) =>
-          prev.map((orden: AnyRecord) => (orden.id === id ? { ...orden, estado: 'ENTREGADO' } : orden))
-        )
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Error al actualizar el estado: ' + (result.message || 'Error desconocido'),
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      console.error('Error updating order status:', error)
-      toast({
-        title: 'Error',
-        description: 'Error al actualizar el estado de la orden',
-        variant: 'destructive',
-      })
-    }
+            // Actualización optimista
+            setOrdenes((prev) =>
+              prev.map((orden: AnyRecord) => (orden.id === id ? { ...orden, estado: 'ENTREGADO' } : orden))
+            )
+          } else {
+            toast({
+              title: 'Error',
+              description: 'Error al actualizar el estado: ' + (result?.message || 'Error desconocido'),
+              variant: 'destructive',
+            })
+          }
+        } catch (error) {
+          console.error('Error updating order status:', error)
+          toast({
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Error al actualizar el estado de la orden',
+            variant: 'destructive',
+          })
+        }
+      },
+    })
   }
 
   const handleModalSuccess = async (ordenData?: AnyRecord) => {
@@ -674,23 +677,10 @@ export default function ComprasPage() {
                 style={{
                   color: 'var(--primary-500)',
                   fontSize: '1rem',
-                  marginBottom: '1.5rem',
                 }}
               >
                 Agrega proveedores para gestionar tus compras de manera eficiente
               </p>
-              <button
-                className="refresh-btn"
-                onClick={() => setIsProveedorModalOpen(true)}
-                style={{
-                  background: 'var(--gradient-success)',
-                  fontSize: '0.95rem',
-                  padding: '0.875rem 1.5rem',
-                }}
-              >
-                <span style={{ fontSize: '1.2rem' }}>+</span>
-                Crear Primer Proveedor
-              </button>
             </div>
           ) : (
             <div
@@ -831,6 +821,15 @@ export default function ComprasPage() {
         onSuccess={handleModalSuccess}
         // Enviar undefined cuando no hay selección para cumplir con el tipo opcional
         orden={selectedOrden || undefined}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
       />
 
       <ProveedorModal

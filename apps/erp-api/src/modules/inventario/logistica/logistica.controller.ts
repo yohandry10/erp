@@ -12,6 +12,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { FeatureFlagGuard } from '../../../common/guards/feature-flag.guard';
+import { RequireFeatureFlag } from '../../../common/decorators/feature-flag.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { LogisticaService } from './logistica.service';
@@ -32,7 +34,8 @@ import {
 @ApiTags('Inventario - Logística')
 @ApiBearerAuth()
 @Controller('api/inventario/logistica')
-@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: logística exige permisos granulares.
+@UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard) // HARDENING: logística exige permisos granulares y bandera de módulo.
+@RequireFeatureFlag('inventario') // HARDENING: deshabilita logística si inventario está apagado.
 export class LogisticaController {
   constructor(private readonly logisticaService: LogisticaService) {}
 

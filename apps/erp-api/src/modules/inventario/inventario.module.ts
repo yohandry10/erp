@@ -6,9 +6,11 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { LogisticaModule } from './logistica/logistica.module';
 import { AlmacenesModule } from './almacenes/almacenes.module';
 import { AuditModule } from '../audit/audit.module';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [IntegrationModule, SupabaseModule, LogisticaModule, AlmacenesModule, AuditModule],
+  imports: [IntegrationModule, SupabaseModule, LogisticaModule, AlmacenesModule, AuditModule, AuthModule, PermissionsModule],
   controllers: [InventarioController],
   providers: [InventarioService],
   exports: [InventarioService, LogisticaModule, AlmacenesModule]

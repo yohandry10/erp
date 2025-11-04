@@ -24,11 +24,16 @@ const parsePermissionPath = (permission: string): ParsedPermission => {
 
   const parts = trimmed.split('.');
 
-  if (parts.length === 3) {
-    const [module, resource, action] = parts;
-    if (!module || !resource || !action) {
+  if (parts.length >= 3) {
+    // HARDENING: Permitir recursos anidados (ej. finanzas.cxc.cobros.write) normalizando a modulo / recurso / accion.
+    const [module, ...rest] = parts;
+    const action = rest.pop();
+
+    if (!module || !action) {
       throw new BadRequestException(`Permiso "${trimmed}" inválido. Se esperaba formato modulo.recurso.accion`);
     }
+
+    const resource = rest.length > 0 ? rest.join('.') : '__global__';
     return {
       module,
       resource,

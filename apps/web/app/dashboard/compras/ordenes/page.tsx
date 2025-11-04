@@ -91,6 +91,16 @@ const ESTADOS_CONFIG: Record<EstadoOrden, {
   }
 }
 
+const ESTADO_QUICK_FILTERS: Array<{ label: string; value: '' | EstadoOrden }> = [
+  { label: 'Todas', value: '' },
+  { label: 'Borrador', value: 'BORRADOR' },
+  { label: 'En aprobación', value: 'APROBACION' },
+  { label: 'Aprobada', value: 'APROBADA' },
+  { label: 'Parcial', value: 'PARCIAL' },
+  { label: 'Recibida', value: 'RECIBIDA' },
+  { label: 'Anulada', value: 'ANULADA' },
+]
+
 export default function OrdenesCompraPage() {
   const router = useRouter()
   const { get } = useApi()
@@ -129,7 +139,7 @@ export default function OrdenesCompraPage() {
         params.append('offset', offset.toString())
       }
 
-      const response = await get(`/api/compras/ordenes?${params.toString()}`)
+      const response = await get(`/compras/ordenes?${params.toString()}`)
       
       if (response?.success) {
         const data = response.data || []
@@ -147,7 +157,7 @@ export default function OrdenesCompraPage() {
 
   const loadProveedores = useCallback(async () => {
     try {
-      const response = await get('/api/compras/proveedores?activo=true')
+      const response = await get('/compras/proveedores?activo=true')
       if (response?.success) {
         setProveedores(response.data || [])
       }
@@ -204,11 +214,14 @@ export default function OrdenesCompraPage() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return '—'
+    const parsed = new Date(dateString)
+    if (Number.isNaN(parsed.getTime())) return '—'
+    return parsed.toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     })
   }
 
@@ -475,6 +488,39 @@ export default function OrdenesCompraPage() {
                   paddingTop: '0.75rem',
                   borderTop: '1px solid var(--primary-200)'
                 }}>
+                  {(orden.estado === 'APROBADA' || orden.estado === 'PARCIAL') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push(`/dashboard/inventario/recepciones?oc=${orden.id}`)
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '0.5rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: '#0ea5e9',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.25rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#0284c7'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#0ea5e9'
+                      }}
+                    >
+                      <Package size={14} />
+                      Recepcionar
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -626,17 +672,51 @@ export default function OrdenesCompraPage() {
           <div className="stat-subtitle">Listas</div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>RECIBIDAS</h3>
-            <Package className="stat-icon" style={{ color: '#059669' }} />
-          </div>
-          <div className="stat-value">
-            {ordenes.filter(o => o.estado === 'RECIBIDA').length}
-          </div>
-          <div className="stat-subtitle">Completadas</div>
+      <div className="stat-card">
+        <div className="stat-header">
+          <h3>RECIBIDAS</h3>
+          <Package className="stat-icon" style={{ color: '#059669' }} />
         </div>
+        <div className="stat-value">
+          {ordenes.filter(o => o.estado === 'RECIBIDA').length}
+        </div>
+        <div className="stat-subtitle">Completadas</div>
       </div>
+    </div>
+
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.5rem',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginBottom: '1.5rem',
+      }}
+    >
+      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Estados:</span>
+      {ESTADO_QUICK_FILTERS.map((filter) => {
+        const isActive = estadoFilter === filter.value
+        return (
+          <button
+            key={filter.label}
+            onClick={() => handleEstadoFilterChange(filter.value)}
+            style={{
+              padding: '0.5rem 0.9rem',
+              borderRadius: '999px',
+              border: isActive ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(148, 163, 184, 0.4)',
+              background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'rgba(148, 163, 184, 0.12)',
+              color: isActive ? '#1d4ed8' : '#475569',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'background 0.15s ease, color 0.15s ease',
+            }}
+          >
+            {filter.label}
+          </button>
+        )
+      })}
+    </div>
 
       {/* Filters - Only show in list view */}
       {viewMode === 'list' && (
@@ -891,6 +971,22 @@ export default function OrdenesCompraPage() {
                           </td>
                           <td style={{ padding: '1rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                              {(orden.estado === 'APROBADA' || orden.estado === 'PARCIAL') && (
+                                <button
+                                  onClick={() => router.push(`/dashboard/inventario/recepciones?oc=${orden.id}`)}
+                                  style={{
+                                    padding: '0.5rem',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: '#0ea5e9',
+                                    color: 'white',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Recepcionar OC"
+                                >
+                                  <Package size={16} />
+                                </button>
+                              )}
                               <button
                                 onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)}
                                 style={{

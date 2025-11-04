@@ -38,6 +38,7 @@ describe('CxpService', () => {
           provide: EventBusService,
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
+            emitFacturaProveedorRegistrada: jest.fn(),
           },
         },
       ],
@@ -88,6 +89,15 @@ describe('CxpService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockCxp);
+      expect(eventBusService.emitFacturaProveedorRegistrada).toHaveBeenCalledTimes(1);
+      expect(eventBusService.emitFacturaProveedorRegistrada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          facturaProvId: mockCxp.id,
+          numeroDocumento: dto.numero_documento,
+          total: dto.total,
+        }),
+      );
     });
 
     it('should throw BadRequestException if proveedor does not exist', async () => {

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { v4 as uuidv4 } from 'uuid';
 import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, ProgramacionPagosQueryDto, FlujoCajaQueryDto } from './dto';
 
 @Injectable()
@@ -47,6 +48,9 @@ export class TesoreriaService {
       throw new NotFoundException('Cuenta por pagar no encontrada');
     }
 
+    const proveedorNombre: string | null =
+      (cxp as any)?.proveedor?.razon_social ?? null;
+
     // Validar que no esté anulada
     if (cxp.estado === 'ANULADA') {
       throw new BadRequestException('No se puede aplicar pago a una cuenta por pagar anulada');
@@ -66,6 +70,8 @@ export class TesoreriaService {
 
     // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
     let cuentaBancaria: any = null;
+    let saldoCuentaAnterior: number | null = null;
+    let saldoCuentaNuevo: number | null = null;
     if (dto.cuenta_bancaria_id) {
       const { data: cuenta, error: errorCuenta } = await client
         .from('cuentas_bancarias')
@@ -132,8 +138,14 @@ export class TesoreriaService {
 
       // 4. Si hay cuenta bancaria, crear movimiento bancario y actualizar saldo
       let movimientoBancario: any = null;
+      const descripcionPago = `Pago a proveedor ${proveedorNombre ?? cxp.proveedor_id} - Doc: ${cxp.numero_documento}`;
+
       if (dto.cuenta_bancaria_id && cuentaBancaria) {
-        // Crear movimiento bancario (tipo CARGO = salida de dinero)
+        const saldoActualCuenta = this.round2(Number(cuentaBancaria.saldo ?? 0));
+        saldoCuentaAnterior = saldoActualCuenta;
+        const nuevoSaldoBanco = this.round2(saldoActualCuenta - dto.monto);
+        saldoCuentaNuevo = nuevoSaldoBanco;
+
         const { data: movimiento, error: errorMovimiento } = await client
           .from('movimientos_bancarios')
           .insert({
@@ -142,21 +154,25 @@ export class TesoreriaService {
             tipo: 'CARGO',
             monto: this.round2(dto.monto),
             fecha: dto.fecha_pago,
-            descripcion: `Pago a proveedor ${(cxp.proveedor as any)?.razon_social || cxp.proveedor_id} - Doc: ${cxp.numero_documento}`,
+            descripcion: descripcionPago,
             referencia: dto.referencia || null,
             metodo_pago: dto.metodo_pago,
             cxp_id: dto.cxp_id,
             proveedor_id: cxp.proveedor_id,
             conciliado: false,
+            saldo_anterior: saldoCuentaAnterior,
+            saldo_nuevo: saldoCuentaNuevo,
             created_by: userId || null,
             created_at: new Date().toISOString(),
           })
-          .select()
+          .select(
+            `*,
+             proveedores:proveedores!movimientos_bancarios_proveedor_id_fkey(id, razon_social, ruc)`
+          )
           .single();
 
         if (errorMovimiento) {
           console.error('Error creando movimiento bancario:', errorMovimiento);
-          // Revertir actualización de CxP
           await client
             .from('cuentas_por_pagar')
             .update({
@@ -166,14 +182,11 @@ export class TesoreriaService {
             })
             .eq('tenant_id', tenantId)
             .eq('id', dto.cxp_id);
-
           throw new BadRequestException('No se pudo crear el movimiento bancario');
         }
 
         movimientoBancario = movimiento;
 
-        // Actualizar saldo de la cuenta bancaria
-        const nuevoSaldoBanco = this.round2(cuentaBancaria.saldo - dto.monto);
         const { error: errorSaldoBanco } = await client
           .from('cuentas_bancarias')
           .update({
@@ -185,7 +198,6 @@ export class TesoreriaService {
 
         if (errorSaldoBanco) {
           console.error('Error actualizando saldo de cuenta bancaria:', errorSaldoBanco);
-          // Revertir movimiento bancario y CxP
           await client.from('movimientos_bancarios').delete().eq('id', movimiento.id);
           await client
             .from('cuentas_por_pagar')
@@ -199,72 +211,71 @@ export class TesoreriaService {
 
           throw new BadRequestException('No se pudo actualizar el saldo de la cuenta bancaria');
         }
+
+        try {
+          this.eventBus.emitMovimientoBancarioRegistrado({
+            tenantId,
+            movimientoId: movimiento.id,
+            cuentaBancariaId: dto.cuenta_bancaria_id,
+            cuentaBancariaNombre: cuentaBancaria.nombre,
+            tipo: 'CARGO',
+            monto: this.round2(dto.monto),
+            moneda: cuentaBancaria.moneda,
+            fecha: dto.fecha_pago,
+            descripcion: descripcionPago,
+            referencia: dto.referencia || null,
+            metodoPago: dto.metodo_pago,
+            proveedorId: cxp.proveedor_id,
+            proveedorNombre: proveedorNombre ?? movimiento.proveedores?.razon_social ?? null,
+            cxpId: dto.cxp_id,
+            saldoAnterior: saldoCuentaAnterior,
+            saldoNuevo: saldoCuentaNuevo,
+            createdBy: userId || undefined,
+          });
+        } catch (errorMovimientoEvento) {
+          console.error('❌ Error emitiendo evento MovimientoBancarioRegistrado:', errorMovimientoEvento);
+        }
       }
 
-      // 5. Emitir evento PagoProveedorRegistrado
+      // 5. Emitir evento PagoProveedorRegistrado endurecido
       try {
+        const pagoId = movimientoBancario?.id ?? uuidv4();
+        const eventId = uuidv4();
+        const idempotencyKey =
+          dto.idempotency_key ??
+          `tesoreria:pago:${tenantId}:${dto.cxp_id}:${pagoId}`;
+
         this.eventBus.emitPagoProveedorRegistrado({
+          tenantId,
+          eventId,
+          idempotencyKey,
           cxpId: dto.cxp_id,
+          pagoId,
           proveedorId: cxp.proveedor_id,
-          proveedorNombre: (cxp.proveedor as any)?.razon_social,
+          proveedorNombre: proveedorNombre ?? cxp.proveedor_id,
           numeroDocumento: cxp.numero_documento,
           monto: this.round2(dto.monto),
           moneda: cxp.moneda,
-          fechaPago: dto.fecha_pago,
+          fecha: dto.fecha_pago,
           metodoPago: dto.metodo_pago,
-          cuentaBancariaId: dto.cuenta_bancaria_id,
-          referencia: dto.referencia,
-          observaciones: dto.observaciones,
+          cuentaBancariaId: dto.cuenta_bancaria_id ?? null,
+          cuentaBancariaNombre: cuentaBancaria?.nombre ?? null,
+          referencia: dto.referencia ?? null,
+          observaciones: dto.observaciones ?? null,
           saldoAnterior: cxp.saldo,
           saldoNuevo: nuevoSaldo,
           estadoAnterior: cxp.estado,
           estadoNuevo: nuevoEstado,
-          tenantId: tenantId,
-          createdBy: userId,
+          createdBy: userId ?? null,
+          movimientoBancarioId: movimientoBancario?.id ?? null,
+          cuentaSaldoAnterior: saldoCuentaAnterior,
+          cuentaSaldoNuevo: saldoCuentaNuevo,
+          source: 'tesoreria.registrarPago',
         });
         console.log('✅ Evento PagoProveedorRegistrado emitido exitosamente');
       } catch (errorEvento) {
         console.error('❌ Error emitiendo evento PagoProveedorRegistrado:', errorEvento);
         // No fallar la operación si el evento no se pudo emitir
-      }
-
-      // 6. Insertar en outbox_events para procesamiento asíncrono
-      const eventoPayload = {
-        tenant_id: tenantId,
-        cxp_id: dto.cxp_id,
-        proveedor_id: cxp.proveedor_id,
-        proveedor_nombre: (cxp.proveedor as any)?.razon_social,
-        numero_documento: cxp.numero_documento,
-        monto: this.round2(dto.monto),
-        moneda: cxp.moneda,
-        fecha_pago: dto.fecha_pago,
-        metodo_pago: dto.metodo_pago,
-        cuenta_bancaria_id: dto.cuenta_bancaria_id || null,
-        referencia: dto.referencia || null,
-        observaciones: dto.observaciones || null,
-        saldo_anterior: cxp.saldo,
-        saldo_nuevo: nuevoSaldo,
-        estado_anterior: cxp.estado,
-        estado_nuevo: nuevoEstado,
-        movimiento_bancario_id: movimientoBancario?.id || null,
-        created_by: userId || null,
-      };
-
-      const { error: errorOutbox } = await client
-        .from('outbox_events')
-        .insert({
-          event_type: 'PagoProveedorRegistrado',
-          aggregate_type: 'CuentaPorPagar',
-          aggregate_id: dto.cxp_id,
-          event_data: eventoPayload,
-          status: 'pending',
-          retry_count: 0,
-          created_at: new Date().toISOString(),
-        });
-
-      if (errorOutbox) {
-        console.error('Error insertando evento en outbox:', errorOutbox);
-        // No fallar la operación si el evento no se pudo insertar
       }
 
       return {
@@ -281,6 +292,9 @@ export class TesoreriaService {
             saldo_nuevo: nuevoSaldo,
             estado_anterior: cxp.estado,
             estado_nuevo: nuevoEstado,
+            pago_id: movimientoBancario?.id ?? null,
+            cuenta_saldo_anterior: saldoCuentaAnterior,
+            cuenta_saldo_nuevo: saldoCuentaNuevo,
           },
           movimiento_bancario: movimientoBancario,
         },
@@ -547,32 +561,125 @@ export class TesoreriaService {
       }
 
       // Emitir eventos para cada pago procesado
-      if (data.pagos && Array.isArray(data.pagos)) {
+      if (data.pagos && Array.isArray(data.pagos) && data.pagos.length > 0) {
+        const cxpIds = Array.from(new Set(data.pagos.map((p: any) => p.cxp_id)));
+        const cxpDetallesMap = new Map<string, any>();
+
+        if (cxpIds.length > 0) {
+          const { data: cxpDetalles, error: errorDetalles } = await client
+            .from('cuentas_por_pagar')
+            .select(`
+              id,
+              proveedor_id,
+              numero_documento,
+              moneda,
+              proveedor:proveedores!cuentas_por_pagar_proveedor_id_fkey(
+                id,
+                razon_social
+              )
+            `)
+            .eq('tenant_id', tenantId)
+            .in('id', cxpIds);
+
+          if (errorDetalles) {
+            console.error('❌ Error obteniendo detalles de CxP para eventos de lote:', errorDetalles);
+          } else if (cxpDetalles) {
+            for (const detalle of cxpDetalles) {
+              cxpDetallesMap.set(detalle.id, detalle);
+            }
+          }
+        }
+
+        let cuentaSaldoCursor =
+          data?.cuenta_bancaria?.saldo_anterior !== undefined
+            ? this.round2(Number(data.cuenta_bancaria.saldo_anterior))
+            : null;
+
         for (const pago of data.pagos) {
+          const cxpDetalle = cxpDetallesMap.get(pago.cxp_id) || {};
+          const proveedorId = cxpDetalle.proveedor_id ?? null;
+          const proveedorNombrePago =
+            pago.proveedor ??
+            cxpDetalle?.proveedor?.razon_social ??
+            proveedorId;
+          const numeroDocumento = cxpDetalle.numero_documento ?? pago.numero_documento ?? null;
+          const monedaPago = cxpDetalle.moneda ?? 'PEN';
+
+          const movimientoId = pago.movimiento_bancario_id ?? null;
+          const pagoId = movimientoId ?? uuidv4();
+          const eventId = uuidv4();
+          const idempotencyKey = `tesoreria:pago-lote:${tenantId}:${loteId}:${pago.cxp_id}:${pagoId}`;
+
+          const cuentaSaldoAnteriorPago = cuentaSaldoCursor;
+          const cuentaSaldoNuevoPago =
+            cuentaSaldoAnteriorPago !== null
+              ? this.round2(cuentaSaldoAnteriorPago - pago.monto)
+              : null;
+
+          if (cuentaSaldoCursor !== null && cuentaSaldoNuevoPago !== null) {
+            cuentaSaldoCursor = cuentaSaldoNuevoPago;
+          }
+
           try {
             this.eventBus.emitPagoProveedorRegistrado({
+              tenantId,
+              eventId,
+              idempotencyKey,
               cxpId: pago.cxp_id,
-              proveedorId: null, // Se obtiene de la base de datos en la función
-              proveedorNombre: pago.proveedor,
-              numeroDocumento: pago.numero_documento,
-              monto: pago.monto,
-              moneda: null, // Se obtiene de la base de datos en la función
-              fechaPago: dto.fecha_pago,
+              pagoId,
+              proveedorId,
+              proveedorNombre: proveedorNombrePago ?? proveedorId ?? null,
+              numeroDocumento: numeroDocumento ?? undefined,
+              monto: this.round2(pago.monto),
+              moneda: monedaPago,
+              fecha: dto.fecha_pago,
               metodoPago: dto.metodo_pago,
               cuentaBancariaId: dto.cuenta_bancaria_id,
+              cuentaBancariaNombre: data?.cuenta_bancaria?.nombre ?? null,
               referencia: loteId,
-              observaciones: dto.observaciones,
+              observaciones: dto.observaciones ?? null,
               saldoAnterior: pago.saldo_anterior,
               saldoNuevo: pago.saldo_nuevo,
               estadoAnterior: pago.estado_anterior,
               estadoNuevo: pago.estado_nuevo,
-              tenantId: tenantId,
-              createdBy: userId,
+              createdBy: userId ?? null,
+              movimientoBancarioId: movimientoId,
+              cuentaSaldoAnterior: cuentaSaldoAnteriorPago,
+              cuentaSaldoNuevo: cuentaSaldoNuevoPago,
+              loteId,
+              source: 'tesoreria.registrarPagoLote',
             });
-            console.log(`✅ Evento PagoProveedorRegistrado emitido para CxP ${pago.numero_documento}`);
           } catch (errorEvento) {
             console.error('❌ Error emitiendo evento PagoProveedorRegistrado:', errorEvento);
-            // No fallar la operación si el evento no se pudo emitir
+          }
+
+          if (movimientoId) {
+            try {
+              const descripcionMovimiento =
+                `${loteId} - Pago a ${proveedorNombrePago ?? proveedorId ?? pago.cxp_id}`;
+
+              this.eventBus.emitMovimientoBancarioRegistrado({
+                tenantId,
+                movimientoId,
+                cuentaBancariaId: dto.cuenta_bancaria_id,
+                cuentaBancariaNombre: data?.cuenta_bancaria?.nombre ?? null,
+                tipo: 'CARGO',
+                monto: this.round2(pago.monto),
+                moneda: monedaPago,
+                fecha: dto.fecha_pago,
+                descripcion: descripcionMovimiento,
+                referencia: loteId,
+                metodoPago: dto.metodo_pago,
+                proveedorId,
+                proveedorNombre: proveedorNombrePago ?? null,
+                cxpId: pago.cxp_id,
+                saldoAnterior: cuentaSaldoAnteriorPago ?? this.round2(pago.saldo_anterior ?? 0),
+                saldoNuevo: cuentaSaldoNuevoPago ?? this.round2(pago.saldo_nuevo ?? 0),
+                createdBy: userId ?? undefined,
+              });
+            } catch (errorMovimientoEvento) {
+              console.error('❌ Error emitiendo evento MovimientoBancarioRegistrado (lote):', errorMovimientoEvento);
+            }
           }
         }
       }

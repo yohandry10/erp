@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 interface Periodo {
   id: string
@@ -27,7 +28,21 @@ export default function PeriodoDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [reopening, setReopening] = useState(false)
-  const [showReopenConfirm, setShowReopenConfirm] = useState(false)
+
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  })
 
   useEffect(() => {
     if (periodoId) {
@@ -112,7 +127,7 @@ export default function PeriodoDetailPage() {
         throw new Error(errorData.message || 'Error al reabrir el período')
       }
 
-      setShowReopenConfirm(false)
+      // Confirmación cerrada automáticamente por el componente
       await fetchPeriodo()
     } catch (err: any) {
       console.error('Error reopening período:', err)
@@ -256,7 +271,15 @@ export default function PeriodoDetailPage() {
           )}
           {periodo.estado === 'CERRADO' && (
             <button
-              onClick={() => setShowReopenConfirm(true)}
+              onClick={() => {
+                setConfirmDialog({
+                  isOpen: true,
+                  title: 'Reabrir Período',
+                  message: '¿Está seguro de reabrir este período contable?\n\nEsto permitirá realizar nuevos movimientos contables.',
+                  variant: 'warning',
+                  onConfirm: handleReabrirPeriodo
+                })
+              }}
               disabled={reopening}
               style={{
                 display: 'flex',
@@ -558,173 +581,14 @@ export default function PeriodoDetailPage() {
         />
       )}
 
-      {/* Reopen Confirmation Modal */}
-      {showReopenConfirm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(15, 23, 42, 0.8)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          zIndex: 1000,
-          animation: 'modal-overlay-enter 0.3s ease-out'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '2rem',
-            width: '90%',
-            maxWidth: '500px',
-            boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-            animation: 'modal-content-enter 0.3s ease-out'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{
-                padding: '0.75rem',
-                background: '#fef3c7',
-                borderRadius: '12px',
-                display: 'flex'
-              }}>
-                <AlertCircle size={24} style={{ color: '#d97706' }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '1.25rem',
-                  fontWeight: '700',
-                  color: '#1f2937'
-                }}>
-                  ¿Reabrir Período Contable?
-                </h3>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  lineHeight: '1.6'
-                }}>
-                  Esta acción reabrirá el período <strong>{formatPeriodo(periodo.anio, periodo.mes)}</strong> y 
-                  permitirá nuevamente el registro de asientos contables. Esta operación solo está disponible 
-                  para superadministradores.
-                </p>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{
-                padding: '1rem',
-                background: '#fee2e2',
-                border: '1px solid #fecaca',
-                borderRadius: '8px',
-                marginBottom: '1.5rem'
-              }}>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  color: '#991b1b',
-                  fontWeight: '500'
-                }}>
-                  ⚠️ {error}
-                </p>
-              </div>
-            )}
-
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => {
-                  setShowReopenConfirm(false)
-                  setError(null)
-                }}
-                disabled={reopening}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  cursor: reopening ? 'not-allowed' : 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s',
-                  opacity: reopening ? 0.5 : 1
-                }}
-                onMouseEnter={(e) => {
-                  if (!reopening) {
-                    e.currentTarget.style.background = '#e5e7eb'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6'
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleReabrirPeriodo}
-                disabled={reopening}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem 1.5rem',
-                  background: reopening ? '#9ca3af' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: reopening ? 'not-allowed' : 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                }}
-                onMouseEnter={(e) => {
-                  if (!reopening) {
-                    e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                }}
-              >
-                {reopening ? (
-                  <>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      border: '2px solid white',
-                      borderTopColor: 'transparent',
-                      borderRadius: '50%',
-                      animation: 'spin 0.6s linear infinite'
-                    }} />
-                    Reabriendo...
-                  </>
-                ) : (
-                  <>
-                    <Unlock size={16} />
-                    Confirmar Reapertura
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
 
       <style jsx>{`
         @keyframes spin {

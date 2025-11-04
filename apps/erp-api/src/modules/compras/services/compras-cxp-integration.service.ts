@@ -1,6 +1,9 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { EventBusService, RecepcionRegistradaEvent, ERPEvent } from '../../../shared/events/event-bus.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { EstadoComparacionCxp, CxpDiscrepanciaDto, TipoDiscrepanciaCxp } from '../../finanzas/cxp/dto';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Servicio de integración entre Compras y Cuentas por Pagar (CxP)
@@ -18,6 +21,7 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
   constructor(
     private readonly eventBus: EventBusService,
     private readonly supabase: SupabaseService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -141,6 +145,11 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
       this.logger.log(`   - IGV: ${montosRecepcion.igv}`);
       this.logger.log(`   - Total: ${montosRecepcion.total}`);
 
+      const comparacion = await this.calcularDiscrepanciasRecepcion(data);
+      const eventId = uuidv4();
+      const idempotencyKey =
+        data.idempotencyKey ?? `recepcion:${data.tenantId}:${data.recepcionId}:${eventId}`;
+
       // Calcular fecha de vencimiento según condiciones de pago
       const condicionesPago = data.condicionesPago || proveedor?.condiciones_pago;
       const diasCredito = data.diasCredito || proveedor?.dias_credito || 0;
@@ -155,9 +164,13 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
 
       // Verificar si es una recepción parcial
       const esRecepcionParcial = await this.esRecepcionParcial(data.ordenId, data.tenantId);
-      const observaciones = esRecepcionParcial
+      const observacionesBase = esRecepcionParcial
         ? `CxP generada automáticamente desde recepción parcial ${data.numeroRecepcion} de OC ${data.numeroOrden}`
         : `CxP generada automáticamente desde recepción ${data.numeroRecepcion}`;
+      const observaciones =
+        comparacion.estado === EstadoComparacionCxp.OK
+          ? observacionesBase
+          : `${observacionesBase} (con discrepancias detectadas)`;
 
       // Crear la cuenta por pagar con el monto exacto de la recepción
       const { data: cxp, error: cxpError } = await this.supabase.getClient()
@@ -178,9 +191,13 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
           estado: 'PENDIENTE',
           referencia_tipo: 'RECEPCION',
           referencia_id: data.recepcionId,
-          orden_compra_id: data.ordenId,
+          orden_id: data.ordenId,
           condiciones_pago: data.condicionesPago || proveedor?.condiciones_pago || `${diasCredito} días`,
           observaciones,
+          estado_comparacion: comparacion.estado,
+          discrepancias: comparacion.discrepancias.length > 0 ? comparacion.discrepancias : null,
+          event_id: eventId,
+          idempotency_key: idempotencyKey,
         })
         .select()
         .single();
@@ -195,12 +212,143 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
         this.logger.log(`📦 Recepción parcial detectada. CxP creada solo por el monto recibido.`);
       }
 
-      // TODO: Emitir evento CxpCreada para notificaciones y contabilidad
-      // this.eventBus.emit('cxp.creada', { cxpId: cxp.id, ... }, 'finanzas');
+      try {
+        this.eventBus.emitFacturaProveedorRegistrada({
+          tenantId: data.tenantId,
+          eventId,
+          idempotencyKey,
+          facturaProvId: cxp.id,
+          numeroDocumento: data.numeroRecepcion,
+          serie: null,
+          ordenId: data.ordenId ?? null,
+          recepcionId: data.recepcionId,
+          proveedorId: data.proveedorId,
+          subtotal: montosRecepcion.subtotal,
+          igv: montosRecepcion.igv,
+          total: montosRecepcion.total,
+          detraccion: null,
+          moneda: data.moneda || 'PEN',
+          tipoCambio: null,
+          fechaEmision: data.fechaRecepcion,
+          fechaVencimiento,
+          estadoComparacion: comparacion.estado,
+          discrepancias: comparacion.discrepancias.length > 0 ? comparacion.discrepancias : undefined,
+        });
+        this.logger.log(
+          `✅ Evento FacturaProveedorRegistrada emitido (${eventId}) para recepción ${data.numeroRecepcion}`,
+        );
+      } catch (eventoError) {
+        this.logger.error('❌ Error emitiendo evento FacturaProveedorRegistrada:', eventoError as Error);
+      }
     } catch (error) {
       this.logger.error(`❌ Error en crearCuentaPorPagar:`, error);
       throw error;
     }
+  }
+
+  private async calcularDiscrepanciasRecepcion(
+    data: RecepcionRegistradaEvent,
+  ): Promise<{ estado: EstadoComparacionCxp; discrepancias: CxpDiscrepanciaDto[] }> {
+    if (!data.ordenId || !data.items?.length) {
+      return { estado: EstadoComparacionCxp.OK, discrepancias: [] };
+    }
+
+    const { data: orden, error } = await this.supabase
+      .getClient()
+      .from('ordenes_compra')
+      .select(
+        `
+        id,
+        detalles:orden_compra_detalles(
+          producto_id,
+          cantidad,
+          precio_unitario
+        )
+      `,
+      )
+      .eq('tenant_id', data.tenantId)
+      .eq('id', data.ordenId)
+      .maybeSingle();
+
+    if (error || !orden?.detalles) {
+      this.logger.warn(
+        `⚠️ No se pudieron obtener detalles de la orden ${data.ordenId} para validar discrepancias`,
+      );
+      return { estado: EstadoComparacionCxp.OK, discrepancias: [] };
+    }
+
+    const detalles = (orden.detalles ?? []) as Array<{
+      producto_id: string;
+      cantidad: number;
+      precio_unitario: number;
+    }>;
+
+    const itemsPorProducto = new Map<string, { cantidad: number; precio: number }>();
+    for (const item of data.items ?? []) {
+      if (item.calidad && item.calidad.toUpperCase() === 'RECHAZADO') {
+        continue;
+      }
+      const entry = itemsPorProducto.get(item.productoId) ?? { cantidad: 0, precio: 0 };
+      entry.cantidad += Number(item.cantidadRecibida ?? 0);
+      entry.precio = Number(item.precioUnitario ?? entry.precio);
+      itemsPorProducto.set(item.productoId, entry);
+    }
+
+    const discrepancias: CxpDiscrepanciaDto[] = [];
+    let estado: EstadoComparacionCxp = EstadoComparacionCxp.OK;
+    const toleranciaCantidad = 0.0001;
+    const toleranciaPrecio = 0.01;
+
+    for (const detalle of detalles) {
+      const productoId = detalle.producto_id;
+      const esperadoCantidad = Number(detalle.cantidad ?? 0);
+      const esperadoPrecio = Number(detalle.precio_unitario ?? 0);
+      const recibido = itemsPorProducto.get(productoId);
+      const cantidadRecibida = recibido?.cantidad ?? 0;
+      const precioRecibido = recibido?.precio ?? esperadoPrecio;
+
+      if (Math.abs(cantidadRecibida - esperadoCantidad) > toleranciaCantidad) {
+        discrepancias.push({
+          tipo: TipoDiscrepanciaCxp.CANTIDAD,
+          productoId,
+          recibido: cantidadRecibida,
+          facturado: cantidadRecibida,
+          esperado: esperadoCantidad,
+        });
+        if (estado !== EstadoComparacionCxp.DESVIACION_PRECIO) {
+          estado = EstadoComparacionCxp.DESVIACION_CANTIDAD;
+        }
+      }
+
+      if (Math.abs(precioRecibido - esperadoPrecio) > toleranciaPrecio) {
+        discrepancias.push({
+          tipo: TipoDiscrepanciaCxp.PRECIO,
+          productoId,
+          recibido: precioRecibido,
+          facturado: precioRecibido,
+          esperado: esperadoPrecio,
+        });
+        estado = EstadoComparacionCxp.DESVIACION_PRECIO;
+      }
+    }
+
+    for (const [productoId, info] of itemsPorProducto.entries()) {
+      const detalle = detalles.find((d) => d.producto_id === productoId);
+      if (!detalle) {
+        discrepancias.push({
+          tipo: TipoDiscrepanciaCxp.CANTIDAD,
+          productoId,
+          recibido: info.cantidad,
+          facturado: info.cantidad,
+          esperado: 0,
+        });
+        if (estado !== EstadoComparacionCxp.DESVIACION_PRECIO) {
+          estado = EstadoComparacionCxp.DESVIACION_CANTIDAD;
+        }
+      }
+    }
+
+    return { estado, discrepancias };
   }
 
   /**
@@ -264,9 +412,14 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
         this.logger.log(`   📦 Producto ${item.producto_id}: ${cantidadRecibida} x ${precioUnitario} = ${totalItem}`);
       }
 
-      // Calcular IGV (18% en Perú)
-      const igv = subtotal * 0.18;
-      const total = subtotal + igv;
+      // ✅ CORRECCIÓN: Calcular IGV usando TaxCalculatorService
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId: data.tenantId,
+      });
+      
+      const igv = taxResult.igv;
+      const total = taxResult.total;
 
       this.logger.log(`✅ Cálculo completado: Subtotal=${subtotal}, IGV=${igv}, Total=${total}`);
 

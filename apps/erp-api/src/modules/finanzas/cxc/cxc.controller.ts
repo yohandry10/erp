@@ -14,7 +14,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { CxcService } from './cxc.service';
-import { RegistrarPagoCxcDto } from './dto';
+import { RegistrarPagoCxcDto, AplicarNotaCreditoDto, ReprogramarCxcDto } from './dto';
 
 @ApiTags('Finanzas - Cuentas por Cobrar')
 @ApiBearerAuth()
@@ -24,7 +24,7 @@ export class CxcController {
   constructor(private readonly cxcService: CxcService) {}
 
   @Get()
-  @RequirePermission('finanzas.cxc.ver')
+  @RequirePermission('finanzas.cxc.read')
   @ApiOperation({
     summary: 'Listar cuentas por cobrar',
     description: 'Obtiene la bandeja de cuentas por cobrar con filtros opcionales',
@@ -38,6 +38,7 @@ export class CxcController {
     @Query('page') pageParam?: string,
     @Query('limit') limitParam?: string,
     @Query('vencidas') vencidasParam?: string,
+    @Query('desde') desde?: string, // HARDENING: habilitar filtro desde para evitar exposiciones de tenant cruzado.
     @Query('hasta') hasta?: string,
   ) {
     const page = pageParam ? parseInt(pageParam, 10) : undefined;
@@ -52,12 +53,13 @@ export class CxcController {
       page,
       limit,
       vencidas,
+      desde,
       hasta,
     });
   }
 
   @Get(':id')
-  @RequirePermission('finanzas.cxc.ver')
+  @RequirePermission('finanzas.cxc.read')
   @ApiOperation({
     summary: 'Detalle de cuenta por cobrar',
     description: 'Obtiene el detalle completo de una cuenta por cobrar, incluyendo pagos registrados',
@@ -68,7 +70,7 @@ export class CxcController {
   }
 
   @Post(':id/pagos')
-  @RequirePermission('finanzas.cxc.gestionar')
+  @RequirePermission('finanzas.cxc.cobros.write')
   @ApiOperation({
     summary: 'Registrar pago/anticipo',
     description:
@@ -82,5 +84,37 @@ export class CxcController {
     @CurrentUser() user: any,
   ) {
     return this.cxcService.registrarPago(tenantId, id, registrarPagoDto, user?.id);
+  }
+
+  @Post(':id/notas-credito')
+  @RequirePermission('finanzas.cxc.cobros.write')
+  @ApiOperation({
+    summary: 'Aplicar nota de crédito a una CxC',
+    description: 'Registra una nota de crédito asociada a la cuenta por cobrar reduciendo el saldo pendiente',
+  })
+  @ApiResponse({ status: 200, description: 'Nota de crédito aplicada correctamente' })
+  async aplicarNotaCredito(
+    @Param('id') id: string,
+    @Body() aplicarNotaCreditoDto: AplicarNotaCreditoDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.cxcService.aplicarNotaCredito(tenantId, id, aplicarNotaCreditoDto, user?.id);
+  }
+
+  @Post(':id/reprogramar')
+  @RequirePermission('finanzas.cxc.cobros.write')
+  @ApiOperation({
+    summary: 'Reprogramar vencimiento de una CxC',
+    description: 'Actualiza la fecha de vencimiento de la cuenta por cobrar manteniendo trazabilidad en auditoría',
+  })
+  @ApiResponse({ status: 200, description: 'Reprogramación registrada correctamente' })
+  async reprogramarCuenta(
+    @Param('id') id: string,
+    @Body() reprogramarDto: ReprogramarCxcDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.cxcService.reprogramarCuentaPorCobrar(tenantId, id, reprogramarDto, user?.id);
   }
 }

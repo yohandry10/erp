@@ -1,6 +1,7 @@
--- Migration 039: Conciliaciones Bancarias
+-- Migration 039: Conciliaciones Bancarias - Columnas Adicionales
 -- Fecha: 2025-10-25
--- Descripción: Crea la tabla de conciliaciones bancarias
+-- Descripción: Agrega columnas adicionales a la tabla conciliaciones_bancarias (fecha_desde, fecha_hasta, created_by, cerrado_at, cerrado_by)
+-- Nota: La tabla base se crea en la migración 038b
 
 -- =====================================================
 -- ENUMS NECESARIOS
@@ -19,10 +20,10 @@ BEGIN
 END $$;
 
 -- =====================================================
--- TABLA: conciliaciones_bancarias
+-- TABLA: conciliaciones_bancarias - COLUMNAS ADICIONALES
 -- =====================================================
 
--- La tabla conciliaciones_bancarias ya existe, solo agregamos columnas faltantes si no existen
+-- Agregar columnas adicionales a la tabla conciliaciones_bancarias (creada en migración 038b)
 DO $$ 
 BEGIN
   -- Agregar fecha_desde si no existe

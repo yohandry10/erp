@@ -83,7 +83,7 @@ export class OrdenesCompraController {
     summary: 'Listar órdenes de compra',
     description: 'Obtiene todas las órdenes de compra con filtros opcionales'
   })
-  @ApiQuery({ name: 'estado', required: false, description: 'Filtrar por estado' })
+  @ApiQuery({ name: 'estado', required: false, description: 'Filtrar por estado. Soporta múltiples valores separados por coma (ej: APROBADA,PARCIAL)' })
   @ApiQuery({ name: 'proveedor_id', required: false, description: 'Filtrar por proveedor' })
   @ApiQuery({ name: 'fecha_desde', required: false, description: 'Fecha desde (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_hasta', required: false, description: 'Fecha hasta (YYYY-MM-DD)' })

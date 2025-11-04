@@ -1,23 +1,5 @@
-import * as path from 'path';
-import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-
-// Forzar carga del .env - buscar en múltiples ubicaciones
-const possiblePaths = [
-  path.resolve(process.cwd(), '.env'),
-  path.resolve(__dirname, '..', '.env'),
-  path.resolve(__dirname, '..', '..', '.env'),
-];
-
-let envPath = '';
-for (const p of possiblePaths) {
-  if (fs.existsSync(p)) {
-    envPath = p;
-    break;
-  }
-}
-
-dotenv.config({ path: envPath });
+// NestJS ConfigModule maneja la carga de .env automáticamente
+// No necesitamos dotenv directamente
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
+import { usePosConfig } from '@/hooks/use-pos-config'
+import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus'
 // import { showSuccessToast } from '@/components/ui/success-toast'
 // import { showErrorToast } from '@/components/ui/error-toast'
 
@@ -69,21 +72,6 @@ interface EstadoCaja {
   ventasEfectivo: number
   ventasTarjeta: number
   montoFinal: number
-}
-
-interface ConfigurationStatus {
-  isComplete: boolean
-  completionPercentage: number
-  missingItems: string[]
-  certificate: {
-    exists: boolean
-    isValid: boolean
-    expiresAt?: Date
-  }
-  ruc: {
-    isConfigured: boolean
-    missingFields: string[]
-  }
 }
 
 export default function POSPage() {
@@ -161,8 +149,18 @@ export default function POSPage() {
         const configResponse = await api.get('/api/pos/configuration-status');
         console.log('⚙️ Configuration status:', configResponse);
         if (configResponse?.success && configResponse?.data) {
-          setConfigurationStatus(configResponse.data);
-          
+          // Convertir expiresAt de string a Date si existe
+          const configData = {
+            ...configResponse.data,
+            certificate: {
+              ...configResponse.data.certificate,
+              expiresAt: configResponse.data.certificate?.expiresAt
+                ? new Date(configResponse.data.certificate.expiresAt)
+                : undefined
+            }
+          };
+          setConfigurationStatus(configData);
+
           // Show warning if configuration is incomplete
           if (!configResponse.data.isComplete) {
             console.warn('⚠️ Configuración incompleta:', configResponse.data.missingItems);
@@ -524,7 +522,7 @@ export default function POSPage() {
     // SUNAT limit for boletas without RUC is S/ 700
     const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
     const esBoletaSinRuc = clienteActual?.tipo_documento !== 'RUC'
-    
+
     if (esBoletaSinRuc && totalVenta > 700) {
       const confirmar = confirm(
         `⚠️ ADVERTENCIA SUNAT\n\nEl monto total es S/ ${totalVenta.toFixed(2)}\n\nPara ventas mayores a S/ 700 sin RUC, se generará automáticamente una Guía de Remisión Electrónica (GRE).\n\n¿Desea continuar?`
@@ -1051,51 +1049,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           </div>
 
           {/* Configuration Warning Banner */}
-          {configurationStatus && !configurationStatus.isComplete && (
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #FFF3CD 0%, #FFE69C 100%)',
-                border: '2px solid #FFC107',
-                borderRadius: 'var(--border-radius)',
-                padding: '1rem 1.5rem',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem',
-              }}
-            >
-              <div style={{ fontSize: '2rem' }}>⚠️</div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ margin: 0, color: '#856404', fontSize: '1.1rem', fontWeight: 'bold' }}>
-                  Configuración Incompleta
-                </h3>
-                <p style={{ margin: '0.5rem 0 0 0', color: '#856404' }}>
-                  {!configurationStatus.certificate.isValid && (
-                    <span>❌ Certificado digital inválido o vencido. </span>
-                  )}
-                  {configurationStatus.ruc.missingFields.length > 0 && (
-                    <span>
-                      ❌ Faltan datos de RUC: {configurationStatus.ruc.missingFields.join(', ')}.{' '}
-                    </span>
-                  )}
-                  Las ventas pueden fallar si no se completa la configuración.
-                </p>
-              </div>
-              <button
-                onClick={() => (window.location.href = '/dashboard/wizard')}
-                className="btn"
-                style={{
-                  background: '#FFC107',
-                  color: '#856404',
-                  border: 'none',
-                  fontWeight: 'bold',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Completar Configuración
-              </button>
-            </div>
-          )}
+          <ConfigStatusBanner
+            onOpenWizard={() => window.location.href = '/dashboard/wizard'}
+            configurationStatus={configurationStatus}
+          />
 
           {/* Certificate Expiring Warning */}
           {configurationStatus &&
@@ -1104,7 +1061,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               (() => {
                 const daysUntilExpiration = Math.floor(
                   (new Date(configurationStatus.certificate.expiresAt).getTime() - Date.now()) /
-                    (1000 * 60 * 60 * 24)
+                  (1000 * 60 * 60 * 24)
                 );
                 return daysUntilExpiration < 30 && daysUntilExpiration > 0 ? (
                   <div

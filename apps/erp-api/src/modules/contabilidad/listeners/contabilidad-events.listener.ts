@@ -170,17 +170,101 @@ export class ContabilidadEventsListener implements OnModuleInit {
   }
 
   /**
+   * Registra el inicio del procesamiento de un evento en event_processing_log
+   */
+  private async registrarInicioProcesamiento(evento: OutboxEvent, tenantId: string): Promise<string | null> {
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('event_processing_log')
+        .insert({
+          tenant_id: tenantId,
+          event_id: evento.event_id || evento.id,
+          processor_name: 'ContabilidadEventsListener',
+          started_at: new Date().toISOString(),
+          status: 'PROCESSING',
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        this.logger.warn('⚠️ [ContabilidadEventsListener] No se pudo registrar inicio en event_processing_log:', error);
+        return null;
+      }
+
+      return data?.id || null;
+    } catch (error) {
+      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando inicio de procesamiento:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Registra la finalización exitosa del procesamiento de un evento
+   */
+  private async registrarFinalizacionExitosa(logId: string | null): Promise<void> {
+    if (!logId) return;
+
+    try {
+      await this.supabaseService
+        .getClient()
+        .from('event_processing_log')
+        .update({
+          completed_at: new Date().toISOString(),
+          status: 'COMPLETED',
+        })
+        .eq('id', logId);
+    } catch (error) {
+      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando finalización exitosa:', error);
+    }
+  }
+
+  /**
+   * Registra el error en el procesamiento de un evento
+   */
+  private async registrarErrorProcesamiento(logId: string | null, error: any): Promise<void> {
+    if (!logId) return;
+
+    try {
+      await this.supabaseService
+        .getClient()
+        .from('event_processing_log')
+        .update({
+          completed_at: new Date().toISOString(),
+          status: 'FAILED',
+          error_details: {
+            message: error?.message || 'Error desconocido',
+            stack: error?.stack || null,
+            name: error?.name || 'Error',
+          },
+        })
+        .eq('id', logId);
+    } catch (err) {
+      this.logger.warn('⚠️ [ContabilidadEventsListener] Error registrando error de procesamiento:', err);
+    }
+  }
+
+  /**
    * Procesa un evento individual y genera el asiento correspondiente
    * Implementa lógica de reintentos con backoff exponencial
    */
   private async procesarEvento(evento: OutboxEvent): Promise<void> {
     const maxRetries = 3;
     const retryCount = evento.retry_count || 0;
+    let logId: string | null = null;
 
     try {
       this.logger.log(
         `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
       );
+
+      // Extraer tenantId del evento para logging
+      const tenantId = evento.event_data?.tenantId || evento.event_data?.tenant_id || null;
+      
+      // Registrar inicio del procesamiento
+      if (tenantId) {
+        logId = await this.registrarInicioProcesamiento(evento, tenantId);
+      }
 
       // Mapear el tipo de evento al handler correspondiente
       switch (evento.event_type) {
@@ -236,9 +320,15 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
 
       this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
+      
+      // Registrar finalización exitosa
+      await this.registrarFinalizacionExitosa(logId);
     } catch (error) {
       const errorMessage = error.message || 'Error desconocido';
       const isRetryable = this.isRetryableError(error);
+      
+      // Registrar error en event_processing_log
+      await this.registrarErrorProcesamiento(logId, error);
       
       this.logger.error(
         `❌ [ContabilidadEventsListener] Error procesando evento ${evento.event_id} (intento ${retryCount + 1}/${maxRetries}):`,

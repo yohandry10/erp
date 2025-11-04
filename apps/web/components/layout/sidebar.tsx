@@ -93,13 +93,54 @@ const menuItems: MenuItem[] = [
   },
   {
     title: 'Inventario',
-    href: '/dashboard/inventario',
     icon: Package,
     permission: {
       modulo: 'inventario',
       accion: 'read',
       recurso: 'productos'
-    }
+    },
+    submenu: [
+      {
+        title: 'Resumen',
+        href: '/dashboard/inventario',
+        icon: Package,
+        permission: {
+          modulo: 'inventario',
+          accion: 'read',
+          recurso: 'stats'
+        }
+      },
+      {
+        title: 'Almacenes',
+        href: '/dashboard/inventario/almacenes',
+        icon: Building2,
+        permission: {
+          modulo: 'inventario',
+          accion: 'read',
+          recurso: 'almacenes'
+        }
+      },
+      {
+        title: 'Recepciones',
+        href: '/dashboard/inventario/recepciones',
+        icon: Truck,
+        permission: {
+          modulo: 'inventario',
+          accion: 'write',
+          recurso: 'ingresos'
+        }
+      },
+      {
+        title: 'Kardex',
+        href: '/dashboard/inventario/kardex',
+        icon: FileSpreadsheet,
+        permission: {
+          modulo: 'inventario',
+          accion: 'read',
+          recurso: 'kardex'
+        }
+      }
+    ]
   },
   {
     title: 'CPE',
@@ -436,12 +477,17 @@ export default function Sidebar() {
   const { isSuperAdmin, user } = useTenant()
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
+  const inventarioEnabled =
+    process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === undefined
+      ? true
+      : process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === 'true'
 
   const filteredMenuItems = menuItems
     .filter((item) => {
       // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
       if (!posEnabled && item.href === '/dashboard/pos') return false
       if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
+      if (!inventarioEnabled && item.title === 'Inventario') return false
       return true
     })
     .map((item) => {

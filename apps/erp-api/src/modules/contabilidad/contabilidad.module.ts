@@ -13,9 +13,11 @@ import { PresupuestosService } from './services/presupuestos.service';
 import { CentrosCostoService } from './services/centros-costo.service';
 import { ContabilidadEventsListener } from './listeners/contabilidad-events.listener';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule, ScheduleModule.forRoot()],
+  imports: [SupabaseModule, IntegrationModule, ScheduleModule.forRoot(), AuthModule, PermissionsModule],
   controllers: [ContabilidadController],
   providers: [
     EstadosFinancierosService,

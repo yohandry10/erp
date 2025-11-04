@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
@@ -27,6 +28,7 @@ export default function OrdenCompraModal({
   onSuccess, 
   orden 
 }: OrdenCompraModalProps) {
+  const { tasaIgv } = useTaxConfig()
   
   // DEBUG: Log de props recibidas
   console.log('🔍 OrdenCompraModal recibido props:', { isOpen, orden })
@@ -173,7 +175,7 @@ export default function OrdenCompraModal({
       const itemSubtotal = Number(item.subtotal) || 0
       return sum + itemSubtotal
     }, 0)
-    const igv = subtotal * 0.18
+    const igv = subtotal * tasaIgv
     const total = subtotal + igv
 
     setTotales({ subtotal, igv, total })

@@ -11,9 +11,11 @@ import { OutboxModule } from '../../shared/outbox/outbox.module';
 import { EmailModule } from '../../shared/email/email.module';
 import { EmailNotificationService } from './email-notification.service';
 import { EmailOutboxWorker } from './email-outbox-worker.service';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [SupabaseModule, EventsModule, OutboxModule, EmailModule],
+  imports: [SupabaseModule, EventsModule, OutboxModule, EmailModule, AuthModule, PermissionsModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

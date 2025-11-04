@@ -2,6 +2,7 @@
 
 import { Calculator } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface TotalesCardProps {
   subtotal?: number
@@ -19,9 +20,11 @@ export default function TotalesCard({
   total: propTotal,
   autoCalculate = false,
   items = [],
-  igvRate = 0.18,
+  igvRate,
   className = ''
 }: TotalesCardProps) {
+  const { tasaIgv: defaultTasaIgv } = useTaxConfig()
+  const effectiveIgvRate = igvRate ?? defaultTasaIgv
   const [calculatedSubtotal, setCalculatedSubtotal] = useState(0)
   const [calculatedIgv, setCalculatedIgv] = useState(0)
   const [calculatedTotal, setCalculatedTotal] = useState(0)
@@ -32,14 +35,14 @@ export default function TotalesCard({
         (sum, item) => sum + item.cantidad * item.precio_unitario,
         0
       )
-      const igv = subtotal * igvRate
+      const igv = subtotal * effectiveIgvRate
       const total = subtotal + igv
 
       setCalculatedSubtotal(subtotal)
       setCalculatedIgv(igv)
       setCalculatedTotal(total)
     }
-  }, [autoCalculate, items, igvRate])
+  }, [autoCalculate, items, effectiveIgvRate])
 
   const subtotal = autoCalculate ? calculatedSubtotal : (propSubtotal ?? 0)
   const igv = autoCalculate ? calculatedIgv : (propIgv ?? 0)
@@ -71,7 +74,7 @@ export default function TotalesCard({
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">
-            IGV ({Math.round(igvRate * 100)}%):
+            IGV ({Math.round(effectiveIgvRate * 100)}%):
           </span>
           <span className="font-medium text-gray-900">
             {formatCurrency(igv)}

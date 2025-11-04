@@ -10,6 +10,10 @@ export interface ERPEvent {
 }
 
 export interface VentaProcessedEvent {
+  eventId: string;
+  tenantId: string;
+  idempotencyKey: string;
+  source: string;
   ventaId: string;
   numeroTicket: string;
   clienteId: string;
@@ -25,7 +29,6 @@ export interface VentaProcessedEvent {
     total: number;
   }>;
   cpeId?: string;
-  tenantId?: string;
 }
 
 export interface ComprobanteCreadoEvent {
@@ -42,6 +45,10 @@ export interface ComprobanteCreadoEvent {
 }
 
 export interface MovimientoStockEvent {
+  eventId?: string;
+  tenantId?: string;
+  idempotencyKey?: string;
+  source?: string;
   productoId: string;
   tipoMovimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE';
   cantidad: number;
@@ -53,19 +60,36 @@ export interface MovimientoStockEvent {
 }
 
 export interface CompraEntregadaEvent {
+  tenantId: string;
+  eventId: string;
+  idempotencyKey: string;
   ordenId: string;
   numeroOrden: string;
   proveedorId: string;
   proveedorNombre: string;
+  proveedorRuc?: string | null;
   fechaEntrega: string;
+  subtotal: number;
+  igv: number;
   total: number;
+  moneda: string;
+  diasCredito?: number | null;
+  condicionesPago?: string | null;
+  almacenId?: string | null;
+  observaciones?: string | null;
   items: Array<{
     productoId: string;
+    descripcion?: string;
     cantidad: number;
     precioUnitario: number;
     total: number;
+    calidad?: string;
+    lote?: string | null;
+    serie?: string | null;
+    ubicacionId?: string | null;
+    recepcionId?: string;
   }>;
-  tenantId?: string;
+  emittedAt: string;
 }
 
 export interface OrdenCompraAprobadaEvent {
@@ -93,14 +117,17 @@ export interface OrdenCompraAprobadaEvent {
 }
 
 export interface RecepcionRegistradaEvent {
+  tenantId: string;
+  eventId: string;
+  idempotencyKey: string;
   recepcionId: string;
   numeroRecepcion: string;
   ordenId: string;
   numeroOrden: string;
   proveedorId: string;
   proveedorNombre: string;
-  proveedorRuc: string;
-  almacenId: string;
+  proveedorRuc?: string | null;
+  almacenId?: string | null;
   fechaRecepcion: string;
   subtotal: number;
   igv: number;
@@ -108,6 +135,7 @@ export interface RecepcionRegistradaEvent {
   moneda: string;
   diasCredito?: number;
   condicionesPago?: string;
+  greProveedor?: string | null;
   items: Array<{
     productoId: string;
     descripcion: string;
@@ -119,17 +147,18 @@ export interface RecepcionRegistradaEvent {
     serie?: string;
     ubicacionId?: string;
   }>;
-  tenantId: string;
+  emittedAt: string;
 }
 
 export interface FacturaEmitidaEvent {
   eventId: string;
   tenantId: string;
-  pedidoId: string;
+  // HARDENING: permitir facturación directa sin pedido asociado.
+  pedidoId?: string;
   cpeId: string;
   facturaId?: string;
   serie: string;
-  numero: number;
+  numero: string;
   clienteId: string;
   subtotal: number;
   impuestos: number;
@@ -139,6 +168,9 @@ export interface FacturaEmitidaEvent {
   fechaVencimiento: string;
   idempotencyKey: string;
   source: string;
+  sunatStatus?: string;
+  hashFirma?: string;
+  hash?: string;
   ajustes?: {
     retencion: number;
     percepcion: number;
@@ -151,19 +183,23 @@ export interface FacturaEmitidaEvent {
 export interface CuentaPorCobrarCreadaEvent {
   eventId: string;
   tenantId: string;
-  cuentaId: string;
-  facturaId: string;
+  idempotencyKey: string; // HARDENING: evita duplicados al reintentar creación de CxC.
+  cxcId: string; // HARDENING: identificador consistente con especificación cross-service.
+  cuentaId?: string;
+  cpeId?: string;
+  facturaId?: string;
   serie?: string;
   numero?: string;
   clienteId: string;
-  montoTotal: number;
-  montoPendiente: number;
+  saldoInicial: number;
+  saldoPendiente: number;
   moneda: string;
+  montoTotal?: number;
+  montoPendiente?: number;
   subtotal?: number;
   impuestos?: number;
   fechaEmision: string;
   fechaVencimiento: string;
-  idempotencyKey?: string;
   source?: string;
   costoVentas?: number;
   ajustes?: {
@@ -268,6 +304,10 @@ export interface FacturaCobradaEvent {
 }
 
 export interface GastoRegistradoEvent {
+  eventId?: string;
+  tenantId?: string;
+  idempotencyKey?: string;
+  source?: string;
   gastoId: string;
   concepto: string;
   descripcion: string; // Add this line
@@ -280,45 +320,88 @@ export interface GastoRegistradoEvent {
 }
 
 export interface PagoProveedorRegistradoEvent {
+  tenantId: string;
+  eventId: string;
+  idempotencyKey: string;
   cxpId: string;
-  proveedorId: string;
+  pagoId: string;
+  proveedorId?: string;
   proveedorNombre?: string;
-  numeroDocumento: string;
-  monto: number;
-  moneda: string;
-  fechaPago: string;
-  metodoPago: string;
-  cuentaBancariaId?: string;
-  referencia?: string;
-  observaciones?: string;
-  saldoAnterior: number;
-  saldoNuevo: number;
-  estadoAnterior: string;
-  estadoNuevo: string;
-  tenantId: string;
-  createdBy?: string;
-}
-
-export interface CobroRegistradoEvent {
-  tenantId: string;
-  cobroId: string;
-  cxcId: string;
-  clienteId: string;
-  clienteNombre?: string;
-  documentoId?: string;
   numeroDocumento?: string;
   monto: number;
   moneda: string;
   fecha: string;
   metodoPago: string;
-  cuentaBancariaId?: string;
-  referencia?: string;
-  notas?: string;
+  cuentaBancariaId?: string | null;
+  cuentaBancariaNombre?: string | null;
+  referencia?: string | null;
+  observaciones?: string | null;
   saldoAnterior: number;
   saldoNuevo: number;
   estadoAnterior: string;
   estadoNuevo: string;
-  createdBy?: string;
+  createdBy?: string | null;
+  movimientoBancarioId?: string | null;
+  cuentaSaldoAnterior?: number | null;
+  cuentaSaldoNuevo?: number | null;
+  loteId?: string | null;
+  source?: string;
+}
+
+export interface FacturaProveedorRegistradaEvent {
+  tenantId: string;
+  eventId: string;
+  idempotencyKey: string;
+  facturaProvId: string;
+  numeroDocumento: string;
+  serie?: string | null;
+  ordenId?: string | null;
+  recepcionId?: string | null;
+  proveedorId: string;
+  subtotal: number;
+  igv: number;
+  total: number;
+  detraccion?: number | null;
+  moneda: string;
+  tipoCambio?: number | null;
+  fechaEmision: string;
+  fechaVencimiento: string;
+  estadoComparacion: 'OK' | 'DESVIACION_CANTIDAD' | 'DESVIACION_PRECIO';
+  discrepancias?: Array<{
+    tipo: 'CANTIDAD' | 'PRECIO';
+    productoId: string;
+    recibido: number;
+    facturado: number;
+    esperado?: number;
+  }>;
+  emittedAt?: string;
+}
+
+// HARDENING: evento de cobro endurecido con metadatos de idempotencia e identidad contable.
+export interface CobroRegistradoEvent {
+  tenantId: string;
+  eventId: string;
+  idempotencyKey: string;
+  cobroId: string;
+  cxcId: string;
+  clienteId: string;
+  clienteNombre?: string;
+  documentoId?: string | null;
+  numeroDocumento?: string | null;
+  monto: number;
+  moneda: string;
+  fecha: string;
+  medio: string;
+  cuentaBancariaId?: string | null;
+  referencia?: string | null;
+  notas?: string | null;
+  saldoAnterior: number;
+  saldoNuevo: number;
+  estadoAnterior: string;
+  estadoNuevo: string;
+  source?: string;
+  createdBy?: string | null;
+  timestamp?: string;
 }
 
 export interface MovimientoBancarioRegistradoEvent {
@@ -396,17 +479,26 @@ export interface ComprobanteEnviadoSunatEvent {
 }
 
 export interface GuiaRemisionCreadaEvent {
+  eventId: string;
+  tenantId: string;
+  idempotencyKey: string;
   greId: string;
   tipoDocumento: string;
   serie: string;
   numero: number;
-  transportistaId: string;
-  vehiculoId: string;
-  ruta: string;
+  numeroCompleto?: string;
+  transportistaId?: string;
+  vehiculoId?: string;
+  ruta?: string;
   peso: number;
   cpeRelacionado?: string;
   ventaRelacionada?: string;
   fechaTraslado: string;
+  destinatario?: string;
+  direccionDestino?: string;
+  sunatStatus?: string;
+  hashGre?: string;
+  notasSalida?: string[];
 }
 
 export interface GuiaRemisionEntregadaEvent {
@@ -554,7 +646,17 @@ export class EventBusService {
 
   // Eventos de ventas y facturación
   async emitVentaProcessed(data: VentaProcessedEvent) {
-    await this.emit('venta.procesada', data, 'ventas', data.tenantId);
+    if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey) {
+      throw new Error('VentaProcessedEvent requiere eventId, tenantId e idempotencyKey');
+    }
+
+    const payload: VentaProcessedEvent = {
+      ...data,
+      numeroTicket: data.numeroTicket ?? data.ventaId,
+      source: data.source ?? 'ventas.desconocido',
+    };
+
+    await this.emit('venta.procesada', payload, 'ventas', data.tenantId);
   }
 
   emitComprobanteCreadoEvent(data: ComprobanteCreadoEvent) {
@@ -566,15 +668,34 @@ export class EventBusService {
     if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey) {
       throw new Error('FacturaEmitidaEvent requiere eventId, tenantId e idempotencyKey');
     }
-    await this.emit('factura.emitida', data, 'ventas', data.tenantId);
+    const payload: FacturaEmitidaEvent = {
+      ...data,
+      pedidoId: data.pedidoId ?? undefined,
+      numero: data.numero != null ? String(data.numero) : '0', // HARDENING: normaliza correlativo como string.
+    };
+    await this.emit('factura.emitida', payload, 'ventas', data.tenantId);
   }
 
   // HARDENING: notifica creación automática de CxC.
   emitCuentaPorCobrarCreadaEvent(data: CuentaPorCobrarCreadaEvent) {
-    if (!data?.eventId || !data?.tenantId || !data?.cuentaId) {
-      throw new Error('CuentaPorCobrarCreadaEvent requiere eventId, tenantId y cuentaId');
+    const resolvedCxcId = data?.cxcId ?? data?.cuentaId;
+    if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey || !resolvedCxcId) {
+      throw new Error('CuentaPorCobrarCreadaEvent requiere eventId, tenantId, idempotencyKey y cxcId');
     }
-    this.emit('cxc.creada', data, 'finanzas');
+
+    const payload: CuentaPorCobrarCreadaEvent = {
+      ...data,
+      cxcId: resolvedCxcId,
+      cuentaId: data.cuentaId ?? resolvedCxcId,
+      facturaId: data.facturaId ?? data.cpeId,
+      cpeId: data.cpeId ?? data.facturaId,
+      saldoInicial: data.saldoInicial ?? data.montoTotal ?? data.montoPendiente ?? 0, // HARDENING: normalizar campos legacy.
+      saldoPendiente: data.saldoPendiente ?? data.montoPendiente ?? data.montoTotal ?? 0,
+      montoTotal: data.montoTotal ?? data.saldoInicial ?? data.saldoPendiente,
+      montoPendiente: data.montoPendiente ?? data.saldoPendiente ?? data.montoTotal,
+    };
+
+    this.emit('cxc.creada', payload, 'finanzas', data.tenantId);
   }
 
   emitComprobanteEnviadoSunat(data: ComprobanteEnviadoSunatEvent) {
@@ -600,7 +721,14 @@ export class EventBusService {
 
   // Eventos de compras
   emitCompraEntregada(data: CompraEntregadaEvent) {
-    this.emit('compra.entregada', data, 'compras', data.tenantId);
+    if (!data?.tenantId || !data?.ordenId || !data?.eventId || !data?.idempotencyKey) {
+      throw new Error('CompraEntregadaEvent requiere tenantId, ordenId, eventId e idempotencyKey');
+    }
+    const payload: CompraEntregadaEvent = {
+      ...data,
+      emittedAt: data.emittedAt ?? new Date().toISOString(), // HARDENING: garantizamos timestamp del evento.
+    };
+    this.emit('compra.entregada', payload, 'compras', data.tenantId);
   }
 
   emitOrdenCompraAprobada(data: OrdenCompraAprobadaEvent) {
@@ -608,11 +736,29 @@ export class EventBusService {
   }
 
   emitRecepcionRegistrada(data: RecepcionRegistradaEvent) {
-    this.emit('recepcion.registrada', data, 'compras', data.tenantId);
+    if (!data?.tenantId || !data?.eventId || !data?.idempotencyKey || !data?.recepcionId) {
+      throw new Error('RecepcionRegistradaEvent requiere tenantId, eventId, idempotencyKey y recepcionId');
+    }
+    const payload: RecepcionRegistradaEvent = {
+      ...data,
+      emittedAt: data.emittedAt ?? new Date().toISOString(),
+    };
+    this.emit('recepcion.registrada', payload, 'compras', data.tenantId);
   }
 
   emitDevolucionProveedorEmitida(data: DevolucionProveedorEmitidaEvent) {
     this.emit('devolucion.proveedor.emitida', data, 'compras');
+  }
+
+  emitFacturaProveedorRegistrada(data: FacturaProveedorRegistradaEvent) {
+    if (!data?.tenantId || !data?.eventId || !data?.idempotencyKey || !data?.facturaProvId) {
+      throw new Error('FacturaProveedorRegistradaEvent requiere tenantId, eventId, idempotencyKey y facturaProvId');
+    }
+    const payload: FacturaProveedorRegistradaEvent = {
+      ...data,
+      emittedAt: data.emittedAt ?? new Date().toISOString(),
+    };
+    this.emit('factura.proveedor.registrada', payload, 'compras', data.tenantId);
   }
 
   // Eventos de cotizaciones
@@ -626,7 +772,20 @@ export class EventBusService {
 
   // Eventos de GRE (Guías de Remisión)
   emitGuiaRemisionCreada(data: GuiaRemisionCreadaEvent) {
-    this.emit('gre.creada', data, 'gre');
+    if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey || !data?.greId) {
+      throw new Error('GuiaRemisionCreadaEvent requiere eventId, tenantId, idempotencyKey y greId');
+    }
+
+    const payload: GuiaRemisionCreadaEvent = {
+      ...data,
+      numero: Number(data.numero ?? 0),
+      transportistaId: data.transportistaId ?? undefined,
+      vehiculoId: data.vehiculoId ?? undefined,
+      ruta: data.ruta ?? undefined,
+      notasSalida: data.notasSalida ?? [],
+    };
+
+    this.emit('gre.creada', payload, 'gre', data.tenantId);
   }
 
   emitGuiaRemisionEntregada(data: GuiaRemisionEntregadaEvent) {
@@ -669,12 +828,19 @@ export class EventBusService {
 
   // Eventos de pagos a proveedores
   emitPagoProveedorRegistrado(data: PagoProveedorRegistradoEvent) {
-    this.emit('pago.proveedor.registrado', data, 'finanzas');
+    if (!data?.tenantId || !data?.eventId || !data?.idempotencyKey || !data?.pagoId) {
+      throw new Error('PagoProveedorRegistradoEvent requiere tenantId, eventId, idempotencyKey y pagoId');
+    }
+    this.emit('pago.proveedor.registrado', data, 'finanzas', data.tenantId);
   }
 
   // Eventos de cobros a clientes
   emitCobroRegistrado(data: CobroRegistradoEvent) {
-    this.emit('cobro.registrado', data, 'finanzas');
+    // HARDENING: validar metadatos críticos antes de emitir el evento de cobro.
+    if (!data?.eventId || !data?.tenantId || !data?.idempotencyKey || !data?.cobroId) {
+      throw new Error('CobroRegistradoEvent requiere tenantId, eventId, idempotencyKey y cobroId');
+    }
+    this.emit('cobro.registrado', data, 'finanzas', data.tenantId);
   }
 
   // Eventos de movimientos bancarios
@@ -821,4 +987,3 @@ export class EventBusService {
     this.on('dashboard.metrics.updated', listener);
   }
 }
-

@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
@@ -18,6 +20,7 @@ describe('CxcService - CobroRegistrado Event', () => {
       eq: jest.fn().mockReturnThis(),
       single: jest.fn(),
       maybeSingle: jest.fn(),
+      order: jest.fn().mockReturnThis(),
     };
     mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null, error: null });
 
@@ -111,16 +114,18 @@ describe('CxcService - CobroRegistrado Event', () => {
       };
 
       // Mock update cuenta (needs to chain two .eq() calls)
-      const mockEq2 = jest.fn().mockResolvedValueOnce({ error: null });
-      const mockEq1 = jest.fn().mockReturnValueOnce({ eq: mockEq2 });
-      const mockUpdateCuenta = { eq: mockEq1 };
+      const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
+      const mockCuentaEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
 
-      // Setup mock chain
       mockSupabaseClient.insert
-        .mockReturnValueOnce(mockInsertPago) // First insert for pago
-        .mockResolvedValueOnce({ error: null }); // Second insert for outbox returns directly
+        .mockReturnValueOnce(mockInsertPago)
+        .mockResolvedValueOnce({ error: null });
 
-      mockSupabaseClient.update.mockReturnValueOnce(mockUpdateCuenta);
+      mockSupabaseClient.update
+        .mockReturnValueOnce({ eq: mockIdempotencyEq1 })
+        .mockReturnValueOnce({ eq: mockCuentaEq1 });
 
       // Act
       await service.registrarPago(tenantId, cuentaId, pagoDto, userId);
@@ -139,7 +144,7 @@ describe('CxcService - CobroRegistrado Event', () => {
           monto: 500,
           moneda: 'PEN',
           fecha: '2025-10-26',
-          metodoPago: 'TRANSFERENCIA',
+          medio: 'TRANSFERENCIA',
           referencia: 'REF-001',
           notas: 'Pago parcial',
           saldoAnterior: 1000,
@@ -147,6 +152,10 @@ describe('CxcService - CobroRegistrado Event', () => {
           estadoAnterior: 'PENDIENTE',
           estadoNuevo: 'PARCIAL',
           createdBy: userId,
+          eventId: expect.any(String),
+          idempotencyKey: expect.any(String),
+          source: 'finanzas.cxc',
+          timestamp: expect.any(String),
         }),
       );
 
@@ -155,8 +164,8 @@ describe('CxcService - CobroRegistrado Event', () => {
       // The second call should be for outbox_events
       expect(mockSupabaseClient.insert).toHaveBeenNthCalledWith(2,
         expect.objectContaining({
-          event_type: 'CobroRegistrado',
-          aggregate_type: 'CuentaPorCobrar',
+          event_type: 'cobro.registrado',
+          aggregate_type: 'cobro',
           aggregate_id: cuentaId,
           event_data: expect.objectContaining({
             tenant_id: tenantId,
@@ -167,12 +176,14 @@ describe('CxcService - CobroRegistrado Event', () => {
             numero_documento: 'F001-00001234',
             monto: 500,
             moneda: 'PEN',
-            metodo_pago: 'TRANSFERENCIA',
+            medio: 'TRANSFERENCIA',
             referencia: 'REF-001',
             saldo_anterior: 1000,
             saldo_nuevo: 500,
             estado_anterior: 'PENDIENTE',
             estado_nuevo: 'PARCIAL',
+            eventId: expect.any(String),
+            idempotency_key: expect.any(String),
           }),
           status: 'pending',
           retry_count: 0,
@@ -236,16 +247,18 @@ describe('CxcService - CobroRegistrado Event', () => {
       };
 
       // Mock update cuenta (needs to chain two .eq() calls)
-      const mockEq2 = jest.fn().mockResolvedValueOnce({ error: null });
-      const mockEq1 = jest.fn().mockReturnValueOnce({ eq: mockEq2 });
-      const mockUpdateCuenta = { eq: mockEq1 };
+      const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
+      const mockCuentaEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
 
-      // Setup mock chain
       mockSupabaseClient.insert
         .mockReturnValueOnce(mockInsertPago)
-        .mockResolvedValueOnce({ error: null }); // Second insert for outbox returns directly
+        .mockResolvedValueOnce({ error: null });
 
-      mockSupabaseClient.update.mockReturnValueOnce(mockUpdateCuenta);
+      mockSupabaseClient.update
+        .mockReturnValueOnce({ eq: mockIdempotencyEq1 })
+        .mockReturnValueOnce({ eq: mockCuentaEq1 });
 
       // Act
       await service.registrarPago(tenantId, cuentaId, pagoDto);
@@ -257,6 +270,10 @@ describe('CxcService - CobroRegistrado Event', () => {
           estadoNuevo: 'CANCELADO',
           saldoAnterior: 1000,
           saldoNuevo: 0,
+          medio: 'EFECTIVO',
+          eventId: expect.any(String),
+          idempotencyKey: expect.any(String),
+          source: 'finanzas.cxc',
         }),
       );
 
@@ -265,11 +282,58 @@ describe('CxcService - CobroRegistrado Event', () => {
       // The second call should be for outbox_events
       expect(mockSupabaseClient.insert).toHaveBeenNthCalledWith(2,
         expect.objectContaining({
-          event_type: 'CobroRegistrado',
-          aggregate_type: 'CuentaPorCobrar',
+          event_type: 'cobro.registrado',
+          aggregate_type: 'cobro',
           status: 'pending',
         }),
       );
+    });
+
+    it('should throw BadRequestException when idempotency key is duplicated', async () => {
+      const tenantId = 'tenant-dup';
+      const cuentaId = 'cxc-dup';
+
+      const cuentaMock = {
+        id: cuentaId,
+        tenant_id: tenantId,
+        cliente_id: 'cliente-dup',
+        documento_id: 'doc-dup',
+        serie: 'F001',
+        numero: '00000001',
+        monto_total: 500,
+        monto_pendiente: 500,
+        moneda: 'PEN',
+        estado: 'PENDIENTE',
+        fecha_vencimiento: '2025-12-31',
+        clientes: {
+          razon_social: 'Cliente Dup SAC',
+        },
+      };
+
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: cuentaMock, error: null });
+
+      const mockInsertPagoError = {
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValueOnce({
+          data: null,
+          error: { message: 'duplicate key value violates unique constraint "cxc_pagos_idempotency_key_key"' },
+        }),
+      };
+
+      mockSupabaseClient.insert.mockReturnValueOnce(mockInsertPagoError);
+
+      await expect(
+        service.registrarPago(tenantId, cuentaId, {
+          monto: 100,
+          fecha_pago: '2025-10-01',
+          metodo_pago: 'EFECTIVO',
+          idempotency_key: 'dup-key',
+        } as any),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(1);
+      expect(mockInsertPagoError.select).toHaveBeenCalled();
+      expect(mockInsertPagoError.single).toHaveBeenCalled();
     });
   });
 });

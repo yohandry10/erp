@@ -7,14 +7,14 @@ export const FINANZAS_CXC_PERMISSIONS: PermissionDefinition[] = [
   {
     modulo: 'finanzas',
     recurso: 'cxc',
-    accion: 'ver',
-    descripcion: 'Ver bandejas y detalle de cuentas por cobrar',
+    accion: 'read',
+    descripcion: 'Ver bandejas, aging y detalle de cuentas por cobrar',
   },
   {
     modulo: 'finanzas',
-    recurso: 'cxc',
-    accion: 'gestionar',
-    descripcion: 'Registrar pagos parciales, anticipos y actualizar estados de CxC',
+    recurso: 'cxc.cobros',
+    accion: 'write',
+    descripcion: 'Registrar cobros, notas de crédito y reprogramaciones de cartera',
   },
 ];
 

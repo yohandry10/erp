@@ -1,12 +1,14 @@
-import { 
-  IsString, 
-  IsNumber, 
-  IsArray, 
-  ValidateNested, 
-  IsOptional, 
+import {
+  IsString,
+  IsNumber,
+  IsArray,
+  ValidateNested,
+  IsOptional,
   IsEnum,
   Min,
-  Max
+  Max,
+  MaxLength,
+  IsISO8601,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -100,6 +102,19 @@ export class CreateFacturaDto {
   @IsNumber()
   @Min(0)
   total_venta: number;
+
+  @IsOptional()
+  @IsISO8601()
+  fecha_emision?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  fecha_vencimiento?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  idempotency_key?: string;
 }
 
 export class FacturaDto extends CreateFacturaDto {
@@ -123,6 +138,18 @@ export class FacturaDto extends CreateFacturaDto {
   @IsString()
   @IsOptional()
   error_message?: string;
+
+  @IsString()
+  @IsOptional()
+  hash_firma?: string;
+
+  @IsString()
+  @IsOptional()
+  sunat_status?: string;
+
+  @IsString()
+  @IsOptional()
+  event_id?: string;
 
   tenant_id: string;
   created_at: Date;

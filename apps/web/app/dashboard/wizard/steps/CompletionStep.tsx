@@ -3,12 +3,14 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWizard } from '../useWizard'
+import { usePosConfig } from '@/hooks/use-pos-config'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, ArrowRight, Sparkles } from 'lucide-react'
 
 export function CompletionStep() {
   const router = useRouter()
   const { completeWizard } = useWizard()
+  const { markWizardAsCompleted } = usePosConfig()
   const [isCompleting, setIsCompleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -18,6 +20,11 @@ export function CompletionStep() {
       setError(null)
 
       await completeWizard()
+
+      // Marcar el wizard como completado en localStorage
+      console.log('✅ Marcando wizard como completado...')
+      markWizardAsCompleted()
+      console.log('✅ Wizard marcado como completado')
 
       // Redirect to dashboard and force reload to refresh configuration status
       setTimeout(() => {
@@ -49,7 +56,7 @@ export function CompletionStep() {
         }}>
           <CheckCircle size={60} style={{ color: 'white' }} />
         </div>
-        
+
         <h3 style={{
           fontSize: '2rem',
           fontWeight: '700',
@@ -58,7 +65,7 @@ export function CompletionStep() {
         }}>
           ¡Configuración Completada!
         </h3>
-        
+
         <p style={{
           fontSize: '1.125rem',
           color: 'var(--primary-600)',
@@ -245,7 +252,7 @@ export function CompletionStep() {
           Ahora puedes comenzar a usar el sistema para emitir facturas, boletas,
           guías de remisión y más. Explora el dashboard para conocer todas las funcionalidades.
         </p>
-        
+
         <Button
           onClick={handleComplete}
           disabled={isCompleting}

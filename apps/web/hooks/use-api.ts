@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useToast } from '@/components/ui/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface ApiResponse<T> {
   data?: T
@@ -21,6 +22,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   })
   
   const { toast } = useToast()
+  const { session, loading: authLoading } = useAuth()
   const { showErrorToast = true, showSuccessToast = false } = options
 
   const apiCall = useCallback(async (
@@ -30,67 +32,38 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     setState({ success: false, data: undefined })
 
     try {
-      // ✅ CRÍTICO: Obtener token del localStorage (custom auth)
-      let token: string | null = null
+      // ✅ CRÍTICO: Esperar a que AuthContext termine de cargar
+      if (authLoading) {
+        console.log('⏳ [useApi] Esperando a que AuthContext termine de cargar...')
+        // Esperar un momento para que el contexto se inicialice
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // ✅ SOLUCIÓN: Obtener token del contexto de autenticación (siempre sincronizado)
+      const token = session?.access_token
       
-      if (typeof window !== 'undefined') {
-        try {
-          token = localStorage.getItem('access_token')
-          
-          // Debug solo en desarrollo
-          if (process.env.NODE_ENV === 'development') {
-            console.log('🔍 [useApi] Token status:', {
-              hasToken: !!token,
-              tokenLength: token?.length || 0,
-              endpoint: endpoint
-            })
-          }
-        } catch (localStorageError) {
-          console.error('❌ [useApi] Error accediendo localStorage:', localStorageError)
-        }
+      // Debug solo en desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [useApi] Token status:', {
+          authLoading,
+          hasSession: !!session,
+          hasToken: !!token,
+          tokenLength: token?.length || 0,
+          endpoint: endpoint
+        })
       }
       
-      if (!token && typeof window !== 'undefined') {
-        console.error('❌ [useApi] CRÍTICO: No se encontró token de autenticación en localStorage')
+      if (!token) {
+        console.error('❌ [useApi] No hay sesión activa')
         console.error('❌ [useApi] Endpoint solicitado:', endpoint)
-        console.error('❌ [useApi] Esto causará un 401 Unauthorized')
+        console.error('❌ [useApi] AuthContext loading:', authLoading)
         
-        // Intentar cargar sesión desde authService como fallback
-        try {
-          console.log('🔄 [useApi] Intentando recuperar token desde authService...')
-          const { customAuth } = await import('@/lib/auth-service')
-          const { data } = await customAuth.getSession()
-          console.log('🔍 [useApi] Respuesta de getSession:', {
-            hasData: !!data,
-            hasSession: !!data?.session,
-            hasToken: !!data?.session?.access_token
-          })
-          
-          if (data?.session?.access_token) {
-            console.log('✅ [useApi] Token recuperado desde authService')
-            token = data.session.access_token
-            // Guardar inmediatamente para próximas requests
-            localStorage.setItem('access_token', token)
-            console.log('✅ [useApi] Token guardado en localStorage')
-          } else {
-            console.warn('⚠️ [useApi] authService tampoco tiene token - usuario no autenticado')
-            // Redirigir al login si estamos en el cliente y no estamos ya en login
-            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-              console.log('🔄 [useApi] Redirigiendo al login...')
-              window.location.href = '/login'
-              // Retornar null para evitar continuar con la request
-              return null
-            }
-          }
-        } catch (authError) {
-          console.error('❌ [useApi] Error recuperando token desde authService:', authError)
-          // Redirigir al login en caso de error también
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            console.log('🔄 [useApi] Error al recuperar token, redirigiendo al login...')
-            window.location.href = '/login'
-            return null
-          }
+        // Redirigir al login si no estamos ya ahí
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          console.log('🔄 [useApi] Redirigiendo al login...')
+          window.location.href = '/login'
         }
+        return null
       }
       
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
@@ -199,7 +172,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
       return null
     }
-  }, [toast, showErrorToast, showSuccessToast])
+  }, [toast, session, authLoading, showErrorToast, showSuccessToast])
 
   // Métodos helper
   const get = useCallback((endpoint: string) => {

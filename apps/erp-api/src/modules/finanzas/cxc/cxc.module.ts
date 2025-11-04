@@ -8,9 +8,10 @@ import { EventsModule } from '../../../shared/events/events.module';
 import { AuditModule } from '../../audit/audit.module';
 import { CxcFacturaListener } from './listeners/cxc-factura.listener';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
-  imports: [SupabaseModule, PermissionsModule, IntegrationModule, EventsModule, AuditModule],
+  imports: [SupabaseModule, PermissionsModule, IntegrationModule, EventsModule, AuditModule, AuthModule],
   controllers: [CxcController],
   providers: [CxcService, CxcFacturaListener, RetencionesValidationService],
   exports: [CxcService],

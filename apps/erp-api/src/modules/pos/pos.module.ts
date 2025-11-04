@@ -9,9 +9,11 @@ import { ConfiguracionModule } from '../configuracion.module';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { CacheModule } from '../../shared/cache/cache.module';
 import { CxcModule } from '../finanzas/cxc/cxc.module';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule, CpeModule, ValidationModule, ConfiguracionModule, CacheModule, CxcModule],
+  imports: [SupabaseModule, IntegrationModule, CpeModule, ValidationModule, ConfiguracionModule, CacheModule, CxcModule, AuthModule, PermissionsModule],
   controllers: [PosController],
   providers: [PosService, FeatureFlagGuard],
   exports: [PosService]

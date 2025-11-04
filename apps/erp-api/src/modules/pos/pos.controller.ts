@@ -102,4 +102,17 @@ export class PosController {
   async reintentarFacturacionVenta(@Param('ventaId') ventaId: string, @Req() req: any) {
     return this.posService.reintentarFacturacionVenta(ventaId, req.user);
   }
+
+  @Post('worker/procesar-pendientes')
+  @RequirePermission('pos.configuracion.write') // HARDENING: solo workers o admins pueden llamar este endpoint
+  async procesarVentasPendientesWorker(@Req() req: any) {
+    // Verificar que la llamada viene del worker (service role key)
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.includes(process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+      throw new Error('Unauthorized: Solo el worker puede llamar este endpoint');
+    }
+
+    const tenantId = req.headers['x-tenant-id'];
+    return this.posService.procesarVentasPendientesFacturacion(tenantId, 50);
+  }
 }

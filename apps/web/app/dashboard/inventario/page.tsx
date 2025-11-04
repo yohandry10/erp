@@ -1,543 +1,456 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useApiCall } from '@/hooks/use-api'
-import ProductModal from '@/components/modals/ProductModal'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useApi } from '@/hooks/use-api'
+import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
-interface Product {
-  id?: string;
-  codigo: string;
-  nombre: string;
-  descripcion: string;
-  categoria: string;
-  unidadMedida: string;
-  precio: number;
-  stock: number;
-  stock_minimo: number;
-  activo: boolean;
-  proveedor: string;
-  codigo_barras: string;
-}
-
-interface StockMovement {
-  id: string
-  productoId: string
-  producto: string
-  tipoMovimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE'
-  cantidad: number
-  motivo: string
-  usuario: string
-  fecha: string
-}
-
-interface InventoryStats {
+type InventoryStats = {
   totalProductos: number
   valorInventario: number
   productosStockBajo: number
   movimientosHoy: number
 }
 
+type Producto = {
+  id: string
+  nombre: string
+  codigo?: string | null
+  categoria?: string | null
+  activo: boolean
+  stockActual: number
+  stockMinimo: number
+  updatedAt?: string | null
+}
+
+type Movimiento = {
+  id: string
+  tipo: string
+  cantidad: number
+  motivo?: string | null
+  referencia?: string | null
+  productoId?: string | null
+  creadoEn?: string | null
+}
+
+type Filters = {
+  search: string
+  estado: 'TODOS' | 'ACTIVO' | 'INACTIVO'
+  categoria: string
+  soloCriticos: boolean
+}
+
+const DEFAULT_STATS: InventoryStats = {
+  totalProductos: 0,
+  valorInventario: 0,
+  productosStockBajo: 0,
+  movimientosHoy: 0,
+}
+
+const ESTADO_OPTIONS: Array<{ value: Filters['estado']; label: string }> = [
+  { value: 'TODOS', label: 'Todos' },
+  { value: 'ACTIVO', label: 'Activos' },
+  { value: 'INACTIVO', label: 'Inactivos' },
+]
+
+const formatCurrency = (value?: number | null, currency: string = 'PEN') =>
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value ?? 0)
+
+const formatNumber = (value?: number | null) =>
+  (value ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? '—'
+    : parsed.toLocaleString('es-PE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+}
+
+function StatsFallback() {
+  return <div className="status-warning">Necesitas el permiso <code>inventario.stats.read</code> para ver los indicadores.</div>
+}
+
+function ProductsFallback() {
+  return (
+    <div className="status-warning">
+      Solicita acceso a <code>inventario.productos.read</code> para revisar el catálogo de productos.
+    </div>
+  )
+}
+
+function MovementsFallback() {
+  return (
+    <div className="status-warning">
+      Necesitas <code>inventario.movimientos.read</code> para consultar la bitácora de movimientos.
+    </div>
+  )
+}
+
 export default function InventarioPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [movements, setMovements] = useState<StockMovement[]>([])
-  const [stats, setStats] = useState<InventoryStats | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [filters, setFilters] = useState({
+  const { get } = useApi()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<InventoryStats>(DEFAULT_STATS)
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    estado: 'ACTIVO',
     categoria: '',
-    estado: '',
-    stockBajo: false
+    soloCriticos: false,
   })
 
-  const api = useApiCall<Product[]>()
-  const movementsApi = useApiCall<StockMovement[]>()
-  const statsApi = useApiCall<InventoryStats>()
-  const deleteApi = useApiCall<any>()
-
   useEffect(() => {
-    loadData()
-  }, [filters])
+    loadDashboard()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const loadData = async () => {
-    await Promise.all([
-      loadProducts(),
-      loadMovements(),
-      loadStats()
-    ])
-  }
-
-  const loadProducts = async () => {
-    const queryParams = new URLSearchParams()
-    if (filters.categoria) queryParams.append('categoria', filters.categoria)
-    if (filters.estado) queryParams.append('estado', filters.estado)
-    if (filters.stockBajo) queryParams.append('stockBajo', 'true')
-
-    console.log('📦 Cargando productos con filtros:', filters)
-    const response = await api.get(`/api/inventario/productos?${queryParams}`)
-    if (response && response.success && response.data) {
-      console.log('✅ Productos cargados:', response.data)
-      setProducts(response.data)
-    } else {
-      console.log('❌ No se pudieron cargar productos:', response)
-      setProducts([])
-    }
-  }
-
-  const loadMovements = async () => {
-    console.log('📊 Cargando movimientos de inventario...')
-    const response = await movementsApi.get('/api/inventario/movimientos?limit=10')
-    if (response && response.success && response.data) {
-      console.log('✅ Movimientos cargados:', response.data)
-      setMovements(response.data)
-    } else {
-      console.log('❌ No se pudieron cargar movimientos:', response)
-      setMovements([])
-    }
-  }
-
-  const loadStats = async () => {
-    console.log('📈 Cargando estadísticas de inventario...')
-    const response = await statsApi.get('/api/inventario/stats')
-    if (response && response.success && response.data) {
-      console.log('✅ Estadísticas cargadas:', response.data)
-      setStats(response.data)
-    } else {
-      console.log('❌ No se pudieron cargar estadísticas:', response)
-      setStats({
-        totalProductos: 0,
-        valorInventario: 0,
-        productosStockBajo: 0,
-        movimientosHoy: 0
-      })
-    }
-  }
-
-  const getStockStatus = (stock: number, stockMinimo: number) => {
-    if (!stock || !stockMinimo) {
-      return { status: 'S/D', color: '#9ca3af', bgColor: 'rgba(156, 163, 175, 0.1)' };
-    }
-    if (stock <= stockMinimo) {
-      return { status: 'CRÍTICO', color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)' };
-    } else if (stock <= stockMinimo * 2) {
-      return { status: 'BAJO', color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)' }
-    } else {
-      return { status: 'NORMAL', color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.1)' }
-    }
-  }
-
-  const getMovementColor = (tipo: string) => {
-    return tipo === 'ENTRADA' 
-      ? { background: '#10b981', color: 'white' }
-      : { background: '#ef4444', color: 'white' }
-  }
-
-  const handleProductCreated = () => {
-    loadData() // Reload all data when a new product is created
-  }
-
-  const handleDeleteProduct = async (product: Product) => {
+  const loadDashboard = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      console.log('🗑️ Eliminando producto:', product.nombre);
-      
-      // Buscar el producto actual en la lista para obtener el ID
-      const productData = products.find(p => p.codigo === product.codigo);
-      
-      if (!productData || !(productData as any).id) {
-        console.error('❌ No se pudo encontrar el ID del producto');
-        // Como fallback, intentar obtener el ID desde el API
-        const productResponse = await api.get(`/api/inventario/productos?codigo=${encodeURIComponent(product.codigo)}`);
-        
-        if (!productResponse?.success || !productResponse?.data?.length) {
-          console.error('❌ No se pudo encontrar el producto para eliminar');
-          return;
-        }
+      const [statsResp, productosResp, movimientosResp] = await Promise.all([
+        get('/inventario/stats'),
+        get('/inventario/productos'),
+        get('/inventario/movimientos?limit=8'),
+      ])
 
-        const productId = productResponse.data[0].id;
-        
-        if (!productId) {
-          console.error('❌ No se pudo obtener el ID del producto');
-          return;
-        }
-
-        // Llamar al endpoint de eliminación
-        const deleteResponse = await deleteApi.delete(`/api/inventario/productos/${productId}`);
-        
-        if (deleteResponse?.success) {
-          console.log('✅ Producto eliminado exitosamente');
-          await loadData();
-        } else {
-          console.error('❌ Error eliminando producto:', deleteResponse?.message);
-        }
+      if (statsResp?.success && statsResp.data) {
+        setStats({
+          totalProductos: Number(statsResp.data.totalProductos ?? 0),
+          valorInventario: Number(statsResp.data.valorInventario ?? 0),
+          productosStockBajo: Number(statsResp.data.productosStockBajo ?? 0),
+          movimientosHoy: Number(statsResp.data.movimientosHoy ?? 0),
+        })
       } else {
-        // Usar el ID que ya tenemos
-        const productId = (productData as any).id;
-        
-        // Llamar al endpoint de eliminación
-        const deleteResponse = await deleteApi.delete(`/api/inventario/productos/${productId}`);
-        
-        if (deleteResponse?.success) {
-          console.log('✅ Producto eliminado exitosamente');
-          await loadData();
-        } else {
-          console.error('❌ Error eliminando producto:', deleteResponse?.message);
-        }
+        setStats(DEFAULT_STATS)
       }
-    } catch (error) {
-      console.error('❌ Error en eliminación:', error);
+
+      if (productosResp?.success && Array.isArray(productosResp.data)) {
+        setProductos(
+          productosResp.data.map((item: any) => ({
+            id: item.id,
+            nombre: item.nombre ?? 'Producto sin nombre',
+            codigo: item.codigo ?? null,
+            categoria: item.categoria ?? null,
+            activo: item.activo !== false,
+            stockActual: Number(item.stock_actual ?? 0),
+            stockMinimo: Number(item.stock_minimo ?? 0),
+            updatedAt: item.updated_at ?? null,
+          })),
+        )
+      } else {
+        setProductos([])
+      }
+
+      if (movimientosResp?.success && Array.isArray(movimientosResp.data)) {
+        setMovimientos(
+          movimientosResp.data.map((item: any, index: number) => ({
+            id: item.id ?? `${item.producto_id ?? 'mov'}-${index}`,
+            tipo: String(item.tipo_movimiento ?? item.tipo ?? 'MOVIMIENTO').toUpperCase(),
+            cantidad: Number(item.cantidad ?? item.cantidad_recibida ?? 0),
+            motivo: item.motivo ?? null,
+            referencia: item.referencia ?? null,
+            productoId: item.producto_id ?? null,
+            creadoEn: item.created_at ?? item.fecha ?? null,
+          })),
+        )
+      } else {
+        setMovimientos([])
+      }
+    } catch (err) {
+      console.error('Error cargando dashboard de inventario', err)
+      setError('No se pudo cargar el dashboard de inventario. Intenta nuevamente.')
+      setStats(DEFAULT_STATS)
+      setProductos([])
+      setMovimientos([])
+    } finally {
+      setLoading(false)
     }
   }
 
-  if (api.loading && products.length === 0) {
-    return (
-      <div className="dashboard-container">
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              border: '4px solid #f3f4f6', 
-              borderTop: '4px solid #3b82f6', 
-              borderRadius: '50%', 
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }}></div>
-            <p>Cargando inventario...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const categorias = useMemo(() => {
+    const set = new Set<string>()
+    productos.forEach((producto) => {
+      const categoria = producto.categoria?.trim()
+      if (categoria) set.add(categoria)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es-PE'))
+  }, [productos])
+
+  const productoPorId = useMemo(() => {
+    const map = new Map<string, Producto>()
+    productos.forEach((producto) => map.set(producto.id, producto))
+    return map
+  }, [productos])
+
+  const productosFiltrados = useMemo(() => {
+    const termino = filters.search.trim().toLowerCase()
+
+    return productos
+      .filter((producto) => {
+        if (filters.estado === 'TODOS') return true
+        return filters.estado === 'ACTIVO' ? producto.activo : !producto.activo
+      })
+      .filter((producto) => {
+        if (!filters.categoria) return true
+        return producto.categoria?.toLowerCase() === filters.categoria.toLowerCase()
+      })
+      .filter((producto) => {
+        if (!filters.soloCriticos) return true
+        return producto.stockMinimo > 0 && producto.stockActual <= producto.stockMinimo
+      })
+      .filter((producto) => {
+        if (!termino) return true
+        return [producto.nombre, producto.codigo, producto.categoria]
+          .filter(Boolean)
+          .some((valor) => valor!.toLowerCase().includes(termino))
+      })
+  }, [productos, filters])
+
+  const criticos = useMemo(
+    () =>
+      productosFiltrados
+        .filter((producto) => producto.stockMinimo > 0 && producto.stockActual <= producto.stockMinimo)
+        .slice(0, 5),
+    [productosFiltrados],
+  )
 
   return (
     <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Gestión de Inventario</h1>
-        <p className="dashboard-subtitle">Controla el stock de tus productos</p>
-        <button 
-          className="refresh-btn"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Nuevo Producto
-        </button>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>PRODUCTOS TOTALES</h3>
-            <span className="stat-icon">📦</span>
-          </div>
-          <div className="stat-value">{stats?.totalProductos || 0}</div>
-          <div className="stat-subtitle">Productos registrados</div>
+      <header className="dashboard-header">
+        <div>
+          <h1 className="dashboard-title">Inventario</h1>
+          <p className="dashboard-subtitle">
+            Resumen del módulo de inventario endurecido. Los datos consideran restricciones multitenant y
+            eventos de recepción y kardex.
+          </p>
         </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>VALOR INVENTARIO</h3>
-            <span className="stat-icon">💰</span>
-          </div>
-          <div className="stat-value">S/ {stats?.valorInventario?.toLocaleString() || '0'}</div>
-          <div className="stat-subtitle">Valor total del stock</div>
+        <div>
+          <Link href="/dashboard/inventario/recepciones" className="btn btn-secondary">
+            Recepciones →
+          </Link>
+          <Link href="/dashboard/inventario/kardex" className="btn btn-secondary">
+            Kardex valorizado →
+          </Link>
+          <button type="button" onClick={loadDashboard} className="refresh-btn">
+            Actualizar
+          </button>
         </div>
+      </header>
 
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>MOVIMIENTOS HOY</h3>
-            <span className="stat-icon">📊</span>
-          </div>
-          <div className="stat-value">{stats?.movimientosHoy || 0}</div>
-          <div className="stat-subtitle">Entradas y salidas</div>
+      {error && <div className="status-error">{error}</div>}
+
+      {loading ? (
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          <p>Cargando…</p>
         </div>
+      ) : (
+        <>
+          {/* Estadísticas */}
+          <ProtectedComponent
+            modulo="inventario"
+            recurso="stats"
+            accion="read"
+            fallback={<StatsFallback />}
+          >
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-header">
+                  <h3>Productos</h3>
+                </div>
+                <div className="stat-value">{stats.totalProductos.toLocaleString('es-PE')}</div>
+                <div className="stat-subtitle">Activos registrados</div>
+              </div>
 
-        <div className="stat-card alert">
-          <div className="stat-header">
-            <h3>STOCK CRÍTICO</h3>
-            <span className="stat-icon">⚠️</span>
-          </div>
-          <div className="stat-value warning">{stats?.productosStockBajo || 0}</div>
-          <div className="stat-subtitle">Productos por reponer</div>
-        </div>
-      </div>
+              <div className="stat-card">
+                <div className="stat-header">
+                  <h3>Valor</h3>
+                </div>
+                <div className="stat-value">{formatCurrency(stats.valorInventario)}</div>
+                <div className="stat-subtitle">Inventario valorizado</div>
+              </div>
 
-      {/* Products Section */}
-      <div className="activity-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className="activity-title">Productos en Inventario</h2>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#10b981',
-                color: 'white',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.875rem'
-              }}
-            >
-              + Nuevo Producto
-            </button>
-            <select 
-              value={filters.categoria}
-              onChange={(e) => setFilters(prev => ({ ...prev, categoria: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid #d1d5db', 
-                background: 'white',
-                color: '#374151'
-              }}
-            >
-              <option value="">Todas las categorías</option>
-              <option value="Tecnología">Tecnología</option>
-              <option value="Oficina">Oficina</option>
-              <option value="Accesorios">Accesorios</option>
-              <option value="Materiales">Materiales</option>
-              <option value="Herramientas">Herramientas</option>
-            </select>
-            
-            <select 
-              value={filters.estado}
-              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid #d1d5db', 
-                background: 'white',
-                color: '#374151'
-              }}
-            >
-              <option value="">Todos los estados</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-            </select>
+              <div className="stat-card alert">
+                <div className="stat-header">
+                  <h3>Críticos</h3>
+                </div>
+                <div className="stat-value warning">{stats.productosStockBajo.toLocaleString('es-PE')}</div>
+                <div className="stat-subtitle">Stock por debajo del mínimo</div>
+              </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#374151', fontWeight: '500' }}>
-              <input
-                type="checkbox"
-                checked={filters.stockBajo}
-                onChange={(e) => setFilters(prev => ({ ...prev, stockBajo: e.target.checked }))}
-              />
-              Solo stock bajo
-            </label>
+              <div className="stat-card">
+                <div className="stat-header">
+                  <h3>Movimientos</h3>
+                </div>
+                <div className="stat-value">{stats.movimientosHoy.toLocaleString('es-PE')}</div>
+                <div className="stat-subtitle">Registrados hoy</div>
+              </div>
+            </div>
+          </ProtectedComponent>
 
-            <button
-              onClick={loadData}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #3b82f6',
-                background: '#3b82f6',
-                color: 'white',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              🔄 Actualizar
-            </button>
-          </div>
-        </div>
+          {/* Productos */}
+          <ProtectedComponent
+            modulo="inventario"
+            recurso="productos"
+            accion="read"
+            fallback={<ProductsFallback />}
+          >
+            <div className="activity-card">
+              <h2 className="activity-title">Productos</h2>
+              <p className="dashboard-subtitle">
+                Filtros aplicados en cliente. Los movimientos y recepciones respetan el tenant activo.
+              </p>
 
-        {/* Products Table */}
-        <div className="activity-card">
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Código</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Producto</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Categoría</th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Stock</th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Precio</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Estado</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.isArray(products) && products.map((product) => {
-                  const stockStatus = getStockStatus(product.stock, product.stock_minimo)
-                  return (
-                    <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }} key={product.codigo}>
-                      <td style={{ padding: '1rem', fontWeight: '600', fontFamily: 'monospace' }}>
-                        {product.codigo}
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <div>
-                          <div style={{ fontWeight: '600' }}>{product.nombre}</div>
-                          <div style={{ fontSize: '0.8rem', opacity: '0.7' }}>
-                            {product.proveedor} • {product.unidadMedida}
+              <div className="modal-grid">
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+                  placeholder="Buscar por nombre, código o categoría"
+                />
+                <select
+                  value={filters.estado}
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, estado: event.target.value as Filters['estado'] }))
+                  }
+                >
+                  {ESTADO_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={filters.categoria}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))}
+                >
+                  <option value="">Todas las categorías</option>
+                  {categorias.map((categoria) => (
+                    <option key={categoria} value={categoria}>
+                      {categoria}
+                    </option>
+                  ))}
+                </select>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={filters.soloCriticos}
+                    onChange={(event) =>
+                      setFilters((prev) => ({ ...prev, soloCriticos: event.target.checked }))
+                    }
+                  />
+                  Solo stock crítico
+                </label>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Estado</th>
+                    <th>Stock</th>
+                    <th>Min.</th>
+                    <th>Actualización</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productosFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={6}>Sin productos que cumplan los filtros.</td>
+                    </tr>
+                  ) : (
+                    productosFiltrados.map((producto) => {
+                      const critico = producto.stockMinimo > 0 && producto.stockActual <= producto.stockMinimo
+                      return (
+                        <tr key={producto.id}>
+                          <td>
+                            <div>
+                              <strong>{producto.nombre}</strong>
+                              {producto.codigo && <small>Código: {producto.codigo}</small>}
+                            </div>
+                          </td>
+                          <td>{producto.categoria ?? '—'}</td>
+                          <td>
+                            <span className={producto.activo ? 'status-success' : 'status-error'}>
+                              {producto.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td className={critico ? 'text-red-600' : ''}>{formatNumber(producto.stockActual)}</td>
+                          <td>{producto.stockMinimo > 0 ? formatNumber(producto.stockMinimo) : '—'}</td>
+                          <td>{formatDateTime(producto.updatedAt)}</td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              {criticos.length > 0 && (
+                <div className="status-error">
+                  <strong>Productos críticos:</strong>{' '}
+                  {criticos.map((producto) => producto.nombre).join(', ')}
+                </div>
+              )}
+            </div>
+          </ProtectedComponent>
+
+          {/* Movimientos recientes */}
+          <ProtectedComponent
+            modulo="inventario"
+            recurso="movimientos"
+            accion="read"
+            fallback={<MovementsFallback />}
+          >
+            <div className="activity-card">
+              <div className="activity-header">
+                <h2 className="activity-title">Movimientos recientes</h2>
+                <Link href="/dashboard/inventario/kardex" className="btn btn-primary">
+                  Ver kardex →
+                </Link>
+              </div>
+
+              {movimientos.length === 0 ? (
+                <p>Sin movimientos recientes.</p>
+              ) : (
+                <div className="activity-list">
+                  {movimientos.map((movimiento) => {
+                    const producto = movimiento.productoId ? productoPorId.get(movimiento.productoId) : null
+                    return (
+                      <div key={movimiento.id} className="activity-item">
+                        <div className="activity-content">
+                          <strong>{producto?.nombre ?? 'Movimiento de inventario'}</strong>
+                          <div className="activity-meta-info">
+                            <span>
+                              Tipo:{' '}
+                              <strong>{movimiento.tipo === 'ENTRADA' ? 'Entrada' : movimiento.tipo === 'SALIDA' ? 'Salida' : 'Ajuste'}</strong>
+                            </span>
+                            <span>
+                              Cantidad: <strong>{formatNumber(movimiento.cantidad)}</strong>
+                            </span>
+                            {movimiento.motivo && <span>Motivo: {movimiento.motivo}</span>}
+                            {movimiento.referencia && <span>Ref: {movimiento.referencia}</span>}
                           </div>
                         </div>
-                      </td>
-                      <td style={{ padding: '1rem' }}>{product.categoria}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <div style={{ fontWeight: '600' }}>{product.stock || 0}</div>
-                        <div style={{ fontSize: '0.8rem', opacity: '0.7' }}>
-                          Min: {product.stock_minimo}
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
-                        S/ {(product.precio || 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <span style={{ 
-                          padding: '0.25rem 0.75rem', 
-                          borderRadius: '9999px', 
-                          fontSize: '0.8rem',
-                          color: product.activo ? '#10b981' : '#f59e0b',
-                          backgroundColor: product.activo ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'
-                        }}>
-                          {product.activo ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                          <button 
-                            onClick={() => {
-                              console.log('Editando producto:', product.nombre);
-                              // TODO: Abrir modal de edición con datos del producto
-                            }}
-                            style={{ 
-                              background: '#3b82f6', 
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '0.5rem',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem'
-                            }}
-                            title="Editar producto"
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            onClick={() => {
-                              if (confirm(`¿Estás seguro de eliminar "${product.nombre}"?`)) {
-                                handleDeleteProduct(product);
-                              }
-                            }}
-                            style={{ 
-                              background: '#ef4444', 
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '0.5rem',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem'
-                            }}
-                            title="Eliminar producto"
-                            disabled={deleteApi.loading}
-                          >
-                            {deleteApi.loading ? '⏳' : '🗑️'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            {Array.isArray(products) && products.length === 0 && !api.loading && (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</div>
-                <h3 style={{ marginBottom: '0.5rem' }}>No hay productos</h3>
-                <p style={{ marginBottom: '1.5rem' }}>Comienza agregando productos a tu inventario</p>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#3b82f6',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: '600'
-                  }}
-                >
-                  + Crear Primer Producto
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Movements */}
-      <div className="activity-section">
-        <h2 className="activity-title">Movimientos Recientes</h2>
-        <div className="activity-card">
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Producto</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Tipo</th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Cantidad</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Motivo</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Usuario</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.isArray(movements) && movements.map((mov) => {
-                  const movColor = getMovementColor(mov.tipoMovimiento)
-                  return (
-                    <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }} key={mov.id}>
-                      <td style={{ padding: '1rem', fontWeight: '600' }}>
-                        {mov.producto}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <span style={{ 
-                          background: movColor.background, 
-                          color: movColor.color, 
-                          padding: '0.25rem 0.75rem', 
-                          borderRadius: '20px', 
-                          fontSize: '0.8rem',
-                          fontWeight: '500'
-                        }}>
-                          {mov.tipoMovimiento}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
-                        {mov.tipoMovimiento === 'ENTRADA' ? '+' : '-'}{mov.cantidad}
-                      </td>
-                      <td style={{ padding: '1rem' }}>{mov.motivo}</td>
-                      <td style={{ padding: '1rem' }}>{mov.usuario}</td>
-                      <td style={{ padding: '1rem' }}>
-                        {new Date(mov.fecha).toLocaleDateString('es-PE')}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            {movements.length === 0 && !movementsApi.loading && (
-              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                <p>No hay movimientos recientes</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Product Modal */}
-      <ProductModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={handleProductCreated}
-      />
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+                        <div className="activity-time">{formatDateTime(movimiento.creadoEn)}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </ProtectedComponent>
+        </>
+      )}
     </div>
   )
 }

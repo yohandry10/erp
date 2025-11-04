@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class AplicarPagoCxpDto {
@@ -55,4 +55,12 @@ export class AplicarPagoCxpDto {
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser una cadena de texto' })
   observaciones?: string;
+
+  @ApiPropertyOptional({
+    description: 'Llave de idempotencia para asegurar pagos idempotentes',
+    example: 'cxp-pago-tenant-123-cxp-456-20251025',
+  })
+  @IsOptional()
+  @IsString({ message: 'La llave de idempotencia debe ser una cadena de texto' })
+  idempotency_key?: string;
 }

@@ -1,8 +1,8 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { PERMISSION_KEY, ParsedPermission } from '../decorators/require-permission.decorator';
 import { PermissionService } from '../../modules/permissions/permission.service';
-import * as jwt from 'jsonwebtoken';
 
 /**
  * HARDENING: Guard centralizado que valida permisos granulares contra la tabla
@@ -13,6 +13,7 @@ export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly permissionService: PermissionService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -45,7 +46,7 @@ export class PermissionGuard implements CanActivate {
       }
 
       try {
-        const payload = jwt.verify(token, jwtSecret) as Record<string, any>;
+        const payload = this.jwtService.verify(token) as Record<string, any>;
         user = {
           id: payload.sub,
           email: payload.email,

@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { Cotizacion, EstadoCotizacion, CotizacionDetalle } from './entities';
@@ -17,6 +18,7 @@ export class CotizacionesService {
     private readonly supabase: SupabaseService,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -43,7 +45,7 @@ export class CotizacionesService {
     }
 
     // Calcular totales
-    const { subtotal, igv, total } = this.calcularTotales(createCotizacionDto.detalle);
+    const { subtotal, igv, total } = await this.calcularTotales(createCotizacionDto.detalle, tenantId);
 
     // Generar número de cotización
     const numero = await this.generarNumero(tenantId);
@@ -252,7 +254,7 @@ export class CotizacionesService {
 
     // Si se actualiza el detalle, recalcular totales
     if (updateCotizacionDto.detalle) {
-      const { subtotal, igv, total } = this.calcularTotales(updateCotizacionDto.detalle);
+      const { subtotal, igv, total } = await this.calcularTotales(updateCotizacionDto.detalle, tenantId);
       updateData.subtotal = subtotal;
       updateData.igv = igv;
       updateData.total = total;
@@ -453,20 +455,27 @@ export class CotizacionesService {
 
   /**
    * Calcular totales (subtotal, IGV, total)
-   * IGV = 18%
+   * ✅ Usa TaxCalculatorService para obtener la tasa correcta según el país
    */
-  private calcularTotales(detalle: Array<{ cantidad: number; precio_unitario: number }>) {
+  private async calcularTotales(
+    detalle: Array<{ cantidad: number; precio_unitario: number }>,
+    tenantId: string,
+  ) {
     const subtotal = detalle.reduce(
       (sum, item) => sum + item.cantidad * item.precio_unitario,
       0,
     );
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
+    
+    // ✅ CORRECCIÓN SRP: Usar TaxCalculatorService centralizado
+    const taxResult = await this.taxCalculator.calcularImpuestos({
+      subtotal,
+      tenantId,
+    });
 
     return {
-      subtotal: Math.round(subtotal * 100) / 100,
-      igv: Math.round(igv * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      subtotal: Math.round(taxResult.subtotal * 100) / 100,
+      igv: Math.round(taxResult.igv * 100) / 100,
+      total: Math.round(taxResult.total * 100) / 100,
     };
   }
 

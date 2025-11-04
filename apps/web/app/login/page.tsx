@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { customAuth } from '@/lib/auth-service'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { signIn } = useAuth()
 
   const {
     paises,
@@ -48,8 +49,8 @@ export default function LoginPage() {
     }
   }, [paises, selectedCountry])
 
-  const handleLogin = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e && 'preventDefault' in e) e.preventDefault()
+  const handleLogin = async (e?: React.FormEvent) => {
+    e?.preventDefault()
 
     if (!selectedCountry) {
       toast({
@@ -63,81 +64,32 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // ✅ USAR CUSTOM AUTH SERVICE
-      const { data, error } = await customAuth.signInWithPassword({
-        email,
-        password,
+      // ✅ SOLUCIÓN: Usar signIn del contexto (maneja la sesión automáticamente)
+      await signIn(email, password)
+
+      console.log('✅ [LoginPage] Login exitoso')
+
+      // Persistir país seleccionado en localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedCountry', selectedCountry)
+      }
+
+      const list = (paises as Pais[]) || []
+      const selectedPais = list.find((p) => String(p.id) === selectedCountry)
+
+      toast({
+        title: 'Bienvenido',
+        description: `Has iniciado sesión correctamente - ${selectedPais?.nombre ?? '—'}`,
       })
 
-      if (error) {
-        console.error('🚨 Auth Error:', error)
-        toast({
-          variant: 'destructive',
-          title: 'Error de autenticación',
-          description: error.message,
-        })
-        return
-      }
-
-      if (data?.user) {
-        console.log('✅ [LoginPage] Login exitoso, verificando token guardado...')
-
-        // ✅ CRÍTICO: Esperar a que el token esté realmente guardado en localStorage
-        // Esto previene race conditions donde el dashboard se monta antes de que el token esté disponible
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Verificar que el token se guardó correctamente
-        const savedToken = localStorage.getItem('access_token')
-        if (!savedToken) {
-          console.error('❌ [LoginPage] CRÍTICO: Token no se guardó en localStorage')
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Error guardando sesión. Por favor intenta nuevamente.',
-          })
-          return
-        }
-
-        console.log('✅ [LoginPage] Token verificado en localStorage')
-
-        // Guardar/crear preferencia de país del usuario
-        const userId = data.user.id
-
-        // Convertir selectedCountry a número
-        const paisPreferidoId = parseInt(selectedCountry, 10)
-
-        // TODO: Arreglar updateUserConfiguration para usar el token del localStorage
-        // try {
-        //   await updateUserConfiguration({
-        //     pais_preferido_id: paisPreferidoId,
-        //     idioma: 'es',
-        //     zona_horaria: 'America/Lima'
-        //   })
-        // } catch (configError) {
-        //   console.warn('Error guardando configuración de usuario:', configError)
-        // }
-
-        // Persistir en localStorage para uso inmediato
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('selectedCountry', selectedCountry)
-        }
-
-        const list = (paises as Pais[]) || []
-        const selectedPais = list.find((p) => String(p.id) === selectedCountry)
-
-        toast({
-          title: 'Bienvenido',
-          description: `Has iniciado sesión correctamente - ${selectedPais?.nombre ?? '—'}`,
-        })
-
-        console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
-        router.push('/dashboard')
-      }
-    } catch (_err) {
+      console.log('🚀 [LoginPage] Redirigiendo a dashboard...')
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('🚨 Auth Error:', error)
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Ocurrió un error inesperado',
+        title: 'Error de autenticación',
+        description: error instanceof Error ? error.message : 'Ocurrió un error inesperado',
       })
     } finally {
       setLoading(false)
@@ -262,11 +214,14 @@ export default function LoginPage() {
                   className="form-input"
                 />
               </div>
+
+              <button type="submit" style={{ display: 'none' }} aria-hidden="true" />
             </form>
           </CardContent>
 
           <CardFooter className="login-footer">
             <Button
+              type="submit"
               onClick={handleLogin}
               disabled={loading || paisesLoading || !selectedCountry}
               className="login-button primary"

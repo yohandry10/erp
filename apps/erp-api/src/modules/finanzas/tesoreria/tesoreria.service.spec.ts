@@ -45,6 +45,7 @@ describe('TesoreriaService', () => {
           provide: EventBusService,
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
+            emitMovimientoBancarioRegistrado: jest.fn(),
           },
         },
       ],
@@ -858,3 +859,7 @@ describe('TesoreriaService', () => {
     });
   });
 });
+
+
+
+

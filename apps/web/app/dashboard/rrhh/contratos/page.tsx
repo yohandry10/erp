@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import PromptDialog from '@/components/ui/PromptDialog';
 
 const ContratosPage = () => {
   const [contratos, setContratos] = useState<any[]>([]);
@@ -15,6 +17,38 @@ const ContratosPage = () => {
   const [loading, setLoading] = useState(true);
   const api = useApi();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
+
+  // Estado para diálogo de prompt
+  const [promptDialog, setPromptDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    placeholder?: string
+    onConfirm: (value: string) => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+    multiline?: boolean
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
 
   useEffect(() => {
     if (!rrhhEnabled) {
@@ -53,32 +87,47 @@ const ContratosPage = () => {
   };
 
   const renovarContrato = async (contratoId: string) => {
-    const meses = prompt('¿Por cuántos meses renovar el contrato?', '12');
-    if (meses && !isNaN(Number(meses))) {
-      try {
-        await api.post(`/api/rrhh/contratos/${contratoId}/renovar`, {
-          meses: parseInt(meses)
-        });
-        loadData();
-      } catch (error) {
-        console.error('Error renovando contrato:', error);
+    setPromptDialog({
+      isOpen: true,
+      title: 'Renovar Contrato',
+      message: '¿Por cuántos meses desea renovar el contrato?',
+      placeholder: '12',
+      variant: 'default',
+      onConfirm: async (meses: string) => {
+        if (!isNaN(Number(meses))) {
+          try {
+            await api.post(`/api/rrhh/contratos/${contratoId}/renovar`, {
+              meses: parseInt(meses)
+            });
+            loadData();
+          } catch (error) {
+            console.error('Error renovando contrato:', error);
+          }
+        }
       }
-    }
+    });
   };
 
   const finalizarContrato = async (contratoId: string) => {
-    const motivo = prompt('Motivo de finalización:');
-    if (motivo && confirm('¿Confirmar finalización del contrato?')) {
-      try {
-        await api.put(`/api/rrhh/contratos/${contratoId}/finalizar`, {
-          motivo_finalizacion: motivo,
-          fecha_finalizacion: new Date().toISOString().split('T')[0]
-        });
-        loadData();
-      } catch (error) {
-        console.error('Error finalizando contrato:', error);
+    setPromptDialog({
+      isOpen: true,
+      title: 'Finalizar Contrato',
+      message: 'Ingrese el motivo de finalización del contrato:',
+      placeholder: 'Ej: Renuncia voluntaria, término de proyecto, etc.',
+      variant: 'warning',
+      multiline: true,
+      onConfirm: async (motivo: string) => {
+        try {
+          await api.put(`/api/rrhh/contratos/${contratoId}/finalizar`, {
+            motivo_finalizacion: motivo,
+            fecha_finalizacion: new Date().toISOString().split('T')[0]
+          });
+          loadData();
+        } catch (error) {
+          console.error('Error finalizando contrato:', error);
+        }
       }
-    }
+    });
   };
 
   const generarContrato = async (contratoId: string) => {
@@ -827,6 +876,26 @@ const ContratosPage = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
+
+      <PromptDialog
+        isOpen={promptDialog.isOpen}
+        onClose={() => setPromptDialog({ ...promptDialog, isOpen: false })}
+        onConfirm={promptDialog.onConfirm}
+        title={promptDialog.title}
+        message={promptDialog.message}
+        placeholder={promptDialog.placeholder}
+        variant={promptDialog.variant}
+        multiline={promptDialog.multiline}
+      />
     </div>
   );
 };

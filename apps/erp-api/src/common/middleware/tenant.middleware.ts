@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
-import * as jwt from 'jsonwebtoken';
 
 /**
  * Middleware multi-tenant que fija el contexto de tenant para cada request.
@@ -10,7 +10,10 @@ import * as jwt from 'jsonwebtoken';
 export class TenantMiddleware implements NestMiddleware {
   private readonly logger = new Logger(TenantMiddleware.name);
 
-  constructor(private readonly tenantContext: TenantContextService) {}
+  constructor(
+    private readonly tenantContext: TenantContextService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
     // NOTA: Este middleware se ejecuta ANTES del JwtAuthGuard
@@ -32,7 +35,7 @@ export class TenantMiddleware implements NestMiddleware {
         try {
           // Decodificar el token SIN verificar (la verificación la hace el guard)
           // Solo necesitamos extraer el tenant_id para el contexto
-          const decoded = jwt.decode(token) as any;
+          const decoded = this.jwtService.decode(token) as any;
           
           if (decoded) {
             tenantId = decoded.tenant_id || null;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { PedidoVenta } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,8 +47,6 @@ interface DetalleItem {
   subtotal: number
 }
 
-const IGV_RATE = 0.18
-
 export default function PedidoForm({
   pedido,
   onSubmit,
@@ -55,6 +54,7 @@ export default function PedidoForm({
   disabled = false
 }: PedidoFormProps) {
   const { get } = useApi()
+  const { tasaIgv } = useTaxConfig()
   
   const [clienteId, setClienteId] = useState(pedido?.cliente_id || '')
   const [notas, setNotas] = useState(pedido?.notas || '')
@@ -158,7 +158,7 @@ export default function PedidoForm({
 
   const calculateTotals = () => {
     const subtotal = detalle.reduce((sum, item) => sum + item.subtotal, 0)
-    const igv = subtotal * IGV_RATE
+    const igv = subtotal * tasaIgv
     const total = subtotal + igv
     return { subtotal, igv, total }
   }
