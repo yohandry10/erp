@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useApiCall } from '@/hooks/use-api'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface DocumentoModalProps {
   isOpen: boolean
@@ -23,6 +24,7 @@ interface DetalleTipo {
 }
 
 export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }: DocumentoModalProps) {
+  const { tasaIgv } = useTaxConfig()
   const [formData, setFormData] = useState({
     tipo_documento: 'FACTURA',
     serie: '',
@@ -160,7 +162,7 @@ export default function DocumentoModal({ isOpen, onClose, onSuccess, documento }
       return sum + valorVenta
     }, 0)
 
-    const igvCalculado = subtotalCalculado * 0.18 // 18% IGV
+    const igvCalculado = subtotalCalculado * tasaIgv
     const totalCalculado = subtotalCalculado + igvCalculado
 
     setFormData(prev => ({

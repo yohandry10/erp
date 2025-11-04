@@ -8,6 +8,8 @@ import { GREIntegrationService } from './gre-integration.service';
 import { CreatePedidoDto, UpdatePedidoDto, DecisionAprobacion } from './dto';
 import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 interface ConfiguracionEmpresa {
   usar_flujo_logistica: boolean;
@@ -61,6 +63,8 @@ export class PedidosService {
     private readonly cpeIntegrationService: CPEIntegrationService,
     private readonly greIntegrationService: GREIntegrationService,
     private readonly eventBus: EventBusService,
+    private readonly taxCalculator: TaxCalculatorService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   /**
@@ -87,7 +91,7 @@ export class PedidosService {
     }
 
     // Calcular totales
-    const { subtotal, igv, total } = this.calcularTotales(createPedidoDto.detalle);
+    const { subtotal, igv, total } = await this.calcularTotales(createPedidoDto.detalle);
 
     // Generar número de pedido
     const numero = await this.generarNumero(tenantId);
@@ -526,7 +530,7 @@ export class PedidosService {
 
     // Si se actualiza el detalle, recalcular totales
     if (updatePedidoDto.detalle) {
-      const { subtotal, igv, total } = this.calcularTotales(updatePedidoDto.detalle);
+      const { subtotal, igv, total } = await this.calcularTotales(updatePedidoDto.detalle);
       updateData.subtotal = subtotal;
       updateData.igv = igv;
       updateData.total = total;
@@ -892,9 +896,16 @@ export class PedidosService {
     try {
       const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
 
+      const eventId = uuidv4();
+      const idempotencyKey = `ventas:pedido-confirmado:${tenantId}:${pedido.id}`;
+
       await this.eventBus.emitVentaProcessed({
+        eventId,
+        tenantId,
+        idempotencyKey,
+        source: 'ventas.pedidos.confirmacion',
         ventaId: pedido.id,
-        numeroTicket: pedido.numero,
+        numeroTicket: String(pedido.numero),
         clienteId: pedido.cliente_id,
         clienteNombre:
           clienteInfo?.razon_social ??
@@ -911,7 +922,6 @@ export class PedidosService {
           precio: Number(item.precio_unitario ?? 0),
           total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
         })),
-        tenantId,
       });
 
       console.log(`✅ [PedidosService] Evento VentaProcessedEvent emitido al confirmar pedido ${pedido.numero}`);
@@ -939,9 +949,16 @@ export class PedidosService {
 
       const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
 
+      const eventId = uuidv4();
+      const idempotencyKey = `ventas:pedido-facturado:${tenantId}:${factura.factura_id ?? pedido.id}`;
+
       this.eventBus.emitVentaProcessed({
+        eventId,
+        tenantId,
+        idempotencyKey,
+        source: 'ventas.pedidos.facturacion',
         ventaId: factura.factura_id,
-        numeroTicket: numeroDocumento,
+        numeroTicket: String(numeroDocumento),
         clienteId: pedido.cliente_id,
         clienteNombre:
           clienteInfo?.razon_social ??
@@ -959,7 +976,6 @@ export class PedidosService {
           total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
         })),
         cpeId: factura.factura_id,
-        tenantId,
       });
     } catch (error) {
       console.error('Error emitiendo evento de venta procesada para asientos contables:', error);
@@ -1016,15 +1032,22 @@ export class PedidosService {
 
   /**
    * Calcular totales (subtotal, IGV, total)
-   * IGV = 18%
+   * Usa TaxCalculatorService para obtener la tasa correcta según el país
    */
-  private calcularTotales(detalle: Array<{ cantidad: number; precio_unitario: number }>) {
+  private async calcularTotales(detalle: Array<{ cantidad: number; precio_unitario: number }>) {
     const subtotal = detalle.reduce(
       (sum, item) => sum + item.cantidad * item.precio_unitario,
       0,
     );
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
+    
+    // ✅ CORRECCIÓN: Usar TaxCalculatorService
+    const taxResult = await this.taxCalculator.calcularImpuestos({
+      subtotal,
+      tenantId: this.tenantContext.getTenantId(),
+    });
+    
+    const igv = taxResult.igv;
+    const total = taxResult.total;
 
     return {
       subtotal: Math.round(subtotal * 100) / 100,
@@ -1520,7 +1543,10 @@ export class PedidosService {
 
     const facturaEventId = uuidv4();
     const facturaSerie = facturaResultado.serie ?? 'SIN-SERIE';
-    const facturaNumero = facturaResultado.numero ?? 0;
+    const facturaNumero =
+      facturaResultado.numero != null
+        ? String(facturaResultado.numero)
+        : '0'; // HARDENING: normalizar correlativo como string para preservar ceros a la izquierda.
     const facturaMoneda = facturaResultado.moneda ?? 'PEN';
     const fechaEmisionFactura =
       facturaResultado.fecha_emision ?? new Date().toISOString().split('T')[0];
@@ -1846,10 +1872,5 @@ export class PedidosService {
     };
   }
 }
-
-
-
-
-
 
 

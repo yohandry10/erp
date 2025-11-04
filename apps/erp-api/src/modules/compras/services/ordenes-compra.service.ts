@@ -13,6 +13,7 @@ import { NotificationType, NotificationSeverity } from '../../notifications/noti
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
 @Injectable()
 export class OrdenesCompraService {
@@ -25,6 +26,7 @@ export class OrdenesCompraService {
     private readonly eventBusService: EventBusService,
     private readonly auditService: AuditService,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) { }
 
   async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string) {
@@ -97,7 +99,13 @@ export class OrdenesCompraService {
       (sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario),
       0
     );
-    const total = subtotal * 1.18; // Incluir IGV 18%
+    
+    // ✅ CORRECCIÓN SRP: Usar TaxCalculatorService centralizado
+    const taxResult = await this.taxCalculator.calcularImpuestos({
+      subtotal,
+      tenantId,
+    });
+    const total = taxResult.total;
 
     // Evaluar si requiere aprobación basado en el monto configurado
     const requiereAprobacion = await this.evaluarRequiereAprobacion(total, tenantId);
@@ -106,9 +114,14 @@ export class OrdenesCompraService {
     if (requiereAprobacion && !createDto.estado) {
       createDto.estado = 'APROBACION' as any;
     }
-
-    // Crear orden de compra
-    const orden = await this.ordenesRepository.create(createDto, tenantId, userId);
+    
+    // Crear orden de compra pasando los totales ya calculados
+    const orden = await this.ordenesRepository.create(
+      createDto, 
+      tenantId, 
+      userId,
+      { subtotal, igv: taxResult.igv, total: taxResult.total }
+    );
 
     // Si la orden fue creada desde una cotización, marcar la cotización como convertida
     if (createDto.cotizacion_id) {
@@ -260,6 +273,23 @@ export class OrdenesCompraService {
       }
     }
 
+    // ✅ SRP: Si se actualizan detalles, calcular totales en el servicio
+    if (updateDto.detalles && updateDto.detalles.length > 0) {
+      const subtotal = updateDto.detalles.reduce(
+        (sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario),
+        0
+      );
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      
+      // Agregar totales calculados al DTO
+      (updateDto as any).subtotal = subtotal;
+      (updateDto as any).igv = taxResult.igv;
+      (updateDto as any).total = taxResult.total;
+    }
+    
     // Actualizar orden de compra
     const orden = await this.ordenesRepository.update(updateDto, id, tenantId, userId);
 
@@ -1003,10 +1033,17 @@ export class OrdenesCompraService {
         .eq('orden_id', orden.id)
         .eq('tenant_id', tenantId);
 
-      // Calcular totales
+      // Calcular totales usando TaxCalculatorService
       const subtotal = detalles?.reduce((sum, d) => sum + (d.cantidad * d.precio_unitario), 0) || 0;
-      const igv = subtotal * 0.18;
-      const total = subtotal + igv;
+      
+      // ✅ CORRECCIÓN: Usar servicio centralizado
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      
+      const igv = taxResult.igv;
+      const total = taxResult.total;
 
       // Preparar items para el evento
       const items = detalles?.map(d => ({

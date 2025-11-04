@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 const PagosPage = () => {
   const [pagos, setPagos] = useState<any[]>([]);
@@ -11,6 +12,21 @@ const PagosPage = () => {
   const [filtroPeriodo, setFiltroPeriodo] = useState('todos');
   const [loading, setLoading] = useState(true);
   const api = useApi();
+
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
 
   // Definir API_BASE_URL
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
@@ -74,14 +90,20 @@ const PagosPage = () => {
   };
 
   const procesarPago = async (pagoId: string) => {
-    if (confirm('¿Confirmar el pago? Esta acción no se puede deshacer.')) {
-      try {
-        await api.put(`/api/rrhh/pagos/${pagoId}/procesar`);
-        loadData();
-      } catch (error) {
-        console.error('Error procesando pago:', error);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Procesar Pago',
+      message: '¿Confirmar el pago?\n\nEsta acción no se puede deshacer.',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          await api.put(`/api/rrhh/pagos/${pagoId}/procesar`);
+          loadData();
+        } catch (error) {
+          console.error('Error procesando pago:', error);
+        }
       }
-    }
+    });
   };
 
   const generarComprobante = async (pagoId: string) => {
@@ -422,6 +444,15 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 };

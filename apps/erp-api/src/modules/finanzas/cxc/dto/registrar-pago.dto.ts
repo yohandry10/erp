@@ -14,6 +14,7 @@ export enum TipoMovimientoCxc {
   DETRACCION = 'DETRACCION',
   PERCEPCION = 'PERCEPCION',
   RETENCION = 'RETENCION',
+  NOTA_CREDITO = 'NOTA_CREDITO',
 }
 
 export class RegistrarPagoCxcDto {
@@ -59,4 +60,9 @@ export class RegistrarPagoCxcDto {
   @IsOptional()
   @IsUUID()
   documento_pago_id?: string;
+
+  @IsOptional()
+  @IsString()
+  // HARDENING: permitir idempotencia en solicitudes de cobro al aceptar un identificador del cliente.
+  idempotency_key?: string;
 }

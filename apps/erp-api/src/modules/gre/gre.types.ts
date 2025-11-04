@@ -14,6 +14,8 @@ export interface CreateGuiaRemisionDto {
   pedidoNumero?: string;
   tenantId?: string;
   despachosAsociados?: string[];
+  idempotencyKey?: string;
+  datosAdicionales?: Record<string, any>;
 }
 
 export interface GuiaRemisionResponseDto {
@@ -34,4 +36,7 @@ export interface GuiaRemisionResponseDto {
   cpeRelacionado?: string; // ID del CPE relacionado
   numeroSunat?: string; // Número asignado por SUNAT
   hashGre?: string; // Hash del XML firmado
+  sunatStatus?: string;
+  idempotencyKey?: string;
+  eventId?: string;
 } 

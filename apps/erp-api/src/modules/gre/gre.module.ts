@@ -5,9 +5,11 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { IntegrationModule } from '../../shared/integration/integration.module';
 import { OseModule } from '../ose/ose.module';
 import { ValidationModule } from '../validations/validation.module';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule, OseModule, ValidationModule],
+  imports: [SupabaseModule, IntegrationModule, OseModule, ValidationModule, AuthModule, PermissionsModule],
   controllers: [GreController],
   providers: [GreService],
   exports: [GreService],

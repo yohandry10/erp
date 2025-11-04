@@ -1,25 +1,50 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateOrdenCompraDto } from '../dto/create-orden-compra.dto';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
+/**
+ * Repositorio de Órdenes de Compra
+ * 
+ * RESPONSABILIDAD: Solo persistencia de datos (CRUD)
+ * NO debe contener lógica de negocio ni cálculos
+ */
 @Injectable()
 export class OrdenesCompraRepository {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly taxCalculator: TaxCalculatorService, // Solo para fallback
+  ) {}
 
   async create(
     createDto: CreateOrdenCompraDto,
     tenantId: string,
-    userId?: string
+    userId?: string,
+    totales?: { subtotal: number; igv: number; total: number }
   ) {
     const supabase = this.supabaseService.getClient();
 
-    // Calcular totales
-    const subtotal = createDto.detalles.reduce(
-      (sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario),
-      0
-    );
-    const igv = subtotal * 0.18; // 18% IGV
-    const total = subtotal + igv;
+    // ✅ SRP: Los totales deben venir calculados desde el servicio
+    // Si no se proporcionan, calcularlos aquí como fallback (pero el servicio debería enviarlos)
+    let subtotal: number, igv: number, total: number;
+    
+    if (totales) {
+      subtotal = totales.subtotal;
+      igv = totales.igv;
+      total = totales.total;
+    } else {
+      // Fallback: calcular si no se proporcionan (no recomendado)
+      subtotal = createDto.detalles.reduce(
+        (sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario),
+        0
+      );
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      igv = taxResult.igv;
+      total = taxResult.total;
+    }
 
     // Preparar items array for JSONB field
     const items = createDto.detalles.map(detalle => ({
@@ -194,8 +219,16 @@ export class OrdenesCompraRepository {
       `, { count: 'exact' })
       .eq('tenant_id', tenantId);
 
+    // ✅ FIX CRÍTICO: Soportar filtros compuestos con coma
     if (filters?.estado) {
-      query = query.eq('estado', filters.estado);
+      if (filters.estado.includes(',')) {
+        // Múltiples estados separados por coma (ej: "APROBADA,PARCIAL")
+        const estados = filters.estado.split(',').map((e: string) => e.trim());
+        query = query.in('estado', estados);
+      } else {
+        // Un solo estado
+        query = query.eq('estado', filters.estado);
+      }
     }
 
     if (filters?.proveedor_id) {
@@ -315,14 +348,22 @@ export class OrdenesCompraRepository {
       ordenData.observaciones = updateDto.observaciones;
     }
 
-    // Si se actualizan los detalles, recalcular totales
+    // ✅ SRP: Si se actualizan los detalles, recalcular totales
+    // NOTA: Idealmente el servicio debería enviar los totales ya calculados
     if (updateDto.detalles && updateDto.detalles.length > 0) {
       const subtotal = updateDto.detalles.reduce(
         (sum: number, detalle: any) => sum + (detalle.cantidad * detalle.precio_unitario),
         0
       );
-      const igv = subtotal * 0.18;
-      const total = subtotal + igv;
+      
+      // Calcular impuestos (fallback - el servicio debería hacerlo)
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      
+      const igv = taxResult.igv;
+      const total = taxResult.total;
 
       // Preparar items array for JSONB field
       const items = updateDto.detalles.map((detalle: any) => ({

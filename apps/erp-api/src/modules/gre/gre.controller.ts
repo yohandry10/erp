@@ -24,11 +24,11 @@ export class GreController {
   @Get('guias')
   @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Listar guías de remisión' })
-  async findAllGuias(@Query() filters: any) {
+  async findAllGuias(@Query() filters: any, @CurrentTenant() tenantId: string) {
     try {
       console.log('🔍 Recibiendo petición para listar GREs con filtros:', filters);
       
-      const guias = await this.greService.findAllGuias();
+      const guias = await this.greService.findAllGuias(tenantId);
       console.log(`✅ Controlador: Se encontraron ${guias.length} GREs`);
       
       return { 
@@ -50,11 +50,11 @@ export class GreController {
   @RequirePermission('gre.guias.ver')
   @ApiOperation({ summary: 'Obtener una guía de remisión por ID' })
   @ApiResponse({ status: 200, description: 'Guía de remisión obtenida exitosamente' })
-  async findGuiaById(@Param('id') id: string) {
+  async findGuiaById(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     console.log(`🔍 Obteniendo guía de remisión con ID: ${id}`);
     
     try {
-      const guia = await this.greService.findGuiaById(id);
+      const guia = await this.greService.findGuiaById(id, tenantId);
       
       console.log(`✅ Guía de remisión obtenida:`, guia);
       
@@ -118,9 +118,9 @@ export class GreController {
   @Get('stats')
   @RequirePermission('gre.reportes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de GRE' })
-  async getStats() {
+  async getStats(@CurrentTenant() tenantId: string) {
     try {
-      const stats = await this.greService.getStats();
+      const stats = await this.greService.getStats(tenantId);
       return {
         success: true,
         data: stats
@@ -143,11 +143,11 @@ export class GreController {
   @RequirePermission('gre.guias.reenviar')
   @ApiOperation({ summary: 'Reenviar guía de remisión a SUNAT' })
   @ApiResponse({ status: 200, description: 'GRE reenviada exitosamente' })
-  async reenviarGre(@Param('id') id: string) {
+  async reenviarGre(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     console.log(`🔄 [GRE] Reenviando GRE ${id} a SUNAT...`);
     
     try {
-      const resultado = await this.greService.reenviarGre(id);
+      const resultado = await this.greService.reenviarGre(id, tenantId);
       
       return {
         success: resultado.success,
@@ -168,11 +168,11 @@ export class GreController {
   @RequirePermission('gre.guias.consultar')
   @ApiOperation({ summary: 'Consultar estado de GRE en SUNAT' })
   @ApiResponse({ status: 200, description: 'Estado consultado exitosamente' })
-  async consultarEstadoSunat(@Param('id') id: string) {
+  async consultarEstadoSunat(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     console.log(`🔍 [GRE] Consultando estado de GRE ${id} en SUNAT...`);
     
     try {
-      const estado = await this.greService.consultarEstadoGre(id);
+      const estado = await this.greService.consultarEstadoGre(id, tenantId);
       
       return {
         success: true,
@@ -224,12 +224,15 @@ export class GreController {
   @RequirePermission('gre.guias.enviar')
   @ApiOperation({ summary: 'Enviar GRE firmada a SUNAT manualmente' })
   @ApiResponse({ status: 200, description: 'GRE enviada a SUNAT exitosamente' })
-  async enviarManualmenteSunat(@Param('id') id: string) {
+  async enviarManualmenteSunat(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
     console.log(`🚀 [GRE] Envío manual a SUNAT solicitado para GRE ${id}`);
     
     try {
       // Verificar que la GRE esté en estado FIRMADO
-      const gre = await this.greService.findGuiaById(id);
+      const gre = await this.greService.findGuiaById(id, tenantId);
       
       if (gre.estado !== 'FIRMADO') {
         return {
@@ -239,7 +242,7 @@ export class GreController {
       }
 
       // Enviar a SUNAT usando el método existente
-      const resultado = await this.greService.enviarManualmenteSunat(id);
+      const resultado = await this.greService.enviarManualmenteSunat(id, tenantId);
       
       return {
         success: resultado.success,

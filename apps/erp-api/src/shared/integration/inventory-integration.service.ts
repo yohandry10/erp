@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService, ERPEvent, VentaProcessedEvent, MovimientoStockEvent, CompraEntregadaEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
@@ -32,15 +32,16 @@ export interface ProductoStock {
 
 @Injectable()
 export class InventoryIntegrationService {
+  private readonly logger = new Logger(InventoryIntegrationService.name); // HARDENING: centraliza trazabilidad cross-módulo.
   
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly tenantContext: TenantContextService,
   ) {
-    console.log('🏗️ [InventoryIntegrationService] Constructor llamado - inicializando...');
+    this.logger.log('🏗️ [InventoryIntegrationService] Constructor inicializado'); // HARDENING: evita console.log global.
     this.initializeEventListeners();
-    console.log('✅ [InventoryIntegrationService] Servicio de inventario listo y listeners registrados');
+    this.logger.log('✅ [InventoryIntegrationService] Listeners registrados'); // HARDENING: registra readiness.
   }
   private resolveTenantId(tenantId?: string): string {
     const contextTenant = tenantId ?? this.tenantContext.getTenantId();
@@ -52,7 +53,7 @@ export class InventoryIntegrationService {
   }
 
   initializeEventListeners() {
-    console.log('📦 [Inventario] Inicializando listeners de eventos...');
+    this.logger.log('📦 [Inventario] Inicializando listeners de eventos...'); // HARDENING: audit trail listeners.
     
     this.eventBus.onVentaProcessed(async (event: ERPEvent) => {
         const data = event.data as VentaProcessedEvent;
@@ -65,21 +66,38 @@ export class InventoryIntegrationService {
     });
 }
 
+  private formatError(error: unknown): string { // HARDENING: estandariza serialización segura de errores.
+    if (!error) {
+      return 'unknown error';
+    }
+    if (error instanceof Error) {
+      return `${error.name}: ${error.message}`;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+
   async procesarVentaParaInventario(venta: VentaProcessedEvent): Promise<void> {
     try {
       // ✅ MULTI-TENANT: Extraer tenant_id del evento
       const tenantId = venta.tenantId;
       if (!tenantId) {
         // HARDENING: sin tenant no se procesa, evita fuga multi-tenant.
-        console.warn('⚠️ [INVENTARIO] Evento de venta sin tenantId, se omite actualización de stock');
+        this.logger.warn('⚠️ [Inventario] Evento de venta sin tenantId, se omite actualización de stock'); // HARDENING: sin tenant no procesa.
         return;
       }
 
-      console.log(`📦 [INVENTARIO] [Tenant: ${tenantId}] Procesando venta ${venta.numeroTicket} para inventario`);
-      console.log(`📦 [INVENTARIO] Datos de venta:`, JSON.stringify(venta, null, 2));
+      this.logger.log(`📦 [Inventario] [Tenant: ${tenantId}] Procesando venta ${venta.numeroTicket}`); // HARDENING: substituye console.log.
+      this.logger.debug(`📦 [Inventario] Datos de venta ${venta.numeroTicket}: ${JSON.stringify(venta)}`);
 
       for (const item of venta.items) {
-        console.log(`📦 [INVENTARIO] Procesando item: ${item.productoId} - cantidad: ${item.cantidad}`);
+        this.logger.debug(`📦 [Inventario] Procesando item ${item.productoId} - cantidad: ${item.cantidad}`); // HARDENING.
         
         await this.realizarMovimientoStock({
           productoId: item.productoId,
@@ -96,9 +114,9 @@ export class InventoryIntegrationService {
         }, tenantId); // ✅ Pasar tenant_id
       }
 
-      console.log(`✅ [INVENTARIO] Stock actualizado para venta ${venta.numeroTicket}`);
+      this.logger.log(`✅ [Inventario] Stock actualizado para venta ${venta.numeroTicket}`);
     } catch (error) {
-      console.error('❌ [INVENTARIO] Error procesando venta para inventario:', error);
+      this.logger.error('❌ [Inventario] Error procesando venta', this.formatError(error));
     }
   }
 
@@ -108,11 +126,11 @@ export class InventoryIntegrationService {
       const tenantId = compra.tenantId;
       if (!tenantId) {
         // HARDENING: sin tenant no se procesa, evita fuga multi-tenant.
-        console.warn('⚠️ [INVENTARIO] Evento de compra sin tenantId, se omite actualización de stock');
+        this.logger.warn('⚠️ [Inventario] Evento de recepción sin tenantId, se omite actualización de stock'); // HARDENING.
         return;
       }
 
-      console.log(`📦 [Tenant: ${tenantId}] Procesando compra entregada ${compra.numeroOrden} para inventario`);
+      this.logger.log(`📦 [Inventario] [Tenant: ${tenantId}] Procesando compra ${compra.numeroOrden}`);
 
       for (const item of compra.items) {
         await this.realizarMovimientoStock({
@@ -129,9 +147,9 @@ export class InventoryIntegrationService {
         }, tenantId); // ✅ Pasar tenant_id
       }
 
-      console.log(`✅ Stock actualizado para compra ${compra.numeroOrden}`);
+      this.logger.log(`✅ [Inventario] Stock actualizado para compra ${compra.numeroOrden}`);
     } catch (error) {
-      console.error('❌ Error procesando compra para inventario:', error);
+      this.logger.error('❌ [Inventario] Error procesando compra', this.formatError(error));
     }
   }
 
@@ -140,10 +158,10 @@ export class InventoryIntegrationService {
       // ✅ MULTI-TENANT: Usar tenant_id proporcionado o default
       const currentTenantId = this.resolveTenantId(tenantId);
       
-      console.log(`📦 [Tenant: ${currentTenantId}] Realizando movimiento: ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`);
+      this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Movimiento ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`); // HARDENING.
 
       // 1. Obtener producto por ID o código (CON FILTRO DE TENANT)
-      console.log(`🔍 Buscando producto con ID/código: ${movimiento.productoId}`);
+      this.logger.debug(`🔍 [Inventario] Buscando producto ${movimiento.productoId}`); // HARDENING.
       
       let producto = null;
       
@@ -157,7 +175,7 @@ export class InventoryIntegrationService {
           .single();
 
         if (!errorPorId && productoPorId) {
-          console.log(`✅ Producto encontrado por ID:`, productoPorId);
+          this.logger.debug(`✅ [Inventario] Producto encontrado por ID ${movimiento.productoId}: ${JSON.stringify(productoPorId)}`);
           producto = productoPorId;
         }
       }
@@ -172,7 +190,7 @@ export class InventoryIntegrationService {
           .single();
 
         if (!errorPorCodigo && productoPorCodigo) {
-          console.log(`✅ Producto encontrado por código:`, productoPorCodigo);
+          this.logger.debug(`✅ [Inventario] Producto encontrado por código ${movimiento.productoId}: ${JSON.stringify(productoPorCodigo)}`);
           producto = productoPorCodigo;
         }
       }
@@ -187,13 +205,13 @@ export class InventoryIntegrationService {
           .single();
 
         if (!errorPorNombre && productoPorNombre) {
-          console.log(`✅ Producto encontrado por nombre:`, productoPorNombre);
+          this.logger.debug(`✅ [Inventario] Producto encontrado por nombre ${movimiento.productoId}: ${JSON.stringify(productoPorNombre)}`);
           producto = productoPorNombre;
         }
       }
 
       if (!producto) {
-        console.error(`❌ Producto ${movimiento.productoId} no encontrado en ninguna búsqueda`);
+        this.logger.error(`❌ [Inventario] Producto ${movimiento.productoId} no encontrado en ninguna búsqueda`);
         return null;
       }
 
@@ -209,7 +227,7 @@ export class InventoryIntegrationService {
         case 'SALIDA':
           nuevoStock = stockActual - movimiento.cantidad;
           if (nuevoStock < 0) {
-            console.warn(`⚠️ Stock negativo para ${movimiento.productoId}: ${nuevoStock}`);
+            this.logger.warn(`⚠️ [Inventario] Stock negativo para ${movimiento.productoId}: ${nuevoStock}`);
             // Permitir stock negativo pero generar alerta
           }
           break;
@@ -223,7 +241,7 @@ export class InventoryIntegrationService {
       movimiento.stockNuevo = nuevoStock;
 
       // 3. Actualizar stock en tabla productos (usar ID del producto encontrado)
-      console.log(`📦 ACTUALIZANDO STOCK: producto.id=${producto.id}, stockActual=${stockActual}, nuevoStock=${nuevoStock}`);
+      this.logger.debug(`📦 [Inventario] Actualizando stock producto ${producto.id}: actual=${stockActual}, nuevo=${nuevoStock}`);
       
       const { data: updateData, error: updateError } = await this.supabase.getClient()
         .from('productos')
@@ -234,11 +252,11 @@ export class InventoryIntegrationService {
         .select();
 
       if (updateError) {
-        console.error('❌ Error actualizando stock del producto:', updateError);
+        this.logger.error('❌ [Inventario] Error actualizando stock del producto', this.formatError(updateError));
         throw updateError;
       }
 
-      console.log(`✅ STOCK ACTUALIZADO EXITOSAMENTE:`, updateData);
+      this.logger.debug(`✅ [Inventario] Stock actualizado correctamente: ${JSON.stringify(updateData)}`);
       
       // VERIFICACIÓN ADICIONAL - Leer de nuevo el producto para confirmar
       const { data: verificacion } = await this.supabase.getClient()
@@ -247,7 +265,7 @@ export class InventoryIntegrationService {
         .eq('id', producto.id)
         .single();
       
-      console.log(`🔍 VERIFICACIÓN POST-UPDATE:`, verificacion);
+      this.logger.debug(`🔍 [Inventario] Verificación post actualización: ${JSON.stringify(verificacion)}`);
 
       // 4. Registrar el movimiento en histórico usando las columnas correctas según Supabase
       const { data: movimientoGuardado, error: movimientoError } = await this.supabase.getClient()
@@ -266,7 +284,7 @@ export class InventoryIntegrationService {
         .single();
 
       if (movimientoError) {
-        console.error('❌ Error registrando movimiento de stock:', movimientoError);
+        this.logger.error('❌ [Inventario] Error registrando movimiento de stock', this.formatError(movimientoError));
         throw movimientoError;
       }
 
@@ -282,11 +300,11 @@ export class InventoryIntegrationService {
         ventaId: movimiento.ventaId
       });
 
-      console.log(`✅ Movimiento de stock registrado: ${movimientoGuardado.id}`);
+      this.logger.log(`✅ [Inventario] Movimiento registrado ${movimientoGuardado.id}`);
       return movimientoGuardado.id;
 
     } catch (error) {
-      console.error('❌ Error realizando movimiento de stock:', error);
+      this.logger.error('❌ [Inventario] Error realizando movimiento de stock', this.formatError(error));
       throw error;
     }
   }
@@ -317,7 +335,7 @@ export class InventoryIntegrationService {
         activo: producto.activo
       })) || [];
     } catch (error) {
-      console.error('❌ Error obteniendo productos stock:', error);
+      this.logger.error('❌ [Inventario] Error obteniendo productos stock', this.formatError(error));
       return [];
     }
   }
@@ -367,7 +385,7 @@ export class InventoryIntegrationService {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('❌ Error obteniendo movimientos de stock:', error);
+      this.logger.error('❌ [Inventario] Error obteniendo movimientos de stock', this.formatError(error));
       return [];
     }
   }
@@ -407,7 +425,7 @@ export class InventoryIntegrationService {
         rotacionPromedio: this.calcularRotacionPromedio(productos, movimientosHoy)
       };
     } catch (error) {
-      console.error('❌ Error calculando estadísticas de inventario:', error);
+      this.logger.error('❌ [Inventario] Error calculando estadísticas de inventario', this.formatError(error));
       return {
         totalProductos: 0,
         valorInventario: 0,
@@ -461,7 +479,7 @@ export class InventoryIntegrationService {
   async ajustarStock(productoId: string, cantidadAjuste: number, motivo: string, usuarioId: string = 'system', tenantId?: string): Promise<string | null> {
     try {
       const currentTenantId = this.resolveTenantId(tenantId);
-      console.log(`📦 [Tenant: ${currentTenantId}] Ajustando stock de ${productoId}: ${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste}`);
+      this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Ajustando stock de ${productoId}: ${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste}`);
 
       // Obtener precio del producto para valorizar el ajuste
       const { data: producto } = await this.supabase.getClient()
@@ -487,7 +505,7 @@ export class InventoryIntegrationService {
         referencia: `AJUSTE-${Date.now()}`
       }, currentTenantId);
     } catch (error) {
-      console.error('❌ Error ajustando stock:', error);
+      this.logger.error('❌ [Inventario] Error ajustando stock', this.formatError(error));
       throw error;
     }
   }
@@ -495,7 +513,7 @@ export class InventoryIntegrationService {
   async registrarEntrada(productoId: string, cantidad: number, precioUnitario: number, motivo: string, usuarioId: string = 'system', tenantId?: string): Promise<string | null> {
     try {
       const currentTenantId = this.resolveTenantId(tenantId);
-      console.log(`📦 [Tenant: ${currentTenantId}] Registrando entrada: ${cantidad} unidades de ${productoId}`);
+      this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Registrando entrada de ${cantidad} unidades de ${productoId}`);
 
       return await this.realizarMovimientoStock({
         productoId,
@@ -510,7 +528,7 @@ export class InventoryIntegrationService {
         referencia: `ENTRADA-${Date.now()}`
       }, currentTenantId);
     } catch (error) {
-      console.error('❌ Error registrando entrada:', error);
+      this.logger.error('❌ [Inventario] Error registrando entrada', this.formatError(error));
       throw error;
     }
   }
@@ -520,7 +538,7 @@ export class InventoryIntegrationService {
       const productos = await this.getProductosStock(tenantId);
       return productos.filter(p => p.stockActual <= p.stockMinimo);
     } catch (error) {
-      console.error('❌ Error obteniendo productos con stock crítico:', error);
+      this.logger.error('❌ [Inventario] Error obteniendo productos con stock crítico', this.formatError(error));
       return [];
     }
   }
@@ -530,7 +548,7 @@ export class InventoryIntegrationService {
       const productos = await this.getProductosStock(tenantId);
       return productos.filter(p => p.stockActual <= 0);
     } catch (error) {
-      console.error('❌ Error obteniendo productos sin stock:', error);
+      this.logger.error('❌ [Inventario] Error obteniendo productos sin stock', this.formatError(error));
       return [];
     }
   }
@@ -538,11 +556,11 @@ export class InventoryIntegrationService {
   async verificarDisponibilidadStock(productosVenta: { productoId: string, cantidad: number }[], tenantId?: string): Promise<{ disponible: boolean, faltantes: any[] }> {
     try {
       const currentTenantId = this.resolveTenantId(tenantId);
-      console.log(`🔍 [Tenant: ${currentTenantId}] Verificando disponibilidad de stock para:`, productosVenta);
+      this.logger.debug(`🔍 [Inventario] Verificando disponibilidad de stock: ${JSON.stringify(productosVenta)}`);
       const faltantes = [];
       
       for (const item of productosVenta) {
-        console.log(`📦 Verificando producto: ${item.productoId} (cantidad: ${item.cantidad})`);
+        this.logger.debug(`📦 [Inventario] Verificando producto ${item.productoId} (cantidad: ${item.cantidad})`);
         
         // Buscar por ID primero (UUID), luego por código
         let producto = null;
@@ -557,7 +575,7 @@ export class InventoryIntegrationService {
             .single();
           
           if (productoPorId) {
-            console.log(`✅ Producto encontrado por ID:`, productoPorId);
+            this.logger.debug(`✅ [Inventario] Producto encontrado por ID ${item.productoId}: ${JSON.stringify(productoPorId)}`);
             producto = productoPorId;
           }
         }
@@ -572,13 +590,13 @@ export class InventoryIntegrationService {
             .single();
           
           if (productoPorCodigo) {
-            console.log(`✅ Producto encontrado por código:`, productoPorCodigo);
+            this.logger.debug(`✅ [Inventario] Producto encontrado por código ${item.productoId}: ${JSON.stringify(productoPorCodigo)}`);
             producto = productoPorCodigo;
           }
         }
 
         if (!producto) {
-          console.log(`❌ Producto no encontrado: ${item.productoId}`);
+          this.logger.warn(`❌ [Inventario] Producto no encontrado: ${item.productoId}`);
           faltantes.push({
             productoId: item.productoId,
             solicitado: item.cantidad,
@@ -590,10 +608,10 @@ export class InventoryIntegrationService {
         }
 
         const stockDisponible = parseFloat(producto.stock || 0);
-        console.log(`📊 Stock disponible: ${stockDisponible}, solicitado: ${item.cantidad}`);
+        this.logger.debug(`📊 [Inventario] Stock disponible ${stockDisponible} vs solicitado ${item.cantidad}`);
         
         if (stockDisponible < item.cantidad) {
-          console.log(`❌ Stock insuficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
+          this.logger.warn(`❌ [Inventario] Stock insuficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
           faltantes.push({
             productoId: item.productoId,
             nombre: producto.nombre,
@@ -603,7 +621,7 @@ export class InventoryIntegrationService {
             motivo: 'Stock insuficiente'
           });
         } else {
-          console.log(`✅ Stock suficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
+          this.logger.debug(`✅ [Inventario] Stock suficiente para ${producto.nombre}: disponible ${stockDisponible}, solicitado ${item.cantidad}`);
         }
       }
 
@@ -612,10 +630,10 @@ export class InventoryIntegrationService {
         faltantes
       };
     } catch (error) {
-      console.error('❌ Error verificando disponibilidad de stock:', error);
+      this.logger.error('❌ [Inventario] Error verificando disponibilidad de stock', this.formatError(error));
       return {
         disponible: false,
-        faltantes: [{ motivo: 'Error verificando stock', error: error.message }]
+        faltantes: [{ motivo: 'Error verificando stock', error: this.formatError(error) }]
       };
     }
   }

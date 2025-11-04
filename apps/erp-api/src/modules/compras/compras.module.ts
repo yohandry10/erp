@@ -18,15 +18,17 @@ import { OrdenesCompraRepository } from './repositories/ordenes-compra.repositor
 import { OcAprobacionesRepository } from './repositories/oc-aprobaciones.repository';
 import { DevolucionesProveedorRepository } from './repositories/devoluciones-proveedor.repository';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
-import { EventBusService } from '../../shared/events/event-bus.service';
+import { EventsModule } from '../../shared/events/events.module';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { InventarioService } from '../inventario/inventario.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
 import { CacheModule } from '../../shared/cache/cache.module';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [SupabaseModule, NotificationsModule, AuditModule, CacheModule],
+  imports: [SupabaseModule, EventsModule, NotificationsModule, AuditModule, CacheModule, AuthModule, PermissionsModule],
   controllers: [
     // More specific routes must come first to avoid being caught by catch-all routes
     RecepcionesController,

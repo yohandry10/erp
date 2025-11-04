@@ -270,7 +270,10 @@ test('Compras CxP Integration – Crear CxP automáticamente cuando configuraci�
     moneda: 'PEN',
     condicionesPago: '30 días',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId}`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   // Execute: Trigger event handler
@@ -331,7 +334,10 @@ test('Compras CxP Integration – No crear CxP cuando configuración es APROBACI
     total: 1180,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: 'evt-rec-002',
+    idempotencyKey: `recepcion:${tenantId}:rec-002`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({
@@ -383,7 +389,10 @@ test('Compras CxP Integration – No crear CxP duplicada (idempotencia)', async 
     total: 1180,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId}`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({
@@ -461,7 +470,10 @@ test('Compras CxP Integration – Calcular monto correcto para recepción parcia
     total: 2360,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId}`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({
@@ -550,7 +562,10 @@ test('Compras CxP Integration – Excluir items rechazados del cálculo de CxP',
     total: 2360,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId}`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({
@@ -648,7 +663,10 @@ test('Compras CxP Integration – Calcular vencimiento según diferentes condici
       moneda: 'PEN',
       condicionesPago: testCase.condiciones,
       items: [],
-      tenantId
+      tenantId,
+      eventId: `evt-${recepcionId}`,
+      idempotencyKey: `recepcion:${tenantId}:${recepcionId}`,
+      emittedAt: '2025-01-15T05:00:00.000Z',
     }
     
     await service['handleRecepcionRegistrada']({
@@ -746,7 +764,10 @@ test('Compras CxP Integration – Múltiples recepciones parciales crean múltip
     total: 3540,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId1}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId1}`,
+    emittedAt: '2025-01-15T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({
@@ -788,7 +809,10 @@ test('Compras CxP Integration – Múltiples recepciones parciales crean múltip
     total: 4720,
     moneda: 'PEN',
     items: [],
-    tenantId
+    tenantId,
+    eventId: `evt-${recepcionId2}`,
+    idempotencyKey: `recepcion:${tenantId}:${recepcionId2}`,
+    emittedAt: '2025-01-20T05:00:00.000Z',
   }
   
   await service['handleRecepcionRegistrada']({

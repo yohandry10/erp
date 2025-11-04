@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useApiCall } from '@/hooks/use-api'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 
 interface CpeModalProps {
   isOpen: boolean
@@ -10,6 +11,7 @@ interface CpeModalProps {
 }
 
 export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) {
+  const { tasaIgv } = useTaxConfig()
   const [formData, setFormData] = useState({
     tipoComprobante: '01', // Factura por defecto
     serie: 'F001',
@@ -116,7 +118,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       const cantidad = field === 'cantidad' ? value : newItems[index].cantidad
       const valorUnitario = field === 'valorUnitario' ? value : newItems[index].valorUnitario
       const subtotalItem = cantidad * valorUnitario
-      const igvItem = subtotalItem * 0.18 // 18% IGV
+      const igvItem = subtotalItem * tasaIgv
       const totalItem = subtotalItem + igvItem
 
       newItems[index] = {

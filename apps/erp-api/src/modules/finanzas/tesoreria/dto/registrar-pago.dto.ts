@@ -60,4 +60,12 @@ export class RegistrarPagoDto {
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser un texto' })
   observaciones?: string;
+
+  @ApiPropertyOptional({
+    description: 'Llave de idempotencia para asegurar que el pago no se procese dos veces',
+    example: 'tesoreria:pago:tenant-uuid:cxp-uuid:ref-001',
+  })
+  @IsOptional()
+  @IsString({ message: 'La llave de idempotencia debe ser un texto' })
+  idempotency_key?: string;
 }

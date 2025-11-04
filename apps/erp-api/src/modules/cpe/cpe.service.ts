@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
 import { XmlSigner } from '@erp-suite/crypto';
@@ -13,6 +14,14 @@ import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.
 @Injectable()
 export class CpeService {
   private readonly logger = new Logger(CpeService.name);
+  private readonly sunatStatuses = {
+    NOT_SENT: 'NOT_SENT',
+    READY: 'READY',
+    SENDING: 'SENDING',
+    ACCEPTED: 'ACCEPTED',
+    REJECTED: 'REJECTED',
+    ERROR: 'ERROR',
+  } as const;
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -60,6 +69,33 @@ export class CpeService {
 
   async create(createFacturaDto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
     try {
+      const supabaseClient = this.supabaseService.getClient();
+      const eventId = randomUUID();
+      const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
+      const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
+      const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
+
+      (createFacturaDto as any).fecha_emision = emissionDate;
+      (createFacturaDto as any).fecha_vencimiento = dueDate;
+      (createFacturaDto as any).idempotency_key = idempotencyKey;
+
+      const { data: existingCpe, error: existingCpeError } = await supabaseClient
+        .from('cpe')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('idempotency_key', idempotencyKey)
+        .maybeSingle();
+
+      if (existingCpeError && existingCpeError.code && existingCpeError.code !== 'PGRST116') {
+        this.logger.error(`❌ [CPE] Error verificando idempotencia: ${existingCpeError.message}`, existingCpeError);
+        throw new BadRequestException('No se pudo validar idempotencia del comprobante');
+      }
+
+      if (existingCpe) {
+        this.logger.warn(`♻️ [CPE] Solicitud idempotente detectada para ${idempotencyKey}, retornando CPE existente ${existingCpe.id}`);
+        return this.mapToDto(existingCpe);
+      }
+
       // ===== PRE-EMISSION VALIDATIONS =====
       this.logger.log(`Starting pre-emission validations for tenant: ${tenantId}`);
 
@@ -145,13 +181,19 @@ export class CpeService {
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
         items: createFacturaDto.items,
+        fecha_emision: emissionDate,
+        fecha_vencimiento: dueDate,
+        idempotency_key: idempotencyKey,
+        event_id: eventId,
         estado: 'FIRMADO',
         hash: hash,
+        hash_firma: hash,
+        sunat_status: this.sunatStatuses.NOT_SENT,
         xml_firmado: signedXml,
       };
 
       // Insert into database
-      const { data, error } = await this.supabaseService.getClient()
+      const { data, error } = await supabaseClient
         .from('cpe')
         .insert(cpeData)
         .select()
@@ -169,7 +211,7 @@ export class CpeService {
       const createdCpe = Array.isArray(data) ? data[0] : data;
 
       // Generar XML firmado (sin enviar a SUNAT todavía)
-      await this.prepareXmlForSunat((createdCpe as any).id, xmlContent, tenantId);
+      const preparedForSunat = await this.prepareXmlForSunat((createdCpe as any).id, xmlContent, tenantId);
 
       // ℹ️ NO ENVIAR AUTOMÁTICAMENTE - El usuario debe enviar manualmente desde el módulo CPE
       console.log('ℹ️ CPE creado y firmado. Estado: FIRMADO (listo para envío manual a SUNAT)');
@@ -185,9 +227,33 @@ export class CpeService {
         numero: createFacturaDto.numero,
         clienteId: createFacturaDto.documento_receptor,
         total: createFacturaDto.total_venta,
-          esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
+        esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
         ventaId: undefined, // Se puede agregar referencia si viene de POS
-        requiereTransporte: requiereTransporte
+        requiereTransporte: requiereTransporte,
+        moneda: createFacturaDto.moneda,
+      });
+
+      const sunatStatusForEvent = preparedForSunat ? this.sunatStatuses.READY : this.sunatStatuses.ERROR;
+
+      await this.eventBus.emitFacturaEmitidaEvent({
+        eventId,
+        tenantId,
+        idempotencyKey,
+        cpeId,
+        facturaId: cpeId,
+        serie: createFacturaDto.serie,
+        numero: String(createFacturaDto.numero),
+        clienteId: createFacturaDto.documento_receptor,
+        subtotal: createFacturaDto.total_gravadas,
+        impuestos: createFacturaDto.total_igv,
+        total: createFacturaDto.total_venta,
+        moneda: createFacturaDto.moneda,
+        fechaEmision: emissionDate,
+        fechaVencimiento: dueDate,
+        source: 'cpe.api',
+        sunatStatus: sunatStatusForEvent,
+        hashFirma: hash,
+        hash: hash,
       });
 
       // Evaluar si necesita guía de remisión automática
@@ -240,7 +306,42 @@ export class CpeService {
         this.logger.warn('⚠️ No se pudo invalidar cache después de crear CPE:', error);
       }
 
-      return this.mapToDto(createdCpe);
+      let persistedCpeRecord = createdCpe;
+
+      try {
+        const { data: refreshedCpe, error: refreshError } = await supabaseClient
+          .from('cpe')
+          .select('*')
+          .eq('id', cpeId)
+          .single();
+
+        if (!refreshError && refreshedCpe) {
+          persistedCpeRecord = refreshedCpe;
+        } else {
+          persistedCpeRecord = {
+            ...createdCpe,
+            sunat_status: sunatStatusForEvent,
+            hash_firma: hash,
+            fecha_emision: emissionDate,
+            fecha_vencimiento: dueDate,
+            idempotency_key: idempotencyKey,
+            event_id: eventId,
+          };
+        }
+      } catch (refreshError) {
+        this.logger.warn(`⚠️ [CPE] No se pudo refrescar CPE ${cpeId} desde Supabase:`, refreshError);
+        persistedCpeRecord = {
+          ...createdCpe,
+          sunat_status: sunatStatusForEvent,
+          hash_firma: hash,
+          fecha_emision: emissionDate,
+          fecha_vencimiento: dueDate,
+          idempotency_key: idempotencyKey,
+          event_id: eventId,
+        };
+      }
+
+      return this.mapToDto(persistedCpeRecord);
     } catch (error) {
       console.error('Error in CpeService.create:', error);
       if (error instanceof BadRequestException) {
@@ -400,9 +501,20 @@ export class CpeService {
     if (response.success) {
       await this.supabaseService.update(
         'cpe',
-        { 
+        {
           estado: 'ACEPTADO',
+          sunat_status: this.sunatStatuses.ACCEPTED,
           cdr_sunat: response.cdr || 'CDR_RECEIVED',
+          updated_at: new Date().toISOString(),
+        },
+        { id: cpe.id }
+      );
+    } else {
+      await this.supabaseService.update(
+        'cpe',
+        {
+          sunat_status: this.sunatStatuses.REJECTED,
+          error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
           updated_at: new Date().toISOString(),
         },
         { id: cpe.id }
@@ -411,7 +523,7 @@ export class CpeService {
     
     return {
       id: cpe.id,
-                estado: response.success ? 'ACEPTADO' : cpe.estado,
+      estado: response.success ? 'ACEPTADO' : cpe.estado,
       codigoSunat: response.codigoRespuesta,
       descripcionSunat: response.descripcionRespuesta,
       timestamp: new Date(),
@@ -424,7 +536,7 @@ export class CpeService {
    * NOTA: El envío automático a SUNAT está DESACTIVADO por ahora.
    * Para enviar manualmente usar el endpoint: POST /api/cpe/:id/enviar-sunat
    */
-  private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<void> {
+  private async prepareXmlForSunat(cpeId: string, xmlContent: string, tenantId: string): Promise<boolean> {
     try {
       console.log(`📄 [CPE] Preparando XML para CPE ${cpeId}...`);
       
@@ -443,13 +555,15 @@ export class CpeService {
       }
 
       // Actualizar CPE con XML firmado
-              console.log('🔧 [CPE] Actualizando estado a: FIRMADO');
-        await this.supabaseService.update(
+      console.log('🔧 [CPE] Actualizando estado a: FIRMADO');
+      await this.supabaseService.update(
         'cpe',
-        { 
+        {
           estado: 'FIRMADO', // Estado que indica listo para SUNAT
           hash: hash,
+          hash_firma: hash,
           xml_firmado: xmlSigned,
+          sunat_status: this.sunatStatuses.READY,
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }
@@ -460,19 +574,23 @@ export class CpeService {
       console.log(`📊 [CPE] Firma válida: ${isValid ? '✅' : '⚠️'}`);
       console.log(`📊 [CPE] Modo certificado: DEMO`);
 
+      return true;
     } catch (error) {
       console.error(`❌ [CPE] Error preparando XML para CPE ${cpeId}:`, error);
       
       // Marcar como ERROR
       await this.supabaseService.update(
         'cpe',
-        { 
+        {
           estado: 'RECHAZADO',
+          sunat_status: this.sunatStatuses.ERROR,
           error_message: `Error preparando XML: ${error.message}`,
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }
       );
+
+      return false;
     }
   }
 
@@ -490,8 +608,9 @@ export class CpeService {
       // Marcar como ENVIADO primero
       await this.supabaseService.update(
         'cpe',
-        { 
+        {
           estado: 'ENVIADO',
+          sunat_status: this.sunatStatuses.SENDING,
           updated_at: new Date().toISOString(),
         },
         { id: cpeId }
@@ -522,10 +641,12 @@ export class CpeService {
         // Actualizar como ACEPTADO
         await this.supabaseService.update(
           'cpe',
-          { 
+          {
             estado: 'ACEPTADO',
+            sunat_status: this.sunatStatuses.ACCEPTED,
             cdr_sunat: response.cdr || 'CDR_RECEIVED',
             hash: response.hashCPE || null,
+            hash_firma: response.hashCPE || null,
             numero_comprobante_sunat: response.numeroComprobante,
             updated_at: new Date().toISOString(),
           },
@@ -540,8 +661,9 @@ export class CpeService {
         // Marcar como RECHAZADO
         await this.supabaseService.update(
           'cpe',
-          { 
+          {
             estado: 'RECHAZADO',
+            sunat_status: isTechnicalError ? this.sunatStatuses.ERROR : this.sunatStatuses.REJECTED,
             error_message: `${response.codigoRespuesta}: ${response.descripcionRespuesta}`,
             retry_count: isTechnicalError ? 0 : null, // Solo reintentar errores técnicos
             next_retry_at: null,
@@ -558,8 +680,9 @@ export class CpeService {
       const retryCount = 0; // Primera vez que falla
       await this.supabaseService.update(
         'cpe',
-        { 
+        {
           estado: 'RECHAZADO',
+          sunat_status: this.sunatStatuses.ERROR,
           error_message: `Error técnico: ${error.message}`,
           retry_count: retryCount,
           next_retry_at: null, // El servicio de reintentos lo programará
@@ -597,8 +720,51 @@ export class CpeService {
     return technicalKeywords.some(keyword => errorMessage.includes(keyword));
   }
 
+  private resolveEmissionDate(fechaEmision?: string): string {
+    if (!fechaEmision) {
+      return this.formatDate(new Date());
+    }
+
+    const parsed = new Date(fechaEmision);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`fecha_emision inválida: ${fechaEmision}`);
+    }
+
+    return this.formatDate(parsed);
+  }
+
+  private resolveDueDate(emissionDate: string, fechaVencimiento?: string): string {
+    if (fechaVencimiento) {
+      const parsed = new Date(fechaVencimiento);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException(`fecha_vencimiento inválida: ${fechaVencimiento}`);
+      }
+      return this.formatDate(parsed);
+    }
+
+    const emission = new Date(emissionDate);
+    const due = new Date(emission);
+    due.setDate(due.getDate() + 30);
+    return this.formatDate(due);
+  }
+
+  private resolveIdempotencyKey(dto: CreateFacturaDto, tenantId: string): string {
+    const provided = (dto as any).idempotency_key?.trim();
+    if (provided) {
+      return provided;
+    }
+
+    return `${tenantId}:${dto.tipo_documento}:${dto.serie}:${dto.numero}`;
+  }
+
+  private formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
   private generateXmlContent(factura: CreateFacturaDto): string {
     // Generate basic UBL 2.1 XML structure (simplified)
+    const issueDate = (factura as any).fecha_emision || this.formatDate(new Date());
+    const dueDateTag = (factura as any).fecha_vencimiento ? `\n  <cbc:DueDate>${(factura as any).fecha_vencimiento}</cbc:DueDate>` : '';
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
@@ -614,7 +780,7 @@ export class CpeService {
   <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
   <cbc:CustomizationID>2.0</cbc:CustomizationID>
   <cbc:ID>${factura.serie}-${factura.numero}</cbc:ID>
-  <cbc:IssueDate>${new Date().toISOString().split('T')[0]}</cbc:IssueDate>
+  <cbc:IssueDate>${issueDate}</cbc:IssueDate>${dueDateTag}
   <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${factura.tipo_documento}</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode listID="ISO 4217 Alpha" listName="Currency" listAgencyName="United Nations Economic Commission for Europe">${factura.moneda}</cbc:DocumentCurrencyCode>
 
@@ -687,14 +853,19 @@ export class CpeService {
 </Invoice>`;
   }
 
-  private generateSimplePdfContent(cpe: FacturaDto): string {
+  private generateSimplePdfContent(cpe: any): string {
+    const fechaEmision = cpe.fecha_emision ? new Date(cpe.fecha_emision).toLocaleDateString() : new Date(cpe.created_at).toLocaleDateString();
+    const fechaVencimiento = cpe.fecha_vencimiento ? new Date(cpe.fecha_vencimiento).toLocaleDateString() : 'No definido';
+    const sunatStatus = cpe.sunat_status ?? this.sunatStatuses.NOT_SENT;
+    const hashFirma = cpe.hash_firma ?? cpe.hash ?? 'N/A';
     return `
 FACTURA ELECTRÓNICA
 ===================
 
 Serie: ${cpe.serie}
 Número: ${cpe.numero}
-Fecha: ${new Date().toLocaleDateString()}
+Fecha emisión: ${fechaEmision}
+Fecha vencimiento: ${fechaVencimiento}
 
 EMISOR:
 ${cpe.razon_social_emisor}
@@ -715,7 +886,8 @@ IGV: ${cpe.total_igv}
 Total: ${cpe.total_venta}
 
 Estado: ${cpe.estado}
-Hash: ${cpe.hash}
+SUNAT Status: ${sunatStatus}
+Hash firma: ${hashFirma}
 
 ---
 Documento generado por ERP Suite
@@ -724,6 +896,14 @@ Documento generado por ERP Suite
 
   private generateSimplePdfContentFromData(cpeData: any): string {
     const items = Array.isArray(cpeData.items) ? cpeData.items : [];
+    const fechaEmision = cpeData.fecha_emision
+      ? new Date(cpeData.fecha_emision).toLocaleDateString()
+      : (cpeData.created_at ? new Date(cpeData.created_at).toLocaleDateString() : new Date().toLocaleDateString());
+    const fechaVencimiento = cpeData.fecha_vencimiento
+      ? new Date(cpeData.fecha_vencimiento).toLocaleDateString()
+      : 'No definido';
+    const sunatStatus = cpeData.sunat_status ?? this.sunatStatuses.NOT_SENT;
+    const hashFirma = cpeData.hash_firma ?? cpeData.hash ?? 'N/A';
     
     return `
 COMPROBANTE ELECTRÓNICO
@@ -731,7 +911,8 @@ COMPROBANTE ELECTRÓNICO
 
 Serie: ${cpeData.serie || 'N/A'}
 Número: ${cpeData.numero || 'N/A'}
-Fecha: ${cpeData.created_at ? new Date(cpeData.created_at).toLocaleDateString() : new Date().toLocaleDateString()}
+Fecha emisión: ${fechaEmision}
+Fecha vencimiento: ${fechaVencimiento}
 
 EMISOR:
 ${cpeData.razon_social_emisor || 'ERP KAME'}
@@ -752,7 +933,8 @@ IGV: S/${parseFloat(cpeData.total_igv || 0).toFixed(2)}
 Total: S/${parseFloat(cpeData.total_venta || 0).toFixed(2)}
 
 Estado: ${cpeData.estado || 'EMITIDO'}
-Hash: ${cpeData.hash || 'N/A'}
+SUNAT Status: ${sunatStatus}
+Hash firma: ${hashFirma}
 
 ---
 Documento generado por ERP KAME

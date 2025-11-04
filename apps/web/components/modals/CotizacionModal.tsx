@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { toast } from '@/components/ui/use-toast'
 
 interface CotizacionModalProps {
@@ -30,6 +31,7 @@ interface DetalleCotizacion {
 }
 
 export default function CotizacionModal({ isOpen, onClose, onSuccess }: CotizacionModalProps) {
+  const { tasaIgv } = useTaxConfig()
   console.log('🎯 CotizacionModal recibido props:', { isOpen })
   console.log('🎯 Modal renderizando con isOpen:', isOpen)
   console.log('🎯 Elemento Dialog debe estar visible:', isOpen ? 'SÍ' : 'NO')
@@ -127,7 +129,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
 
   const calcularTotales = (detallesActualizados: DetalleCotizacion[]) => {
     const subtotal = detallesActualizados.reduce((sum, detalle) => sum + detalle.total, 0)
-    const igv = subtotal * 0.18
+    const igv = subtotal * tasaIgv
     const total = subtotal + igv
 
     setFormData(prev => ({

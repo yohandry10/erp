@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { SessionProvider } from '@/components/providers/session-provider'
+import { AuthProvider } from '@/contexts/AuthContext'
 import { TenantProvider } from '@/contexts/TenantContext'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as HotToaster } from 'react-hot-toast'
@@ -24,13 +25,15 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <div className="app-wrapper">
           <ErrorBoundary>
-            <SessionProvider session={null}>
-              <TenantProvider>
-                {children}
-                <Toaster />
-                <HotToaster />
-              </TenantProvider>
-            </SessionProvider>
+            <AuthProvider>
+              <SessionProvider session={null}>
+                <TenantProvider>
+                  {children}
+                  <Toaster />
+                  <HotToaster />
+                </TenantProvider>
+              </SessionProvider>
+            </AuthProvider>
           </ErrorBoundary>
         </div>
         <div id="modal-root" />

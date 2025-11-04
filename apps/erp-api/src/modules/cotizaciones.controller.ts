@@ -1,12 +1,16 @@
 import { Controller, Get, Post, Put, Delete, Body, Query, Param, Req, UseGuards, HttpCode, HttpStatus, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
+import { TaxCalculatorService } from '../shared/utils/tax-calculator';
 import { Request } from 'express';
 
 @ApiTags('cotizaciones')
 @Controller('cotizaciones')
 export class CotizacionesController {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly taxCalculator: TaxCalculatorService,
+  ) {}
   
   private resolveTenantOrThrow(req: Request): string {
     const tenantId = (req.user as any)?.tenant_id;
@@ -598,21 +602,29 @@ export class CotizacionesController {
 
         // 5. Crear detalles del documento
         if (cotizacion.items && Array.isArray(cotizacion.items)) {
-          const detalles = cotizacion.items.map((item, index) => ({
-            documento_id: documento.id,
-            tenant_id: tenantId,
-            orden: index + 1,
-            codigo_producto: item.codigo || item.codigo_producto || 'N/A',
-            descripcion: item.descripcion,
-            unidad_medida: item.unidad || item.unidad_medida || 'NIU',
-            cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-            descuento_unitario: item.descuento || 0,
-            valor_venta: item.valor_venta || (item.cantidad * item.precio_unitario),
-            impuesto_igv: item.igv || (item.valor_venta * 0.18),
-            impuesto_isc: 0,
-            total_item: item.total || item.valor_venta + (item.igv || 0)
-          }));
+          // ✅ CORRECCIÓN: Obtener tasa de IGV una sola vez antes del map
+          const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
+          
+          const detalles = cotizacion.items.map((item, index) => {
+            const valorVenta = item.valor_venta || (item.cantidad * item.precio_unitario);
+            const impuestoIgv = item.igv || (valorVenta * tasaIgv);
+            
+            return {
+              documento_id: documento.id,
+              tenant_id: tenantId,
+              orden: index + 1,
+              codigo_producto: item.codigo || item.codigo_producto || 'N/A',
+              descripcion: item.descripcion,
+              unidad_medida: item.unidad || item.unidad_medida || 'NIU',
+              cantidad: item.cantidad,
+              precio_unitario: item.precio_unitario,
+              descuento_unitario: item.descuento || 0,
+              valor_venta: valorVenta,
+              impuesto_igv: impuestoIgv,
+              impuesto_isc: 0,
+              total_item: item.total || valorVenta + impuestoIgv
+            };
+          });
 
           const { error: errorDetalles } = await this.supabaseService
             .getClient()

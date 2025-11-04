@@ -7,10 +7,14 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { OutboxModule } from '../../shared/outbox/outbox.module';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
+import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
     SupabaseModule,
+    AuthModule,
+    PermissionsModule,
   ],
   controllers: [RrhhController],
   providers: [

@@ -6,6 +6,7 @@ import { ConfigurationService } from '../configuracion/configuration.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { CxcService } from '../finanzas/cxc/cxc.service';
+import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
 import { v4 as uuidv4 } from 'uuid';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 
@@ -22,6 +23,7 @@ export class PosService {
     private readonly eventBus: EventBusService,
     private readonly inventoryIntegration: InventoryIntegrationService,
     private readonly cxcService: CxcService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) { }
 
   private async runWithTenantContext<T>(user: any, operation: () => Promise<T>): Promise<T> {
@@ -333,13 +335,13 @@ export class PosService {
           // Obtener producto para stock anterior y precio
           const { data: producto } = await this.supabase.getClient()
             .from('productos')
-            .select('stock_actual, precio_venta')
+            .select('stock, stock_reservado, precio_venta')
             .eq('id', item.producto_id)
             .eq('tenant_id', user.tenant_id)
             .single();
 
           if (producto) {
-            const stockAnterior = Number(producto.stock_actual || 0);
+            const stockAnterior = Number(producto.stock || 0);
             const stockNuevo = stockAnterior - item.cantidad;
             const precioVenta = Number(producto.precio_venta || item.precio_unitario || 0);
             const valorTotal = precioVenta * item.cantidad;
@@ -408,22 +410,30 @@ export class PosService {
       // 🔴 CRÍTICO FIX: Emitir evento VentaProcessedEvent para contabilidad
       // Esto asegura que las ventas POS generen asientos contables automáticamente
       try {
+        const eventId = uuidv4();
+        const resolvedTenant = venta.tenant_id ?? user.tenant_id;
+        const idempotencyKey = `pos:venta:${resolvedTenant}:${venta.id}`;
+
         await this.eventBus.emitVentaProcessed({
+          eventId,
+          tenantId: resolvedTenant,
+          idempotencyKey,
+          source: 'ventas.pos.registro',
           ventaId: venta.id,
-          numeroTicket: venta.numero_ticket || numeroVenta,
+          numeroTicket: String(venta.numero_ticket || numeroVenta),
           clienteId: ventaData.cliente_id || null,
           clienteNombre: ventaData.cliente_nombre || 'Cliente Genérico',
           metodoPago: ventaData.metodo_pago_id || 'EFECTIVO',
-          subtotal: ventaData.subtotal || 0,
-          impuestos: ventaData.impuestos || 0,
-          total: ventaData.total || 0,
+          subtotal: Number(ventaData.subtotal || 0),
+          impuestos: Number(ventaData.impuestos || 0),
+          total: Number(ventaData.total || 0),
           items: (ventaData.items || []).map((item: any) => ({
             productoId: item.producto_id,
-            cantidad: item.cantidad || 0,
-            precio: item.precio_unitario || 0,
-            total: item.subtotal || (item.cantidad || 0) * (item.precio_unitario || 0),
+            cantidad: Number(item.cantidad || 0),
+            precio: Number(item.precio_unitario || 0),
+            total: Number(item.subtotal || (item.cantidad || 0) * (item.precio_unitario || 0)),
           })),
-          tenantId: user.tenant_id,
+          cpeId: ventaData.cpe_id || null,
         });
         this.logger.log('✅ Evento VentaProcessedEvent emitido para POS');
       } catch (error) {
@@ -458,6 +468,9 @@ export class PosService {
 
         this.logger.log('✅ Empresa encontrada:', empresa.razon_social);
 
+        // ✅ FIX: Obtener tasa de IGV una sola vez antes del map
+        const tasaIgv = await this.taxCalculator.getTasaIgv(user.tenant_id);
+        
         cpeData = {
           tipo_documento: '03' as any, // Boleta
           serie: 'B001',
@@ -481,9 +494,9 @@ export class PosService {
             valor_unitario: parseFloat(item.precio_unitario) || 0,
             precio_venta: parseFloat(item.subtotal) || 0,
             valor_venta: parseFloat(item.subtotal) || 0,
-            igv: parseFloat(item.subtotal) * 0.18 || 0,
-            total_impuestos: parseFloat(item.subtotal) * 0.18 || 0,
-            total: parseFloat(item.subtotal) * 1.18 || 0
+            igv: parseFloat(item.subtotal) * tasaIgv || 0,
+            total_impuestos: parseFloat(item.subtotal) * tasaIgv || 0,
+            total: parseFloat(item.subtotal) * (1 + tasaIgv) || 0
           }))
         };
 
@@ -567,17 +580,20 @@ export class PosService {
 
             // Preparar datos del CPE para serie y número (usar datos del CPE si se emitió exitosamente)
             const serieCpe = cpeData?.serie || 'B001';
-            const numeroCpe = cpeData?.numero?.toString() || venta.numero_ticket?.split('-')[1] || null;
+            const numeroCpe =
+              cpeData?.numero != null
+                ? String(cpeData.numero)
+                : venta.numero_ticket?.split('-')[1] || null; // HARDENING: preservar formato del correlativo serializado.
 
             // Crear FacturaEmitidaEvent para usar el método de CxC
             const facturaEvent = {
               eventId: uuidv4(),
               tenantId: user.tenant_id,
-              pedidoId: null, // POS no tiene pedido asociado
+              pedidoId: undefined, // HARDENING: POS puede no tener pedido asociado.
               cpeId: cpeId || venta.id, // Usar CPE ID si existe, sino venta ID
               facturaId: venta.id,
               serie: serieCpe,
-              numero: numeroCpe ? parseInt(numeroCpe) : null,
+              numero: numeroCpe ?? '0',
               clienteId: clienteId,
               subtotal: ventaData.subtotal || 0,
               impuestos: ventaData.impuestos || 0,

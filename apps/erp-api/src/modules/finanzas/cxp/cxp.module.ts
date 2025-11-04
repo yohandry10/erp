@@ -6,9 +6,10 @@ import { SupabaseModule } from '../../../shared/supabase/supabase.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
+import { AuthModule } from '../../auth/auth.module';
 
 @Module({
-  imports: [SupabaseModule, PermissionsModule],
+  imports: [SupabaseModule, PermissionsModule, AuthModule],
   controllers: [CxpController],
   providers: [CxpService, CxpRecepcionListener, RetencionesValidationService],
   exports: [CxpService],

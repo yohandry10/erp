@@ -29,6 +29,7 @@ describe('AccountingEntriesService - Period Validation', () => {
         order: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
         single: jest.fn().mockResolvedValue({ data: null, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
         insert: jest.fn().mockReturnThis()
       }))
     }))
@@ -131,9 +132,13 @@ describe('AccountingEntriesService - Period Validation', () => {
         eq: jest.fn().mockReturnThis(),
         order: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ 
-          data: { numero_asiento: 100 }, 
-          error: null 
+        single: jest.fn().mockResolvedValue({
+          data: { numero_asiento: 100 },
+          error: null
+        }),
+        maybeSingle: jest.fn().mockResolvedValue({
+          data: { numero_asiento: 100 },
+          error: null
         }),
         insert: jest.fn().mockReturnValue({
           select: jest.fn().mockReturnValue({
@@ -236,6 +241,60 @@ describe('AccountingEntriesService - Period Validation', () => {
         'test-tenant-id',
         expect.any(Date)
       );
+    });
+
+    it('should return existing asiento when sourceEventId already processed', async () => {
+      const existingAsientoId = 'asiento-existing-001';
+
+      mockPeriodosService.validarPeriodoAbierto.mockResolvedValue(undefined);
+
+      const selectMock = jest.fn().mockReturnThis();
+      const eqMock = jest.fn().mockReturnThis();
+      const maybeSingleMock = jest.fn().mockResolvedValue({
+        data: { id: existingAsientoId },
+        error: null,
+      });
+
+      const mockFrom = jest.fn().mockReturnValueOnce({
+        select: selectMock,
+        eq: eqMock,
+        maybeSingle: maybeSingleMock,
+      });
+
+      mockSupabaseService.getClient = jest.fn(() => ({
+        from: mockFrom,
+      }));
+
+      const asiento = {
+        fecha: new Date().toISOString().split('T')[0],
+        concepto: 'Asiento idempotente',
+        referencia: 'EVENT-001',
+        sourceEventId: 'event-001',
+        detalles: [
+          {
+            cuentaId: 'cuenta-1',
+            cuentaCodigo: '101',
+            cuentaNombre: 'Caja',
+            debe: 50,
+            haber: 0,
+            descripcion: 'Debe',
+          },
+          {
+            cuentaId: 'cuenta-2',
+            cuentaCodigo: '701',
+            cuentaNombre: 'Ventas',
+            debe: 0,
+            haber: 50,
+            descripcion: 'Haber',
+          },
+        ],
+      };
+
+      const result = await (service as any).guardarAsientoContable(asiento);
+
+      expect(result).toBe(existingAsientoId);
+      expect(mockFrom).toHaveBeenCalledTimes(1);
+      expect(maybeSingleMock).toHaveBeenCalledTimes(1);
     });
   });
 });

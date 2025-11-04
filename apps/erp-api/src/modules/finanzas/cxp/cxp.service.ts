@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService, PagoProveedorRegistradoEvent } from '../../../shared/events/event-bus.service';
+import { v4 as uuidv4 } from 'uuid';
 import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto } from './dto';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
@@ -393,7 +394,20 @@ export class CxpService {
     // Obtener la CxP actual
     const { data: cxp, error: errorCxp } = await client
       .from('cuentas_por_pagar')
-      .select('id, estado, saldo, total, moneda, proveedor_id, numero_documento')
+      .select(`
+        id,
+        estado,
+        saldo,
+        total,
+        moneda,
+        proveedor_id,
+        numero_documento,
+        proveedor:proveedores!cuentas_por_pagar_proveedor_id_fkey(
+          id,
+          razon_social,
+          ruc
+        )
+      `)
       .eq('tenant_id', tenantId)
       .eq('id', cxpId)
       .maybeSingle();
@@ -419,6 +433,12 @@ export class CxpService {
       );
     }
 
+    const proveedorNombre: string | null =
+      (cxp as any)?.proveedor?.razon_social ?? null;
+
+    let cuentaBancariaNombre: string | null = null;
+    let cuentaSaldoAnterior: number | null = null;
+
     // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
     if (dto.cuenta_bancaria_id) {
       const { data: cuentaBancaria, error: errorCuenta } = await client
@@ -431,6 +451,8 @@ export class CxpService {
       if (errorCuenta || !cuentaBancaria) {
         throw new BadRequestException('Cuenta bancaria no encontrada');
       }
+
+      cuentaBancariaNombre = cuentaBancaria.nombre;
 
       if (!cuentaBancaria.activa) {
         throw new BadRequestException('No se pueden registrar pagos desde una cuenta bancaria inactiva');
@@ -445,6 +467,7 @@ export class CxpService {
 
       // ✅ VALIDAR SALDO BANCARIO: Verificar que hay fondos suficientes
       const saldoActual = Number(cuentaBancaria.saldo || 0);
+      cuentaSaldoAnterior = this.round2(saldoActual);
       const permiteSobregiro = cuentaBancaria.permite_sobregiro || false;
 
       if (!permiteSobregiro && saldoActual < dto.monto) {
@@ -501,23 +524,39 @@ export class CxpService {
     // 2. Actualizar el saldo de la cuenta bancaria
     // 3. Registrar el pago en la tabla de pagos
     try {
+      const pagoId = uuidv4();
+      const eventId = uuidv4();
+      const idempotencyKey =
+        dto.idempotency_key ?? `cxp:pago:${tenantId}:${cxpId}:${pagoId}`;
+      const cuentaSaldoPosterior =
+        cuentaSaldoAnterior !== null ? this.round2(cuentaSaldoAnterior - dto.monto) : null;
+
       const eventoPayload: PagoProveedorRegistradoEvent = {
+        tenantId,
+        eventId,
+        idempotencyKey,
         cxpId: cxpId,
+        pagoId,
         proveedorId: cxp.proveedor_id,
+        proveedorNombre: proveedorNombre ?? cxp.proveedor_id,
         numeroDocumento: cxp.numero_documento,
         monto: this.round2(dto.monto),
         moneda: cxp.moneda,
-        fechaPago: dto.fecha_pago,
+        fecha: dto.fecha_pago,
         metodoPago: dto.metodo_pago,
-        cuentaBancariaId: dto.cuenta_bancaria_id,
-        referencia: dto.referencia,
-        observaciones: dto.observaciones,
+        cuentaBancariaId: dto.cuenta_bancaria_id ?? null,
+        cuentaBancariaNombre,
+        referencia: dto.referencia ?? null,
+        observaciones: dto.observaciones ?? null,
         saldoAnterior: cxp.saldo,
         saldoNuevo: nuevoSaldo,
         estadoAnterior: cxp.estado,
         estadoNuevo: nuevoEstado,
-        tenantId: tenantId,
-        createdBy: userId,
+        createdBy: userId ?? null,
+        movimientoBancarioId: null,
+        cuentaSaldoAnterior,
+        cuentaSaldoNuevo: cuentaSaldoPosterior,
+        source: 'cxp.aplicarPago',
       };
 
       this.eventBus.emitPagoProveedorRegistrado(eventoPayload);

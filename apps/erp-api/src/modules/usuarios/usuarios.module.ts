@@ -7,9 +7,10 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../../shared/email/email.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [SupabaseModule, PermissionsModule, AuditModule, EmailModule],
+  imports: [SupabaseModule, PermissionsModule, AuditModule, EmailModule, AuthModule],
   providers: [UsuariosService, UserManagementService],
   controllers: [UsuariosController, UserManagementController],
   exports: [UsuariosService, UserManagementService],

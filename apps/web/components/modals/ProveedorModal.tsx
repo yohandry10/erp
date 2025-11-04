@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+import { useApi } from '@/hooks/use-api'
 
 interface Proveedor {
   id?: number | string
@@ -56,6 +55,7 @@ export default function ProveedorModal({
   onSuccess,
   proveedor,
 }: ProveedorModalProps) {
+  const { post, put } = useApi()
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -108,21 +108,10 @@ export default function ProveedorModal({
 
     setIsLoading(true)
     try {
-      const url = proveedor
-        ? `${API_URL}/api/compras/proveedores/${proveedor.id}`
-        : `${API_URL}/api/compras/proveedores`
-
-      const method = proveedor ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      const result = await response.json()
+      // ✅ Usar useApi en lugar de fetch directo
+      const result = proveedor
+        ? await put(`/compras/proveedores/${proveedor.id}`, formData)
+        : await post('/compras/proveedores', formData)
 
       if (result?.success) {
         onSuccess()

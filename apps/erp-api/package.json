@@ -4,7 +4,7 @@
   "description": "Backend ERP Suite API (NestJS)",
   "main": "dist/erp-api/src/main.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node --transpile-only src/main.ts",
+    "dev": "dotenv -e .env -- nodemon --exec ts-node --transpile-only src/main.ts",
     "start": "node dist/erp-api/src/main.js",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -60,6 +60,7 @@
     "@types/jest": "^30.0.0",
     "@types/nodemailer": "^7.0.3",
     "@types/passport-jwt": "^4.0.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^8.0.0",
     "jest": "^30.2.0",
     "nodemon": "^3.1.10",

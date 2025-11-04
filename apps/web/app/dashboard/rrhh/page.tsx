@@ -3,15 +3,31 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import EmpleadoModal from '@/components/modals/EmpleadoModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useApi } from '@/hooks/use-api';
 
 const RrhhPage = () => {
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [departamentos, setDepartamentos] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { get, post, delete: del } = useApi();
 
-  // Definir API_BASE_URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
+
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   useEffect(() => {
@@ -28,42 +44,22 @@ const RrhhPage = () => {
     try {
       setLoading(true);
       
-      // Cargar empleados
-      const empleadosResponse = await fetch(`${API_BASE_URL}/api/rrhh/empleados`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      
-      if (empleadosResponse.ok) {
-        const empleadosData = await empleadosResponse.json();
-        if (empleadosData && empleadosData.success && Array.isArray(empleadosData.data)) {
-          setEmpleados(empleadosData.data);
-        } else if (Array.isArray(empleadosData)) {
-          setEmpleados(empleadosData);
-        } else {
-          setEmpleados([]);
-        }
+      // ✅ Cargar empleados usando useApi
+      const empleadosData = await get('/rrhh/empleados');
+      if (empleadosData && empleadosData.success && Array.isArray(empleadosData.data)) {
+        setEmpleados(empleadosData.data);
+      } else if (Array.isArray(empleadosData)) {
+        setEmpleados(empleadosData);
       } else {
         setEmpleados([]);
       }
 
-      // Cargar departamentos
-      const departamentosResponse = await fetch(`${API_BASE_URL}/api/rrhh/departamentos`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      
-      if (departamentosResponse.ok) {
-        const departamentosData = await departamentosResponse.json();
-        if (departamentosData && departamentosData.success && Array.isArray(departamentosData.data)) {
-          setDepartamentos(departamentosData.data);
-        } else if (Array.isArray(departamentosData)) {
-          setDepartamentos(departamentosData);
-        } else {
-          setDepartamentos([]);
-        }
+      // ✅ Cargar departamentos usando useApi
+      const departamentosData = await get('/rrhh/departamentos');
+      if (departamentosData && departamentosData.success && Array.isArray(departamentosData.data)) {
+        setDepartamentos(departamentosData.data);
+      } else if (Array.isArray(departamentosData)) {
+        setDepartamentos(departamentosData);
       } else {
         setDepartamentos([]);
       }
@@ -79,16 +75,10 @@ const RrhhPage = () => {
 
   const handleCreateEmpleado = async (empleadoData: any) => {
     try {
-      const response = await fetch('/api/rrhh/empleados', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(empleadoData),
-      });
+      // ✅ Usar useApi en lugar de fetch
+      const response = await post('/rrhh/empleados', empleadoData);
 
-      if (response.ok) {
+      if (response) {
         setIsModalOpen(false);
         loadData(); // Recargar la lista
       } else {
@@ -493,27 +483,29 @@ Dirección: ${empleado.direccion || 'No registrada'}
                           <button 
                             className="btn-icon-danger" 
                             title="Eliminar empleado"
-                            onClick={async () => {
-                              if (confirm(`¿Está seguro de eliminar a ${empleado.nombres} ${empleado.apellidos}?`)) {
-                                try {
-                                  const response = await fetch(`${API_BASE_URL}/api/rrhh/empleados/${empleado.id}`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                                    },
-                                  });
-                                  
-                                  if (response.ok) {
-                                    loadData(); // Recargar la lista
-                                    alert('Empleado eliminado exitosamente');
-                                  } else {
-                                    throw new Error('Error al eliminar empleado');
+                            onClick={() => {
+                              setConfirmDialog({
+                                isOpen: true,
+                                title: 'Eliminar Empleado',
+                                message: `¿Está seguro de eliminar a ${empleado.nombres} ${empleado.apellidos}?\n\nEsta acción no se puede deshacer.`,
+                                variant: 'danger',
+                                onConfirm: async () => {
+                                  try {
+                                    // ✅ Usar useApi en lugar de fetch
+                                    const response = await del(`/rrhh/empleados/${empleado.id}`);
+                                    
+                                    if (response) {
+                                      loadData(); // Recargar la lista
+                                      alert('Empleado eliminado exitosamente');
+                                    } else {
+                                      throw new Error('Error al eliminar empleado');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error:', error);
+                                    alert('Error al eliminar empleado');
                                   }
-                                } catch (error) {
-                                  console.error('Error:', error);
-                                  alert('Error al eliminar empleado');
                                 }
-                              }
+                              });
                             }}
                           >
                             🗑️
@@ -535,6 +527,15 @@ Dirección: ${empleado.direccion || 'No registrada'}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateEmpleado}
         departamentos={departamentos}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
       />
     </div>
   );

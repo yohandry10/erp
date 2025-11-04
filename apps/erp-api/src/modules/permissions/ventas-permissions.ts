@@ -170,6 +170,60 @@ export const INVENTARIO_LOGISTICA_PERMISSIONS: PermissionDefinition[] = [
   },
 ];
 
+/**
+ * Permisos núcleo de inventario (almacenes, recepciones, kardex)
+ */
+export const INVENTARIO_CORE_PERMISSIONS: PermissionDefinition[] = [
+  {
+    modulo: 'inventario',
+    recurso: 'almacenes',
+    accion: 'read',
+    descripcion: 'Consultar almacenes y ubicaciones activas',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'ingresos',
+    accion: 'write',
+    descripcion: 'Registrar recepciones y notas de ingreso',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'salidas',
+    accion: 'write',
+    descripcion: 'Registrar salidas y notas de salida de almacén',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'transferencias',
+    accion: 'write',
+    descripcion: 'Gestionar transferencias entre almacenes y ubicaciones',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'kardex',
+    accion: 'read',
+    descripcion: 'Consultar kardex valorizado y movimientos por producto',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'movimientos',
+    accion: 'read',
+    descripcion: 'Listar movimientos de stock históricos',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'movimientos',
+    accion: 'create',
+    descripcion: 'Registrar movimientos manuales de inventario',
+  },
+  {
+    modulo: 'inventario',
+    recurso: 'stats',
+    accion: 'read',
+    descripcion: 'Visualizar estadísticas de inventario',
+  },
+];
+
 export const VENTAS_RMA_PERMISSIONS: PermissionDefinition[] = [
   {
     modulo: 'ventas',
@@ -211,6 +265,7 @@ export const ALL_VENTAS_PERMISSIONS: PermissionDefinition[] = [
   ...VENTAS_COTIZACIONES_PERMISSIONS,
   ...VENTAS_PEDIDOS_PERMISSIONS,
   ...VENTAS_APROBACIONES_PERMISSIONS,
+  ...INVENTARIO_CORE_PERMISSIONS,
   ...INVENTARIO_LOGISTICA_PERMISSIONS,
   ...VENTAS_RMA_PERMISSIONS,
 ];

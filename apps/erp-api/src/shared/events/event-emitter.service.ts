@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { CobroRegistradoEvent } from './event-bus.service';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface EmitEventOptions {
@@ -129,29 +130,28 @@ export class EventEmitterService {
    * @param cobroData - Collection data
    * @returns The created event ID
    */
-  async emitCobroRegistrado(cobroData: {
-    cobroId: string;
-    tenantId: string;
-    fecha: string;
-    monto: number;
-    centroCostoId?: string;
-    numeroDocumento?: string;
-    referencia?: string;
-  }): Promise<string> {
+  async emitCobroRegistrado(evento: CobroRegistradoEvent): Promise<string> {
+    // HARDENING: normalizar payload asegurando compatibilidad snake_case/camelCase.
+    const payload = {
+      ...evento,
+      tenant_id: evento.tenantId,
+      cobro_id: evento.cobroId,
+      cxc_id: evento.cxcId,
+      cuenta_bancaria_id: evento.cuentaBancariaId ?? null,
+      numeroDocumento: evento.numeroDocumento ?? null,
+      numero_documento: evento.numeroDocumento ?? null,
+      documento_id: evento.documentoId ?? null,
+      metodo_pago: evento.medio,
+      referencia: evento.referencia ?? null,
+      timestamp: evento.timestamp ?? new Date().toISOString(),
+    };
+
     return this.emit({
       eventType: 'cobro.registrado',
       aggregateType: 'cobro',
-      aggregateId: cobroData.cobroId,
-      eventData: {
-        tenant_id: cobroData.tenantId,
-        cobro_id: cobroData.cobroId,
-        fecha: cobroData.fecha,
-        monto: cobroData.monto,
-        centro_costo_id: cobroData.centroCostoId,
-        numeroDocumento: cobroData.numeroDocumento,
-        referencia: cobroData.referencia,
-        timestamp: new Date().toISOString()
-      }
+      aggregateId: evento.cobroId,
+      eventData: payload,
+      correlationId: evento.idempotencyKey,
     });
   }
 

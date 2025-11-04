@@ -4,10 +4,12 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { EventBusService } from '../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
+import { TaxCalculatorService } from '../shared/utils/tax-calculator';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { TenantContextService } from '../shared/tenant/tenant-context.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @ApiTags('compras')
 @Controller('compras')
@@ -17,7 +19,8 @@ export class ComprasController {
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly inventoryIntegration: InventoryIntegrationService,
-    private readonly tenantContext: TenantContextService
+    private readonly tenantContext: TenantContextService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   private resolveTenant(): string {
@@ -222,8 +225,14 @@ export class ComprasController {
       // Calcular totales
       const subtotal = ordenData.items.reduce((sum, item) => 
         sum + (item.cantidad * item.precio_unitario), 0);
-      const igv = subtotal * 0.18;
-      const total = subtotal + igv;
+      
+      // ✅ CORRECCIÓN: Usar TaxCalculatorService en lugar de hardcodear IGV
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal,
+        tenantId,
+      });
+      const igv = taxResult.igv;
+      const total = taxResult.total;
 
       // Crear orden de compra
       const { data: orden, error: ordenError } = await this.supabase.getClient()
@@ -357,21 +366,47 @@ export class ComprasController {
 
       // Si la orden está completamente entregada, emitir evento para contabilidad
       if (nuevoEstado === 'ENTREGADO') {
+        // HARDENING: evento de compra incluye metadatos idempotentes para contabilidad/inventario.
+        const eventId = uuidv4();
+        const idempotencyKey = `compra:${tenantId}:${orden.id}:${eventId}`;
+        const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
+        const subtotal = round2(orden.subtotal ?? 0);
+        const igv = round2(orden.igv ?? 0);
+        const total = round2(orden.total ?? subtotal + igv);
+        const moneda = orden.moneda ?? 'PEN';
+
         this.eventBus.emitCompraEntregada({
+          tenantId,
+          eventId,
+          idempotencyKey,
           ordenId: orden.id,
           numeroOrden: orden.numero_orden,
-          proveedorId: orden.proveedor_id,
-          proveedorNombre: orden.proveedor?.nombre || 'Proveedor',
-          total: orden.total,
+          proveedorId: orden.proveedor_id ?? orden.proveedor?.id,
+          proveedorNombre: orden.proveedor?.nombre ?? 'Proveedor',
+          proveedorRuc: orden.proveedor?.ruc ?? null,
           fechaEntrega: new Date().toISOString(),
-          tenantId, // HARDENING: propagar tenant al evento de compras
-          items: orden.orden_compra_detalles.map(item => ({
-            productoId: item.producto_id,
-            descripcion: item.descripcion,
-            cantidad: item.cantidad,
-            precioUnitario: item.precio_unitario,
-            subtotal: item.subtotal
-          }))
+          subtotal,
+          igv,
+          total,
+          moneda,
+          diasCredito: orden.proveedor?.dias_credito ?? null,
+          condicionesPago: orden.proveedor?.condiciones_pago ?? null,
+          almacenId: recepcionData?.almacen_id ?? null,
+          observaciones: recepcionData?.observaciones ?? null,
+          items: orden.orden_compra_detalles.map((item) => {
+            const cantidad = Number(item.cantidad ?? 0);
+            const precioUnitario = round2(item.precio_unitario ?? 0);
+            return {
+              productoId: item.producto_id,
+              descripcion: item.descripcion ?? item.nombre ?? 'Producto',
+              cantidad,
+              precioUnitario,
+              total: round2(precioUnitario * cantidad),
+              calidad: 'OK',
+              ubicacionId: recepcionData?.ubicacion_id ?? null,
+            };
+          }),
+          emittedAt: new Date().toISOString(),
         });
       }
 

@@ -1,64 +1,169 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
 import { EventBusService, RecepcionRegistradaEvent, CompraEntregadaEvent } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class RecepcionesService {
+  private readonly logger = new Logger(RecepcionesService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly inventarioService: InventarioService,
     private readonly eventBus: EventBusService,
+    private readonly auditService: AuditService,
   ) {}
+
+  private async registrarIntegrationLog(entry: {
+    tenantId: string;
+    operacion: string;
+    correlacionId?: string | null;
+    correlacionTipo?: string | null;
+    status: 'SUCCESS' | 'ERROR';
+    requestSummary?: Record<string, any>;
+    responseSummary?: Record<string, any>;
+    errorMessage?: string;
+    durationMs?: number;
+  }): Promise<void> {
+    try {
+      await this.supabase
+        .getClient()
+        .from('integration_logs')
+        .insert({
+          tenant_id: entry.tenantId,
+          servicio: 'COMPRAS',
+          operacion: entry.operacion,
+          correlacion_id: entry.correlacionId ?? null,
+          correlacion_tipo: entry.correlacionTipo ?? null,
+          status: entry.status,
+          request_summary: entry.requestSummary ?? null,
+          response_summary: entry.responseSummary ?? null,
+          error_message: entry.errorMessage ?? null,
+          duration_ms: entry.durationMs ?? null,
+        });
+    } catch (error) {
+      this.logger.error('❌ [Recepciones] Error registrando integration_log:', error);
+    }
+  }
+
+  private normalizeDateFilter(value?: string, boundary: 'start' | 'end' = 'start'): string | null {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const isoCandidate = trimmed.includes('T') ? trimmed : `${trimmed}T00:00:00Z`;
+    const parsed = new Date(isoCandidate);
+    if (Number.isNaN(parsed.getTime())) {
+      this.logger.warn(`⚠️ [Recepciones] Fecha inválida recibida: "${value}"`);
+      return null;
+    }
+
+    if (boundary === 'end') {
+      parsed.setUTCHours(23, 59, 59, 999);
+    } else {
+      parsed.setUTCHours(0, 0, 0, 0);
+    }
+
+    return parsed.toISOString();
+  }
+
+  private sanitizeSearchTerm(value?: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return trimmed.replace(/[%_]/g, '');
+  }
 
   /**
    * Obtiene todas las recepciones con filtros opcionales
    */
-  async obtenerRecepciones(tenantId: string, filtros?: any): Promise<any[]> {
+  async obtenerRecepciones(tenantId: string, filtros: any = {}): Promise<any[]> {
+    const startedAt = Date.now();
     try {
-      console.log(`📦 [Recepciones] Obteniendo recepciones para tenant: ${tenantId}`);
+      this.logger.log(`📦 [Recepciones] Listando recepciones para tenant ${tenantId}`);
 
-      let query = this.supabase.getClient()
+      const estado = filtros?.estado ? String(filtros.estado).toUpperCase() : undefined;
+      const ordenId = filtros?.orden_id ?? filtros?.ordenId ?? null;
+      const fechaDesde = this.normalizeDateFilter(filtros?.fecha_desde ?? filtros?.desde, 'start');
+      const fechaHasta = this.normalizeDateFilter(filtros?.fecha_hasta ?? filtros?.hasta, 'end');
+      const search = this.sanitizeSearchTerm(filtros?.search ?? filtros?.numero);
+
+      let query = this.supabase
+        .getClient()
         .from('recepciones')
-        .select(`
-          *,
-          orden:ordenes_compra(
-            id,
-            numero,
-            proveedor:proveedores(id, razon_social, ruc)
-          )
-        `)
+        .select(
+          `
+            *,
+            orden:ordenes_compra(
+              id,
+              numero,
+              proveedor:proveedores(id, razon_social, ruc)
+            )
+          `,
+        )
         .eq('tenant_id', tenantId)
+        .order('fecha_recepcion', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (filtros?.estado) {
-        query = query.eq('estado', filtros.estado);
+      if (estado) {
+        query = query.eq('estado', estado);
       }
 
-      if (filtros?.orden_id) {
-        query = query.eq('orden_id', filtros.orden_id);
+      if (ordenId) {
+        query = query.eq('orden_id', ordenId);
       }
 
-      if (filtros?.fecha_desde) {
-        query = query.gte('fecha_recepcion', filtros.fecha_desde);
+      if (fechaDesde) {
+        query = query.gte('fecha_recepcion', fechaDesde);
       }
 
-      if (filtros?.fecha_hasta) {
-        query = query.lte('fecha_recepcion', filtros.fecha_hasta);
+      if (fechaHasta) {
+        query = query.lte('fecha_recepcion', fechaHasta);
+      }
+
+      if (search) {
+        query = query.ilike('numero', `%${search}%`);
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ Error obteniendo recepciones:', error);
         throw new BadRequestException(`Error al obtener recepciones: ${error.message}`);
       }
 
-      console.log(`✅ Recepciones obtenidas: ${data?.length || 0}`);
-      return data || [];
+      const results = data || [];
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.listar',
+        status: 'SUCCESS',
+        requestSummary: { estado, ordenId, fechaDesde, fechaHasta, search },
+        responseSummary: { total: results.length },
+        durationMs: Date.now() - startedAt,
+      });
+
+      return results;
     } catch (error) {
-      console.error('❌ Error en obtenerRecepciones:', error);
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.listar',
+        status: 'ERROR',
+        requestSummary: filtros,
+        errorMessage: error?.message ?? 'Error inesperado',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ Error en obtenerRecepciones:', error);
       throw error;
     }
   }
@@ -67,8 +172,9 @@ export class RecepcionesService {
    * Obtiene una recepción específica por ID
    */
   async obtenerRecepcionPorId(recepcionId: string, tenantId: string): Promise<any> {
+    const startedAt = Date.now();
     try {
-      console.log(`📦 [Recepciones] Obteniendo recepción ${recepcionId}`);
+      this.logger.log(`📦 [Recepciones] Obteniendo recepción ${recepcionId}`);
 
       const { data, error } = await this.supabase.getClient()
         .from('recepciones')
@@ -77,26 +183,61 @@ export class RecepcionesService {
           orden:ordenes_compra(
             id,
             numero,
-            proveedor:proveedores(id, razon_social, ruc)
+            subtotal,
+            igv,
+            total,
+            moneda,
+            proveedor:proveedores(id, razon_social, ruc, documento_tipo, documento_numero, condiciones_pago, dias_credito)
           ),
           items:recepcion_items(
             *,
-            producto:productos(id, codigo, nombre)
+            producto:productos(id, codigo, nombre, sku),
+            detalle:orden_compra_detalles( // HARDENING: obtenemos metadata directa para eventos contables.
+              id,
+              descripcion,
+              cantidad,
+              cantidad_recibida,
+              precio_unitario
+            )
           )
         `)
         .eq('tenant_id', tenantId)
         .eq('id', recepcionId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        console.error('❌ Error obteniendo recepción:', error);
-        throw new NotFoundException(`Recepción no encontrada: ${error.message}`);
+      if (error || !data) {
+        if (error) {
+          this.logger.error('❌ Error obteniendo recepción:', error);
+        }
+        throw new NotFoundException('Recepción no encontrada');
       }
 
-      console.log(`✅ Recepción obtenida: ${data.numero}`);
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.detalle',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'SUCCESS',
+        responseSummary: {
+          numero: (data as any).numero,
+          items: (data as any).items?.length ?? 0,
+        },
+        durationMs: Date.now() - startedAt,
+      });
+
+      this.logger.log(`✅ Recepción obtenida: ${(data as any).numero}`);
       return data;
     } catch (error) {
-      console.error('❌ Error en obtenerRecepcionPorId:', error);
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.detalle',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'ERROR',
+        errorMessage: error?.message ?? 'Error inesperado',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ Error en obtenerRecepcionPorId:', error);
       throw error;
     }
   }
@@ -105,8 +246,9 @@ export class RecepcionesService {
    * Crea una nueva recepción en estado BORRADOR
    */
   async crearRecepcion(tenantId: string, dto: CreateRecepcionDto, userId?: string): Promise<any> {
+    const startedAt = Date.now();
     try {
-      console.log(`📦 [Recepciones] Creando recepción para orden ${dto.orden_id}`);
+      this.logger.log(`📦 [Recepciones] Creando recepción para orden ${dto.orden_id}`);
 
       // Validar que la orden existe y está en estado válido
       const { data: orden, error: ordenError } = await this.supabase.getClient()
@@ -148,7 +290,7 @@ export class RecepcionesService {
         .single();
 
       if (recepcionError) {
-        console.error('❌ Error creando recepción:', recepcionError);
+        this.logger.error('❌ Error creando recepción:', recepcionError);
         throw new BadRequestException(`Error al crear recepción: ${recepcionError.message}`);
       }
 
@@ -189,7 +331,7 @@ export class RecepcionesService {
         .insert(itemsToInsert);
 
       if (itemsError) {
-        console.error('❌ Error creando items de recepción:', itemsError);
+        this.logger.error('❌ Error creando items de recepción:', itemsError);
         // Rollback: eliminar la recepción creada
         await this.supabase.getClient()
           .from('recepciones')
@@ -198,12 +340,33 @@ export class RecepcionesService {
         throw new BadRequestException(`Error al crear items de recepción: ${itemsError.message}`);
       }
 
-      console.log(`✅ Recepción creada: ${recepcion.numero}`);
+      this.logger.log(`✅ Recepción creada: ${recepcion.numero}`);
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.crear',
+        correlacionId: recepcion.id,
+        correlacionTipo: 'RECEPCION',
+        status: 'SUCCESS',
+        requestSummary: { ordenId: dto.orden_id, items: dto.items?.length ?? 0 },
+        responseSummary: { numero: recepcion.numero },
+        durationMs: Date.now() - startedAt,
+      });
 
       // Retornar recepción completa con items
       return this.obtenerRecepcionPorId(recepcion.id, tenantId);
     } catch (error) {
-      console.error('❌ Error en crearRecepcion:', error);
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.crear',
+        correlacionId: dto?.orden_id ?? null,
+        correlacionTipo: 'RECEPCION',
+        status: 'ERROR',
+        requestSummary: { ordenId: dto?.orden_id },
+        errorMessage: error?.message ?? 'Error inesperado',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ Error en crearRecepcion:', error);
       throw error;
     }
   }
@@ -217,11 +380,13 @@ export class RecepcionesService {
     dto: CerrarRecepcionDto,
     userId?: string
   ): Promise<any> {
+    const startedAt = Date.now();
     try {
-      console.log(`📦 [Recepciones] Cerrando recepción ${recepcionId}`);
+      this.logger.log(`📦 [Recepciones] Cerrando recepción ${recepcionId}`);
 
       // Obtener recepción con todos sus datos
       const recepcion = await this.obtenerRecepcionPorId(recepcionId, tenantId);
+      const estadoAnteriorRecepcion = recepcion.estado;
 
       if (recepcion.estado !== 'BORRADOR') {
         throw new BadRequestException('Solo se pueden cerrar recepciones en estado BORRADOR');
@@ -251,9 +416,8 @@ export class RecepcionesService {
             fechaExpiracion: item.fecha_expiracion,
           });
 
-          console.log(
-            `✅ Movimiento de inventario creado atómicamente para producto ${item.producto_id} ` +
-            `(Movimiento ID: ${movimientoId})`
+          this.logger.log(
+            `✅ Movimiento de inventario creado atómicamente para producto ${item.producto_id} (Movimiento ID: ${movimientoId})`,
           );
         }
 
@@ -282,7 +446,7 @@ export class RecepcionesService {
           throw new BadRequestException(`Error al actualizar detalle de orden: ${updateDetalleError.message}`);
         }
 
-        console.log(`✅ Detalle de orden actualizado: ${item.detalle_id}`);
+        this.logger.log(`✅ Detalle de orden actualizado: ${item.detalle_id}`);
       }
 
       // Actualizar estado de la orden de compra
@@ -304,19 +468,22 @@ export class RecepcionesService {
         .single();
 
       if (ordenError) {
-        console.error('⚠️ Error obteniendo orden para eventos:', ordenError);
+        this.logger.error('⚠️ Error obteniendo orden para eventos:', ordenError);
         // No bloquear el cierre de recepción si falla obtener orden
       }
 
       // Cerrar la recepción
+      const cerradoEn = new Date().toISOString();
+      const observaciones = dto.observaciones || recepcion.observaciones;
+
       const { error: cerrarError } = await this.supabase.getClient()
         .from('recepciones')
         .update({
           estado: 'CERRADA',
-          observaciones: dto.observaciones || recepcion.observaciones,
+          observaciones,
           cerrado_por: userId || null,
-          cerrado_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          cerrado_at: cerradoEn,
+          updated_at: cerradoEn,
         })
         .eq('id', recepcionId)
         .eq('tenant_id', tenantId);
@@ -325,21 +492,62 @@ export class RecepcionesService {
         throw new BadRequestException(`Error al cerrar recepción: ${cerrarError.message}`);
       }
 
-      console.log(`✅ Recepción cerrada: ${recepcion.numero}`);
+      this.logger.log(`✅ Recepción cerrada: ${recepcion.numero}`);
+
+      const auditor = userId ?? 'system';
+      try {
+        await this.auditService.registrarCambio(
+          'recepciones',
+          'UPDATE',
+          auditor,
+          {
+            old: { estado: estadoAnteriorRecepcion },
+            new: { estado: 'CERRADA', observaciones },
+          },
+          tenantId,
+          recepcionId,
+          {
+            accion: 'CERRAR_RECEPCION',
+            orden_id: recepcion.orden_id,
+          },
+        );
+      } catch (auditError) {
+        this.logger.warn('⚠️ [Recepciones] No se pudo registrar auditoría de cierre:', auditError);
+      }
 
       // Emitir evento RecepcionRegistrada para integración con CxP
-      await this.emitirEventoRecepcionRegistrada(recepcionId, tenantId);
+      await this.emitirEventoRecepcionRegistrada(recepcion, orden ?? null, tenantId);
 
       // 🔴 CRÍTICO FIX: Emitir evento CompraEntregadaEvent para contabilidad
       if (orden) {
         await this.emitirEventoCompraEntregada(recepcion, orden, tenantId);
       } else {
-        console.warn('⚠️ No se pudo obtener orden para emitir evento CompraEntregadaEvent');
+        this.logger.warn('⚠️ No se pudo obtener orden para emitir evento CompraEntregadaEvent');
       }
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.cerrar',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'SUCCESS',
+        requestSummary: { observaciones },
+        responseSummary: { numero: recepcion.numero },
+        durationMs: Date.now() - startedAt,
+      });
 
       return this.obtenerRecepcionPorId(recepcionId, tenantId);
     } catch (error) {
-      console.error('❌ Error en cerrarRecepcion:', error);
+      await this.registrarIntegrationLog({
+        tenantId,
+        operacion: 'recepciones.cerrar',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'ERROR',
+        errorMessage: error?.message ?? 'Error inesperado',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ Error en cerrarRecepcion:', error);
       throw error;
     }
   }
@@ -385,9 +593,9 @@ export class RecepcionesService {
         throw new BadRequestException(`Error al actualizar estado de orden: ${updateError.message}`);
       }
 
-      console.log(`✅ Estado de orden actualizado a: ${nuevoEstado}`);
+      this.logger.log(`✅ Estado de orden actualizado a: ${nuevoEstado}`);
     } catch (error) {
-      console.error('❌ Error en actualizarEstadoOrden:', error);
+      this.logger.error('❌ Error en actualizarEstadoOrden:', error);
       throw error;
     }
   }
@@ -406,7 +614,7 @@ export class RecepcionesService {
         .limit(1);
 
       if (error) {
-        console.error('❌ Error generando número de recepción:', error);
+        this.logger.error('❌ Error generando número de recepción:', error);
       }
 
       let nextNumber = 1;
@@ -421,7 +629,7 @@ export class RecepcionesService {
       const year = new Date().getFullYear();
       return `REC-${year}-${nextNumber.toString().padStart(4, '0')}`;
     } catch (error) {
-      console.error('❌ Error en generarNumeroRecepcion:', error);
+      this.logger.error('❌ Error en generarNumeroRecepcion:', error);
       // Fallback
       return `REC-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
     }
@@ -437,7 +645,7 @@ export class RecepcionesService {
     userId?: string
   ): Promise<any> {
     try {
-      console.log(`📦 [Recepciones] Actualizando recepción ${recepcionId}`);
+      this.logger.log(`📦 [Recepciones] Actualizando recepción ${recepcionId}`);
 
       const recepcion = await this.obtenerRecepcionPorId(recepcionId, tenantId);
 
@@ -461,11 +669,11 @@ export class RecepcionesService {
         }
       }
 
-      console.log(`✅ Recepción actualizada: ${recepcionId}`);
+      this.logger.log(`✅ Recepción actualizada: ${recepcionId}`);
 
       return this.obtenerRecepcionPorId(recepcionId, tenantId);
     } catch (error) {
-      console.error('❌ Error en actualizarRecepcion:', error);
+      this.logger.error('❌ Error en actualizarRecepcion:', error);
       throw error;
     }
   }
@@ -473,92 +681,119 @@ export class RecepcionesService {
   /**
    * Emite el evento RecepcionRegistrada para integración con CxP y Contabilidad
    */
-  private async emitirEventoRecepcionRegistrada(recepcionId: string, tenantId: string): Promise<void> {
+  private async emitirEventoRecepcionRegistrada(
+    recepcion: any,
+    orden: any | null,
+    tenantId: string,
+  ): Promise<void> {
+    const eventId = uuidv4();
+    const idempotencyKey = `recepcion:${tenantId}:${recepcion.id}`;
+
     try {
-      console.log(`📡 [Recepciones] Emitiendo evento RecepcionRegistrada para ${recepcionId}`);
+      this.logger.log(`📡 [Recepciones] Emitiendo RecepcionRegistrada (${recepcion.id})`);
 
-      // Obtener datos completos de la recepción
-      const recepcion = await this.obtenerRecepcionPorId(recepcionId, tenantId);
+      let ordenData = orden ?? recepcion.orden ?? null;
 
-      // Obtener datos de la orden de compra
-      const { data: orden, error: ordenError } = await this.supabase.getClient()
-        .from('ordenes_compra')
-        .select(`
-          *,
-          proveedor:proveedores(
-            id,
-            razon_social,
-            ruc,
-            condiciones_pago,
-            dias_credito
+      if (!ordenData) {
+        const { data: ordenFromDb } = await this.supabase
+          .getClient()
+          .from('ordenes_compra')
+          .select(
+            `
+              *,
+              proveedor:proveedores(
+                id,
+                razon_social,
+                ruc,
+                documento_tipo,
+                documento_numero,
+                condiciones_pago,
+                dias_credito
+              )
+            `,
           )
-        `)
-        .eq('tenant_id', tenantId)
-        .eq('id', recepcion.orden_id)
-        .single();
-
-      if (ordenError) {
-        console.error('❌ Error obteniendo orden de compra para evento:', ordenError);
-        throw new Error(`Error obteniendo orden de compra: ${ordenError.message}`);
+          .eq('tenant_id', tenantId)
+          .eq('id', recepcion.orden_id)
+          .maybeSingle();
+        ordenData = ordenFromDb;
       }
 
-      // Construir el payload del evento
+      if (!ordenData) {
+        this.logger.warn('⚠️ [Recepciones] No se encontró orden asociada para el evento RecepcionRegistrada');
+        return;
+      }
+
+      const proveedor = ordenData.proveedor ?? {};
+
+      // HARDENING: garantizamos que cada item tenga metadata de la orden para costeo y contabilidad.
+      const fallbackDetalleIds = (recepcion.items || []).map((item: any) => item.detalle_id).filter(Boolean);
+      const detalleMap = new Map<string, any>();
+
+      if (fallbackDetalleIds.length > 0) {
+        const missing = fallbackDetalleIds.filter(
+          (detalleId) =>
+            !(recepcion.items || []).some(
+              (item: any) => item.detalle_id === detalleId && item.detalle && item.detalle.precio_unitario !== undefined,
+            ),
+        );
+
+        if (missing.length > 0) {
+          const { data: detalles } = await this.supabase
+            .getClient()
+            .from('orden_compra_detalles')
+            .select('id, descripcion, cantidad, cantidad_recibida, precio_unitario')
+            .in('id', missing);
+          (detalles || []).forEach((detalle: any) => {
+            detalleMap.set(detalle.id, detalle);
+          });
+        }
+      }
+
+      const items = (recepcion.items || []).map((item: any) => {
+        const detalle = item.detalle ?? detalleMap.get(item.detalle_id) ?? null;
+        const precioUnitario = Number(detalle?.precio_unitario ?? 0);
+        const total = this.round2(precioUnitario * Number(item.cantidad_recibida || 0));
+        return {
+          productoId: item.producto_id,
+          descripcion: detalle?.descripcion ?? item.producto?.nombre ?? 'Producto',
+          cantidadRecibida: Number(item.cantidad_recibida || 0),
+          precioUnitario: this.round2(precioUnitario),
+          total,
+          calidad: item.calidad,
+          lote: item.lote || null,
+          serie: item.serie || null,
+          ubicacionId: item.ubicacion_id || null,
+        };
+      });
+
       const eventData: RecepcionRegistradaEvent = {
+        tenantId,
+        eventId,
+        idempotencyKey,
         recepcionId: recepcion.id,
         numeroRecepcion: recepcion.numero,
-        ordenId: orden.id,
-        numeroOrden: orden.numero,
-        proveedorId: orden.proveedor.id,
-        proveedorNombre: orden.proveedor.razon_social,
-        proveedorRuc: orden.proveedor.ruc,
-        almacenId: recepcion.items[0]?.almacen_id || null,
+        ordenId: ordenData.id,
+        numeroOrden: ordenData.numero,
+        proveedorId: proveedor.id,
+        proveedorNombre: proveedor.razon_social,
+        proveedorRuc: proveedor.ruc ?? null,
+        almacenId: recepcion.items?.[0]?.almacen_id ?? null,
         fechaRecepcion: recepcion.fecha_recepcion,
-        subtotal: orden.subtotal,
-        igv: orden.igv,
-        total: orden.total,
-        moneda: orden.moneda || 'PEN',
-        diasCredito: orden.proveedor.dias_credito,
-        condicionesPago: orden.proveedor.condiciones_pago,
-        items: await Promise.all(recepcion.items.map(async (item: any) => {
-          // Obtener precio de orden_compra_detalles
-          const { data: detalleOrden } = await this.supabase.getClient()
-            .from('orden_compra_detalles')
-            .select('precio_unitario, cantidad')
-            .eq('id', item.detalle_id)
-            .single();
-
-          const precioUnitario = detalleOrden ? Number(detalleOrden.precio_unitario || 0) : 0;
-          const total = precioUnitario * Number(item.cantidad_recibida || 0);
-
-          return {
-            productoId: item.producto_id,
-            descripcion: item.producto?.nombre || 'Producto',
-            cantidadRecibida: item.cantidad_recibida,
-            precioUnitario,
-            total,
-            calidad: item.calidad,
-            lote: item.lote,
-            serie: item.serie,
-            ubicacionId: item.ubicacion_id,
-          };
-        })),
-        tenantId,
+        subtotal: this.round2(Number(ordenData.subtotal ?? 0)),
+        igv: this.round2(Number(ordenData.igv ?? 0)),
+        total: this.round2(Number(ordenData.total ?? 0)),
+        moneda: ordenData.moneda ?? 'PEN',
+        diasCredito: proveedor.dias_credito ?? null,
+        condicionesPago: proveedor.condiciones_pago ?? null,
+        greProveedor: recepcion.gre_proveedor ?? null,
+        items,
+        emittedAt: new Date().toISOString(),
       };
 
-      // Emitir el evento
-      // 🟡 MEJORA MEDIA: Manejo de errores en eventos para no bloquear operaciones críticas
-      try {
-        this.eventBus.emitRecepcionRegistrada(eventData);
-        console.log(`✅ Evento RecepcionRegistrada emitido exitosamente`);
-      } catch (error) {
-        console.error('❌ Error emitiendo evento RecepcionRegistrada:', error);
-        // No lanzamos el error para no bloquear el cierre de la recepción
-        // En producción, esto debería ir a un sistema de monitoreo
-      }
+      this.eventBus.emitRecepcionRegistrada(eventData);
+      this.logger.log(`✅ Evento RecepcionRegistrada emitido (${eventId})`);
     } catch (error) {
-      console.error('❌ Error emitiendo evento RecepcionRegistrada:', error);
-      // No lanzamos el error para no bloquear el cierre de la recepción
-      // En producción, esto debería ir a un sistema de monitoreo
+      this.logger.error('❌ Error emitiendo evento RecepcionRegistrada:', error);
     }
   }
 
@@ -572,42 +807,73 @@ export class RecepcionesService {
     tenantId: string
   ): Promise<void> {
     try {
-      // Obtener items de la recepción con precios de la orden
+      const eventId = uuidv4();
+      const idempotencyKey = `compra:${tenantId}:${orden.id}:${recepcion.id}`;
+
+      // HARDENING: construimos payload enriquecido para contabilidad/inventario.
       const itemsWithPrices = [];
       for (const item of recepcion.items || []) {
-        const { data: detalleOrden } = await this.supabase.getClient()
-          .from('orden_compra_detalles')
-          .select('precio_unitario, cantidad')
-          .eq('id', item.detalle_id)
-          .single();
+        const detalle = item.detalle ?? null;
+        let detalleOrden = detalle;
 
-        if (detalleOrden) {
-          itemsWithPrices.push({
-            productoId: item.producto_id,
-            cantidad: item.cantidad_recibida,
-            precioUnitario: Number(detalleOrden.precio_unitario || 0),
-            total: Number(detalleOrden.precio_unitario || 0) * Number(item.cantidad_recibida || 0),
-          });
+        if (!detalleOrden) {
+          const { data: detalleFromDb } = await this.supabase
+            .getClient()
+            .from('orden_compra_detalles')
+            .select('descripcion, precio_unitario')
+            .eq('id', item.detalle_id)
+            .maybeSingle();
+          detalleOrden = detalleFromDb ?? null;
         }
+
+        const precioUnitario = Number(detalleOrden?.precio_unitario ?? 0);
+        itemsWithPrices.push({
+          productoId: item.producto_id,
+          descripcion: detalleOrden?.descripcion ?? item.producto?.nombre ?? 'Producto',
+          cantidad: Number(item.cantidad_recibida || 0),
+          precioUnitario: this.round2(precioUnitario),
+          total: this.round2(precioUnitario * Number(item.cantidad_recibida || 0)),
+          calidad: item.calidad,
+          lote: item.lote ?? null,
+          serie: item.serie ?? null,
+          ubicacionId: item.ubicacion_id ?? null,
+          recepcionId: recepcion.id,
+        });
       }
 
+      const proveedor = orden.proveedor ?? {};
       const eventData: CompraEntregadaEvent = {
+        tenantId,
+        eventId,
+        idempotencyKey,
         ordenId: orden.id,
         numeroOrden: orden.numero,
-        proveedorId: orden.proveedor?.id || orden.proveedor_id,
-        proveedorNombre: orden.proveedor?.razon_social || 'Proveedor',
+        proveedorId: proveedor.id ?? orden.proveedor_id,
+        proveedorNombre: proveedor.razon_social ?? 'Proveedor',
+        proveedorRuc: proveedor.ruc ?? proveedor.documento_numero ?? null,
         fechaEntrega: recepcion.fecha_recepcion,
-        total: Number(orden.total || 0),
+        subtotal: this.round2(Number(orden.subtotal ?? 0)),
+        igv: this.round2(Number(orden.igv ?? 0)),
+        total: this.round2(Number(orden.total ?? 0)),
+        moneda: orden.moneda ?? 'PEN',
+        diasCredito: proveedor.dias_credito ?? null,
+        condicionesPago: proveedor.condiciones_pago ?? null,
+        almacenId: recepcion.items?.[0]?.almacen_id ?? null,
+        observaciones: recepcion.observaciones ?? null,
         items: itemsWithPrices,
-        tenantId,
+        emittedAt: new Date().toISOString(),
       };
 
       await this.eventBus.emitCompraEntregada(eventData);
-      console.log(`✅ Evento CompraEntregadaEvent emitido para orden ${orden.numero}`);
+      this.logger.log(`✅ Evento CompraEntregadaEvent emitido para orden ${orden.numero}`);
     } catch (error) {
-      console.error('❌ Error emitiendo evento CompraEntregadaEvent:', error);
+      this.logger.error('❌ Error emitiendo evento CompraEntregadaEvent', error as Error);
       // No lanzamos el error para no bloquear el cierre de la recepción
       // El outbox pattern garantizará que el evento se procese luego
     }
+  }
+
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 }

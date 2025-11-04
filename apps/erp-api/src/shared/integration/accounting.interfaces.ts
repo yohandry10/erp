@@ -3,6 +3,7 @@ export interface AsientoContable {
   concepto: string;
   referencia: string;
   detalles: AsientoDetalle[];
+  sourceEventId?: string;
 }
 
 export interface AsientoDetalle {

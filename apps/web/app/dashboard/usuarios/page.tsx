@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import UsuarioModal from '@/components/modals/UsuarioModal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useToast } from "@/components/ui/use-toast"
+import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
 export default function UsuariosPage() {
@@ -20,36 +22,43 @@ export default function UsuariosPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [usuarioEditando, setUsuarioEditando] = useState<any>(null)
   const { toast } = useToast()
+  const { get, put, delete: del } = useApi()
 
-  // Definir API_BASE_URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  })
 
   const fetchData = async () => {
     try {
       setLoading(true)
       
-      // Cargar datos en paralelo
-      const [usuariosRes, rolesRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
-        fetch(`${API_BASE_URL}/api/usuarios-sistema/roles`),
-        fetch(`${API_BASE_URL}/api/usuarios-sistema/stats`)
-      ])
-
+      // ✅ Cargar datos en paralelo usando useApi
       const [usuariosData, rolesData, statsData] = await Promise.all([
-        usuariosRes.json(),
-        rolesRes.json(),
-        statsRes.json()
+        get(`/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
+        get('/usuarios-sistema/roles'),
+        get('/usuarios-sistema/stats')
       ])
 
-      if (usuariosData.success) {
+      if (usuariosData?.success) {
         setUsuarios(usuariosData.data || [])
       }
 
-      if (rolesData.success) {
+      if (rolesData?.success) {
         setRoles(rolesData.data || [])
       }
 
-      if (statsData.success) {
+      if (statsData?.success) {
         setStats(statsData.data)
       }
 
@@ -81,24 +90,19 @@ export default function UsuariosPage() {
 
   const handleCambiarEstado = async (usuario: any, nuevoEstado: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/usuarios-sistema/${usuario.id}/estado`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ estado: nuevoEstado }),
+      // ✅ Usar useApi en lugar de fetch
+      const data = await put(`/usuarios-sistema/${usuario.id}/estado`, {
+        estado: nuevoEstado
       })
 
-      const data = await response.json()
-
-      if (data.success) {
+      if (data?.success) {
         toast({
           title: "✅ Éxito",
           description: data.message,
         })
         fetchData() // Recargar datos
       } else {
-        throw new Error(data.error)
+        throw new Error(data?.error || 'Error al cambiar estado')
       }
     } catch (error: any) {
       toast({
@@ -110,33 +114,34 @@ export default function UsuariosPage() {
   }
 
   const handleEliminarUsuario = async (usuario: any) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar al usuario "${usuario.nombre}"?`)) {
-      return
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Eliminar Usuario',
+      message: `¿Estás seguro de que deseas eliminar al usuario "${usuario.nombre}"?\n\nEsta acción no se puede deshacer.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          // ✅ Usar useApi en lugar de fetch
+          const data = await del(`/usuarios-sistema/${usuario.id}`)
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/usuarios-sistema/${usuario.id}`, {
-        method: 'DELETE',
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: "✅ Éxito",
-          description: "Usuario eliminado exitosamente",
-        })
-        fetchData() // Recargar datos
-      } else {
-        throw new Error(data.error)
+          if (data?.success) {
+            toast({
+              title: "✅ Éxito",
+              description: "Usuario eliminado exitosamente",
+            })
+            fetchData() // Recargar datos
+          } else {
+            throw new Error(data?.error || 'Error al eliminar')
+          }
+        } catch (error: any) {
+          toast({
+            variant: "destructive",
+            title: "❌ Error",
+            description: error.message || "Error eliminando usuario",
+          })
+        }
       }
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "❌ Error",
-        description: error.message || "Error eliminando usuario",
-      })
-    }
+    })
   }
 
   const getStatusColor = (estado: string) => {
@@ -583,6 +588,15 @@ export default function UsuariosPage() {
         onSuccess={fetchData}
         usuario={usuarioEditando}
         roles={roles}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
       />
     </div>
   )

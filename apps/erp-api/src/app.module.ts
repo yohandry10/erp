@@ -48,12 +48,13 @@ import { OutboxModule } from './shared/outbox/outbox.module';
 import { SunatRetryModule } from './modules/sunat-retry/sunat-retry.module';
 import { CacheModule } from './shared/cache/cache.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: ['.env', 'apps/erp-api/.env'],
     }),
     SecurityModule,
     SecurityDashboardModule,
@@ -61,6 +62,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     SupabaseModule,
     PermissionsModule,
     IntegrationModule,
+    TaxCalculatorModule, // ✅ Cálculo centralizado de impuestos
     CacheModule, // ✅ Cache distribuido con Redis
     UsuariosModule,
     TenantsModule,

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { ChevronLeft, ChevronRight, Check, FileText, Package, Eye, Plus, Trash2, Calendar, Building2 } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { Proveedor } from '@/types/compras'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 
@@ -40,6 +41,7 @@ export function OCWizard({
   onCancel,
   isLoading = false
 }: OCWizardProps) {
+  const { tasaIgv } = useTaxConfig()
   const [currentStep, setCurrentStep] = useState(1)
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [productos, setProductos] = useState<any[]>([])
@@ -154,7 +156,7 @@ export function OCWizard({
 
   const calculateTotals = () => {
     const subtotal = detalles.reduce((sum, d) => sum + d.subtotal, 0)
-    const igv = subtotal * 0.18
+    const igv = subtotal * tasaIgv
     const total = subtotal + igv
     return { subtotal, igv, total }
   }
@@ -746,8 +748,9 @@ function Step2AddProducts({
 
 // Totales Summary Component - Shows real-time totals
 function TotalesSummary({ detalles, formatCurrency }: any) {
+  const { tasaIgv } = useTaxConfig()
   const subtotal = detalles.reduce((sum: number, d: ProductoDetalle) => sum + d.subtotal, 0)
-  const igv = subtotal * 0.18
+  const igv = subtotal * tasaIgv
   const total = subtotal + igv
 
   return (

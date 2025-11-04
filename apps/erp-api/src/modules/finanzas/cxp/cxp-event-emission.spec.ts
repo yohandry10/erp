@@ -32,6 +32,7 @@ describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
           provide: EventBusService,
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
+            emitFacturaProveedorRegistrada: jest.fn(),
           },
         },
       ],
@@ -67,6 +68,9 @@ describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
         id: 'cuenta-001',
         nombre: 'Cuenta BCP',
         saldo: 5000,
+        moneda: 'PEN',
+        permite_sobregiro: false,
+        activa: true,
       };
 
       const mockCxpActualizada = {
@@ -101,23 +105,31 @@ describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
       expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledTimes(1);
       expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledWith(
         expect.objectContaining({
-          cxpId: cxpId,
+          tenantId,
+          eventId: expect.any(String),
+          idempotencyKey: expect.any(String),
+          cxpId,
+          pagoId: expect.any(String),
           proveedorId: 'prov-001',
+          proveedorNombre: 'prov-001',
           numeroDocumento: 'F001-00001',
           monto: 500,
           moneda: 'PEN',
-          fechaPago: '2025-10-25',
+          fecha: '2025-10-25',
           metodoPago: 'TRANSFERENCIA',
           cuentaBancariaId: 'cuenta-001',
+          cuentaBancariaNombre: 'Cuenta BCP',
           referencia: 'REF-001',
           observaciones: 'Pago parcial',
           saldoAnterior: 1000,
           saldoNuevo: 500,
           estadoAnterior: 'PENDIENTE',
           estadoNuevo: 'PARCIAL',
-          tenantId: tenantId,
           createdBy: userId,
-        })
+          cuentaSaldoAnterior: 5000,
+          cuentaSaldoNuevo: 4500,
+          source: 'cxp.aplicarPago',
+        }),
       );
     });
 
@@ -164,10 +176,21 @@ describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
       expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledTimes(1);
       expect(eventBusService.emitPagoProveedorRegistrado).toHaveBeenCalledWith(
         expect.objectContaining({
+          tenantId,
+          eventId: expect.any(String),
+          idempotencyKey: expect.any(String),
+          cxpId,
+          pagoId: expect.any(String),
           estadoAnterior: 'PARCIAL',
           estadoNuevo: 'PAGADA',
           saldoAnterior: 500,
           saldoNuevo: 0,
+          proveedorNombre: 'prov-001',
+          cuentaBancariaId: null,
+          cuentaBancariaNombre: null,
+          cuentaSaldoAnterior: null,
+          cuentaSaldoNuevo: null,
+          source: 'cxp.aplicarPago',
         })
       );
     });

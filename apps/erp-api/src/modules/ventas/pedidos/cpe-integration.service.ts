@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
@@ -20,6 +21,7 @@ export class CPEIntegrationService {
     private readonly cpeService: CpeService,
     private readonly validationService: ValidationService,
     private readonly integrationAlerts: IntegrationAlertsService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -133,10 +135,13 @@ export class CPEIntegrationService {
     // Obtener serie y número de factura
     const { serie, numero } = await this.obtenerSerieYNumero(pedido.tenant_id);
 
+    // ✅ CORRECCIÓN SRP: Obtener tasa de IGV una sola vez usando TaxCalculatorService
+    const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
+
     // Mapear items del pedido a items de factura
     const items: ItemFacturaDto[] = pedido.detalle.map((item, index) => {
       const valorVenta = item.subtotal;
-      const igv = valorVenta * 0.18; // 18% IGV
+      const igv = valorVenta * tasaIgv;
       const precioVenta = valorVenta + igv;
 
       return {

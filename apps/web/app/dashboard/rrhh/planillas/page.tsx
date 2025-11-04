@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import PlanillaModal from '@/components/modals/PlanillaModal';
 import PlanillaCalcularModal from '@/components/modals/PlanillaCalcularModal';
 import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
 
 const PlanillasPage = () => {
@@ -17,6 +18,21 @@ const PlanillasPage = () => {
   const [showCalcularModal, setShowCalcularModal] = useState(false);
   const [showPagarModal, setShowPagarModal] = useState(false);
   const [planillaSeleccionada, setPlanillaSeleccionada] = useState<any>(null);
+
+  // Estado para diálogo de confirmación
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void | Promise<void>
+    variant?: 'default' | 'danger' | 'warning'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    variant: 'default'
+  });
   
   console.log('🔥 COMPONENTE RENDERIZADO - showPlanillaModal:', showPlanillaModal);
 
@@ -86,32 +102,36 @@ const PlanillasPage = () => {
   };
 
   const generarAsientosContables = async (planillaId: string) => {
-    if (!confirm('¿Está seguro de generar los asientos contables para esta planilla?\n\nEsto creará registros en el módulo de contabilidad.')) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Generar Asientos Contables',
+      message: '¿Está seguro de generar los asientos contables para esta planilla?\n\nEsto creará registros en el módulo de contabilidad.',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/generar-asientos`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
 
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/generar-asientos`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+          if (response.ok) {
+            const data = await response.json();
+            alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: S/ ${data.monto_total || '0.00'}`);
+          } else {
+            throw new Error('Error generando asientos contables');
+          }
+        } catch (error: any) {
+          console.error('Error generando asientos:', error);
+          alert('Error generando asientos contables: ' + error.message);
+        } finally {
+          setLoading(false);
         }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(`✅ Asientos contables generados correctamente\n\n• Total registros: ${data.registros || 'N/A'}\n• Monto total: S/ ${data.monto_total || '0.00'}`);
-      } else {
-        throw new Error('Error generando asientos contables');
       }
-    } catch (error) {
-      console.error('Error generando asientos:', error);
-      alert('Error generando asientos contables: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handlePlanillaSuccess = () => {
@@ -259,27 +279,31 @@ const PlanillasPage = () => {
   };
 
   const aprobarPlanilla = async (planillaId: string) => {
-    if (!confirm('¿Está seguro de aprobar esta planilla? Una vez aprobada no se podrá modificar.')) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Aprobar Planilla',
+      message: '¿Está seguro de aprobar esta planilla?\n\nUna vez aprobada no se podrá modificar.',
+      variant: 'warning',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+            body: JSON.stringify({ estado: 'aprobada' }),
+          });
 
-    try {
-      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ estado: 'aprobada' }),
-      });
-
-      if (response.ok) {
-        alert('✅ Planilla aprobada exitosamente');
-        loadPlanillas();
+          if (response.ok) {
+            alert('✅ Planilla aprobada exitosamente');
+            loadPlanillas();
+          }
+        } catch (error) {
+          console.error('Error aprobando planilla:', error);
+        }
       }
-    } catch (error) {
-      console.error('Error aprobando planilla:', error);
-    }
+    });
   };
 
   const descargarBoleta = async (empleadoPlanillaId: string) => {
@@ -948,6 +972,15 @@ const PlanillasPage = () => {
         }}
         onSuccess={handlePagarSuccess}
         planilla={planillaSeleccionada}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        variant={confirmDialog.variant}
       />
     </div>
   );

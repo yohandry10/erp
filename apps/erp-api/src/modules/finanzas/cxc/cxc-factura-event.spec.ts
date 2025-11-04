@@ -50,7 +50,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       cpeId: 'factura-456',
       facturaId: 'factura-456',
       serie: 'F001',
-      numero: 12,
+      numero: '12',
       clienteId: 'cliente-789',
       subtotal: 1000,
       impuestos: 180,
@@ -125,6 +125,8 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     expect(eventBusService.emitCuentaPorCobrarCreadaEvent).toHaveBeenCalledWith(expect.objectContaining({
       eventId: facturaEvent.eventId,
       tenantId,
+      cxcId: 'cxc-999',
+      cuentaId: 'cxc-999',
       facturaId: facturaEvent.cpeId,
       idempotencyKey: facturaEvent.idempotencyKey,
     }));
@@ -145,7 +147,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       cpeId: 'factura-456',
       facturaId: 'factura-456',
       serie: 'F001',
-      numero: 12,
+      numero: '12',
       clienteId: 'cliente-789',
       subtotal: 1000,
       impuestos: 180,

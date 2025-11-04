@@ -1,7 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CxpRecepcionListener } from './cxp-recepcion.listener';
 import { CxpService } from './cxp.service';
-import { EventBusService, RecepcionRegistradaEvent, ERPEvent } from '../../../shared/events/event-bus.service';
+import {
+  EventBusService,
+  RecepcionRegistradaEvent,
+  ERPEvent,
+} from '../../../shared/events/event-bus.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { EstadoComparacionCxp } from './dto';
 
 describe('CxpRecepcionListener', () => {
   let listener: CxpRecepcionListener;
@@ -34,6 +40,12 @@ describe('CxpRecepcionListener', () => {
             onRecepcionRegistrada: jest.fn(),
           },
         },
+        {
+          provide: SupabaseService,
+          useValue: {
+            getClient: jest.fn(() => mockSupabaseClient),
+          },
+        },
       ],
     }).compile();
 
@@ -57,6 +69,21 @@ describe('CxpRecepcionListener', () => {
 
   describe('handleRecepcionRegistrada', () => {
     it('should create CxP from RecepcionRegistrada event', async () => {
+      mockSupabaseClient.maybeSingle
+        .mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({
+          data: {
+            detalles: [
+              {
+                producto_id: 'prod-001',
+                cantidad: 10,
+                precio_unitario: 100,
+              },
+            ],
+          },
+          error: null,
+        });
+
       const mockRecepcionEvent: ERPEvent = {
         type: 'recepcion.registrada',
         module: 'compras',
@@ -77,8 +104,18 @@ describe('CxpRecepcionListener', () => {
           moneda: 'PEN',
           diasCredito: 30,
           condicionesPago: 'CREDITO_30',
-          items: [],
+          items: [
+            {
+              productoId: 'prod-001',
+              cantidadRecibida: 10,
+              precioUnitario: 100,
+              calidad: 'OK',
+            },
+          ],
           tenantId: 'tenant-123',
+          eventId: 'evt-recepcion-001',
+          idempotencyKey: 'recepcion:tenant-123:rec-001',
+          emittedAt: '2025-10-25T05:00:00.000Z',
         } as RecepcionRegistradaEvent,
       };
 
@@ -87,9 +124,6 @@ describe('CxpRecepcionListener', () => {
         numero_documento: 'REC-2025-001',
         total: 1180,
       };
-
-      // Mock: No existe CxP previa
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
       // Mock: Creación exitosa
       (cxpService.crearCuentaPorPagar as jest.Mock).mockResolvedValueOnce({
@@ -116,6 +150,13 @@ describe('CxpRecepcionListener', () => {
           moneda: 'PEN',
           condiciones_pago: 'CREDITO_30',
           dias_credito: 30,
+          tipo_documento: 'RECEPCION',
+          referencia_tipo: 'RECEPCION',
+          referencia_id: 'rec-001',
+          numero: 'REC-2025-001',
+          idempotency_key: 'recepcion:tenant-123:rec-001',
+          estado_comparacion: EstadoComparacionCxp.OK,
+          discrepancias: [],
         }),
         undefined,
       );
@@ -142,6 +183,9 @@ describe('CxpRecepcionListener', () => {
           moneda: 'PEN',
           items: [],
           tenantId: 'tenant-123',
+          eventId: 'evt-recepcion-001',
+          idempotencyKey: 'recepcion:tenant-123:rec-001',
+          emittedAt: '2025-10-25T05:00:00.000Z',
         } as RecepcionRegistradaEvent,
       };
 
@@ -158,6 +202,21 @@ describe('CxpRecepcionListener', () => {
     });
 
     it('should not throw error if CxP creation fails', async () => {
+      mockSupabaseClient.maybeSingle
+        .mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({
+          data: {
+            detalles: [
+              {
+                producto_id: 'prod-001',
+                cantidad: 5,
+                precio_unitario: 80,
+              },
+            ],
+          },
+          error: null,
+        });
+
       const mockRecepcionEvent: ERPEvent = {
         type: 'recepcion.registrada',
         module: 'compras',
@@ -176,12 +235,21 @@ describe('CxpRecepcionListener', () => {
           igv: 180,
           total: 1180,
           moneda: 'PEN',
-          items: [],
+          items: [
+            {
+              productoId: 'prod-001',
+              cantidadRecibida: 5,
+              precioUnitario: 80,
+              calidad: 'OK',
+            },
+          ],
           tenantId: 'tenant-123',
+          eventId: 'evt-recepcion-001',
+          idempotencyKey: 'recepcion:tenant-123:rec-001',
+          emittedAt: '2025-10-25T05:00:00.000Z',
         } as RecepcionRegistradaEvent,
       };
 
-      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
       (cxpService.crearCuentaPorPagar as jest.Mock).mockRejectedValueOnce(
         new Error('Database error')
       );

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -6,7 +7,9 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum CondicionesPagoCxp {
   CONTADO = 'CONTADO',
@@ -16,6 +19,35 @@ export enum CondicionesPagoCxp {
   CREDITO_45 = 'CREDITO_45',
   CREDITO_60 = 'CREDITO_60',
   CREDITO_90 = 'CREDITO_90',
+}
+
+export enum EstadoComparacionCxp {
+  OK = 'OK',
+  DESVIACION_CANTIDAD = 'DESVIACION_CANTIDAD',
+  DESVIACION_PRECIO = 'DESVIACION_PRECIO',
+}
+
+export enum TipoDiscrepanciaCxp {
+  CANTIDAD = 'CANTIDAD',
+  PRECIO = 'PRECIO',
+}
+
+export class CxpDiscrepanciaDto {
+  @IsEnum(TipoDiscrepanciaCxp, { message: 'El tipo de discrepancia debe ser CANTIDAD o PRECIO' })
+  tipo!: TipoDiscrepanciaCxp;
+
+  @IsString()
+  productoId!: string;
+
+  @IsNumber()
+  recibido!: number;
+
+  @IsNumber()
+  facturado!: number;
+
+  @IsOptional()
+  @IsNumber()
+  esperado?: number;
 }
 
 export class CrearCxpDto {
@@ -68,4 +100,46 @@ export class CrearCxpDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  @IsOptional()
+  @IsString()
+  numero?: string;
+
+  @IsOptional()
+  @IsString()
+  tipo_documento?: string;
+
+  @IsOptional()
+  @IsString()
+  referencia_tipo?: string;
+
+  @IsOptional()
+  @IsString()
+  referencia_id?: string;
+
+  @IsOptional()
+  @IsString()
+  serie?: string;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El tipo de cambio debe ser numérico' })
+  tipo_cambio?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'La detracción debe ser numérica' })
+  detraccion?: number;
+
+  @IsOptional()
+  @IsString()
+  idempotency_key?: string;
+
+  @IsOptional()
+  @IsEnum(EstadoComparacionCxp, { message: 'Estado de comparación inválido' })
+  estado_comparacion?: EstadoComparacionCxp;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CxpDiscrepanciaDto)
+  discrepancias?: CxpDiscrepanciaDto[];
 }

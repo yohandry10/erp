@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
@@ -37,6 +37,24 @@ export interface MovimientoInventario {
   created_by?: string;
 }
 
+interface ListarRecepcionesFiltros {
+  estado?: string;
+  almacenId?: string;
+  search?: string;
+  desde?: string;
+  hasta?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface KardexValorizadoFiltros {
+  productoId?: string;
+  almacenId?: string;
+  desde?: string;
+  hasta?: string;
+  limit?: number;
+}
+
 /**
  * Servicio de Inventario con soporte para reservas de stock
  * 
@@ -44,10 +62,12 @@ export interface MovimientoInventario {
  * - Reservar stock (RESERVA)
  * - Liberar reservas (LIBERACION)
  * - Descontar stock real (SALIDA)
- * - Calcular stock disponible (stock_actual - stock_reservado)
+ * - Calcular stock disponible (stock - stock_reservado)
  */
 @Injectable()
 export class InventarioService {
+  private readonly logger = new Logger(InventarioService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly auditService: AuditService,
@@ -58,7 +78,7 @@ export class InventarioService {
 
   /**
    * Calcula el stock disponible de un producto
-   * Formula: stock_actual - stock_reservado
+   * Formula: stock - stock_reservado
    * 
    * @param producto_id - ID del producto
    * @param tenant_id - ID del tenant
@@ -70,7 +90,7 @@ export class InventarioService {
 
       const { data: producto, error } = await this.supabase.getClient()
         .from('productos')
-        .select('stock_actual, stock_reservado')
+        .select('stock, stock_reservado')
         .eq('tenant_id', tenant_id)
         .eq('id', producto_id)
         .single();
@@ -84,7 +104,7 @@ export class InventarioService {
         throw new NotFoundException(`Producto ${producto_id} no encontrado`);
       }
 
-      const stockActual = parseFloat(producto.stock_actual || '0');
+      const stockActual = parseFloat(producto.stock || '0');
       const stockReservado = parseFloat(producto.stock_reservado || '0');
       const stockDisponible = stockActual - stockReservado;
 
@@ -143,13 +163,13 @@ export class InventarioService {
           // Obtener producto para calcular valores
           const { data: producto } = await this.supabase.getClient()
             .from('productos')
-            .select('stock_actual, precio_venta, precio_compra')
+            .select('stock, precio_venta, precio_compra')
             .eq('id', movimiento.producto_id)
             .eq('tenant_id', movimiento.tenant_id)
             .single();
 
           if (producto) {
-            const stockActual = Number(producto.stock_actual || 0);
+            const stockActual = Number(producto.stock || 0);
             // Calcular stock anterior basado en el tipo de movimiento
             // Nota: Esto es aproximado porque el stock ya pudo haber sido actualizado
             const stockAnterior = movimiento.tipo === TipoMovimiento.ENTRADA 
@@ -248,7 +268,7 @@ export class InventarioService {
       // Verificar que el producto existe
       const { data: producto, error: productoError } = await this.supabase.getClient()
         .from('productos')
-        .select('id, nombre, stock_actual, stock_reservado')
+        .select('id, nombre, stock, stock_reservado')
         .eq('tenant_id', tenant_id)
         .eq('id', producto_id)
         .single();
@@ -257,7 +277,7 @@ export class InventarioService {
         throw new NotFoundException(`Producto ${producto_id} no encontrado`);
       }
 
-      const stockActual = parseFloat(producto.stock_actual || '0');
+      const stockActual = parseFloat(producto.stock || '0');
       const stockReservado = parseFloat(producto.stock_reservado || '0');
       const stockDisponible = stockActual - stockReservado;
 
@@ -332,7 +352,7 @@ export class InventarioService {
       // Verificar que el producto existe
       const { data: producto, error: productoError } = await this.supabase.getClient()
         .from('productos')
-        .select('id, nombre, stock_actual, stock_reservado')
+        .select('id, nombre, stock, stock_reservado')
         .eq('tenant_id', tenant_id)
         .eq('id', producto_id)
         .single();
@@ -389,7 +409,7 @@ export class InventarioService {
   /**
    * Descuenta stock real del inventario
    * - Crea movimiento tipo SALIDA
-   * - Decrementa stock_actual
+   * - Decrementa stock
    * - Libera la reserva correspondiente (decrementa stock_reservado)
    * - Operación atómica con transacción
    * 
@@ -417,7 +437,7 @@ export class InventarioService {
       // Verificar que el producto existe
       const { data: producto, error: productoError } = await this.supabase.getClient()
         .from('productos')
-        .select('id, nombre, stock_actual, stock_reservado')
+        .select('id, nombre, stock, stock_reservado')
         .eq('tenant_id', tenant_id)
         .eq('id', producto_id)
         .single();
@@ -426,7 +446,7 @@ export class InventarioService {
         throw new NotFoundException(`Producto ${producto_id} no encontrado`);
       }
 
-      const stockActual = parseFloat(producto.stock_actual || '0');
+      const stockActual = parseFloat(producto.stock || '0');
       const stockReservado = parseFloat(producto.stock_reservado || '0');
 
       console.log(`📊 Stock actual: ${stockActual}, reservado: ${stockReservado}`);
@@ -438,14 +458,14 @@ export class InventarioService {
         );
       }
 
-      // Operación atómica: decrementar stock_actual y stock_reservado
+      // Operación atómica: decrementar stock y stock_reservado
       const nuevoStockActual = stockActual - cantidad;
       const nuevoStockReservado = Math.max(0, stockReservado - cantidad);
 
       const { error: updateError } = await this.supabase.getClient()
         .from('productos')
         .update({
-          stock_actual: nuevoStockActual,
+          stock: nuevoStockActual,
           stock_reservado: nuevoStockReservado
         })
         .eq('tenant_id', tenant_id)
@@ -467,7 +487,7 @@ export class InventarioService {
         notas: `Salida de ${cantidad} unidades`
       });
 
-      console.log(`✅ Stock descontado exitosamente. Nuevo stock_actual: ${nuevoStockActual}, stock_reservado: ${nuevoStockReservado}`);
+      console.log(`✅ Stock descontado exitosamente. Nuevo stock: ${nuevoStockActual}, stock_reservado: ${nuevoStockReservado}`);
 
       // 🔴 CRÍTICO FIX: Emitir evento MovimientoStockEvent para contabilidad
       // El evento ya se emite en crearMovimiento(), pero aquí tenemos acceso al stock anterior/nuevo
@@ -608,7 +628,7 @@ export class InventarioService {
       // Obtener stock actualizado para logging y emisión de evento
       const { data: existencia } = await client
         .from('producto_existencias')
-        .select('stock_actual, stock_reservado')
+        .select('stock, stock_reservado')
         .eq('tenant_id', params.tenantId)
         .eq('producto_id', params.productoId)
         .eq('almacen_id', params.almacenId)
@@ -616,7 +636,7 @@ export class InventarioService {
 
       if (existencia) {
         console.log(
-          `📊 Stock actualizado en almacén: ${existencia.stock_actual}, Reservado: ${existencia.stock_reservado}`
+          `📊 Stock actualizado en almacén: ${existencia.stock}, Reservado: ${existencia.stock_reservado}`
         );
       }
 
@@ -625,14 +645,14 @@ export class InventarioService {
         // Obtener producto para calcular valores
         const { data: producto } = await client
           .from('productos')
-          .select('stock_actual, precio_compra')
+          .select('stock, precio_compra')
           .eq('id', params.productoId)
           .eq('tenant_id', params.tenantId)
           .single();
 
         if (producto) {
-          const stockAnterior = Number(producto.stock_actual || 0) - params.cantidad; // Stock antes de la entrada
-          const stockNuevo = Number(producto.stock_actual || 0); // Stock después de la entrada
+          const stockAnterior = Number(producto.stock || 0) - params.cantidad; // Stock antes de la entrada
+          const stockNuevo = Number(producto.stock || 0); // Stock después de la entrada
           const precioCompra = Number(producto.precio_compra || 0);
           const valorTotal = precioCompra * params.cantidad;
 
@@ -713,7 +733,7 @@ export class InventarioService {
       // 2. Verificar que el stock en producto_existencias fue actualizado correctamente
       const { data: existencia, error: existenciaError } = await client
         .from('producto_existencias')
-        .select('stock_actual, stock_reservado, producto_id, almacen_id')
+        .select('stock, stock_reservado, producto_id, almacen_id')
         .eq('tenant_id', tenantId)
         .eq('producto_id', productoId)
         .eq('almacen_id', almacenId)
@@ -740,7 +760,7 @@ export class InventarioService {
         // Verificar el stock agregado en la tabla productos
         const { data: producto, error: productoError } = await client
           .from('productos')
-          .select('stock_actual, stock_reservado')
+          .select('stock, stock_reservado')
           .eq('id', productoId)
           .eq('tenant_id', tenantId)
           .single();
@@ -754,25 +774,25 @@ export class InventarioService {
 
         return {
           stockActualizado: true,
-          stockActual: Number(producto.stock_actual || 0),
+          stockActual: Number(producto.stock || 0),
           stockReservado: Number(producto.stock_reservado || 0),
         };
       }
 
       // 3. Verificar que el stock se actualizó correctamente según el tipo de movimiento
       if (existencia) {
-        const stockActual = Number(existencia.stock_actual || 0);
+        const stockActual = Number(existencia.stock || 0);
         const stockReservado = Number(existencia.stock_reservado || 0);
 
-        // Para ENTRADA: stock_actual debe haber aumentado
-        // Para SALIDA: stock_actual debe haber disminuido (pero no podemos validar el valor exacto sin conocer el anterior)
+        // Para ENTRADA: stock debe haber aumentado
+        // Para SALIDA: stock debe haber disminuido (pero no podemos validar el valor exacto sin conocer el anterior)
         // Para RESERVA: stock_reservado debe haber aumentado
         // Para LIBERACION: stock_reservado debe haber disminuido
 
         // Verificar también el stock agregado en productos
         const { data: producto, error: productoError } = await client
           .from('productos')
-          .select('stock_actual, stock_reservado')
+          .select('stock, stock_reservado')
           .eq('id', productoId)
           .eq('tenant_id', tenantId)
           .single();
@@ -784,14 +804,14 @@ export class InventarioService {
           };
         }
 
-        const stockAgregadoActual = Number(producto.stock_actual || 0);
+        const stockAgregadoActual = Number(producto.stock || 0);
         const stockAgregadoReservado = Number(producto.stock_reservado || 0);
 
         // Validación básica: los valores deben ser no negativos
         if (stockActual < 0 || stockReservado < 0 || stockAgregadoActual < 0 || stockAgregadoReservado < 0) {
           return {
             stockActualizado: false,
-            error: `Stock actualizado pero tiene valores negativos (stock_actual: ${stockActual}, stock_reservado: ${stockReservado})`,
+            error: `Stock actualizado pero tiene valores negativos (stock: ${stockActual}, stock_reservado: ${stockReservado})`,
           };
         }
 
@@ -811,8 +831,908 @@ export class InventarioService {
       console.error('❌ Error verificando stock actualizado:', error);
       return {
         stockActualizado: false,
-        error: `Excepción verificando stock: ${error.message}`,
+      error: `Excepción verificando stock: ${error.message}`,
       };
+    }
+  }
+
+  async obtenerKardexValorizado(
+    tenantId: string,
+    filtros: KardexValorizadoFiltros = {},
+  ): Promise<{ success: boolean; data: any[]; resumen: any }> {
+    const startedAt = Date.now();
+    try {
+      const client = this.supabase.getClient();
+      const limit = filtros.limit && filtros.limit > 0 ? Math.min(filtros.limit, 500) : 200;
+
+      let itemsQuery = client
+        .from('vw_kardex_valorizado')
+        .select(
+          `
+            recepcion_item_id,
+            recepcion_id,
+            tenant_id,
+            recepcion_numero,
+            fecha_recepcion,
+            recepcion_estado,
+            producto_id,
+            producto_codigo,
+            producto_nombre,
+            producto_sku,
+            cantidad_recibida,
+            costo_unitario,
+            valor_total,
+            almacen_id,
+            almacen_nombre,
+            ubicacion_id,
+            ubicacion_codigo,
+            lote,
+            serie,
+            fecha_expiracion,
+            moneda_detalle
+          `,
+        )
+        .eq('tenant_id', tenantId);
+
+      if (filtros.productoId) {
+        itemsQuery = itemsQuery.eq('producto_id', filtros.productoId);
+      }
+
+      if (filtros.almacenId) {
+        itemsQuery = itemsQuery.eq('almacen_id', filtros.almacenId);
+      }
+
+      const fechaDesde = this.normalizeDateFilter(filtros.desde, 'start');
+      if (fechaDesde) {
+        itemsQuery = itemsQuery.gte('fecha_recepcion', fechaDesde);
+      }
+
+      const fechaHasta = this.normalizeDateFilter(filtros.hasta, 'end');
+      if (fechaHasta) {
+        itemsQuery = itemsQuery.lte('fecha_recepcion', fechaHasta);
+      }
+
+      itemsQuery = itemsQuery.order('fecha_recepcion', { ascending: false }).limit(limit);
+
+      const { data: itemsData, error } = await itemsQuery;
+      if (error) {
+        throw error;
+      }
+
+      const movimientos = (itemsData ?? []).map((item: any) => {
+        const cantidad = Number(item.cantidad_recibida ?? 0);
+        const costoUnitario = this.round2(Number(item.costo_unitario ?? 0));
+        const valorTotal = this.round2(Number(item.valor_total ?? 0));
+
+        return {
+          id: item.recepcion_item_id,
+          tipo: 'ENTRADA',
+          fecha: this.sanitizeDateOutput(item.fecha_recepcion) ?? null,
+          documento: item.recepcion_numero ?? null,
+          estado: item.recepcion_estado ?? null,
+          cantidad,
+          costoUnitario,
+          valorTotal,
+          moneda: item.moneda_detalle ?? 'PEN',
+          producto: {
+            id: item.producto_id,
+            nombre: item.producto_nombre ?? 'Producto',
+            codigo: item.producto_codigo ?? null,
+            sku: item.producto_sku ?? null,
+          },
+          almacen: item.almacen_id
+            ? {
+                id: item.almacen_id,
+                nombre: item.almacen_nombre ?? 'Almacén',
+                codigo: null,
+              }
+            : null,
+          ubicacion: item.ubicacion_id
+            ? {
+                id: item.ubicacion_id,
+                codigo: item.ubicacion_codigo ?? null,
+              }
+            : null,
+          lote: item.lote ?? null,
+          serie: item.serie ?? null,
+          fechaExpiracion: this.sanitizeDateOutput(item.fecha_expiracion, true),
+          recepcionId: item.recepcion_id,
+        };
+      });
+
+      movimientos.sort((a, b) => {
+        const fechaA = a.fecha ? new Date(a.fecha).getTime() : 0;
+        const fechaB = b.fecha ? new Date(b.fecha).getTime() : 0;
+        return fechaB - fechaA;
+      });
+
+      const totalEntradas = movimientos.reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
+      const valorEntradas = movimientos.reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
+      const valorPorMoneda = movimientos.reduce<Record<string, number>>((acc, mov) => {
+        const moneda = mov.moneda ?? 'PEN';
+        acc[moneda] = (acc[moneda] ?? 0) + Number(mov.valorTotal ?? 0);
+        return acc;
+      }, {});
+
+      const resumen = {
+        totalMovimientos: movimientos.length,
+        totalEntradas: this.round2(totalEntradas),
+        valorEntradas: this.round2(valorEntradas),
+        saldoCantidad: this.round2(totalEntradas),
+        saldoValorizado: this.round2(valorEntradas),
+        valorPorMoneda: Object.entries(valorPorMoneda).reduce<Record<string, number>>((acc, [moneda, valor]) => {
+          acc[moneda] = this.round2(valor);
+          return acc;
+        }, {}),
+      };
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'kardex.valorizado',
+        status: 'SUCCESS',
+        requestSummary: filtros,
+        responseSummary: resumen,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        success: true,
+        data: movimientos,
+        resumen,
+      };
+    } catch (error) {
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'kardex.valorizado',
+        status: 'ERROR',
+        requestSummary: filtros,
+        errorMessage: error?.message ?? 'Error desconocido',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ [Inventario] Error obteniendo kardex valorizado:', error);
+      throw new BadRequestException('No se pudo obtener el kardex valorizado');
+    }
+  }
+
+  async obtenerRecepcionPorId(tenantId: string, recepcionId: string): Promise<{ success: boolean; data: any }> {
+    const startedAt = Date.now();
+    try {
+      const client = this.supabase.getClient();
+
+      const { data: recepcion, error } = await client
+        .from('recepciones')
+        .select(
+          `
+            id,
+            tenant_id,
+            numero,
+            fecha_recepcion,
+            estado,
+            observaciones,
+            orden:ordenes_compra (
+              id,
+              numero,
+              proveedor_id,
+              moneda,
+              total,
+              proveedor:proveedores (
+                id,
+                razon_social,
+                documento_tipo,
+                documento_numero
+              )
+            )
+          `,
+        )
+        .eq('tenant_id', tenantId)
+        .eq('id', recepcionId)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!recepcion) {
+        throw new NotFoundException('Recepción no encontrada');
+      }
+
+      const { data: itemsData, error: itemsError } = await client
+        .from('recepcion_items')
+        .select(
+          `
+            id,
+            recepcion_id,
+            producto_id,
+            cantidad_recibida,
+            calidad,
+            almacen_id,
+            ubicacion_id,
+            lote,
+            serie,
+            fecha_expiracion,
+            detalle_id
+          `,
+        )
+        .eq('recepcion_id', recepcionId);
+
+      if (itemsError) {
+        throw itemsError;
+      }
+
+      const productoIds = new Set<string>();
+      const detalleIds = new Set<string>();
+      const almacenIds = new Set<string>();
+      const ubicacionIds = new Set<string>();
+
+      (itemsData ?? []).forEach((item: any) => {
+        if (item.producto_id) productoIds.add(item.producto_id);
+        if (item.detalle_id) detalleIds.add(item.detalle_id);
+        if (item.almacen_id) almacenIds.add(item.almacen_id);
+        if (item.ubicacion_id) ubicacionIds.add(item.ubicacion_id);
+      });
+
+      const [productosResp, detallesResp, almacenesResp, ubicacionesResp] = await Promise.all([
+        productoIds.size
+          ? client
+              .from('productos')
+              .select('id, nombre, codigo, sku, precio_compra')
+              .eq('tenant_id', tenantId)
+              .in('id', Array.from(productoIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        detalleIds.size
+          ? client
+              .from('orden_compra_detalles')
+              .select('id, precio_unitario, moneda')
+              .in('id', Array.from(detalleIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        almacenIds.size
+          ? client
+              .from('almacenes')
+              .select('id, nombre, codigo')
+              .in('id', Array.from(almacenIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        ubicacionIds.size
+          ? client
+              .from('almacen_ubicaciones')
+              .select('id, codigo, descripcion')
+              .in('id', Array.from(ubicacionIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]);
+
+      if (productosResp.error) throw productosResp.error;
+      if (detallesResp.error) throw detallesResp.error;
+      if (almacenesResp.error) throw almacenesResp.error;
+      if (ubicacionesResp.error) throw ubicacionesResp.error;
+
+      const productoMap = new Map<string, any>(
+        (productosResp.data ?? []).map((producto: any) => [producto.id, producto]),
+      );
+      const detalleMap = new Map<string, any>(
+        (detallesResp.data ?? []).map((detalle: any) => [detalle.id, detalle]),
+      );
+      const almacenMap = new Map<string, any>(
+        (almacenesResp.data ?? []).map((almacen: any) => [almacen.id, almacen]),
+      );
+      const ubicacionMap = new Map<string, any>(
+        (ubicacionesResp.data ?? []).map((ubicacion: any) => [ubicacion.id, ubicacion]),
+      );
+
+      const itemsConstruidos = (itemsData ?? []).map((item: any) => {
+        const producto = productoMap.get(item.producto_id);
+        const detalle = detalleMap.get(item.detalle_id);
+        const almacen = almacenMap.get(item.almacen_id);
+        const ubicacion = ubicacionMap.get(item.ubicacion_id);
+
+        const cantidad = Number(item.cantidad_recibida ?? 0);
+        const costoUnitario =
+          detalle?.precio_unitario != null
+            ? Number(detalle.precio_unitario)
+            : producto?.precio_compra != null
+            ? Number(producto.precio_compra)
+            : 0;
+        const valorTotal = this.round2(cantidad * costoUnitario);
+
+        return {
+          id: item.id,
+          cantidad,
+          costoUnitario: this.round2(costoUnitario),
+          valorTotal,
+          calidad: item.calidad,
+          lote: item.lote ?? null,
+          serie: item.serie ?? null,
+          fechaExpiracion: this.sanitizeDateOutput(item.fecha_expiracion, true),
+          almacen: almacen ? { id: almacen.id, nombre: almacen.nombre, codigo: almacen.codigo } : null,
+          ubicacion: ubicacion
+            ? { id: ubicacion.id, codigo: ubicacion.codigo, descripcion: ubicacion.descripcion }
+            : null,
+          producto: producto
+            ? {
+                id: item.producto_id,
+                nombre: producto.nombre,
+                codigo: producto.codigo,
+                sku: producto.sku,
+              }
+            : { id: item.producto_id },
+        };
+      });
+
+      const totalCantidad = itemsConstruidos.reduce((sum, item) => sum + Number(item.cantidad ?? 0), 0);
+      const totalValorizado = itemsConstruidos.reduce((sum, item) => sum + Number(item.valorTotal ?? 0), 0);
+
+      const respuesta = {
+        id: recepcion.id,
+        numero: recepcion.numero,
+        fechaRecepcion: this.sanitizeDateOutput(recepcion.fecha_recepcion),
+        estado: recepcion.estado,
+        observaciones: recepcion.observaciones,
+        orden: (recepcion.orden && !Array.isArray(recepcion.orden))
+          ? {
+              id: (recepcion.orden as any).id,
+              numero: (recepcion.orden as any).numero,
+              moneda: (recepcion.orden as any).moneda,
+              total: (recepcion.orden as any).total,
+            }
+          : null,
+        proveedor: (recepcion.orden && !Array.isArray(recepcion.orden) && (recepcion.orden as any).proveedor && !Array.isArray((recepcion.orden as any).proveedor))
+          ? {
+              id: (recepcion.orden as any).proveedor.id,
+              razonSocial: (recepcion.orden as any).proveedor.razon_social,
+              documentoTipo: (recepcion.orden as any).proveedor.documento_tipo,
+              documentoNumero: (recepcion.orden as any).proveedor.documento_numero,
+            }
+          : null,
+        totalItems: itemsConstruidos.length,
+        totalCantidad: this.round2(totalCantidad),
+        totalValorizado: this.round2(totalValorizado),
+        items: itemsConstruidos,
+      };
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'recepciones.detalle',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'SUCCESS',
+        responseSummary: { totalItems: itemsConstruidos.length },
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        success: true,
+        data: respuesta,
+      };
+    } catch (error) {
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'recepciones.detalle',
+        correlacionId: recepcionId,
+        correlacionTipo: 'RECEPCION',
+        status: 'ERROR',
+        errorMessage: error?.message ?? 'Error desconocido',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error(`❌ [Inventario] Error obteniendo recepción ${recepcionId}:`, error);
+      throw error instanceof NotFoundException
+        ? error
+        : new BadRequestException('No se pudo obtener el detalle de la recepción');
+    }
+  }
+
+  async listarRecepciones(
+    tenantId: string,
+    filtros: ListarRecepcionesFiltros = {},
+  ): Promise<{
+    success: boolean;
+    data: any[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const startedAt = Date.now();
+    try {
+      const client = this.supabase.getClient();
+      const page = filtros.page && filtros.page > 0 ? filtros.page : 1;
+      const limit = filtros.limit && filtros.limit > 0 && filtros.limit <= 200 ? filtros.limit : 50;
+      const offset = (page - 1) * limit;
+
+      const estado = filtros.estado ? filtros.estado.toUpperCase() : undefined;
+      const sanitizedSearch = this.sanitizeSearchTerm(filtros.search);
+
+      const fechaDesde = this.normalizeDateFilter(filtros.desde, 'start');
+      const fechaHasta = this.normalizeDateFilter(filtros.hasta, 'end');
+
+      let recepcionesQuery = client
+        .from('vw_inventario_recepciones')
+        .select(
+          `
+            recepcion_id,
+            tenant_id,
+            numero,
+            fecha_recepcion,
+            estado,
+            observaciones,
+            gre_proveedor,
+            orden_id,
+            numero_orden,
+            proveedor_id,
+            proveedor_nombre,
+            proveedor_ruc,
+            total_items,
+            cantidad_total,
+            valor_total,
+            moneda,
+            created_at,
+            updated_at
+          `,
+          { count: 'exact' },
+        )
+        .eq('tenant_id', tenantId);
+
+      if (estado) {
+        recepcionesQuery = recepcionesQuery.eq('estado', estado);
+      }
+
+      if (fechaDesde) {
+        recepcionesQuery = recepcionesQuery.gte('fecha_recepcion', fechaDesde);
+      }
+
+      if (fechaHasta) {
+        recepcionesQuery = recepcionesQuery.lte('fecha_recepcion', fechaHasta);
+      }
+
+      if (sanitizedSearch) {
+        const searchPattern = `%${sanitizedSearch}%`;
+        recepcionesQuery = recepcionesQuery.or(
+          [
+            `numero.ilike.${searchPattern}`,
+            `numero_orden.ilike.${searchPattern}`,
+            `proveedor_nombre.ilike.${searchPattern}`,
+            `proveedor_ruc.ilike.${searchPattern}`,
+          ].join(','),
+        );
+      }
+
+      recepcionesQuery = recepcionesQuery
+        .order('fecha_recepcion', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      const { data: recepcionesData, error, count } = await recepcionesQuery;
+
+      if (error) {
+        throw error;
+      }
+
+      const recepcionList = (recepcionesData ?? []).map((recepcion: any) => ({
+        id: recepcion.recepcion_id,
+        numero: recepcion.numero,
+        fechaRecepcionIso: recepcion.fecha_recepcion,
+        estado: recepcion.estado,
+        observaciones: recepcion.observaciones,
+        greProveedor: recepcion.gre_proveedor,
+        ordenId: recepcion.orden_id,
+        numeroOrden: recepcion.numero_orden,
+        proveedorId: recepcion.proveedor_id,
+        proveedorNombre: recepcion.proveedor_nombre,
+        proveedorRuc: recepcion.proveedor_ruc,
+        totalItems: Number(recepcion.total_items ?? 0),
+        cantidadTotal: Number(recepcion.cantidad_total ?? 0),
+        valorTotal: Number(recepcion.valor_total ?? 0),
+        moneda: recepcion.moneda ?? 'PEN',
+      }));
+
+      if (recepcionList.length === 0) {
+        await this.registrarIntegrationLog({
+          tenantId,
+          servicio: 'INVENTARIO',
+          operacion: 'recepciones.listar',
+          status: 'SUCCESS',
+          requestSummary: filtros,
+          responseSummary: { total: 0 },
+          durationMs: Date.now() - startedAt,
+        });
+
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+
+      const recepcionIds = recepcionList.map((recepcion) => recepcion.id);
+
+      let itemsQuery = client
+        .from('recepcion_items')
+        .select(
+          `
+            id,
+            recepcion_id,
+            producto_id,
+            cantidad_recibida,
+            calidad,
+            almacen_id,
+            ubicacion_id,
+            lote,
+            serie,
+            fecha_expiracion,
+            detalle_id
+          `,
+        )
+        .in('recepcion_id', recepcionIds);
+
+      if (filtros.almacenId) {
+        itemsQuery = itemsQuery.eq('almacen_id', filtros.almacenId);
+      }
+
+      const { data: itemsData, error: itemsError } = await itemsQuery;
+      if (itemsError) {
+        throw itemsError;
+      }
+
+      const itemsByRecepcion = new Map<string, any[]>();
+      const productoIds = new Set<string>();
+      const detalleIds = new Set<string>();
+      const almacenIds = new Set<string>();
+      const ubicacionIds = new Set<string>();
+      const ordenIds = new Set<string>();
+      const proveedorIds = new Set<string>();
+
+      (itemsData ?? []).forEach((item: any) => {
+        if (!itemsByRecepcion.has(item.recepcion_id)) {
+          itemsByRecepcion.set(item.recepcion_id, []);
+        }
+        itemsByRecepcion.get(item.recepcion_id)!.push(item);
+
+        if (item.producto_id) productoIds.add(item.producto_id);
+        if (item.detalle_id) detalleIds.add(item.detalle_id);
+        if (item.almacen_id) almacenIds.add(item.almacen_id);
+        if (item.ubicacion_id) ubicacionIds.add(item.ubicacion_id);
+      });
+
+      recepcionList.forEach((recepcion) => {
+        if (recepcion.ordenId) {
+          ordenIds.add(recepcion.ordenId);
+        }
+        if (recepcion.proveedorId) {
+          proveedorIds.add(recepcion.proveedorId);
+        }
+      });
+
+      const [productosResp, detallesResp, almacenesResp, ubicacionesResp, ordenesResp, proveedoresResp] = await Promise.all([
+        productoIds.size
+          ? client
+              .from('productos')
+              .select('id, nombre, codigo, sku, precio_compra')
+              .eq('tenant_id', tenantId)
+              .in('id', Array.from(productoIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        detalleIds.size
+          ? client
+              .from('orden_compra_detalles')
+              .select('id, precio_unitario, moneda')
+              .in('id', Array.from(detalleIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        almacenIds.size
+          ? client
+              .from('almacenes')
+              .select('id, nombre, codigo')
+              .in('id', Array.from(almacenIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        ubicacionIds.size
+          ? client
+              .from('almacen_ubicaciones')
+              .select('id, codigo, descripcion')
+              .in('id', Array.from(ubicacionIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        ordenIds.size
+          ? client
+              .from('ordenes_compra')
+              .select('id, numero, moneda, total')
+              .eq('tenant_id', tenantId)
+              .in('id', Array.from(ordenIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+        proveedorIds.size
+          ? client
+              .from('proveedores')
+              .select('id, razon_social, documento_tipo, documento_numero, ruc')
+              .eq('tenant_id', tenantId)
+              .in('id', Array.from(proveedorIds))
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]);
+
+      if (productosResp.error) throw productosResp.error;
+      if (detallesResp.error) throw detallesResp.error;
+      if (almacenesResp.error) throw almacenesResp.error;
+      if (ubicacionesResp.error) throw ubicacionesResp.error;
+      if (ordenesResp.error) throw ordenesResp.error;
+      if (proveedoresResp.error) throw proveedoresResp.error;
+
+      const productoMap = new Map<string, any>(
+        (productosResp.data ?? []).map((producto: any) => [producto.id, producto]),
+      );
+      const detalleMap = new Map<string, any>(
+        (detallesResp.data ?? []).map((detalle: any) => [detalle.id, detalle]),
+      );
+      const almacenMap = new Map<string, any>(
+        (almacenesResp.data ?? []).map((almacen: any) => [almacen.id, almacen]),
+      );
+      const ubicacionMap = new Map<string, any>(
+        (ubicacionesResp.data ?? []).map((ubicacion: any) => [ubicacion.id, ubicacion]),
+      );
+      const ordenMap = new Map<string, any>(
+        (ordenesResp.data ?? []).map((orden: any) => [orden.id, orden]),
+      );
+      const proveedorMap = new Map<string, any>(
+        (proveedoresResp.data ?? []).map((proveedor: any) => [proveedor.id, proveedor]),
+      );
+
+      const resultados = recepcionList
+        .map((recepcion) => {
+          const items = itemsByRecepcion.get(recepcion.id) ?? [];
+          if (filtros.almacenId && items.length === 0) {
+            return null;
+          }
+
+          const detalleOrden = recepcion.ordenId ? ordenMap.get(recepcion.ordenId) : null;
+          const proveedorDetalle = recepcion.proveedorId ? proveedorMap.get(recepcion.proveedorId) : null;
+
+          const itemsConstruidos = items.map((item: any) => {
+            const producto = productoMap.get(item.producto_id);
+            const detalle = detalleMap.get(item.detalle_id);
+            const almacen = almacenMap.get(item.almacen_id);
+            const ubicacion = ubicacionMap.get(item.ubicacion_id);
+
+            const cantidad = Number(item.cantidad_recibida ?? 0);
+            const costoUnitario =
+              detalle?.precio_unitario != null
+                ? Number(detalle.precio_unitario)
+                : producto?.precio_compra != null
+                ? Number(producto.precio_compra)
+                : 0;
+            const valorTotal = this.round2(cantidad * costoUnitario);
+
+            return {
+              id: item.id,
+              cantidad,
+              costoUnitario: this.round2(costoUnitario),
+              valorTotal,
+              calidad: item.calidad,
+              lote: item.lote ?? null,
+              serie: item.serie ?? null,
+              fechaExpiracion: this.sanitizeDateOutput(item.fecha_expiracion, true),
+              almacen: almacen
+                ? { id: almacen.id, nombre: almacen.nombre, codigo: almacen.codigo }
+                : null,
+              ubicacion: ubicacion
+                ? { id: ubicacion.id, codigo: ubicacion.codigo, descripcion: ubicacion.descripcion }
+                : null,
+              producto: producto
+                ? {
+                    id: item.producto_id,
+                    nombre: producto.nombre,
+                    codigo: producto.codigo,
+                    sku: producto.sku,
+                  }
+                : { id: item.producto_id },
+            };
+          });
+
+          const totalCantidadItems = itemsConstruidos.reduce(
+            (sum, item) => sum + Number(item?.cantidad ?? 0),
+            0,
+          );
+          const totalValorizadoItems = itemsConstruidos.reduce(
+            (sum, item) => sum + Number(item?.valorTotal ?? 0),
+            0,
+          );
+          const almacenesAsociados = Array.from(
+            new Map(
+              itemsConstruidos
+                .filter((item) => item.almacen)
+                .map((item) => [item.almacen!.id, item.almacen]),
+            ).values(),
+          );
+
+          const proveedor = proveedorDetalle
+            ? {
+                id: proveedorDetalle.id,
+                razonSocial: proveedorDetalle.razon_social,
+                documentoTipo: proveedorDetalle.documento_tipo ?? (proveedorDetalle.ruc ? 'RUC' : null),
+                documentoNumero:
+                  proveedorDetalle.documento_numero ?? proveedorDetalle.ruc ?? null,
+              }
+            : recepcion.proveedorNombre
+            ? {
+                id: recepcion.proveedorId,
+                razonSocial: recepcion.proveedorNombre,
+                documentoTipo: recepcion.proveedorRuc ? 'RUC' : null,
+                documentoNumero: recepcion.proveedorRuc ?? null,
+              }
+            : null;
+
+          const totalCantidad = filtros.almacenId
+            ? this.round2(totalCantidadItems)
+            : this.round2(recepcion.cantidadTotal);
+          const totalValorizado = filtros.almacenId
+            ? this.round2(totalValorizadoItems)
+            : this.round2(recepcion.valorTotal);
+          const totalItems = filtros.almacenId ? itemsConstruidos.length : recepcion.totalItems;
+
+          return {
+            id: recepcion.id,
+            numero: recepcion.numero,
+            fechaRecepcion: this.sanitizeDateOutput(recepcion.fechaRecepcionIso),
+            estado: recepcion.estado,
+            observaciones: recepcion.observaciones,
+            greProveedor: recepcion.greProveedor,
+            orden: detalleOrden
+              ? {
+                  id: detalleOrden.id,
+                  numero: detalleOrden.numero,
+                  moneda: detalleOrden.moneda,
+                  total: detalleOrden.total,
+                }
+              : recepcion.ordenId
+              ? {
+                  id: recepcion.ordenId,
+                  numero: recepcion.numeroOrden,
+                  moneda: recepcion.moneda,
+                  total: recepcion.valorTotal,
+                }
+              : null,
+            proveedor,
+            totalItems,
+            totalCantidad,
+            totalValorizado,
+            almacenes: almacenesAsociados,
+            items: itemsConstruidos,
+          };
+        })
+        .filter((recepcion) => recepcion !== null) as any[];
+
+      const filteredResultados =
+        sanitizedSearch && filtros.search
+          ? resultados.filter((recepcion) => {
+              const search = sanitizedSearch.toLowerCase();
+              return (
+                (recepcion.numero || '').toLowerCase().includes(search) ||
+                (recepcion.orden?.numero || '').toLowerCase().includes(search) ||
+                (recepcion.proveedor?.razonSocial || '').toLowerCase().includes(search)
+              );
+            })
+          : resultados;
+
+      const total =
+        filtros.almacenId || sanitizedSearch ? filteredResultados.length : count ?? filteredResultados.length;
+      const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'recepciones.listar',
+        status: 'SUCCESS',
+        requestSummary: filtros,
+        responseSummary: { total: filteredResultados.length },
+        durationMs: Date.now() - startedAt,
+      });
+
+      return {
+        success: true,
+        data: filteredResultados,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      };
+    } catch (error) {
+      await this.registrarIntegrationLog({
+        tenantId,
+        servicio: 'INVENTARIO',
+        operacion: 'recepciones.listar',
+        status: 'ERROR',
+        requestSummary: filtros,
+        errorMessage: error?.message ?? 'Error desconocido',
+        durationMs: Date.now() - startedAt,
+      });
+      this.logger.error('❌ [Inventario] Error listando recepciones:', error);
+      throw new BadRequestException('No se pudieron obtener las recepciones');
+    }
+  }
+
+  private normalizeDateFilter(value?: string, boundary: 'start' | 'end' = 'start'): string | null {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    // HARDENING: sanitizar filtros de fechas para evitar inyecciones o fechas inválidas.
+    const isoCandidate = trimmed.includes('T') ? trimmed : `${trimmed}T00:00:00Z`;
+    const parsed = new Date(isoCandidate);
+    if (Number.isNaN(parsed.getTime())) {
+      this.logger.warn(`⚠️ [Inventario] Fecha inválida recibida en filtros: "${value}"`);
+      return null;
+    }
+
+    if (boundary === 'end') {
+      parsed.setUTCHours(23, 59, 59, 999);
+    } else {
+      parsed.setUTCHours(0, 0, 0, 0);
+    }
+
+    return parsed.toISOString();
+  }
+
+  private sanitizeDateOutput(value?: string | null, dateOnly = false): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const candidate = value.includes('T') ? value : `${value}T00:00:00Z`;
+    const parsed = new Date(candidate);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    const iso = parsed.toISOString();
+    return dateOnly ? iso.split('T')[0] : iso;
+  }
+
+  private sanitizeSearchTerm(value?: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return trimmed.replace(/[%_]/g, '');
+  }
+
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  private async registrarIntegrationLog(entry: {
+    tenantId: string;
+    servicio: string;
+    operacion: string;
+    correlacionId?: string | null;
+    correlacionTipo?: string | null;
+    status: 'SUCCESS' | 'ERROR';
+    requestSummary?: Record<string, any>;
+    responseSummary?: Record<string, any>;
+    errorMessage?: string;
+    durationMs?: number;
+  }): Promise<void> {
+    try {
+      await this.supabase
+        .getClient()
+        .from('integration_logs')
+        .insert({
+          tenant_id: entry.tenantId,
+          servicio: entry.servicio,
+          operacion: entry.operacion,
+          correlacion_id: entry.correlacionId ?? null,
+          correlacion_tipo: entry.correlacionTipo ?? null,
+          status: entry.status,
+          request_summary: entry.requestSummary ?? null,
+          response_summary: entry.responseSummary ?? null,
+          error_message: entry.errorMessage ?? null,
+          duration_ms: entry.durationMs ?? null,
+        });
+    } catch (error) {
+      this.logger.error('❌ [Inventario] Error registrando integration_log:', error);
     }
   }
 

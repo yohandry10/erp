@@ -4,7 +4,7 @@ import Sidebar from '../../components/layout/sidebar'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmpresaConfigProvider } from '@/hooks/use-empresa-config'
-import { customAuth } from '@/lib/auth-service'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function DashboardLayout({
   children,
@@ -12,56 +12,31 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const { session, loading: authLoading } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
   const [isTablet, setIsTablet] = useState(false)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Verificar autenticación al montar
+  // ✅ SOLUCIÓN: Usar AuthContext en lugar de verificación manual
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('🔍 [DashboardLayout] Verificando autenticación...')
-        
-        // ✅ Dar un pequeño delay para asegurar que localStorage esté sincronizado
-        // Esto previene race conditions cuando se redirige desde login
-        await new Promise(resolve => setTimeout(resolve, 50))
-        
-        // Verificar token en localStorage primero
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
-        
-        console.log('🔍 [DashboardLayout] Token en localStorage:', token ? 'SÍ' : 'NO')
-        
-        if (!token) {
-          console.warn('⚠️ [DashboardLayout] No hay token, redirigiendo a login')
-          // Pequeño delay antes de redirigir para evitar loops
-          await new Promise(resolve => setTimeout(resolve, 100))
-          router.replace('/login')
-          return
-        }
-
-        // Verificar sesión con authService
-        const { data } = await customAuth.getSession()
-        
-        if (!data.session || !data.session.access_token) {
-          console.warn('⚠️ [DashboardLayout] Sesión inválida, redirigiendo a login')
-          router.replace('/login')
-          return
-        }
-
-        console.log('✅ [DashboardLayout] Usuario autenticado:', {
-          userId: data.session.user.id,
-          email: data.session.user.email,
-          tenantId: data.session.user.tenant_id
-        })
-        setIsCheckingAuth(false)
-      } catch (error) {
-        console.error('❌ [DashboardLayout] Error verificando autenticación:', error)
-        router.replace('/login')
-      }
+    // Esperar a que AuthContext termine de cargar
+    if (authLoading) {
+      console.log('⏳ [DashboardLayout] Esperando AuthContext...')
+      return
     }
 
-    checkAuth()
-  }, [router])
+    // Si no hay sesión, redirigir a login
+    if (!session) {
+      console.warn('⚠️ [DashboardLayout] No hay sesión, redirigiendo a login')
+      router.replace('/login')
+      return
+    }
+
+    console.log('✅ [DashboardLayout] Usuario autenticado:', {
+      userId: session.user.id,
+      email: session.user.email,
+      tenantId: session.user.tenant_id
+    })
+  }, [session, authLoading, router])
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -75,8 +50,8 @@ export default function DashboardLayout({
     return () => window.removeEventListener('resize', checkScreenSize)
   }, [])
 
-  // Mostrar loading mientras se verifica autenticación
-  if (isCheckingAuth) {
+  // ✅ Mostrar loading mientras AuthContext carga o no hay sesión
+  if (authLoading || !session) {
     return (
       <div style={{
         display: 'flex',
@@ -96,7 +71,7 @@ export default function DashboardLayout({
             margin: '0 auto 1rem'
           }} />
           <p style={{ color: '#64748b', fontSize: '1.1rem' }}>
-            Verificando autenticación...
+            {authLoading ? 'Verificando autenticación...' : 'Redirigiendo...'}
           </p>
           <style jsx>{`
             @keyframes spin {
