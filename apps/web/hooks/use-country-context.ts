@@ -1,70 +1,119 @@
-'use client'
+import { useState, useEffect } from 'react';
+import { useApi } from './use-api';
 
-import * as React from 'react'
-import { usePaises, type Pais } from './use-paises'
-
-type ChildrenProps = { children: React.ReactNode }
-
-interface CountryContextType {
-  selectedCountry: Pais | null
-  setSelectedCountry: (country: Pais | null) => void
-  isLoading: boolean
+interface CountryContext {
+  paisId: number;
+  paisCodigo: string;
+  paisNombre: string;
+  servicioFiscal: string; // SUNAT, DIAN, etc.
+  documentoFiscal: string; // RUC, NIT, etc.
+  moneda: string;
+  simboloMoneda: string;
+  impuesto: string; // IGV, IVA, etc.
+  loading: boolean;
 }
 
-const defaultContextValue: CountryContextType = {
-  selectedCountry: null,
-  setSelectedCountry: () => {
-    // eslint-disable-next-line no-console
-    console.warn('CountryProvider no está montado')
-  },
-  isLoading: true,
-}
+const DEFAULT_CONTEXT: CountryContext = {
+  paisId: 1,
+  paisCodigo: 'PE',
+  paisNombre: 'Perú',
+  servicioFiscal: 'SUNAT',
+  documentoFiscal: 'RUC',
+  moneda: 'PEN',
+  simboloMoneda: 'S/',
+  impuesto: 'IGV',
+  loading: true,
+};
 
-const CountryContext = React.createContext<CountryContextType>(defaultContextValue)
+/**
+ * Hook para obtener el contexto del país del tenant actual
+ * Detecta automáticamente el país y retorna textos dinámicos
+ */
+export function useCountryContext(): CountryContext {
+  const [context, setContext] = useState<CountryContext>(DEFAULT_CONTEXT);
+  const api = useApi();
 
-export function CountryProvider({ children }: ChildrenProps) {
-  const [selectedCountry, setSelectedCountryState] = React.useState<Pais | null>(null)
-  const { paises, loading } = usePaises()
+  useEffect(() => {
+    loadCountryContext();
+  }, []);
 
-  // Cargar país desde localStorage cuando haya lista de países
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return
-    const savedCountryId = window.localStorage.getItem('selectedCountry')
-    if (savedCountryId && paises.length > 0) {
-      const country = paises.find((p) => String(p.id) === savedCountryId)
-      if (country) setSelectedCountryState(country)
+  const loadCountryContext = async () => {
+    try {
+      // Obtener configuración de la empresa que incluye país
+      const response = await api.get('/api/configuracion/empresa');
+      
+      if (response?.data) {
+        const paisId = response.data.pais_id || 1;
+        const paisCodigo = response.data.pais || 'PE';
+        
+        // Mapear según país
+        const contextMap: Record<string, Partial<CountryContext>> = {
+          'PE': {
+            paisId: 1,
+            paisCodigo: 'PE',
+            paisNombre: 'Perú',
+            servicioFiscal: 'SUNAT',
+            documentoFiscal: 'RUC',
+            moneda: 'PEN',
+            simboloMoneda: 'S/',
+            impuesto: 'IGV (18%)',
+          },
+          'CO': {
+            paisId: 2,
+            paisCodigo: 'CO',
+            paisNombre: 'Colombia',
+            servicioFiscal: 'DIAN',
+            documentoFiscal: 'NIT',
+            moneda: 'COP',
+            simboloMoneda: '$',
+            impuesto: 'IVA (19%)',
+          },
+          'CL': {
+            paisId: 3,
+            paisCodigo: 'CL',
+            paisNombre: 'Chile',
+            servicioFiscal: 'SII',
+            documentoFiscal: 'RUT',
+            moneda: 'CLP',
+            simboloMoneda: '$',
+            impuesto: 'IVA (19%)',
+          },
+          'MX': {
+            paisId: 4,
+            paisCodigo: 'MX',
+            paisNombre: 'México',
+            servicioFiscal: 'SAT',
+            documentoFiscal: 'RFC',
+            moneda: 'MXN',
+            simboloMoneda: '$',
+            impuesto: 'IVA (16%)',
+          },
+          'EC': {
+            paisId: 5,
+            paisCodigo: 'EC',
+            paisNombre: 'Ecuador',
+            servicioFiscal: 'SRI',
+            documentoFiscal: 'RUC',
+            moneda: 'USD',
+            simboloMoneda: '$',
+            impuesto: 'IVA (12%)',
+          },
+        };
+
+        const countryData = contextMap[paisCodigo.toUpperCase()] || contextMap['PE'];
+        
+        setContext({
+          ...countryData,
+          loading: false,
+        } as CountryContext);
+      } else {
+        setContext({ ...DEFAULT_CONTEXT, loading: false });
+      }
+    } catch (error) {
+      console.error('Error loading country context:', error);
+      setContext({ ...DEFAULT_CONTEXT, loading: false });
     }
-  }, [paises])
+  };
 
-  // Setter con persistencia
-  const setSelectedCountry = React.useCallback((country: Pais | null) => {
-    setSelectedCountryState(country)
-    if (typeof window === 'undefined') return
-    if (country) {
-      window.localStorage.setItem('selectedCountry', String(country.id))
-    } else {
-      window.localStorage.removeItem('selectedCountry')
-    }
-  }, [])
-
-  const contextValue = React.useMemo<CountryContextType>(
-    () => ({
-      selectedCountry,
-      setSelectedCountry,
-      isLoading: loading,
-    }),
-    [selectedCountry, setSelectedCountry, loading]
-  )
-
-  // 🔧 Sin JSX para evitar el error del Provider en tu IDE
-  return React.createElement(
-    CountryContext.Provider,
-    { value: contextValue as CountryContextType },
-    children
-  )
-}
-
-export function useCountryContext(): CountryContextType {
-  const context = React.useContext(CountryContext)
-  return context
+  return context;
 }

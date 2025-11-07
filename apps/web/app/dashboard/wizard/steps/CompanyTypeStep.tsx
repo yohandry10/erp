@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react'
 import { useWizard } from '../useWizard'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Label } from '@/components/ui/label'
 import { Building2, Package, Truck, FileText } from 'lucide-react'
 
@@ -9,6 +10,7 @@ type TipoEmpresa = 'MICRO' | 'PEQUEÑA' | 'MEDIANA' | 'GRANDE'
 
 export function CompanyTypeStep() {
   const { state, updateConfiguration } = useWizard()
+  const country = useCountryContext()
 
   const tiposEmpresa: Array<{
     value: TipoEmpresa
@@ -158,8 +160,8 @@ export function CompanyTypeStep() {
         </div>
       </div>
 
-      {/* Configuración GRE */}
-      {state.configuration.tipo_empresa && (
+      {/* Configuración GRE - Solo para Perú */}
+      {state.configuration.tipo_empresa && country.paisCodigo === 'PE' && (
         <div style={{
           marginTop: '2rem',
           padding: '1.5rem',

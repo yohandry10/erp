@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { OutboxEventBuilder, CreateOutboxEventOptions } from './outbox-event.interface';
 
 /**
  * Servicio para gestionar eventos usando Outbox Pattern
@@ -14,6 +15,7 @@ export class OutboxService {
   /**
    * Persiste un evento en la tabla outbox antes de procesarlo
    * Esto garantiza que el evento no se pierda si el servicio se reinicia
+   * @deprecated Use persistEventStandard instead for consistent structure
    */
   async persistEvent(
     tenantId: string,
@@ -21,59 +23,50 @@ export class OutboxService {
     eventData: any,
     maxRetries: number = 5,
   ): Promise<string> {
+    this.logger.warn('⚠️ persistEvent is deprecated. Use persistEventStandard instead.');
+    
+    // Extraer aggregateType y aggregateId del eventData si existen
+    const aggregateType = eventData.aggregateType || eventType.split('.')[0] || 'unknown';
+    const aggregateId = eventData.aggregateId || eventData.id || eventData.ventaId || eventData.cobroId || eventData.recepcionId || 'unknown';
+
+    return this.persistEventStandard({
+      tenantId,
+      eventType,
+      aggregateType,
+      aggregateId,
+      eventData,
+      maxRetries,
+    });
+  }
+
+  /**
+   * Persiste un evento en la tabla outbox con estructura estándar
+   * Garantiza consistencia en todos los campos requeridos
+   */
+  async persistEventStandard(options: CreateOutboxEventOptions): Promise<string> {
     const client = this.supabase.getClient();
 
-    // Adaptar a estructura existente: la tabla tiene columnas diferentes
-    // Intentar insertar con tenant_id (si existe la columna) o sin él
-    const insertData: any = {
-      event_type: eventType,
-      event_data: {
-        ...eventData,
-        tenantId, // Siempre en event_data para compatibilidad
-      },
-      status: 'PENDING',
-      retry_count: 0,
-    };
-
-    // Solo agregar tenant_id si la columna existe (será agregada por migración)
-    // Intentamos insertar tenant_id, si falla, lo omitimos y solo usamos event_data
     try {
+      // Construir evento con estructura estándar
+      const eventToInsert = OutboxEventBuilder.build(options);
+
       const { data: event, error } = await client
         .from('outbox_events')
-        .insert({
-          ...insertData,
-          tenant_id: tenantId, // Intentar agregar tenant_id
-          max_retries: maxRetries,
-        } as any)
-        .select('id')
+        .insert(eventToInsert)
+        .select('id, event_id')
         .single();
 
       if (error) {
-        // Si falla por tenant_id, intentar sin él
-        if (error.message?.includes('tenant_id')) {
-          const { data: event2, error: error2 } = await client
-            .from('outbox_events')
-            .insert(insertData)
-            .select('id')
-            .single();
-
-          if (error2) {
-            this.logger.error(`❌ Error persistiendo evento ${eventType}:`, error2);
-            throw new Error(`No se pudo persistir evento: ${error2.message}`);
-          }
-
-          this.logger.log(`✅ Evento ${eventType} persistido en outbox (ID: ${event2.id})`);
-          return event2.id;
-        }
-
-        this.logger.error(`❌ Error persistiendo evento ${eventType}:`, error);
+        this.logger.error(`❌ Error persistiendo evento ${options.eventType}:`, error);
         throw new Error(`No se pudo persistir evento: ${error.message}`);
       }
 
-      this.logger.log(`✅ Evento ${eventType} persistido en outbox (ID: ${event.id})`);
-      return event.id;
+      this.logger.log(
+        `✅ Evento ${options.eventType} persistido en outbox (ID: ${event.id}, Event ID: ${event.event_id})`
+      );
+      return event.event_id;
     } catch (error) {
-      this.logger.error(`❌ Error persistiendo evento ${eventType}:`, error);
+      this.logger.error(`❌ Error persistiendo evento ${options.eventType}:`, error);
       throw error;
     }
   }

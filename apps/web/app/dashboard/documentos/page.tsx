@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
+import { useCountryContext } from '@/hooks/use-country-context'
 import DocumentoModal from '@/components/modals/DocumentoModal'
 
 interface Documento {
@@ -29,6 +30,7 @@ interface DocumentoStats {
 }
 
 export default function DocumentosPage() {
+  const country = useCountryContext()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [stats, setStats] = useState<DocumentoStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -107,13 +109,13 @@ export default function DocumentosPage() {
     }
   }
 
-  const enviarSUNAT = async (documentoId: string) => {
+  const enviarFiscal = async (documentoId: string) => {
     const response = await api.post(`/api/documentos/${documentoId}/enviar-sunat`)
     if (response && response.success) {
       loadDocumentos() // Reload documents to update status
-      showSuccessToast('Documento enviado a SUNAT correctamente')
+      showSuccessToast(`Documento enviado a ${country.servicioFiscal} correctamente`)
     } else {
-      showErrorToast(response?.message || 'Error al enviar documento a SUNAT')
+      showErrorToast(response?.message || `Error al enviar documento a ${country.servicioFiscal}`)
     }
   }
 
@@ -194,7 +196,7 @@ export default function DocumentosPage() {
     const estados = {
       'BORRADOR': 'Borrador',
       'EMITIDO': 'Emitido',
-      'ENVIADO_SUNAT': 'Enviado SUNAT',
+      'ENVIADO_SUNAT': `Enviado ${country.servicioFiscal}`,
       'ACEPTADO': 'Aceptado',
       'RECHAZADO': 'Rechazado',
       'ANULADO': 'Anulado'
@@ -312,7 +314,7 @@ export default function DocumentosPage() {
       {/* Header */}
       <div className="dashboard-header">
         <h1 className="dashboard-title">Gestión Documental y Facturación Electrónica</h1>
-        <p className="dashboard-subtitle">Gestiona facturas, boletas, notas y contratos con validación SUNAT</p>
+        <p className="dashboard-subtitle">Gestiona facturas, boletas, notas y contratos con validación {country.servicioFiscal}</p>
         <button 
           className="refresh-btn"
           onClick={() => setIsModalOpen(true)}
@@ -374,7 +376,7 @@ export default function DocumentosPage() {
             <span className="stat-icon">⏳</span>
           </div>
           <div className="stat-value">{stats?.pendientesEnvio || 0}</div>
-          <div className="stat-subtitle">Por enviar a SUNAT</div>
+          <div className="stat-subtitle">Por enviar a {country.servicioFiscal}</div>
         </div>
       </div>
 
@@ -428,7 +430,7 @@ export default function DocumentosPage() {
               <option value="">Todos los estados</option>
               <option value="BORRADOR">Borrador</option>
               <option value="EMITIDO">Emitido</option>
-              <option value="ENVIADO_SUNAT">Enviado SUNAT</option>
+              <option value="ENVIADO_SUNAT">Enviado {country.servicioFiscal}</option>
               <option value="ACEPTADO">Aceptado</option>
               <option value="RECHAZADO">Rechazado</option>
               <option value="ANULADO">Anulado</option>
@@ -659,7 +661,7 @@ export default function DocumentosPage() {
                       )}
                       {documento.estado === 'EMITIDO' && (
                         <button 
-                          onClick={() => enviarSUNAT(documento.id)}
+                          onClick={() => enviarFiscal(documento.id)}
                           style={{ 
                             background: 'rgba(16, 185, 129, 0.1)', 
                             border: '1px solid rgba(16, 185, 129, 0.2)', 
@@ -670,7 +672,7 @@ export default function DocumentosPage() {
                             fontSize: '0.75rem'
                           }}
                         >
-                          Enviar SUNAT
+                          Enviar {country.servicioFiscal}
                         </button>
                       )}
                       {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (

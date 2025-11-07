@@ -54,6 +54,19 @@ export class TenantManagementService {
     const adminEmail = tenantData.admin_email || tenantData.email;
     const adminNombre = tenantData.admin_nombre || 'Administrador';
 
+    // Get pais_id from paises table
+    const { data: paisData } = await client
+      .from('paises')
+      .select('id')
+      .eq('codigo_iso', pais.toUpperCase())
+      .single();
+
+    if (!paisData) {
+      throw new BadRequestException(`País no válido: ${pais}. Países soportados: PE, CO, CL, MX, EC`);
+    }
+
+    const paisId = paisData.id;
+
     // Insert tenant record with sales configuration
     const { data: newTenant, error: tenantError } = await client
       .from('empresa_config')
@@ -72,7 +85,7 @@ export class TenantManagementService {
         fecha_inicio: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        pais_id: pais === 'PE' ? 1 : 2,
+        pais_id: paisId,
         // Sales configuration
         tipo_empresa: tenantData.tipo_empresa || 'MICRO',
         usar_flujo_logistica: tenantData.usar_flujo_logistica ?? false,

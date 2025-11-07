@@ -4,6 +4,8 @@ import { AsientosGeneratorService } from '../services/asientos-generator.service
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
 import { EventBusService, ERPEvent } from '../../../shared/events/event-bus.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -19,7 +21,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
     private readonly asientosGenerator: AsientosGeneratorService,
     private readonly outboxEventsService: OutboxEventsService,
     private readonly eventBus: EventBusService,
-    private readonly supabaseService: SupabaseService
+    private readonly supabaseService: SupabaseService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -80,28 +83,33 @@ export class ContabilidadEventsListener implements OnModuleInit {
     eventData: any
   ): Promise<void> {
     try {
-      const eventId = uuidv4();
-      const aggregateId = eventData.ventaId || eventData.cobroId || eventData.recepcionId || eventData.pagoId || eventData.cuentaId || eventData.facturaId || eventId;
+      const tenantId = eventData.tenantId || eventData.tenant_id;
+      if (!tenantId) {
+        this.logger.warn(
+          `⚠️ [ContabilidadEventsListener] Evento ${eventType} sin tenantId, se omite persistencia`
+        );
+        return;
+      }
+
+      const aggregateId = eventData.ventaId || eventData.cobroId || eventData.recepcionId || eventData.pagoId || eventData.cuentaId || eventData.facturaId || uuidv4();
 
       this.logger.log(
         `💾 [ContabilidadEventsListener] Persistiendo evento ${eventType} en outbox`
       );
 
+      // Usar el builder para garantizar estructura consistente
+      const eventToInsert = OutboxEventBuilder.build({
+        tenantId,
+        eventType,
+        aggregateType,
+        aggregateId,
+        eventData,
+      });
+
       const { error } = await this.supabaseService
         .getClient()
         .from('outbox_events')
-        .insert({
-          event_id: eventId,
-          correlation_id: uuidv4(),
-          aggregate_type: aggregateType,
-          aggregate_id: aggregateId,
-          event_type: eventType,
-          event_data: eventData,
-          event_version: 1,
-          status: 'pending',
-          retry_count: 0,
-          created_at: new Date().toISOString()
-        });
+        .insert(eventToInsert);
 
       if (error) {
         this.logger.error(
@@ -112,7 +120,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
 
       this.logger.log(
-        `✅ [ContabilidadEventsListener] Evento ${eventType} persistido en outbox: ${eventId}`
+        `✅ [ContabilidadEventsListener] Evento ${eventType} persistido en outbox: ${eventToInsert.event_id}`
       );
     } catch (error) {
       this.logger.error(
@@ -982,12 +990,26 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       // Generar asiento de reversión (montos negativos)
       // Este asiento revierte el asiento original de venta
+      // ✅ FIX H09: Usar TaxCalculatorService en lugar de hardcodear 1.18
+      const totalAnulado = -(eventData.total || 0);
+      let baseImponible = 0;
+      let igvAnulado = 0;
+
+      if (eventData.total) {
+        const subtotalCalculado = await this.taxCalculator.calcularSubtotalDesdeTotal(
+          Math.abs(eventData.total),
+          tenantId
+        );
+        baseImponible = -subtotalCalculado;
+        igvAnulado = totalAnulado - baseImponible;
+      }
+
       const reversoData = {
         tenant_id: tenantId,
         fecha: eventData.anulado_at || new Date().toISOString(),
-        total: -(eventData.total || 0), // Negativo para revertir
-        base_imponible: eventData.total ? -(eventData.total / 1.18) : 0, // Negativo
-        igv: eventData.total ? -(eventData.total - (eventData.total / 1.18)) : 0, // Negativo
+        total: totalAnulado, // Negativo para revertir
+        base_imponible: baseImponible, // Negativo
+        igv: igvAnulado, // Negativo
         costo_ventas: 0, // No revertir costo si no hay información
         centro_costo_id: eventData.centro_costo_id,
         referencia: `REV-${referencia}`, // Prefijo REV para identificar reversiones

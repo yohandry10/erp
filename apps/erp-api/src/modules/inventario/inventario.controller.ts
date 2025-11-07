@@ -10,6 +10,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { InventarioService } from './inventario.service';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
+import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
 
 /**
  * ✅ MULTI-TENANT: Controlador de Inventario con soporte multi-tenant
@@ -28,6 +29,7 @@ export class InventarioController {
     private readonly supabase: SupabaseService,
     private readonly almacenesService: AlmacenesService,
     private readonly inventarioService: InventarioService,
+    private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
   /**
@@ -312,6 +314,10 @@ export class InventarioController {
         };
       }
 
+      // ✅ FIX H09: Obtener tasa de impuesto desde configuración fiscal
+      const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
+      const impuestoPorcentaje = tasaIgv * 100; // Convertir 0.18 a 18.0
+
       const nuevoProducto = {
         tenant_id: tenantId,
         codigo: productData.codigo,
@@ -323,7 +329,7 @@ export class InventarioController {
         codigo_barras: productData.codigoBarras || productData.codigo,
         precio_mayorista: parseFloat(productData.precioCompra || 0),
         stock_minimo: parseInt(productData.stockMinimo || 0),
-        impuesto: 18.0
+        impuesto: impuestoPorcentaje
       };
 
       const { data: insertedProduct, error } = await this.supabase.getClient()
