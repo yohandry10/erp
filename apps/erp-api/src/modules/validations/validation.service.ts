@@ -9,12 +9,16 @@ import {
   ValidationErrorCode,
   ValidateDocumentDto,
 } from './validation.types';
+import { ColombiaValidationService } from './colombia-validation.service';
 
 @Injectable()
 export class ValidationService {
   private readonly logger = new Logger(ValidationService.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly colombiaValidationService: ColombiaValidationService,
+  ) {}
 
   /**
    * Validate certificate existence, format, and expiration
@@ -100,7 +104,7 @@ export class ValidationService {
   }
 
   /**
-   * Validate RUC configuration completeness and format
+   * Validate RUC/NIT configuration completeness and format (multi-country support)
    */
   async validateRucConfiguration(tenantId: string): Promise<RucValidationResult> {
     const errors: string[] = [];
@@ -108,11 +112,11 @@ export class ValidationService {
     let isValid = true;
 
     try {
-      // Get empresa configuration
+      // Get empresa configuration with country
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, direccion')
+        .select('ruc, razon_social, direccion, pais_id')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -123,15 +127,25 @@ export class ValidationService {
         return { isValid, missingFields, errors };
       }
 
+      // Get country info for validation rules
+      const { data: pais } = await this.supabaseService
+        .getClient()
+        .from('paises')
+        .select('codigo_iso, nombre')
+        .eq('id', empresa.pais_id)
+        .single();
+
+      const paisCodigo = pais?.codigo_iso || 'PE'; // Default to Peru
+
       // Check required fields
       if (!empresa.ruc || empresa.ruc.trim() === '') {
-        missingFields.push('RUC');
+        missingFields.push(paisCodigo === 'PE' ? 'RUC' : 'NIT');
         isValid = false;
       } else {
-        // Validate RUC format (11 digits for Peru)
-        const rucPattern = /^\d{11}$/;
-        if (!rucPattern.test(empresa.ruc)) {
-          errors.push('El RUC debe tener exactamente 11 dígitos numéricos');
+        // Validate RUC/NIT format based on country
+        const validationResult = this.validateTaxIdFormat(empresa.ruc, paisCodigo);
+        if (!validationResult.isValid) {
+          errors.push(validationResult.error);
           isValid = false;
         }
       }
@@ -151,7 +165,7 @@ export class ValidationService {
       }
 
       this.logger.log(
-        `RUC validation for tenant ${tenantId}: ${isValid ? 'VALID' : 'INVALID'}`,
+        `Tax ID validation for tenant ${tenantId} (${paisCodigo}): ${isValid ? 'VALID' : 'INVALID'}`,
       );
 
       return {
@@ -160,8 +174,8 @@ export class ValidationService {
         errors,
       };
     } catch (error) {
-      this.logger.error(`Error validating RUC for tenant ${tenantId}:`, error);
-      errors.push('Error al validar la configuración del RUC');
+      this.logger.error(`Error validating tax ID for tenant ${tenantId}:`, error);
+      errors.push('Error al validar la configuración fiscal');
       return {
         isValid: false,
         missingFields,
@@ -171,37 +185,108 @@ export class ValidationService {
   }
 
   /**
-   * Validate document before emission according to SUNAT rules
+   * Validate tax ID format based on country
+   */
+  private validateTaxIdFormat(taxId: string, countryCode: string): { isValid: boolean; error?: string } {
+    switch (countryCode) {
+      case 'PE': // Peru - RUC
+        const rucPattern = /^\d{11}$/;
+        if (!rucPattern.test(taxId)) {
+          return { isValid: false, error: 'El RUC debe tener exactamente 11 dígitos numéricos' };
+        }
+        return { isValid: true };
+
+      case 'CO': // Colombia - NIT (use dedicated service)
+        return this.colombiaValidationService.validateNIT(taxId);
+
+      case 'CL': // Chile - RUT
+        const rutPattern = /^\d{7,8}-[\dkK]$/;
+        if (!rutPattern.test(taxId)) {
+          return { isValid: false, error: 'El RUT debe tener formato 12345678-9 o 12345678-K' };
+        }
+        return { isValid: true };
+
+      case 'MX': // Mexico - RFC
+        const rfcPattern = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+        if (!rfcPattern.test(taxId)) {
+          return { isValid: false, error: 'El RFC debe tener formato válido (ej: ABC123456XYZ)' };
+        }
+        return { isValid: true };
+
+      default:
+        // For unknown countries, just check it's not empty
+        return { isValid: taxId.length > 0 };
+    }
+  }
+
+  /**
+   * Validate document before emission according to fiscal rules (multi-country support)
    */
   async validateDocumentBeforeEmission(
     document: ValidateDocumentDto,
+    tenantId?: string,
   ): Promise<DocumentValidationResult> {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
     let isValid = true;
 
     try {
-      // Validate item count (max 999 items per SUNAT)
-      if (document.items && document.items.length > 999) {
+      // Get country-specific limits if tenantId provided
+      let maxItems = 999; // Default SUNAT limit
+      let maxAmount = 999999999.99; // Default SUNAT limit
+      let fiscalAuthority = 'SUNAT';
+
+      if (tenantId) {
+        const { data: empresa } = await this.supabaseService
+          .getClient()
+          .from('empresa_config')
+          .select('pais_id')
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (empresa?.pais_id) {
+          const { data: config } = await this.supabaseService
+            .getClient()
+            .from('configuracion_fiscal')
+            .select('max_items_por_documento, monto_maximo_documento')
+            .eq('pais_id', empresa.pais_id)
+            .single();
+
+          if (config) {
+            maxItems = config.max_items_por_documento || maxItems;
+            maxAmount = config.monto_maximo_documento || maxAmount;
+          }
+
+          // Get country name for messages
+          const { data: pais } = await this.supabaseService
+            .getClient()
+            .from('paises')
+            .select('codigo_iso')
+            .eq('id', empresa.pais_id)
+            .single();
+
+          fiscalAuthority = pais?.codigo_iso === 'CO' ? 'DIAN' : 'SUNAT';
+        }
+      }
+
+      // Validate item count
+      if (document.items && document.items.length > maxItems) {
         errors.push({
           field: 'items',
           code: ValidationErrorCode.ITEMS_LIMIT_EXCEEDED,
-          message: `El documento excede el límite de 999 items permitidos por SUNAT (actual: ${document.items.length})`,
+          message: `El documento excede el límite de ${maxItems} items permitidos por ${fiscalAuthority} (actual: ${document.items.length})`,
           severity: 'error',
         });
         isValid = false;
       }
 
-      // Validate amount limits according to SUNAT rules
-      // For boletas: max S/ 700 without customer identification
-      // For facturas: no specific limit but validate reasonable amounts
+      // Validate amount limits
       if (document.total) {
-        const maxAmount = 999999999.99; // Maximum amount supported by SUNAT
         if (document.total > maxAmount) {
           errors.push({
             field: 'total',
             code: ValidationErrorCode.AMOUNT_LIMIT_EXCEEDED,
-            message: `El monto total excede el límite máximo permitido por SUNAT (S/ ${maxAmount.toFixed(2)})`,
+            message: `El monto total excede el límite máximo permitido por ${fiscalAuthority} (${maxAmount.toFixed(2)})`,
             severity: 'error',
           });
           isValid = false;

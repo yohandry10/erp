@@ -10,6 +10,9 @@ import { ValidationService } from '../validations/validation.service';
 import { Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.service';
+import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
+import { PdfGeneratorService } from './pdf-generator.service';
+import { FiscalAdapterService } from './fiscal-adapter.service';
 
 @Injectable()
 export class CpeService {
@@ -31,6 +34,8 @@ export class CpeService {
     private readonly validationService: ValidationService,
     private readonly auditService: AuditService,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly pdfGenerator: PdfGeneratorService,
+    private readonly fiscalAdapter: FiscalAdapterService, // 🌍 Adaptador multi-país
   ) {}
 
   /**
@@ -127,19 +132,22 @@ export class CpeService {
         });
       }
 
-      // 3. Validate document format and SUNAT limits
-      const documentValidation = await this.validationService.validateDocumentBeforeEmission({
-        items: createFacturaDto.items || [],
-        total: createFacturaDto.total_venta,
-        serie: createFacturaDto.serie,
-        correlativo: createFacturaDto.numero?.toString(),
-        tipoDocumento: createFacturaDto.tipo_documento,
-      });
+      // 3. Validate document format and fiscal limits (multi-country)
+      const documentValidation = await this.validationService.validateDocumentBeforeEmission(
+        {
+          items: createFacturaDto.items || [],
+          total: createFacturaDto.total_venta,
+          serie: createFacturaDto.serie,
+          correlativo: createFacturaDto.numero?.toString(),
+          tipoDocumento: createFacturaDto.tipo_documento,
+        },
+        tenantId // 🌍 Pasar tenantId para validaciones por país
+      );
 
       if (!documentValidation.isValid) {
         this.logger.error(`Document validation failed: ${documentValidation.errors.length} errors`);
         throw new BadRequestException({
-          message: 'No se puede emitir el CPE: El documento no cumple con las validaciones SUNAT',
+          message: 'No se puede emitir el CPE: El documento no cumple con las validaciones fiscales',
           errors: documentValidation.errors.map(e => e.message),
           validationErrors: documentValidation.errors,
           code: 'DOCUMENT_VALIDATION_FAILED',
@@ -432,27 +440,19 @@ export class CpeService {
 
   async generatePdf(id: string, tenantId: string): Promise<Buffer> {
     try {
-      console.log(`📄 Buscando CPE con ID: ${id} y tenant: ${tenantId}`);
+      this.logger.log(`📄 Generando PDF con formato SUNAT para CPE: ${id}`);
       
-      // Obtener CPE directamente desde la base de datos
-      const { data: cpeData, error } = await this.supabaseService.getClient()
-        .from('cpe')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error || !cpeData) {
-        console.error('❌ CPE no encontrado:', error);
-        throw new Error('CPE no encontrado');
-      }
-
-      console.log('✅ CPE encontrado:', cpeData);
-
-      // Generar contenido PDF simple pero funcional
-      const pdfContent = this.generateSimplePdfContentFromData(cpeData);
-      return Buffer.from(pdfContent, 'utf-8');
+      // Usar el nuevo generador de PDF con formato oficial SUNAT
+      // ✅ Incluye código QR obligatorio
+      // ✅ Diseño visual estándar SUNAT
+      // ✅ Leyendas obligatorias
+      const pdfBuffer = await this.pdfGenerator.generateSunatCompliantPdf(id, tenantId);
+      
+      this.logger.log(`✅ PDF generado exitosamente para CPE: ${id}`);
+      return pdfBuffer;
+      
     } catch (error) {
-      console.error('❌ Error generando PDF:', error);
+      this.logger.error(`❌ Error generando PDF para CPE ${id}:`, error);
       throw new Error(`Error generando PDF: ${error.message}`);
     }
   }
@@ -489,12 +489,16 @@ export class CpeService {
   async checkOseStatus(id: string, tenantId: string) {
     const cpe = await this.findOne(id, tenantId);
     
-    // Consultar estado real en SUNAT
-    const response = await this.oseService.consultarEstadoCpe(
-      cpe.ruc_emisor,
+    // 🌍 Consultar estado en servicio fiscal correcto (SUNAT o DIAN)
+    const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
+    console.log(`🔍 Consultando estado en ${servicioFiscal} para CPE ${id}`);
+    
+    const response = await this.fiscalAdapter.consultarEstado(
+      tenantId,
       cpe.tipo_documento,
       cpe.serie,
-      cpe.numero.toString()
+      cpe.numero.toString(),
+      cpe.hash
     );
     
     // Actualizar estado en BD si es necesario
@@ -603,9 +607,24 @@ export class CpeService {
 
   private async sendToOse(cpeId: string, xmlContent?: string, fileName?: string): Promise<void> {
     try {
-      console.log(`📤 [CPE] Enviando CPE ${cpeId} a SUNAT...`);
+      // 🔍 PASO 1: Obtener datos del CPE incluyendo tenant_id
+      const { data: cpeData, error: cpeError } = await this.supabaseService.getClient()
+        .from('cpe')
+        .select('*, tenant_id, xml_firmado, ruc_emisor, tipo_documento, serie, numero')
+        .eq('id', cpeId)
+        .single();
+
+      if (cpeError || !cpeData) {
+        throw new Error('No se pudo obtener datos del CPE');
+      }
+
+      const tenantId = cpeData.tenant_id;
       
-      // Marcar como ENVIADO primero
+      // 🌍 PASO 2: Detectar servicio fiscal según país del tenant
+      const servicioFiscal = await this.fiscalAdapter.obtenerNombreServicioFiscal(tenantId);
+      console.log(`📤 [CPE] Enviando CPE ${cpeId} a ${servicioFiscal}...`);
+      
+      // PASO 3: Marcar como ENVIADO
       await this.supabaseService.update(
         'cpe',
         {
@@ -616,27 +635,45 @@ export class CpeService {
         { id: cpeId }
       );
 
-      // Si no se proporciona XML, obtenerlo de la BD
+      // PASO 4: Preparar XML si no se proporcionó
       if (!xmlContent || !fileName) {
-        const { data: cpeData, error } = await this.supabaseService.getClient()
-          .from('cpe')
-          .select('xml_firmado, ruc_emisor, tipo_documento, serie, numero')
-          .eq('id', cpeId)
-          .single();
-
-        if (error || !cpeData) {
-          throw new Error('No se pudo obtener el XML del CPE');
-        }
-
         xmlContent = cpeData.xml_firmado;
         fileName = `${cpeData.ruc_emisor}-${cpeData.tipo_documento}-${cpeData.serie}-${cpeData.numero}`;
       }
 
-      // Enviar a SUNAT mediante OSE
-      const response = await this.oseService.enviarCpe(xmlContent, fileName);
+      // 🚀 PASO 5: ENVIAR AL SERVICIO FISCAL CORRECTO (SUNAT o DIAN)
+      // Construir documento electrónico desde CPE
+      const documento = {
+        id: cpeData.id,
+        tipoDocumento: cpeData.tipo_documento,
+        serie: cpeData.serie,
+        numero: cpeData.numero?.toString() || '',
+        fechaEmision: cpeData.fecha_emision,
+        fechaVencimiento: cpeData.fecha_vencimiento,
+        emisor: {
+          tipoDocumento: '6',
+          numeroDocumento: cpeData.ruc_emisor,
+          razonSocial: cpeData.razon_social_emisor || 'Emisor',
+          direccion: cpeData.direccion_emisor || '',
+        },
+        receptor: {
+          tipoDocumento: cpeData.tipo_documento_cliente || '6',
+          numeroDocumento: cpeData.numero_documento_cliente || '',
+          razonSocial: cpeData.razon_social_cliente || 'Cliente',
+          direccion: cpeData.direccion_cliente || '',
+        },
+        moneda: cpeData.moneda || 'PEN',
+        subtotal: parseFloat(cpeData.subtotal || '0'),
+        totalImpuestos: parseFloat(cpeData.igv || '0'),
+        importeTotal: parseFloat(cpeData.total || '0'),
+        items: cpeData.items || [],
+        xmlContent: xmlContent
+      };
+
+      const response = await this.fiscalAdapter.enviarDocumento(documento, tenantId);
 
       if (response.success) {
-        console.log(`✅ [CPE] CPE ${cpeId} enviado exitosamente a SUNAT`);
+        console.log(`✅ [CPE] CPE ${cpeId} enviado exitosamente a ${servicioFiscal}`);
         
         // Actualizar como ACEPTADO
         await this.supabaseService.update(
@@ -645,15 +682,15 @@ export class CpeService {
             estado: 'ACEPTADO',
             sunat_status: this.sunatStatuses.ACCEPTED,
             cdr_sunat: response.cdr || 'CDR_RECEIVED',
-            hash: response.hashCPE || null,
-            hash_firma: response.hashCPE || null,
+            hash: response.hash || response.numeroComprobante || null,
+            hash_firma: response.hash || null,
             numero_comprobante_sunat: response.numeroComprobante,
             updated_at: new Date().toISOString(),
           },
           { id: cpeId }
         );
       } else {
-        console.error(`❌ [CPE] Error enviando CPE ${cpeId}: ${response.descripcionRespuesta}`);
+        console.error(`❌ [CPE] Error enviando CPE ${cpeId} a ${servicioFiscal}: ${response.descripcionRespuesta}`);
         
         // 🔴 CRÍTICO FIX: Determinar si es error técnico recuperable o error de validación
         const isTechnicalError = this.isTechnicalError(response.codigoRespuesta, response.descripcionRespuesta);
@@ -1322,26 +1359,26 @@ ${new Date().toLocaleString()}
     // - Finanzas: Liberar CxC
     // - Inventario: Restaurar stock (si aplica)
     try {
+      const eventToInsert = OutboxEventBuilder.build({
+        tenantId,
+        eventType: 'cpe.anulado',
+        aggregateType: 'cpe',
+        aggregateId: cpeId,
+        eventData: {
+          cpe_id: cpeId,
+          nota_credito_id: notaCredito.id,
+          serie: cpe.serie,
+          numero: cpe.numero,
+          total: cpe.total_venta,
+          motivo: motivo,
+          anulado_por: userId,
+          anulado_at: new Date().toISOString(),
+        },
+      });
+
       await client
         .from('outbox_events')
-        .insert({
-          tenant_id: tenantId,
-          event_type: 'cpe.anulado',
-          aggregate_type: 'cpe',
-          aggregate_id: cpeId,
-          event_data: {
-            cpe_id: cpeId,
-            nota_credito_id: notaCredito.id,
-            serie: cpe.serie,
-            numero: cpe.numero,
-            total: cpe.total_venta,
-            motivo: motivo,
-            anulado_por: userId,
-            anulado_at: new Date().toISOString(),
-          },
-          status: 'PENDING',
-          created_at: new Date().toISOString(),
-        });
+        .insert(eventToInsert);
 
       console.log(`✅ [CPE] Evento CPEAnulado emitido para CPE ${cpeId}`);
     } catch (error) {

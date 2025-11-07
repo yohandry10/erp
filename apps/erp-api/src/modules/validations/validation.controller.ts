@@ -71,8 +71,9 @@ export class ValidationController {
   })
   async validateDocument(
     @Body() dto: ValidateDocumentDto,
+    @CurrentTenant() tenantId: string,
   ): Promise<DocumentValidationResult> {
-    return this.validationService.validateDocumentBeforeEmission(dto);
+    return this.validationService.validateDocumentBeforeEmission(dto, tenantId);
   }
 
   @Get('status')

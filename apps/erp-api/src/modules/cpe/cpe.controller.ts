@@ -9,10 +9,10 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-// import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CpeService } from './cpe.service';
+import { CpeHelperService } from './cpe-helper.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto } from '@erp-suite/dtos';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -22,10 +22,13 @@ import { User } from '../auth/user.interface';
 
 @ApiTags('cpe')
 @Controller('cpe')
-@UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: CPE requiere autenticación + permisos específicos.
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class CpeController {
-  constructor(private readonly cpeService: CpeService) {}
+  constructor(
+    private readonly cpeService: CpeService,
+    private readonly cpeHelper: CpeHelperService,
+  ) {}
 
   @Post()
   @RequirePermission('cpe.comprobantes.emitir')
@@ -152,25 +155,33 @@ export class CpeController {
 
   @Post('comprobantes/:id/enviar-sunat')
   @RequirePermission('cpe.comprobantes.enviar')
-  @ApiOperation({ summary: 'Enviar CPE a SUNAT' })
+  @ApiOperation({ summary: 'Enviar CPE a autoridad fiscal (SUNAT/DIAN)' })
   async enviarSunat(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
   ) {
     try {
-      console.log(`📡 Enviando CPE a SUNAT: ${id}`);
+      console.log(`📡 Enviando CPE a autoridad fiscal: ${id}`);
+      
+      const fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
       const result = await this.cpeService.resendToOse(id, tenantId);
       
       return {
         success: true,
-        message: 'CPE enviado a SUNAT exitosamente',
+        message: `CPE enviado a ${fiscalAuthority} exitosamente`,
         data: result
       };
     } catch (error) {
-      console.error('❌ Error enviando a SUNAT:', error);
+      console.error('❌ Error enviando a autoridad fiscal:', error);
+      
+      let fiscalAuthority = 'autoridad fiscal';
+      try {
+        fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
+      } catch {}
+      
       return {
         success: false,
-        message: 'Error enviando CPE a SUNAT',
+        message: `Error enviando CPE a ${fiscalAuthority}`,
         error: error.message
       };
     }

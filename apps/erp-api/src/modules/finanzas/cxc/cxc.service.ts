@@ -5,6 +5,7 @@ import { RegistrarPagoCxcDto, TipoMovimientoCxc, AplicarNotaCreditoDto, Reprogra
 import { EventBusService, FacturaEmitidaEvent, CuentaPorCobrarCreadaEvent } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
+import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -892,19 +893,20 @@ export class CxcService {
       timestamp: ahora,
     };
 
+    // Usar el builder para garantizar estructura consistente
+    const eventToInsert = OutboxEventBuilder.build({
+      tenantId: cxc.tenant_id,
+      eventType: 'cobro.registrado',
+      aggregateType: 'cobro',
+      aggregateId: pagoRegistrado.id,
+      eventData: eventoPayload,
+      eventId: cobroEventId,
+      correlationId: finalIdempotencyKey,
+    });
+
     const { error: errorOutbox } = await client
       .from('outbox_events')
-      .insert({
-        event_id: cobroEventId,
-        correlation_id: finalIdempotencyKey,
-        aggregate_type: 'cobro',
-        aggregate_id: pagoRegistrado.id,
-        event_type: 'cobro.registrado',
-        event_data: eventoPayload,
-        status: 'pending',
-        retry_count: 0,
-        created_at: ahora,
-      });
+      .insert(eventToInsert);
 
     if (errorOutbox) {
       console.error('Error insertando evento CobroRegistrado en outbox:', errorOutbox);

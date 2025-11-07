@@ -4,6 +4,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
 
 /**
  * Controlador para obtener la configuración fiscal del tenant
@@ -12,7 +13,10 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 @Controller('configuracion-fiscal')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class ConfiguracionFiscalController {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly taxCalculator: TaxCalculatorService,
+  ) {}
 
   /**
    * Obtiene la configuración fiscal del tenant actual
@@ -43,38 +47,45 @@ export class ConfiguracionFiscalController {
 
     if (error) {
       console.error('Error obteniendo configuración fiscal:', error);
-      
-      // Retornar configuración por defecto si no existe
-      return {
-        success: true,
-        data: {
-          pais_id: 1, // Perú por defecto
-          tasa_igv: 0.18,
-          moneda_principal: 'PEN',
-          impuesto_principal_nombre: 'IGV',
-          impuesto_principal_porcentaje: 0.18,
-          retencion_renta_porcentaje: 0.08,
-          percepcion_porcentaje: 0.01,
-          detraccion_porcentaje: 0.10,
-        },
-      };
     }
 
-    // Si no hay configuración, retornar valores por defecto
+    // ✅ FIX H09: Si no hay configuración, obtener defaults desde TaxCalculatorService
+    // que a su vez los obtiene de la tabla configuracion_fiscal global
     if (!config) {
-      return {
-        success: true,
-        data: {
-          pais_id: 1, // Perú por defecto
-          tasa_igv: 0.18,
-          moneda_principal: 'PEN',
-          impuesto_principal_nombre: 'IGV',
-          impuesto_principal_porcentaje: 0.18,
-          retencion_renta_porcentaje: 0.08,
-          percepcion_porcentaje: 0.01,
-          detraccion_porcentaje: 0.10,
-        },
-      };
+      try {
+        const taxConfig = await this.taxCalculator.getTaxConfig(user.tenant_id);
+        
+        return {
+          success: true,
+          data: {
+            pais_id: taxConfig.paisId || 1,
+            tasa_igv: taxConfig.tasaIgv,
+            moneda_principal: taxConfig.moneda,
+            impuesto_principal_nombre: taxConfig.nombreImpuesto,
+            impuesto_principal_porcentaje: taxConfig.tasaIgv,
+            retencion_renta_porcentaje: taxConfig.retencionRenta || 0.08,
+            percepcion_porcentaje: 0.01,
+            detraccion_porcentaje: 0.10,
+          },
+        };
+      } catch (err) {
+        console.error('Error obteniendo configuración fiscal desde TaxCalculator:', err);
+        
+        // Último fallback: valores hardcodeados de Perú
+        return {
+          success: true,
+          data: {
+            pais_id: 1,
+            tasa_igv: 0.18,
+            moneda_principal: 'PEN',
+            impuesto_principal_nombre: 'IGV',
+            impuesto_principal_porcentaje: 0.18,
+            retencion_renta_porcentaje: 0.08,
+            percepcion_porcentaje: 0.01,
+            detraccion_porcentaje: 0.10,
+          },
+        };
+      }
     }
 
     return {

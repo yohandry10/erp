@@ -2,12 +2,14 @@
 
 import React from 'react'
 import { useWizard } from '../useWizard'
+import { useCountryContext } from '@/hooks/use-country-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Building2 } from 'lucide-react'
 
 export function RucConfigStep() {
   const { state, updateConfiguration } = useWizard()
+  const country = useCountryContext()
 
   const handleInputChange = (field: string, value: string) => {
     updateConfiguration({ [field]: value })
@@ -30,22 +32,22 @@ export function RucConfigStep() {
           color: 'var(--primary-700)',
           margin: 0,
         }}>
-          Ingresa los datos de tu empresa tal como aparecen en SUNAT
+          Ingresa los datos de tu empresa tal como aparecen en {country.servicioFiscal}
         </p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
           <Label htmlFor="ruc" style={{ marginBottom: '0.5rem', display: 'block' }}>
-            RUC <span style={{ color: '#ef4444' }}>*</span>
+            {country.documentoFiscal} <span style={{ color: '#ef4444' }}>*</span>
           </Label>
           <Input
             id="ruc"
             type="text"
-            placeholder="Ej: 20123456789"
+            placeholder={country.paisCodigo === 'PE' ? 'Ej: 20123456789' : country.paisCodigo === 'CO' ? 'Ej: 900123456-7' : 'Ingrese documento fiscal'}
             value={state.configuration.ruc}
             onChange={(e) => handleInputChange('ruc', e.target.value)}
-            maxLength={11}
+            maxLength={country.paisCodigo === 'PE' ? 11 : country.paisCodigo === 'CO' ? 12 : 20}
             style={{
               fontSize: '1rem',
             }}
@@ -55,7 +57,7 @@ export function RucConfigStep() {
             color: 'var(--primary-500)',
             marginTop: '0.25rem',
           }}>
-            Debe tener 11 dígitos
+            {country.paisCodigo === 'PE' ? 'Debe tener 11 dígitos' : country.paisCodigo === 'CO' ? 'Formato: 9-10 dígitos + dígito de verificación' : 'Ingrese documento fiscal válido'}
           </p>
         </div>
 

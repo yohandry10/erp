@@ -313,6 +313,30 @@ export class GreService {
       this.logger.log(`🚚 [GRE] Creando nueva guía de remisión para tenant: ${tenantId}`);
       console.log('🚚 [GRE] Datos recibidos:', greData);
 
+      // VALIDACIÓN: GRE es exclusivo de Perú
+      const { data: empresaConfig } = await supabase
+        .from('empresa_config')
+        .select('pais_id')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (empresaConfig?.pais_id) {
+        const { data: pais } = await supabase
+          .from('paises')
+          .select('codigo_iso, nombre')
+          .eq('id', empresaConfig.pais_id)
+          .single();
+
+        if (pais && pais.codigo_iso !== 'PE') {
+          this.logger.error(`❌ [GRE] Intento de crear GRE para país ${pais.nombre} (${pais.codigo_iso}). GRE solo disponible para Perú.`);
+          throw new BadRequestException({
+            message: `Las Guías de Remisión Electrónicas (GRE) solo están disponibles para empresas peruanas. Su empresa está configurada para ${pais.nombre}.`,
+            code: 'GRE_NOT_AVAILABLE_FOR_COUNTRY',
+            country: pais.nombre,
+          });
+        }
+      }
+
       const eventId = randomUUID();
       const idempotencyKey = this.resolveGreIdempotencyKey(greData, tenantId);
 

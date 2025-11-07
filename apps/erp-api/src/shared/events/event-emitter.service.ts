@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CobroRegistradoEvent } from './event-bus.service';
+import { OutboxEventBuilder } from '../outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface EmitEventOptions {
+  tenantId: string;
   eventType: string;
   aggregateType: string;
   aggregateId: string;
   eventData: any;
+  eventId?: string;
   correlationId?: string;
   eventVersion?: number;
 }
@@ -29,36 +32,37 @@ export class EventEmitterService {
    */
   async emit(options: EmitEventOptions): Promise<string> {
     const {
+      tenantId,
       eventType,
       aggregateType,
       aggregateId,
       eventData,
+      eventId = uuidv4(),
       correlationId = uuidv4(),
       eventVersion = 1
     } = options;
-
-    const eventId = uuidv4();
 
     try {
       this.logger.log(
         `📤 [EventEmitter] Emitting event: ${eventType} for ${aggregateType}:${aggregateId}`
       );
 
+      // Usar el builder para garantizar estructura consistente
+      const eventToInsert = OutboxEventBuilder.build({
+        tenantId,
+        eventType,
+        aggregateType,
+        aggregateId,
+        eventData,
+        eventId,
+        correlationId,
+        eventVersion,
+      });
+
       const { data, error } = await this.supabaseService
         .getClient()
         .from('outbox_events')
-        .insert({
-          event_id: eventId,
-          correlation_id: correlationId,
-          aggregate_type: aggregateType,
-          aggregate_id: aggregateId,
-          event_type: eventType,
-          event_data: eventData,
-          event_version: eventVersion,
-          status: 'pending',
-          retry_count: 0,
-          created_at: new Date().toISOString()
-        })
+        .insert(eventToInsert)
         .select()
         .single();
 
@@ -103,6 +107,7 @@ export class EventEmitterService {
     cpeId?: string;
   }): Promise<string> {
     return this.emit({
+      tenantId: ventaData.tenantId,
       eventType: 'venta.procesada',
       aggregateType: 'venta',
       aggregateId: ventaData.ventaId,
@@ -147,6 +152,7 @@ export class EventEmitterService {
     };
 
     return this.emit({
+      tenantId: evento.tenantId,
       eventType: 'cobro.registrado',
       aggregateType: 'cobro',
       aggregateId: evento.cobroId,
@@ -172,6 +178,7 @@ export class EventEmitterService {
     numeroOrden?: string;
   }): Promise<string> {
     return this.emit({
+      tenantId: recepcionData.tenantId,
       eventType: 'recepcion.registrada',
       aggregateType: 'recepcion',
       aggregateId: recepcionData.recepcionId,
@@ -207,6 +214,7 @@ export class EventEmitterService {
     referencia?: string;
   }): Promise<string> {
     return this.emit({
+      tenantId: pagoData.tenantId,
       eventType: 'pago.proveedor.registrado',
       aggregateType: 'pago',
       aggregateId: pagoData.pagoId,

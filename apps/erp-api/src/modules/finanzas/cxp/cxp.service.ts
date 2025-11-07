@@ -4,6 +4,7 @@ import { EventBusService, PagoProveedorRegistradoEvent } from '../../../shared/e
 import { v4 as uuidv4 } from 'uuid';
 import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto } from './dto';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
+import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 
 @Injectable()
 export class CxpService {
@@ -654,18 +655,18 @@ export class CxpService {
       anulado_at: new Date().toISOString(),
     };
 
-    // Insertar evento en outbox_events
+    // Insertar evento en outbox_events usando el builder
+    const eventToInsert = OutboxEventBuilder.build({
+      tenantId: cxp.tenant_id,
+      eventType: 'CuentaPorPagarAnulada',
+      aggregateType: 'CuentaPorPagar',
+      aggregateId: cxpId,
+      eventData: eventoPayload,
+    });
+
     const { error: errorEvento } = await client
       .from('outbox_events')
-      .insert({
-        event_type: 'CuentaPorPagarAnulada',
-        aggregate_type: 'CuentaPorPagar',
-        aggregate_id: cxpId,
-        event_data: eventoPayload,
-        status: 'pending',
-        retry_count: 0,
-        created_at: new Date().toISOString(),
-      });
+      .insert(eventToInsert);
 
     if (errorEvento) {
       console.error('Error emitiendo evento CuentaPorPagarAnulada:', errorEvento);

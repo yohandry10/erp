@@ -257,14 +257,17 @@ export class PosService {
         };
       }
 
-      // 3. Validate sale document (items count, amounts, etc.)
-      const documentValidation = await this.validationService.validateDocumentBeforeEmission({
-        items: ventaData.items || [],
-        total: ventaData.total,
-        serie: ventaData.comprobante?.serie,
-        correlativo: ventaData.comprobante?.numero?.toString(),
-        tipoDocumento: ventaData.comprobante?.tipo,
-      });
+      // 3. Validate sale document (items count, amounts, etc.) - multi-country
+      const documentValidation = await this.validationService.validateDocumentBeforeEmission(
+        {
+          items: ventaData.items || [],
+          total: ventaData.total,
+          serie: ventaData.comprobante?.serie,
+          correlativo: ventaData.comprobante?.numero?.toString(),
+          tipoDocumento: ventaData.comprobante?.tipo,
+        },
+        user.tenant_id // 🌍 Pasar tenantId para validaciones por país
+      );
 
       if (!documentValidation.isValid) {
         this.logger.error(`Document validation failed: ${documentValidation.errors.length} errors`);

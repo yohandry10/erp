@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQueryDto, CrearMovimientoBancarioDto } from './dto';
+import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 
 @Injectable()
 export class BancosService {
@@ -462,17 +463,17 @@ export class BancosService {
       created_by: userId || null,
     };
 
+    const eventToInsert = OutboxEventBuilder.build({
+      tenantId,
+      eventType: 'MovimientoBancarioRegistrado',
+      aggregateType: 'MovimientoBancario',
+      aggregateId: movimiento.id,
+      eventData: eventoPayload,
+    });
+
     const { error: errorOutbox } = await client
       .from('outbox_events')
-      .insert({
-        event_type: 'MovimientoBancarioRegistrado',
-        aggregate_type: 'MovimientoBancario',
-        aggregate_id: movimiento.id,
-        event_data: eventoPayload,
-        status: 'pending',
-        retry_count: 0,
-        created_at: new Date().toISOString(),
-      });
+      .insert(eventToInsert);
 
     if (errorOutbox) {
       console.error('Error insertando evento en outbox:', errorOutbox);
