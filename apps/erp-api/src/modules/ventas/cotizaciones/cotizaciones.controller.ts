@@ -28,7 +28,7 @@ import { EstadoCotizacion } from './entities';
  */
 @ApiTags('Ventas - Cotizaciones')
 @ApiBearerAuth()
-@Controller('api/ventas/cotizaciones')
+@Controller('ventas/cotizaciones')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: cotizaciones exige permisos granulares.
 export class CotizacionesController {
   constructor(private readonly cotizacionesService: CotizacionesService) {}
@@ -54,13 +54,18 @@ export class CotizacionesController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.cotizacionesService.findAll(tenantId, {
+    const result = await this.cotizacionesService.findAll(tenantId, {
       estado,
       cliente_id,
       search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
+    
+    return {
+      success: true,
+      ...result,
+    };
   }
 
   /**
@@ -83,7 +88,12 @@ export class CotizacionesController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.cotizacionesService.create(createCotizacionDto, tenantId, user?.id);
+    const cotizacion = await this.cotizacionesService.create(createCotizacionDto, tenantId, user?.id);
+    return {
+      success: true,
+      data: cotizacion,
+      message: 'Cotización creada exitosamente',
+    };
   }
 
   /**
@@ -101,7 +111,11 @@ export class CotizacionesController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   async findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    return this.cotizacionesService.findOne(id, tenantId);
+    const cotizacion = await this.cotizacionesService.findOne(id, tenantId);
+    return {
+      success: true,
+      data: cotizacion,
+    };
   }
 
   /**
@@ -133,18 +147,21 @@ export class CotizacionesController {
    */
   @Delete(':id')
   @RequirePermission('ventas.cotizaciones.eliminar')
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar cotización',
     description: 'Elimina una cotización del sistema',
   })
-  @ApiResponse({ status: 204, description: 'Cotización eliminada exitosamente' })
+  @ApiResponse({ status: 200, description: 'Cotización eliminada exitosamente' })
   @ApiResponse({ status: 400, description: 'No se puede eliminar la cotización' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
   async delete(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    await this.cotizacionesService.delete(id, tenantId);
+    await this.cotizacionesService.remove(id, tenantId);
+    return {
+      success: true,
+      message: 'Cotización eliminada correctamente',
+    };
   }
 
   /**

@@ -10,6 +10,10 @@ import {
   ValidateDocumentDto,
 } from './validation.types';
 import { ColombiaValidationService } from './colombia-validation.service';
+import {
+  normalizeCertificateInput,
+  parseCertificateBuffer,
+} from '../../shared/utils/certificate.utils';
 
 @Injectable()
 export class ValidationService {
@@ -46,39 +50,46 @@ export class ValidationService {
         return { isValid, errors, warnings };
       }
 
-      // Check certificate existence
-      if (!empresa.certificado_pfx) {
-        errors.push('No se ha cargado un certificado digital');
+      const certificadoBuffer = normalizeCertificateInput(empresa.certificado_pfx);
+
+      this.logger.log(
+        `[ValidationService] certificado_pfx type=${typeof empresa.certificado_pfx} bufferLength=${
+          certificadoBuffer?.length ?? 'null'
+        } for tenant ${tenantId}`,
+      );
+
+      if (!certificadoBuffer) {
+        errors.push('No se ha cargado un certificado digital válido');
         isValid = false;
         return { isValid, errors, warnings };
       }
 
-      // Validate certificate format (should be Buffer/binary data or base64 string)
-      if (!Buffer.isBuffer(empresa.certificado_pfx) && typeof empresa.certificado_pfx !== 'string') {
-        errors.push('El formato del certificado no es válido (debe ser PFX/P12)');
-        isValid = false;
+      if (!empresa.certificado_password) {
+        warnings.push('No se ha configurado la contraseña del certificado');
       }
 
-      // Check expiration date
-      if (empresa.certificado_expira_en) {
-        expiresAt = new Date(empresa.certificado_expira_en);
+      try {
+        const metadata = parseCertificateBuffer(certificadoBuffer, empresa.certificado_password || '');
+        expiresAt = metadata.validTo;
+
         const now = new Date();
-        const diffTime = expiresAt.getTime() - now.getTime();
+        const diffTime = metadata.validTo.getTime() - now.getTime();
         daysUntilExpiration = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (daysUntilExpiration < 0) {
-          errors.push(`El certificado digital ha vencido el ${expiresAt.toLocaleDateString()}`);
+          errors.push(`El certificado digital ha vencido el ${metadata.validTo.toLocaleDateString()}`);
           isValid = false;
         } else if (daysUntilExpiration <= 30) {
           warnings.push(
-            `El certificado digital vencerá en ${daysUntilExpiration} días (${expiresAt.toLocaleDateString()})`,
+            `El certificado digital vencerá en ${daysUntilExpiration} días (${metadata.validTo.toLocaleDateString()})`,
           );
         }
-      }
-
-      // Check password existence
-      if (!empresa.certificado_password) {
-        warnings.push('No se ha configurado la contraseña del certificado');
+      } catch (certError) {
+        this.logger.error(`Error leyendo certificado para tenant ${tenantId}:`, certError);
+        errors.push(
+          certError instanceof Error ? certError.message : 'No se pudo validar el certificado digital',
+        );
+        isValid = false;
       }
 
       this.logger.log(
@@ -116,7 +127,7 @@ export class ValidationService {
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, direccion, pais_id')
+        .select('ruc, razon_social, direccion_fiscal, pais_id')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -155,8 +166,10 @@ export class ValidationService {
         isValid = false;
       }
 
-      if (!empresa.direccion || empresa.direccion.trim() === '') {
-        missingFields.push('Dirección');
+      const direccionFiscal = empresa.direccion_fiscal?.trim();
+
+      if (!direccionFiscal) {
+        missingFields.push('Dirección Fiscal');
         isValid = false;
       }
 

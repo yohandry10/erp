@@ -27,7 +27,7 @@ import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
  */
 @ApiTags('Ventas - Clientes')
 @ApiBearerAuth()
-@Controller('api/ventas/clientes')
+@Controller('ventas/clientes')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: clientes exige permisos granulares.
 export class ClientesController {
   constructor(private readonly clientesService: ClientesService) {}

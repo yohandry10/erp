@@ -766,6 +766,11 @@ export class RecepcionesService {
         };
       });
 
+      // Totales parciales según lo efectivamente recibido (ignorando ítems rechazados arriba)
+      const subtotalParcial = items.reduce((sum: number, i: any) => sum + (i.total || 0), 0);
+      const igvParcial = this.round2(Number(ordenData.igv ?? 0) > 0 ? subtotalParcial * 0.18 : 0); // usa IGV 18% solo si la orden usa IGV
+      const totalParcial = this.round2(subtotalParcial + igvParcial);
+
       const eventData: RecepcionRegistradaEvent = {
         tenantId,
         eventId,
@@ -782,6 +787,9 @@ export class RecepcionesService {
         subtotal: this.round2(Number(ordenData.subtotal ?? 0)),
         igv: this.round2(Number(ordenData.igv ?? 0)),
         total: this.round2(Number(ordenData.total ?? 0)),
+        subtotalParcial,
+        igvParcial,
+        totalParcial,
         moneda: ordenData.moneda ?? 'PEN',
         diasCredito: proveedor.dias_credito ?? null,
         condicionesPago: proveedor.condiciones_pago ?? null,
@@ -850,7 +858,7 @@ export class RecepcionesService {
         numeroOrden: orden.numero,
         proveedorId: proveedor.id ?? orden.proveedor_id,
         proveedorNombre: proveedor.razon_social ?? 'Proveedor',
-        proveedorRuc: proveedor.ruc ?? proveedor.documento_numero ?? null,
+        proveedorRuc: proveedor.ruc ?? null,
         fechaEntrega: recepcion.fecha_recepcion,
         subtotal: this.round2(Number(orden.subtotal ?? 0)),
         igv: this.round2(Number(orden.igv ?? 0)),

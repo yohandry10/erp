@@ -38,15 +38,38 @@ export default function NuevoPedidoPage() {
 
   return (
     <div className="dashboard-container">
-      <div className="mb-6">
-        <Button
-          variant="ghost"
+      <div style={{ marginBottom: '1.5rem' }}>
+        <button
           onClick={handleCancel}
-          className="mb-4"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1rem',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: 'var(--primary-700)',
+            background: 'rgba(255, 255, 255, 0.8)',
+            border: '1px solid var(--primary-200)',
+            borderRadius: 'var(--border-radius)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            marginBottom: '1rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--primary-50)'
+            e.currentTarget.style.borderColor = 'var(--primary-300)'
+            e.currentTarget.style.transform = 'translateX(-2px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'
+            e.currentTarget.style.borderColor = 'var(--primary-200)'
+            e.currentTarget.style.transform = 'translateX(0)'
+          }}
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
           Volver a Pedidos
-        </Button>
+        </button>
         
         <div>
           <h1 className="dashboard-title">Nuevo Pedido de Venta</h1>

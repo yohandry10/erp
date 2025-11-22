@@ -13,6 +13,7 @@ interface ApiResponse<T> {
 interface UseApiOptions {
   showErrorToast?: boolean
   showSuccessToast?: boolean
+  throwOnError?: boolean
 }
 
 export function useApi<T = any>(options: UseApiOptions = {}) {
@@ -23,7 +24,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   
   const { toast } = useToast()
   const { session, loading: authLoading } = useAuth()
-  const { showErrorToast = true, showSuccessToast = false } = options
+  const { showErrorToast = true, showSuccessToast = false, throwOnError = false } = options
 
   const apiCall = useCallback(async (
     endpoint: string,
@@ -105,8 +106,12 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       const { headers: _, ...restOptions } = options
       
       const response = await fetch(url, {
+        cache: 'no-store', // evita servir 304/ETag y trae estado fresco
         ...restOptions,
-        headers,
+        headers: {
+          'Cache-Control': 'no-cache',
+          ...headers,
+        },
         mode: 'cors',
       })
 
@@ -133,8 +138,36 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       }
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
+        // Intentar parsear JSON de error para propagar detalles (warnings, etc.)
+        let errorData: any = null
+        try {
+          errorData = await response.json()
+        } catch {
+          /* ignore parse error */
+        }
+
+        const errorMessage =
+          errorData?.message ||
+          errorData?.error ||
+          `HTTP error! status: ${response.status}`
+
+        const err = new Error(errorMessage) as any
+        if (errorData) {
+          err.data = errorData
+        }
+        throw err
+      }
+
+      // Handle 204 No Content (DELETE success)
+      if (response.status === 204) {
+        setState({ success: true, data: undefined as any })
+        if (showSuccessToast) {
+          toast({
+            title: 'Éxito',
+            description: 'Operación completada exitosamente',
+          })
+        }
+        return { success: true } as any
       }
 
       const result: any = await response.json()
@@ -170,6 +203,10 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         })
       }
 
+      if (throwOnError) {
+        throw err
+      }
+
       return null
     }
   }, [toast, session, authLoading, showErrorToast, showSuccessToast])
@@ -202,6 +239,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     get,
     post,
     put,
+    del,
     delete: del,
     request: apiCall,
   }

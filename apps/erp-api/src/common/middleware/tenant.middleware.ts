@@ -40,7 +40,8 @@ export class TenantMiddleware implements NestMiddleware {
           if (decoded) {
             tenantId = decoded.tenant_id || null;
             userId = decoded.sub || null;
-            isSuperAdmin = decoded.is_super_admin === true;
+            // Aceptar múltiples variantes de la claim
+            isSuperAdmin = decoded.is_super_admin === true || decoded.isSuperAdmin === true || decoded.roles?.includes?.('superadmin');
             
             this.logger.debug(
               `Token decoded - Tenant: ${tenantId}, User: ${userId}, Path: ${req.path}`,
@@ -63,6 +64,12 @@ export class TenantMiddleware implements NestMiddleware {
           break;
         }
       }
+    }
+
+    // Si no hay tenantId en el token y viene en header (ej: X-Tenant-Id) y es superadmin, usarlo
+    const headerTenant = (req.headers['x-tenant-id'] || req.headers['x-tenantid']) as string | undefined;
+    if (!tenantId && headerTenant) {
+      tenantId = headerTenant;
     }
 
     // HARDENING: propagar información en el request

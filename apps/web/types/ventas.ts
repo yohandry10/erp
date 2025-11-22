@@ -111,12 +111,12 @@ export interface PedidoVenta {
   cotizacion_id?: string
   cliente_id: string
   cliente?: Cliente
-  fecha: string
+  fecha_pedido: string
   estado: EstadoPedido
   subtotal: number
   igv: number
   total: number
-  notas?: string
+  observaciones?: string
   factura_id?: string
   gre_id?: string
   detalle: PedidoDetalle[]

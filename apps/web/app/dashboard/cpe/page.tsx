@@ -6,6 +6,8 @@ import CpeModal from '@/components/modals/CpeModal'
 import CpeViewModal from '@/components/modals/CpeViewModal'
 import GreModal from '@/components/modals/GreModal'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
+import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 
 interface CpeDocument {
   id: string
@@ -45,7 +47,9 @@ export default function CPEPage() {
     estado: '',
     fechaDesde: '',
     fechaHasta: '',
-    cliente: ''
+    cliente: '',
+    serie: '',
+    moneda: ''
   })
 
   const api = useApiCall<CpeDocument[]>()
@@ -66,6 +70,8 @@ export default function CPEPage() {
     const queryParams = new URLSearchParams()
     if (filters.tipoComprobante) queryParams.append('tipoComprobante', filters.tipoComprobante)
     if (filters.estado) queryParams.append('estado', filters.estado)
+    if (filters.serie) queryParams.append('serie', filters.serie)
+    if (filters.moneda) queryParams.append('moneda', filters.moneda)
     if (filters.fechaDesde) queryParams.append('fechaDesde', filters.fechaDesde)
     if (filters.fechaHasta) queryParams.append('fechaHasta', filters.fechaHasta)
     if (filters.cliente) queryParams.append('cliente', filters.cliente)
@@ -249,269 +255,29 @@ export default function CPEPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="activity-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className="activity-title">Lista de Comprobantes</h2>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <select 
-              value={filters.tipoComprobante}
-              onChange={(e) => setFilters(prev => ({ ...prev, tipoComprobante: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white'
-              }}
-            >
-              <option value="">Todos los tipos</option>
-              <option value="01">Facturas</option>
-              <option value="03">Boletas</option>
-              <option value="07">Notas de Crédito</option>
-              <option value="08">Notas de Débito</option>
-            </select>
-            
-            <select 
-              value={filters.estado}
-              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white'
-              }}
-            >
-              <option value="">Todos los estados</option>
-              <option value="BORRADOR">Borrador</option>
-              <option value="ENVIADO">Enviado</option>
-              <option value="ACEPTADO">Aceptado</option>
-              <option value="RECHAZADO">Rechazado</option>
-            </select>
+      <ComprobantesFilters
+        filters={{ ...filters }}
+        onChange={(next) => setFilters(next)}
+        onExport={(f) => {
+          const params = new URLSearchParams()
+          if (f.tipoComprobante) params.append('tipoComprobante', f.tipoComprobante)
+          if (f.estado) params.append('estado', f.estado)
+          if (f.serie) params.append('serie', f.serie)
+          if (f.moneda) params.append('moneda', f.moneda)
+          if (f.fechaDesde) params.append('fechaDesde', f.fechaDesde)
+          if (f.fechaHasta) params.append('fechaHasta', f.fechaHasta)
+          if (f.cliente) params.append('cliente', f.cliente)
+          window.open(`/api/cpe/comprobantes/export?${params.toString()}`, '_blank')
+        }}
+      />
 
-            <input
-              type="date"
-              value={filters.fechaDesde}
-              onChange={(e) => setFilters(prev => ({ ...prev, fechaDesde: e.target.value }))}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white'
-              }}
-            />
-
-            <input
-              type="date"
-              value={filters.fechaHasta}
-              onChange={(e) => setFilters(prev => ({ ...prev, fechaHasta: e.target.value }))}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white'
-              }}
-            />
-
-            <input
-              type="text"
-              placeholder="Buscar cliente..."
-              value={filters.cliente}
-              onChange={(e) => setFilters(prev => ({ ...prev, cliente: e.target.value }))}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white'
-              }}
-            />
-
-            <button
-              onClick={loadData}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: '#3b82f6',
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Actualizar
-            </button>
-          </div>
-        </div>
-
-        {/* Documents Table */}
-        <div className="activity-card">
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Serie-Número</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Tipo</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Cliente</th>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Fecha</th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Importe</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Estado</th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.isArray(documents) && documents.map((doc) => {
-                  const statusColor = getStatusColor(doc.estado)
-                  return (
-                    <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }} key={doc.id}>
-                      <td style={{ padding: '1rem', fontWeight: '600', fontFamily: 'monospace' }}>
-                        {doc.serie}-{doc.numero.toString().padStart(8, '0')}
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <span style={{
-                          background: 'rgba(59, 130, 246, 0.1)',
-                          color: '#3b82f6',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.8rem',
-                          fontWeight: '500'
-                        }}>
-                          {getTipoComprobanteText(doc.tipoComprobante)}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <div>
-                          <div style={{ fontWeight: '600' }}>{doc.cliente}</div>
-                          <div style={{ fontSize: '0.8rem', opacity: '0.7' }}>
-                            {doc.clienteRuc}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        {new Date(doc.fechaEmision).toLocaleDateString('es-PE')}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
-                        {doc.moneda} {doc.total.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <span style={{ 
-                          background: statusColor.background,
-                          color: statusColor.color, 
-                          padding: '0.25rem 0.75rem', 
-                          borderRadius: '20px', 
-                          fontSize: '0.8rem',
-                          fontWeight: '500'
-                        }}>
-                          {getStatusText(doc.estado)}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                          <button 
-                            onClick={() => viewDocument(doc.id, doc.tipoComprobante)}
-                            style={{ 
-                              background: 'rgba(59, 130, 246, 0.1)', 
-                              border: '1px solid rgba(59, 130, 246, 0.2)', 
-                              padding: '0.5rem 1rem', 
-                              borderRadius: '6px', 
-                              color: '#3b82f6', 
-                              cursor: 'pointer',
-                              fontSize: '0.8rem'
-                            }}
-                          >
-                            👁️ Ver
-                          </button>
-                          
-                          {/* Botón GRE - Solo para facturas y boletas ACEPTADAS */}
-                          {(doc.tipoComprobante === '01' || doc.tipoComprobante === '03') && 
-                           doc.estado === 'ACEPTADO' && (
-                            <ProtectedComponent
-                              modulo="gre"
-                              accion="create"
-                              recurso="guias"
-                              fallback={null}
-                            >
-                              <button 
-                                onClick={() => openGreModal(doc)}
-                                style={{ 
-                                  background: 'rgba(34, 197, 94, 0.1)', 
-                                  border: '1px solid rgba(34, 197, 94, 0.2)', 
-                                  padding: '0.5rem 1rem', 
-                                  borderRadius: '6px', 
-                                  color: '#22c55e', 
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem'
-                                }}
-                                title="Crear Guía de Remisión Electrónica"
-                              >
-                                🚚 GRE
-                              </button>
-                            </ProtectedComponent>
-                          )}
-                          
-                          {doc.estado === 'BORRADOR' && (
-                            <ProtectedComponent
-                              modulo="cpe"
-                              accion="emitir"
-                              recurso="comprobantes"
-                              fallback={null}
-                            >
-                              <button 
-                                onClick={() => sendToSunat(doc.id)}
-                                style={{ 
-                                  background: 'rgba(245, 158, 11, 0.1)', 
-                                  border: '1px solid rgba(245, 158, 11, 0.2)', 
-                                  padding: '0.5rem 1rem', 
-                                  borderRadius: '6px', 
-                                  color: '#f59e0b', 
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem'
-                                }}
-                              >
-                                📤 Enviar
-                              </button>
-                            </ProtectedComponent>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-
-            {Array.isArray(documents) && documents.length === 0 && !api.loading && (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-                <h3 style={{ marginBottom: '0.5rem' }}>No hay comprobantes</h3>
-                <p style={{ marginBottom: '1.5rem' }}>Comienza creando tu primer comprobante electrónico</p>
-                <ProtectedComponent
-                  modulo="cpe"
-                  accion="create"
-                  recurso="comprobantes"
-                  fallback={null}
-                >
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: '#3b82f6',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontWeight: '600'
-                    }}
-                  >
-                    + Crear Primer CPE
-                  </button>
-                </ProtectedComponent>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="activity-card">
+        <ComprobantesTable
+          documents={documents}
+          onView={viewDocument}
+          onSend={sendToSunat}
+          onGre={openGreModal}
+        />
       </div>
 
       {/* CPE Modal */}

@@ -33,7 +33,7 @@ import {
  */
 @ApiTags('Inventario - Logística')
 @ApiBearerAuth()
-@Controller('api/inventario/logistica')
+@Controller('inventario/logistica')
 @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard) // HARDENING: logística exige permisos granulares y bandera de módulo.
 @RequireFeatureFlag('inventario') // HARDENING: deshabilita logística si inventario está apagado.
 export class LogisticaController {
@@ -55,6 +55,21 @@ export class LogisticaController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   async getOrdenesPendientes(@CurrentTenant() tenantId: string) {
     return this.logisticaService.getOrdenesPendientes(tenantId);
+  }
+
+  /**
+   * GET /api/inventario/logistica/listo-despacho
+   * Lista pedidos listos para despacho
+   */
+  @Get('listo-despacho')
+  @RequirePermission('inventario.logistica.ver')
+  @ApiOperation({
+    summary: 'Listar órdenes listas para despacho',
+    description: 'Obtiene la lista de pedidos preparados (LISTO_DESPACHO) pendientes de confirmar despacho',
+  })
+  @ApiResponse({ status: 200, description: 'Órdenes listas obtenidas exitosamente' })
+  async getOrdenesListasDespacho(@CurrentTenant() tenantId: string) {
+    return this.logisticaService.getOrdenesListasDespacho(tenantId);
   }
 
   /**

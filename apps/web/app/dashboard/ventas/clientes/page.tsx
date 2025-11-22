@@ -40,10 +40,11 @@ export default function ClientesPage() {
 
       const response = await get(`/api/ventas/clientes?${params.toString()}`)
       
-      if (response?.success) {
+      // El backend devuelve { data: [], pagination: { total, page, limit, totalPages } }
+      if (response?.data) {
         setClientes(response.data || [])
-        setTotalClientes(response.total || 0)
-        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage))
+        setTotalClientes(response.pagination?.total || 0)
+        setTotalPages(response.pagination?.totalPages || 1)
       }
     } catch (error) {
       console.error('Error loading clientes:', error)
@@ -227,17 +228,8 @@ export default function ClientesPage() {
               <p style={{ marginBottom: '1.5rem' }}>
                 {searchTerm || tipoFilter 
                   ? 'No se encontraron clientes con los filtros aplicados'
-                  : 'Comienza agregando tu primer cliente'}
+                  : 'Usa el botón "Nuevo Cliente" en la parte superior para agregar tu primer cliente'}
               </p>
-              {!searchTerm && !tipoFilter && (
-                <button
-                  onClick={() => router.push('/dashboard/ventas/clientes/nuevo')}
-                  className="refresh-btn"
-                >
-                  <Plus size={16} />
-                  Crear Primer Cliente
-                </button>
-              )}
             </div>
           ) : (
             <>

@@ -50,3 +50,17 @@ export interface UpdateGREThresholdsDto {
   umbralGREAutomatico: number;
   greAutomaticoHabilitado: boolean;
 }
+
+export interface ValidateWizardCertificateDto {
+  certificateBase64: string;
+  certificatePassword: string;
+}
+
+export interface WizardCertificateValidationResult {
+  subject: string;
+  issuer: string;
+  serialNumber: string;
+  validFrom: Date;
+  validTo: Date;
+  daysUntilExpiration: number;
+}

@@ -160,7 +160,7 @@ export class GREIntegrationService {
           cliente: {
             id: cliente.id,
             documento_tipo: cliente.documento_tipo,
-            documento_numero: cliente.documento_numero,
+            documento_numero: cliente.numero_documento,
             razon_social: cliente.razon_social,
             direccion: cliente.direccion,
           },

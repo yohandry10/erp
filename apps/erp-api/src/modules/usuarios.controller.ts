@@ -1,19 +1,38 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Req, Query, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { PermissionService } from './permissions/permission.service';
+import { TenantContextService } from '../shared/tenant/tenant-context.service';
 
 @ApiTags('usuarios-sistema')
 @Controller('usuarios-sistema')
 export class UsuariosController {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly permissionService: PermissionService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
 
   private resolveTenantOrThrow(req: any): string {
-    const tenantId = req?.user?.tenant_id;
+    const fromUser = req?.user?.tenant_id;
+    const fromMiddleware = req?.tenantId || req?.tenant_id;
+    const fromHeaders =
+      req?.headers?.['x-tenant-id'] ||
+      req?.headers?.['x-tenant'] ||
+      req?.headers?.['tenant-id'];
+
+    const tenantId = (fromMiddleware || fromUser || fromHeaders)?.toString().trim();
+
     if (!tenantId) {
       // HARDENING: no permitir defaults ni tenants ajenos.
       throw new BadRequestException('Tenant requerido en la sesión actual');
     }
+
+    // Normalizar en la request para el resto del pipeline.
+    req.tenantId = tenantId;
+    req.tenant_id = tenantId;
+
     return tenantId;
   }
 
@@ -450,16 +469,41 @@ export class UsuariosController {
   }
 
   @Get('/:id/permissions')
-  @RequirePermission('usuarios', 'read', 'permisos')
   @ApiOperation({ summary: 'Obtener permisos del usuario' })
   @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
   async getUserPermissions(@Param('id') id: string, @Req() req: any) {
+    // NOTA: Este endpoint NO tiene @RequirePermission porque se usa durante el login
+    // para obtener los permisos del usuario. Si tuviera @RequirePermission, crearía
+    // una dependencia circular (necesitas permisos para obtener permisos).
     try {
       console.log(`🔑 Obteniendo permisos del usuario: ${id}`);
       const user = req.user as any;
-      const tenantId = this.resolveTenantOrThrow(req);
+        const tenantId = this.resolveTenantOrThrow(req);
+        const requesterId = (user?.id || id || '').trim();
+        const requestedUserId = (id || '').trim();
+
+        if (!requesterId) {
+          throw new ForbiddenException('Usuario no autenticado');
+        }
+
+        // Asegurar contexto tenant para Supabase (evita errores en service layer)
+        this.tenantContext.setContext({
+          tenantId,
+          userId: requesterId,
+          isSuperAdmin: user?.is_super_admin ?? false,
+        });
+
+        // Permitir que un usuario obtenga sus propios permisos
+        // Si intenta obtener permisos de otro usuario, verificar permiso
+        if (requesterId !== requestedUserId) {
+          // Solo super-admins pueden ver permisos de otros usuarios
+          if (!user?.is_super_admin) {
+            throw new ForbiddenException('Solo puedes ver tus propios permisos');
+          }
+        }
 
       // Get user's roles
+      console.log(`📋 Buscando roles para usuario_sistema_id: ${requestedUserId}`);
       const { data: userRoles, error: rolesError } = await this.supabaseService
         .getClient()
         .from('user_roles')
@@ -470,15 +514,18 @@ export class UsuariosController {
             nombre
           )
         `)
-        .eq('usuario_sistema_id', id);
+          .eq('usuario_sistema_id', requestedUserId);
 
       if (rolesError) {
         console.error('❌ Error obteniendo roles del usuario:', rolesError);
+        console.error('❌ Detalles del error:', JSON.stringify(rolesError, null, 2));
         throw rolesError;
       }
 
+      console.log(`📋 Roles encontrados: ${userRoles?.length || 0}`, userRoles);
+
       if (!userRoles || userRoles.length === 0) {
-        console.log('⚠️ Usuario sin roles asignados');
+        console.log('⚠️ Usuario sin roles asignados - retornando array vacío de permisos');
         return {
           success: true,
           data: []
@@ -487,6 +534,7 @@ export class UsuariosController {
 
       // Get permissions for all user's roles
       const roleIds = userRoles.map(ur => ur.role_id);
+      console.log(`🔑 Buscando permisos para roles:`, roleIds);
       
       const { data: rolePermissions, error: permError } = await this.supabaseService
         .getClient()
@@ -505,6 +553,7 @@ export class UsuariosController {
 
       if (permError) {
         console.error('❌ Error obteniendo permisos:', permError);
+        console.error('❌ Detalles del error:', JSON.stringify(permError, null, 2));
         throw permError;
       }
 

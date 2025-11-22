@@ -13,6 +13,8 @@ interface WizardContextType {
   markStepComplete: (stepIndex: number) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  setPersistedConfiguration: (value: boolean) => void
+  resetWizardState: () => void
 }
 
 type WizardAction =
@@ -24,8 +26,10 @@ type WizardAction =
   | { type: 'MARK_STEP_COMPLETE'; payload: number }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_PERSISTED'; payload: boolean }
+  | { type: 'RESET' }
 
-const initialState: WizardState = {
+const createInitialState = (): WizardState => ({
   currentStep: 0,
   steps: [
     {
@@ -111,7 +115,10 @@ const initialState: WizardState = {
   validationResults: {},
   isLoading: false,
   error: null,
-}
+  hasPersistedConfiguration: false,
+})
+
+const initialState: WizardState = createInitialState()
 
 const WizardContext = createContext<WizardContextType | undefined>(undefined)
 
@@ -163,10 +170,16 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
     
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload }
-    
+
     case 'SET_ERROR':
       return { ...state, error: action.payload }
-    
+
+    case 'SET_PERSISTED':
+      return { ...state, hasPersistedConfiguration: action.payload }
+
+    case 'RESET':
+      return createInitialState()
+
     default:
       return state
   }
@@ -207,6 +220,14 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_ERROR', payload: error })
   }
 
+  const resetWizardState = () => {
+    dispatch({ type: 'RESET' })
+  }
+
+  const setPersistedConfiguration = (value: boolean) => {
+    dispatch({ type: 'SET_PERSISTED', payload: value })
+  }
+
   return (
     <WizardContext.Provider
       value={{
@@ -219,6 +240,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         markStepComplete,
         setLoading,
         setError,
+        setPersistedConfiguration,
+        resetWizardState,
       }}
     >
       {children}

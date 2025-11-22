@@ -131,7 +131,7 @@ export default function CuentasPorCobrarPage() {
     } finally {
       setLoading(false)
     }
-  }, [api, filters])
+  }, [api.get, filters])
 
   const fetchClientes = useCallback(async () => {
     try {
@@ -142,7 +142,7 @@ export default function CuentasPorCobrarPage() {
       console.error('Error cargando clientes', error)
       setClientes([])
     }
-  }, [api])
+  }, [api.get])
 
   const fetchHistorial = useCallback(
     async (cxcId: string) => {
@@ -161,12 +161,13 @@ export default function CuentasPorCobrarPage() {
         setLoadingHistorial(false)
       }
     },
-    [api],
+    [api.get],
   )
 
   useEffect(() => {
     fetchClientes()
-  }, [fetchClientes])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     fetchCuentas()

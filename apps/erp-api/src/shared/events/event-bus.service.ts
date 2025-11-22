@@ -132,6 +132,9 @@ export interface RecepcionRegistradaEvent {
   subtotal: number;
   igv: number;
   total: number;
+  subtotalParcial?: number;
+  igvParcial?: number;
+  totalParcial?: number;
   moneda: string;
   diasCredito?: number;
   condicionesPago?: string;
@@ -208,6 +211,37 @@ export interface CuentaPorCobrarCreadaEvent {
     detraccion: number;
     anticipo: number;
   };
+}
+
+export interface DocumentoGeneradoEvent {
+  eventId: string;
+  tenantId: string;
+  pedidoId: string;
+  documentoId: string;
+  tipoDocumento: string;
+  serie: string;
+  numero: string;
+  total: number;
+  moneda: string;
+  cpeId?: string | null;
+  cxcId?: string | null;
+  userId?: string | null;
+}
+
+export interface DocumentoFiscalGeneradoEvent {
+  eventId: string;
+  tenantId: string;
+  documentoId: string;
+  pedidoId?: string;
+  tipoDocumento: string;
+  serie: string;
+  numero: string;
+  subtotal: number;
+  impuesto: number;
+  total: number;
+  moneda: string;
+  fechaEmision: string;
+  paisId?: number | null;
 }
 
 export interface DevolucionProveedorEmitidaEvent {
@@ -621,7 +655,23 @@ export class EventBusService {
     // Esto garantiza que el evento no se pierda si el servicio se reinicia
     if (this.outboxService && tenantId) {
       try {
-        await this.outboxService.persistEvent(tenantId, eventType, event.data);
+        const aggregateType = data?.aggregateType || eventType.split('.')[0] || 'unknown';
+        const aggregateId =
+          data?.aggregateId ||
+          data?.id ||
+          data?.ventaId ||
+          data?.cpeId ||
+          data?.facturaId ||
+          data?.pedidoId ||
+          'unknown';
+
+        await this.outboxService.persistEventStandard({
+          tenantId,
+          eventType,
+          aggregateType,
+          aggregateId,
+          eventData: data,
+        });
         console.log(`✅ [EventBus] Evento ${eventType} persistido en outbox`);
       } catch (error) {
         console.error(`❌ [EventBus] Error persistiendo evento en outbox:`, error);
@@ -698,6 +748,22 @@ export class EventBusService {
     this.emit('cxc.creada', payload, 'finanzas', data.tenantId);
   }
 
+  async emitDocumentoGenerado(data: DocumentoGeneradoEvent) {
+    if (!data?.eventId || !data?.tenantId || !data?.documentoId) {
+      throw new Error('DocumentoGeneradoEvent requiere eventId, tenantId y documentoId');
+    }
+
+    await this.emit('documento.generado', data, 'ventas', data.tenantId);
+  }
+
+  async emitDocumentoFiscalGenerado(data: DocumentoFiscalGeneradoEvent) {
+    if (!data?.eventId || !data?.tenantId || !data?.documentoId) {
+      throw new Error('DocumentoFiscalGeneradoEvent requiere eventId, tenantId y documentoId');
+    }
+
+    await this.emit('documento.fiscal.generado', data, 'contabilidad', data.tenantId);
+  }
+
   emitComprobanteEnviadoSunat(data: ComprobanteEnviadoSunatEvent) {
     this.emit('comprobante.enviado.sunat', data, 'cpe');
   }
@@ -707,8 +773,13 @@ export class EventBusService {
   }
 
   // Eventos de inventario
-  emitMovimientoStock(data: MovimientoStockEvent) {
-    this.emit('stock.movimiento', data, 'inventario');
+  emitMovimientoStock(data: MovimientoStockEvent, tenantId?: string) {
+    const resolvedTenant = tenantId ?? (data as any)?.tenantId ?? (data as any)?.tenant_id ?? null;
+    const payload: MovimientoStockEvent = {
+      ...data,
+      tenantId: resolvedTenant ?? data?.tenantId,
+    };
+    this.emit('stock.movimiento', payload, 'inventario', resolvedTenant ?? undefined);
   }
 
   async emitProductoStockBajo(data: ProductoStockBajoEvent, tenantId?: string) {
@@ -873,6 +944,10 @@ export class EventBusService {
 
   onFacturaEmitidaEvent(listener: (event: ERPEvent) => void) {
     this.on('factura.emitida', listener);
+  }
+
+  onDocumentoFiscalGenerado(listener: (event: ERPEvent) => void) {
+    this.on('documento.fiscal.generado', listener);
   }
 
   onCuentaPorCobrarCreadaEvent(listener: (event: ERPEvent) => void) {

@@ -6,6 +6,8 @@ import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { NotificationType, NotificationSeverity } from '../../notifications/notification.types';
 import { CreateCotizacionDto, UpdateCotizacionDto, ConvertirPedidoDto } from './dto';
 import { Cotizacion, EstadoCotizacion, CotizacionDetalle } from './entities';
+import { PedidosService } from '../pedidos/pedidos.service';
+import { CreatePedidoDto } from '../pedidos/dto';
 
 /**
  * CotizacionesService
@@ -19,6 +21,7 @@ export class CotizacionesService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly taxCalculator: TaxCalculatorService,
+    private readonly pedidosService: PedidosService,
   ) {}
 
   /**
@@ -44,11 +47,62 @@ export class CotizacionesService {
       throw new NotFoundException('Cliente no encontrado');
     }
 
+    // Validar stock disponible antes de crear cotización (bloqueo hard)
+    for (const item of createCotizacionDto.detalle) {
+      const { data: prodStock } = await client
+        .from('productos')
+        .select('stock, stock_reservado')
+        .eq('id', item.producto_id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      const disponible =
+        Number(prodStock?.stock ?? 0) - Number(prodStock?.stock_reservado ?? 0);
+
+      if (Number(item.cantidad ?? 0) > disponible) {
+        throw new BadRequestException({
+          message: 'Stock insuficiente para uno o más productos',
+          warnings: [
+            {
+              producto_id: item.producto_id,
+              solicitado: Number(item.cantidad ?? 0),
+              disponible,
+            },
+          ],
+        });
+      }
+    }
+
     // Calcular totales
     const { subtotal, igv, total } = await this.calcularTotales(createCotizacionDto.detalle, tenantId);
 
     // Generar número de cotización
     const numero = await this.generarNumero(tenantId);
+
+    // Obtener información del usuario para el campo vendedor
+    let vendedorNombre = 'Sistema';
+    if (userId) {
+      const { data: usuario } = await client
+        .from('usuarios')
+        .select('nombre, apellido, email')
+        .eq('id', userId)
+        .single();
+      
+      if (usuario) {
+        vendedorNombre = usuario.nombre && usuario.apellido 
+          ? `${usuario.nombre} ${usuario.apellido}`
+          : usuario.email;
+      }
+    }
+
+    // Preparar items en formato JSON para la columna items
+    const items = createCotizacionDto.detalle.map((item) => ({
+      producto_id: item.producto_id,
+      descripcion: item.descripcion,
+      cantidad: item.cantidad,
+      precio_unitario: item.precio_unitario,
+      subtotal: item.cantidad * item.precio_unitario,
+    }));
 
     // Crear cotización
     const { data: cotizacion, error: cotizacionError } = await client
@@ -57,14 +111,17 @@ export class CotizacionesService {
         tenant_id: tenantId,
         numero,
         cliente_id: createCotizacionDto.cliente_id,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha_cotizacion: new Date().toISOString().split('T')[0],
         fecha_vencimiento: createCotizacionDto.fecha_vencimiento || null,
         estado: EstadoCotizacion.BORRADOR,
         subtotal,
         igv,
         total,
-        notas: createCotizacionDto.notas || null,
-        created_by: userId || null,
+        observaciones: createCotizacionDto.notas || null,
+        vendedor: vendedorNombre, // Nombre del vendedor
+        moneda: 'PEN', // Moneda por defecto
+        items: items, // Items en formato JSON
+        probabilidad: 50, // Probabilidad por defecto
       })
       .select()
       .single();
@@ -74,18 +131,35 @@ export class CotizacionesService {
       throw new BadRequestException('Error al crear la cotización');
     }
 
+    // Obtener información de productos para los detalles
+    const productosIds = createCotizacionDto.detalle.map(d => d.producto_id);
+    const { data: productos } = await client
+      .from('productos')
+      .select('id, codigo, nombre')
+      .in('id', productosIds);
+
+    const productosMap = new Map(productos?.map(p => [p.id, p]) || []);
+
     // Crear detalles
-    const detalleData = createCotizacionDto.detalle.map((item) => ({
-      cotizacion_id: cotizacion.id,
-      producto_id: item.producto_id,
-      descripcion: item.descripcion,
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      subtotal: item.cantidad * item.precio_unitario,
-    }));
+    const detalleData = createCotizacionDto.detalle.map((item, index) => {
+      const producto = productosMap.get(item.producto_id);
+      return {
+        cotizacion_id: cotizacion.id,
+        producto_id: item.producto_id,
+        producto_codigo: producto?.codigo || '',
+        producto_nombre: producto?.nombre || item.descripcion,
+        descripcion: item.descripcion,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        descuento_porcentaje: 0,
+        descuento_monto: 0,
+        subtotal: item.cantidad * item.precio_unitario,
+        orden: index + 1,
+      };
+    });
 
     const { data: detalle, error: detalleError } = await client
-      .from('cotizaciones_detalle')
+      .from('cotizacion_detalles')
       .insert(detalleData)
       .select();
 
@@ -126,7 +200,15 @@ export class CotizacionesService {
 
     let query = client
       .from('cotizaciones')
-      .select('*, clientes!inner(id, razon_social, documento_numero)', { count: 'exact' })
+      .select(`
+        *,
+        cliente:cliente_id (
+          id,
+          razon_social,
+          numero_documento,
+          documento_tipo
+        )
+      `, { count: 'exact' })
       .eq('tenant_id', tenantId);
 
     // Filtro por estado
@@ -139,12 +221,10 @@ export class CotizacionesService {
       query = query.eq('cliente_id', filters.cliente_id);
     }
 
-    // Búsqueda por número o cliente
+    // Búsqueda por número
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
-      query = query.or(
-        `numero.ilike.${searchTerm},clientes.razon_social.ilike.${searchTerm}`,
-      );
+      query = query.ilike('numero', searchTerm);
     }
 
     // Ordenar y paginar
@@ -155,9 +235,11 @@ export class CotizacionesService {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching cotizaciones:', error);
+      console.error('❌ [CotizacionesService] Error fetching cotizaciones:', error);
       throw new BadRequestException('Error al obtener cotizaciones');
     }
+
+    console.log(`✅ [CotizacionesService] Cotizaciones encontradas: ${data?.length || 0} de ${count || 0} total`);
 
     return {
       data: data || [],
@@ -182,19 +264,29 @@ export class CotizacionesService {
 
     const { data: cotizacion, error: cotizacionError } = await client
       .from('cotizaciones')
-      .select('*, clientes(*)')
+      .select(`
+        *,
+        cliente:cliente_id (
+          id,
+          razon_social,
+          numero_documento,
+          documento_tipo
+        )
+      `)
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .single();
 
     if (cotizacionError || !cotizacion) {
-      console.error('Error fetching cotizacion:', cotizacionError);
+      console.error('❌ [CotizacionesService] Error fetching cotizacion:', cotizacionError);
       throw new NotFoundException('Cotización no encontrada');
     }
 
+    console.log('✅ [CotizacionesService] Cotización encontrada:', id);
+
     // Obtener detalle
     const { data: detalle, error: detalleError } = await client
-      .from('cotizaciones_detalle')
+      .from('cotizacion_detalles')
       .select('*')
       .eq('cotizacion_id', id)
       .order('created_at', { ascending: true });
@@ -370,35 +462,42 @@ export class CotizacionesService {
       );
     }
 
-    // TODO: Cuando PedidosService esté implementado, crear el pedido aquí
-    // Por ahora, solo preparamos los datos y cambiamos el estado de la cotización
-    
-    const pedidoData = {
-      tenant_id: tenantId,
-      cotizacion_id: id,
+    if (!cotizacion.detalle || cotizacion.detalle.length === 0) {
+      throw new BadRequestException('La cotización no tiene productos para convertir en pedido');
+    }
+
+    const pedidoDto: CreatePedidoDto = {
       cliente_id: cotizacion.cliente_id,
-      fecha: new Date().toISOString().split('T')[0],
-      estado: 'PENDIENTE',
-      subtotal: cotizacion.subtotal,
-      igv: cotizacion.igv,
-      total: cotizacion.total,
-      notas: convertirPedidoDto.notas || cotizacion.notas,
+      cotizacion_id: id,
       detalle: cotizacion.detalle.map((item) => ({
         producto_id: item.producto_id,
-        descripcion: item.descripcion,
+        descripcion: item.descripcion || 'Producto sin descripción',
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
-        subtotal: item.subtotal,
       })),
-      created_by: userId,
+      notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? cotizacion.notas,
     };
 
-    // Cambiar estado de cotización a CONVERTIDA
-    await this.update(
-      id,
-      { estado: EstadoCotizacion.CONVERTIDA },
-      tenantId,
-    );
+    const pedido = await this.pedidosService.create(pedidoDto, tenantId, userId);
+
+    const now = new Date().toISOString();
+    const { error: updateError } = await client
+      .from('cotizaciones')
+      .update({
+        estado: EstadoCotizacion.CONVERTIDA,
+        fecha_conversion: now,
+        convertido_por: userId || null,
+        updated_at: now,
+      })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (updateError) {
+      console.error('❌ [CotizacionesService] Error actualizando cotización tras convertir:', updateError);
+      throw new BadRequestException('Cotización convertida pero no se pudo actualizar su estado');
+    }
+
+    const updatedCotizacion = await this.findOne(id, tenantId);
 
     // Emitir notificación
     try {
@@ -406,7 +505,7 @@ export class CotizacionesService {
         type: NotificationType.CONFIGURATION_INCOMPLETE, // TODO: Agregar tipo VENTAS al enum
         severity: NotificationSeverity.INFO,
         title: 'Cotización convertida',
-        message: `La cotización ${cotizacion.numero} ha sido convertida a pedido`,
+        message: `La cotización ${cotizacion.numero} ha sido convertida al pedido ${pedido.numero}`,
         usuario_id: userId,
       });
     } catch (error) {
@@ -419,7 +518,11 @@ export class CotizacionesService {
     return {
       success: true,
       message: 'Cotización convertida exitosamente',
-      pedido_data: pedidoData,
+      data: {
+        pedido_id: pedido.id,
+        pedido_numero: pedido.numero,
+        cotizacion: updatedCotizacion,
+      },
     };
   }
 
@@ -562,5 +665,49 @@ export class CotizacionesService {
         eventos_auditoria: auditLogs.length,
       },
     };
+  }
+
+  /**
+   * Eliminar una cotización
+   * Solo se pueden eliminar cotizaciones en estado BORRADOR
+   * Requirements: 3.1, 14.3
+   */
+  async remove(id: string, tenantId: string): Promise<void> {
+    const client = this.supabase.getClient();
+
+    // Verificar que la cotización existe
+    const cotizacion = await this.findOne(id, tenantId);
+
+    // Validar que se puede eliminar (solo BORRADOR)
+    if (cotizacion.estado !== EstadoCotizacion.BORRADOR) {
+      throw new BadRequestException(
+        'Solo se pueden eliminar cotizaciones en estado BORRADOR',
+      );
+    }
+
+    // Eliminar detalles primero
+    const { error: detalleError } = await client
+      .from('cotizacion_detalles')
+      .delete()
+      .eq('cotizacion_id', id);
+
+    if (detalleError) {
+      console.error('❌ [CotizacionesService] Error deleting cotizacion detalle:', detalleError);
+      throw new BadRequestException('Error al eliminar el detalle de la cotización');
+    }
+
+    // Eliminar cotización
+    const { error: cotizacionError } = await client
+      .from('cotizaciones')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (cotizacionError) {
+      console.error('❌ [CotizacionesService] Error deleting cotizacion:', cotizacionError);
+      throw new BadRequestException('Error al eliminar la cotización');
+    }
+
+    console.log('✅ [CotizacionesService] Cotización eliminada:', id);
   }
 }

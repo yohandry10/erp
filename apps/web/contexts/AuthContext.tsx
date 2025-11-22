@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { customAuth, Session, User } from '@/lib/auth-service'
+import { clearPermissionCache } from '@/hooks/use-permission'
 
 interface AuthContextType {
   session: Session | null
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         setSession(data.session)
         setUser(data.session.user)
+        clearPermissionCache(data.session.user.id)
       } else {
         console.log('ℹ️ [AuthContext] No hay sesión activa')
         setSession(null)
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('✅ [AuthContext] Login exitoso')
       setSession(data.session)
       setUser(data.user)
+      clearPermissionCache(data.user.id)
     } else {
       throw new Error('No se recibió sesión del servidor')
     }
@@ -75,9 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     console.log('🚪 [AuthContext] Cerrando sesión...')
+    const previousUserId = user?.id
     await customAuth.signOut()
     setSession(null)
     setUser(null)
+    if (previousUserId) {
+      clearPermissionCache(previousUserId)
+    } else {
+      clearPermissionCache()
+    }
     console.log('✅ [AuthContext] Sesión cerrada')
   }
 

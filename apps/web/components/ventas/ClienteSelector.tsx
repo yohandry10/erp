@@ -39,6 +39,11 @@ export default function ClienteSelector({
     }
   }, [value])
 
+  // Load all clientes on mount
+  useEffect(() => {
+    loadAllClientes()
+  }, [])
+
   // Search clientes with debounce
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -49,8 +54,9 @@ export default function ClienteSelector({
       searchTimeoutRef.current = setTimeout(() => {
         searchClientes(searchTerm)
       }, 300)
-    } else if (searchTerm.length === 0) {
-      setClientes([])
+    } else if (searchTerm.length === 0 && clientes.length === 0) {
+      // Reload all clientes if search is cleared and list is empty
+      loadAllClientes()
     }
 
     return () => {
@@ -80,6 +86,44 @@ export default function ClienteSelector({
       }
     } catch (error) {
       console.error('Error loading cliente:', error)
+    }
+  }
+
+  const loadAllClientes = async () => {
+    try {
+      setLoading(true)
+      console.log('🔍 [ClienteSelector] Cargando todos los clientes...')
+      const response = await get('/api/ventas/clientes?limit=100')
+      
+      console.log('📦 [ClienteSelector] Respuesta recibida:', response)
+      
+      // Si response es null, probablemente no hay token
+      if (response === null) {
+        console.error('❌ [ClienteSelector] No se recibió respuesta - probablemente no hay token de autenticación')
+        setClientes([])
+        return
+      }
+      
+      if (response?.success && response?.data) {
+        console.log('✅ [ClienteSelector] Clientes cargados:', response.data.length || 0)
+        setClientes(response.data || [])
+      } else if (Array.isArray(response?.data)) {
+        // A veces la respuesta viene directamente en data sin success flag
+        console.log('✅ [ClienteSelector] Clientes cargados (sin success flag):', response.data.length)
+        setClientes(response.data)
+      } else if (Array.isArray(response)) {
+        // A veces la respuesta es directamente el array
+        console.log('✅ [ClienteSelector] Clientes cargados (array directo):', response.length)
+        setClientes(response)
+      } else {
+        console.warn('⚠️ [ClienteSelector] Respuesta sin datos válidos:', response)
+        setClientes([])
+      }
+    } catch (error) {
+      console.error('❌ [ClienteSelector] Error loading clientes:', error)
+      setClientes([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -121,6 +165,16 @@ export default function ClienteSelector({
     }
   }
 
+  const handleInputFocus = () => {
+    if (clientes.length > 0) {
+      setIsOpen(true)
+    } else if (searchTerm.length === 0) {
+      // Load all clientes if list is empty and no search term
+      loadAllClientes()
+      setIsOpen(true)
+    }
+  }
+
   const handleCreateNew = () => {
     setIsOpen(false)
     if (onCreateNew) {
@@ -129,74 +183,194 @@ export default function ClienteSelector({
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div style={{ position: 'relative' }} ref={dropdownRef}>
       {/* Selected Cliente Display */}
       {selectedCliente ? (
-        <div className={`flex items-center justify-between p-3 border rounded-md bg-white ${
-          error ? 'border-red-500' : 'border-gray-300'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '1rem',
+          border: error ? '2px solid var(--red-500)' : '2px solid var(--primary-200)',
+          borderRadius: 'var(--border-radius)',
+          background: 'rgba(255, 255, 255, 0.9)',
+          opacity: disabled ? 0.6 : 1,
+          cursor: disabled ? 'not-allowed' : 'default',
+          transition: 'all 0.3s ease'
+        }}>
+          <div style={{ flex: 1 }}>
+            <p style={{
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              color: 'var(--primary-800)',
+              margin: '0 0 0.25rem 0'
+            }}>
               {selectedCliente.razon_social}
             </p>
-            <p className="text-xs text-gray-500">
+            <p style={{
+              fontSize: '0.8rem',
+              color: 'var(--primary-500)',
+              margin: 0
+            }}>
               {selectedCliente.documento_tipo}: {selectedCliente.documento_numero}
             </p>
           </div>
           {!disabled && (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
               onClick={handleClearSelection}
-              className="ml-2"
+              style={{
+                marginLeft: '0.75rem',
+                padding: '0.5rem',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--border-radius)',
+                cursor: 'pointer',
+                color: 'var(--primary-500)',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--primary-100)'
+                e.currentTarget.style.color = 'var(--primary-700)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'var(--primary-500)'
+              }}
             >
-              <X className="w-4 h-4" />
-            </Button>
+              <X style={{ width: '1.125rem', height: '1.125rem' }} />
+            </button>
           )}
         </div>
       ) : (
         <>
           {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
+          <div style={{ position: 'relative' }}>
+            <Search style={{
+              position: 'absolute',
+              left: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--primary-400)',
+              width: '1.25rem',
+              height: '1.25rem',
+              pointerEvents: 'none'
+            }} />
+            <input
               type="text"
               placeholder="Buscar por RUC, DNI o nombre..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-              onFocus={() => {
-                if (clientes.length > 0) {
-                  setIsOpen(true)
+              onFocus={handleInputFocus}
+              disabled={disabled}
+              style={{
+                width: '100%',
+                padding: '1rem 3rem 1rem 3rem',
+                border: error ? '2px solid var(--red-500)' : '2px solid var(--primary-200)',
+                borderRadius: 'var(--border-radius)',
+                fontSize: '1rem',
+                transition: 'all 0.3s ease',
+                background: 'rgba(255, 255, 255, 0.9)',
+                color: 'var(--primary-800)'
+              }}
+              onFocus={(e) => {
+                if (!error) {
+                  e.currentTarget.style.borderColor = 'var(--blue-500)'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  e.currentTarget.style.background = 'white'
+                }
+                handleInputFocus()
+              }}
+              onBlur={(e) => {
+                if (!error) {
+                  e.currentTarget.style.borderColor = 'var(--primary-200)'
+                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
                 }
               }}
-              disabled={disabled}
-              className={`pl-10 pr-10 ${error ? 'border-red-500' : ''}`}
             />
             {loading && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <div style={{
+                position: 'absolute',
+                right: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)'
+              }}>
+                <div className="loading-spinner" style={{
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  border: '2px solid var(--primary-200)',
+                  borderTop: '2px solid var(--blue-600)',
+                  borderRadius: '50%'
+                }}></div>
               </div>
             )}
             {!loading && searchTerm && (
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <ChevronDown style={{
+                position: 'absolute',
+                right: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--primary-400)',
+                width: '1.25rem',
+                height: '1.25rem',
+                pointerEvents: 'none'
+              }} />
             )}
           </div>
 
           {/* Dropdown */}
           {isOpen && clientes.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+            <div style={{
+              position: 'absolute',
+              zIndex: 50,
+              width: '100%',
+              marginTop: '0.5rem',
+              background: 'white',
+              border: '1px solid var(--primary-200)',
+              borderRadius: 'var(--border-radius)',
+              boxShadow: 'var(--shadow-xl)',
+              maxHeight: '20rem',
+              overflowY: 'auto'
+            }}>
               {clientes.map((cliente) => (
                 <button
                   key={cliente.id}
                   type="button"
                   onClick={() => handleSelectCliente(cliente)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '1rem',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid var(--primary-100)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--primary-50)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
                 >
-                  <p className="text-sm font-medium text-gray-900">
+                  <p style={{
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    color: 'var(--primary-800)',
+                    margin: '0 0 0.25rem 0'
+                  }}>
                     {cliente.razon_social}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--primary-500)',
+                    margin: 0
+                  }}>
                     {cliente.documento_tipo}: {cliente.documento_numero}
                     {cliente.nombre_comercial && ` • ${cliente.nombre_comercial}`}
                   </p>
@@ -207,8 +381,23 @@ export default function ClienteSelector({
 
           {/* No Results */}
           {isOpen && !loading && searchTerm.length >= 2 && clientes.length === 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4">
-              <p className="text-sm text-gray-600 text-center">
+            <div style={{
+              position: 'absolute',
+              zIndex: 50,
+              width: '100%',
+              marginTop: '0.5rem',
+              background: 'white',
+              border: '1px solid var(--primary-200)',
+              borderRadius: 'var(--border-radius)',
+              boxShadow: 'var(--shadow-lg)',
+              padding: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <p style={{
+                fontSize: '0.875rem',
+                color: 'var(--primary-600)',
+                margin: 0
+              }}>
                 No se encontraron clientes
               </p>
             </div>
@@ -218,28 +407,65 @@ export default function ClienteSelector({
 
       {/* Create New Button */}
       {onCreateNew && !selectedCliente && (
-        <Button
+        <button
           type="button"
-          variant="outline"
-          size="sm"
           onClick={handleCreateNew}
           disabled={disabled}
-          className="mt-2 w-full"
+          style={{
+            marginTop: '0.75rem',
+            width: '100%',
+            padding: '0.75rem 1rem',
+            background: 'white',
+            color: 'var(--primary-700)',
+            border: '2px solid var(--primary-200)',
+            borderRadius: 'var(--border-radius)',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            opacity: disabled ? 0.6 : 1
+          }}
+          onMouseEnter={(e) => {
+            if (!disabled) {
+              e.currentTarget.style.background = 'var(--primary-50)'
+              e.currentTarget.style.borderColor = 'var(--primary-300)'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'white'
+            e.currentTarget.style.borderColor = 'var(--primary-200)'
+            e.currentTarget.style.transform = 'translateY(0)'
+          }}
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus style={{ width: '1rem', height: '1rem' }} />
           Nuevo Cliente (rápido)
-        </Button>
+        </button>
       )}
 
       {/* Error Message */}
       {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
+        <p style={{
+          marginTop: '0.5rem',
+          fontSize: '0.875rem',
+          color: 'var(--red-600)',
+          fontWeight: '500'
+        }}>{error}</p>
       )}
 
       {/* Helper Text */}
       {!selectedCliente && !error && (
-        <p className="mt-1 text-xs text-gray-500">
-          Escribe al menos 2 caracteres para buscar
+        <p style={{
+          marginTop: '0.5rem',
+          fontSize: '0.8rem',
+          color: 'var(--primary-500)',
+          fontWeight: '500'
+        }}>
+          Haz clic para ver todos los clientes o escribe para buscar
         </p>
       )}
     </div>

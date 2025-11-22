@@ -18,7 +18,7 @@ import { RegistrarPagoCxcDto, AplicarNotaCreditoDto, ReprogramarCxcDto } from '.
 
 @ApiTags('Finanzas - Cuentas por Cobrar')
 @ApiBearerAuth()
-@Controller('api/finanzas/cxc')
+@Controller('finanzas/cxc')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: CxC exige permisos granulares.
 export class CxcController {
   constructor(private readonly cxcService: CxcService) {}

@@ -21,13 +21,13 @@ export class ClientesService {
   async create(createClienteDto: CreateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
     const client = this.supabase.getClient();
 
-    // Validar duplicados por documento_numero
+    // Validar duplicados por numero_documento
     const { data: existingCliente } = await client
       .from('clientes')
-      .select('id, documento_numero')
+      .select('id, numero_documento')
       .eq('tenant_id', tenantId)
-      .eq('documento_numero', createClienteDto.documento_numero)
-      .single();
+      .eq('numero_documento', createClienteDto.documento_numero)
+      .maybeSingle();
 
     if (existingCliente) {
       throw new ConflictException(
@@ -36,20 +36,38 @@ export class ClientesService {
     }
 
     // Crear cliente
-    const { data, error } = await client
+    // Mapear tipo_documento a 1 carácter para la columna tipo_documento (varchar 1)
+    const tipoDocumentoMap: Record<string, string> = {
+      'DNI': 'D',
+      'RUC': 'R',
+      'CE': 'C',
+      'PASAPORTE': 'P'
+    };
+    const tipoDocumentoCorto = tipoDocumentoMap[createClienteDto.documento_tipo] || 'D';
+    
+    console.log('🔍 [DEBUG] createClienteDto.tipo:', createClienteDto.tipo);
+    console.log('🔍 [DEBUG] documento_tipo:', createClienteDto.documento_tipo, '→ tipo_documento:', tipoDocumentoCorto);
+    
+    const insertData = {
+      tenant_id: tenantId,
+      tipo: createClienteDto.tipo, // PERSONA o EMPRESA
+      tipo_documento: tipoDocumentoCorto, // D, R, C, P (columna varchar 1 - NOT NULL)
+      documento_tipo: createClienteDto.documento_tipo, // DNI, RUC, CE, PASAPORTE (columna varchar 11)
+      numero_documento: createClienteDto.documento_numero,
+      razon_social: createClienteDto.razon_social,
+      nombre_comercial: createClienteDto.nombre_comercial || null,
+      direccion: createClienteDto.direccion || null,
+      email: createClienteDto.email || null,
+      telefono: createClienteDto.telefono || null,
+      contacto: createClienteDto.nombre_comercial || null,
+      activo: true,
+    };
+    
+    console.log('🔍 [DEBUG] Datos a insertar:', JSON.stringify(insertData, null, 2));
+    
+    const { data, error} = await client
       .from('clientes')
-      .insert({
-        tenant_id: tenantId,
-        tipo: createClienteDto.tipo,
-        documento_tipo: createClienteDto.documento_tipo,
-        documento_numero: createClienteDto.documento_numero,
-        razon_social: createClienteDto.razon_social,
-        nombre_comercial: createClienteDto.nombre_comercial || null,
-        direccion: createClienteDto.direccion || null,
-        email: createClienteDto.email || null,
-        telefono: createClienteDto.telefono || null,
-        created_by: userId || null,
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -95,7 +113,7 @@ export class ClientesService {
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
       query = query.or(
-        `documento_numero.ilike.${searchTerm},razon_social.ilike.${searchTerm},nombre_comercial.ilike.${searchTerm}`
+        `numero_documento.ilike.${searchTerm},razon_social.ilike.${searchTerm},nombre_comercial.ilike.${searchTerm}`
       );
     }
 
@@ -107,8 +125,17 @@ export class ClientesService {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching clientes:', error);
+      console.error('❌ [ClientesService] Error fetching clientes:', error);
       throw new BadRequestException('Error al obtener clientes');
+    }
+
+    console.log(`✅ [ClientesService] Clientes encontrados: ${data?.length || 0} de ${count || 0} total`);
+    if (data && data.length > 0) {
+      console.log(`📋 [ClientesService] Primeros clientes:`, data.slice(0, 3).map(c => ({
+        id: c.id,
+        razon_social: c.razon_social,
+        documento: `${c.documento_tipo}-${c.numero_documento}`
+      })));
     }
 
     return {
@@ -158,9 +185,9 @@ export class ClientesService {
     if (updateClienteDto.documento_numero) {
       const { data: existingCliente } = await client
         .from('clientes')
-        .select('id, documento_numero')
+        .select('id, numero_documento')
         .eq('tenant_id', tenantId)
-        .eq('documento_numero', updateClienteDto.documento_numero)
+        .eq('numero_documento', updateClienteDto.documento_numero)
         .neq('id', id)
         .single();
 

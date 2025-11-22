@@ -12,6 +12,12 @@ No description
 
 uuiduuid
 
+tenant_id
+
+No description
+
+uuiduuid
+
 codigo
 
 No description
@@ -1958,4 +1964,303 @@ moneda_detalle
 No description
 
 character varying	varchar		
+
+
+
+Database Tables
+cotizaciones
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+numero
+
+No description
+
+character varying	varchar		
+cliente_id
+
+No description
+
+uuid	uuid		
+fecha_cotizacion
+
+No description
+
+date	date		
+fecha_vencimiento
+
+No description
+
+date	date		
+vendedor
+
+No description
+
+character varying	varchar		
+moneda
+
+No description
+
+character varying	varchar		
+subtotal
+
+No description
+
+numeric	numeric		
+igv
+
+No description
+
+numeric	numeric		
+total
+
+No description
+
+numeric	numeric		
+estado
+
+No description
+
+character varying	varchar		
+probabilidad
+
+No description
+
+integer	int4		
+items
+
+No description
+
+jsonb	jsonb		
+observaciones
+
+No description
+
+text	text		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+fecha_aprobacion
+
+No description
+
+timestamp without time zone	timestamp		
+fecha_conversion
+
+No description
+
+timestamp without time zone	timestamp		
+fecha_rechazo
+
+No description
+
+timestamp without time zone	timestamp		
+aprobado_por
+
+No description
+
+uuid	uuid		
+convertido_por
+
+No description
+
+uuid	uuid		
+rechazado_por
+
+No description
+
+uuid	uuid		
+observaciones_aprobacion
+
+No description
+
+text	text		
+motivo_rechazo
+
+No description
+
+text	text		
+documento_generado_id
+
+No description
+
+uuid	uuid		
+ 
+Database Tables
+cotizacion_detalles
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+cotizacion_id
+
+No description
+
+uuid	uuid		
+producto_id
+
+No description
+
+uuid	uuid		
+producto_codigo
+
+No description
+
+character varying	varchar		
+producto_nombre
+
+No description
+
+text	text		
+descripcion
+
+No description
+
+text	text		
+cantidad
+
+No description
+
+numeric	numeric		
+precio_unitario
+
+No description
+
+numeric	numeric		
+descuento_porcentaje
+
+No description
+
+numeric	numeric		
+descuento_monto
+
+No description
+
+numeric	numeric		
+subtotal
+
+No description
+
+numeric	numeric		
+orden
+
+No description
+
+integer	int4		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+ 
+
+ Database Tables
+proveedores
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+ruc
+
+No description
+
+character varying	varchar		
+razon_social
+
+No description
+
+character varying	varchar		
+nombre_comercial
+
+No description
+
+character varying	varchar		
+direccion
+
+No description
+
+text	text		
+telefono
+
+No description
+
+character varying	varchar		
+email
+
+No description
+
+character varying	varchar		
+contacto
+
+No description
+
+character varying	varchar		
+estado
+
+No description
+
+character varying	varchar		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+condiciones_pago
+
+No description
+
+character varying	varchar		
+activo
+
+No description
+
+boolean	bool		
+limite_credito
+
+No description
+
+numeric	numeric		
+dias_credito
+
+No description
+
+integer	int4		
  

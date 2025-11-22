@@ -98,6 +98,24 @@ export class CpeController {
     }
   }
 
+  @Get('comprobantes/export')
+  @RequirePermission('cpe.comprobantes.listar')
+  @ApiOperation({ summary: 'Exportar comprobantes CPE a CSV' })
+  async exportComprobantes(
+    @Query() filters: any,
+    @CurrentTenant() tenantId: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.cpeService.exportComprobantesCsv(filters, tenantId);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message || 'Error exportando comprobantes' });
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    return res.send(result.content);
+  }
+
   @Get('comprobantes/:id')
   @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener datos del CPE' })

@@ -30,18 +30,11 @@ export default function ListoDespachoPage() {
   const loadOrdenes = async () => {
     try {
       setLoading(true)
-      const response = await get('/ventas/pedidos')
+      const response = await get('/inventario/logistica/listo-despacho')
       if (response?.success) {
-        const allPedidos = response.data || []
-        const listoDespacho = allPedidos.filter(
-          (p: PedidoVenta) => p.estado === EstadoPedido.LISTO_DESPACHO
-        )
-        setOrdenes(listoDespacho)
+        setOrdenes(response.data || [])
       } else if (Array.isArray(response)) {
-        const listoDespacho = response.filter(
-          (p: PedidoVenta) => p.estado === EstadoPedido.LISTO_DESPACHO
-        )
-        setOrdenes(listoDespacho)
+        setOrdenes(response)
       }
     } catch (error) {
       console.error('Error loading ordenes:', error)
@@ -138,7 +131,7 @@ export default function ListoDespachoPage() {
                       <small>{orden.cliente?.documento_numero || ''}</small>
                     </div>
                   </td>
-                  <td>{formatFecha(orden.fecha)}</td>
+                  <td>{formatFecha((orden as any).fecha || orden.created_at)}</td>
                   <td>{orden.detalle?.length || 0}</td>
                   <td><strong>{formatMonto(orden.total)}</strong></td>
                   <td>

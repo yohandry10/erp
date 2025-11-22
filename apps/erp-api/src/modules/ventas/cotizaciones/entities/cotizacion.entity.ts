@@ -25,6 +25,7 @@ export interface Cotizacion {
   igv: number;
   total: number;
   notas?: string;
+  observaciones?: string;
   created_at: string;
   updated_at: string;
   created_by?: string;

@@ -6,6 +6,7 @@ import { EventBusService, FacturaEmitidaEvent, CuentaPorCobrarCreadaEvent } from
 import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
+import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.interface';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -17,6 +18,8 @@ interface ListarCxcFilters {
   desde?: string;
   hasta?: string;
 }
+
+type ClienteReferenciaInfo = { id: string; numeroDocumento: string | null };
 
 @Injectable()
 export class CxcService {
@@ -140,11 +143,28 @@ export class CxcService {
   }
   async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<void> {
     const tenantId = evento.tenantId;
-    const facturaId = evento.cpeId ?? evento.facturaId;
-    if (!tenantId || !facturaId) {
-      // HARDENING: sin tenant o identificación fiscal no procesamos para evitar fugas.
-      this.logger.warn('⚠️ [CXC] Evento de factura emitida sin tenant o cpeId/facturaId, se ignora.');
+    const cpeReferenciaId = evento.cpeId ?? null;
+    let documentoReferenciaId = evento.facturaId ?? null;
+
+    const requiereResolucionDocumento =
+      !documentoReferenciaId || (cpeReferenciaId && documentoReferenciaId === cpeReferenciaId);
+
+    if (tenantId && cpeReferenciaId && requiereResolucionDocumento) {
+      documentoReferenciaId = await this.ensureDocumentoIdForCpe(cpeReferenciaId, tenantId);
+    }
+
+    if (!tenantId || (!documentoReferenciaId && !cpeReferenciaId)) {
+      // HARDENING: sin tenant o identificadores no procesamos para evitar fugas.
+      this.logger.warn('⚠️ [CXC] Evento de factura emitida sin tenant o sin IDs válidos, se ignora.');
       return;
+    }
+
+    const facturaId = documentoReferenciaId ?? cpeReferenciaId;
+
+    if (!documentoReferenciaId && cpeReferenciaId) {
+      this.logger.warn(
+        `⚠️ [CXC] No se pudo resolver documento_id para CPE ${cpeReferenciaId}, se usará el ID del CPE como referencia`,
+      );
     }
 
     const client = this.supabase.getClient();
@@ -153,6 +173,27 @@ export class CxcService {
     const eventSource = evento.source ?? 'ventas';
     const sourceEventId = evento.eventId ?? uuidv4();
     let cuentaId: string | null = null;
+
+    const clienteReferencia = await this.resolveClienteReferencia(
+      tenantId,
+      evento.clienteId,
+      cpeReferenciaId,
+    );
+    if (!clienteReferencia) {
+      throw new BadRequestException(
+        'El cliente indicado en el evento de factura emitida no existe en este tenant',
+      );
+    }
+
+    const numeroSerie = evento.serie ?? null;
+    const numeroCorrelativo =
+      evento.numero != null ? String(evento.numero).padStart(8, '0') : null;
+    const numeroDocumentoFiscal = this.buildNumeroDocumento(
+      numeroSerie,
+      numeroCorrelativo,
+      facturaId,
+    );
+    const tipoDocumentoCxC = this.resolveTipoDocumentoDesdeSerie(numeroSerie);
 
     try {
       const { data: existentePorKey, error: idempotencyError } = await client
@@ -227,7 +268,7 @@ export class CxcService {
       }
 
       const config = await this.obtenerConfiguracionEmpresa(tenantId);
-      const cliente = await this.obtenerCliente(evento.clienteId, tenantId);
+      const cliente = await this.obtenerCliente(clienteReferencia.id, tenantId);
       const ajustes = this.calcularAjustesDesdeEvento(evento, cliente, config);
 
       // 🔴 TAREA 17: Validar que los cálculos de retenciones sean correctos antes de crear CxC
@@ -326,23 +367,24 @@ export class CxcService {
             ? 'PARCIAL'
             : 'PENDIENTE';
 
-      const numeroSerie = evento.serie ?? null;
-      const numeroCorrelativo = evento.numero != null ? String(evento.numero).padStart(8, '0') : null;
-
       const { data: cuentaInsertada, error: insertError } = await client
         .from('cuentas_por_cobrar')
         .insert({
           tenant_id: tenantId,
-          cliente_id: evento.clienteId,
+          cliente_id: clienteReferencia.id,
           pedido_id: evento.pedidoId ?? null,
           documento_id: facturaId,
           serie: numeroSerie,
           numero: numeroCorrelativo,
+          numero_documento: numeroDocumentoFiscal,
+          tipo_documento: tipoDocumentoCxC,
           fecha_emision: this.toISODate(fechaEmision),
           fecha_vencimiento: this.toISODate(fechaVencimiento),
           moneda: evento.moneda ?? 'PEN',
           monto_total: this.round2(evento.total),
+          monto_original: this.round2(evento.total),
           monto_pendiente: montoPendiente,
+          saldo_pendiente: montoPendiente,
           estado: estadoInicial,
           dias_mora: 0,
           retencion_total: this.round2(retencion),
@@ -481,7 +523,7 @@ export class CxcService {
         facturaId,
         serie: numeroSerie ?? undefined,
         numero: numeroCorrelativo != null ? String(numeroCorrelativo) : undefined,
-        clienteId: evento.clienteId,
+        clienteId: clienteReferencia.id,
         saldoInicial: this.round2(evento.total),
         saldoPendiente: this.round2(montoPendiente),
         moneda: evento.moneda ?? 'PEN',
@@ -895,7 +937,7 @@ export class CxcService {
 
     // Usar el builder para garantizar estructura consistente
     const eventToInsert = OutboxEventBuilder.build({
-      tenantId: cxc.tenant_id,
+      tenantId,
       eventType: 'cobro.registrado',
       aggregateType: 'cobro',
       aggregateId: pagoRegistrado.id,
@@ -1117,6 +1159,317 @@ export class CxcService {
     };
   }
 
+  async crearCxCDesdeDocumento(documento: DocumentoFiscal, tenantId: string) {
+    const client = this.supabase.getClient();
+
+    const { data: existente, error: existenteError } = await client
+      .from('cuentas_por_cobrar')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('documento_id', documento.id)
+      .maybeSingle();
+
+    if (existenteError && existenteError.code && existenteError.code !== 'PGRST116') {
+      throw new BadRequestException('No se pudo validar la cuenta por cobrar existente');
+    }
+
+    if (existente) {
+      return existente;
+    }
+
+    const payload = {
+      tenant_id: tenantId,
+      documento_id: documento.id,
+      cliente_id: documento.cliente_id,
+      numero_documento: `${documento.serie}-${documento.numero}`,
+      tipo_documento: documento.tipo_documento,
+      fecha_emision: documento.fecha_emision,
+      fecha_vencimiento: documento.fecha_vencimiento,
+      monto_total: documento.total,
+      monto_original: documento.total,
+      monto_pendiente: documento.total,
+      saldo_pendiente: documento.total,
+      estado: 'PENDIENTE',
+      moneda: documento.moneda,
+      serie: documento.serie,
+      numero: documento.numero,
+    };
+
+    const { data, error } = await client
+      .from('cuentas_por_cobrar')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ [CXC] Error creando CxC desde documento:', error);
+      throw new BadRequestException('No se pudo crear la cuenta por cobrar desde el documento');
+    }
+
+    const eventId = uuidv4();
+    const idempotencyKey = `cxc.doc:${documento.id}`;
+
+    this.eventBus.emitCuentaPorCobrarCreadaEvent({
+      eventId,
+      tenantId,
+      idempotencyKey,
+      cxcId: data.id,
+      facturaId: documento.id,
+      serie: documento.serie,
+      numero: documento.numero,
+      clienteId: documento.cliente_id,
+      saldoInicial: documento.total,
+      saldoPendiente: documento.total,
+      moneda: documento.moneda,
+      fechaEmision: documento.fecha_emision,
+      fechaVencimiento: documento.fecha_vencimiento,
+      source: 'ventas.pedidos',
+      ajustes: {
+        retencion: 0,
+        percepcion: 0,
+        detraccion: 0,
+        anticipo: 0,
+      },
+    });
+
+    return data;
+  }
+
+  private async ensureDocumentoIdForCpe(cpeId: string | null, tenantId: string): Promise<string | null> {
+    if (!cpeId || !tenantId) {
+      return null;
+    }
+
+    const client = this.supabase.getClient();
+    let cpeRecord: any = null;
+
+    try {
+      const { data, error } = await client
+        .from('cpe')
+        .select(
+          `
+            id,
+            documento_id,
+            tipo_documento,
+            serie,
+            numero,
+            fecha_emision,
+            fecha_vencimiento,
+            cliente_id,
+            pedido_id,
+            moneda,
+            total_gravadas,
+            total_igv,
+            total_venta,
+            estado,
+            documento_receptor,
+            razon_social_receptor,
+            direccion_receptor,
+            tipo_documento_receptor,
+            ruc_emisor,
+            razon_social_emisor,
+            created_at
+          `,
+        )
+        .eq('tenant_id', tenantId)
+        .eq('id', cpeId)
+        .maybeSingle();
+
+      if (error) {
+        this.logger.warn(
+          `⚠️ [CXC] No se pudo consultar CPE ${cpeId} para obtener documento_id: ${error.message}`,
+        );
+      } else if (data) {
+        cpeRecord = data;
+        if (data.documento_id) {
+          return data.documento_id;
+        }
+      }
+    } catch (lookupError: any) {
+      this.logger.warn(
+        `⚠️ [CXC] Error consultando CPE ${cpeId} para documento_id: ${lookupError?.message ?? lookupError}`,
+      );
+    }
+
+    try {
+      const { data: documentoId, error: rpcError } = await client.rpc('crear_documento_desde_cpe', {
+        p_cpe_id: cpeId,
+      });
+
+      if (rpcError) {
+        this.logger.warn(
+          `⚠️ [CXC] RPC crear_documento_desde_cpe falló para ${cpeId}: ${rpcError.message}`,
+        );
+      } else if (documentoId) {
+        return documentoId as string;
+      }
+    } catch (rpcError: any) {
+      this.logger.warn(
+        `⚠️ [CXC] Error invocando crear_documento_desde_cpe para ${cpeId}: ${rpcError?.message ?? rpcError}`,
+      );
+    }
+
+    if (!cpeRecord) {
+      return null;
+    }
+
+    let resolvedClienteId = cpeRecord.cliente_id ?? null;
+
+    if (!resolvedClienteId && cpeRecord.documento_receptor) {
+      try {
+        const { data: clientePorDocumento } = await client
+          .from('clientes')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('numero_documento', cpeRecord.documento_receptor)
+          .maybeSingle();
+
+        if (clientePorDocumento?.id) {
+          resolvedClienteId = clientePorDocumento.id;
+        }
+      } catch (clienteLookupError: any) {
+        this.logger.warn(
+          `⚠️ [CXC] Error buscando cliente por documento ${cpeRecord.documento_receptor}: ${
+            clienteLookupError?.message ?? clienteLookupError
+          }`,
+        );
+      }
+    }
+
+    const correlativo =
+      cpeRecord.numero != null ? String(cpeRecord.numero).padStart(8, '0') : '00000000';
+    const fechaEmision = cpeRecord.fecha_emision ?? new Date().toISOString();
+    const fechaVencimiento = cpeRecord.fecha_vencimiento ?? fechaEmision;
+    const subtotal = Number(cpeRecord.total_gravadas ?? cpeRecord.total_venta ?? 0);
+    const impuestos = Number(cpeRecord.total_igv ?? 0);
+    const total = Number(cpeRecord.total_venta ?? subtotal + impuestos);
+
+    const emisorInfo = await this.getEmpresaInfoFallback(tenantId);
+    const tipoDocumentoNormalizado = this.mapTipoDocumentoDesdeCpe(cpeRecord.tipo_documento);
+
+    const documentoPayload: Record<string, any> = {
+      tenant_id: tenantId,
+      pedido_id: cpeRecord.pedido_id ?? null,
+      cliente_id: resolvedClienteId,
+      tipo_documento: tipoDocumentoNormalizado,
+      serie: cpeRecord.serie ?? 'F001',
+      numero: correlativo,
+      fecha_emision: fechaEmision,
+      fecha_vencimiento: fechaVencimiento,
+      subtotal,
+      impuesto_igv: impuestos,
+      total,
+      moneda: cpeRecord.moneda ?? 'PEN',
+      estado: 'EMITIDO',
+      emisor_ruc: this.pickFirstNonEmpty([cpeRecord.ruc_emisor, emisorInfo.ruc], '20000000000'),
+      emisor_razon_social: this.pickFirstNonEmpty([cpeRecord.razon_social_emisor, emisorInfo.razonSocial], 'EMISOR'),
+      emisor_direccion: this.pickFirstNonEmpty([cpeRecord.direccion_emisor, emisorInfo.direccion], 'DIRECCION NO DEFINIDA'),
+      receptor_nombre: cpeRecord.razon_social_receptor ?? null,
+      receptor_documento: cpeRecord.documento_receptor ?? null,
+      receptor_direccion: cpeRecord.direccion_receptor ?? null,
+      created_at: cpeRecord.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { data: documentoInsertado, error: insertError } = await client
+        .from('documentos')
+        .insert(documentoPayload)
+        .select('id, serie, numero')
+        .single();
+
+      if (insertError) {
+        if ((insertError as any)?.code === '23505') {
+          const { data: existente } = await client
+            .from('documentos')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .eq('serie', documentoPayload.serie)
+            .eq('numero', documentoPayload.numero)
+            .maybeSingle();
+
+          if (existente?.id) {
+            await client.from('cpe').update({ documento_id: existente.id }).eq('id', cpeId);
+            return existente.id;
+          }
+        }
+
+        this.logger.error(
+          `❌ [CXC] Error creando documento fallback para CPE ${cpeId}:`,
+          insertError,
+        );
+        return null;
+      }
+
+      const documentoId = documentoInsertado?.id ?? null;
+
+      if (documentoId) {
+        await client.from('cpe').update({ documento_id: documentoId }).eq('id', cpeId);
+      }
+
+      return documentoId;
+    } catch (fallbackError: any) {
+      this.logger.error(
+        `❌ [CXC] Error general creando documento para CPE ${cpeId}: ${fallbackError?.message ?? fallbackError}`,
+      );
+      return null;
+    }
+  }
+
+  private mapTipoDocumentoDesdeCpe(tipo: string | null | undefined): string {
+    if (!tipo) {
+      return 'FACTURA';
+    }
+
+    const normalized = tipo.toString().trim().toUpperCase();
+
+    if (normalized === 'FACTURA' || normalized === '01') {
+      return 'FACTURA';
+    }
+
+    if (normalized === 'BOLETA' || normalized === '03') {
+      return 'BOLETA';
+    }
+
+    return normalized;
+  }
+
+  private async getEmpresaInfoFallback(tenantId: string) {
+    try {
+      const { data } = await this.supabase
+        .getClient()
+        .from('empresa_config')
+        .select('ruc, razon_social, direccion_fiscal')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      return {
+        ruc: data?.ruc ?? '20000000000',
+        razonSocial: data?.razon_social ?? 'EMPRESA',
+        direccion: data?.direccion_fiscal ?? 'DIRECCION NO DEFINIDA',
+      };
+    } catch (error) {
+      this.logger.warn(`⚠️ [CXC] No se pudo obtener empresa para fallback: ${error?.message ?? error}`);
+      return {
+        ruc: '20000000000',
+        razonSocial: 'EMPRESA',
+        direccion: 'DIRECCION NO DEFINIDA',
+      };
+    }
+  }
+
+  private pickFirstNonEmpty(values: Array<string | null | undefined>, fallback = ''): string {
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+    return fallback;
+  }
+
   private addDays(date: Date, days: number): Date {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
@@ -1267,6 +1620,249 @@ export class CxcService {
       console.log('✅ Evento CobroRegistrado emitido exitosamente');
     } catch (error) {
       console.error('Error emitiendo evento CobroRegistrado:', error);
+    }
+  }
+
+  private buildNumeroDocumento(
+    serie?: string | null,
+    correlativo?: string | null,
+    fallbackId?: string | null,
+  ): string {
+    if (serie && correlativo) {
+      return `${serie}-${correlativo}`;
+    }
+
+    if (serie && fallbackId) {
+      return `${serie}-${fallbackId.slice(0, 8)}`;
+    }
+
+    if (fallbackId) {
+      return fallbackId;
+    }
+
+    return 'SIN-NUMERO';
+  }
+
+  private resolveTipoDocumentoDesdeSerie(serie?: string | null): string {
+    if (!serie) {
+      return 'FACTURA';
+    }
+
+    const normalized = serie.toUpperCase();
+    if (normalized.startsWith('B')) {
+      return 'BOLETA';
+    }
+
+    return 'FACTURA';
+  }
+
+  private isUuid(value?: string): boolean {
+    if (!value) {
+      return false;
+    }
+
+    return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+      value,
+    );
+  }
+
+  private async resolveClienteReferencia(
+    tenantId: string,
+    rawClienteId?: string,
+    cpeReferenciaId?: string | null,
+  ): Promise<ClienteReferenciaInfo | null> {
+    if (!tenantId) {
+      return null;
+    }
+
+    const client = this.supabase.getClient();
+
+    const lookupById = async (id: string): Promise<ClienteReferenciaInfo | null> => {
+      const { data, error } = await client
+        .from('clientes')
+        .select('id, numero_documento')
+        .eq('tenant_id', tenantId)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        this.logger.warn(`⚠️ [CXC] Error buscando cliente ${id}: ${error.message}`);
+        return null;
+      }
+
+      if (!data) {
+        return null;
+      }
+
+      return { id: data.id, numeroDocumento: data.numero_documento ?? null } as ClienteReferenciaInfo;
+    };
+
+    const lookupByDocumento = async (documento: string): Promise<ClienteReferenciaInfo | null> => {
+      const { data, error } = await client
+        .from('clientes')
+        .select('id, numero_documento')
+        .eq('tenant_id', tenantId)
+        .eq('numero_documento', documento)
+        .maybeSingle();
+
+      if (error) {
+        this.logger.warn(
+          `⚠️ [CXC] Error buscando cliente por documento ${documento}: ${error.message}`,
+        );
+        return null;
+      }
+
+      if (!data) {
+        return null;
+      }
+
+      return { id: data.id, numeroDocumento: data.numero_documento ?? null } as ClienteReferenciaInfo;
+    };
+
+    if (rawClienteId && this.isUuid(rawClienteId)) {
+      const clientePorId = await lookupById(rawClienteId);
+      if (clientePorId) {
+        return clientePorId;
+      }
+    }
+
+    if (rawClienteId && !this.isUuid(rawClienteId)) {
+      const clientePorDocumento = await lookupByDocumento(rawClienteId);
+      if (clientePorDocumento) {
+        return clientePorDocumento;
+      }
+    }
+
+    if (!cpeReferenciaId) {
+      return null;
+    }
+
+    const { data: cpeRecord, error: cpeError } = await client
+      .from('cpe')
+      .select(
+        'cliente_id, documento_receptor, tipo_documento_receptor, razon_social_receptor, direccion_receptor',
+      )
+      .eq('tenant_id', tenantId)
+      .eq('id', cpeReferenciaId)
+      .maybeSingle();
+
+    if (cpeError) {
+      this.logger.warn(
+        `⚠️ [CXC] No se pudo obtener CPE ${cpeReferenciaId} para resolver cliente: ${cpeError.message}`,
+      );
+    }
+
+    if (!cpeRecord) {
+      return null;
+    }
+
+    if (cpeRecord.cliente_id) {
+      const clientePorId = await lookupById(cpeRecord.cliente_id);
+      if (clientePorId) {
+        return clientePorId;
+      }
+    }
+
+    const documentoReceptor = cpeRecord.documento_receptor ?? rawClienteId;
+    if (documentoReceptor) {
+      const clientePorDocumento = await lookupByDocumento(documentoReceptor);
+      if (clientePorDocumento) {
+        return clientePorDocumento;
+      }
+
+      const clienteCreado = await this.crearClienteDesdeCpe(
+        tenantId,
+        documentoReceptor,
+        cpeRecord.tipo_documento_receptor,
+        cpeRecord.razon_social_receptor,
+        cpeRecord.direccion_receptor,
+      );
+      if (clienteCreado) {
+        return clienteCreado;
+      }
+    }
+
+    return null;
+  }
+
+  private mapSunatDocumentoTipo(code?: string | null): 'RUC' | 'DNI' | 'CE' | 'PASAPORTE' {
+    switch ((code ?? '').toString().trim()) {
+      case '6':
+        return 'RUC';
+      case '4':
+        return 'CE';
+      case '7':
+        return 'PASAPORTE';
+      case '1':
+      default:
+        return 'DNI';
+    }
+  }
+
+  private mapDocumentoTipoCorto(tipo: string): string {
+    switch (tipo) {
+      case 'RUC':
+        return 'R';
+      case 'CE':
+        return 'C';
+      case 'PASAPORTE':
+        return 'P';
+      default:
+        return 'D';
+    }
+  }
+
+  private async crearClienteDesdeCpe(
+    tenantId: string,
+    documento: string,
+    tipoDocumentoSunat?: string | null,
+    razonSocial?: string | null,
+    direccion?: string | null,
+  ): Promise<ClienteReferenciaInfo | null> {
+    if (!documento) {
+      return null;
+    }
+
+    const client = this.supabase.getClient();
+    const tipoDocumento = this.mapSunatDocumentoTipo(tipoDocumentoSunat);
+    const tipoCliente = tipoDocumento === 'RUC' ? 'EMPRESA' : 'PERSONA';
+    const tipoDocumentoCorto = this.mapDocumentoTipoCorto(tipoDocumento);
+
+    const insertData = {
+      tenant_id: tenantId,
+      tipo: tipoCliente,
+      tipo_documento: tipoDocumentoCorto,
+      documento_tipo: tipoDocumento,
+      numero_documento: documento,
+      razon_social: razonSocial ?? 'CLIENTE',
+      nombre_comercial: razonSocial ?? null,
+      direccion: direccion ?? null,
+      email: null,
+      telefono: null,
+      contacto: null,
+      activo: true,
+    };
+
+    try {
+      const { data, error } = await client
+        .from('clientes')
+        .insert(insertData)
+        .select('id, numero_documento')
+        .single();
+
+      if (error) {
+        this.logger.error('❌ [CXC] Error creando cliente desde CPE:', error);
+        return null;
+      }
+
+      if (!data) {
+        return null;
+      }
+
+      return { id: data.id, numeroDocumento: data.numero_documento ?? null } as ClienteReferenciaInfo;
+    } catch (error) {
+      this.logger.error('❌ [CXC] Error inesperado creando cliente desde CPE:', error);
+      return null;
     }
   }
 }

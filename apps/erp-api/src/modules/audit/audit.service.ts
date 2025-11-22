@@ -27,6 +27,14 @@ export class AuditService {
    * Requirements: 8.1, 8.2
    */
   async logAction(auditLog: AuditLog): Promise<void> {
+    if (!auditLog?.table_name || !auditLog?.operation || !auditLog?.tenant_id) {
+      console.warn(
+        '⚠️ [AUDIT] Acción ignorada: faltan campos obligatorios (table_name, operation o tenant_id)',
+        auditLog,
+      );
+      return;
+    }
+
     const client = this.supabase.getClient();
 
     // Insert into audit_log table

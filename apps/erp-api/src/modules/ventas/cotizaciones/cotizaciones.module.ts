@@ -6,6 +6,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
 import { AuditModule } from '../../audit/audit.module';
 import { AuthModule } from '../../auth/auth.module';
+import { PedidosModule } from '../pedidos/pedidos.module';
 
 /**
  * CotizacionesModule
@@ -13,7 +14,7 @@ import { AuthModule } from '../../auth/auth.module';
  * Requirements: 3.1, 3.2, 3.3, 27.1, 27.2, 27.4
  */
 @Module({
-  imports: [SupabaseModule, NotificationsModule, PermissionsModule, AuditModule, AuthModule],
+  imports: [SupabaseModule, NotificationsModule, PermissionsModule, AuditModule, AuthModule, PedidosModule],
   controllers: [CotizacionesController],
   providers: [CotizacionesService],
   exports: [CotizacionesService],

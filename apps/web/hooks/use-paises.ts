@@ -63,7 +63,7 @@ export function usePaises() {
           throw new Error('Error al obtener países')
         }
       } else {
-        throw new Error('Error al obtener países')
+        throw new Error(`Error ${response.status}: ${response.statusText}`)
       }
     } catch (err) {
       setError('Error de conexión con el servidor')

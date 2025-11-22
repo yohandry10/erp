@@ -4,6 +4,7 @@ import { RecepcionesService } from './recepciones.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
 
 describe('RecepcionesService', () => {
@@ -22,11 +23,13 @@ describe('RecepcionesService', () => {
     update: jest.fn().mockReturnThis(),
     delete: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
     like: jest.fn().mockReturnThis(),
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     single: jest.fn(),
   };
 
@@ -44,12 +47,19 @@ describe('RecepcionesService', () => {
           provide: InventarioService,
           useValue: {
             registrarMovimientoAlmacen: jest.fn(),
+            registrarEntradaStockAtomico: jest.fn().mockResolvedValue('mov-1'),
           },
         },
         {
           provide: EventBusService,
           useValue: {
             emitRecepcionRegistrada: jest.fn(),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            registrarCambio: jest.fn(),
           },
         },
       ],

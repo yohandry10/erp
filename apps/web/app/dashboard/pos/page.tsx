@@ -5,27 +5,12 @@ import { useApi } from '@/hooks/use-api'
 import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
 import { usePosConfig } from '@/hooks/use-pos-config'
 import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus'
+import { CajaControls } from '@/components/pos/CajaControls'
+import { ProductGrid, ProductoPOS } from '@/components/pos/ProductGrid'
+import { QuickActions } from '@/components/pos/QuickActions'
+import { QuickClient } from '@/components/pos/QuickClient'
 // import { showSuccessToast } from '@/components/ui/success-toast'
 // import { showErrorToast } from '@/components/ui/error-toast'
-
-// Interfaces actualizadas para el POS empresarial
-interface ProductoPOS {
-  id: string
-  codigo: string
-  codigo_barras?: string
-  nombre: string
-  descripcion?: string
-  categoria: string
-  subcategoria?: string
-  marca?: string
-  precio_venta: number
-  precio_mayorista?: number
-  precio_especial?: number
-  stock_actual: number
-  stock_minimo: number
-  impuesto: number
-  imagen_url?: string
-}
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -72,6 +57,8 @@ interface EstadoCaja {
   ventasEfectivo: number
   ventasTarjeta: number
   montoFinal: number
+  cajaId?: string
+  sesionId?: string
 }
 
 export default function POSPage() {
@@ -129,6 +116,13 @@ export default function POSPage() {
   const [loadingFactura, setLoadingFactura] = useState<boolean>(false);
   const [greThreshold, setGreThreshold] = useState<number>(700);
   const [greEnabled, setGreEnabled] = useState<boolean>(true);
+  const [cajaId, setCajaId] = useState<string | null>(null);
+  const [sesionCajaId, setSesionCajaId] = useState<string | null>(null);
+
+  const formatMoney = (value: any): string => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+  };
 
   useEffect(() => {
     cargarDatos()
@@ -186,13 +180,11 @@ export default function POSPage() {
       const [
         clientesRes,
         metodosPagoRes,
-        sesionCajaRes,
         empresaRes,
         ventasRecientesRes,
       ] = await Promise.all([
         api.get('/api/pos/clientes'),
         api.get('/api/pos/metodos-pago'),
-        api.get('/api/pos/sesion-caja'),
         api.get('/api/pos/empresa-config'),
         api.get('/api/pos/ventas-recientes'),
       ]);
@@ -211,23 +203,39 @@ export default function POSPage() {
         setMetodosPago([]);
       }
 
-      if (sesionCajaRes?.success && sesionCajaRes.data) {
-        setEstadoCaja({
-          estado: sesionCajaRes.data.estado || 'ABIERTA',
-          montoInicial: sesionCajaRes.data.monto_inicial || 0,
-          ventasEfectivo: sesionCajaRes.data.total_efectivo || 0,
-          ventasTarjeta: sesionCajaRes.data.total_tarjeta || 0,
-          montoFinal: sesionCajaRes.data.monto_contado || 0,
-        });
-      } else {
-        console.warn("No se encontró caja abierta, usando estado por defecto 'CERRADA'");
-        setEstadoCaja({
-          estado: 'CERRADA',
-          montoInicial: 0,
-          ventasEfectivo: 0,
-          ventasTarjeta: 0,
-          montoFinal: 0,
-        });
+      // Obtener cajas y sesión abierta (nuevo endpoint)
+      try {
+        const cajasRes = await api.get('/cajas');
+        const cajas = cajasRes?.data || [];
+        if (cajas.length > 0) {
+          setCajaId((prev) => prev ?? cajas[0].id);
+        }
+
+        const sesionesRes = await api.get('/cajas/sesiones?estado=ABIERTA');
+        const sesionActiva = sesionesRes?.data?.[0];
+        if (sesionActiva) {
+          setCajaId(sesionActiva.caja_id);
+          setSesionCajaId(sesionActiva.id);
+          setEstadoCaja({
+            estado: 'ABIERTA',
+            montoInicial: sesionActiva.monto_inicio || 0,
+            ventasEfectivo: 0,
+            ventasTarjeta: 0,
+            montoFinal: sesionActiva.monto_inicio || 0,
+            cajaId: sesionActiva.caja_id,
+            sesionId: sesionActiva.id,
+          });
+        } else {
+          setEstadoCaja({
+            estado: 'CERRADA',
+            montoInicial: 0,
+            ventasEfectivo: 0,
+            ventasTarjeta: 0,
+            montoFinal: 0,
+          });
+        }
+      } catch (cajaError) {
+        console.error('❌ Error cargando cajas:', cajaError);
       }
 
       if (empresaRes?.success) {
@@ -411,10 +419,17 @@ export default function POSPage() {
   }
 
   const agregarAlCarrito = (producto: ProductoPOS) => {
-    // Verificar stock disponible (solo si no permite venta sin stock)
-    if (!ventaSinStock && producto.stock_actual <= 0) {
+    const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0
+
+    // Verificar stock disponible (solo si no permite venta sin stock y no es servicio)
+    if (!ventaSinStock && !producto.es_servicio && stockDisponible <= 0) {
       alert(`❌ SIN STOCK\n${producto.nombre} no tiene stock disponible`)
       return
+    }
+
+    // Aviso de stock mínimo
+    if (!producto.es_servicio && stockDisponible <= (producto.stock_minimo ?? 0)) {
+      alert(`⚠️ Stock mínimo alcanzado\n${producto.nombre} tiene stock bajo (${stockDisponible})`)
     }
 
     // Validar límite de items SUNAT (max 999 items)
@@ -433,8 +448,8 @@ export default function POSPage() {
 
     if (itemExistente) {
       // Verificar que no exceda el stock (solo si no permite venta sin stock)
-      if (!ventaSinStock && itemExistente.cantidad >= producto.stock_actual) {
-        alert(`❌ STOCK INSUFICIENTE\nSolo hay ${producto.stock_actual} unidades disponibles`)
+      if (!ventaSinStock && !producto.es_servicio && itemExistente.cantidad >= stockDisponible) {
+        alert(`❌ STOCK INSUFICIENTE\nSolo hay ${stockDisponible} unidades disponibles`)
         return
       }
 
@@ -491,6 +506,10 @@ export default function POSPage() {
     }
   }
 
+  const aplicarDescuentoRapido = (productoId: string, porcentaje: number) => {
+    aplicarDescuentoItem(productoId, { tipo: 'PORCENTAJE', valor: porcentaje, descripcion: `Descuento ${porcentaje}%` })
+  }
+
   const eliminarDelCarrito = (productoId: string) => {
     console.log('🗑️ Eliminando producto del carrito:', productoId);
     setCarrito(carrito.filter(item => item.producto.id !== productoId));
@@ -525,7 +544,7 @@ export default function POSPage() {
 
     if (esBoletaSinRuc && totalVenta > 700) {
       const confirmar = confirm(
-        `⚠️ ADVERTENCIA SUNAT\n\nEl monto total es S/ ${totalVenta.toFixed(2)}\n\nPara ventas mayores a S/ 700 sin RUC, se generará automáticamente una Guía de Remisión Electrónica (GRE).\n\n¿Desea continuar?`
+        `⚠️ ADVERTENCIA SUNAT\n\nEl monto total es S/ ${formatMoney(totalVenta)}\n\nPara ventas mayores a S/ 700 sin RUC, se generará automáticamente una Guía de Remisión Electrónica (GRE).\n\n¿Desea continuar?`
       )
       if (!confirmar) {
         return
@@ -631,7 +650,7 @@ export default function POSPage() {
         let mensajeExito = `✅ VENTA PROCESADA EXITOSAMENTE
 
 📄 Ticket: ${ventaInfo.numero_ticket || comprobante.numero}
-💰 Total: S/ ${totalVenta.toFixed(2)}
+💰 Total: S/ ${formatMoney(totalVenta)}
 📋 Estado: ${ventaInfo.estado || 'PAGADA'}
 🧾 Factura Electrónica: ${ventaInfo.factura_electronica ? 'GENERADA' : 'PENDIENTE'}`;
 
@@ -757,8 +776,15 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
   // Función para generar comprobante
   const generarComprobante = () => {
+    const correlativo = String(Date.now()).slice(-8)
+    const serie = 'T001'
+    const tipo = '03' // Boleta por defecto en POS
+
     const comprobante = {
-      numero: `T001-${String(Date.now()).slice(-8)}`,
+      serie,
+      correlativo,
+      numero: `${serie}-${correlativo}`,
+      tipo,
       fecha: new Date().toISOString(),
       cliente: clientes.find(c => c.id === clienteSeleccionado),
       items: carrito,
@@ -787,23 +813,33 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     }
 
     try {
-      const resultado = await api.post('/api/pos/caja/abrir', {
-        monto_inicial: montoInicial
+      if (!cajaId) {
+        alert('❌ No hay caja configurada para abrir. Cree una caja primero.')
+        return
+      }
+
+      const resultado = await api.post(`/cajas/${cajaId}/apertura`, {
+        monto_inicio: montoInicial
       })
 
       if (resultado) {
+        const sesion = resultado.data || resultado
+        setCajaId(cajaId)
+        setSesionCajaId(sesion.id)
         setEstadoCaja({
           estado: 'ABIERTA',
           montoInicial,
           ventasEfectivo: 0,
           ventasTarjeta: 0,
-          montoFinal: montoInicial
+          montoFinal: montoInicial,
+          cajaId,
+          sesionId: sesion.id,
         })
 
         setMostrarModalAbrirCaja(false)
         setMontoInicialInput('')
 
-        alert(`🔓 ¡CAJA ABIERTA!\nCaja abierta con S/ ${montoInicial.toFixed(2)}`)
+        alert(`🔓 ¡CAJA ABIERTA!\nCaja abierta con S/ ${formatMoney(montoInicial)}`)
       }
     } catch (error) {
       console.error('❌ Error abriendo caja:', error)
@@ -812,13 +848,27 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
   const cerrarCaja = async () => {
     try {
-      const resultado = await api.post('/api/pos/caja/cerrar', {
-        monto_contado: parseFloat(montoContadoInput) || 0,
+      if (!cajaId || !sesionCajaId) {
+        alert('❌ No hay sesión de caja activa para cerrar.')
+        return
+      }
+
+      const resultado = await api.post(`/cajas/${cajaId}/cierre`, {
+        sesion_id: sesionCajaId,
+        monto_cierre: parseFloat(montoContadoInput) || 0,
         notas: notasCierreInput
       })
 
       if (resultado) {
-        cargarDatos()
+        setSesionCajaId(null)
+        setEstadoCaja({
+          estado: 'CERRADA',
+          montoInicial: 0,
+          ventasEfectivo: 0,
+          ventasTarjeta: 0,
+          montoFinal: 0,
+          cajaId,
+        })
 
         // Toast para cerrar caja
         alert('🔒 ¡CAJA CERRADA!\nSesión finalizada correctamente')
@@ -853,7 +903,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       !categoriaFiltro || producto.categoria === categoriaFiltro;
 
     // Mostrar productos sin stock solo si está habilitado
-    const tieneStock = ventaSinStock || producto.stock_actual > 0;
+    const stockDisponible = producto.stock_disponible ?? producto.stock_actual;
+    const tieneStock = ventaSinStock || producto.es_servicio || stockDisponible > 0;
 
     return coincideBusqueda && coincideCategoria && tieneStock;
   });
@@ -863,6 +914,24 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     (m) => m.id === metodoPagoSeleccionado
   );
   const clienteActual = clientes.find((c) => c.id === clienteSeleccionado);
+
+  const mensajeAccionRapida = () => {
+    const lineas = carrito.slice(0, 5).map(
+      (item) => `• ${item.producto.nombre} x${item.cantidad} - S/ ${formatMoney(item.subtotal)}`
+    )
+    const extra = carrito.length > 5 ? `… y ${carrito.length - 5} ítems más` : ''
+    return [
+      `Hola ${clienteActual?.razon_social || clienteActual?.nombres || clienteActual?.apellidos || 'cliente'},`,
+      `Detalle de tu compra en Neon System:`,
+      ...lineas,
+      extra,
+      `Total: S/ ${formatMoney(calcularTotal())}`,
+      `Método de pago: ${metodoPagoActual?.nombre || 'Sin seleccionar'}`,
+      `Gracias por tu preferencia.`
+    ]
+      .filter(Boolean)
+      .join('\n')
+  }
 
   return (
     <>
@@ -908,105 +977,20 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
             </div>
           </div>
 
-          {/* Modal para abrir caja */}
-          {mostrarModalAbrirCaja && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-              }}
-            >
-              <div className="stat-card" style={{ maxWidth: '400px', textAlign: 'center' }}>
-                <div style={{ marginBottom: '2rem' }}>
-                  <div
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      margin: '0 auto 1rem',
-                      background: 'var(--gradient-success)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '2.5rem',
-                    }}
-                  >
-                    💰
-                  </div>
-                  <h3
-                    style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 'bold',
-                      color: 'var(--primary-800)',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    Abrir Caja Registradora
-                  </h3>
-                  <p style={{ color: 'var(--primary-600)' }}>Ingrese el monto inicial en efectivo</p>
-                </div>
-
-                <div style={{ marginBottom: '2rem' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    Monto inicial (S/)
-                  </label>
-                  <input
-                    type="number"
-                    value={montoInicialInput}
-                    onChange={(e) => setMontoInicialInput(e.target.value)}
-                    placeholder="0.00"
-                    style={{
-                      width: '100%',
-                      padding: '1rem',
-                      border: '2px solid var(--primary-300)',
-                      borderRadius: 'var(--border-radius)',
-                      fontSize: '1.25rem',
-                      textAlign: 'center',
-                      background: 'white',
-                    }}
-                    step="0.01"
-                    min="0"
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button
-                    onClick={() => setMostrarModalAbrirCaja(false)}
-                    className="btn btn-secondary"
-                    style={{ flex: 1 }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={confirmarAbrirCaja}
-                    className="btn btn-primary"
-                    style={{
-                      flex: 1,
-                      background: 'var(--gradient-success)',
-                    }}
-                  >
-                    Abrir Caja
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <CajaControls
+            estadoCaja={estadoCaja}
+            montoInicialInput={montoInicialInput}
+            setMontoInicialInput={setMontoInicialInput}
+            montoContadoInput={montoContadoInput}
+            setMontoContadoInput={setMontoContadoInput}
+            notasCierreInput={notasCierreInput}
+            setNotasCierreInput={setNotasCierreInput}
+            abrirCaja={abrirCaja}
+            confirmarAbrirCaja={confirmarAbrirCaja}
+            cerrarCaja={cerrarCaja}
+            mostrarModalAbrirCaja={mostrarModalAbrirCaja}
+            setMostrarModalAbrirCaja={setMostrarModalAbrirCaja}
+          />
         </div>
       ) : (
         <div className="dashboard-container" style={{ padding: '1rem', maxWidth: '100%' }}>
@@ -1033,6 +1017,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 }}
               >
                 🔄 Sincronizar
+              </button>
+              <button
+                onClick={abrirCaja}
+                className="btn"
+                style={{
+                  background: 'var(--gradient-success)',
+                  color: 'white',
+                  border: 'none',
+                }}
+              >
+                🔓 Abrir Caja
               </button>
               <button
                 onClick={cerrarCaja}
@@ -1109,6 +1104,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       type="text"
                       placeholder="🔍 Buscar por nombre, código o código de barras..."
                       value={busqueda}
+                      list="pos-busqueda-options"
                       onChange={(e) => setBusqueda(e.target.value)}
                       style={{
                         width: '100%',
@@ -1119,6 +1115,11 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         background: 'white',
                       }}
                     />
+                    <datalist id="pos-busqueda-options">
+                      {(productos || []).slice(0, 50).map((p) => (
+                        <option key={p.id} value={`${p.codigo} - ${p.nombre}`} />
+                      ))}
+                    </datalist>
                   </div>
                   <select
                     value={categoriaFiltro}
@@ -1287,117 +1288,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   boxShadow: 'var(--shadow-xl)',
                 }}
               >
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                    gap: '1rem',
-                  }}
-                >
-                  {productosFiltrados.map((producto) => (
-                    <div
-                      key={producto.id}
-                      onClick={() => agregarAlCarrito(producto)}
-                      className="stat-card"
-                      style={{
-                        cursor: 'pointer',
-                        padding: '1rem',
-                        transition: 'all 0.3s ease',
-                      }}
-                    >
-                      <div
-                        style={{
-                          aspectRatio: '1',
-                          background: 'var(--gradient-primary)',
-                          borderRadius: 'var(--border-radius)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginBottom: '1rem',
-                        }}
-                      >
-                        {producto.imagen_url ? (
-                          <img
-                            src={producto.imagen_url}
-                            alt={producto.nombre}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              borderRadius: 'var(--border-radius)',
-                            }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: '3rem' }}>📦</span>
-                        )}
-                      </div>
-                      <div>
-                        <h3
-                          style={{
-                            fontWeight: '600',
-                            color: 'var(--primary-800)',
-                            fontSize: '0.875rem',
-                            lineHeight: '1.2',
-                            marginBottom: '0.5rem',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {producto.nombre}
-                        </h3>
-                        <p
-                          style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--primary-500)',
-                            marginBottom: '0.5rem',
-                          }}
-                        >
-                          {producto.codigo}
-                        </p>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 'bold',
-                              color: 'var(--emerald-600)',
-                              fontSize: '1rem',
-                            }}
-                          >
-                            S/ {producto.precio_venta.toFixed(2)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '999px',
-                              backgroundColor:
-                                producto.stock_actual > producto.stock_minimo
-                                  ? 'var(--emerald-100)'
-                                  : producto.stock_actual > 0
-                                    ? 'var(--amber-100)'
-                                    : 'var(--red-100)',
-                              color:
-                                producto.stock_actual > producto.stock_minimo
-                                  ? 'var(--emerald-800)'
-                                  : producto.stock_actual > 0
-                                    ? 'var(--amber-800)'
-                                    : 'var(--red-800)',
-                            }}
-                          >
-                            {producto.stock_actual} un.
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ProductGrid productos={productosFiltrados} onAgregar={agregarAlCarrito} />
               </div>
             </div>
 
@@ -1501,8 +1392,22 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           {item.producto.nombre}
                         </h4>
                         <p style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
-                          S/ {item.precio_unitario.toFixed(2)}
+                          S/ {formatMoney(item.precio_unitario)}
                         </p>
+                        <p style={{ fontSize: '0.7rem', color: '#9CA3AF', margin: 0 }}>
+                          Stock: {item.producto.stock_disponible ?? item.producto.stock_actual ?? 0}
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem' }}>
+                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 5)}>
+                            -5%
+                          </button>
+                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 10)}>
+                            -10%
+                          </button>
+                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 0)}>
+                            Reset
+                          </button>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
                           <button
                             onClick={() => actualizarCantidad(item.producto.id, item.cantidad - 1)}
@@ -1521,7 +1426,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
-                          S/ {item.subtotal.toFixed(2)}
+                          S/ {formatMoney(item.subtotal)}
                         </p>
                         <button
                           onClick={() => eliminarDelCarrito(item.producto.id)}
@@ -1554,7 +1459,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     }}
                   >
                     <span>Subtotal</span>
-                    <span>S/ {calcularSubtotal().toFixed(2)}</span>
+                    <span>S/ {formatMoney(calcularSubtotal())}</span>
                   </div>
                   <div
                     style={{
@@ -1566,7 +1471,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   >
                     <span>Descuentos</span>
                     <span style={{ color: 'var(--red-600)' }}>
-                      -S/ {calcularDescuentoTotal().toFixed(2)}
+                      -S/ {formatMoney(calcularDescuentoTotal())}
                     </span>
                   </div>
                   <div
@@ -1578,7 +1483,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     }}
                   >
                     <span>IGV (18%)</span>
-                    <span>S/ {calcularImpuestos().toFixed(2)}</span>
+                    <span>S/ {formatMoney(calcularImpuestos())}</span>
                   </div>
                   <div
                     style={{
@@ -1590,13 +1495,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       borderTop: '2px dashed var(--primary-300)',
                       paddingTop: '1rem',
                     }}
-                  >
-                    <span>TOTAL</span>
-                    <span>S/ {calcularTotal().toFixed(2)}</span>
-                  </div>
+                >
+                  <span>TOTAL</span>
+                  <span>S/ {formatMoney(calcularTotal())}</span>
+                </div>
 
-                  {/* GRE Indicator */}
-                  {greEnabled && calcularTotal() > greThreshold && (
+                {/* Acciones rápidas */}
+                <QuickActions
+                  mensaje={mensajeAccionRapida()}
+                  emailDestino={clienteActual?.email}
+                />
+
+                {/* GRE Indicator */}
+                {greEnabled && calcularTotal() > greThreshold && (
                     <div
                       style={{
                         marginTop: '1rem',
@@ -1622,7 +1533,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           GRE Automática
                         </p>
                         <p style={{ margin: 0, fontSize: '0.7rem', color: '#1976D2' }}>
-                          Se generará Guía de Remisión (&gt; S/ {greThreshold.toFixed(2)})
+                          Se generará Guía de Remisión (&gt; S/ {formatMoney(greThreshold)})
                         </p>
                       </div>
                     </div>
@@ -1651,31 +1562,38 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 }}
               >
                 <h3 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>👤 Cliente</h3>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <select
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <input
+                    list="clientes-pos-options"
                     value={clienteSeleccionado}
                     onChange={(e) => setClienteSeleccionado(e.target.value)}
+                    placeholder="Selecciona cliente (buscar por documento)"
                     style={{
                       flex: 1,
                       padding: '0.75rem',
                       border: '1px solid var(--primary-300)',
                       borderRadius: '4px',
                     }}
-                  >
-                    <option value="">Cliente general</option>
+                  />
+                  <datalist id="clientes-pos-options">
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.razon_social || `${c.nombres} ${c.apellidos}`}
+                        {(c.razon_social || `${c.nombres || ''} ${c.apellidos || ''}`.trim() || 'Cliente')} - {c.numero_documento}
                       </option>
                     ))}
-                  </select>
-                  <button className="btn-icon">➕</button>
+                  </datalist>
                 </div>
                 {clienteActual && (
-                  <div style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--primary-600)' }}>
+                  <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', color: 'var(--primary-600)' }}>
                     {clienteActual.tipo_documento}: {clienteActual.numero_documento}
                   </div>
                 )}
+                <QuickClient
+                  onCreated={(nuevo) => {
+                    setClientes((prev) => [nuevo, ...prev])
+                    setClienteSeleccionado(nuevo.id)
+                  }}
+                />
               </div>
 
               {/* Métodos de Pago */}
@@ -1740,7 +1658,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     borderRadius: '8px',
                   }}
                 >
-                  Procesar Venta (S/ {calcularTotal().toFixed(2)})
+                  Procesar Venta (S/ {formatMoney(calcularTotal())})
                 </button>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <button
@@ -1795,7 +1713,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         </td>
                         <td style={{ padding: '0.75rem' }}>{venta.cliente_nombre || 'General'}</td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                          S/ {parseFloat(venta.total).toFixed(2)}
+                          S/ {formatMoney(venta.total)}
                         </td>
                         <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                           <span
@@ -1942,8 +1860,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                             <td style={{ padding: '0.75rem' }}>{item.codigo_producto}</td>
                             <td style={{ padding: '0.75rem' }}>{item.descripcion}</td>
                             <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.cantidad}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.precio_unitario.toFixed(2)}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {item.subtotal.toFixed(2)}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {formatMoney(item.precio_unitario)}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>S/ {formatMoney(item.subtotal)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1955,15 +1873,15 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     <div style={{ width: '280px', fontSize: '0.875rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
                         <span>Subtotal:</span>
-                        <strong>S/ {parseFloat(facturaSeleccionada.subtotal || 0).toFixed(2)}</strong>
+                        <strong>S/ {formatMoney(facturaSeleccionada.subtotal || 0)}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
                         <span>Descuentos:</span>
-                        <strong>- S/ {parseFloat(facturaSeleccionada.descuentos || 0).toFixed(2)}</strong>
+                        <strong>- S/ {formatMoney(facturaSeleccionada.descuentos || 0)}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
                         <span>IGV (18%):</span>
-                        <strong>S/ {parseFloat(facturaSeleccionada.impuestos || 0).toFixed(2)}</strong>
+                        <strong>S/ {formatMoney(facturaSeleccionada.impuestos || 0)}</strong>
                       </div>
                       <div style={{
                         display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0.5rem',
@@ -1971,7 +1889,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         fontSize: '1.125rem', fontWeight: 'bold', color: '#111827'
                       }}>
                         <span>TOTAL:</span>
-                        <span>S/ {parseFloat(facturaSeleccionada.total || 0).toFixed(2)}</span>
+                        <span>S/ {formatMoney(facturaSeleccionada.total || 0)}</span>
                       </div>
                     </div>
                   </div>

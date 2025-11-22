@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CxpService } from './cxp.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 describe('CxpService', () => {
   let service: CxpService;
@@ -39,6 +40,14 @@ describe('CxpService', () => {
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
             emitFacturaProveedorRegistrada: jest.fn(),
+          },
+        },
+        {
+          provide: RetencionesValidationService,
+          useValue: {
+            obtenerConfiguracionEmpresa: jest.fn().mockResolvedValue({}),
+            validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
+            validarMontoPendiente: jest.fn().mockReturnValue({ valido: true, montoEsperado: 0 }),
           },
         },
       ],

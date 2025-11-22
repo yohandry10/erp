@@ -7,6 +7,8 @@ import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+
 const PlanillasPage = () => {
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
   const { get } = useApi();
@@ -286,7 +288,7 @@ const PlanillasPage = () => {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const response = await fetch(`http://localhost:3001/api/rrhh/planillas/${planillaId}`, {
+          const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -308,7 +310,7 @@ const PlanillasPage = () => {
 
   const descargarBoleta = async (empleadoPlanillaId: string) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/rrhh/planillas/empleado/${empleadoPlanillaId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/empleado/${empleadoPlanillaId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },

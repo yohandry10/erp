@@ -1,12 +1,29 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { CacheInvalidationService } from '../shared/cache/cache-invalidation.service';
+import { TaxCalculatorService } from '../shared/utils/tax-calculator';
+import { EventBusService } from '../shared/events/event-bus.service';
+import { CpeService } from './cpe/cpe.service';
+import { CxcService } from './finanzas/cxc/cxc.service';
+import { PedidoVenta, PedidoDetalle } from './ventas/pedidos/entities';
+import { DocumentoFiscal, DocumentoDetalleFiscal } from './documentos/interfaces/documento-fiscal.interface';
+
+interface DocumentoDesdePedidoResult {
+  documento: DocumentoFiscal;
+  cpe?: any;
+  cuentaPorCobrar?: any;
+}
 
 @Injectable()
 export class DocumentosService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly cacheInvalidation: CacheInvalidationService,
+    private readonly taxCalculator: TaxCalculatorService,
+    private readonly eventBus: EventBusService,
+    private readonly cpeService: CpeService,
+    private readonly cxcService: CxcService,
   ) {}
 
   // ========== ESTADÍSTICAS ==========
@@ -329,6 +346,173 @@ export class DocumentosService {
     }
   }
 
+  async crearDocumentoDesdePedido(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tipoDoc: '01' | '03',
+    tenantId: string,
+    userId?: string,
+  ): Promise<DocumentoDesdePedidoResult> {
+    if (!pedido) {
+      throw new BadRequestException('El pedido es requerido para generar el documento');
+    }
+
+    if (!pedido.detalle || pedido.detalle.length === 0) {
+      throw new BadRequestException('El pedido no tiene detalle para generar un documento fiscal');
+    }
+
+    try {
+      const client = this.supabaseService.getClient();
+      const cliente = await this.obtenerClienteFiscalData(pedido.cliente_id, tenantId);
+      const empresa = await this.obtenerEmpresaFiscalConfig(tenantId);
+      const serieActiva = await this.obtenerSerieActiva(tipoDoc, tenantId);
+      const numeroDocumento = await this.incrementarNumeroSerie(serieActiva, tenantId);
+
+      const baseSubtotal =
+        pedido.subtotal != null
+          ? Number(pedido.subtotal)
+          : this.calcularSubtotalDesdeDetalle(pedido.detalle);
+
+      const impuestos = await this.taxCalculator.calcularImpuestos({
+        subtotal: baseSubtotal,
+        tenantId,
+        moneda: empresa.moneda,
+      });
+
+      const fechaEmision = new Date();
+      const fechaVencimiento = this.sumarDias(
+        fechaEmision,
+        empresa.dias_vencimiento_factura ?? 30,
+      );
+
+      const documentoPayload = {
+        tenant_id: tenantId,
+        tipo_documento: tipoDoc,
+        serie: serieActiva.serie,
+        numero: numeroDocumento,
+        fecha_emision: fechaEmision.toISOString(),
+        fecha_vencimiento: fechaVencimiento.toISOString(),
+        pedido_id: pedido.id,
+        cliente_id: pedido.cliente_id,
+        subtotal: impuestos.subtotal,
+        impuesto_igv: impuestos.igv,
+        total: impuestos.total,
+        moneda: empresa.moneda || impuestos.moneda || 'PEN',
+        estado: 'EMITIDO',
+        created_by: userId ?? null,
+      };
+
+      const { data: documentoInsertado, error: documentoError } = await client
+        .from('documentos')
+        .insert(documentoPayload)
+        .select()
+        .single();
+
+      if (documentoError || !documentoInsertado) {
+        console.error('❌ Error creando documento desde pedido:', documentoError);
+        throw new BadRequestException('No se pudo crear el documento fiscal');
+      }
+
+      const detallesFiscal = this.prepararDetallesDesdePedido(
+        pedido.detalle,
+        impuestos.tasaIgv ?? 0,
+      );
+
+      const detallesParaInsertar = detallesFiscal.map((detalle) => ({
+        codigo_producto: detalle.codigo_producto,
+        descripcion: detalle.descripcion,
+        unidad_medida: detalle.unidad_medida ?? 'NIU',
+        cantidad: detalle.cantidad,
+        precio_unitario: detalle.precio_unitario,
+        descuento_unitario: 0,
+        valor_venta: detalle.valor_venta,
+        impuesto_igv: detalle.impuesto_igv,
+        impuesto_isc: 0,
+        total_item: detalle.total_item,
+      }));
+
+      await this.crearDetallesDocumento(documentoInsertado.id, detallesParaInsertar, tenantId);
+      await this.registrarAuditoria(
+        documentoInsertado.id,
+        'CREADO',
+        userId ?? null,
+        'Documento generado desde pedido',
+        tenantId,
+      );
+
+      if (tenantId) {
+        try {
+          await this.cacheInvalidation.onDocumentoCreated(tenantId);
+        } catch (cacheError) {
+          console.warn('⚠️ No se pudo invalidar cache después de generar documento:', cacheError);
+        }
+      }
+
+      const documentoFiscal: DocumentoFiscal = {
+        ...documentoInsertado,
+        pais_id: empresa.pais_id ?? null,
+        detalles: detallesFiscal,
+        cliente: {
+          id: cliente.id,
+          documento_tipo: cliente.documento_tipo,
+          documento_numero: cliente.numero_documento,
+          razon_social: cliente.razon_social,
+          direccion: cliente.direccion,
+          email: cliente.email,
+        },
+        emisor: {
+          ruc: empresa.ruc,
+          razon_social: empresa.razon_social,
+          direccion: empresa.direccion_fiscal,
+        },
+      };
+
+      let cpeGenerado: any = null;
+      let cuentaPorCobrar: any = null;
+
+      try {
+        cpeGenerado = await this.cpeService.crearCPEDesdeDocumento(documentoFiscal, tenantId);
+      } catch (cpeError) {
+        console.error('❌ Error generando CPE desde documento:', cpeError);
+        throw new BadRequestException('No se pudo generar el CPE asociado al documento');
+      }
+
+      try {
+        cuentaPorCobrar = await this.cxcService.crearCxCDesdeDocumento(documentoFiscal, tenantId);
+      } catch (cxcError) {
+        console.error('❌ Error generando CxC desde documento:', cxcError);
+        throw new BadRequestException('No se pudo generar la cuenta por cobrar del documento');
+      }
+
+      await this.eventBus.emitDocumentoFiscalGenerado({
+        eventId: uuidv4(),
+        tenantId,
+        documentoId: documentoFiscal.id,
+        pedidoId: pedido.id,
+        tipoDocumento: tipoDoc,
+        serie: documentoFiscal.serie,
+        numero: documentoFiscal.numero,
+        subtotal: documentoFiscal.subtotal,
+        impuesto: documentoFiscal.impuesto_igv,
+        total: documentoFiscal.total,
+        moneda: documentoFiscal.moneda,
+        fechaEmision: documentoFiscal.fecha_emision,
+        paisId: documentoFiscal.pais_id ?? empresa.pais_id ?? 1,
+      });
+
+      return {
+        documento: documentoFiscal,
+        cpe: cpeGenerado,
+        cuentaPorCobrar,
+      };
+    } catch (error) {
+      console.error('❌ Error creando documento desde pedido:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Error al generar el documento desde el pedido');
+    }
+  }
+
   private async crearDetallesDocumento(documentoId: string, detalles: any[], tenantId?: string) {
     const detallesConId = detalles.map((detalle, index) => ({
       documento_id: documentoId,
@@ -355,6 +539,137 @@ export class DocumentosService {
       console.error('❌ Error creando detalles:', error);
       throw new BadRequestException('Error creando detalles del documento');
     }
+  }
+
+  private prepararDetallesDesdePedido(
+    detallePedido: PedidoDetalle[],
+    tasaIgv: number,
+  ): DocumentoDetalleFiscal[] {
+    return detallePedido.map((item) => {
+      const cantidad = Number(item.cantidad ?? 0);
+      const precioUnitario = Number(item.precio_unitario ?? 0);
+      const valorBase =
+        item.subtotal != null ? Number(item.subtotal) : this.roundValue(cantidad * precioUnitario);
+      const igv = this.roundValue(valorBase * tasaIgv);
+      return {
+        producto_id: item.producto_id ?? null,
+        codigo_producto: item.producto_id ?? null,
+        descripcion: item.descripcion,
+        unidad_medida: 'NIU',
+        cantidad,
+        precio_unitario: precioUnitario,
+        valor_venta: valorBase,
+        impuesto_igv: igv,
+        total_item: this.roundValue(valorBase + igv),
+      };
+    });
+  }
+
+  private roundValue(value: number, precision = 2): number {
+    const multiplier = Math.pow(10, precision);
+    return Math.round((Number(value) + Number.EPSILON) * multiplier) / multiplier;
+  }
+
+  private sumarDias(fecha: Date, dias: number): Date {
+    const nuevaFecha = new Date(fecha);
+    nuevaFecha.setDate(nuevaFecha.getDate() + dias);
+    return nuevaFecha;
+  }
+
+  private async obtenerClienteFiscalData(clienteId: string, tenantId: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('clientes')
+      .select('id, documento_tipo, numero_documento, razon_social, direccion, email')
+      .eq('tenant_id', tenantId)
+      .eq('id', clienteId)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new NotFoundException('Cliente no encontrado para generar documento');
+    }
+
+    return data;
+  }
+
+  private async obtenerEmpresaFiscalConfig(tenantId: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select(
+        'ruc, razon_social, direccion_fiscal, pais_id, moneda_defecto, dias_vencimiento_factura',
+      )
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error obteniendo configuración fiscal de empresa:', error);
+    }
+
+    return {
+      ruc: data?.ruc || '00000000000',
+      razon_social: data?.razon_social || 'EMPRESA',
+      direccion_fiscal: data?.direccion_fiscal || 'DIRECCIÓN NO DEFINIDA',
+      pais_id: data?.pais_id || 1,
+      moneda: data?.moneda_defecto || 'PEN',
+      dias_vencimiento_factura: data?.dias_vencimiento_factura || 30,
+    };
+  }
+
+  private async obtenerSerieActiva(tipoDoc: string, tenantId: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('documento_series')
+      .select('id, serie, tipo_documento, correlativo_actual, correlativo_maximo')
+      .eq('tenant_id', tenantId)
+      .eq('tipo_documento', tipoDoc)
+      .eq('activo', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new BadRequestException(
+        `No hay series activas para el tipo de documento ${tipoDoc} en el tenant`,
+      );
+    }
+
+    return data;
+  }
+
+  private async incrementarNumeroSerie(
+    serie: { tipo_documento: string; serie: string },
+    tenantId: string,
+  ): Promise<string> {
+    try {
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .rpc('obtener_siguiente_numero_documento', {
+          p_tenant_id: tenantId,
+          p_tipo_documento: serie.tipo_documento,
+          p_serie: serie.serie,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        return data as string;
+      }
+    } catch (rpcError) {
+      console.warn('⚠️ Error usando obtener_siguiente_numero_documento, usando fallback:', rpcError);
+    }
+
+    return this.obtenerSiguienteNumero(serie.tipo_documento, serie.serie, tenantId);
+  }
+
+  private calcularSubtotalDesdeDetalle(detalle: PedidoDetalle[]): number {
+    return detalle.reduce((sum, item) => {
+      const cantidad = Number(item.cantidad ?? 0);
+      const precio = Number(item.precio_unitario ?? 0);
+      return sum + cantidad * precio;
+    }, 0);
   }
 
   // ========== FACTURACIÓN ELECTRÓNICA ==========

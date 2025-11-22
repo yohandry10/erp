@@ -82,8 +82,8 @@ export default function PedidosPage() {
       return false
     }
 
-    if (fechaDesde && new Date(pedido.fecha) < new Date(fechaDesde)) return false
-    if (fechaHasta && new Date(pedido.fecha) > new Date(fechaHasta)) return false
+    if (fechaDesde && new Date(pedido.fecha_pedido) < new Date(fechaDesde)) return false
+    if (fechaHasta && new Date(pedido.fecha_pedido) > new Date(fechaHasta)) return false
 
     return true
   })
@@ -407,7 +407,7 @@ export default function PedidosPage() {
                         </div>
                       </td>
                       <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                        {formatFecha(pedido.fecha)}
+                        {formatFecha(pedido.fecha_pedido)}
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <span style={{

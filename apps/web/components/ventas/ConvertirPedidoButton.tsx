@@ -2,13 +2,12 @@
 
 import { useState } from 'react'
 import { useApi } from '@/hooks/use-api'
-import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight, Loader2, ShieldCheck, X } from 'lucide-react'
 
 interface ConvertirPedidoButtonProps {
   cotizacionId: string
-  onSuccess?: (pedidoId: string) => void
+  onSuccess?: (pedidoId?: string, payload?: any) => void
   disabled?: boolean
 }
 
@@ -28,14 +27,16 @@ export default function ConvertirPedidoButton({
       const response = await post(`/api/ventas/cotizaciones/${cotizacionId}/convertir-pedido`, {})
       
       if (response?.success) {
-        toast({
-          title: 'Éxito',
-          description: 'Cotización convertida a pedido exitosamente'
-        })
-        
-        // Call success callback with pedido ID
-        if (onSuccess && response.data?.pedido_id) {
-          onSuccess(response.data.pedido_id)
+        const payload = response.data
+        const pedidoId = payload?.pedido_id
+
+        if (onSuccess) {
+          onSuccess(pedidoId, payload)
+        } else {
+          toast({
+            title: 'Éxito',
+            description: 'Cotización convertida a pedido exitosamente'
+          })
         }
       } else {
         throw new Error(response?.message || 'Error al convertir la cotización')
@@ -58,64 +59,97 @@ export default function ConvertirPedidoButton({
   }
 
   const handleCancel = () => {
-    setShowConfirmation(false)
+    if (!converting) {
+      setShowConfirmation(false)
+    }
   }
+
+  const isDisabled = disabled || converting
 
   return (
     <>
-      <Button
+      <button
+        type="button"
         onClick={handleClick}
-        disabled={disabled || converting}
-        className="bg-green-600 hover:bg-green-700"
+        disabled={isDisabled}
+        className={`btn btn-success ${isDisabled ? 'opacity-60' : ''}`}
       >
         {converting ? (
           <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" />
             Convirtiendo...
           </>
         ) : (
           <>
-            <ArrowRight className="w-4 h-4 mr-2" />
+            <ArrowRight className="w-4 h-4" />
             Convertir a Pedido
           </>
         )}
-      </Button>
+      </button>
 
       {/* Confirmation Modal */}
       {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Convertir a Pedido
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">
+                <ShieldCheck className="w-5 h-5" />
+                Confirmar conversión
               </h3>
-              <p className="text-gray-600 mb-6">
-                ¿Está seguro de convertir esta cotización a pedido de venta? 
-                Esta acción cambiará el estado de la cotización a "CONVERTIDA" y creará un nuevo pedido.
+              <button
+                type="button"
+                className="modal-close"
+                onClick={handleCancel}
+                disabled={converting}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="text-gray-700 mb-4">
+                ¿Está seguro de convertir esta cotización a pedido de venta? Esta acción cambiará el
+                estado a <span className="font-semibold text-green-600">CONVERTIDA</span> y creará un nuevo pedido.
               </p>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  disabled={converting}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConvert}
-                  disabled={converting}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {converting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Convirtiendo...
-                    </>
-                  ) : (
-                    'Confirmar'
-                  )}
-                </Button>
+
+              <div className="modal-info">
+                <p>Al confirmar se realizará lo siguiente:</p>
+                <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
+                  <li>Generar un pedido vinculado a la cotización</li>
+                  <li>Reservar stock disponible para cada ítem</li>
+                  <li>Actualizar el estado histórico y auditoría</li>
+                </ul>
               </div>
+
+              <p className="text-sm text-gray-500">
+                Esta acción no se puede deshacer automáticamente.
+              </p>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn modal-btn-secondary"
+                onClick={handleCancel}
+                disabled={converting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="modal-btn modal-btn-success"
+                onClick={handleConvert}
+                disabled={converting}
+              >
+                {converting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Convirtiendo...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
+              </button>
             </div>
           </div>
         </div>

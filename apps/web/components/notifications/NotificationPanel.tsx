@@ -77,132 +77,37 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const unreadCount = notifications.filter(n => !n.leida).length
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column',
-      height: '100%',
-      background: 'white'
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '1.25rem 1.5rem',
-        borderBottom: '2px solid #e2e8f0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Bell size={20} style={{ color: '#3b82f6' }} />
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '700',
-            color: '#1e293b',
-            margin: 0
-          }}>
-            Notificaciones
-          </h3>
-          {unreadCount > 0 && (
-            <span style={{
-              backgroundColor: '#ef4444',
-              color: 'white',
-              borderRadius: '12px',
-              padding: '0.25rem 0.625rem',
-              fontSize: '0.75rem',
-              fontWeight: '700'
-            }}>
-              {unreadCount}
-            </span>
-          )}
+    <div className="notification-panel">
+      <div className="notification-header">
+        <div className="notification-header__title">
+          <Bell size={20} className="notification-header__icon" />
+          <h3>Notificaciones</h3>
+          {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
         </div>
         {unreadCount > 0 && (
-          <button
-            onClick={handleMarkAllAsRead}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#3b82f6',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '8px',
-              transition: 'background-color 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
+          <button className="notification-header__action" onClick={handleMarkAllAsRead}>
             Marcar todas
           </button>
         )}
       </div>
 
-      {/* Content */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto',
-        minHeight: 0
-      }}>
+      <div className="notification-body">
         {loading ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3rem 1.5rem',
-            gap: '1rem'
-          }}>
-            <Loader2 size={32} style={{ color: '#94a3b8' }} className="animate-spin" />
-            <p style={{ 
-              color: '#64748b', 
-              fontSize: '0.875rem', 
-              fontWeight: '500',
-              margin: 0
-            }}>
-              Cargando notificaciones...
-            </p>
+          <div className="notification-empty">
+            <Loader2 size={32} className="notification-empty__loader animate-spin" />
+            <p>Cargando notificaciones...</p>
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3rem 1.5rem',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#f1f5f9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1rem'
-            }}>
-              <Bell size={32} style={{ color: '#cbd5e1' }} />
+          <div className="notification-empty">
+            <div className="notification-empty__icon">
+              <Bell size={32} />
             </div>
-            <p style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: '#475569',
-              marginBottom: '0.5rem',
-              margin: '0 0 0.5rem 0'
-            }}>
-              No tienes notificaciones
-            </p>
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#94a3b8',
-              margin: 0
-            }}>
-              Te notificaremos cuando haya algo nuevo
-            </p>
+            <p className="notification-empty__title">No tienes notificaciones</p>
+            <p className="notification-empty__subtitle">Te notificaremos cuando haya algo nuevo</p>
           </div>
         ) : (
-          <div>
-            {notifications.map(notification => (
+          <div className="notification-list">
+            {notifications.map((notification) => (
               <NotificationItem
                 key={notification.id}
                 notification={notification}

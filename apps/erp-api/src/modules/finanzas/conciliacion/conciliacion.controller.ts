@@ -18,7 +18,7 @@ import { CrearConciliacionDto, ListarConciliacionesDto, ImportarCsvDto, MatchAut
 
 @ApiTags('Finanzas - Conciliación')
 @ApiBearerAuth()
-@Controller('api/finanzas/conciliacion')
+@Controller('finanzas/conciliacion')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: conciliación bancaria requiere permisos granulares.
 export class ConciliacionController {
   constructor(private readonly conciliacionService: ConciliacionService) {}

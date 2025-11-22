@@ -141,7 +141,7 @@ export default function InventarioPage() {
             codigo: item.codigo ?? null,
             categoria: item.categoria ?? null,
             activo: item.activo !== false,
-            stockActual: Number(item.stock_actual ?? 0),
+            stockActual: Number(item.stock_actual ?? item.stock ?? 0),
             stockMinimo: Number(item.stock_minimo ?? 0),
             updatedAt: item.updated_at ?? null,
           })),
@@ -233,7 +233,10 @@ export default function InventarioPage() {
             eventos de recepción y kardex.
           </p>
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <Link href="/dashboard/inventario/productos" className="btn btn-primary">
+            Gestionar Productos →
+          </Link>
           <Link href="/dashboard/inventario/recepciones" className="btn btn-secondary">
             Recepciones →
           </Link>

@@ -25,7 +25,8 @@ describe('AsientosGeneratorService', () => {
       lt: jest.fn(),
       order: jest.fn(),
       limit: jest.fn(),
-      single: jest.fn()
+      single: jest.fn(),
+      maybeSingle: jest.fn()
     };
     
     // Make all methods return the mock itself for chaining
@@ -40,6 +41,7 @@ describe('AsientosGeneratorService', () => {
     mock.lt.mockImplementation(returnMock);
     mock.order.mockImplementation(returnMock);
     mock.limit.mockImplementation(returnMock);
+    mock.maybeSingle.mockImplementation(returnMock);
     
     return mock;
   };
@@ -1482,6 +1484,84 @@ describe('AsientosGeneratorService', () => {
         expect(error).toBeInstanceOf(BadRequestException);
         expect(error.message).toContain('CERRADO');
       }
+    });
+  });
+
+  describe('handleDocumentoFiscalGenerado', () => {
+    it('genera asiento contable usando la plantilla configurada', async () => {
+      const plantilla = {
+        cuenta_debe_codigo: '12',
+        cuenta_haber_ventas_codigo: '70',
+        cuenta_haber_impuesto_codigo: '40'
+      };
+
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: plantilla,
+        error: null
+      });
+
+      const cuentas = new Map<string, PlanCuenta>([
+        ['12', createMockPlanCuenta('12', 'Clientes', 'ACTIVO')],
+        ['70', createMockPlanCuenta('70', 'Ventas', 'INGRESO')],
+        ['40', createMockPlanCuenta('40', 'IGV', 'PASIVO')]
+      ]);
+      planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(cuentas);
+
+      const generarAsientoSpy = jest
+        .spyOn(service, 'generarAsiento')
+        .mockResolvedValue({} as any);
+
+      const evento: DocumentoFiscalGeneradoEvent = {
+        eventId: 'evt-1',
+        tenantId,
+        documentoId: 'doc-1',
+        pedidoId: 'ped-1',
+        tipoDocumento: '01',
+        serie: 'F001',
+        numero: '000123',
+        subtotal: 1000,
+        impuesto: 180,
+        total: 1180,
+        moneda: 'PEN',
+        fechaEmision: new Date().toISOString(),
+        paisId: 1
+      };
+
+      await service.handleDocumentoFiscalGenerado(evento);
+
+      expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(tenantId, [
+        '12',
+        '70',
+        '40'
+      ]);
+
+      expect(generarAsientoSpy).toHaveBeenCalledWith(
+        tenantId,
+        expect.any(Date),
+        'Venta F001-000123',
+        [
+          {
+            cuenta_id: 'cta-12',
+            debe: 1180,
+            haber: 0,
+            concepto: 'Cuenta por cobrar F001-000123'
+          },
+          {
+            cuenta_id: 'cta-70',
+            debe: 0,
+            haber: 1000,
+            concepto: 'Ingresos por venta F001-000123'
+          },
+          {
+            cuenta_id: 'cta-40',
+            debe: 0,
+            haber: 180,
+            concepto: 'Impuestos por pagar F001-000123'
+          }
+        ],
+        evento.documentoId,
+        evento.eventId
+      );
     });
   });
 });

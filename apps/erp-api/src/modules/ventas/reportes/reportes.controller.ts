@@ -18,7 +18,7 @@ import { ReportesService } from './reportes.service';
  */
 @ApiTags('Ventas - Reportes')
 @ApiBearerAuth()
-@Controller('api/ventas/reportes')
+@Controller('ventas/reportes')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: reportes exige permisos granulares.
 export class ReportesController {
   constructor(private readonly reportesService: ReportesService) {}

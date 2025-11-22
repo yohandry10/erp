@@ -17,6 +17,7 @@ interface Producto {
   nombre: string
   precio_venta: number
   stock_actual: number
+  stock_reservado?: number
 }
 
 interface PedidoFormProps {
@@ -64,6 +65,22 @@ export default function PedidoForm({
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Derivar advertencias de stock para mostrar alerta en la UI antes de enviar
+const stockAlerts = detalle
+  .filter((item) => !!item.producto_id)
+  .map((item) => {
+    const producto = productos.find((p) => p.id === item.producto_id)
+    const disponible = (producto?.stock_actual ?? 0) - (producto?.stock_reservado ?? 0)
+      return {
+        descripcion: item.descripcion || producto?.nombre || 'Producto',
+        solicitado: item.cantidad,
+        disponible,
+        reservado: producto?.stock_reservado ?? 0,
+      }
+  })
+  .filter((info) => info.solicitado > info.disponible)
+const hasStockShortage = stockAlerts.length > 0
+
   // Load productos on mount
   useEffect(() => {
     loadProductos()
@@ -89,7 +106,15 @@ export default function PedidoForm({
       setLoadingProductos(true)
       const response = await get('/inventario/productos')
       if (response?.success) {
-        setProductos(response.data || [])
+        const productosApi = (response.data || []).map((p: any) => ({
+          id: p.id,
+          codigo: p.codigo,
+          nombre: p.nombre,
+          precio_venta: Number(p.precio_venta ?? p.precio ?? 0),
+          stock_actual: Number(p.stock ?? 0),
+          stock_reservado: Number(p.stock_reservado ?? 0)
+        }))
+        setProductos(productosApi)
       }
     } catch (error) {
       console.error('Error loading productos:', error)
@@ -181,6 +206,11 @@ export default function PedidoForm({
       if (item.cantidad <= 0) {
         newErrors[`cantidad_${index}`] = 'La cantidad debe ser mayor a 0'
       }
+      const producto = productos.find(p => p.id === item.producto_id)
+      const disponible = (producto?.stock_actual ?? 0) - (producto?.stock_reservado ?? 0)
+      if (producto && item.cantidad > disponible) {
+        newErrors[`cantidad_${index}`] = `Solo hay ${disponible} disponibles (reservado: ${producto.stock_reservado ?? 0})`
+      }
       if (item.precio_unitario <= 0) {
         newErrors[`precio_${index}`] = 'El precio debe ser mayor a 0'
       }
@@ -192,6 +222,16 @@ export default function PedidoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (hasStockShortage) {
+      const first = stockAlerts[0]
+      toast({
+        title: 'Stock insuficiente',
+        description: `${first.descripcion}: solicitado ${first.solicitado}, disponible ${first.disponible} (reservado ${first.reservado}). Ajusta las cantidades o repon stock para continuar.`,
+        variant: 'destructive'
+      })
+      return
+    }
 
     if (!validate()) {
       toast({
@@ -231,10 +271,41 @@ export default function PedidoForm({
   const { subtotal, igv, total } = calculateTotals()
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {hasStockShortage && (
+        <div style={{
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          background: 'rgba(254, 226, 226, 0.6)',
+          color: '#b91c1c',
+          padding: '0.75rem 1rem',
+          borderRadius: '0.75rem',
+          fontSize: '0.9rem'
+        }}>
+          <strong>Stock insuficiente</strong>
+          <ul style={{ margin: '0.5rem 0 0 1.25rem', padding: 0, listStyle: 'disc' }}>
+            {stockAlerts.map((a, idx) => (
+              <li key={idx}>
+                {a.descripcion}: solicitado {a.solicitado}, disponible {a.disponible} (reservado {a.reservado})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* Cliente Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Cliente</h3>
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-md)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          marginBottom: '1rem'
+        }}>Cliente</h3>
         <ClienteSelector
           value={clienteId}
           onChange={(id) => setClienteId(id)}
@@ -244,83 +315,197 @@ export default function PedidoForm({
       </div>
 
       {/* Productos Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Productos</h3>
-          <Button
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-md)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
+        {stockAlerts.length > 0 && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            color: 'var(--red-700)',
+            borderRadius: 'var(--border-radius)',
+            padding: '0.75rem 1rem',
+            marginBottom: '0.75rem'
+          }}>
+            <strong style={{ display: 'block', marginBottom: '0.25rem' }}>⚠️ Stock insuficiente</strong>
+            <ul style={{ margin: 0, paddingLeft: '1rem', fontSize: '0.9rem' }}>
+              {stockAlerts.map((s, i) => (
+                <li key={i}>
+                  {s.descripcion}: solicitado {s.solicitado}, disponible {s.disponible} (reservado {s.reservado})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 style={{
+            fontSize: '1.125rem',
+            fontWeight: '600',
+            color: 'var(--primary-900)',
+            margin: 0
+          }}>Productos</h3>
+          <button
             type="button"
             onClick={handleAddItem}
             disabled={disabled || loadingProductos}
-            variant="outline"
-            size="sm"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.625rem 1.25rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: 'white',
+              background: 'var(--gradient-primary)',
+              border: 'none',
+              borderRadius: 'var(--border-radius)',
+              cursor: disabled || loadingProductos ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: 'var(--shadow-md)',
+              opacity: disabled || loadingProductos ? 0.6 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!disabled && !loadingProductos) {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'var(--shadow-md)'
+            }}
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus style={{ width: '1rem', height: '1rem' }} />
             Agregar Producto
-          </Button>
+          </button>
         </div>
 
         {errors.detalle && (
-          <p className="text-sm text-red-600 mb-4">{errors.detalle}</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', marginBottom: '1rem' }}>{errors.detalle}</p>
         )}
 
         {detalle.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-            <p>No hay productos agregados</p>
-            <p className="text-sm">Haz clic en "Agregar Producto" para comenzar</p>
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--primary-500)' }}>
+            <Package style={{ width: '3rem', height: '3rem', margin: '0 auto 0.5rem', color: 'var(--primary-400)' }} />
+            <p style={{ margin: '0.5rem 0' }}>No hay productos agregados</p>
+            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en "Agregar Producto" para comenzar</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {detalle.map((item, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4">
-                <div className="grid grid-cols-12 gap-4">
+              <div key={index} style={{
+                border: '1px solid var(--primary-200)',
+                borderRadius: 'var(--border-radius)',
+                padding: '1rem',
+                background: 'rgba(255, 255, 255, 0.5)'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(12, 1fr)',
+                  gap: '1rem'
+                }}>
                   {/* Producto Selector */}
-                  <div className="col-span-12 md:col-span-5">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div style={{ gridColumn: 'span 12 / span 12' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: 'var(--primary-700)',
+                      marginBottom: '0.25rem'
+                    }}>
                       Producto
                     </label>
                     <select
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
                       disabled={disabled}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors[`producto_${index}`] ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        border: errors[`producto_${index}`] ? '1px solid var(--red-500)' : '1px solid var(--primary-300)',
+                        borderRadius: 'var(--border-radius)',
+                        fontSize: '1rem',
+                        background: 'white',
+                        color: 'var(--primary-800)',
+                        cursor: 'pointer'
+                      }}
                     >
                       <option value="">Seleccionar producto...</option>
-                      {productos.map(producto => (
-                        <option key={producto.id} value={producto.id}>
-                          {producto.codigo} - {producto.nombre} (Stock: {producto.stock_actual})
-                        </option>
-                      ))}
+                      {productos.map(producto => {
+                        const reservado = producto.stock_reservado ?? 0
+                        const disponible = (producto.stock_actual ?? 0) - reservado
+                        const warning = disponible <= 0
+                        return (
+                          <option key={producto.id} value={producto.id}>
+                            {warning ? '⚠️ ' : ''}
+                            {producto.codigo} - {producto.nombre} (Stock: {producto.stock_actual} | Reservado: {reservado} | Disp: {disponible})
+                          </option>
+                        )
+                      })}
                     </select>
                     {errors[`producto_${index}`] && (
-                      <p className="text-xs text-red-600 mt-1">{errors[`producto_${index}`]}</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                        {errors[`producto_${index}`]}
+                      </p>
                     )}
                   </div>
 
                   {/* Cantidad */}
-                  <div className="col-span-6 md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div style={{ gridColumn: 'span 4 / span 4' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: 'var(--primary-700)',
+                      marginBottom: '0.25rem'
+                    }}>
                       Cantidad
                     </label>
                     <Input
                       type="number"
-                      min="0.01"
-                      step="0.01"
+                      min="1"
+                      step="1"
                       value={item.cantidad}
-                      onChange={(e) => handleCantidadChange(index, parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleCantidadChange(index, parseInt(e.target.value || '0', 10))}
                       disabled={disabled}
-                      className={errors[`cantidad_${index}`] ? 'border-red-500' : ''}
+                      style={{
+                        borderColor: errors[`cantidad_${index}`] ? 'var(--red-500)' : undefined
+                      }}
                     />
                     {errors[`cantidad_${index}`] && (
-                      <p className="text-xs text-red-600 mt-1">{errors[`cantidad_${index}`]}</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                        {errors[`cantidad_${index}`]}
+                      </p>
+                    )}
+                    {item.producto && (
+                      (() => {
+                        const reservado = item.producto?.stock_reservado ?? 0
+                        const disponible = (item.producto.stock_actual ?? 0) - reservado
+                        const warn = item.cantidad > disponible
+                        return (
+                          <p style={{ fontSize: '0.75rem', color: warn ? 'var(--red-600)' : 'var(--primary-600)', marginTop: '0.15rem', fontWeight: warn ? 600 : 400 }}>
+                            {warn ? '⚠️ ' : ''}
+                            Stock: {item.producto.stock_actual ?? 0} • Reservado: {reservado} • Disponible: {disponible}
+                          </p>
+                        )
+                      })()
                     )}
                   </div>
 
                   {/* Precio Unitario */}
-                  <div className="col-span-6 md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div style={{ gridColumn: 'span 4 / span 4' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: 'var(--primary-700)',
+                      marginBottom: '0.25rem'
+                    }}>
                       Precio Unit.
                     </label>
                     <Input
@@ -330,38 +515,68 @@ export default function PedidoForm({
                       value={item.precio_unitario}
                       onChange={(e) => handlePrecioChange(index, parseFloat(e.target.value) || 0)}
                       disabled={disabled}
-                      className={errors[`precio_${index}`] ? 'border-red-500' : ''}
+                      style={{
+                        borderColor: errors[`precio_${index}`] ? 'var(--red-500)' : undefined
+                      }}
                     />
                     {errors[`precio_${index}`] && (
-                      <p className="text-xs text-red-600 mt-1">{errors[`precio_${index}`]}</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                        {errors[`precio_${index}`]}
+                      </p>
                     )}
                   </div>
 
                   {/* Subtotal */}
-                  <div className="col-span-10 md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <div style={{ gridColumn: 'span 3 / span 3' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: 'var(--primary-700)',
+                      marginBottom: '0.25rem'
+                    }}>
                       Subtotal
                     </label>
                     <Input
                       type="text"
                       value={`S/ ${item.subtotal.toFixed(2)}`}
                       disabled
-                      className="bg-gray-50"
+                      style={{ background: 'var(--primary-50)' }}
                     />
                   </div>
 
                   {/* Remove Button */}
-                  <div className="col-span-2 md:col-span-1 flex items-end">
-                    <Button
+                  <div style={{ gridColumn: 'span 1 / span 1', display: 'flex', alignItems: 'flex-end' }}>
+                    <button
                       type="button"
-                      variant="ghost"
-                      size="sm"
                       onClick={() => handleRemoveItem(index)}
                       disabled={disabled}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0.5rem',
+                        color: 'var(--red-600)',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--border-radius)',
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        opacity: disabled ? 0.5 : 1
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!disabled) {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                          e.currentTarget.style.color = 'var(--red-700)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.color = 'var(--red-600)'
+                      }}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      <Trash2 style={{ width: '1.125rem', height: '1.125rem' }} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -371,18 +586,43 @@ export default function PedidoForm({
       </div>
 
       {/* Totales Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Totales</h3>
-        <div className="space-y-2 max-w-md ml-auto">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Subtotal:</span>
-            <span className="font-medium">S/ {subtotal.toFixed(2)}</span>
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-md)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          marginBottom: '1rem'
+        }}>Totales</h3>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.5rem',
+          maxWidth: '28rem',
+          marginLeft: 'auto'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+            <span style={{ color: 'var(--primary-600)' }}>Subtotal:</span>
+            <span style={{ fontWeight: '500' }}>S/ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">IGV (18%):</span>
-            <span className="font-medium">S/ {igv.toFixed(2)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+            <span style={{ color: 'var(--primary-600)' }}>IGV (18%):</span>
+            <span style={{ fontWeight: '500' }}>S/ {igv.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-lg font-bold border-t pt-2">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: '1.125rem',
+            fontWeight: '700',
+            borderTop: '1px solid var(--primary-200)',
+            paddingTop: '0.5rem'
+          }}>
             <span>Total:</span>
             <span>S/ {total.toFixed(2)}</span>
           </div>
@@ -390,10 +630,28 @@ export default function PedidoForm({
       </div>
 
       {/* Additional Info Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Adicional</h3>
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '1.5rem',
+        boxShadow: 'var(--shadow-md)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          marginBottom: '1rem'
+        }}>Información Adicional</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: 'var(--primary-700)',
+            marginBottom: '0.25rem'
+          }}>
             Notas (Opcional)
           </label>
           <Textarea
@@ -407,23 +665,23 @@ export default function PedidoForm({
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={submitting}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          disabled={disabled || submitting}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          {submitting ? 'Guardando...' : pedido ? 'Actualizar Pedido' : 'Crear Pedido'}
-        </Button>
-      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '1rem' }}>
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={submitting}
+        className="btn btn-outline"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        disabled={disabled || submitting || stockAlerts.length > 0}
+        className="btn btn-primary"
+      >
+        {submitting ? 'Guardando...' : pedido ? 'Actualizar Pedido' : 'Crear Pedido'}
+      </button>
+    </div>
     </form>
   )
 }

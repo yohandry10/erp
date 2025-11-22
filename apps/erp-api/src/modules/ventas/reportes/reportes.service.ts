@@ -63,7 +63,7 @@ export class ReportesService {
         acc[clienteId] = {
           cliente_id: clienteId,
           cliente_nombre: (pedido.clientes as any).razon_social,
-          cliente_documento: (pedido.clientes as any).documento_numero,
+          cliente_documento: (pedido.clientes as any).numero_documento,
           periodo: `${fechaDesde || 'Inicio'} - ${fechaHasta || 'Hoy'}`,
           moneda: 'PEN',
           estado: estadoFiltro || 'Todos',
@@ -140,7 +140,7 @@ export class ReportesService {
         id: cot.id,
         numero: cot.numero,
         cliente_nombre: (cot.clientes as any).razon_social,
-        cliente_documento: (cot.clientes as any).documento_numero,
+        cliente_documento: (cot.clientes as any).numero_documento,
         fecha: cot.fecha,
         fecha_vencimiento: cot.fecha_vencimiento,
         estado: cot.estado,
@@ -325,7 +325,7 @@ export class ReportesService {
         acc[clienteId] = {
           cliente_id: clienteId,
           cliente_nombre: (pedido.clientes as any).razon_social,
-          cliente_documento: (pedido.clientes as any).documento_numero,
+          cliente_documento: (pedido.clientes as any).numero_documento,
           total_facturacion: 0,
           cantidad_pedidos: 0,
           cantidad_facturas: 0,
@@ -873,7 +873,7 @@ export class ReportesService {
         fecha_vencimiento,
         estado,
         monto_pendiente,
-        clientes!inner(razon_social, documento_numero)
+        clientes!inner(razon_social, numero_documento)
       `,
       )
       .eq('tenant_id', tenantId)
@@ -933,7 +933,7 @@ export class ReportesService {
         monto: this.round2(monto),
         diasMora: diasEnMora > 0 ? diasEnMora : 0,
         estado: cuenta.estado,
-        cliente_documento: (cuenta.clientes as any)?.documento_numero ?? null,
+        cliente_documento: (cuenta.clientes as any)?.numero_documento ?? null,
       };
     });
 

@@ -105,7 +105,14 @@ export class EnhancedEventBusService {
   }
 
   async emitMovimientoStock(data: any, options?: { metadata?: Record<string, any> }) {
-    await this.emit('stock.movimiento', data, {
+    const tenantId =
+      data?.tenantId ?? data?.tenant_id ?? options?.metadata?.tenantId ?? options?.metadata?.tenant_id ?? null;
+    const payload = {
+      ...data,
+      tenantId,
+    };
+
+    await this.emit('stock.movimiento', payload, {
       module: 'inventario',
       aggregateType: 'producto',
       aggregateId: data.productoId,

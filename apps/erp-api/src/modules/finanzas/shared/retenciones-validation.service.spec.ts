@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { RetencionesValidationService } from '../retenciones-validation.service';
+import { RetencionesValidationService } from './retenciones-validation.service';
 import { SupabaseService } from '../../../../shared/supabase/supabase.service';
 
 /**
@@ -138,7 +138,9 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(false);
-      expect(resultado.errores).toContain(expect.stringContaining('Retención aplicada pero tasa es 0%'));
+      expect(resultado.errores).toEqual(
+        expect.arrayContaining([expect.stringContaining('Retención aplicada'), expect.stringContaining('tasa es 0%')])
+      );
     });
 
     it('debe detectar error cuando ajustes exceden el total', async () => {
@@ -150,7 +152,7 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(false);
-      expect(resultado.errores).toContain(expect.stringContaining('excede el total'));
+      expect(resultado.errores).toEqual(expect.arrayContaining([expect.stringContaining('excede el total')]));
     });
 
     it('debe priorizar configuración de cliente sobre empresa', async () => {

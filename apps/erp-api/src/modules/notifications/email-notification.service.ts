@@ -99,12 +99,14 @@ export class EmailNotificationService {
       },
     };
 
-    const eventId = await this.outboxService.persistEvent(
+    const eventId = await this.outboxService.persistEventStandard({
       tenantId,
-      'email.send',
+      eventType: 'email.send',
+      aggregateType: 'notification',
+      aggregateId: eventData.aggregateId || emailData.to,
       eventData,
-      5, // Máximo 5 reintentos
-    );
+      maxRetries: 5,
+    });
 
     // Agregar eventId al metadata para poder rastrearlo
     eventData.metadata.eventId = eventId;

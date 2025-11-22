@@ -39,6 +39,7 @@ import { ValidationModule } from './modules/validations/validation.module';
 import { TenantMiddleware } from './common/middleware/tenant.middleware'; // ✅ MULTI-TENANT
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor'; // ✅ MULTI-TENANT
 import { ClientesModule } from './modules/ventas/clientes/clientes.module';
+import { CotizacionesModule as VentasCotizacionesModule } from './modules/ventas/cotizaciones/cotizaciones.module';
 import { PedidosModule } from './modules/ventas/pedidos/pedidos.module';
 import { ReportesModule } from './modules/ventas/reportes/reportes.module';
 import { RmaModule } from './modules/ventas/rma/rma.module';
@@ -49,6 +50,8 @@ import { SunatRetryModule } from './modules/sunat-retry/sunat-retry.module';
 import { CacheModule } from './shared/cache/cache.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
+import { ImportExportModule } from './modules/import-export/import-export.module';
+import { CajasModule } from './modules/cajas/cajas.module';
 
 @Module({
   imports: [
@@ -90,12 +93,15 @@ import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
     PaisesModule,
     ValidationModule,
     ClientesModule,
+    VentasCotizacionesModule,
     PedidosModule,
     ReportesModule,
     RmaModule,
     OutboxModule, // 🔴 CRÍTICO: Módulo de outbox pattern para eventos persistentes
     SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana
+    ImportExportModule,
+    CajasModule,
   ],
   controllers: [AppController],
   providers: [

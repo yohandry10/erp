@@ -31,7 +31,18 @@ export class CPEIntegrationService {
   async generarFacturaDesdePedido(
     pedido: PedidoVenta & { detalle: PedidoDetalle[] },
     tenantId: string,
-  ): Promise<{ factura_id: string; estado: string; warnings?: string[]; serie?: string; numero?: number; moneda?: string; fecha_emision?: string; total: number }> {
+  ): Promise<{
+    factura_id: string;
+    estado: string;
+    warnings?: string[];
+    serie?: string;
+    numero?: number;
+    moneda?: string;
+    fecha_emision?: string;
+    total: number;
+    documento_id?: string | null;
+    cpe_id?: string;
+  }> {
     this.logger.log(`Generando factura desde pedido ${pedido.id}`);
 
     const startedAt = Date.now();
@@ -77,6 +88,7 @@ export class CPEIntegrationService {
       // 6. Llamar a CPEService para generar XML/UBL 2.1, QR, hash, PDF (Requirement 10.3, 19.8)
       this.logger.log('Llamando a CPEService para crear factura');
       const factura = await this.cpeService.create(facturaData, tenantId);
+      const documentoId = (factura as any).documento_id ?? (factura as any).documentoId ?? null;
 
       this.logger.log(`✅ Factura generada exitosamente: ${factura.id}`);
 
@@ -99,6 +111,7 @@ export class CPEIntegrationService {
 
       return {
         factura_id: factura.id,
+        cpe_id: factura.id,
         estado: resultado.estado,
         warnings: resultado.warnings,
         serie: factura.serie ?? facturaData.serie,
@@ -106,6 +119,7 @@ export class CPEIntegrationService {
         moneda: factura.moneda ?? facturaData.moneda ?? 'PEN',
         fecha_emision: (factura as any).fecha_emision ?? new Date().toISOString().split('T')[0],
         total: factura.total_venta ?? facturaData.total_venta,
+        documento_id: documentoId,
       };
     } catch (error) {
       this.logger.error(`Error generando factura desde pedido ${pedido.id}:`, error);
@@ -139,22 +153,50 @@ export class CPEIntegrationService {
     const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
 
     // Mapear items del pedido a items de factura
-    const items: ItemFacturaDto[] = pedido.detalle.map((item, index) => {
-      const valorVenta = item.subtotal;
+    const items: ItemFacturaDto[] = pedido.detalle.map((item) => {
+      const cantidad = Number(item.cantidad ?? 0);
+      const precioUnitario = Number(item.precio_unitario ?? 0);
+      const valorVenta = Number(item.subtotal ?? cantidad * precioUnitario);
       const igv = valorVenta * tasaIgv;
       const precioVenta = valorVenta + igv;
 
       return {
         codigo: item.producto_id.substring(0, 8), // Código simplificado
         descripcion: item.descripcion,
-        cantidad: item.cantidad,
+        cantidad,
         unidad: 'NIU', // Unidad por defecto (SUNAT)
-        precio_unitario: item.precio_unitario,
+        precio_unitario: precioUnitario,
         valor_venta: valorVenta,
-        igv: igv,
+        igv,
         precio_venta: precioVenta,
       };
     });
+
+    const numeroDocumentoCliente = ((
+      cliente.documento_numero ??
+      cliente.numero_documento ??
+      cliente.documento ??
+      ''
+    )
+      ?.toString()
+      .trim()) || null;
+
+    if (!numeroDocumentoCliente) {
+      throw new BadRequestException({
+        message: 'El cliente seleccionado no tiene un documento tributario configurado',
+        code: 'CLIENTE_SIN_DOCUMENTO',
+      });
+    }
+
+    const tipoDocumentoSunat = this.mapearTipoDocumentoSunat(cliente.documento_tipo);
+    const razonSocialCliente = cliente.razon_social || cliente.nombre_comercial;
+
+    if (!razonSocialCliente) {
+      throw new BadRequestException({
+        message: 'El cliente no tiene una razón social configurada',
+        code: 'CLIENTE_SIN_RAZON_SOCIAL',
+      });
+    }
 
     // Construir DTO de factura
     const facturaDto: CreateFacturaDto = {
@@ -163,15 +205,15 @@ export class CPEIntegrationService {
       tipo_documento: TipoDocumento.FACTURA,
       ruc_emisor: empresaConfig.ruc,
       razon_social_emisor: empresaConfig.razon_social,
-      tipo_documento_receptor: cliente.documento_tipo === 'RUC' ? '6' : '1', // 6=RUC, 1=DNI
-      documento_receptor: cliente.documento_numero,
-      razon_social_receptor: cliente.razon_social,
-      direccion_receptor: cliente.direccion || '',
+      tipo_documento_receptor: tipoDocumentoSunat,
+      documento_receptor: numeroDocumentoCliente,
+      razon_social_receptor: razonSocialCliente,
+      direccion_receptor: cliente.direccion || 'DIRECCIÓN NO REGISTRADA',
       moneda: 'PEN', // Por ahora solo soles
       items: items,
-      total_gravadas: pedido.subtotal,
-      total_igv: pedido.igv,
-      total_venta: pedido.total,
+      total_gravadas: Number(pedido.subtotal ?? 0),
+      total_igv: Number(pedido.igv ?? 0),
+      total_venta: Number(pedido.total ?? 0),
     };
 
     return facturaDto;
@@ -223,7 +265,22 @@ export class CPEIntegrationService {
   private async obtenerCliente(clienteId: string, tenantId: string): Promise<any> {
     const { data: cliente, error } = await this.supabase.getClient()
       .from('clientes')
-      .select('*')
+      .select(
+        `
+          id,
+          tenant_id,
+          tipo,
+          documento_tipo,
+          documento_numero:numero_documento,
+          razon_social,
+          nombre_comercial,
+          direccion,
+          email,
+          telefono,
+          limite_credito,
+          permite_morosidad
+        `,
+      )
       .eq('id', clienteId)
       .eq('tenant_id', tenantId)
       .single();
@@ -233,6 +290,30 @@ export class CPEIntegrationService {
     }
 
     return cliente;
+  }
+
+  private mapearTipoDocumentoSunat(tipo?: string | null): string {
+    if (!tipo) {
+      return '0';
+    }
+
+    const normalizado = tipo.toString().trim().toUpperCase();
+
+    // Si ya viene con código SUNAT (numérico) lo respetamos
+    if (/^\d+$/.test(normalizado) && normalizado.length <= 2) {
+      return normalizado;
+    }
+
+    const map: Record<string, string> = {
+      RUC: '6',
+      DNI: '1',
+      CE: '4',
+      CARNET_EXTRANJERIA: '4',
+      PASAPORTE: '7',
+      PTP: '4',
+    };
+
+    return map[normalizado] ?? '0';
   }
 
   /**

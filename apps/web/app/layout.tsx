@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { SessionProvider } from '@/components/providers/session-provider'
+import { QueryProvider } from '@/components/providers/query-provider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { TenantProvider } from '@/contexts/TenantContext'
 import { Toaster } from '@/components/ui/toaster'
@@ -25,15 +26,17 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <div className="app-wrapper">
           <ErrorBoundary>
-            <AuthProvider>
-              <SessionProvider session={null}>
-                <TenantProvider>
-                  {children}
-                  <Toaster />
-                  <HotToaster />
-                </TenantProvider>
-              </SessionProvider>
-            </AuthProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <SessionProvider session={null}>
+                  <TenantProvider>
+                    {children}
+                    <Toaster />
+                    <HotToaster />
+                  </TenantProvider>
+                </SessionProvider>
+              </AuthProvider>
+            </QueryProvider>
           </ErrorBoundary>
         </div>
         <div id="modal-root" />

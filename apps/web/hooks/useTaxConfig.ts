@@ -19,11 +19,21 @@ export function useTaxConfig() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['tax-config'],
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: TaxConfig }>('/api/configuracion-fiscal')
-      return response.data
+      const response = await api.get('/api/configuracion-fiscal')
+      if (response?.success && response?.data) {
+        return response.data as TaxConfig
+      }
+      // Retornar valores por defecto si no hay respuesta
+      return {
+        tasa_igv: 0.18,
+        moneda_principal: 'PEN',
+        pais_id: 1,
+        impuesto_principal_nombre: 'IGV',
+        impuesto_principal_porcentaje: 0.18,
+      } as TaxConfig
     },
     staleTime: 1000 * 60 * 60, // Cache por 1 hora (la configuración fiscal no cambia frecuentemente)
-    cacheTime: 1000 * 60 * 60 * 24, // Mantener en cache por 24 horas
+    gcTime: 1000 * 60 * 60 * 24, // Mantener en cache por 24 horas (antes era cacheTime)
   })
 
   /**

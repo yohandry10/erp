@@ -19,7 +19,7 @@ import { CrearCuentaBancariaDto, ActualizarCuentaBancariaDto, ListarMovimientosQ
 
 @ApiTags('Finanzas - Bancos')
 @ApiBearerAuth()
-@Controller('api/finanzas/bancos')
+@Controller('finanzas/bancos')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: bancos requiere permisos granulares.
 export class BancosController {
   constructor(private readonly bancosService: BancosService) {}

@@ -3,6 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { EmailService } from './email.service';
 import { EmailProvider } from './interfaces/email-config.interface';
 
+jest.mock('nodemailer', () => {
+  const sendMail = jest.fn().mockResolvedValue({ messageId: 'test' });
+  const verify = jest.fn().mockResolvedValue(true);
+
+  return {
+    __esModule: true,
+    createTransport: jest.fn(() => ({ sendMail, verify })),
+  };
+});
+
 describe('EmailService', () => {
   let service: EmailService;
   let configService: ConfigService;

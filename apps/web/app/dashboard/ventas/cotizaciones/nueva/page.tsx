@@ -41,20 +41,43 @@ export default function NuevaCotizacionPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button
           onClick={() => router.back()}
-          className="hover:bg-gray-100"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0.5rem',
+            color: 'var(--primary-700)',
+            background: 'rgba(255, 255, 255, 0.8)',
+            border: '1px solid var(--primary-200)',
+            borderRadius: 'var(--border-radius)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--primary-50)'
+            e.currentTarget.style.borderColor = 'var(--primary-300)'
+            e.currentTarget.style.transform = 'translateX(-2px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'
+            e.currentTarget.style.borderColor = 'var(--primary-200)'
+            e.currentTarget.style.transform = 'translateX(0)'
+          }}
         >
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+          <ArrowLeft style={{ width: '1.125rem', height: '1.125rem' }} />
+        </button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Nueva Cotización</h1>
-          <p className="text-gray-600 mt-1">Crea una nueva cotización de venta</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary-900)', margin: 0 }}>
+            Nueva Cotización
+          </h1>
+          <p style={{ fontSize: '1rem', color: 'var(--primary-600)', margin: '0.25rem 0 0 0' }}>
+            Crea una nueva cotización de venta
+          </p>
         </div>
       </div>
 

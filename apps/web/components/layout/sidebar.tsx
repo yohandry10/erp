@@ -97,7 +97,7 @@ const menuItems: MenuItem[] = [
     permission: {
       modulo: 'inventario',
       accion: 'read',
-      recurso: 'productos'
+      recurso: 'stats'
     },
     submenu: [
       {
@@ -138,6 +138,26 @@ const menuItems: MenuItem[] = [
           modulo: 'inventario',
           accion: 'read',
           recurso: 'kardex'
+        }
+      },
+      {
+        title: 'Órdenes de Preparación',
+        href: '/dashboard/inventario/logistica/ordenes-pendientes',
+        icon: Package,
+        permission: {
+          modulo: 'inventario',
+          accion: 'ver',
+          recurso: 'logistica'
+        }
+      },
+      {
+        title: 'Listo para Despacho',
+        href: '/dashboard/inventario/logistica/listo-despacho',
+        icon: Truck,
+        permission: {
+          modulo: 'inventario',
+          accion: 'ver',
+          recurso: 'logistica'
         }
       }
     ]
@@ -324,8 +344,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     }
   }, [isSubmenuActive])
 
-  // Check permission if required
-  const { hasPermission, loading } = item.permission
+  // Check permission if required (only for items WITHOUT submenu)
+  // Items with submenu will be shown if user has access to at least one subitem
+  const { hasPermission, loading } = item.permission && !item.submenu
     ? usePermission(item.permission.modulo, item.permission.accion, item.permission.recurso)
     : { hasPermission: true, loading: false }
 
@@ -334,10 +355,14 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     return null
   }
 
-  // Filter items based on permissions (super-admins bypass this)
-  if (item.permission && !isSuperAdmin && !loading && !hasPermission) {
+  // For items WITHOUT submenu, filter based on permissions
+  if (!item.submenu && item.permission && !isSuperAdmin && !loading && !hasPermission) {
     return null
   }
+
+  // For items WITH submenu, always show the parent
+  // The submenu items will handle their own permission checks
+  // If all submenu items are hidden, the parent will still show (acceptable UX)
 
   // Show loading state for items being checked
   if (loading && item.permission) {

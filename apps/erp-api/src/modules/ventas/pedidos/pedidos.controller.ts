@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -33,7 +34,7 @@ import { EstadoPedido } from './entities';
  */
 @ApiTags('Ventas - Pedidos')
 @ApiBearerAuth()
-@Controller('api/ventas/pedidos')
+@Controller('ventas/pedidos')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: exigir permisos granulares en pedidos.
 export class PedidosController {
   constructor(private readonly pedidosService: PedidosService) {}
@@ -61,7 +62,7 @@ export class PedidosController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.pedidosService.findAll(tenantId, {
+    const result = await this.pedidosService.findAll(tenantId, {
       estado,
       cliente_id,
       fecha_desde,
@@ -70,6 +71,11 @@ export class PedidosController {
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     });
+    
+    return {
+      success: true,
+      ...result,
+    };
   }
 
   /**
@@ -92,7 +98,12 @@ export class PedidosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.pedidosService.create(createPedidoDto, tenantId, user?.id);
+    const pedido = await this.pedidosService.create(createPedidoDto, tenantId, user?.id);
+    return {
+      success: true,
+      data: pedido,
+      message: `Pedido ${pedido.numero} creado exitosamente`,
+    };
   }
 
   /**
@@ -165,7 +176,11 @@ export class PedidosController {
   @ApiResponse({ status: 403, description: 'Sin permisos' })
   @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
   async findOne(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    return this.pedidosService.findOne(id, tenantId);
+    const pedido = await this.pedidosService.findOne(id, tenantId);
+    return {
+      success: true,
+      data: pedido,
+    };
   }
 
   /**
@@ -302,5 +317,64 @@ export class PedidosController {
   async listarGresDelPedido(@Param('id') id: string, @CurrentTenant() tenantId: string) {
     const data = await this.pedidosService.obtenerGreAsociadas(id, tenantId);
     return { success: true, data };
+  }
+  /**
+   * POST /api/ventas/pedidos/:id/generar-documento - Generar documento fiscal desde pedido
+   * Requirements: Flujo completo Ventas → Documentos → CPE → CxC → Contabilidad
+   */
+  @Post(':id/generar-documento')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Generar documento fiscal desde pedido',
+    description: 'Genera una factura o boleta desde un pedido confirmado. Crea automáticamente el CPE, CxC y asiento contable.',
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Documento generado exitosamente con CPE y CxC',
+    schema: {
+      example: {
+        success: true,
+        documento: {
+          id: 'uuid',
+          tipo_documento: '01',
+          serie: 'F001',
+          numero: '00000123',
+          total: 1180.00
+        },
+        cpe: {
+          id: 'uuid',
+          estado_sunat: 'PENDIENTE'
+        },
+        cxc: {
+          id: 'uuid',
+          monto_pendiente: 1180.00
+        },
+        message: 'Documento F001-00000123 generado exitosamente'
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Pedido no puede ser facturado o ya tiene documento' })
+  @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Sin permisos' })
+  @ApiResponse({ status: 404, description: 'Pedido no encontrado' })
+  async generarDocumento(
+    @Param('id') id: string,
+    @Body('tipo_documento') tipoDocumento: '01' | '03',
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    // Validar tipo de documento
+    if (!tipoDocumento || (tipoDocumento !== '01' && tipoDocumento !== '03')) {
+      throw new BadRequestException(
+        'tipo_documento es requerido y debe ser "01" (Factura) o "03" (Boleta)'
+      );
+    }
+
+    return this.pedidosService.generarDocumentoDesdePedido(
+      id,
+      tipoDocumento,
+      tenantId,
+      user?.id,
+    );
   }
 }

@@ -4,6 +4,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService } from '../events/event-bus.service';
 import { PeriodosService, EstadoPeriodo } from '../../modules/contabilidad/services/periodos.service';
 import { BadRequestException } from '@nestjs/common';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 describe('AccountingEntriesService - Period Validation', () => {
   let service: AccountingEntriesService;
@@ -48,6 +49,11 @@ describe('AccountingEntriesService - Period Validation', () => {
     obtenerPeriodo: jest.fn()
   };
 
+  const mockTenantContextService = {
+    getTenantId: jest.fn(() => 'test-tenant-id'),
+    getUserId: jest.fn(() => 'user-1'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,6 +69,10 @@ describe('AccountingEntriesService - Period Validation', () => {
         {
           provide: PeriodosService,
           useValue: mockPeriodosService
+        },
+        {
+          provide: TenantContextService,
+          useValue: mockTenantContextService,
         }
       ],
     }).compile();

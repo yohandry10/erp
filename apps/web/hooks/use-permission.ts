@@ -9,8 +9,114 @@ interface Permission {
   tenant_id: string
   modulo: string
   accion: string
-  recurso: string
+  recurso: string | null
   descripcion?: string
+}
+
+const READ_EQUIVALENTS = ['read', 'ver', 'view', 'listar', 'consultar']
+const WRITE_EQUIVALENTS = [
+  'write',
+  'crear',
+  'create',
+  'editar',
+  'update',
+  'actualizar',
+  'modificar',
+  'registrar',
+  'generar',
+  'emitir',
+  'convertir_pedido',
+  'generar_factura',
+  'generar_nota_credito',
+  'preparar',
+  'despachar',
+  'recepcionar',
+  'resolver',
+  'validar_ruc',
+]
+const DELETE_EQUIVALENTS = ['delete', 'eliminar', 'anular', 'cancelar']
+const APPROVE_EQUIVALENTS = ['approve', 'aprobar', 'autorizar']
+const MANAGE_EQUIVALENTS = ['manage', 'administrar', 'configurar']
+
+const ACTION_EQUIVALENCE: Record<string, string[]> = {
+  read: READ_EQUIVALENTS,
+  ver: READ_EQUIVALENTS,
+  view: READ_EQUIVALENTS,
+  listar: READ_EQUIVALENTS,
+  consultar: READ_EQUIVALENTS,
+  write: WRITE_EQUIVALENTS,
+  crear: WRITE_EQUIVALENTS,
+  create: WRITE_EQUIVALENTS,
+  editar: WRITE_EQUIVALENTS,
+  update: WRITE_EQUIVALENTS,
+  actualizar: WRITE_EQUIVALENTS,
+  modificar: WRITE_EQUIVALENTS,
+  registrar: WRITE_EQUIVALENTS,
+  generar: WRITE_EQUIVALENTS,
+  emitir: WRITE_EQUIVALENTS,
+  convertir_pedido: WRITE_EQUIVALENTS,
+  generar_factura: WRITE_EQUIVALENTS,
+  generar_nota_credito: WRITE_EQUIVALENTS,
+  preparar: WRITE_EQUIVALENTS,
+  despachar: WRITE_EQUIVALENTS,
+  recepcionar: WRITE_EQUIVALENTS,
+  resolver: WRITE_EQUIVALENTS,
+  validar_ruc: WRITE_EQUIVALENTS,
+  delete: DELETE_EQUIVALENTS,
+  eliminar: DELETE_EQUIVALENTS,
+  anular: DELETE_EQUIVALENTS,
+  cancelar: DELETE_EQUIVALENTS,
+  approve: APPROVE_EQUIVALENTS,
+  aprobar: APPROVE_EQUIVALENTS,
+  autorizar: APPROVE_EQUIVALENTS,
+  manage: MANAGE_EQUIVALENTS,
+  administrar: MANAGE_EQUIVALENTS,
+  configurar: MANAGE_EQUIVALENTS,
+}
+
+const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? ''
+const normalizeResource = (value?: string | null) => {
+  const normalized = normalize(value)
+  return normalized && normalized !== '__global__' ? normalized : '__global__'
+}
+
+const matchesAction = (permissionAction: string, requestedAction: string) => {
+  const normalizedRequested = normalize(requestedAction)
+  const normalizedPermission = normalize(permissionAction)
+  if (!normalizedRequested || !normalizedPermission) {
+    return false
+  }
+
+  const equivalents =
+    ACTION_EQUIVALENCE[normalizedRequested] || [normalizedRequested]
+  return equivalents.includes(normalizedPermission)
+}
+
+const matchesResource = (
+  permissionResource: string | null | undefined,
+  requestedResource?: string
+) => {
+  const normalizedPermission = normalizeResource(permissionResource)
+  const normalizedRequested = normalizeResource(requestedResource ?? '')
+
+  if (normalizedRequested === '__global__') {
+    // Para recursos globales aceptamos permisos globales o comodín
+    return (
+      normalizedPermission === '__global__' || normalizedPermission === '*'
+    )
+  }
+
+  if (normalizedPermission === '*' || normalizedPermission === normalizedRequested) {
+    return true
+  }
+
+  // Si el permiso es global pero se solicita un recurso específico,
+  // asumimos que todavía aplica (permiso amplio concedido).
+  if (normalizedPermission === '__global__') {
+    return true
+  }
+
+  return false
 }
 
 // Cache for permissions with TTL
@@ -65,15 +171,18 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
         userPermissions = cached.permissions
       } else {
         // Fetch permissions from API
+        console.log(`[usePermission] Fetching permissions for user ${user.id}`)
         const response = await get(`/usuarios-sistema/${user.id}/permissions`)
         
         if (!response) {
+          console.error(`[usePermission] No response from permissions API for user ${user.id}`)
           setHasPermission(false)
           setLoading(false)
           return
         }
 
         userPermissions = Array.isArray(response) ? response : (response.data || [])
+        console.log(`[usePermission] Fetched ${userPermissions.length} permissions for user ${user.id}`, userPermissions)
 
         // Update cache
         permissionCache.set(cacheKey, {
@@ -82,13 +191,22 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
         })
       }
 
-      // Check if user has the required permission
-      const hasRequiredPermission = userPermissions.some(
-        (permission) =>
-          permission.modulo === modulo &&
-          permission.accion === accion &&
-          permission.recurso === recurso
-      )
+      const normalizedModule = normalize(modulo)
+      const normalizedAction = normalize(accion)
+      const normalizedResource = normalizeResource(recurso)
+
+      // Check if user has the required permission (with alias support)
+      const hasRequiredPermission = userPermissions.some((permission) => {
+        if (normalize(permission.modulo) !== normalizedModule) {
+          return false
+        }
+
+        if (!matchesAction(permission.accion, normalizedAction)) {
+          return false
+        }
+
+        return matchesResource(permission.recurso, normalizedResource)
+      })
 
       setHasPermission(hasRequiredPermission)
     } catch (error) {

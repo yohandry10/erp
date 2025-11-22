@@ -9,8 +9,46 @@ export { Permission, RolePermission } from './types';
 export class PermissionService {
   private permissionCache: Map<string, { permissions: string[]; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private readonly actionGroups: string[][] = [
+    ['read', 'ver', 'view', 'listar', 'consultar'],
+    ['write', 'crear', 'create', 'editar', 'update', 'actualizar', 'modificar', 'registrar', 'generar', 'emitir'],
+    ['delete', 'eliminar', 'anular', 'cancelar'],
+    ['approve', 'aprobar', 'autorizar'],
+    ['manage', 'administrar', 'configurar'],
+    ['convertir_pedido'],
+    ['generar_factura'],
+    ['generar_nota_credito'],
+    ['preparar'],
+    ['despachar'],
+    ['recepcionar'],
+    ['resolver'],
+    ['validar_ruc'],
+  ];
 
   constructor(private readonly supabase: SupabaseService) {}
+
+  private normalize(value?: string | null): string {
+    return value?.trim().toLowerCase() ?? '';
+  }
+
+  private normalizeResource(value?: string | null): string {
+    const normalized = this.normalize(value);
+    if (!normalized || normalized === '__global__') {
+      return '__global__';
+    }
+    return normalized;
+  }
+
+  private findActionGroup(action: string): string[] {
+    const normalized = this.normalize(action);
+    return this.actionGroups.find(group => group.includes(normalized)) || [normalized];
+  }
+
+  private actionsMatch(requested: string, actual: string): boolean {
+    const requestedGroup = this.findActionGroup(requested);
+    const actualGroup = this.findActionGroup(actual);
+    return requestedGroup.some(action => actualGroup.includes(action));
+  }
 
   /**
    * B1: Invalidar cache de permisos para un usuario específico
@@ -238,7 +276,11 @@ export class PermissionService {
     }
 
     // Generate cache key
-    const cacheKey = `${userId}:${tenantId}:${modulo}:${accion}:${recurso}`;
+    const normalizedModule = this.normalize(modulo);
+    const normalizedAction = this.normalize(accion);
+    const normalizedResource = this.normalizeResource(recurso);
+
+    const cacheKey = `${userId}:${tenantId}:${normalizedModule}:${normalizedAction}:${normalizedResource}`;
     
     // Check cache
     const cached = this.permissionCache.get(cacheKey);
@@ -269,7 +311,7 @@ export class PermissionService {
     // HARDENING B2: Validar explícitamente que los roles pertenezcan al tenant
     const { data: validRoles, error: validRolesError } = await client
       .from('roles')
-      .select('id')
+      .select('id, nombre')
       .in('id', roleIds)
       .eq('tenant_id', tenantId);
 
@@ -284,14 +326,21 @@ export class PermissionService {
       return false;
     }
 
+    // Bypass global if user tiene rol ADMIN en este tenant
+    const isAdmin = validRoles.some(r => (r as any)?.nombre?.toUpperCase() === 'ADMIN');
+    if (isAdmin) {
+      this.permissionCache.set(cacheKey, { permissions: [cacheKey], timestamp: Date.now() });
+      return true;
+    }
+
     const validRoleIds = validRoles.map(r => r.id);
 
     // HARDENING B2: Query role permissions solo de roles válidos del tenant
-    const { data: rolePermissions, error: permissionsError } = await client
-      .from('rol_permisos')
-      .select(`
-        permiso_id,
-        concedido,
+      const { data: rolePermissions, error: permissionsError } = await client
+        .from('rol_permisos')
+        .select(`
+          permiso_id,
+          concedido,
         permisos (
           id,
           tenant_id,
@@ -320,17 +369,17 @@ export class PermissionService {
         // (Ya validamos que los roles pertenecen al tenant, ahora validamos los permisos)
         if (p.tenant_id !== tenantId) return false;
         if (p.activo !== true) return false;
-        if (p.modulo !== modulo) return false;
-        if (p.accion !== accion) return false;
+        if (this.normalize(p.modulo) !== normalizedModule) return false;
+        if (!this.actionsMatch(normalizedAction, p.accion)) return false;
 
         // HARDENING: habilita llaves globales como comodín.
-        const permisoRecurso = p.recurso || '__global__';
-        if (normalizedRequestedResource === '__global__') {
+        const permisoRecurso = this.normalizeResource(p.recurso);
+        if (normalizedResource === '__global__') {
           return permisoRecurso === '__global__' || permisoRecurso === '*';
         }
 
         return (
-          permisoRecurso === normalizedRequestedResource ||
+          permisoRecurso === normalizedResource ||
           permisoRecurso === '__global__' ||
           permisoRecurso === '*'
         );

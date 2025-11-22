@@ -8,7 +8,13 @@ import {
   SaveWizardStepDto,
   UpdateEmpresaConfigDto,
   UpdateGREThresholdsDto,
+  ValidateWizardCertificateDto,
+  WizardCertificateValidationResult,
 } from './configuration.types';
+import { normalizeCertificateInput, parseCertificateBuffer } from '../../shared/utils/certificate.utils';
+import { createHash } from 'crypto';
+
+export const TOTAL_WIZARD_STEPS = 7;
 
 @Injectable()
 export class ConfigurationService {
@@ -257,16 +263,21 @@ export class ConfigurationService {
       // Get existing progress or create new
       const existingProgress = await this.getWizardProgress(tenantId);
 
-      const pasosCompletados = existingProgress?.pasosCompletados || [];
-      if (!pasosCompletados.includes(stepData.pasoActual)) {
-        pasosCompletados.push(stepData.pasoActual);
-      }
+      const pasosCompletados = new Set(existingProgress?.pasosCompletados || []);
+      pasosCompletados.add(stepData.pasoActual);
+
+      const configuracionTemporal = stepData.configuracionTemporal
+        ? {
+            ...(existingProgress?.configuracionTemporal || {}),
+            ...stepData.configuracionTemporal,
+          }
+        : existingProgress?.configuracionTemporal;
 
       const progressData = {
         tenant_id: tenantId,
         paso_actual: stepData.pasoActual,
-        pasos_completados: pasosCompletados,
-        configuracion_temporal: stepData.configuracionTemporal || existingProgress?.configuracionTemporal,
+        pasos_completados: Array.from(pasosCompletados),
+        configuracion_temporal: configuracionTemporal,
         updated_at: new Date().toISOString(),
       };
 
@@ -329,9 +340,57 @@ export class ConfigurationService {
   }
 
   /**
+   * Validates a raw certificate payload before persisting it.
+   */
+  async validateCertificatePayload(
+    tenantId: string,
+    payload: ValidateWizardCertificateDto,
+  ): Promise<WizardCertificateValidationResult> {
+    if (!payload.certificateBase64) {
+      throw new Error('El certificado es requerido');
+    }
+
+    if (payload.certificatePassword === undefined || payload.certificatePassword === null) {
+      throw new Error('La contraseña del certificado es requerida');
+    }
+
+    try {
+      const normalizedBase64 = payload.certificateBase64.replace(/\s+/g, '');
+      const buffer = Buffer.from(normalizedBase64, 'base64');
+      const metadata = parseCertificateBuffer(buffer, payload.certificatePassword);
+
+      const now = new Date();
+      const daysUntilExpiration = Math.ceil(
+        (metadata.validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      this.logger.log(
+        `Certificate payload validated for tenant ${tenantId} (expira: ${metadata.validTo.toISOString()})`,
+      );
+
+      return {
+        subject: metadata.subject,
+        issuer: metadata.issuer,
+        serialNumber: metadata.serialNumber,
+        validFrom: metadata.validFrom,
+        validTo: metadata.validTo,
+        daysUntilExpiration,
+      };
+    } catch (error) {
+      this.logger.error(`Error validating certificate payload for tenant ${tenantId}:`, error);
+      throw error instanceof Error
+        ? error
+        : new Error('No se pudo validar el certificado digital');
+    }
+  }
+
+  /**
    * Calculate wizard completion percentage
    */
-  calculateWizardCompletionPercentage(pasosCompletados: number[], totalSteps: number = 5): number {
+  calculateWizardCompletionPercentage(
+    pasosCompletados: number[],
+    totalSteps: number = TOTAL_WIZARD_STEPS,
+  ): number {
     if (totalSteps === 0) return 0;
     return Math.round((pasosCompletados.length / totalSteps) * 100);
   }
@@ -339,28 +398,48 @@ export class ConfigurationService {
   /**
    * Mark wizard as completed
    */
-  async completeWizard(tenantId: string): Promise<void> {
+  async completeWizard(tenantId: string, configOverride?: any): Promise<void> {
     try {
       this.logger.log(`Completing wizard and saving configuration for tenant: ${tenantId}`);
 
-      // 1. Get wizard progress with temporary configuration
-      const progress = await this.getWizardProgress(tenantId);
-      
-      if (!progress || !progress.configuracionTemporal) {
-        throw new Error('No se encontró configuración temporal para guardar');
+      let config = configOverride;
+
+      if (!config) {
+        // 1. Get wizard progress with temporary configuration
+        const progress = await this.getWizardProgress(tenantId);
+        
+        if (!progress || !progress.configuracionTemporal) {
+          throw new Error('No se encontró configuración temporal para guardar');
+        }
+
+        config = progress.configuracionTemporal;
       }
 
-      const config = progress.configuracionTemporal;
       this.logger.log(`Configuration data to save:`, config);
+
+      if (!config.certificateBase64) {
+        throw new Error('No se encontró el certificado digital en la configuración');
+      }
+
+      if (config.certificatePassword === undefined || config.certificatePassword === null) {
+        throw new Error('La contraseña del certificado digital es requerida');
+      }
+
+      const certificateValidation = await this.validateCertificatePayload(tenantId, {
+        certificateBase64: config.certificateBase64,
+        certificatePassword: config.certificatePassword,
+      });
 
       // 2. Save RUC, company data AND certificate to empresa_config
       this.logger.log(`Saving all configuration to empresa_config...`);
       
       // Convert base64 certificate to Buffer for bytea storage
-      let certificateBuffer = null;
-      if (config.certificateBase64) {
-        certificateBuffer = Buffer.from(config.certificateBase64, 'base64');
-      }
+      const certificateBuffer = Buffer.from(config.certificateBase64.replace(/\s+/g, ''), 'base64');
+      const certificateHexValue = `\\x${certificateBuffer.toString('hex')}`;
+      const certificateHash = createHash('sha256').update(certificateBuffer).digest('hex');
+      this.logger.log(
+        `Certificate payload size=${certificateBuffer.length}, hash=${certificateHash.substr(0, 16)}...`,
+      );
       
       const { error: empresaError } = await this.supabaseService
         .getClient()
@@ -370,8 +449,9 @@ export class ConfigurationService {
           ruc: config.ruc,
           razon_social: config.razonSocial,
           direccion_fiscal: config.direccion,
-          certificado_pfx: certificateBuffer,
+          certificado_pfx: certificateHexValue,
           certificado_password: config.certificatePassword,
+          certificado_expira_en: certificateValidation.validTo.toISOString(),
           configuracion_completa: true,
           // Configuración de ventas
           tipo_empresa: config.tipo_empresa || 'MICRO',
@@ -403,6 +483,42 @@ export class ConfigurationService {
       
       this.logger.log(`✅ All configuration saved to empresa_config`);
 
+      // Double-check that the certificate can be read back correctly
+      const { data: verifyData, error: verifyError } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('certificado_pfx, certificado_password')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (verifyError) {
+        this.logger.error(`Error verifying certificate after save for tenant ${tenantId}:`, verifyError);
+        throw verifyError;
+      }
+
+      try {
+        const storedBuffer = normalizeCertificateInput(verifyData.certificado_pfx);
+        if (!storedBuffer) {
+          throw new Error('El certificado almacenado está vacío');
+        }
+        const storedHash = createHash('sha256').update(storedBuffer).digest('hex');
+        this.logger.log(
+          `✅ Certificate stored for tenant ${tenantId}. Bytes: ${storedBuffer.length}, hash=${storedHash.substr(0, 16)}...`,
+        );
+        if (storedHash !== certificateHash) {
+          this.logger.warn(
+            `Hash mismatch between payload and stored certificate for tenant ${tenantId}`,
+          );
+        }
+        parseCertificateBuffer(storedBuffer, verifyData.certificado_password || '');
+      } catch (verifyParseError) {
+        this.logger.error(
+          `Error verifying stored certificate for tenant ${tenantId}:`,
+          verifyParseError,
+        );
+        throw verifyParseError;
+      }
+
 
       // 4. Mark wizard as completed
       const { error: wizardError } = await this.supabaseService
@@ -426,4 +542,57 @@ export class ConfigurationService {
       throw error;
     }
   }
+
+  /**
+   * Reset wizard progress and mark configuration as incomplete.
+   */
+  async resetWizard(tenantId: string): Promise<void> {
+    try {
+      this.logger.log(`Resetting wizard for tenant: ${tenantId}`);
+
+      const client = this.supabaseService.getClient();
+
+      const { error: deleteError } = await client
+        .from('wizard_progress')
+        .delete()
+        .eq('tenant_id', tenantId);
+
+      if (deleteError && deleteError.code !== 'PGRST116') {
+        this.logger.error(`Error deleting wizard progress for tenant ${tenantId}:`, deleteError);
+        throw deleteError;
+      }
+
+      const resetPayload = {
+        tenant_id: tenantId,
+        configuracion_completa: false,
+        certificado_pfx: null,
+        certificado_password: null,
+        certificado_expira_en: null,
+        ultima_validacion: null,
+        errores_configuracion: {
+          reason: 'wizard_reset',
+          at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: empresaError } = await client
+        .from('empresa_config')
+        .upsert(resetPayload, {
+          onConflict: 'tenant_id',
+        });
+
+      if (empresaError) {
+        this.logger.error(`Error resetting empresa_config for tenant ${tenantId}:`, empresaError);
+        throw empresaError;
+      }
+
+      this.logger.log(`✅ Wizard reset completed for tenant: ${tenantId}`);
+    } catch (error) {
+      this.logger.error(`Error resetting wizard for tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
 }
+

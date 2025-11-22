@@ -40,13 +40,14 @@ export default function ConfirmarPedidoButton({
   pedidoId,
   onSuccess
 }: ConfirmarPedidoButtonProps) {
-  const { post } = useApi()
+  const { post } = useApi({ throwOnError: true }) // dejamos toasts de useApi y re-lanzamos error
   const { hasPermission, loading: permissionLoading } = usePermission('ventas', 'confirmar', 'pedidos')
   
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showWarningDialog, setShowWarningDialog] = useState(false)
   const [warnings, setWarnings] = useState<StockWarning[]>([])
   const [confirming, setConfirming] = useState(false)
+  const [lastError, setLastError] = useState<string | null>(null)
 
   const handleConfirm = async () => {
     if (permissionLoading) {
@@ -98,11 +99,13 @@ export default function ConfirmarPedidoButton({
         if (response.warnings && response.warnings.length > 0) {
           setWarnings(response.warnings)
           setShowWarningDialog(true)
+          setLastError(null)
         } else {
           toast({
             title: 'Pedido confirmado',
             description: 'El pedido ha sido confirmado y el stock ha sido reservado',
           })
+          setLastError(null)
           onSuccess()
         }
       } else {
@@ -110,9 +113,24 @@ export default function ConfirmarPedidoButton({
       }
     } catch (error: any) {
       console.error('Error confirming pedido:', error)
+      const warnings = error?.data?.warnings
+      if (warnings?.length) {
+        setWarnings(warnings)
+        setShowWarningDialog(true)
+        setConfirming(false)
+        setLastError(null)
+        return
+      }
+
+      const errorMessage =
+        error?.data?.message ||
+        (typeof error?.message === 'string' ? error.message : null) ||
+        'No se pudo confirmar el pedido'
+
+      setLastError(errorMessage)
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo confirmar el pedido',
+        description: errorMessage,
         variant: 'destructive'
       })
     } finally {
@@ -126,6 +144,7 @@ export default function ConfirmarPedidoButton({
       title: 'Pedido confirmado con advertencias',
       description: 'El pedido ha sido confirmado a pesar de las advertencias de stock',
     })
+    setLastError(null)
     onSuccess()
   }
 
@@ -140,6 +159,12 @@ export default function ConfirmarPedidoButton({
 
   return (
     <>
+      {lastError && (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {lastError}
+        </div>
+      )}
+
       <Button
         onClick={() => setShowConfirmDialog(true)}
         disabled={confirming || permissionLoading || !hasPermission}

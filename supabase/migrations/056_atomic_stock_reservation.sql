@@ -48,7 +48,7 @@ BEGIN
   -- HARDENING C1: Lock del registro con FOR UPDATE para prevenir race conditions
   -- Esto asegura que solo una transacción puede reservar stock del mismo producto a la vez
   SELECT 
-    COALESCE(stock_actual, stock::NUMERIC, 0),
+    COALESCE(stock::NUMERIC, 0),
     COALESCE(stock_reservado, 0),
     TRUE
   INTO 

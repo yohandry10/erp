@@ -15,7 +15,7 @@ import { PreparacionPedidoModal } from '@/components/ventas/PreparacionPedidoMod
 
 export default function OrdenesPendientesPage() {
   const router = useRouter()
-  const { get } = useApi()
+  const { get, post } = useApi()
   const { config, loading: configLoading, isFlujologistica } = useEmpresaConfig()
   
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([])
@@ -50,7 +50,7 @@ export default function OrdenesPendientesPage() {
     }
   }
 
-  const handlePreparar = (pedido: PedidoVenta) => {
+  const handlePreparar = async (pedido: PedidoVenta) => {
     setSelectedPedido(pedido)
     setShowPreparacionModal(true)
   }
