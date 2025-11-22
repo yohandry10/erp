@@ -17,6 +17,8 @@ export function useWizard() {
     markStepComplete,
     setLoading,
     setError,
+    setPersistedConfiguration,
+    resetWizardState,
   } = useWizardContext()
 
   const loadProgress = async () => {
@@ -39,19 +41,27 @@ export function useWizard() {
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
         
-        // Si la configuración está completa, marcar todos los pasos como completados y ir al último paso
-        if (statusData.success && statusData.data?.isComplete) {
-          console.log('✅ Configuration already complete, marking all steps as done')
+        // VALIDACIÓN ESTRICTA: Solo marcar como completo si TODOS los campos críticos existen
+        const isReallyComplete = statusData.success && 
+          statusData.data?.isComplete === true &&
+          statusData.data?.certificate?.exists === true &&
+          statusData.data?.certificate?.isValid === true &&
+          statusData.data?.ruc?.isConfigured === true &&
+          (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
+        
+        if (isReallyComplete) {
+          console.log('✅ Configuration already complete - redirecting to dashboard')
           
-          // Marcar todos los pasos como completados
-          state.steps.forEach((_, index) => {
-            markStepComplete(index)
-          })
-          
-          // Ir al último paso (Completado)
-          goToStep(state.steps.length - 1)
+          // Si la configuración está completa, redirigir al dashboard
+          // NO mostrar el wizard
+          if (typeof window !== 'undefined') {
+            window.location.href = '/dashboard'
+          }
           setLoading(false)
           return
+        } else if (statusData.success && statusData.data?.isComplete === true) {
+          // Si dice que está completo pero faltan validaciones, resetear
+          console.warn('⚠️ Configuration marked as complete but validations failed, resetting wizard')
         }
       }
       
@@ -70,39 +80,32 @@ export function useWizard() {
       if (data.success && data.data) {
         const progress = data.data
         
-        // Si el wizard está marcado como completado, ir al último paso
-        if (progress.completado) {
-          console.log('✅ Wizard marked as completed, going to final step')
-          
-          // Marcar todos los pasos como completados
-          state.steps.forEach((_, index) => {
-            markStepComplete(index)
-          })
-          
-          // Ir al último paso
-          goToStep(state.steps.length - 1)
-          setLoading(false)
-          return
-        }
-        
         // Restaurar configuración temporal si existe
         if (progress.configuracionTemporal) {
           updateConfiguration(progress.configuracionTemporal)
         }
         
-        // Marcar pasos completados (backend uses 1-indexed, frontend uses 0-indexed)
-        if (Array.isArray(progress.pasosCompletados)) {
+        // Restaurar pasos completados
+        if (Array.isArray(progress.pasosCompletados) && progress.pasosCompletados.length > 0) {
           progress.pasosCompletados.forEach((stepNumber: number) => {
-            const stepIndex = stepNumber - 1 // Convert from 1-indexed to 0-indexed
+            const stepIndex = stepNumber - 1
             if (stepIndex >= 0 && stepIndex < state.steps.length) {
               markStepComplete(stepIndex)
             }
           })
+          
+          // Si el paso de validación (paso 6, índice 5) está completado, ir al último paso
+          if (progress.pasosCompletados.includes(6)) {
+            console.log('✅ Validation step completed - going to final step')
+            goToStep(state.steps.length - 1)
+            setLoading(false)
+            return
+          }
         }
         
-        // Ir al paso actual (backend uses 1-indexed, frontend uses 0-indexed)
+        // Ir al paso actual guardado
         if (progress.pasoActual !== undefined && progress.pasoActual > 0) {
-          goToStep(progress.pasoActual - 1) // Convert from 1-indexed to 0-indexed
+          goToStep(progress.pasoActual - 1)
         }
       }
     } catch (error) {
@@ -114,9 +117,12 @@ export function useWizard() {
     }
   }
 
-  const saveStepProgress = async (stepId: string, stepData: any) => {
+  const saveStepProgress = async (stepId: string, stepData: any, options?: { silent?: boolean }) => {
+    const showLoader = !options?.silent
     try {
-      setLoading(true)
+      if (showLoader) {
+        setLoading(true)
+      }
       
       // Obtener token del localStorage (custom auth)
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
@@ -159,52 +165,119 @@ export function useWizard() {
       setError(error instanceof Error ? error.message : 'Error al guardar')
       throw error
     } finally {
-      setLoading(false)
+      if (showLoader) {
+        setLoading(false)
+      }
     }
   }
 
   const validateCertificate = async () => {
+    const { certificateBase64, certificatePassword, certificateFile } = state.configuration
+
     try {
-      setLoading(true)
-      
-      // Validate locally first (don't need backend for basic validation)
+
       const errors: string[] = []
       const warnings: string[] = []
-      let isValid = true
-      
-      if (!state.configuration.certificateBase64) {
+
+      if (!certificateBase64) {
         errors.push('No se ha cargado un certificado digital')
-        isValid = false
       }
-      
-      if (!state.configuration.certificatePassword) {
-        errors.push('No se ha configurado la contraseña del certificado')
-        isValid = false
+
+      if (certificatePassword === undefined || certificatePassword === null || certificatePassword === '') {
+        errors.push('La contraseña del certificado es requerida')
       }
-      
-      if (state.configuration.certificateFile) {
-        const fileName = state.configuration.certificateFile.name?.toLowerCase() || ''
+
+      if (certificateFile) {
+        const fileName = certificateFile.name?.toLowerCase() || ''
         if (fileName && !fileName.endsWith('.pfx') && !fileName.endsWith('.p12')) {
           errors.push('El archivo debe ser un certificado .pfx o .p12')
-          isValid = false
         }
       }
-      
+
+      if (errors.length > 0) {
+        updateValidationResults({
+          certificate: {
+            isValid: false,
+            errors,
+            warnings,
+          }
+        })
+        throw new Error(errors.join('. '))
+      }
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+      if (!token) {
+        throw new Error('No hay sesión activa')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/validate-certificate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          certificateBase64,
+          certificatePassword,
+        }),
+      })
+
+      const responseData = await response.json().catch(() => ({}))
+
+      if (!response.ok || !responseData.success) {
+        const message = responseData.message || 'Certificado inválido'
+        updateValidationResults({
+          certificate: {
+            isValid: false,
+            errors: [message],
+            warnings: [],
+          }
+        })
+        throw new Error(message)
+      }
+
+      const certificateData = responseData.data || {}
+      const validTo = certificateData.validTo ? new Date(certificateData.validTo) : undefined
+      const validFrom = certificateData.validFrom ? new Date(certificateData.validFrom) : undefined
+
+      const serverWarnings: string[] = []
+      if (certificateData.daysUntilExpiration !== undefined && certificateData.daysUntilExpiration <= 30) {
+        serverWarnings.push(`El certificado vencerá en ${certificateData.daysUntilExpiration} días`)
+      }
+
       updateValidationResults({
         certificate: {
-          isValid,
-          errors,
-          warnings,
+          isValid: true,
+          errors: [],
+          warnings: serverWarnings,
+          expiresAt: validTo,
+          validFrom,
+          daysUntilExpiration: certificateData.daysUntilExpiration,
+          subject: certificateData.subject,
+          issuer: certificateData.issuer,
+          serialNumber: certificateData.serialNumber,
         }
       })
-      
-      return { success: true, data: { isValid, errors, warnings } }
+
+      return {
+        success: true,
+        data: {
+          isValid: true,
+          certificate: {
+            subject: certificateData.subject,
+            issuer: certificateData.issuer,
+            serialNumber: certificateData.serialNumber,
+            validFrom,
+            validTo,
+            daysUntilExpiration: certificateData.daysUntilExpiration,
+          },
+          warnings: serverWarnings,
+        },
+      }
     } catch (error) {
       console.error('Error validating certificate:', error)
       setError(error instanceof Error ? error.message : 'Error al validar certificado')
       throw error
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -212,7 +285,6 @@ export function useWizard() {
     const { ruc, razonSocial, direccion } = state.configuration
     
     try {
-      setLoading(true)
       
       // Validate locally (don't need backend for basic validation)
       const errors: string[] = []
@@ -250,16 +322,21 @@ export function useWizard() {
       console.error('Error validating RUC:', error)
       setError(error instanceof Error ? error.message : 'Error al validar RUC')
       throw error
-    } finally {
-      setLoading(false)
     }
-  }, [state.configuration, updateValidationResults, setLoading, setError])
+  }, [state.configuration, updateValidationResults, setError])
 
-  const completeWizard = useCallback(async () => {
+  const completeWizard = useCallback(async (options?: { silent?: boolean }) => {
+    if (state.hasPersistedConfiguration) {
+      return { success: true, alreadyPersisted: true }
+    }
+
+    const showLoader = !options?.silent
     const configuration = state.configuration
     
     try {
-      setLoading(true)
+      if (showLoader) {
+        setLoading(true)
+      }
       
       // Obtener token del localStorage (custom auth)
       const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
@@ -285,15 +362,55 @@ export function useWizard() {
       }
 
       const data = await response.json()
+      setPersistedConfiguration(true)
       return data
     } catch (error) {
       console.error('Error completing wizard:', error)
       setError(error instanceof Error ? error.message : 'Error al completar')
       throw error
     } finally {
+      if (showLoader) {
+        setLoading(false)
+      }
+    }
+  }, [state.configuration, state.hasPersistedConfiguration, setLoading, setError, setPersistedConfiguration])
+
+  const resetWizardProcess = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+
+      if (!token) {
+        throw new Error('No hay sesión activa')
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Error al reiniciar la configuración')
+      }
+
+      resetWizardState()
+      goToStep(0)
+
+      return data
+    } catch (error) {
+      console.error('Error resetting wizard:', error)
+      setError(error instanceof Error ? error.message : 'Error al reiniciar la configuración')
+      throw error
+    } finally {
       setLoading(false)
     }
-  }, [state.configuration, setLoading, setError])
+  }, [goToStep, resetWizardState, setLoading, setError])
 
   const canGoNext = useCallback(() => {
     const currentStepData = state.steps[state.currentStep]
@@ -370,6 +487,7 @@ export function useWizard() {
     validateCertificate,
     validateRuc,
     completeWizard,
+    resetWizardProcess,
     canGoNext,
   }
 }

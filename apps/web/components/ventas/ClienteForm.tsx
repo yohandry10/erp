@@ -160,36 +160,72 @@ export default function ClienteForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onFormSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Tipo de Cliente y Documento */}
-      <div className="bg-gray-50 p-6 rounded-lg space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Información Básica</h3>
+      <div style={{
+        background: 'var(--primary-50)',
+        padding: '1.5rem',
+        borderRadius: 'var(--border-radius)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          margin: 0
+        }}>Información Básica</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '1rem'
+        }}>
           {/* Tipo de Cliente */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="tipo">Tipo de Cliente *</Label>
             <select
               id="tipo"
               {...register('tipo')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{
+                width: '100%',
+                padding: '0.875rem 1rem',
+                border: '1px solid var(--primary-300)',
+                borderRadius: 'var(--border-radius)',
+                fontSize: '1rem',
+                background: 'white',
+                color: 'var(--primary-800)',
+                cursor: 'pointer'
+              }}
               disabled={loading}
             >
               <option value={TipoCliente.PERSONA}>Persona Natural</option>
               <option value={TipoCliente.EMPRESA}>Empresa</option>
             </select>
             {errors.tipo && (
-              <p className="text-sm text-red-600">{errors.tipo.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.tipo.message}
+              </p>
             )}
           </div>
 
           {/* Tipo de Documento */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="documento_tipo">Tipo de Documento *</Label>
             <select
               id="documento_tipo"
               {...register('documento_tipo')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{
+                width: '100%',
+                padding: '0.875rem 1rem',
+                border: '1px solid var(--primary-300)',
+                borderRadius: 'var(--border-radius)',
+                fontSize: '1rem',
+                background: 'white',
+                color: 'var(--primary-800)',
+                cursor: 'pointer'
+              }}
               disabled={loading}
               onChange={() => setRucValidated(false)}
             >
@@ -199,20 +235,22 @@ export default function ClienteForm({
               <option value={TipoDocumento.PASAPORTE}>Pasaporte</option>
             </select>
             {errors.documento_tipo && (
-              <p className="text-sm text-red-600">{errors.documento_tipo.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.documento_tipo.message}
+              </p>
             )}
           </div>
         </div>
 
         {/* Número de Documento con Validación SUNAT */}
-        <div className="space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label htmlFor="documento_numero">
             Número de Documento *
             {documentoTipo === TipoDocumento.RUC && ' (11 dígitos)'}
             {documentoTipo === TipoDocumento.DNI && ' (8 dígitos)'}
           </Label>
-          <div className="flex gap-2">
-            <div className="flex-1">
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ flex: 1 }}>
               <Input
                 id="documento_numero"
                 {...register('documento_numero')}
@@ -231,16 +269,16 @@ export default function ClienteForm({
                 variant="outline"
                 onClick={handleValidarRuc}
                 disabled={loading || validatingRuc || documentoNumero.length !== 11}
-                className="whitespace-nowrap"
+                style={{ whiteSpace: 'nowrap' }}
               >
                 {validatingRuc ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} className="animate-spin" />
                     Validando...
                   </>
                 ) : rucValidated ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                    <CheckCircle2 style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: 'var(--emerald-600)' }} />
                     Validado
                   </>
                 ) : (
@@ -250,10 +288,12 @@ export default function ClienteForm({
             )}
           </div>
           {errors.documento_numero && (
-            <p className="text-sm text-red-600">{errors.documento_numero.message}</p>
+            <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+              {errors.documento_numero.message}
+            </p>
           )}
           {documentoTipo === TipoDocumento.RUC && (
-            <p className="text-xs text-gray-500">
+            <p style={{ fontSize: '0.75rem', color: 'var(--primary-500)', margin: 0 }}>
               Opcional: Valida el RUC con SUNAT para autocompletar datos
             </p>
           )}
@@ -261,12 +301,24 @@ export default function ClienteForm({
       </div>
 
       {/* Datos del Cliente */}
-      <div className="bg-gray-50 p-6 rounded-lg space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Datos del Cliente</h3>
+      <div style={{
+        background: 'var(--primary-50)',
+        padding: '1.5rem',
+        borderRadius: 'var(--border-radius)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          margin: 0
+        }}>Datos del Cliente</h3>
         
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Razón Social */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="razon_social">Razón Social / Nombre Completo *</Label>
             <Input
               id="razon_social"
@@ -275,12 +327,14 @@ export default function ClienteForm({
               disabled={loading}
             />
             {errors.razon_social && (
-              <p className="text-sm text-red-600">{errors.razon_social.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.razon_social.message}
+              </p>
             )}
           </div>
 
           {/* Nombre Comercial */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="nombre_comercial">Nombre Comercial (Opcional)</Label>
             <Input
               id="nombre_comercial"
@@ -289,12 +343,14 @@ export default function ClienteForm({
               disabled={loading}
             />
             {errors.nombre_comercial && (
-              <p className="text-sm text-red-600">{errors.nombre_comercial.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.nombre_comercial.message}
+              </p>
             )}
           </div>
 
           {/* Dirección */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="direccion">Dirección (Opcional)</Label>
             <Textarea
               id="direccion"
@@ -304,19 +360,37 @@ export default function ClienteForm({
               disabled={loading}
             />
             {errors.direccion && (
-              <p className="text-sm text-red-600">{errors.direccion.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.direccion.message}
+              </p>
             )}
           </div>
         </div>
       </div>
 
       {/* Datos de Contacto */}
-      <div className="bg-gray-50 p-6 rounded-lg space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Datos de Contacto</h3>
+      <div style={{
+        background: 'var(--primary-50)',
+        padding: '1.5rem',
+        borderRadius: 'var(--border-radius)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: 'var(--primary-900)',
+          margin: 0
+        }}>Datos de Contacto</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '1rem'
+        }}>
           {/* Email */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="email">Email (Opcional)</Label>
             <Input
               id="email"
@@ -326,12 +400,14 @@ export default function ClienteForm({
               disabled={loading}
             />
             {errors.email && (
-              <p className="text-sm text-red-600">{errors.email.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.email.message}
+              </p>
             )}
           </div>
 
           {/* Teléfono */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label htmlFor="telefono">Teléfono (Opcional)</Label>
             <Input
               id="telefono"
@@ -340,14 +416,22 @@ export default function ClienteForm({
               disabled={loading}
             />
             {errors.telefono && (
-              <p className="text-sm text-red-600">{errors.telefono.message}</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', margin: 0 }}>
+                {errors.telefono.message}
+              </p>
             )}
           </div>
         </div>
       </div>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: '0.75rem',
+        paddingTop: '1rem',
+        borderTop: '1px solid var(--primary-200)'
+      }}>
         {onCancel && (
           <Button
             type="button"
@@ -361,11 +445,14 @@ export default function ClienteForm({
         <Button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700"
+          style={{
+            background: 'var(--gradient-primary)',
+            color: 'white'
+          }}
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} className="animate-spin" />
               Guardando...
             </>
           ) : (

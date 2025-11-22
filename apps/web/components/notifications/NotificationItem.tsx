@@ -53,8 +53,8 @@ export function NotificationItem({
   onDelete,
 }: NotificationItemProps) {
   const router = useRouter()
-  const config = severityConfig[notification.severidad]
-  const Icon = config.icon
+  const config = severityConfig[notification.severidad] ?? severityConfig.info
+  const Icon = config?.icon ?? Info
 
   const handleClick = () => {
     if (!notification.leida) {

@@ -597,7 +597,7 @@ export class CxpService {
     // Obtener la CxP actual
     const { data: cxp, error: errorCxp } = await client
       .from('cuentas_por_pagar')
-      .select('id, estado, saldo, total, proveedor_id, numero_documento')
+      .select('id, estado, saldo, total, proveedor_id, numero_documento, tenant_id')
       .eq('tenant_id', tenantId)
       .eq('id', cxpId)
       .maybeSingle();

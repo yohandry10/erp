@@ -158,6 +158,18 @@ export class InventoryIntegrationService {
       // ✅ MULTI-TENANT: Usar tenant_id proporcionado o default
       const currentTenantId = this.resolveTenantId(tenantId);
       
+      // Sanitizar cantidad: solo enteros para evitar errores de casteo en DB
+      const cantidadEntera = Math.round(Number(movimiento.cantidad ?? 0));
+      if (!Number.isFinite(cantidadEntera)) {
+        throw new BadRequestException('Cantidad de movimiento inválida');
+      }
+      if (cantidadEntera !== movimiento.cantidad) {
+        this.logger.warn(
+          `⚠️ [Inventario] Ajustando cantidad de ${movimiento.cantidad} a entero ${cantidadEntera} para producto ${movimiento.productoId}`,
+        );
+      }
+      movimiento.cantidad = cantidadEntera;
+      
       this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Movimiento ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`); // HARDENING.
 
       // 1. Obtener producto por ID o código (CON FILTRO DE TENANT)
@@ -297,8 +309,9 @@ export class InventoryIntegrationService {
         stockNuevo: movimiento.stockNuevo,
         motivo: movimiento.motivo,
         valor: movimiento.valorTotal,
-        ventaId: movimiento.ventaId
-      });
+        ventaId: movimiento.ventaId,
+        tenantId: currentTenantId,
+      }, currentTenantId);
 
       this.logger.log(`✅ [Inventario] Movimiento registrado ${movimientoGuardado.id}`);
       return movimientoGuardado.id;

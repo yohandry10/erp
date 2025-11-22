@@ -195,7 +195,8 @@ export class InventarioService {
               ventaId: movimiento.referencia_tipo === 'VENTA' || movimiento.referencia_tipo === 'VENTA_POS' 
                 ? movimiento.referencia_id 
                 : undefined,
-            });
+              tenantId: movimiento.tenant_id ?? null,
+            }, movimiento.tenant_id ?? undefined);
 
             console.log(`✅ Evento MovimientoStockEvent emitido para movimiento ${data.id}`);
           }
@@ -512,7 +513,8 @@ export class InventarioService {
           motivo: `Salida de ${cantidad} unidades${referencia_tipo ? ` (${referencia_tipo})` : ''}`,
           valor: valorTotal,
           ventaId: referencia_tipo === 'VENTA' || referencia_tipo === 'VENTA_POS' ? referencia_id : undefined,
-        });
+          tenantId: tenant_id,
+        }, tenant_id);
 
         console.log(`✅ Evento MovimientoStockEvent emitido para salida de stock`);
       } catch (error) {
@@ -665,7 +667,8 @@ export class InventarioService {
             motivo: params.notas || `Entrada de stock${params.referenciaTipo ? ` (${params.referenciaTipo})` : ''}`,
             valor: valorTotal,
             ventaId: undefined, // Entradas no están relacionadas con ventas
-          });
+            tenantId: params.tenantId,
+          }, params.tenantId);
 
           console.log(`✅ Evento MovimientoStockEvent emitido para entrada atómica de stock`);
         }
@@ -1179,8 +1182,8 @@ export class InventarioService {
           ? {
               id: (recepcion.orden as any).proveedor.id,
               razonSocial: (recepcion.orden as any).proveedor.razon_social,
-              documentoTipo: (recepcion.orden as any).proveedor.documento_tipo,
-              documentoNumero: (recepcion.orden as any).proveedor.documento_numero,
+              documentoTipo: (recepcion.orden as any).proveedor.ruc ? 'RUC' : null,
+              documentoNumero: (recepcion.orden as any).proveedor.ruc ?? null,
             }
           : null,
         totalItems: itemsConstruidos.length,
@@ -1440,7 +1443,7 @@ export class InventarioService {
         proveedorIds.size
           ? client
               .from('proveedores')
-              .select('id, razon_social, documento_tipo, documento_numero, ruc')
+              .select('id, razon_social, ruc')
               .eq('tenant_id', tenantId)
               .in('id', Array.from(proveedorIds))
           : Promise.resolve({ data: [] as any[], error: null }),
@@ -1543,9 +1546,8 @@ export class InventarioService {
             ? {
                 id: proveedorDetalle.id,
                 razonSocial: proveedorDetalle.razon_social,
-                documentoTipo: proveedorDetalle.documento_tipo ?? (proveedorDetalle.ruc ? 'RUC' : null),
-                documentoNumero:
-                  proveedorDetalle.documento_numero ?? proveedorDetalle.ruc ?? null,
+                documentoTipo: proveedorDetalle.ruc ? 'RUC' : null,
+                documentoNumero: proveedorDetalle.ruc ?? null,
               }
             : recepcion.proveedorNombre
             ? {

@@ -22,6 +22,7 @@ export interface SunatResponse {
   observaciones?: string[];
   numeroComprobante?: string;
   hashCPE?: string;
+  ticket?: string;
 }
 
 @Injectable()
@@ -182,6 +183,20 @@ export class OseService {
         descripcionRespuesta: `Error consultando estado: ${error.message}`
       };
     }
+  }
+
+  /**
+   * Consultar ticket de comunicación de bajas u otros procesos asíncronos
+   * (stub simple hasta tener integración real con OSE)
+   */
+  async consultarTicket(ticket: string): Promise<SunatResponse> {
+    this.logger.warn(`⚠️ [OSE] consultarTicket() aún no implementado. Ticket recibido: ${ticket}`);
+    return {
+      success: true,
+      codigoRespuesta: '0',
+      descripcionRespuesta: 'Consulta de ticket simulada (pendiente de integración real)',
+      ticket,
+    };
   }
 
   /**

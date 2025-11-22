@@ -39,6 +39,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
   }
 
   const currentStepData = state.steps[state.currentStep]
+  const isFinalStep = state.currentStep === state.steps.length - 1
   const progress = ((state.currentStep + 1) / state.steps.length) * 100
 
   return (
@@ -213,7 +214,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
               borderTop: '1px solid var(--primary-200)',
               gap: '1rem'
             }}>
-              {state.currentStep > 0 && (
+              {state.currentStep > 0 && !isFinalStep && (
                 <button
                   className="btn btn-secondary"
                   onClick={previousStep}

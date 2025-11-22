@@ -119,6 +119,14 @@ export class CreateFacturaDto {
 
 export class FacturaDto extends CreateFacturaDto {
   id: string;
+
+  @IsOptional()
+  @IsString()
+  documento_id?: string;
+
+  @IsOptional()
+  @IsString()
+  documentoId?: string;
   
   @IsString()
   estado: EstadoCPE;

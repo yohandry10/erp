@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsNumber, Min } from 'class-validator';
+import { IsString, IsUUID, IsNumber, Min, IsInt } from 'class-validator';
 
 /**
  * PedidoDetalleDto
@@ -12,8 +12,8 @@ export class PedidoDetalleDto {
   @IsString({ message: 'La descripción debe ser texto' })
   descripcion: string;
 
-  @IsNumber({}, { message: 'La cantidad debe ser un número' })
-  @Min(0.01, { message: 'La cantidad debe ser mayor a 0' })
+  @IsInt({ message: 'La cantidad debe ser un número entero' })
+  @Min(1, { message: 'La cantidad debe ser al menos 1 unidad' })
   cantidad: number;
 
   @IsNumber({}, { message: 'El precio unitario debe ser un número' })

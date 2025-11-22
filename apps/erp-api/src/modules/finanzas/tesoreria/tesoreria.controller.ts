@@ -17,7 +17,7 @@ import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, Programaci
 
 @ApiTags('Finanzas - Tesorería')
 @ApiBearerAuth()
-@Controller('api/finanzas/tesoreria')
+@Controller('finanzas/tesoreria')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: tesorería exige permisos granulares.
 export class TesoreriaController {
   constructor(private readonly tesoreriaService: TesoreriaService) {}

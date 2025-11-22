@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { CxpController } from './cxp.controller';
 import { CxpService } from './cxp.service';
-import { CxpRecepcionListener } from './cxp-recepcion.listener';
 import { SupabaseModule } from '../../../shared/supabase/supabase.module';
 import { PermissionsModule } from '../../permissions/permissions.module';
-import { EventBusService } from '../../../shared/events/event-bus.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { AuthModule } from '../../auth/auth.module';
+import { CxpEventsListener } from './listeners/cxp-events.listener';
+import { EventsModule } from '../../../shared/events/events.module';
 
 @Module({
-  imports: [SupabaseModule, PermissionsModule, AuthModule],
+  imports: [SupabaseModule, PermissionsModule, AuthModule, EventsModule],
   controllers: [CxpController],
-  providers: [CxpService, CxpRecepcionListener, RetencionesValidationService],
+  providers: [CxpService, RetencionesValidationService, CxpEventsListener],
   exports: [CxpService],
 })
 export class CxpModule {}

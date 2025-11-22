@@ -5,6 +5,7 @@ import { DevolucionesProveedorRepository } from '../repositories/devoluciones-pr
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
 
 describe('DevolucionesProveedorService', () => {
@@ -103,6 +104,12 @@ describe('DevolucionesProveedorService', () => {
         {
           provide: EventBusService,
           useValue: mockEventBusService
+        },
+        {
+          provide: TaxCalculatorService,
+          useValue: {
+            calcularImpuestos: jest.fn().mockResolvedValue({ igv: 0, total: 0 })
+          }
         }
       ]
     }).compile();

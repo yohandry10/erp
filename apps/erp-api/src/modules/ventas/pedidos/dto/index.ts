@@ -4,3 +4,4 @@ export * from './pedido-detalle.dto';
 export * from './confirmar-pedido.dto';
 export * from './cancelar-pedido.dto';
 export * from './decidir-aprobacion.dto';
+export * from './generar-documento.dto';

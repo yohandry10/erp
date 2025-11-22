@@ -10,6 +10,10 @@ export interface CertificateValidationResult {
   isValid: boolean
   expiresAt?: Date
   daysUntilExpiration?: number
+  subject?: string
+  issuer?: string
+  serialNumber?: string
+  validFrom?: Date
   errors: string[]
   warnings: string[]
 }
@@ -60,6 +64,7 @@ export interface WizardState {
   validationResults: WizardValidationResults
   isLoading: boolean
   error: string | null
+  hasPersistedConfiguration: boolean
 }
 
 export interface WizardProgress {

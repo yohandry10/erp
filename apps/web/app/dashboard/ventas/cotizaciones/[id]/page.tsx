@@ -84,12 +84,24 @@ export default function CotizacionDetailPage() {
     }
   }
 
-  const handleConversionSuccess = (pedidoId: string) => {
+  const handleConversionSuccess = (pedidoId?: string) => {
+    loadCotizacion()
+
     toast({
-      title: 'Éxito',
-      description: 'Cotización convertida a pedido exitosamente'
+      title: 'Cotización convertida',
+      description: pedidoId
+        ? 'La cotización fue convertida. Puedes ir al pedido recién creado.'
+        : 'La cotización fue convertida correctamente.',
+      action: pedidoId ? (
+        <button
+          type="button"
+          className="text-sm font-semibold text-primary underline mt-2"
+          onClick={() => router.push(`/dashboard/ventas/pedidos/${pedidoId}`)}
+        >
+          Ver pedido
+        </button>
+      ) : undefined
     })
-    router.push(`/dashboard/ventas/pedidos/${pedidoId}`)
   }
 
   const formatCurrency = (amount: number) => {
@@ -130,44 +142,89 @@ export default function CotizacionDetailPage() {
   const isConverted = cotizacion.estado === EstadoCotizacion.CONVERTIDA
 
   return (
-    <div className="p-6 space-y-6">
+    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
             onClick={() => router.back()}
-            className="hover:bg-gray-100"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              color: 'var(--primary-700)',
+              background: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid var(--primary-200)',
+              borderRadius: 'var(--border-radius)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--primary-50)'
+              e.currentTarget.style.borderColor = 'var(--primary-300)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'
+              e.currentTarget.style.borderColor = 'var(--primary-200)'
+            }}
           >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+            <ArrowLeft style={{ width: '1.125rem', height: '1.125rem' }} />
+          </button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-900">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+              <h1 style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--primary-900)', margin: 0 }}>
                 Cotización {cotizacion.numero}
               </h1>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                ESTADO_COLORS[cotizacion.estado]
-              }`}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '0.5rem 1rem',
+                borderRadius: '9999px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                background: ESTADO_COLORS[cotizacion.estado].bg,
+                color: ESTADO_COLORS[cotizacion.estado].text
+              }}>
                 {cotizacion.estado}
               </span>
             </div>
-            <p className="text-gray-600 mt-1">
+            <p style={{ fontSize: '1rem', color: 'var(--primary-600)', margin: 0 }}>
               {isEditing ? 'Editando cotización' : 'Detalle de la cotización'}
             </p>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
           {!isEditing && canEdit && (
-            <Button
+            <button
               onClick={() => setIsEditing(true)}
-              variant="outline"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: 'var(--primary-700)',
+                background: 'white',
+                border: '2px solid var(--primary-200)',
+                borderRadius: 'var(--border-radius)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--primary-50)'
+                e.currentTarget.style.borderColor = 'var(--primary-300)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white'
+                e.currentTarget.style.borderColor = 'var(--primary-200)'
+              }}
             >
-              <Edit className="w-4 h-4 mr-2" />
+              <Edit style={{ width: '1rem', height: '1rem' }} />
               Editar
-            </Button>
+            </button>
           )}
           
           {!isEditing && canConvert && !isConverted && (
@@ -181,17 +238,21 @@ export default function CotizacionDetailPage() {
 
       {/* Converted Message */}
       {isConverted && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div style={{
+          background: 'rgba(139, 92, 246, 0.1)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          borderRadius: 'var(--border-radius-lg)',
+          padding: '1rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p className="text-sm font-medium text-purple-900">
+              <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#7c3aed', margin: '0 0 0.25rem 0' }}>
                 Esta cotización ya fue convertida a pedido
               </p>
-              <p className="text-sm text-purple-700 mt-1">
+              <p style={{ fontSize: '0.875rem', color: '#7c3aed', margin: 0 }}>
                 No se puede editar ni convertir nuevamente
               </p>
             </div>
-            {/* TODO: Add link to pedido when we have the pedido_id */}
           </div>
         </div>
       )}
@@ -204,87 +265,128 @@ export default function CotizacionDetailPage() {
           onCancel={() => setIsEditing(false)}
         />
       ) : (
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Cliente Info */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Información del Cliente</h3>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-md)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+              Información del Cliente
+            </h3>
             {cotizacion.cliente ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                 <div>
-                  <p className="text-sm text-gray-600">Razón Social</p>
-                  <p className="text-base font-medium text-gray-900">{cotizacion.cliente.razon_social}</p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Razón Social</p>
+                  <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+                    {cotizacion.cliente.razon_social}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Documento</p>
-                  <p className="text-base font-medium text-gray-900">
+                  <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Documento</p>
+                  <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
                     {cotizacion.cliente.documento_tipo}: {cotizacion.cliente.documento_numero}
                   </p>
                 </div>
                 {cotizacion.cliente.email && (
                   <div>
-                    <p className="text-sm text-gray-600">Email</p>
-                    <p className="text-base font-medium text-gray-900">{cotizacion.cliente.email}</p>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Email</p>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+                      {cotizacion.cliente.email}
+                    </p>
                   </div>
                 )}
                 {cotizacion.cliente.telefono && (
                   <div>
-                    <p className="text-sm text-gray-600">Teléfono</p>
-                    <p className="text-base font-medium text-gray-900">{cotizacion.cliente.telefono}</p>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Teléfono</p>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+                      {cotizacion.cliente.telefono}
+                    </p>
                   </div>
                 )}
               </div>
             ) : (
-              <p className="text-gray-500">Cliente no disponible</p>
+              <p style={{ color: 'var(--primary-500)' }}>Cliente no disponible</p>
             )}
           </div>
 
           {/* Fechas */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Fechas</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-md)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+              Fechas
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
               <div>
-                <p className="text-sm text-gray-600">Fecha de Emisión</p>
-                <p className="text-base font-medium text-gray-900">{formatDate(cotizacion.fecha)}</p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Fecha de Emisión</p>
+                <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+                  {formatDate(cotizacion.fecha)}
+                </p>
               </div>
               {cotizacion.fecha_vencimiento && (
                 <div>
-                  <p className="text-sm text-gray-600">Fecha de Vencimiento</p>
-                  <p className="text-base font-medium text-gray-900">{formatDate(cotizacion.fecha_vencimiento)}</p>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Fecha de Vencimiento</p>
+                  <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+                    {formatDate(cotizacion.fecha_vencimiento)}
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Productos */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Productos</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-md)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+              Productos
+            </h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--primary-50)', borderBottom: '2px solid var(--primary-200)' }}>
+                    <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
                       Descripción
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
                       Cantidad
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
                       Precio Unit.
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
                       Subtotal
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody>
                   {cotizacion.detalle.map((item, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-3 text-sm text-gray-900">{item.descripcion}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">{item.cantidad}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                    <tr key={index} style={{ borderBottom: '1px solid var(--primary-100)' }}>
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--primary-900)' }}>
+                        {item.descripcion}
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: 'var(--primary-900)' }}>
+                        {item.cantidad}
+                      </td>
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: 'var(--primary-900)' }}>
                         {formatCurrency(item.precio_unitario)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                      <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', fontWeight: '600', color: 'var(--primary-900)' }}>
                         {formatCurrency(item.subtotal)}
                       </td>
                     </tr>
@@ -295,18 +397,35 @@ export default function CotizacionDetailPage() {
           </div>
 
           {/* Totales */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Totales</h3>
-            <div className="space-y-2 max-w-md ml-auto">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal:</span>
-                <span className="font-medium">{formatCurrency(cotizacion.subtotal)}</span>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            borderRadius: 'var(--border-radius-lg)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-md)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+              Totales
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '28rem', marginLeft: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                <span style={{ color: 'var(--primary-600)' }}>Subtotal:</span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(cotizacion.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">IGV (18%):</span>
-                <span className="font-medium">{formatCurrency(cotizacion.igv)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                <span style={{ color: 'var(--primary-600)' }}>IGV (18%):</span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(cotizacion.igv)}</span>
               </div>
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '1.125rem',
+                fontWeight: '700',
+                borderTop: '2px solid var(--primary-200)',
+                paddingTop: '0.5rem',
+                marginTop: '0.5rem'
+              }}>
                 <span>Total:</span>
                 <span>{formatCurrency(cotizacion.total)}</span>
               </div>
@@ -315,9 +434,20 @@ export default function CotizacionDetailPage() {
 
           {/* Notas */}
           {cotizacion.notas && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Notas</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{cotizacion.notas}</p>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              borderRadius: 'var(--border-radius-lg)',
+              padding: '1.5rem',
+              boxShadow: 'var(--shadow-md)',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
+            }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+                Notas
+              </h3>
+              <p style={{ color: 'var(--primary-700)', whiteSpace: 'pre-wrap', margin: 0 }}>
+                {cotizacion.notas}
+              </p>
             </div>
           )}
         </div>

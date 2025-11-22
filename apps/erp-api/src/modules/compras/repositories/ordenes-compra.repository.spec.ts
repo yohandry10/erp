@@ -49,19 +49,30 @@ describe('OrdenesCompraRepository - findAll con filtros compuestos', () => {
       const tenantId = 'test-tenant-id';
       const filters = { estado: 'APROBADA' };
 
-      // Mock de respuesta
-      mockSupabaseClient.from.mockReturnValue({
-        ...mockSupabaseClient,
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockReturnThis(),
-        then: jest.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
-      });
+      const eqMock = jest.fn().mockReturnThis();
+      const inMock = jest.fn().mockReturnThis();
+      const orderMock = jest.fn().mockReturnThis();
+      const thenable = Promise.resolve({ data: [], error: null, count: 0 } as any);
+      const query = {
+        from: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        eq: eqMock,
+        in: inMock,
+        order: orderMock,
+        gte: jest.fn().mockReturnThis(),
+        lte: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        range: jest.fn().mockReturnThis(),
+        then: thenable.then.bind(thenable),
+      };
+
+      jest.spyOn(supabaseService, 'getClient').mockReturnValue(query as any);
 
       await repository.findAll(tenantId, filters);
 
-      // Verificar que se llamó a .eq() con el estado
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('estado', 'APROBADA');
-      expect(mockSupabaseClient.in).not.toHaveBeenCalled();
+      // Verificar que se llamó a .eq() con el estado en el query real
+      expect(eqMock).toHaveBeenCalledWith('estado', 'APROBADA');
+      expect(inMock).not.toHaveBeenCalled();
     });
 
     it('debe usar .in() para múltiples estados separados por coma', async () => {

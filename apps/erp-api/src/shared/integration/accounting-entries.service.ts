@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Buffer } from 'buffer';
 import { SupabaseService } from '../supabase/supabase.service';
 import {
   EventBusService,
@@ -18,6 +19,15 @@ export class AccountingEntriesService {
   // HARDENING: usamos Logger para centralizar trazas y Map por tenant para evitar fugas.
   private readonly logger = new Logger(AccountingEntriesService.name);
   private cuentasCache: Map<string, string> = new Map();
+  private readonly cuentaFallbacks: Record<string, string[]> = {
+    '101': ['10'],
+    '104': ['10'],
+    '121': ['12'],
+    '201': ['20'],
+    '401': ['40'],
+    '691': ['69'],
+    '701': ['70'],
+  };
 
   constructor(
     private readonly supabase: SupabaseService,
@@ -69,26 +79,47 @@ export class AccountingEntriesService {
       throw new Error('Tenant requerido para resolver cuentas contables');
     }
 
-    const cacheKey = `${tenantId}:${codigo}`;
-    if (this.cuentasCache.has(cacheKey)) {
-      return this.cuentasCache.get(cacheKey)!;
+    const codesToTry = [codigo, ...(this.cuentaFallbacks[codigo] ?? [])];
+    let lastError: Error | null = null;
+
+    for (const currentCode of codesToTry) {
+      const cacheKey = `${tenantId}:${currentCode}`;
+      if (this.cuentasCache.has(cacheKey)) {
+        const cuentaId = this.cuentasCache.get(cacheKey)!;
+        if (currentCode !== codigo) {
+          this.cuentasCache.set(`${tenantId}:${codigo}`, cuentaId);
+        }
+        return cuentaId;
+      }
+
+      const { data: cuenta, error } = await this.supabase
+        .getClient()
+        .from('plan_cuentas')
+        .select('id, acepta_movimiento')
+        .eq('codigo', currentCode)
+        .eq('acepta_movimiento', true)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (error && error.code && error.code !== 'PGRST116') {
+        lastError = new Error(`Cuenta ${currentCode} no disponible: ${error.message}`);
+        continue;
+      }
+
+      if (cuenta?.id) {
+        const cacheKeyCurrent = `${tenantId}:${currentCode}`;
+        this.cuentasCache.set(cacheKeyCurrent, cuenta.id);
+        if (currentCode !== codigo) {
+          this.logger.warn(
+            `⚠️ [AccountingEntries] Cuenta ${codigo} no existe para el tenant ${tenantId}; usando ${currentCode} como fallback.`,
+          );
+          this.cuentasCache.set(`${tenantId}:${codigo}`, cuenta.id);
+        }
+        return cuenta.id;
+      }
     }
 
-    const { data: cuenta, error } = await this.supabase
-      .getClient()
-      .from('plan_cuentas')
-      .select('id')
-      .eq('codigo', codigo)
-      .eq('acepta_movimiento', true)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (error || !cuenta) {
-      throw new Error(`Cuenta ${codigo} no encontrada o no acepta movimientos`);
-    }
-
-    this.cuentasCache.set(cacheKey, cuenta.id);
-    return cuenta.id;
+    throw lastError ?? new Error(`Cuenta ${codigo} no encontrada o no acepta movimientos`);
   }
 
   private async runInTenantContext<T>(tenantId: string | null | undefined, callback: () => Promise<T>): Promise<T | null> {
@@ -164,16 +195,18 @@ export class AccountingEntriesService {
     try {
       const costoVentas = await this.calcularCostoVentas(venta.items);
 
-      const asiento: AsientoContable = {
+      const cuentaCobro = this.resolveCuentaCobro(venta.metodoPago);
+
+      const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],
         concepto: `Venta Ticket ${venta.numeroTicket}`,
         referencia: venta.ventaId,
         sourceEventId: venta.eventId,
         detalles: [
           {
-            cuentaId: await this.getCuentaId(venta.metodoPago === 'efectivo' ? '101' : '104'),
-            cuentaCodigo: venta.metodoPago === 'efectivo' ? '101' : '104',
-            cuentaNombre: venta.metodoPago === 'efectivo' ? 'Caja' : 'Cuentas Corrientes',
+            cuentaId: await this.getCuentaId(cuentaCobro.codigo),
+            cuentaCodigo: cuentaCobro.codigo,
+            cuentaNombre: cuentaCobro.nombre,
             debe: venta.total,
             haber: 0,
             descripcion: `Cobro venta ${venta.numeroTicket}`,
@@ -211,7 +244,7 @@ export class AccountingEntriesService {
             descripcion: `Costo de ventas ${venta.numeroTicket}`,
           },
         ],
-      };
+      });
 
       return await this.guardarAsientoContable(asiento);
     } catch (error) {
@@ -222,7 +255,7 @@ export class AccountingEntriesService {
 
   async procesarAsientoCompra(compra: CompraEntregadaEvent): Promise<string | null> {
     try {
-      const asiento: AsientoContable = {
+      const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],
         concepto: `Compra Orden ${compra.numeroOrden}`,
         referencia: compra.ordenId,
@@ -245,7 +278,7 @@ export class AccountingEntriesService {
             descripcion: `Factura por pagar ${compra.numeroOrden}`,
           },
         ],
-      };
+      });
 
       return await this.guardarAsientoContable(asiento);
     } catch (error) {
@@ -260,7 +293,7 @@ export class AccountingEntriesService {
 
       switch (movimiento.tipoMovimiento) {
         case 'ENTRADA':
-          asiento = {
+          asiento = this.normalizeAsiento({
             fecha: new Date().toISOString().split('T')[0],
             concepto: `Entrada de stock - ${movimiento.motivo}`,
             referencia: movimiento.productoId,
@@ -283,11 +316,11 @@ export class AccountingEntriesService {
                 descripcion: `Contrapartida entrada stock ${movimiento.productoId}`,
               },
             ],
-          };
+          });
           break;
 
         case 'SALIDA':
-          asiento = {
+          asiento = this.normalizeAsiento({
             fecha: new Date().toISOString().split('T')[0],
             concepto: `Salida de stock - ${movimiento.motivo}`,
             referencia: movimiento.productoId,
@@ -310,14 +343,14 @@ export class AccountingEntriesService {
                 descripcion: `Salida stock ${movimiento.productoId}`,
               },
             ],
-          };
+          });
           break;
 
         case 'AJUSTE': {
           const valorAjuste = movimiento.valor;
           const esAjustePositivo = movimiento.cantidad > 0;
 
-          asiento = {
+          asiento = this.normalizeAsiento({
             fecha: new Date().toISOString().split('T')[0],
             concepto: `Ajuste de inventario - ${movimiento.motivo}`,
             referencia: movimiento.productoId,
@@ -340,7 +373,7 @@ export class AccountingEntriesService {
                 descripcion: `Contrapartida ajuste ${movimiento.productoId}`,
               },
             ],
-          };
+          });
           break;
         }
 
@@ -361,7 +394,7 @@ export class AccountingEntriesService {
       const cuentaEfectivo = pago.metodoPago === 'efectivo' ? '101' : '104';
       const nombreCuentaEfectivo = pago.metodoPago === 'efectivo' ? 'Caja' : 'Cuentas Corrientes';
 
-      const asiento: AsientoContable = {
+      const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],
         concepto: `Pago de factura ${pago.numeroFactura}`,
         referencia: pago.facturaId,
@@ -384,7 +417,7 @@ export class AccountingEntriesService {
             descripcion: `Pago ${pago.metodoPago} factura ${pago.numeroFactura}`,
           },
         ],
-      };
+      });
 
       return await this.guardarAsientoContable(asiento);
     } catch (error) {
@@ -438,7 +471,7 @@ export class AccountingEntriesService {
       const monto = Number(gasto.monto ?? 0);
       const conceptoTxt = `Gasto ${gasto.categoria ?? ''}${gasto.descripcion ? ' — ' + gasto.descripcion : ''}`.trim();
 
-      const asiento: AsientoContable = {
+      const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],
         concepto: conceptoTxt,
         referencia: (gasto.gastoId as any) ?? null,
@@ -461,13 +494,27 @@ export class AccountingEntriesService {
             descripcion: 'Contrapartida del gasto',
           },
         ],
-      };
+      });
 
       return await this.guardarAsientoContable(asiento);
     } catch (error) {
       console.error('❌ Error procesando asiento de gasto:', error);
       return null;
     }
+  }
+
+  private resolveCuentaCobro(metodoPago?: string): { codigo: string; nombre: string } {
+    const normalized = metodoPago?.toLowerCase?.() ?? 'efectivo';
+
+    if (normalized === 'efectivo' || normalized === 'cash') {
+      return { codigo: '101', nombre: 'Caja' };
+    }
+
+    if (normalized === 'credito' || normalized === 'crédito' || normalized === 'credit') {
+      return { codigo: '121', nombre: 'Cuentas por Cobrar Comerciales' };
+    }
+
+    return { codigo: '104', nombre: 'Cuentas Corrientes' };
   }
 
   private async calcularCostoVentas(items: any[]): Promise<number> {
@@ -534,16 +581,6 @@ export class AccountingEntriesService {
       }
     }
 
-    const { data: ultimoAsiento } = await client
-      .from('asientos_contables')
-      .select('numero_asiento')
-      .eq('tenant_id', tenantId)
-      .order('numero_asiento', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const numeroAsiento = (ultimoAsiento?.numero_asiento || 0) + 1;
-
     const totalDebe = asiento.detalles.reduce((s, d) => s + d.debe, 0);
     const totalHaber = asiento.detalles.reduce((s, d) => s + d.haber, 0);
 
@@ -551,37 +588,160 @@ export class AccountingEntriesService {
       throw new Error(`Asiento desbalanceado: Debe=${totalDebe}, Haber=${totalHaber}`);
     }
 
-    const { data: asientoCreado, error: errorAsiento } = await client
-      .from('asientos_contables')
-      .insert({
-        tenant_id: tenantId, // HARDENING: cada asiento queda ligado al tenant autenticado.
-        numero_asiento: numeroAsiento,
-        fecha: asiento.fecha,
-        concepto: asiento.concepto,
-        referencia: asiento.referencia,
-        total_debe: totalDebe,
-        total_haber: totalHaber,
-        estado: 'CONFIRMADO',
-        source_event_id: asiento.sourceEventId ?? null,
-      })
-      .select('id')
-      .single();
+    let numeroAsiento: string | number | null = null;
+    let asientoCreado: { id: string } | null = null;
 
-    if (errorAsiento) throw errorAsiento;
+    const conceptoClampSequence = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
+    let ultimoConceptoFinal: string | null = asiento.concepto;
+    let ultimaReferenciaFinal: string | null = asiento.referencia ?? null;
 
-    const detallesParaInsertar = asiento.detalles.map((d) => ({
-      asiento_id: asientoCreado.id,
-      cuenta_id: d.cuentaId,
-      debe: d.debe,
-      haber: d.haber,
-      concepto: d.descripcion,
-    }));
+    for (let intento = 0; intento < conceptoClampSequence.length; intento++) {
+      const { data: ultimoAsiento } = await client
+        .from('asientos_contables')
+        .select('numero_asiento')
+        .eq('tenant_id', tenantId)
+        .order('numero_asiento', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const { error: errorDetalles } = await client
-      .from('detalle_asientos')
-      .insert(detallesParaInsertar);
+      numeroAsiento = (ultimoAsiento?.numero_asiento || 0) + 1;
 
-    if (errorDetalles) throw errorDetalles;
+      const clampLength = conceptoClampSequence[intento];
+      const conceptoFinal = this.clampText(asiento.concepto, clampLength);
+      const referenciaFinal = asiento.referencia ? this.clampText(asiento.referencia, clampLength) : null;
+      ultimoConceptoFinal = conceptoFinal;
+      ultimaReferenciaFinal = referenciaFinal;
+      const { data, error } = await client
+        .from('asientos_contables')
+        .insert({
+          tenant_id: tenantId, // HARDENING: cada asiento queda ligado al tenant autenticado.
+          numero_asiento: numeroAsiento,
+          fecha: asiento.fecha,
+          concepto: conceptoFinal,
+          referencia: referenciaFinal,
+          total_debe: totalDebe,
+          total_haber: totalHaber,
+          estado: 'CONFIRMADO',
+          source_event_id: asiento.sourceEventId ?? null,
+        })
+        .select('id')
+        .single();
+
+      if (!error && data) {
+        asientoCreado = data as { id: string };
+        break;
+      }
+
+      if (error?.code === '23505') {
+        this.logger.warn(
+          `⚠️ [AccountingEntries] Número de asiento duplicado (${numeroAsiento}) para tenant ${tenantId}. Reintentando...`,
+        );
+        continue;
+      }
+      if (error?.code === '22001') {
+        const conceptoStats = this.getTextMetrics(conceptoFinal);
+        const referenciaStats = this.getTextMetrics(referenciaFinal);
+        if (intento < conceptoClampSequence.length - 1) {
+          this.logger.warn(
+            `⚠️ [AccountingEntries] Texto excede límite permitido. Intento ${
+              intento + 1
+            }, clamp=${clampLength}, concepto=${conceptoStats.bytes}b/${conceptoStats.chars}c, referencia=${referenciaStats.bytes}b/${referenciaStats.chars}c (tenant ${tenantId}).`,
+          );
+          continue;
+        }
+        this.logger.error(
+          `❌ [AccountingEntries] No se pudo truncar concepto/referencia por debajo del límite tras ${conceptoClampSequence.length} intentos (tenant ${tenantId}, clamp=${clampLength}, concepto=${conceptoStats.bytes}b/${conceptoStats.chars}c, referencia=${referenciaStats.bytes}b/${referenciaStats.chars}c).`,
+          error,
+        );
+        throw error;
+      }
+
+      if (error) throw error;
+    }
+
+    if (!asientoCreado || numeroAsiento === null) {
+      // Fallback absoluto: usar un identificador monotónico único (timestamp + random) para eliminar colisiones extremas
+      const fallbackNumero = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)
+        .toString()
+        .padStart(6, '0')}`;
+      this.logger.warn(
+        `⚠️ [AccountingEntries] Usando fallback para numero_asiento único ${fallbackNumero} (tenant ${tenantId})`,
+      );
+
+      const { data: dataFallback, error: errorFallback } = await client
+        .from('asientos_contables')
+        .insert({
+          tenant_id: tenantId,
+          numero_asiento: fallbackNumero,
+          fecha: asiento.fecha,
+          concepto: ultimoConceptoFinal ? ultimoConceptoFinal : asiento.concepto,
+          referencia: ultimaReferenciaFinal,
+          total_debe: totalDebe,
+          total_haber: totalHaber,
+          estado: 'CONFIRMADO',
+          source_event_id: asiento.sourceEventId ?? null,
+        })
+        .select('id')
+        .single();
+
+      if (!errorFallback && dataFallback) {
+        asientoCreado = dataFallback as { id: string };
+        numeroAsiento = fallbackNumero as any;
+      } else {
+        throw new Error('No se pudo generar un número de asiento único después de varios intentos');
+      }
+    }
+
+    const asientoId = asientoCreado.id;
+    let detallesInsertados = false;
+    const detalleClampSequence = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
+    for (let intentoDetalle = 0; intentoDetalle < detalleClampSequence.length && !detallesInsertados; intentoDetalle++) {
+      const detalleClamp = detalleClampSequence[intentoDetalle];
+      const detallesParaInsertar = asiento.detalles.map((d) => ({
+        asiento_id: asientoId,
+        cuenta_id: d.cuentaId,
+        debe: d.debe,
+        haber: d.haber,
+        concepto: this.clampText(d.descripcion, detalleClamp),
+      }));
+
+      const { error: errorDetalles } = await client
+        .from('detalle_asientos')
+        .insert(detallesParaInsertar);
+
+      if (!errorDetalles) {
+        detallesInsertados = true;
+        break;
+      }
+
+      if (errorDetalles?.code === '22001' && intentoDetalle < detalleClampSequence.length - 1) {
+        const detalleMetrics = detallesParaInsertar
+          .map((detalle, index) => {
+            const stats = this.getTextMetrics(detalle.concepto);
+            return `#${index + 1}:${stats.bytes}b/${stats.chars}c`;
+          })
+          .join(', ');
+        this.logger.warn(
+          `⚠️ [AccountingEntries] Conceptos de detalle exceden límite. Reintentando con truncado adicional (tenant ${tenantId}, intento ${intentoDetalle + 1}, clamp=${detalleClamp}, metrics=${detalleMetrics}).`,
+        );
+        continue;
+      }
+
+      if (errorDetalles?.code === '22001' && intentoDetalle === detalleClampSequence.length - 1) {
+        const detalleMetrics = detallesParaInsertar
+          .map((detalle, index) => {
+            const stats = this.getTextMetrics(detalle.concepto);
+            return `#${index + 1}:${stats.bytes}b/${stats.chars}c`;
+          })
+          .join(', ');
+        this.logger.error(
+          `❌ [AccountingEntries] Conceptos de detalle siguen excediendo el límite después de varios intentos (tenant ${tenantId}, clamp=${detalleClamp}, metrics=${detalleMetrics}).`,
+          errorDetalles,
+        );
+      }
+
+      throw errorDetalles;
+    }
 
     this.logger.log(`✅ [AccountingEntries] Asiento ${numeroAsiento} creado para tenant ${tenantId} (ID: ${asientoCreado.id})`);
     return asientoCreado.id;
@@ -640,5 +800,75 @@ export class AccountingEntriesService {
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
+  }
+
+  private clampText(value: string | null | undefined, maxLength: number): string {
+    if (!value) {
+      return '';
+    }
+
+    // Normalizar espacios y eliminar saltos de línea que puedan generar bytes extra
+    let normalized = value.toString().replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return '';
+    }
+
+    // Si ya está dentro del límite de bytes UTF-8, retornamos
+    if (Buffer.byteLength(normalized, 'utf8') <= maxLength) {
+      return normalized;
+    }
+
+    // Reducir carácter por carácter hasta que el tamaño en bytes sea <= maxLength
+    let end = normalized.length;
+    while (end > 0 && Buffer.byteLength(normalized.slice(0, end), 'utf8') > maxLength) {
+      end--;
+    }
+
+    return normalized.slice(0, end);
+  }
+
+  private getTextMetrics(value: string | null | undefined): { chars: number; bytes: number } {
+    const normalized = value ?? '';
+    return {
+      chars: normalized.length,
+      bytes: Buffer.byteLength(normalized, 'utf8'),
+    };
+  }
+
+  private normalizeAsiento(asiento: AsientoContable): AsientoContable {
+    const concepto = this.formatShortText(asiento.concepto, 48) || 'MOVIMIENTO';
+    const referenciaRaw = this.formatShortText(asiento.referencia ?? '', 40);
+    const referencia = referenciaRaw ? referenciaRaw : null;
+
+    const detalles = asiento.detalles.map((detalle, index) => ({
+      ...detalle,
+      descripcion:
+        this.formatShortText(detalle.descripcion ?? `Detalle ${index + 1}`, 48) ||
+        `Detalle ${index + 1}`,
+    }));
+
+    return {
+      ...asiento,
+      concepto,
+      referencia,
+      detalles,
+    };
+  }
+
+  private formatShortText(value: string | null | undefined, maxChars: number): string {
+    if (!value) {
+      return '';
+    }
+
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (normalized.length <= maxChars) {
+      return normalized;
+    }
+
+    if (maxChars <= 3) {
+      return normalized.slice(0, maxChars);
+    }
+
+    return `${normalized.slice(0, maxChars - 3)}...`;
   }
 }

@@ -104,7 +104,7 @@ BEGIN
   v_cantidad := p_cantidad;
 
   SELECT
-    COALESCE(stock_actual, stock::numeric, 0),
+    COALESCE(stock::numeric, 0),
     COALESCE(stock, 0)
   INTO v_stock_actual, v_stock_base
   FROM productos
@@ -122,7 +122,6 @@ BEGIN
 
   UPDATE productos
   SET
-    stock_actual = GREATEST(v_stock_actual - v_cantidad, 0),
     stock = GREATEST(v_stock_base - v_cantidad::integer, 0),
     stock_reservado = GREATEST(COALESCE(stock_reservado, 0) - v_cantidad, 0),
     updated_at = NOW()

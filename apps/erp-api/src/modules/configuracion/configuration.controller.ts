@@ -11,13 +11,14 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ConfigurationService } from './configuration.service';
+import { ConfigurationService, TOTAL_WIZARD_STEPS } from './configuration.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { User } from '../auth/user.interface';
 import {
   SaveWizardStepDto,
   UpdateGREThresholdsDto,
+  ValidateWizardCertificateDto,
 } from './configuration.types';
 
 @ApiTags('configuration')
@@ -42,26 +43,8 @@ export class ConfigurationController {
     @CurrentTenant() tenantId?: string,
   ) {
     try {
-      // SUPER ADMINS DON'T NEED CONFIGURATION - ALWAYS RETURN COMPLETE
-      if (user?.is_super_admin === true) {
-        this.logger.log(`Super admin detected - returning complete status`);
-        return {
-          success: true,
-          data: {
-            isComplete: true,
-            completionPercentage: 100,
-            missingItems: [],
-            certificate: {
-              exists: true,
-              isValid: true,
-            },
-            ruc: {
-              isConfigured: true,
-              missingFields: [],
-            },
-          },
-        };
-      }
+      // REMOVED: Super admins MUST also complete configuration for their tenant
+      // Each tenant needs its own configuration regardless of user role
 
       if (!tenantId) {
         throw new HttpException(
@@ -90,6 +73,60 @@ export class ConfigurationController {
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * POST /api/configuration/wizard/validate-certificate
+   * Validate certificate payload before saving wizard progress
+   */
+  @Post('wizard/validate-certificate')
+  @ApiOperation({ summary: 'Validate wizard certificate payload' })
+  @ApiResponse({ status: 200, description: 'Certificate validated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid certificate payload' })
+  async validateWizardCertificate(
+    @CurrentUser() user: User | undefined,
+    @Body() payload: ValidateWizardCertificateDto,
+    @CurrentTenant() tenantId?: string,
+  ) {
+    try {
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para validar certificado',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const result = await this.configurationService.validateCertificatePayload(tenantId, payload);
+
+      return {
+        success: true,
+        data: {
+          subject: result.subject,
+          issuer: result.issuer,
+          serialNumber: result.serialNumber,
+          validFrom: result.validFrom.toISOString(),
+          validTo: result.validTo.toISOString(),
+          daysUntilExpiration: result.daysUntilExpiration,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error validating wizard certificate:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          success: false,
+          message: error instanceof Error ? error.message : 'Certificado inválido',
+        },
+        HttpStatus.BAD_REQUEST,
       );
     }
   }
@@ -222,6 +259,52 @@ export class ConfigurationController {
   }
 
   /**
+   * POST /api/configuration/wizard/reset
+   * Reset wizard configuration to start over
+   */
+  @Post('wizard/reset')
+  @ApiOperation({ summary: 'Reset wizard configuration' })
+  @ApiResponse({ status: 200, description: 'Wizard reset successfully' })
+  async resetWizard(
+    @CurrentUser() user: User | undefined,
+    @CurrentTenant() tenantId?: string,
+  ) {
+    try {
+      if (!tenantId) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Tenant requerido para reiniciar configuración',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      await this.configurationService.resetWizard(tenantId);
+
+      return {
+        success: true,
+        message: 'Configuración reiniciada correctamente',
+      };
+    } catch (error) {
+      this.logger.error('Error resetting wizard configuration:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Error al reiniciar la configuración',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * POST /api/configuration/complete
    * Mark configuration wizard as completed
    */
@@ -251,13 +334,13 @@ export class ConfigurationController {
       // Save the final configuration to wizard_progress before completing
       if (body.configuration) {
         await this.configurationService.saveWizardStep(tenantId, {
-          pasoActual: 5, // Final step
+          pasoActual: TOTAL_WIZARD_STEPS,
           configuracionTemporal: body.configuration,
         });
       }
 
       // Complete wizard (this will save to empresa_config and certificados_digitales)
-      await this.configurationService.completeWizard(tenantId);
+      await this.configurationService.completeWizard(tenantId, body.configuration);
 
       return {
         success: true,

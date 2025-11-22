@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { useWizard } from '../useWizard'
 import { usePosConfig } from '@/hooks/use-pos-config'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, ArrowRight, Sparkles } from 'lucide-react'
+import { CheckCircle, ArrowRight, Sparkles, RotateCw } from 'lucide-react'
 
 export function CompletionStep() {
   const router = useRouter()
-  const { completeWizard } = useWizard()
-  const { markWizardAsCompleted } = usePosConfig()
+  const { state, completeWizard, resetWizardProcess } = useWizard()
+  const { markWizardAsCompleted, resetConfiguration } = usePosConfig()
   const [isCompleting, setIsCompleting] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleComplete = async () => {
@@ -19,7 +20,9 @@ export function CompletionStep() {
       setIsCompleting(true)
       setError(null)
 
-      await completeWizard()
+      if (!state.hasPersistedConfiguration) {
+        await completeWizard()
+      }
 
       // Marcar el wizard como completado en localStorage
       console.log('✅ Marcando wizard como completado...')
@@ -34,6 +37,26 @@ export function CompletionStep() {
       console.error('Error completing wizard:', err)
       setError(err instanceof Error ? err.message : 'Error al completar la configuración')
       setIsCompleting(false)
+    }
+  }
+
+  const handleReset = async () => {
+    const confirmed = window.confirm('¿Seguro que deseas reiniciar la configuración? Se solicitarán nuevamente todos los datos.')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setIsResetting(true)
+      setError(null)
+      await resetWizardProcess()
+      resetConfiguration()
+      setIsCompleting(false)
+    } catch (err) {
+      console.error('Error resetting wizard:', err)
+      setError(err instanceof Error ? err.message : 'Error al reiniciar la configuración')
+    } finally {
+      setIsResetting(false)
     }
   }
 
@@ -218,14 +241,14 @@ export function CompletionStep() {
         </div>
       )}
 
-      <div style={{
-        marginTop: '2rem',
-        padding: '1.5rem',
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))',
-        borderRadius: '12px',
-        border: '1px solid rgba(139, 92, 246, 0.2)',
-        textAlign: 'center',
-      }}>
+        <div style={{
+          marginTop: '2rem',
+          padding: '1.5rem',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))',
+          borderRadius: '12px',
+          border: '1px solid rgba(139, 92, 246, 0.2)',
+          textAlign: 'center',
+        }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -253,27 +276,57 @@ export function CompletionStep() {
           guías de remisión y más. Explora el dashboard para conocer todas las funcionalidades.
         </p>
 
-        <Button
-          onClick={handleComplete}
-          disabled={isCompleting}
-          size="lg"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '1rem',
-            padding: '0.75rem 2rem',
-          }}
-        >
-          {isCompleting ? (
-            <>Finalizando...</>
-          ) : (
-            <>
-              Ir al Dashboard
-              <ArrowRight size={20} />
-            </>
-          )}
-        </Button>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: '1rem',
+        }}>
+          <Button
+            onClick={handleComplete}
+            disabled={isCompleting || isResetting}
+            size="lg"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '1rem',
+              padding: '0.75rem 2rem',
+            }}
+          >
+            {isCompleting ? (
+              <>Finalizando...</>
+            ) : (
+              <>
+                Ir al Dashboard
+                <ArrowRight size={20} />
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={handleReset}
+            disabled={isCompleting || isResetting}
+            variant="outline"
+            size="lg"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '1rem',
+              padding: '0.75rem 2rem',
+            }}
+          >
+            {isResetting ? (
+              <>Reiniciando...</>
+            ) : (
+              <>
+                Reiniciar configuración
+                <RotateCw size={20} />
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )

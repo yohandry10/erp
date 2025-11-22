@@ -3,11 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { Cliente } from '@/types/ventas'
 import ClienteForm from '@/components/ventas/ClienteForm'
-import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 export default function EditarClientePage() {
   const router = useRouter()
@@ -15,7 +12,7 @@ export default function EditarClientePage() {
   const { get, put } = useApi()
   const clienteId = params.id as string
 
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [cliente, setCliente] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,17 +24,14 @@ export default function EditarClientePage() {
       setLoading(true)
       const response = await get(`/api/ventas/clientes/${clienteId}`)
       
-      if (response?.success) {
-        setCliente(response.data)
+      if (response?.id) {
+        setCliente(response)
       } else {
-        throw new Error('Cliente no encontrado')
+        alert('Cliente no encontrado')
+        router.push('/dashboard/ventas/clientes')
       }
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo cargar el cliente',
-        variant: 'destructive'
-      })
+      alert(`Error: ${error.message || 'No se pudo cargar el cliente'}`)
       router.push('/dashboard/ventas/clientes')
     } finally {
       setLoading(false)
@@ -48,21 +42,14 @@ export default function EditarClientePage() {
     try {
       const response = await put(`/api/ventas/clientes/${clienteId}`, data)
       
-      if (response?.success) {
-        toast({
-          title: 'Cliente actualizado',
-          description: `Cliente ${data.razon_social} actualizado exitosamente`
-        })
+      if (response?.id) {
+        alert('✅ Cliente actualizado exitosamente')
         router.push(`/dashboard/ventas/clientes/${clienteId}`)
       } else {
-        throw new Error(response?.error || 'Error al actualizar cliente')
+        throw new Error('Error al actualizar cliente')
       }
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo actualizar el cliente',
-        variant: 'destructive'
-      })
+      alert(`❌ Error: ${error.message || 'No se pudo actualizar el cliente'}`)
       throw error
     }
   }
@@ -73,10 +60,10 @@ export default function EditarClientePage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando cliente...</p>
+      <div className="dashboard-container">
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          <p>Cargando cliente...</p>
         </div>
       </div>
     )
@@ -87,26 +74,64 @@ export default function EditarClientePage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div style={{
+      padding: '2rem',
+      maxWidth: '1200px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem'
+    }}>
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1rem'
+      }}>
+        <button
           onClick={handleCancel}
-          className="gap-2"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1rem',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: 'var(--primary-700)',
+            background: 'rgba(255, 255, 255, 0.8)',
+            border: '1px solid var(--primary-200)',
+            borderRadius: 'var(--border-radius)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
           Volver
-        </Button>
+        </button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Editar Cliente</h1>
-          <p className="text-gray-600 mt-1">{cliente.razon_social}</p>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: '700',
+            color: 'var(--primary-900)',
+            margin: 0
+          }}>Editar Cliente</h1>
+          <p style={{
+            fontSize: '1rem',
+            color: 'var(--primary-600)',
+            margin: '0.25rem 0 0 0'
+          }}>{cliente.razon_social}</p>
         </div>
       </div>
 
       {/* Form Card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '2rem',
+        boxShadow: 'var(--shadow-xl)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
         <ClienteForm
           initialData={cliente}
           onSubmit={handleSubmit}

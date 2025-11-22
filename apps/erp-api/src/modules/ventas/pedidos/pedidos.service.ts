@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -10,6 +10,7 @@ import { PedidoVenta, EstadoPedido, PedidoDetalle } from './entities';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
+import { DocumentosService } from '../../documentos.service';
 
 interface ConfiguracionEmpresa {
   usar_flujo_logistica: boolean;
@@ -49,6 +50,19 @@ interface AjustesTributarios {
   anticipo: number;
 }
 
+export interface DocumentoGeneradoResult {
+  pedidoId: string;
+  documentoId: string;
+  tipoDocumento: '01' | '03';
+  serie: string;
+  numero: string;
+  total: number;
+  moneda: string;
+  estadoPedido: EstadoPedido;
+  cpeId?: string | null;
+  cxcId?: string | null;
+}
+
 /**
  * PedidosService
  * Servicio para gestionar pedidos de venta
@@ -56,6 +70,7 @@ interface AjustesTributarios {
  */
 @Injectable()
 export class PedidosService {
+  private readonly logger = new Logger(PedidosService.name);
   constructor(
     private readonly supabase: SupabaseService,
     private readonly notificationsService: NotificationsService,
@@ -65,6 +80,7 @@ export class PedidosService {
     private readonly eventBus: EventBusService,
     private readonly taxCalculator: TaxCalculatorService,
     private readonly tenantContext: TenantContextService,
+    private readonly documentosService: DocumentosService,
   ) {}
 
   /**
@@ -90,6 +106,23 @@ export class PedidosService {
       throw new NotFoundException('Cliente no encontrado');
     }
 
+    // Validar stock disponible antes de crear (hard stop)
+    for (const item of createPedidoDto.detalle) {
+      const disponible = await this.getStockDisponible(item.producto_id, tenantId);
+      if (Number(item.cantidad ?? 0) > disponible) {
+        throw new BadRequestException({
+          message: 'Stock insuficiente para uno o más productos',
+          warnings: [
+            {
+              producto_id: item.producto_id,
+              solicitado: Number(item.cantidad ?? 0),
+              disponible,
+            },
+          ],
+        });
+      }
+    }
+
     // Calcular totales
     const { subtotal, igv, total } = await this.calcularTotales(createPedidoDto.detalle);
 
@@ -104,12 +137,12 @@ export class PedidosService {
         numero,
         cotizacion_id: createPedidoDto.cotizacion_id || null,
         cliente_id: createPedidoDto.cliente_id,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha_pedido: new Date().toISOString().split('T')[0],
         estado: EstadoPedido.PENDIENTE,
         subtotal,
         igv,
         total,
-        notas: createPedidoDto.notas || null,
+        observaciones: createPedidoDto.notas || null,
         created_by: userId || null,
       })
       .select()
@@ -174,7 +207,7 @@ export class PedidosService {
 
     let query = client
       .from('pedidos_venta')
-      .select('*, clientes!inner(id, razon_social, documento_numero)', { count: 'exact' })
+      .select('*, clientes!inner(id, razon_social, numero_documento)', { count: 'exact' })
       .eq('tenant_id', tenantId);
 
     // Filtro por estado
@@ -189,10 +222,10 @@ export class PedidosService {
 
     // Filtro por rango de fechas
     if (filters?.fecha_desde) {
-      query = query.gte('fecha', filters.fecha_desde);
+      query = query.gte('fecha_pedido', filters.fecha_desde);
     }
     if (filters?.fecha_hasta) {
-      query = query.lte('fecha', filters.fecha_hasta);
+      query = query.lte('fecha_pedido', filters.fecha_hasta);
     }
 
     // Búsqueda por número o cliente
@@ -239,7 +272,7 @@ export class PedidosService {
       .select(
         `
           *,
-          clientes!inner(id, razon_social, documento_numero, limite_credito, permite_morosidad)
+          clientes!inner(id, razon_social, numero_documento, limite_credito, permite_morosidad)
         `,
       )
       .eq('tenant_id', tenantId)
@@ -408,7 +441,7 @@ export class PedidosService {
 
     if (observaciones) {
       const nota = `[APROBACION:${decision}] ${observaciones}`;
-      updateData.notas = pedido.notas ? `${pedido.notas}\n\n${nota}` : nota;
+      updateData.observaciones = pedido.observaciones ? `${pedido.observaciones}\n\n${nota}` : nota;
     }
 
     const { error: updateError } = await client
@@ -525,7 +558,7 @@ export class PedidosService {
     }
 
     if (updatePedidoDto.notas !== undefined) {
-      updateData.notas = updatePedidoDto.notas;
+      updateData.observaciones = updatePedidoDto.notas;
     }
 
     // Si se actualiza el detalle, recalcular totales
@@ -934,7 +967,15 @@ export class PedidosService {
 
   private emitirEventoVentaProcesada(
     pedido: (PedidoVenta & { detalle: PedidoDetalle[] }) & { clientes?: any; cliente?: any },
-    factura: { factura_id: string; serie?: string; numero?: number; total: number; fecha_emision?: string; moneda?: string },
+    factura: {
+      factura_id: string;
+      serie?: string;
+      numero?: number;
+      total: number;
+      fecha_emision?: string;
+      moneda?: string;
+      documento_id?: string | null;
+    },
     tenantId: string,
   ): void {
     if (!this.eventBus) {
@@ -982,52 +1023,9 @@ export class PedidosService {
     }
   }
 
-  /**
-   * 🔴 CRÍTICO FIX: Emite evento VentaProcessedEvent cuando se confirma un pedido
-   * Esto asegura que todos los flujos de venta generen asientos contables, no solo cuando se genera factura
-   */
-
-  private async registrarAuditoriaAccion(
-    pedidoId: string,
-    tenantId: string,
-    userId: string | undefined,
-    newValues: Record<string, any>,
-    action: string,
-  ): Promise<void> {
-    try {
-      await this.auditService.logAction({
-        table_name: 'pedidos_venta',
-        operation: 'UPDATE',
-        record_id: pedidoId,
-        tenant_id: tenantId,
-        user_id: userId ?? undefined,
-        new_values: newValues,
-        metadata: { action },
-      });
-    } catch (error) {
-      console.warn(`⚠️ No se pudo registrar auditoría (${action})`, error);
-    }
-  }
-
   private redondearCantidad(value: number): number {
-    return Math.round(value * 100) / 100;
-  }
-
-  private async enviarNotificacion(
-    tenantId: string,
-    payload: {
-      type: any;
-      severity: any;
-      title: string;
-      message: string;
-      usuario_id?: string;
-    },
-  ): Promise<void> {
-    try {
-      await this.notificationsService.createNotification(tenantId, payload);
-    } catch (error) {
-      console.error('Error creating notification:', error);
-    }
+    // Cantidades ahora son enteros; redondeo defensivo
+    return Math.round(value);
   }
 
   /**
@@ -1133,25 +1131,26 @@ export class PedidosService {
     // Verificar stock disponible
     const stockWarnings = [];
     for (const item of pedido.detalle) {
+      const cantidadSolicitada = this.redondearCantidad(Number(item.cantidad ?? 0));
       const stockDisponible = await this.getStockDisponible(item.producto_id, tenantId);
-      if (stockDisponible < item.cantidad) {
+      if (stockDisponible < cantidadSolicitada) {
         stockWarnings.push({
           producto_id: item.producto_id,
           descripcion: item.descripcion,
           disponible: stockDisponible,
-          solicitado: item.cantidad,
+          solicitado: cantidadSolicitada,
         });
       }
     }
 
     if (stockWarnings.length > 0 && !forzarConfirmacion) {
-      return {
-        success: false,
+      throw new BadRequestException({
+        message: 'Stock insuficiente para uno o más productos',
         warnings: stockWarnings,
-      };
+      });
     }
 
-    // Evitar reservas duplicadas
+    // Evitar reservas duplicadas pero permitir avanzar el estado si ya hay reservas previas
     const { data: reservasExistentes } = await client
       .from('movimientos_inventario')
       .select('id')
@@ -1160,80 +1159,78 @@ export class PedidosService {
       .eq('tipo', 'RESERVA')
       .limit(1);
 
-    if (reservasExistentes && reservasExistentes.length > 0) {
-      console.log(`ℹ️ [PedidosService] Pedido ${id} ya cuenta con reservas registradas, retornando estado actual`);
-      return {
-        success: true,
-        warnings: stockWarnings.length > 0 ? stockWarnings : undefined,
-        estado_credito: evaluacion.estadoCredito,
-      };
+    const saltarReserva = Boolean(reservasExistentes && reservasExistentes.length > 0);
+    if (saltarReserva) {
+      this.logger.log(`ℹ️ [PedidosService] Pedido ${id} ya cuenta con reservas registradas, se omite crear nuevas pero se continúa con confirmación.`);
     }
 
-    // HARDENING C1: Crear reservas usando función atómica con locks
-    // Esto previene race conditions cuando múltiples pedidos reservan el mismo producto
-    for (const item of pedido.detalle) {
-      try {
-        const { data: movimientoId, error: reservaError } = await client.rpc('reservar_stock_atomico', {
-          p_producto_id: item.producto_id,
-          p_cantidad: item.cantidad,
-          p_referencia_tipo: 'PEDIDO',
-          p_referencia_id: id,
-          p_notas: `Reserva atómica para pedido ${pedido.numero}`,
-        });
-
-        if (reservaError) {
-          console.error('❌ Error en reserva atómica de stock:', reservaError);
-          
-          // Si es error de stock insuficiente, retornar warning específico
-          if (reservaError.message?.includes('Stock insuficiente') || reservaError.message?.includes('insufficient')) {
-            throw new BadRequestException(
-              `Stock insuficiente para producto ${item.descripcion}. ${reservaError.message}`,
-            );
-          }
-          
-          throw new BadRequestException(
-            `No se pudo reservar stock para el producto ${item.descripcion}: ${reservaError.message}`,
-          );
-        }
-
-        console.log(`✅ [PedidosService] Stock reservado atómicamente - Movimiento: ${movimientoId}`);
-      } catch (error) {
-        // Si falla alguna reserva, hacer rollback de las ya creadas
-        console.error('❌ Error reservando stock, iniciando rollback...', error);
-        
-        // Intentar liberar reservas ya creadas para este pedido
+    // HARDENING C1: Crear reservas usando función atómica con locks (solo si no existen reservas previas)
+    if (!saltarReserva) {
+      for (const item of pedido.detalle) {
+        const cantidad = this.redondearCantidad(Number(item.cantidad ?? 0));
         try {
-          const { data: reservasCreadas } = await client
-            .from('movimientos_inventario')
-            .select('producto_id, cantidad')
-            .eq('referencia_tipo', 'PEDIDO')
-            .eq('referencia_id', id)
-            .eq('tipo', 'RESERVA')
-            .eq('tenant_id', tenantId);
+          const { data: movimientoId, error: reservaError } = await client.rpc('reservar_stock_atomico', {
+            p_producto_id: item.producto_id,
+            p_cantidad: cantidad,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: id,
+            p_notas: `Reserva atómica para pedido ${pedido.numero}`,
+          });
 
-          if (reservasCreadas && reservasCreadas.length > 0) {
-            for (const reserva of reservasCreadas) {
-              await client.rpc('decrementar_stock_reservado', {
-                p_producto_id: reserva.producto_id,
-                p_cantidad: reserva.cantidad,
-              });
+          if (reservaError) {
+            console.error('❌ Error en reserva atómica de stock:', reservaError);
+            
+            // Si es error de stock insuficiente, retornar warning específico
+            if (reservaError.message?.includes('Stock insuficiente') || reservaError.message?.includes('insufficient')) {
+              throw new BadRequestException(
+                `Stock insuficiente para producto ${item.descripcion}. ${reservaError.message}`,
+              );
             }
             
-            // Eliminar movimientos creados
-            await client
+            throw new BadRequestException(
+              `No se pudo reservar stock para el producto ${item.descripcion}: ${reservaError.message}`,
+            );
+          }
+
+          console.log(`✅ [PedidosService] Stock reservado atómicamente - Movimiento: ${movimientoId}`);
+        } catch (error) {
+          // Si falla alguna reserva, hacer rollback de las ya creadas
+          console.error('❌ Error reservando stock, iniciando rollback...', error);
+          
+          // Intentar liberar reservas ya creadas para este pedido
+          try {
+            const { data: reservasCreadas } = await client
               .from('movimientos_inventario')
-              .delete()
+              .select('producto_id, cantidad')
               .eq('referencia_tipo', 'PEDIDO')
               .eq('referencia_id', id)
               .eq('tipo', 'RESERVA')
               .eq('tenant_id', tenantId);
+
+            if (reservasCreadas && reservasCreadas.length > 0) {
+              for (const reserva of reservasCreadas) {
+                await client.rpc('decrementar_stock_reservado', {
+                  p_producto_id: reserva.producto_id,
+                  p_cantidad: reserva.cantidad,
+                });
+              }
+              
+              // Eliminar movimientos creados
+              await client
+                .from('movimientos_inventario')
+                .delete()
+                .eq('referencia_tipo', 'PEDIDO')
+                .eq('referencia_id', id)
+                .eq('tipo', 'RESERVA')
+                .eq('tenant_id', tenantId);
+            }
+          } catch (rollbackError) {
+            console.error('❌ Error en rollback de reservas:', rollbackError);
+            // Continuar con el error original
           }
-        } catch (rollbackError) {
-          console.error('❌ Error en rollback de reservas:', rollbackError);
-          // Continuar con el error original
+          
+          throw error;
         }
-        
-        throw error;
       }
     }
 
@@ -1373,15 +1370,15 @@ export class PedidosService {
     // 5. Cambiar estado a CANCELADO
     await this.updateEstado(id, EstadoPedido.CANCELADO, tenantId);
 
-    // 6. Registrar motivo de cancelación en notas
+    // 6. Registrar motivo de cancelación en observaciones
     if (motivo) {
-      const notasActualizadas = pedido.notas
-        ? `${pedido.notas}\n\n[CANCELADO] ${motivo}`
+      const observacionesActualizadas = pedido.observaciones
+        ? `${pedido.observaciones}\n\n[CANCELADO] ${motivo}`
         : `[CANCELADO] ${motivo}`;
 
       await client
         .from('pedidos_venta')
-        .update({ notas: notasActualizadas })
+        .update({ observaciones: observacionesActualizadas })
         .eq('id', id)
         .eq('tenant_id', tenantId);
     }
@@ -1436,14 +1433,58 @@ export class PedidosService {
   ): Promise<{ success: boolean; factura_id?: string; sugerir_gre?: boolean }> {
     const client = this.supabase.getClient();
 
-    // 1. Obtener pedido
-    const pedido = await this.findOne(id, tenantId);
+    // 0. VALIDAR CONFIGURACIÓN COMPLETA ANTES DE CONTINUAR
+    const { data: empresaConfig, error: configError } = await client
+      .from('empresa_config')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .single();
 
-    // 2. Validar estado
-    if (pedido.estado !== EstadoPedido.LISTO_FACTURAR) {
+    if (configError || !empresaConfig) {
+      throw new BadRequestException(
+        'No se puede generar factura: La configuración de la empresa no está completa. Por favor, complete el wizard de configuración inicial.',
+      );
+    }
+
+    // Validar campos críticos
+    const camposFaltantes: string[] = [];
+    if (!empresaConfig.ruc) camposFaltantes.push('RUC');
+    if (!empresaConfig.razon_social) camposFaltantes.push('Razón Social');
+    if (!empresaConfig.direccion_fiscal) camposFaltantes.push('Dirección Fiscal');
+    // NOTA: El certificado digital es opcional para testing/desarrollo
+    // En producción, la empresa debe subirlo a través del wizard
+    if (!empresaConfig.certificado_pfx) camposFaltantes.push('Certificado Digital');
+    if (!empresaConfig.certificado_password) camposFaltantes.push('Contraseña del Certificado');
+
+    if (camposFaltantes.length > 0) {
+      throw new BadRequestException(
+        `No se puede generar factura: Faltan los siguientes datos de configuración: ${camposFaltantes.join(', ')}. Por favor, complete el wizard de configuración inicial.`,
+      );
+    }
+
+    // 1. Obtener pedido
+    let pedido = await this.findOne(id, tenantId);
+
+    // 2. Validar estado (considerando flujo simplificado)
+    const config = await this.obtenerConfiguracionEmpresa(tenantId);
+    const esFlujoSimplificado = !config.usar_flujo_logistica;
+    const puedeFacturar =
+      pedido.estado === EstadoPedido.LISTO_FACTURAR ||
+      (esFlujoSimplificado && pedido.estado === EstadoPedido.CONFIRMADO);
+
+    if (!puedeFacturar) {
       throw new BadRequestException(
         `No se puede generar factura para un pedido en estado ${pedido.estado}`,
       );
+    }
+
+    // Si venía en CONFIRMADO (flujo simplificado), intentamos promoverlo antes de continuar.
+    if (esFlujoSimplificado && pedido.estado === EstadoPedido.CONFIRMADO) {
+      await this.updateEstado(id, EstadoPedido.LISTO_FACTURAR, tenantId).catch(() => null);
+      pedido = {
+        ...pedido,
+        estado: EstadoPedido.LISTO_FACTURAR,
+      };
     }
 
     if (pedido.factura_id) {
@@ -1457,8 +1498,6 @@ export class PedidosService {
     }
 
     // 3. Obtener configuración
-    const config = await this.obtenerConfiguracionEmpresa(tenantId);
-
     if (config.usar_flujo_logistica) {
       const pendientesDespacho = pedido.detalle.some((item) => {
         const total = Number(item.cantidad);
@@ -1515,6 +1554,7 @@ export class PedidosService {
 
     // 5. Integrar con CPE real
     const facturaResultado = await this.cpeIntegrationService.generarFacturaDesdePedido(pedido, tenantId);
+    const facturaDocumentoId = facturaResultado.documento_id ?? null;
 
     const ajustesTributarios = this.calcularAjustesTributarios(
       pedido as any,
@@ -1542,6 +1582,8 @@ export class PedidosService {
     pedido.factura_id = facturaResultado.factura_id;
 
     const facturaEventId = uuidv4();
+    const facturaReferenciaId = facturaDocumentoId ?? facturaResultado.factura_id;
+    const facturaIdempotencyKey = `factura:${tenantId}:${facturaReferenciaId}`;
     const facturaSerie = facturaResultado.serie ?? 'SIN-SERIE';
     const facturaNumero =
       facturaResultado.numero != null
@@ -1561,7 +1603,7 @@ export class PedidosService {
       tenantId,
       pedidoId: pedido.id,
       cpeId: facturaResultado.factura_id,
-      facturaId: facturaResultado.factura_id,
+      facturaId: facturaReferenciaId,
       serie: facturaSerie,
       numero: facturaNumero,
       clienteId: pedido.cliente_id,
@@ -1571,7 +1613,7 @@ export class PedidosService {
       moneda: facturaMoneda,
       fechaEmision: fechaEmisionFactura,
       fechaVencimiento: fechaVencimientoFactura,
-      idempotencyKey: `factura:${tenantId}:${facturaResultado.factura_id}`,
+      idempotencyKey: facturaIdempotencyKey,
       source: 'ventas',
       ajustes: ajustesTributarios,
       costoVentas: Number(costoVentasEstimado) || 0,
@@ -1581,6 +1623,7 @@ export class PedidosService {
       pedido,
       {
         factura_id: facturaResultado.factura_id,
+        documento_id: facturaDocumentoId ?? undefined,
         serie: facturaResultado.serie,
         numero: facturaResultado.numero,
         total: facturaResultado.total,
@@ -1666,7 +1709,7 @@ export class PedidosService {
 
     const { data, error } = await client
       .from('productos')
-      .select('stock, stock_actual, stock_reservado')
+      .select('stock, stock_reservado')
       .eq('id', productoId)
       .eq('tenant_id', tenantId)
       .single();
@@ -1676,7 +1719,7 @@ export class PedidosService {
       return 0;
     }
 
-    const stockActual = data.stock_actual != null ? Number(data.stock_actual) : Number(data.stock ?? 0);
+    const stockActual = Number(data.stock ?? 0);
     const stockReservado = Number(data.stock_reservado ?? 0);
 
     return stockActual - stockReservado;
@@ -1871,6 +1914,413 @@ export class PedidosService {
       },
     };
   }
+  /**
+   * 🔥 NUEVO: Genera documento fiscal (factura/boleta) desde un pedido
+   * Requirements: Flujo completo Ventas → Documentos → CPE → CxC → Contabilidad
+   * 
+   * @param pedidoId - ID del pedido a facturar
+   * @param tipoDoc - Tipo de documento: '01' (Factura) o '03' (Boleta)
+   * @param tenantId - ID del tenant
+   * @param userId - ID del usuario que genera el documento
+   * @returns Documento fiscal generado con CPE y CxC
+   */
+  async generarDocumentoDesdePedido(
+    pedidoId: string,
+    tipoDoc: '01' | '03',
+    tenantId: string,
+    userId?: string,
+  ): Promise<{
+    success: boolean;
+    documento: any;
+    cpe: any;
+    cxc: any;
+    message: string;
+  }> {
+    const client = this.supabase.getClient();
+
+    try {
+      this.logger.log(`📄 [PedidosService] Generando documento ${tipoDoc} desde pedido ${pedidoId}`);
+
+      // 1. Obtener pedido con detalle y cliente
+      const pedido = await this.findOne(pedidoId, tenantId);
+
+      // 2. Validar que el pedido puede ser facturado
+      if (pedido.estado !== EstadoPedido.LISTO_FACTURAR && pedido.estado !== EstadoPedido.CONFIRMADO) {
+        throw new BadRequestException(
+          `El pedido debe estar en estado LISTO_FACTURAR o CONFIRMADO para generar documento. Estado actual: ${pedido.estado}`
+        );
+      }
+
+      // Validar que no tenga ya un documento generado
+      if (pedido.factura_id) {
+        throw new BadRequestException(
+          `El pedido ya tiene un documento fiscal generado: ${pedido.factura_id}`
+        );
+      }
+
+      // 3. Obtener configuración del tenant (país, moneda, etc.)
+      const { data: empresaConfig, error: configError } = await client
+        .from('empresa_config')
+        .select('pais_id, ruc, razon_social, direccion_fiscal, dias_vencimiento_factura')
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (configError || !empresaConfig) {
+        throw new BadRequestException('No se pudo obtener la configuración de la empresa');
+      }
+
+      // 4. Obtener serie activa para el tipo de documento
+      const serieDefault = tipoDoc === '01' ? 'F001' : 'B001';
+      
+      const { data: serie, error: serieError } = await client
+        .from('documento_series')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('tipo_documento', tipoDoc)
+        .eq('activo', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (serieError) {
+        this.logger.error('Error obteniendo serie:', serieError);
+        throw new BadRequestException('Error al obtener la serie del documento');
+      }
+
+      const serieAUsar = serie?.serie || serieDefault;
+
+      // 5. Obtener siguiente número de serie (con lock)
+      const { data: numeroData, error: numeroError } = await client
+        .rpc('obtener_siguiente_numero_documento', {
+          p_tenant_id: tenantId,
+          p_tipo_documento: tipoDoc,
+          p_serie: serieAUsar,
+        });
+
+      if (numeroError) {
+        this.logger.error('Error obteniendo número de serie:', numeroError);
+        throw new BadRequestException('Error al obtener el número de serie');
+      }
+
+      const numero = numeroData || '00000001';
+
+      this.logger.log(`📋 [PedidosService] Serie: ${serieAUsar}, Número: ${numero}`);
+
+      // 6. Calcular totales con impuestos según país
+      const taxResult = await this.taxCalculator.calcularImpuestos({
+        subtotal: Number(pedido.subtotal),
+        tenantId,
+      });
+
+      // 7. Calcular fecha de vencimiento
+      const fechaEmision = new Date();
+      const diasVencimiento = empresaConfig.dias_vencimiento_factura || 30;
+      const fechaVencimiento = new Date(fechaEmision);
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + diasVencimiento);
+
+      // 8. Obtener datos del cliente
+      const { data: cliente, error: clienteError } = await client
+        .from('clientes')
+        .select('*')
+        .eq('id', pedido.cliente_id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (clienteError || !cliente) {
+        throw new BadRequestException('No se pudo obtener los datos del cliente');
+      }
+
+      // 9. Crear documento en tabla documentos
+      const documentoData = {
+        tenant_id: tenantId,
+        pedido_id: pedidoId,
+        tipo_documento: tipoDoc,
+        serie: serieAUsar,
+        numero: numero,
+        fecha_emision: fechaEmision.toISOString(),
+        fecha_vencimiento: fechaVencimiento.toISOString(),
+        
+        // Datos del emisor
+        emisor_ruc: empresaConfig.ruc,
+        emisor_razon_social: empresaConfig.razon_social,
+        emisor_direccion: empresaConfig.direccion_fiscal,
+        
+        // Datos del receptor
+        cliente_id: pedido.cliente_id,
+        receptor_tipo_doc: cliente.documento_tipo || 'RUC',
+        receptor_numero_doc: cliente.numero_documento,
+        receptor_razon_social: cliente.razon_social || cliente.nombre_comercial,
+        receptor_direccion: cliente.direccion,
+        receptor_email: cliente.email,
+
+        // Montos
+        moneda: 'PEN', // TODO: Obtener de configuración
+        tipo_cambio: 1.0000,
+        subtotal: taxResult.subtotal,
+        descuentos: 0.00,
+        impuesto_igv: taxResult.igv,
+        impuesto_isc: 0.00,
+        otros_impuestos: 0.00,
+        total: taxResult.total,
+        
+        // Estado
+        estado: 'EMITIDO',
+        observaciones: `Generado desde pedido ${pedido.numero}`,
+        
+        // Auditoría
+        created_by: userId,
+      };
+
+      const { data: documento, error: documentoError } = await client
+        .from('documentos')
+        .insert(documentoData)
+        .select()
+        .single();
+
+      if (documentoError) {
+        this.logger.error('Error creando documento:', documentoError);
+        throw new BadRequestException(`Error al crear el documento: ${documentoError.message}`);
+      }
+
+      this.logger.log(`✅ [PedidosService] Documento creado: ${documento.id}`);
+
+      // 10. Crear detalles del documento
+      const detallesData = pedido.detalle.map((item, index) => ({
+        documento_id: documento.id,
+        tenant_id: tenantId,
+        orden: index + 1,
+        producto_id: item.producto_id,
+        codigo_producto: item.producto_id, // TODO: Obtener código real del producto
+        descripcion: item.descripcion,
+        unidad_medida: 'NIU', // TODO: Obtener de producto
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        descuento_unitario: 0,
+        valor_venta: item.subtotal,
+        impuesto_igv: this.round2(item.subtotal * taxResult.tasaIgv),
+        impuesto_isc: 0,
+        total_item: this.round2(item.subtotal * (1 + taxResult.tasaIgv)),
+      }));
+
+      const { error: detallesError } = await client
+        .from('documento_detalles')
+        .insert(detallesData);
+
+      if (detallesError) {
+        this.logger.error('Error creando detalles del documento:', detallesError);
+        // Rollback: eliminar documento
+        await client.from('documentos').delete().eq('id', documento.id);
+        throw new BadRequestException('Error al crear los detalles del documento');
+      }
+
+      this.logger.log(`✅ [PedidosService] Detalles del documento creados: ${detallesData.length} líneas`);
+
+      // 11. Generar CPE (Comprobante Electrónico)
+      let cpe = null;
+      try {
+        const cpeData = {
+          tenant_id: tenantId,
+          documento_id: documento.id,
+          tipo_documento: tipoDoc,
+          serie: serieAUsar,
+          numero: numero,
+          fecha_emision: fechaEmision.toISOString(),
+
+          // Datos del cliente
+          cliente_tipo_doc: cliente.documento_tipo || 'RUC',
+          cliente_numero_doc: cliente.numero_documento,
+          cliente_razon_social: cliente.razon_social || cliente.nombre_comercial,
+
+          // Montos
+          moneda: 'PEN',
+          total_venta: taxResult.total,
+          total_igv: taxResult.igv,
+          total_gravadas: taxResult.subtotal,
+          
+          // Estado
+          estado_sunat: 'PENDIENTE',
+          
+          // Auditoría
+          created_by: userId,
+        };
+
+        const { data: cpeCreado, error: cpeError } = await client
+          .from('cpe')
+          .insert(cpeData)
+          .select()
+          .single();
+
+        if (cpeError) {
+          this.logger.warn('⚠️ [PedidosService] Error creando CPE (no crítico):', cpeError);
+        } else {
+          cpe = cpeCreado;
+          this.logger.log(`✅ [PedidosService] CPE creado: ${cpe.id}`);
+        }
+      } catch (cpeException) {
+        this.logger.warn('⚠️ [PedidosService] Excepción creando CPE:', cpeException);
+      }
+
+      // 12. Crear Cuenta por Cobrar (CxC)
+      let cxc = null;
+      try {
+        const cxcData = {
+          tenant_id: tenantId,
+          documento_id: documento.id,
+          cliente_id: pedido.cliente_id,
+          numero_documento: `${serieAUsar}-${numero}`,
+          tipo_documento: tipoDoc,
+          fecha_emision: fechaEmision.toISOString(),
+          fecha_vencimiento: fechaVencimiento.toISOString(),
+          monto_total: taxResult.total,
+          monto_pendiente: taxResult.total,
+          estado: 'PENDIENTE',
+          moneda: 'PEN',
+          serie: serieAUsar,
+          numero: numero,
+        };
+
+        const { data: cxcCreada, error: cxcError } = await client
+          .from('cuentas_por_cobrar')
+          .insert(cxcData)
+          .select()
+          .single();
+
+        if (cxcError) {
+          this.logger.warn('⚠️ [PedidosService] Error creando CxC (no crítico):', cxcError);
+        } else {
+          cxc = cxcCreada;
+          this.logger.log(`✅ [PedidosService] CxC creada: ${cxc.id}`);
+        }
+      } catch (cxcException) {
+        this.logger.warn('⚠️ [PedidosService] Excepción creando CxC:', cxcException);
+      }
+
+      // 13. Actualizar pedido con referencia al documento y cambiar estado
+      const { error: updateError } = await client
+        .from('pedidos_venta')
+        .update({
+          factura_id: documento.id,
+          estado: EstadoPedido.FACTURADO,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pedidoId)
+        .eq('tenant_id', tenantId);
+
+      if (updateError) {
+        this.logger.error('Error actualizando pedido:', updateError);
+        // No lanzar error, el documento ya fue creado
+      } else {
+        this.logger.log(`✅ [PedidosService] Pedido actualizado a estado FACTURADO`);
+      }
+
+      // 14. Emitir evento para contabilidad
+      try {
+        const eventId = uuidv4();
+        await this.eventBus.emitCuentaPorCobrarCreadaEvent({
+          eventId,
+          tenantId,
+          idempotencyKey: `pedido-facturado:${pedidoId}`,
+          cxcId: cxc?.id || documento.id,
+          facturaId: documento.id,
+          serie: serieAUsar,
+          numero: numero,
+          clienteId: pedido.cliente_id,
+          saldoInicial: taxResult.total,
+          saldoPendiente: taxResult.total,
+          moneda: 'PEN',
+          fechaEmision: fechaEmision.toISOString(),
+          fechaVencimiento: fechaVencimiento.toISOString(),
+          source: 'ventas.pedidos',
+          ajustes: {
+            retencion: 0,
+            percepcion: 0,
+            detraccion: 0,
+            anticipo: 0,
+          },
+        });
+
+        this.logger.log(`✅ [PedidosService] Evento CuentaPorCobrarCreada emitido`);
+      } catch (eventError) {
+        this.logger.warn('⚠️ [PedidosService] Error emitiendo evento (no crítico):', eventError);
+      }
+
+      // 15. Registrar auditoría
+      await this.registrarAuditoriaAccion(
+        pedidoId,
+        tenantId,
+        userId,
+        {
+          documento_id: documento.id,
+          tipo_documento: tipoDoc,
+          serie: serieAUsar,
+          numero: numero,
+          total: taxResult.total,
+        },
+        'generar_documento',
+      );
+
+      return {
+        success: true,
+        documento,
+        cpe,
+        cxc,
+        message: `Documento ${serieAUsar}-${numero} generado exitosamente`,
+      };
+    } catch (error) {
+      this.logger.error(`❌ [PedidosService] Error generando documento desde pedido ${pedidoId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Redondea un número a 2 decimales
+   */
+  private round2(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  /**
+   * Registra una acción de auditoría en el pedido
+   */
+  private async registrarAuditoriaAccion(
+    pedidoId: string,
+    tenantId: string,
+    userId: string | undefined,
+    cambios: any,
+    accion: string,
+  ): Promise<void> {
+    try {
+      await this.auditService.logAction({
+        table_name: 'pedidos_venta',
+        operation: 'UPDATE',
+        tenant_id: tenantId,
+        record_id: pedidoId,
+        user_id: userId ?? undefined,
+        new_values: cambios,
+        metadata: { action: accion },
+      });
+    } catch (error) {
+      this.logger.warn('⚠️ [PedidosService] Error registrando auditoría:', error);
+    }
+  }
+
+  /**
+   * Envía una notificación al usuario
+   */
+  private async enviarNotificacion(
+    tenantId: string,
+    notification: {
+      type: string;
+      severity: string;
+      title: string;
+      message: string;
+      usuario_id?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.notificationsService.createNotification(tenantId, notification as any);
+    } catch (error) {
+      this.logger.warn('⚠️ [PedidosService] Error enviando notificación:', error);
+    }
+  }
 }
-
-

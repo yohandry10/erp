@@ -496,6 +496,117 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+/* Notifications panel */
+.notification-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: white;
+}
+
+.notification-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.notification-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.notification-header__icon {
+  color: #3b82f6;
+}
+
+.notification-header h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.notification-badge {
+  background-color: #ef4444;
+  color: white;
+  border-radius: 12px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.notification-header__action {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.notification-header__action:hover {
+  background-color: #eff6ff;
+}
+
+.notification-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.notification-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  gap: 0.5rem;
+  color: #475569;
+}
+
+.notification-empty__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-evenly: space-evenly;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  color: #cbd5e1;
+}
+
+.notification-empty__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.notification-empty__subtitle {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.notification-empty__loader {
+  color: #94a3b8;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -538,6 +649,39 @@ body {
   background: var(--primary-200);
   border-color: var(--primary-400);
   transform: translateY(-1px);
+}
+
+.btn-success {
+  background: var(--gradient-success);
+  color: white;
+}
+
+.btn-success:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-outline {
+  background: white;
+  border: 1px solid var(--primary-200);
+  color: var(--primary-700);
+}
+
+.btn-outline:hover {
+  border-color: var(--primary-400);
+  background: var(--primary-50);
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Status Classes */

@@ -45,9 +45,9 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
 
       // Verificar configuración de la empresa para saber si debe generar CxP en recepción
       const config = await this.obtenerConfiguracionEmpresa(data.tenantId);
-      
-      if (config?.generar_cxp_en !== 'RECEPCION') {
-        this.logger.log(`⏭️ Configuración indica no generar CxP en recepción. Saltando...`);
+      const generarEn = (config?.generar_cxp_en || 'RECEPCION').toUpperCase();
+      if (generarEn !== 'RECEPCION') {
+        this.logger.log(`⏭️ Configuración generar_cxp_en=${generarEn} indica no generar CxP al cerrar recepción. Saltando...`);
         return;
       }
 

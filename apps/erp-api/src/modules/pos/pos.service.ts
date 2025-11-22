@@ -219,6 +219,22 @@ export class PosService {
       // ===== PRE-SALE VALIDATIONS =====
       this.logger.log(`Starting pre-sale validations for tenant: ${user.tenant_id}`);
 
+      // Normalizar datos de comprobante para validaciones SUNAT
+      const serie = ventaData?.comprobante?.serie || 'T001';
+      const correlativo = ventaData?.comprobante?.correlativo || String(Date.now()).slice(-8);
+      const tipoDocumento = ventaData?.comprobante?.tipo || '03'; // Boleta por defecto
+      const numeroComprobante = ventaData?.numero_comprobante
+        || ventaData?.comprobante?.numero
+        || `${serie}-${correlativo}`;
+
+      ventaData.comprobante = {
+        ...ventaData.comprobante,
+        serie,
+        correlativo,
+        tipo: tipoDocumento,
+        numero: numeroComprobante,
+      };
+
       // 1. Validate certificate
       const certificateValidation = await this.validationService.validateCertificate(user.tenant_id);
       if (!certificateValidation.isValid) {
@@ -263,7 +279,7 @@ export class PosService {
           items: ventaData.items || [],
           total: ventaData.total,
           serie: ventaData.comprobante?.serie,
-          correlativo: ventaData.comprobante?.numero?.toString(),
+          correlativo: ventaData.comprobante?.correlativo?.toString(),
           tipoDocumento: ventaData.comprobante?.tipo,
         },
         user.tenant_id // 🌍 Pasar tenantId para validaciones por país
@@ -308,7 +324,7 @@ export class PosService {
           total: ventaData.total,
           metodo_pago: ventaData.metodo_pago_id,
           estado: 'PAGADA',
-          numero_ticket: ventaData.numero_comprobante,
+          numero_ticket: numeroComprobante,
           vendedor: user.email || user.username,
           observaciones: JSON.stringify({
             cliente_id: ventaData.cliente_id,
@@ -316,7 +332,12 @@ export class PosService {
             descuento_global: ventaData.descuento_global,
             descuentos: ventaData.descuentos,
             referencia_pago: ventaData.referencia_pago,
-            comprobante: ventaData.comprobante
+            comprobante: {
+              ...ventaData.comprobante,
+              serie,
+              correlativo,
+              numero: numeroComprobante,
+            }
           })
         })
         .select()

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CxpService } from './cxp.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
   let service: CxpService;
@@ -33,6 +34,14 @@ describe('CxpService - PagoProveedorRegistrado Event Emission', () => {
           useValue: {
             emitPagoProveedorRegistrado: jest.fn(),
             emitFacturaProveedorRegistrada: jest.fn(),
+          },
+        },
+        {
+          provide: RetencionesValidationService,
+          useValue: {
+            obtenerConfiguracionEmpresa: jest.fn().mockResolvedValue({}),
+            validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
+            validarMontoPendiente: jest.fn().mockReturnValue({ valido: true, montoEsperado: 0 }),
           },
         },
       ],

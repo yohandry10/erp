@@ -6,6 +6,7 @@ import { AuditService } from '../../audit/audit.service';
 import { PedidoLockService } from '../../../shared/locks/pedido-lock.service';
 import { EstadoPedido } from '../../ventas/pedidos/entities';
 import { AlmacenesService } from '../almacenes/almacenes.service';
+import { EventBusService } from '../../../shared/events/event-bus.service';
 import {
   PrepararPedidoDto,
   ConfirmarDespachoDto,
@@ -32,6 +33,7 @@ export class LogisticaService {
     private readonly auditService: AuditService,
     private readonly pedidoLockService: PedidoLockService,
     private readonly almacenesService: AlmacenesService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   /**
@@ -50,9 +52,9 @@ export class LogisticaService {
       .select(`
         id,
         numero,
-        fecha,
+        fecha_pedido,
         cliente_id,
-        clientes!inner(id, razon_social, documento_numero),
+        clientes(id, razon_social, numero_documento),
         estado,
         total,
         created_at
@@ -84,15 +86,96 @@ export class LogisticaService {
 
         return {
           ...pedido,
+          cantidad_items:
+            (detalle || []).reduce((sum, d) => sum + Number(d.cantidad || 0), 0),
+          items: detalle || [],
+        };
+      }),
+    );
+
+    const pedidosNormalizados = pedidosConItems.map((pedido) => {
+      const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
+      return {
+        ...pedido,
+        fecha: (pedido as any).fecha ?? (pedido as any).fecha_pedido ?? pedido.created_at,
+        cliente: clienteInfo,
+        detalle: (pedido as any).detalle ?? pedido.items ?? [],
+      };
+    });
+
+    console.log(`✅ [LogisticaService] Órdenes pendientes obtenidas: ${pedidosNormalizados.length}`);
+
+    return pedidosNormalizados;
+  }
+
+  /**
+   * Obtiene las órdenes listas para despacho (estado LISTO_DESPACHO)
+   */
+  async getOrdenesListasDespacho(tenantId: string): Promise<any[]> {
+    const client = this.supabase.getClient();
+
+    const config = await this.obtenerConfiguracion(tenantId);
+    if (!config.usar_flujo_logistica) {
+      return [];
+    }
+
+    const { data: pedidos, error } = await client
+      .from('pedidos_venta')
+      .select(`
+        id,
+        numero,
+        fecha_pedido,
+        cliente_id,
+        clientes(id, razon_social, numero_documento),
+        estado,
+        total,
+        created_at
+      `)
+      .eq('tenant_id', tenantId)
+      .in('estado', [EstadoPedido.LISTO_DESPACHO, EstadoPedido.DESPACHO_PARCIAL])
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching órdenes listas despacho:', error);
+      throw new BadRequestException('Error al obtener órdenes listas para despacho');
+    }
+
+    const pedidosConItems = await Promise.all(
+      (pedidos || []).map(async (pedido) => {
+        const { data: detalle, error: detalleError } = await client
+          .from('pedidos_venta_detalle')
+          .select('id, producto_id, descripcion, cantidad')
+          .eq('pedido_id', pedido.id);
+
+        if (detalleError) {
+          console.error('Error fetching pedido detalle:', detalleError);
+          return {
+            ...pedido,
+            cantidad_items: 0,
+            items: [],
+          };
+        }
+
+        return {
+          ...pedido,
           cantidad_items: detalle?.length || 0,
           items: detalle || [],
         };
       }),
     );
 
-    console.log(`✅ [LogisticaService] Órdenes pendientes obtenidas: ${pedidosConItems.length}`);
+    const pedidosNormalizados = pedidosConItems.map((pedido) => {
+      const clienteInfo = (pedido as any).clientes ?? (pedido as any).cliente ?? null;
+      return {
+        ...pedido,
+        fecha: (pedido as any).fecha ?? (pedido as any).fecha_pedido ?? pedido.created_at,
+        cliente: clienteInfo,
+        detalle: (pedido as any).detalle ?? pedido.items ?? [],
+      };
+    });
 
-    return pedidosConItems;
+    console.log(`✅ [LogisticaService] Órdenes listas para despacho: ${pedidosNormalizados.length}`);
+    return pedidosNormalizados;
   }
 
   /**
@@ -327,6 +410,17 @@ export class LogisticaService {
         let itemUbicacionId: string | null = null;
         let itemLote: string | null = null;
 
+        // Obtener stock actual antes de mover para calcular métricas de evento
+        const { data: productoDatos } = await client
+          .from('productos')
+          .select('id, stock, stock_reservado, precio_compra')
+          .eq('tenant_id', tenantId)
+          .eq('id', item.producto_id)
+          .maybeSingle();
+        const stockAntes = Number(productoDatos?.stock ?? 0);
+        const reservadoAntes = Number(productoDatos?.stock_reservado ?? 0);
+        const valorUnitario = Number(productoDatos?.precio_compra ?? 0);
+
         if (config.habilitar_multialmacen) {
           itemAlmacenId = itemInput?.almacen_id ?? almacenPorDefecto;
 
@@ -345,6 +439,27 @@ export class LogisticaService {
           itemLote = itemInput?.lote ?? lotePorDefecto ?? null;
           if (config.requiere_lotes_series && !itemLote) {
             throw new BadRequestException('Debe especificar el lote o serie para completar el despacho.');
+          }
+
+          // Libera reserva si existía y luego registra la salida
+          if (reservadoAntes > 0) {
+            const liberar = Math.min(cantidadSolicitada, reservadoAntes);
+            const { error: liberarError } = await client.rpc('registrar_movimiento_almacen', {
+              p_producto_id: item.producto_id,
+              p_almacen_id: itemAlmacenId,
+              p_tipo: 'LIBERACION',
+              p_cantidad: liberar,
+              p_referencia_tipo: 'PEDIDO',
+              p_referencia_id: pedidoId,
+              p_notas: `Liberación reserva despacho pedido ${pedido.numero}`,
+              p_ubicacion_id: itemUbicacionId,
+              p_lote: itemLote,
+              p_fecha_expiracion: null,
+            });
+            if (liberarError) {
+              console.error('Error liberando reserva en despacho:', liberarError);
+              throw new BadRequestException('No se pudo liberar la reserva de inventario');
+            }
           }
 
           const { error: movimientoError } = await client.rpc('registrar_movimiento_almacen', {
@@ -393,6 +508,28 @@ export class LogisticaService {
 
         const nuevoDespachado = cantidadDespachadaActual + cantidadSolicitada;
         const nuevoEstadoItem = nuevoDespachado >= cantidadTotal ? 'DESPACHADO' : 'PARCIAL';
+        const stockDespues = Math.max(stockAntes - cantidadSolicitada, 0);
+        const reservadoDespues = Math.max(reservadoAntes - cantidadSolicitada, 0);
+
+        // Emitir evento de salida de stock para contabilidad/integraciones
+        try {
+          await this.eventBus.emitMovimientoStock(
+            {
+              productoId: item.producto_id,
+              tipoMovimiento: 'SALIDA',
+              cantidad: cantidadSolicitada,
+              stockAnterior: stockAntes,
+              stockNuevo: stockDespues,
+              motivo: `Despacho pedido ${pedido.numero}`,
+              valor: this.round2(valorUnitario * cantidadSolicitada),
+              ventaId: pedidoId,
+              tenantId,
+            },
+            tenantId,
+          );
+        } catch (emitError) {
+          console.error('⚠️ Error emitiendo evento stock.movimiento en despacho:', emitError);
+        }
 
         detalleActualizado.push({
           id: item.id,
@@ -1128,7 +1265,8 @@ export class LogisticaService {
     }
     return nuevaNota;
   }
+
+  private round2(value: number): number {
+    return Math.round(Number(value || 0) * 100) / 100;
+  }
 }
-
-
-

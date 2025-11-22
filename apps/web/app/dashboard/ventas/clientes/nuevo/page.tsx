@@ -15,14 +15,15 @@ export default function NuevoClientePage() {
     try {
       const response = await post('/api/ventas/clientes', data)
       
-      if (response?.success) {
+      // El backend devuelve directamente el cliente creado (con id)
+      if (response?.id) {
         toast({
           title: 'Cliente creado',
           description: `Cliente ${data.razon_social} creado exitosamente`
         })
         router.push('/dashboard/ventas/clientes')
       } else {
-        throw new Error(response?.error || 'Error al crear cliente')
+        throw new Error('Error al crear cliente')
       }
     } catch (error: any) {
       toast({
@@ -39,26 +40,74 @@ export default function NuevoClientePage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div style={{
+      padding: '2rem',
+      maxWidth: '1200px',
+      margin: '0 auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1.5rem'
+    }}>
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1rem'
+      }}>
+        <button
           onClick={handleCancel}
-          className="gap-2"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.625rem 1rem',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: 'var(--primary-700)',
+            background: 'rgba(255, 255, 255, 0.8)',
+            border: '1px solid var(--primary-200)',
+            borderRadius: 'var(--border-radius)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--primary-50)'
+            e.currentTarget.style.borderColor = 'var(--primary-300)'
+            e.currentTarget.style.transform = 'translateX(-2px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'
+            e.currentTarget.style.borderColor = 'var(--primary-200)'
+            e.currentTarget.style.transform = 'translateX(0)'
+          }}
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
           Volver
-        </Button>
+        </button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Nuevo Cliente</h1>
-          <p className="text-gray-600 mt-1">Registra un nuevo cliente en el sistema</p>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: '700',
+            color: 'var(--primary-900)',
+            margin: 0
+          }}>Nuevo Cliente</h1>
+          <p style={{
+            fontSize: '1rem',
+            color: 'var(--primary-600)',
+            margin: '0.25rem 0 0 0'
+          }}>Registra un nuevo cliente en el sistema</p>
         </div>
       </div>
 
       {/* Form Card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: 'var(--border-radius-lg)',
+        padding: '2rem',
+        boxShadow: 'var(--shadow-xl)',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
         <ClienteForm
           onSubmit={handleSubmit}
           onCancel={handleCancel}

@@ -18,7 +18,7 @@ import { AprobarRmaDto, CrearRmaDto, GenerarNotaCreditoDto, RecepcionarRmaDto } 
 
 @ApiTags('Ventas - RMA')
 @ApiBearerAuth()
-@Controller('api/ventas/rma')
+@Controller('ventas/rma')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: RMA requiere permisos específicos.
 export class RmaController {
   constructor(private readonly rmaService: RmaService) {}

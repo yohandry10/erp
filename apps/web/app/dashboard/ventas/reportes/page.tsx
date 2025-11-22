@@ -27,6 +27,7 @@ import PipelineReport from '@/components/ventas/reportes/PipelineReport'
 import FillRateReport from '@/components/ventas/reportes/FillRateReport'
 import AgingCxcReport from '@/components/ventas/reportes/AgingCxcReport'
 import SunatMetricsReport from '@/components/ventas/reportes/SunatMetricsReport'
+import ResumenVentasReport from '@/components/ventas/reportes/ResumenVentasReport'
 
 interface ReportFilters {
   fechaDesde: string
@@ -42,7 +43,7 @@ export default function ReportesPage() {
     fechaHasta: format(new Date(), 'yyyy-MM-dd')
   })
 
-  const [activeTab, setActiveTab] = useState('ventas-cliente')
+  const [activeTab, setActiveTab] = useState('resumen-ventas')
 
   const handleFilterChange = (field: keyof ReportFilters, value: string) => {
     setFilters(prev => ({
@@ -56,6 +57,7 @@ export default function ReportesPage() {
   }
 
   const tabs = [
+    { id: 'resumen-ventas', label: 'Resumen Ventas', icon: FileText },
     { id: 'ventas-cliente', label: 'Ventas por Cliente', icon: Users },
     { id: 'cotizaciones', label: 'Cotizaciones', icon: FileText },
     { id: 'pedidos-estado', label: 'Pedidos', icon: BarChart3 },
@@ -223,6 +225,7 @@ export default function ReportesPage() {
         {/* Tab Content */}
         <div>
           {activeTab === 'ventas-cliente' && <VentasPorClienteReport filters={filters} />}
+          {activeTab === 'resumen-ventas' && <ResumenVentasReport filters={filters} />}
           {activeTab === 'cotizaciones' && <CotizacionesPendientesReport filters={filters} />}
           {activeTab === 'pedidos-estado' && <PedidosPorEstadoReport filters={filters} />}
           {activeTab === 'productos' && <ProductosMasVendidosReport filters={filters} />}

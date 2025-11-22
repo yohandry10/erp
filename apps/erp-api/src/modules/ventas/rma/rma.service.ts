@@ -45,7 +45,7 @@ export class RmaService {
         recibido_en,
         created_at,
         updated_at,
-        clientes:cliente_id(id, razon_social, documento_numero)
+        clientes:cliente_id(id, razon_social, numero_documento)
       `,
       )
       .eq('tenant_id', tenantId)
@@ -350,7 +350,7 @@ export class RmaService {
         id,
         numero,
         cliente_id,
-        clientes:cliente_id(razon_social, documento_numero, documento_tipo),
+        clientes:cliente_id(razon_social, numero_documento, documento_tipo),
         detalle:pedidos_venta_detalle(id, descripcion, precio_unitario, producto_id, cantidad, cantidad_despachada)
       `,
       )
@@ -399,7 +399,7 @@ export class RmaService {
     const documentoData = {
       tipo_documento: 'NOTA_CREDITO',
       motivo_nota_credito: dto.motivo ?? 'DEVOLUCION DE MERCADERIA',
-      receptor_numero_doc: (pedido.clientes as any)?.documento_numero ?? '',
+      receptor_numero_doc: (pedido.clientes as any)?.numero_documento ?? '',
       receptor_razon_social: (pedido.clientes as any)?.razon_social ?? '',
       receptor_tipo_doc: (pedido.clientes as any)?.documento_tipo ?? '6',
       moneda: 'PEN',

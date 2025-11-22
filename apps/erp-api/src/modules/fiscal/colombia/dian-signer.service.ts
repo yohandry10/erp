@@ -184,8 +184,9 @@ export class DianSignerService {
   private signContent(content: string, privateKey: forge.pki.PrivateKey): string {
     const md = forge.md.sha256.create();
     md.update(content, 'utf8');
-    
-    const signature = privateKey.sign(md);
+
+    const rsaKey = privateKey as forge.pki.rsa.PrivateKey;
+    const signature = rsaKey.sign(md);
     return forge.util.encode64(signature);
   }
 

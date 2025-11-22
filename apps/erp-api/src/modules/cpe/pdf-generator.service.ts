@@ -138,7 +138,7 @@ export class PdfGeneratorService {
    * Formato QR SUNAT:
    * RUC_EMISOR|TIPO_DOC|SERIE|NUMERO|IGV|TOTAL|FECHA_EMISION|TIPO_DOC_RECEPTOR|NUM_DOC_RECEPTOR|HASH
    */
-  private async generateQRCode(cpeData: any): Promise<string> {
+  private async generateQRCode(cpeData: any, _countryCode?: string): Promise<string> {
     try {
       const qrData = [
         cpeData.ruc_emisor || '',
@@ -175,7 +175,8 @@ export class PdfGeneratorService {
   private async buildPdfDocument(
     cpeData: any,
     empresaConfig: any,
-    qrCode: string
+    qrCode: string,
+    _countryCode?: string,
   ): Promise<Buffer> {
     const PDFDocument = (await import('pdfkit')).default;
     const chunks: Buffer[] = [];

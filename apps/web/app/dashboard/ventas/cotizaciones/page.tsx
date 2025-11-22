@@ -209,17 +209,8 @@ export default function CotizacionesPage() {
               <p style={{ marginBottom: '1.5rem' }}>
                 {searchTerm || estadoFilter 
                   ? 'No se encontraron cotizaciones con los filtros aplicados'
-                  : 'Comienza creando tu primera cotización'}
+                  : 'Usa el botón "Nueva Cotización" en la parte superior para crear tu primera cotización'}
               </p>
-              {!searchTerm && !estadoFilter && (
-                <button
-                  onClick={() => router.push('/dashboard/ventas/cotizaciones/nueva')}
-                  className="refresh-btn"
-                >
-                  <Plus size={16} />
-                  Crear Primera Cotización
-                </button>
-              )}
             </div>
           ) : (
             <>

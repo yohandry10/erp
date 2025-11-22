@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PeriodosService } from './periodos.service';
 import { PlanCuentasService } from './plan-cuentas.service';
+import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.service';
 
 export interface AsientoContable {
   id?: string;
@@ -143,6 +145,54 @@ export class AsientosGeneratorService {
     }
 
     return asiento as AsientoContable;
+  }
+
+  @OnEvent('documento.fiscal.generado')
+  async handleDocumentoFiscalGenerado(evento: DocumentoFiscalGeneradoEvent) {
+    try {
+      const paisId = evento.paisId ?? 1;
+      const plantilla = await this.obtenerPlantillaAsientoVenta(paisId, evento.tipoDocumento);
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(evento.tenantId, [
+        plantilla.cuenta_debe_codigo,
+        plantilla.cuenta_haber_ventas_codigo,
+        plantilla.cuenta_haber_impuesto_codigo,
+      ]);
+
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get(plantilla.cuenta_debe_codigo)!.id,
+          debe: this.round2(evento.total),
+          haber: 0,
+          concepto: `Cuenta por cobrar ${evento.serie}-${evento.numero}`,
+        },
+        {
+          cuenta_id: cuentas.get(plantilla.cuenta_haber_ventas_codigo)!.id,
+          debe: 0,
+          haber: this.round2(evento.subtotal),
+          concepto: `Ingresos por venta ${evento.serie}-${evento.numero}`,
+        },
+        {
+          cuenta_id: cuentas.get(plantilla.cuenta_haber_impuesto_codigo)!.id,
+          debe: 0,
+          haber: this.round2(evento.impuesto),
+          concepto: `Impuestos por pagar ${evento.serie}-${evento.numero}`,
+        },
+      ];
+
+      await this.generarAsiento(
+        evento.tenantId,
+        new Date(evento.fechaEmision),
+        `Venta ${evento.serie}-${evento.numero}`,
+        detalles,
+        evento.documentoId,
+        evento.eventId,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ [Asientos] Error generando asiento para documento ${evento.documentoId}:`,
+        error,
+      );
+    }
   }
 
   /**
@@ -1007,6 +1057,25 @@ export class AsientosGeneratorService {
       }
       throw error;
     }
+  }
+
+  private async obtenerPlantillaAsientoVenta(paisId: number, tipoDocumento: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('plantillas_asientos_ventas')
+      .select('*')
+      .eq('pais_id', paisId)
+      .eq('tipo_documento', tipoDocumento)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new Error(
+        `No se encontró plantilla contable para país ${paisId} y documento ${tipoDocumento}`,
+      );
+    }
+
+    return data;
   }
 
   private round2(value: number): number {

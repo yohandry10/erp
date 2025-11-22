@@ -3,6 +3,7 @@ import { RecepcionesService } from './recepciones.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
 import { CalidadRecepcion } from '../dto';
 
 const createSupabaseClientMock = () => {
@@ -57,6 +58,7 @@ describe('RecepcionesService - Inventario Integration', () => {
           provide: InventarioService,
           useValue: {
             registrarMovimientoAlmacen: jest.fn(),
+            registrarEntradaStockAtomico: jest.fn().mockResolvedValue('mov-1'),
           },
         },
         {
@@ -70,6 +72,10 @@ describe('RecepcionesService - Inventario Integration', () => {
           useValue: {
             emitRecepcionRegistrada: jest.fn(),
           },
+        },
+        {
+          provide: AuditService,
+          useValue: { registrarCambio: jest.fn() },
         },
       ],
     }).compile();

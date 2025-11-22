@@ -1,47 +1,67 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useWizard } from '../useWizard'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, XCircle, AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
 
 export function ValidationStep() {
-  const { state, validateCertificate, validateRuc, saveStepProgress } = useWizard()
+  const { state, validateCertificate, validateRuc, saveStepProgress, completeWizard } = useWizard()
   const [isValidating, setIsValidating] = useState(false)
   const [hasValidated, setHasValidated] = useState(false)
+  const hasAutoValidatedRef = useRef(false)
+  const hasSavedProgressRef = useRef(false)
+  const hasFinalizedRef = useRef(false)
 
-  const runValidations = async () => {
+  const runValidations = useCallback(async () => {
     try {
       setIsValidating(true)
       setHasValidated(false)
 
-      // Run validations in parallel
-      await Promise.all([
+      const [certificateResponse, rucResponse] = await Promise.all([
         validateCertificate(),
         validateRuc(),
       ])
 
-      setHasValidated(true)
+      const certificateValid = !!certificateResponse?.data?.isValid
+      const rucValid = !!rucResponse?.data?.isValid
 
-      // If both validations pass, mark step as complete
-      if (state.validationResults.certificate?.isValid && state.validationResults.ruc?.isValid) {
-        await saveStepProgress('validation', {
-          certificateValid: true,
-          rucValid: true,
-          validatedAt: new Date().toISOString(),
-        })
+      if (certificateValid && rucValid) {
+        if (!hasSavedProgressRef.current) {
+          hasSavedProgressRef.current = true
+          await saveStepProgress('validation', {
+            certificateValid: true,
+            rucValid: true,
+            validatedAt: new Date().toISOString(),
+            certificateMetadata: certificateResponse?.data?.certificate,
+          }, { silent: true })
+        }
+
+        if (!state.hasPersistedConfiguration && !hasFinalizedRef.current) {
+          try {
+            hasFinalizedRef.current = true
+            await completeWizard({ silent: true })
+          } catch (error) {
+            hasFinalizedRef.current = false
+            throw error
+          }
+        }
       }
     } catch (error) {
       console.error('Validation error:', error)
     } finally {
       setIsValidating(false)
+      setHasValidated(true)
     }
-  }
+  }, [validateCertificate, validateRuc, saveStepProgress, state.hasPersistedConfiguration, completeWizard])
 
   useEffect(() => {
-    // Auto-run validations on mount
+    if (hasAutoValidatedRef.current) {
+      return
+    }
+    hasAutoValidatedRef.current = true
     runValidations()
-  }, [])
+  }, [runValidations])
 
   const certificateResult = state.validationResults.certificate
   const rucResult = state.validationResults.ruc
@@ -189,14 +209,41 @@ export function ValidationStep() {
                 }}>
                   ✓ Certificado válido y activo
                 </p>
+                {certificateResult.subject && (
+                  <p style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--primary-600)',
+                    margin: '0 0 0.25rem 0',
+                  }}>
+                    <strong>Entidad:</strong> {certificateResult.subject}
+                  </p>
+                )}
+                {certificateResult.issuer && (
+                  <p style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--primary-600)',
+                    margin: '0 0 0.25rem 0',
+                  }}>
+                    <strong>Emisor:</strong> {certificateResult.issuer}
+                  </p>
+                )}
+                {certificateResult.serialNumber && (
+                  <p style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--primary-600)',
+                    margin: '0 0 0.25rem 0',
+                  }}>
+                    <strong>Serie:</strong> {certificateResult.serialNumber}
+                  </p>
+                )}
                 {certificateResult.expiresAt && (
                   <p style={{
                     fontSize: '0.875rem',
                     color: 'var(--primary-600)',
                     margin: 0,
                   }}>
-                    Expira el: {new Date(certificateResult.expiresAt).toLocaleDateString('es-PE')}
-                    {certificateResult.daysUntilExpiration && (
+                    Expira el: {certificateResult.expiresAt.toLocaleDateString('es-PE')}
+                    {certificateResult.daysUntilExpiration !== undefined && (
                       <span> ({certificateResult.daysUntilExpiration} días restantes)</span>
                     )}
                   </p>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Delete, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common';
@@ -196,14 +196,14 @@ export class InventarioController {
 
       const { data: productos, error: productosError } = await client
         .from('productos')
-        .select('precio_venta, stock_actual, stock_minimo')
+        .select('precio_venta, stock, stock_minimo')
         .eq('tenant_id', tenantId);
 
       if (productosError) throw productosError;
 
       const totalProductos = productos?.length || 0;
-      const valorInventario = productos?.reduce((sum, p) => sum + (parseFloat(p.precio_venta || 0) * parseFloat(p.stock_actual || 0)), 0) || 0;
-      const productosStockBajo = productos?.filter(p => parseFloat(p.stock_actual || 0) <= parseFloat(p.stock_minimo || 0)).length || 0;
+      const valorInventario = productos?.reduce((sum, p) => sum + (parseFloat(p.precio_venta || 0) * parseFloat(p.stock || 0)), 0) || 0;
+      const productosStockBajo = productos?.filter(p => parseFloat(p.stock || 0) <= parseFloat(p.stock_minimo || 0)).length || 0;
 
       const hoy = new Date().toISOString().split('T')[0];
       const { data: movimientos } = await client
@@ -266,11 +266,28 @@ export class InventarioController {
         throw error;
       }
 
-      this.logger.log(`✅ ${data?.length || 0} productos obtenidos`); // HARDENING: confirma operación para auditoría.
+      let enriched = data || [];
+      const includeSucursal = `${query.includeSucursal ?? 'false'}`.toLowerCase() === 'true';
+      if (includeSucursal && enriched.length > 0) {
+        const ids = enriched.map((p: any) => p.id);
+        const [preciosResp, stockResp] = await Promise.all([
+          client.from('producto_precios_sucursal').select('*').in('producto_id', ids),
+          client.from('producto_stock_sucursal').select('*').in('producto_id', ids),
+        ]);
+        const precios = preciosResp.data || [];
+        const stocks = stockResp.data || [];
+        enriched = enriched.map((p: any) => ({
+          ...p,
+          precios_sucursal: precios.filter((x: any) => x.producto_id === p.id),
+          stock_sucursal: stocks.filter((x: any) => x.producto_id === p.id),
+        }));
+      }
+
+      this.logger.log(`✅ ${enriched?.length || 0} productos obtenidos`); // HARDENING: confirma operación para auditoría.
       
       return { 
         success: true, 
-        data: data || [] 
+        data: enriched 
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo productos', error as Error);
@@ -318,18 +335,37 @@ export class InventarioController {
       const tasaIgv = await this.taxCalculator.getTasaIgv(tenantId);
       const impuestoPorcentaje = tasaIgv * 100; // Convertir 0.18 a 18.0
 
+      const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
+      const controlaStock = esServicio ? false : !(productData.controla_stock === false || `${productData.controla_stock}`.toLowerCase() === 'false');
+      const precioVenta = parseFloat(productData.precioVenta || productData.precio_venta || 0);
+      const precioCompra = parseFloat(productData.precioCompra || productData.precio_compra || 0);
+      const stockMinimo = parseFloat(productData.stockMinimo || productData.stock_minimo || 0);
+      const stockReservado = parseFloat(productData.stockReservado || productData.stock_reservado || 0);
+      const sucursalId = productData.sucursal_id || null;
+      const almacenId = productData.almacen_id || null;
+      const stockInicial = controlaStock ? parseFloat(productData.stock || 0) : 0;
+
       const nuevoProducto = {
         tenant_id: tenantId,
         codigo: productData.codigo,
         nombre: productData.nombre,
-        precio_venta: parseFloat(productData.precioVenta || 0),
-        stock_actual: parseInt(productData.stock || 0),
+        descripcion: productData.descripcion || null,
+        precio_venta: precioVenta,
+        precio_compra: precioCompra,
+        stock: stockInicial,
         categoria: productData.categoria,
         activo: true,
         codigo_barras: productData.codigoBarras || productData.codigo,
-        precio_mayorista: parseFloat(productData.precioCompra || 0),
-        stock_minimo: parseInt(productData.stockMinimo || 0),
-        impuesto: impuestoPorcentaje
+        stock_minimo: stockMinimo,
+        stock_reservado: stockReservado,
+        impuesto: impuestoPorcentaje,
+        es_servicio: esServicio,
+        controla_stock: controlaStock,
+        afectacion_igv: productData.afectacion_igv || productData.afectacionIgv || '10',
+        tipo_operacion: productData.tipo_operacion || productData.tipoOperacion || null,
+        clasificador_sunat: productData.clasificador_sunat || productData.clasificadorSunat || null,
+        favorito: productData.favorito === true || `${productData.favorito}`.toLowerCase() === 'true',
+        imagen_url: productData.imagen_url || productData.imagenUrl || ''
       };
 
       const { data: insertedProduct, error } = await this.supabase.getClient()
@@ -340,7 +376,7 @@ export class InventarioController {
 
       if (error) throw error;
 
-      if (nuevoProducto.stock_actual > 0) {
+      if (controlaStock && stockInicial > 0) {
         try {
           await this.supabase.getClient()
             .from('stock_movimientos')
@@ -348,13 +384,69 @@ export class InventarioController {
               tenant_id: tenantId,
               producto_id: insertedProduct.id,
               tipo_movimiento: 'ENTRADA',
-              cantidad: nuevoProducto.stock_actual,
+              cantidad: stockInicial,
               motivo: 'Stock inicial del producto',
               referencia: 'INICIAL',
               created_at: new Date().toISOString()
             }]);
         } catch (movError) {
           this.logger.warn(`⚠️ No se pudo registrar movimiento inicial: ${(movError as Error).message}`); // HARDENING: mantiene registro de inconsistencias iniciales.
+        }
+      }
+
+      // Guardar precios por sucursal (acepta arreglo o sucursal_id individual)
+      const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
+      if (sucursalId) {
+        preciosSucursal.push({
+          sucursal_id: sucursalId,
+          moneda: productData.moneda || 'PEN',
+          precio: precioVenta,
+          activo: productData.activo ?? true,
+        });
+      }
+      if (preciosSucursal.length > 0) {
+        const preciosPayload = preciosSucursal
+          .filter((p: any) => p?.sucursal_id)
+          .map((p: any) => ({
+            producto_id: insertedProduct.id,
+            sucursal_id: p.sucursal_id,
+            moneda: p.moneda || 'PEN',
+            precio: parseFloat(p.precio ?? precioVenta ?? 0),
+            activo: p.activo ?? true,
+          }));
+        if (preciosPayload.length > 0) {
+          await this.supabase.getClient()
+            .from('producto_precios_sucursal')
+            .upsert(preciosPayload, { onConflict: 'producto_id,sucursal_id,moneda' });
+        }
+      }
+
+      // Guardar stock por sucursal/almacén si controla stock
+      const stockSucursal = Array.isArray(productData.stock_sucursal) ? productData.stock_sucursal : [];
+      if (controlaStock && sucursalId) {
+        stockSucursal.push({
+          sucursal_id: sucursalId,
+          almacen_id: almacenId,
+          stock: stockInicial,
+          reservado: stockReservado,
+          minimo: stockMinimo,
+        });
+      }
+      if (controlaStock && stockSucursal.length > 0) {
+        const stockPayload = stockSucursal
+          .filter((s: any) => s?.sucursal_id)
+          .map((s: any) => ({
+            producto_id: insertedProduct.id,
+            sucursal_id: s.sucursal_id,
+            almacen_id: s.almacen_id || null,
+            stock: parseFloat(s.stock ?? 0),
+            reservado: parseFloat(s.reservado ?? 0),
+            minimo: parseFloat(s.minimo ?? 0),
+          }));
+        if (stockPayload.length > 0) {
+          await this.supabase.getClient()
+            .from('producto_stock_sucursal')
+            .upsert(stockPayload, { onConflict: 'producto_id,sucursal_id,almacen_id' });
         }
       }
 
@@ -443,7 +535,8 @@ export class InventarioController {
   @ApiResponse({ status: 200, description: 'Producto obtenido exitosamente' })
   async getProducto(
     @CurrentTenant() tenantId: string,
-    @Param('id') id: string
+    @Param('id') id: string,
+    @Query() query: any
   ) {
     try {
       this.logger.log(`🔍 [Tenant: ${tenantId}] Obteniendo producto por ID: ${id}`); // HARDENING: evita logs sin contexto tenant.
@@ -463,6 +556,22 @@ export class InventarioController {
         return {
           success: false,
           message: 'Producto no encontrado'
+        };
+      }
+
+      const includeSucursal = `${query?.includeSucursal ?? 'false'}`.toLowerCase() === 'true';
+      if (includeSucursal && data?.id) {
+        const [preciosResp, stockResp] = await Promise.all([
+          this.supabase.getClient().from('producto_precios_sucursal').select('*').eq('producto_id', data.id),
+          this.supabase.getClient().from('producto_stock_sucursal').select('*').eq('producto_id', data.id),
+        ]);
+        return {
+          success: true,
+          data: {
+            ...data,
+            precios_sucursal: preciosResp.data || [],
+            stock_sucursal: stockResp.data || [],
+          }
         };
       }
 
@@ -549,6 +658,201 @@ export class InventarioController {
       return {
         success: false,
         message: 'Error al eliminar el producto: ' + (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * Actualizar producto por ID
+   */
+  @Put('productos/:id')
+  @RequirePermission('inventario.productos.update') // HARDENING: actualización controlada por permiso.
+  @ApiOperation({ summary: 'Actualizar producto por ID' })
+  @ApiResponse({ status: 200, description: 'Producto actualizado exitosamente' })
+  async updateProducto(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body() productData: any
+  ) {
+    try {
+      this.logger.log(`✏️ [Tenant: ${tenantId}] Actualizando producto por ID: ${id}`);
+
+      // Verificar que el producto existe
+      const { data: existingProduct, error: findError } = await this.supabase.getClient()
+        .from('productos')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('id', id)
+        .single();
+
+      if (findError || !existingProduct) {
+        return {
+          success: false,
+          message: 'Producto no encontrado'
+        };
+      }
+
+      // Verificar si el código ya existe en otro producto
+      if (productData.codigo && productData.codigo !== existingProduct.codigo) {
+        const { data: duplicateProduct } = await this.supabase.getClient()
+          .from('productos')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('codigo', productData.codigo)
+          .neq('id', id)
+          .single();
+
+        if (duplicateProduct) {
+          return {
+            success: false,
+            message: 'Ya existe otro producto con ese código'
+          };
+        }
+      }
+
+      // Preparar datos de actualización
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (productData.codigo) updateData.codigo = productData.codigo;
+      if (productData.nombre) updateData.nombre = productData.nombre;
+      if (productData.descripcion !== undefined) updateData.descripcion = productData.descripcion;
+      if (productData.categoria) updateData.categoria = productData.categoria;
+      if (productData.precioVenta !== undefined || productData.precio_venta !== undefined) {
+        updateData.precio_venta = parseFloat(productData.precioVenta ?? productData.precio_venta);
+      }
+      if (productData.precioCompra !== undefined || productData.precio_compra !== undefined) {
+        updateData.precio_compra = parseFloat(productData.precioCompra ?? productData.precio_compra);
+      }
+      if (productData.stockMinimo !== undefined || productData.stock_minimo !== undefined) {
+        updateData.stock_minimo = parseFloat(productData.stockMinimo ?? productData.stock_minimo);
+      }
+      if (productData.codigoBarras !== undefined) updateData.codigo_barras = productData.codigoBarras;
+      if (productData.impuesto !== undefined) updateData.impuesto = parseFloat(productData.impuesto);
+      if (productData.activo !== undefined) updateData.activo = productData.activo;
+      if (productData.stockReservado !== undefined || productData.stock_reservado !== undefined) {
+        updateData.stock_reservado = parseFloat(productData.stockReservado ?? productData.stock_reservado);
+      }
+      if (productData.es_servicio !== undefined) {
+        const esServicio = productData.es_servicio === true || `${productData.es_servicio}`.toLowerCase() === 'true';
+        updateData.es_servicio = esServicio;
+        if (esServicio) {
+          updateData.controla_stock = false;
+          updateData.stock = 0;
+        }
+      }
+      if (productData.controla_stock !== undefined) {
+        const controlaStock = productData.controla_stock === true || `${productData.controla_stock}`.toLowerCase() === 'true';
+        updateData.controla_stock = controlaStock;
+      }
+      if (productData.afectacion_igv !== undefined || productData.afectacionIgv !== undefined) {
+        updateData.afectacion_igv = productData.afectacion_igv ?? productData.afectacionIgv;
+      }
+      if (productData.tipo_operacion !== undefined || productData.tipoOperacion !== undefined) {
+        updateData.tipo_operacion = productData.tipo_operacion ?? productData.tipoOperacion;
+      }
+      if (productData.clasificador_sunat !== undefined || productData.clasificadorSunat !== undefined) {
+        updateData.clasificador_sunat = productData.clasificador_sunat ?? productData.clasificadorSunat;
+      }
+      if (productData.favorito !== undefined) {
+        updateData.favorito = productData.favorito === true || `${productData.favorito}`.toLowerCase() === 'true';
+      }
+      if (productData.imagen_url !== undefined || productData.imagenUrl !== undefined) {
+        updateData.imagen_url = productData.imagen_url ?? productData.imagenUrl;
+      }
+      if (productData.stock !== undefined) {
+        updateData.stock = parseFloat(productData.stock);
+      }
+
+      // Actualizar producto
+      const { data: updatedProduct, error: updateError } = await this.supabase.getClient()
+        .from('productos')
+        .update(updateData)
+        .eq('tenant_id', tenantId)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Manejo de precio/stock por sucursal en update
+      const sucursalId = productData.sucursal_id || null;
+      const almacenId = productData.almacen_id || null;
+      const precioVenta = parseFloat(productData.precioVenta ?? productData.precio_venta ?? updatedProduct.precio_venta ?? 0);
+      const stockMinimo = parseFloat(productData.stockMinimo ?? productData.stock_minimo ?? updatedProduct.stock_minimo ?? 0);
+      const stockReservado = parseFloat(productData.stockReservado ?? productData.stock_reservado ?? updatedProduct.stock_reservado ?? 0);
+      const stockCantidad = parseFloat(productData.stock ?? updatedProduct.stock ?? 0);
+      const controlaStock = updateData.controla_stock ?? updatedProduct.controla_stock ?? true;
+
+      // Upsert precios por sucursal (acepta arreglo o sucursal_id individual)
+      const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
+      if (sucursalId) {
+        preciosSucursal.push({
+          sucursal_id: sucursalId,
+          moneda: productData.moneda || 'PEN',
+          precio: precioVenta,
+          activo: productData.activo ?? true,
+        });
+      }
+      if (preciosSucursal.length > 0) {
+        const preciosPayload = preciosSucursal
+          .filter((p: any) => p?.sucursal_id)
+          .map((p: any) => ({
+            producto_id: id,
+            sucursal_id: p.sucursal_id,
+            moneda: p.moneda || 'PEN',
+            precio: parseFloat(p.precio ?? precioVenta ?? 0),
+            activo: p.activo ?? true,
+          }));
+        if (preciosPayload.length > 0) {
+          await this.supabase.getClient()
+            .from('producto_precios_sucursal')
+            .upsert(preciosPayload, { onConflict: 'producto_id,sucursal_id,moneda' });
+        }
+      }
+
+      // Upsert stock por sucursal/almacén si controla stock (acepta arreglo)
+      const stockSucursal = Array.isArray(productData.stock_sucursal) ? productData.stock_sucursal : [];
+      if (controlaStock && sucursalId) {
+        stockSucursal.push({
+          sucursal_id: sucursalId,
+          almacen_id: almacenId,
+          stock: stockCantidad,
+          reservado: stockReservado,
+          minimo: stockMinimo,
+        });
+      }
+      if (controlaStock && stockSucursal.length > 0) {
+        const stockPayload = stockSucursal
+          .filter((s: any) => s?.sucursal_id)
+          .map((s: any) => ({
+            producto_id: id,
+            sucursal_id: s.sucursal_id,
+            almacen_id: s.almacen_id || null,
+            stock: parseFloat(s.stock ?? 0),
+            reservado: parseFloat(s.reservado ?? 0),
+            minimo: parseFloat(s.minimo ?? 0),
+          }));
+        if (stockPayload.length > 0) {
+          await this.supabase.getClient()
+            .from('producto_stock_sucursal')
+            .upsert(stockPayload, { onConflict: 'producto_id,sucursal_id,almacen_id' });
+        }
+      }
+
+      this.logger.log(`✅ Producto actualizado exitosamente: ${id}`);
+
+      return {
+        success: true,
+        data: updatedProduct,
+        message: 'Producto actualizado exitosamente'
+      };
+    } catch (error) {
+      this.logger.error('❌ Error actualizando producto', error as Error);
+      return {
+        success: false,
+        message: 'Error al actualizar el producto: ' + (error as Error).message
       };
     }
   }

@@ -2,15 +2,36 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService, FacturaEmitidaEvent } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 describe('CxcService - FacturaEmitidaEvent', () => {
   let service: CxcService;
   let supabaseService: SupabaseService;
   let eventBusService: EventBusService;
   let mockSupabaseClient: any;
+  let auditMock: any;
+  let retencionesMock: any;
 
   beforeEach(async () => {
-    mockSupabaseClient = { from: jest.fn() };
+    const defaultQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      single: jest.fn(),
+      maybeSingle: jest.fn(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+    };
+
+    mockSupabaseClient = { from: jest.fn(() => defaultQuery) };
+    auditMock = { registrarCambio: jest.fn(), logIntegration: jest.fn() };
+    retencionesMock = {
+      validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
+      validarMontoPendiente: jest.fn().mockReturnValue({ valido: true, montoEsperado: 1180 }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -26,6 +47,14 @@ describe('CxcService - FacturaEmitidaEvent', () => {
           useValue: {
             emitCuentaPorCobrarCreadaEvent: jest.fn(),
           },
+        },
+        {
+          provide: AuditService,
+          useValue: auditMock,
+        },
+        {
+          provide: RetencionesValidationService,
+          useValue: retencionesMock,
         },
       ],
     }).compile();
@@ -47,8 +76,8 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       eventId: 'evt-001',
       tenantId,
       pedidoId: 'pedido-123',
-      cpeId: 'factura-456',
-      facturaId: 'factura-456',
+      cpeId: 'cpe-456',
+      facturaId: 'documento-456',
       serie: 'F001',
       numero: '12',
       clienteId: 'cliente-789',
@@ -58,7 +87,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       moneda: 'PEN',
       fechaEmision: '2025-01-10',
       fechaVencimiento: '2025-02-09',
-      idempotencyKey: `factura:${tenantId}:factura-456`,
+      idempotencyKey: `factura:${tenantId}:documento-456`,
       source: 'ventas',
       ajustes: { retencion: 0, percepcion: 0, detraccion: 0, anticipo: 0 },
     };
@@ -80,6 +109,15 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       eq: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({
         data: { dias_vencimiento_factura: 30, detraccion_codigo: '104' },
+        error: null,
+      }),
+    };
+
+    const clienteLookupQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { id: facturaEvent.clienteId },
         error: null,
       }),
     };
@@ -106,6 +144,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     mockSupabaseClient.from
       .mockImplementationOnce(() => idempotencyQuery)
       .mockImplementationOnce(() => existenciaQuery)
+      .mockImplementationOnce(() => clienteLookupQuery)
       .mockImplementationOnce(() => configQuery)
       .mockImplementationOnce(() => clienteQuery)
       .mockImplementationOnce(() => insertCuentaQuery)
@@ -115,7 +154,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
 
     expect(insertCuentaQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
       tenant_id: tenantId,
-      documento_id: facturaEvent.cpeId,
+      documento_id: facturaEvent.facturaId,
       cliente_id: facturaEvent.clienteId,
       event_id: facturaEvent.eventId,
       idempotency_key: facturaEvent.idempotencyKey,
@@ -127,7 +166,8 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       tenantId,
       cxcId: 'cxc-999',
       cuentaId: 'cxc-999',
-      facturaId: facturaEvent.cpeId,
+      facturaId: facturaEvent.facturaId,
+      cpeId: facturaEvent.cpeId,
       idempotencyKey: facturaEvent.idempotencyKey,
     }));
 
@@ -144,8 +184,8 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       eventId: 'evt-dup',
       tenantId,
       pedidoId: 'pedido-123',
-      cpeId: 'factura-456',
-      facturaId: 'factura-456',
+      cpeId: 'cpe-456',
+      facturaId: 'documento-456',
       serie: 'F001',
       numero: '12',
       clienteId: 'cliente-789',
@@ -155,7 +195,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       moneda: 'PEN',
       fechaEmision: '2025-01-10',
       fechaVencimiento: '2025-02-09',
-      idempotencyKey: `factura:${tenantId}:factura-456`,
+      idempotencyKey: `factura:${tenantId}:documento-456`,
       source: 'ventas',
       ajustes: { retencion: 0, percepcion: 0, detraccion: 0, anticipo: 0 },
     };
