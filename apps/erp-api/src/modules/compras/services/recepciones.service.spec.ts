@@ -73,6 +73,8 @@ describe('RecepcionesService', () => {
     // Reset mocks
     jest.clearAllMocks();
     mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
+    mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mockQueryBuilder.single.mockResolvedValue({ data: null, error: null });
   });
 
   describe('obtenerRecepciones', () => {
@@ -132,7 +134,7 @@ describe('RecepcionesService', () => {
         items: [],
       };
 
-      mockQueryBuilder.single.mockResolvedValue({ data: mockRecepcion, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: mockRecepcion, error: null });
 
       const result = await service.obtenerRecepcionPorId('rec-1', 'tenant-1');
 
@@ -141,7 +143,7 @@ describe('RecepcionesService', () => {
     });
 
     it('should throw NotFoundException when recepcion not found', async () => {
-      mockQueryBuilder.single.mockResolvedValue({
+      mockQueryBuilder.maybeSingle.mockResolvedValue({
         data: null,
         error: { message: 'Not found' },
       });
@@ -366,7 +368,7 @@ describe('RecepcionesService', () => {
 
       expect(result).toBeDefined();
       expect(result.numero).toBe('REC-2025-0001');
-      expect(inventarioService.registrarMovimientoAlmacen).toHaveBeenCalled();
+      expect(inventarioService.registrarEntradaStockAtomico).toHaveBeenCalled();
       // El evento se emite pero puede fallar silenciosamente, así que no lo verificamos
     });
 
@@ -459,7 +461,7 @@ describe('RecepcionesService', () => {
       await service.cerrarRecepcion('rec-1', 'tenant-1', cerrarDto, 'user-1');
 
       // Verificar que NO se llamó al servicio de inventario porque el item es RECHAZADO
-      expect(inventarioService.registrarMovimientoAlmacen).not.toHaveBeenCalled();
+      expect(inventarioService.registrarEntradaStockAtomico).not.toHaveBeenCalled();
     });
   });
 

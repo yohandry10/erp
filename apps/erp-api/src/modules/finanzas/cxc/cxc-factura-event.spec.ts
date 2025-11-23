@@ -5,6 +5,20 @@ import { EventBusService, FacturaEmitidaEvent } from '../../../shared/events/eve
 import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
+const createDefaultQuery = () => {
+  const query: any = {};
+  query.select = jest.fn().mockReturnValue(query);
+  query.eq = jest.fn().mockReturnValue(query);
+  query.in = jest.fn().mockReturnValue(query);
+  query.limit = jest.fn().mockReturnValue(query);
+  query.order = jest.fn().mockReturnValue(query);
+  query.single = jest.fn().mockResolvedValue({ data: null, error: null });
+  query.maybeSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+  query.insert = jest.fn().mockReturnValue(query);
+  query.update = jest.fn().mockReturnValue(query);
+  return query;
+};
+
 describe('CxcService - FacturaEmitidaEvent', () => {
   let service: CxcService;
   let supabaseService: SupabaseService;
@@ -14,17 +28,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
   let retencionesMock: any;
 
   beforeEach(async () => {
-    const defaultQuery = {
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      in: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      single: jest.fn(),
-      maybeSingle: jest.fn(),
-      insert: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-    };
+    const defaultQuery = createDefaultQuery();
 
     mockSupabaseClient = { from: jest.fn(() => defaultQuery) };
     auditMock = { registrarCambio: jest.fn(), logIntegration: jest.fn() };
@@ -32,6 +36,8 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
       validarMontoPendiente: jest.fn().mockReturnValue({ valido: true, montoEsperado: 1180 }),
     };
+
+    mockSupabaseClient.from.mockImplementation(() => createDefaultQuery());
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
