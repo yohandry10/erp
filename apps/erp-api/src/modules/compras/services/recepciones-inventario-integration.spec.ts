@@ -11,7 +11,7 @@ const createSupabaseClientMock = () => {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
-    single: jest.fn(),
+    single: jest.fn().mockResolvedValue({ data: null, error: null }),
     update: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
@@ -20,7 +20,7 @@ const createSupabaseClientMock = () => {
 
   client.queueEqBuilder = () => client.eq.mockImplementationOnce(() => client);
   client.queueEqPromise = (response: any) =>
-    client.eq.mockImplementationOnce(() => Promise.resolve(response));
+    client.eq.mockImplementationOnce(() => Promise.resolve({ ...client, ...response }));
   client.queueSingle = (response: any) =>
     client.single.mockResolvedValueOnce(response);
 
@@ -183,7 +183,7 @@ describe('RecepcionesService - Inventario Integration', () => {
       );
 
       // Assert
-      expect(inventarioService.registrarMovimientoAlmacen).toHaveBeenCalledWith({
+      expect(inventarioService.registrarEntradaStockAtomico).toHaveBeenCalledWith({
         tenantId: mockTenantId,
         productoId: mockProductoId,
         almacenId: mockAlmacenId,
@@ -286,7 +286,7 @@ describe('RecepcionesService - Inventario Integration', () => {
       );
 
       // Assert
-      expect(inventarioService.registrarMovimientoAlmacen).toHaveBeenCalledWith({
+      expect(inventarioService.registrarEntradaStockAtomico).toHaveBeenCalledWith({
         tenantId: mockTenantId,
         productoId: mockProductoId,
         almacenId: mockAlmacenId,

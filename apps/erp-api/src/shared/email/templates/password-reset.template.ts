@@ -218,6 +218,8 @@ export function generatePasswordResetEmail(data: PasswordResetTemplateData): Ema
   `.trim();
 
   const text = `
+Restablecer contraseña
+
 Hola ${data.userName},
 
 Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en ${data.appName}.

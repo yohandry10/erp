@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { AuditService } from '../../audit/audit.service';
 
 describe('CxcService - CobroRegistrado Event', () => {
   let service: CxcService;
@@ -38,6 +38,13 @@ describe('CxcService - CobroRegistrado Event', () => {
           useValue: {
             emitPagoFactura: jest.fn(),
             emitCobroRegistrado: jest.fn(),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            registrarCambio: jest.fn(),
+            logIntegration: jest.fn(),
           },
         },
       ],

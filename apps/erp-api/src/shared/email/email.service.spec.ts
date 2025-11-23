@@ -17,26 +17,31 @@ describe('EmailService', () => {
   let service: EmailService;
   let configService: ConfigService;
 
+  const baseConfig = {
+    EMAIL_PROVIDER: 'smtp',
+    EMAIL_FROM_ADDRESS: 'test@example.com',
+    EMAIL_FROM_NAME: 'Test Sender',
+    SUPPORT_EMAIL: 'support@example.com',
+    APP_NAME: 'Test App',
+    APP_URL: 'http://localhost:3000',
+    SMTP_HOST: 'localhost',
+    SMTP_PORT: 1025,
+    SMTP_SECURE: false,
+    SMTP_USER: '',
+    SMTP_PASS: '',
+  };
+
+  const getFromBase = (key: string, defaultValue?: any) =>
+    Object.prototype.hasOwnProperty.call(baseConfig, key) ? (baseConfig as any)[key] : defaultValue;
+
   const mockConfigService = {
-    get: jest.fn((key: string, defaultValue?: any) => {
-      const config = {
-        EMAIL_PROVIDER: 'smtp',
-        EMAIL_FROM_ADDRESS: 'test@example.com',
-        EMAIL_FROM_NAME: 'Test Sender',
-        SUPPORT_EMAIL: 'support@example.com',
-        APP_NAME: 'Test App',
-        APP_URL: 'http://localhost:3000',
-        SMTP_HOST: 'localhost',
-        SMTP_PORT: 1025,
-        SMTP_SECURE: false,
-        SMTP_USER: '',
-        SMTP_PASS: '',
-      };
-      return config[key] !== undefined ? config[key] : defaultValue;
-    }),
+    get: jest.fn(getFromBase),
   };
 
   beforeEach(async () => {
+    // Reset config getter to base implementation before each test
+    mockConfigService.get.mockImplementation(getFromBase);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmailService,
@@ -329,10 +334,9 @@ describe('EmailService', () => {
 
   describe('Configuration Providers', () => {
     it('should recognize SendGrid provider', () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'EMAIL_PROVIDER') return 'sendgrid';
-        return mockConfigService.get(key);
-      });
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: any) =>
+        key === 'EMAIL_PROVIDER' ? 'sendgrid' : getFromBase(key, defaultValue),
+      );
 
       const moduleWithSendGrid = Test.createTestingModule({
         providers: [
@@ -346,10 +350,9 @@ describe('EmailService', () => {
     });
 
     it('should recognize AWS SES provider', () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'EMAIL_PROVIDER') return 'aws-ses';
-        return mockConfigService.get(key);
-      });
+      mockConfigService.get.mockImplementation((key: string, defaultValue?: any) =>
+        key === 'EMAIL_PROVIDER' ? 'aws-ses' : getFromBase(key, defaultValue),
+      );
 
       const moduleWithAwsSes = Test.createTestingModule({
         providers: [

@@ -119,6 +119,9 @@ describe('DevolucionesProveedorService', () => {
     supabaseService = module.get(SupabaseService);
     inventarioService = module.get(InventarioService);
     eventBusService = module.get(EventBusService);
+
+    // Default resolve to avoid undefined in tests that don't override
+    mockSupabaseClient.single.mockResolvedValue({ data: null, error: null });
   });
 
   afterEach(() => {

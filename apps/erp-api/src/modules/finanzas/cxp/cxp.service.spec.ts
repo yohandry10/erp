@@ -418,6 +418,7 @@ describe('CxpService', () => {
         estado: 'PENDIENTE',
         saldo: 1180,
         total: 1180,
+        tenant_id: tenantId,
         proveedor_id: 'prov-001',
         numero_documento: 'F001-00001',
       };
