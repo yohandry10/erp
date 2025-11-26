@@ -10,6 +10,43 @@ import { runConfigurationCheckJob } from './jobs/configuration-check.job';
 import { runPosCpeRetryJob } from './jobs/pos-cpe-retry.job';
 import { runPosFacturaPendienteJob } from './jobs/pos-facturacion-pendiente.job';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
+
+// ERP API base (para endpoints protegidos con service role)
+const apiBase = process.env.ERP_API_URL || 'http://localhost:3002/api';
+const healthPort = parseInt(process.env.WORKER_PORT || '3050', 10);
+
+// Métricas básicas en memoria
+const metrics = {
+  posCpeRetry: { runs: 0, procesadas: 0, errores: 0, omitidas: 0 },
+  posFacturacionDb: { runs: 0, procesadas: 0, errores: 0 },
+  posFacturacionApi: { runs: 0, errores: 0 },
+};
+
+// Helper para registrar cron en integration_logs (tenant_id fijo 'system' o el que se pase)
+async function logCronRun(entry: {
+  tenant_id?: string;
+  servicio: string;
+  operacion: string;
+  status: 'SUCCESS' | 'ERROR';
+  error_message?: string;
+  request_summary?: any;
+  response_summary?: any;
+}) {
+  try {
+    await supabase.from('integration_logs').insert({
+      tenant_id: entry.tenant_id || 'system',
+      servicio: entry.servicio,
+      operacion: entry.operacion,
+      status: entry.status,
+      error_message: entry.error_message || null,
+      request_summary: entry.request_summary || null,
+      response_summary: entry.response_summary || null,
+    });
+  } catch (logErr) {
+    logger.warn(`⚠️ [Cron] No se pudo registrar integration_logs para ${entry.servicio}:`, logErr?.message || logErr);
+  }
+}
 
 // Logger setup
 const logger = winston.createLogger({
@@ -40,8 +77,24 @@ const redisConnection = {
 };
 
 // Job queues
-const cpeQueue = new Queue('cpe-processing', { connection: redisConnection });
-const greQueue = new Queue('gre-processing', { connection: redisConnection });
+const cpeQueue = new Queue('cpe-processing', {
+  connection: redisConnection,
+  defaultJobOptions: {
+    attempts: 5,
+    backoff: { type: 'exponential', delay: 5000 }, // backoff extra para CPE
+    removeOnComplete: true,
+    removeOnFail: false,
+  },
+});
+const greQueue = new Queue('gre-processing', {
+  connection: redisConnection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 }, // backoff extra para GRE
+    removeOnComplete: true,
+    removeOnFail: false,
+  },
+});
 const sireQueue = new Queue('sire-processing', { connection: redisConnection });
 
 // CPE Processing Worker con configuración de reintentos
@@ -113,16 +166,27 @@ const sireWorker = new Worker('sire-processing', async (job) => {
   },
 });
 
-// CPE Processing Functions - STUBS FUNCIONALES
-// Estas funciones son stubs que loguean pero no fallan
-// Reemplazar con implementaciones reales cuando estén disponibles
+// Helpers SUNAT/OSE: usar API ERP con token de servicio
+function getAuthHeaders(tenantId: string) {
+  const token =
+    process.env.WORKER_API_TOKEN ||
+    process.env.API_SERVICE_TOKEN ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    '';
+
+  const headers: Record<string, string> = { 'X-Tenant-Id': tenantId };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 async function processCpeSendToOse(cpeId: string) {
-  logger.info(`[STUB] processCpeSendToOse called for CPE: ${cpeId}`);
-  
+  logger.info(`[CPE] Enviando a SUNAT/OSE: ${cpeId}`);
+
   const { data: cpe, error } = await supabase
     .from('cpe')
-    .select('*')
+    .select('id, tenant_id, serie, numero')
     .eq('id', cpeId)
     .single();
 
@@ -130,44 +194,47 @@ async function processCpeSendToOse(cpeId: string) {
     throw new Error(`CPE not found: ${cpeId}`);
   }
 
-  logger.info(`[STUB] CPE found: ${cpe.serie}-${cpe.numero}, tenant: ${cpe.tenant_id}`);
+  try {
+    const resp = await axios.post(
+      `${apiBase}/cpe/${cpeId}/enviar-sunat`,
+      {},
+      {
+        headers: getAuthHeaders(cpe.tenant_id),
+        timeout: 45000,
+      }
+    );
 
-  // Update status to SENDING (stub)
-  await supabase
-    .from('cpe')
-    .update({ 
-      sunat_status: 'NOT_SENT',
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', cpeId);
-
-  // Log integration log
-  await supabase
-    .from('integration_logs')
-    .insert({
+    await supabase.from('integration_logs').insert({
       tenant_id: cpe.tenant_id,
       servicio: 'OSE',
       operacion: 'SEND_CPE',
       correlacion_id: cpeId,
       correlacion_tipo: 'CPE',
-      status: 'ERROR',
-      error_message: 'OSE integration not implemented - stub executed',
+      status: resp?.data?.success === false ? 'ERROR' : 'SUCCESS',
+      error_message: resp?.data?.success === false ? resp?.data?.message || 'Error enviando CPE' : null,
       request_summary: { cpe_id: cpeId, action: 'SEND_TO_OSE' },
-      response_summary: { stub: true, message: 'Not implemented' }
+      response_summary: resp?.data || null,
     });
 
-  logger.warn(`[STUB] OSE integration not implemented. CPE ${cpeId} marked as NOT_SENT`);
-  
-  // NO lanzar error - permitir que el job se complete
-  return { success: false, stub: true, message: 'OSE integration not implemented' };
+    if (resp?.data?.success === false) {
+      throw new Error(resp?.data?.message || 'OSE envío fallido');
+    }
+
+    logger.info(`✅ [CPE] Envío solicitado: ${cpe.serie}-${cpe.numero}`);
+    return { success: true };
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || 'Error enviando CPE';
+    logger.error(`❌ [CPE] Error enviando ${cpeId}:`, msg);
+    throw new Error(msg);
+  }
 }
 
 async function processCpeCheckStatus(cpeId: string) {
-  logger.info(`[STUB] processCpeCheckStatus called for CPE: ${cpeId}`);
-  
+  logger.info(`[CPE] Consultando estado OSE: ${cpeId}`);
+
   const { data: cpe, error } = await supabase
     .from('cpe')
-    .select('*')
+    .select('id, tenant_id, serie, numero')
     .eq('id', cpeId)
     .single();
 
@@ -175,35 +242,42 @@ async function processCpeCheckStatus(cpeId: string) {
     throw new Error(`CPE not found: ${cpeId}`);
   }
 
-  logger.info(`[STUB] Checking status for CPE: ${cpe.serie}-${cpe.numero}`);
+  try {
+    const resp = await axios.get(`${apiBase}/cpe/${cpeId}/status`, {
+      headers: getAuthHeaders(cpe.tenant_id),
+      timeout: 30000,
+    });
 
-  // Log integration log
-  await supabase
-    .from('integration_logs')
-    .insert({
+    await supabase.from('integration_logs').insert({
       tenant_id: cpe.tenant_id,
       servicio: 'OSE',
       operacion: 'CHECK_STATUS',
       correlacion_id: cpeId,
       correlacion_tipo: 'CPE',
-      status: 'ERROR',
-      error_message: 'OSE status check not implemented - stub executed',
+      status: resp?.data?.success === false ? 'ERROR' : 'SUCCESS',
+      error_message: resp?.data?.success === false ? resp?.data?.message || 'Error consultando estado' : null,
       request_summary: { cpe_id: cpeId, action: 'CHECK_STATUS' },
-      response_summary: { stub: true, message: 'Not implemented' }
+      response_summary: resp?.data || null,
     });
 
-  logger.warn(`[STUB] OSE status check not implemented for CPE ${cpeId}`);
-  
-  // NO lanzar error
-  return { success: false, stub: true, message: 'OSE status check not implemented' };
+    if (resp?.data?.success === false) {
+      throw new Error(resp?.data?.message || 'Estado OSE fallido');
+    }
+
+    logger.info(`✅ [CPE] Estado consultado: ${cpe.serie}-${cpe.numero}`);
+    return { success: true };
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || 'Error consultando estado CPE';
+    logger.error(`❌ [CPE] Error estado ${cpeId}:`, msg);
+    throw new Error(msg);
+  }
 }
 
 async function processCpeGeneratePdf(cpeId: string) {
-  logger.info(`[STUB] processCpeGeneratePdf called for CPE: ${cpeId}`);
-  
+  logger.info(`[CPE] Generar PDF solicitado: ${cpeId}`);
   const { data: cpe, error } = await supabase
     .from('cpe')
-    .select('*')
+    .select('id, tenant_id, serie, numero')
     .eq('id', cpeId)
     .single();
 
@@ -211,28 +285,40 @@ async function processCpeGeneratePdf(cpeId: string) {
     throw new Error(`CPE not found: ${cpeId}`);
   }
 
-  logger.info(`[STUB] Generating PDF for CPE: ${cpe.serie}-${cpe.numero}`);
+  try {
+    const resp = await axios.get(`${apiBase}/cpe/comprobantes/${cpeId}/pdf`, {
+      headers: getAuthHeaders(cpe.tenant_id),
+      responseType: 'arraybuffer',
+      timeout: 30000,
+    });
 
-  // Log integration log
-  await supabase
-    .from('integration_logs')
-    .insert({
+    await supabase.from('integration_logs').insert({
       tenant_id: cpe.tenant_id,
       servicio: 'PDF_GENERATOR',
       operacion: 'GENERATE_PDF',
       correlacion_id: cpeId,
       correlacion_tipo: 'CPE',
-      status: 'ERROR',
-      error_message: 'PDF generation not implemented - stub executed',
+      status: resp?.status === 200 ? 'SUCCESS' : 'ERROR',
+      error_message: resp?.status === 200 ? null : 'Error generando PDF',
       request_summary: { cpe_id: cpeId, action: 'GENERATE_PDF' },
-      response_summary: { stub: true, message: 'Not implemented' }
+      response_summary: { status: resp?.status },
     });
 
-  logger.warn(`[STUB] PDF generation not implemented for CPE ${cpeId}`);
-  
-  // NO lanzar error
-  return { success: false, stub: true, message: 'PDF generation not implemented' };
+    await supabase
+      .from('cpe')
+      .update({ pdf_generado_en: new Date().toISOString() })
+      .eq('id', cpeId);
+
+    logger.info(`✅ [CPE] PDF generado para ${cpe.serie}-${cpe.numero}`);
+    return { success: true };
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || 'Error generando PDF';
+    logger.error(`❌ [CPE] Error PDF ${cpeId}:`, msg);
+    throw new Error(msg);
+  }
 }
+
+
 
 // SIRE Processing Function
 async function processSireGeneration(tenantId: string, period: string) {
@@ -260,6 +346,22 @@ async function processSireGeneration(tenantId: string, period: string) {
       })
       .eq('id', sireFile.id);
     
+    // Auditoría: registrar integration_logs para SIRE
+    try {
+      await supabase.from('integration_logs').insert({
+        tenant_id: tenantId,
+        servicio: 'SIRE',
+        operacion: 'GENERATE',
+        correlacion_id: sireFile.id,
+        correlacion_tipo: 'SIRE',
+        status: 'SUCCESS',
+        request_summary: { tenantId, period },
+        response_summary: { file_path: generatedPath },
+      });
+    } catch (logErr) {
+      logger.warn('⚠️ [SIRE] No se pudo registrar integration_logs:', logErr?.message || logErr);
+    }
+
     logger.info(`✅ SIRE file marked as completed: ${generatedPath}`);
     return; // Salir sin error
   } catch (error) {
@@ -272,6 +374,20 @@ async function processSireGeneration(tenantId: string, period: string) {
         completed_at: new Date().toISOString()
       })
       .eq('id', sireFile!.id);
+    try {
+      await supabase.from('integration_logs').insert({
+        tenant_id: tenantId,
+        servicio: 'SIRE',
+        operacion: 'GENERATE',
+        correlacion_id: sireFile?.id,
+        correlacion_tipo: 'SIRE',
+        status: 'ERROR',
+        error_message: errorMessage,
+        request_summary: { tenantId, period },
+      });
+    } catch {
+      /* ignore */
+    }
     
     throw error;
   }
@@ -302,9 +418,70 @@ const healthCheck = () => {
       cpe: cpeQueue.name,
       gre: greQueue.name, 
       sire: sireQueue.name,
-    }
+    },
+    metrics,
+    uptimeSeconds: Math.floor(process.uptime()),
   };
 };
+
+// POS: Procesar ventas pendientes de facturación llamando al endpoint del API (usa service role key)
+async function triggerPosFacturacionPendienteViaApi() {
+  try {
+    const workerSecret = process.env.POS_WORKER_JWT_SECRET || '';
+    if (!workerSecret || workerSecret.length < 24) {
+      logger.error('❌ [POS Facturación Cron] POS_WORKER_JWT_SECRET no configurado o demasiado corto');
+      return;
+    }
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY && workerSecret === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('❌ [POS Facturación Cron] POS_WORKER_JWT_SECRET no debe ser igual a SUPABASE_SERVICE_ROLE_KEY');
+      return;
+    }
+
+    const { data: tenants, error } = await supabase
+      .from('tenants')
+      .select('id, estado')
+      .eq('estado', 'ACTIVO');
+
+    if (error) {
+      logger.error('❌ [POS Facturación Cron] No se pudieron obtener tenants:', error);
+      return;
+    }
+
+    for (const tenant of tenants || []) {
+      try {
+        const token = jwt.sign(
+          {
+            scope: 'pos.worker',
+            tenant_id: tenant.id,
+            tenant_ids: [tenant.id],
+          },
+          workerSecret,
+          { expiresIn: '10m' },
+        );
+
+        await axios.post(
+          `${apiBase}/pos/worker/procesar-pendientes`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'X-Tenant-Id': tenant.id,
+            },
+            timeout: 30000,
+          }
+        );
+        logger.info(`✅ [POS Facturación Cron] Procesadas pendientes para tenant ${tenant.id}`);
+      } catch (err: any) {
+        logger.error(
+          `❌ [POS Facturación Cron] Error procesando tenant ${tenant.id}:`,
+          err?.message || err
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('❌ [POS Facturación Cron] Error general:', err);
+  }
+}
 
 // Error handling
 process.on('uncaughtException', (error) => {
@@ -524,25 +701,34 @@ class BackgroundWorker {
     try {
       console.log('📦 [Worker] Verificando stock crítico...');
 
+      // Traer stock y mínimo, filtrar en memoria para evitar comparaciones columna-columna en PostgREST
       const { data: productos, error } = await supabase
         .from('productos')
-        .select('codigo, nombre, stock, stock_minimo')
-        .lt('stock', supabase.rpc('stock_minimo')); // Productos con stock menor al mínimo
+        .select('codigo, nombre, stock, stock_minimo');
 
       if (error) {
         console.error('❌ [Worker] Error consultando stock crítico:', error);
         return false;
       }
 
-      if (productos && productos.length > 0) {
-        console.log(`⚠️ [Worker] ${productos.length} productos con stock crítico detectados`);
-        
-        // Aquí se podría enviar notificaciones, emails, etc.
-        for (const producto of productos) {
-          console.log(`⚠️ [Worker] Stock crítico: ${producto.codigo} - ${producto.nombre} (Stock: ${producto.stock}, Mínimo: ${producto.stock_minimo})`);
-        }
-      } else {
+      const criticos =
+        (productos || []).filter((p: any) => {
+          const stock = Number(p?.stock ?? 0);
+          const minimo = Number(p?.stock_minimo ?? 0);
+          return !Number.isNaN(stock) && !Number.isNaN(minimo) && stock < minimo;
+        }) || [];
+
+      if (criticos.length === 0) {
         console.log('✅ [Worker] Todos los productos tienen stock adecuado');
+        return true;
+      }
+
+      console.log(`⚠️ [Worker] ${criticos.length} productos con stock crítico detectados`);
+      // Aquí se podrían enviar notificaciones, emails, etc.
+      for (const producto of criticos) {
+        console.log(
+          `⚠️ [Worker] Stock crítico: ${producto.codigo} - ${producto.nombre} (Stock: ${producto.stock}, Mínimo: ${producto.stock_minimo})`
+        );
       }
 
       return true;
@@ -703,8 +889,27 @@ cron.schedule('*/10 * * * *', async () => {
   logger.info('🔄 [Cron] Running scheduled POS CPE retry job');
   try {
     const result = await runPosCpeRetryJob();
+    metrics.posCpeRetry.runs += 1;
+    metrics.posCpeRetry.procesadas += result.procesadas;
+    metrics.posCpeRetry.errores += result.errores;
+    metrics.posCpeRetry.omitidas += result.omitidas;
+    await logCronRun({
+      servicio: 'POS_CPE_RETRY',
+      operacion: 'CRON',
+      status: 'SUCCESS',
+      request_summary: { job: 'pos-cpe-retry' },
+      response_summary: result,
+    });
     logger.info(`✅ [Cron] POS CPE retry completed: ${result.procesadas} procesadas, ${result.errores} errores, ${result.omitidas} omitidas`);
   } catch (error) {
+    metrics.posCpeRetry.errores += 1;
+    await logCronRun({
+      servicio: 'POS_CPE_RETRY',
+      operacion: 'CRON',
+      status: 'ERROR',
+      error_message: error instanceof Error ? error.message : `${error}`,
+      request_summary: { job: 'pos-cpe-retry' },
+    });
     logger.error('❌ [Cron] POS CPE retry job failed:', error);
   }
 });
@@ -714,9 +919,52 @@ cron.schedule('*/10 * * * *', async () => {
   logger.info('🧾 [Cron] Running scheduled POS pending invoicing job');
   try {
     const result = await runPosFacturaPendienteJob();
+    metrics.posFacturacionDb.runs += 1;
+    metrics.posFacturacionDb.procesadas += result.procesadas;
+    metrics.posFacturacionDb.errores += result.errores;
+    await logCronRun({
+      servicio: 'POS_FACTURACION_DB',
+      operacion: 'CRON',
+      status: 'SUCCESS',
+      request_summary: { job: 'pos-facturacion-db' },
+      response_summary: result,
+    });
     logger.info(`✅ [Cron] POS pending invoicing completed: ${result.procesadas} procesadas, ${result.errores} errores`);
   } catch (error) {
+    metrics.posFacturacionDb.errores += 1;
+    await logCronRun({
+      servicio: 'POS_FACTURACION_DB',
+      operacion: 'CRON',
+      status: 'ERROR',
+      error_message: error instanceof Error ? error.message : `${error}`,
+      request_summary: { job: 'pos-facturacion-db' },
+    });
     logger.error('❌ [Cron] POS pending invoicing job failed:', error);
+  }
+});
+
+// 🔄 SCHEDULED JOB: POS Facturación Pendiente vía API (Every 15 minutes, service role)
+cron.schedule('*/15 * * * *', async () => {
+  logger.info('🧾 [Cron] Running POS invoicing via API worker endpoint');
+  metrics.posFacturacionApi.runs += 1;
+  try {
+    await triggerPosFacturacionPendienteViaApi();
+    await logCronRun({
+      servicio: 'POS_FACTURACION_API',
+      operacion: 'CRON',
+      status: 'SUCCESS',
+      request_summary: { job: 'pos-facturacion-api' },
+    });
+  } catch (error) {
+    metrics.posFacturacionApi.errores += 1;
+    await logCronRun({
+      servicio: 'POS_FACTURACION_API',
+      operacion: 'CRON',
+      status: 'ERROR',
+      error_message: error instanceof Error ? error.message : `${error}`,
+      request_summary: { job: 'pos-facturacion-api' },
+    });
+    logger.error('❌ [Cron] POS invoicing via API failed:', error);
   }
 });
 
@@ -725,8 +973,39 @@ logger.info('   - Certificate validation: Daily at 2:00 AM');
 logger.info('   - Configuration check: Daily at 3:00 AM');
 logger.info('   - POS CPE retry: Every 10 minutes');
 logger.info('   - POS pending invoicing: Every 10 minutes');
+logger.info('   - POS pending invoicing via API: Every 15 minutes');
+logger.info('   - POS pending invoicing via API: Every 15 minutes');
 
 // Worker is ready and waiting for real tasks
+
+// Servidor de salud/metrics ligero
+import http from 'http';
+
+const server = http.createServer((req, res) => {
+  if (req.url === '/health' || req.url === '/healthz') {
+    // Protección opcional con HEALTH_TOKEN
+    if (process.env.HEALTH_TOKEN) {
+      const token = req.headers['x-health-token'] || req.headers['authorization'];
+      const cleaned = Array.isArray(token) ? token[0] : (token || '').toString().replace(/^Bearer\s+/i, '');
+      if (cleaned !== process.env.HEALTH_TOKEN) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'unauthorized' }));
+        return;
+      }
+    }
+
+    const body = JSON.stringify(healthCheck());
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(body);
+    return;
+  }
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'not_found' }));
+});
+
+server.listen(healthPort, () => {
+  logger.info(`🩺 [Health] Worker health endpoint listening on :${healthPort}`);
+});
 
 // MANEJO DE SEÑALES
 process.on('SIGINT', () => {
