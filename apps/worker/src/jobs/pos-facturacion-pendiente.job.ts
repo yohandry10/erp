@@ -28,17 +28,29 @@ const apiToken = process.env.WORKER_API_TOKEN || process.env.API_SERVICE_TOKEN |
  * 🔄 JOB: Procesar ventas POS pendientes de facturación (CPE)
  * - Busca ventas_pos en PENDIENTE_FACTURACION con intentos < 5
  * - Respeta backoff simple de 5,10,20,40 minutos
- * - Marca errores y registra logs de procesamiento
+ * - Marca errores y registra logs de procesamiento, con desglose por tenant
  */
 export async function runPosFacturaPendienteJob(): Promise<{
   success: boolean;
   procesadas: number;
   errores: number;
+  omitidas: number;
+  tenantStats: Record<string, { procesadas: number; errores: number; omitidas: number }>;
 }> {
   logger.info('🧾 [POS Facturación] Iniciando job de ventas pendientes');
 
   let procesadas = 0;
   let errores = 0;
+  let omitidas = 0;
+  const tenantStats: Record<string, { procesadas: number; errores: number; omitidas: number }> = {};
+
+  const ensureTenantStats = (tenantId: string | null | undefined) => {
+    const key = tenantId || 'unknown';
+    if (!tenantStats[key]) {
+      tenantStats[key] = { procesadas: 0, errores: 0, omitidas: 0 };
+    }
+    return key;
+  };
 
   try {
     const { data: ventasPendientes, error: queryError } = await supabase
@@ -69,11 +81,15 @@ export async function runPosFacturaPendienteJob(): Promise<{
         const espera = Math.pow(2, venta.intentos_facturacion || 0) * 5;
         if (minutos < espera) {
           logger.info(`⏳ [POS Facturación] Venta ${venta.numero_ticket} espera ${Math.max(0, espera - minutos).toFixed(1)} min`);
+          const tKey = ensureTenantStats(venta.tenant_id);
+          tenantStats[tKey].omitidas += 1;
+          omitidas++;
           continue;
         }
       }
 
       if (!venta.cpe_data) {
+        const tKey = ensureTenantStats(venta.tenant_id);
         await supabase
           .from('ventas_pos')
           .update({
@@ -84,6 +100,7 @@ export async function runPosFacturaPendienteJob(): Promise<{
           })
           .eq('id', venta.id);
         errores++;
+        tenantStats[tKey].errores += 1;
         continue;
       }
 
@@ -155,6 +172,8 @@ export async function runPosFacturaPendienteJob(): Promise<{
           .eq('id', venta.id);
 
         procesadas++;
+        const tKey = ensureTenantStats(venta.tenant_id);
+        tenantStats[tKey].procesadas += 1;
       } catch (error: any) {
         logger.error(`❌ [POS Facturación] Error facturando venta ${venta.numero_ticket}:`, error);
         await supabase
@@ -166,13 +185,15 @@ export async function runPosFacturaPendienteJob(): Promise<{
           })
           .eq('id', venta.id);
         errores++;
+        const tKey = ensureTenantStats(venta.tenant_id);
+        tenantStats[tKey].errores += 1;
       }
     }
 
-    logger.info(`🧾 [POS Facturación] Finalizado: ${procesadas} ok, ${errores} con error`);
-    return { success: true, procesadas, errores };
+    logger.info(`🧾 [POS Facturación] Finalizado: ${procesadas} ok, ${errores} con error, ${omitidas} omitidas/backoff`);
+    return { success: true, procesadas, errores, omitidas, tenantStats };
   } catch (error) {
     logger.error('❌ [POS Facturación] Error general:', error);
-    return { success: false, procesadas, errores: errores + 1 };
+    return { success: false, procesadas, errores: errores + 1, omitidas, tenantStats };
   }
 }
