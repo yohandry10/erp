@@ -63,7 +63,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
-    "@nestjs/testing": "^10.0.0",
+    "@nestjs/testing": "^11.1.9",
     "@types/bcrypt": "^6.0.0",
     "@types/compression": "^1.8.1",
     "@types/form-data": "^2.5.2",
