@@ -4,10 +4,13 @@ import { EventBusService } from './event-bus.service';
 import { EnhancedEventBusService } from './enhanced-event-bus.service';
 import { OutboxModule } from '../outbox/outbox.module';
 import { OutboxService } from '../outbox/outbox.service';
+import { EventEmitterService } from './event-emitter.service';
+import { SupabaseModule } from '../supabase/supabase.module';
 
 @Global()
 @Module({
   imports: [
+    SupabaseModule,
     EventEmitterModule.forRoot({
       wildcard: false,
       delimiter: '.',
@@ -27,8 +30,9 @@ import { OutboxService } from '../outbox/outbox.service';
       },
       inject: [OutboxService],
     },
+    EventEmitterService,
     EnhancedEventBusService,
   ],
-  exports: [EventBusService, EnhancedEventBusService],
+  exports: [EventBusService, EnhancedEventBusService, EventEmitterService],
 })
 export class EventsModule {}

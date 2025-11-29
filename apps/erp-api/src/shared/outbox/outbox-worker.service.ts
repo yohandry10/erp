@@ -41,6 +41,9 @@ export class OutboxWorker implements OnModuleInit {
     try {
       this.logger.log('🔄 [OutboxWorker] Procesando eventos pendientes...');
 
+      // Evitar eventos atascados en PROCESSING por ejecuciones previas (TTL 10 min)
+      await this.resetStuckEvents(5);
+
       // Obtener eventos pendientes (máximo 100 por ejecución)
       const pendingEvents = await this.outboxService.getPendingEvents(100);
 
@@ -98,6 +101,39 @@ export class OutboxWorker implements OnModuleInit {
       }
     } finally {
       this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Recoloca en PENDING los eventos que quedaron en PROCESSING por más de ttlMinutes
+   * para evitar atascos si un worker murió a mitad de ejecución.
+   */
+  private async resetStuckEvents(ttlMinutes: number = 10): Promise<void> {
+    try {
+      // Usamos el cliente público (service role) para no requerir contexto de tenant al limpiar.
+      const client = this.supabase.getPublicClient();
+      const cutoff = new Date(Date.now() - ttlMinutes * 60 * 1000).toISOString();
+
+      const { error, count } = await client
+        .from('outbox_events')
+        .update({
+          status: 'PENDING',
+          next_retry_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('status', 'PROCESSING')
+        .lt('updated_at', cutoff);
+
+      if (error) {
+        this.logger.warn(`⚠️ [OutboxWorker] No se pudieron limpiar eventos atascados: ${error.message}`);
+        return;
+      }
+
+      if ((count || 0) > 0) {
+        this.logger.warn(`⚠️ [OutboxWorker] Reestablecidos ${count} eventos atascados en PROCESSING`);
+      }
+    } catch (err) {
+      this.logger.warn('[OutboxWorker] Error limpiando eventos atascados:', err);
     }
   }
 

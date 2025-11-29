@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ContabilidadEventsListener } from './contabilidad-events.listener';
 import { AsientosGeneratorService } from '../services/asientos-generator.service';
 import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.service';
+import { EventBusService } from '../../../shared/events/event-bus.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
 describe('ContabilidadEventsListener', () => {
   let listener: ContabilidadEventsListener;
@@ -34,6 +37,47 @@ describe('ContabilidadEventsListener', () => {
         {
           provide: OutboxEventsService,
           useValue: mockOutboxEventsService
+        },
+        {
+          provide: EventBusService,
+          useValue: {
+            onVentaProcessed: jest.fn(),
+            on: jest.fn(),
+            onRecepcionRegistrada: jest.fn(),
+            onCuentaPorCobrarCreadaEvent: jest.fn(),
+            onPagoProveedorRegistrado: jest.fn(),
+          }
+        },
+        {
+          provide: SupabaseService,
+          useValue: {
+            getClient: jest.fn().mockReturnValue({
+              from: jest.fn().mockReturnThis(),
+              insert: jest.fn().mockReturnThis(),
+              select: jest.fn().mockReturnThis(),
+              update: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              order: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockResolvedValue({ data: [{ id: 'detalle-1' }], error: null }),
+              single: jest.fn().mockResolvedValue({ data: { id: 'test-id' }, error: null }),
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: {
+                  id: 'asiento-1',
+                  numero_asiento: 'A-001',
+                  total_debe: 100,
+                  total_haber: 100,
+                  estado: 'CONFIRMADO'
+                },
+                error: null
+              }),
+            })
+          }
+        },
+        {
+          provide: TaxCalculatorService,
+          useValue: {
+            calculateTax: jest.fn()
+          }
         }
       ]
     }).compile();

@@ -52,6 +52,7 @@ describe('AccountingEntriesService - Period Validation', () => {
   const mockTenantContextService = {
     getTenantId: jest.fn(() => 'test-tenant-id'),
     getUserId: jest.fn(() => 'user-1'),
+    getContext: jest.fn(() => ({ tenantId: 'test-tenant-id', userId: 'user-1' })),
   };
 
   beforeEach(async () => {

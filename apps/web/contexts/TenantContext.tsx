@@ -272,10 +272,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const newSession = await customAuth.getSession()
       await extractFromToken(newSession.data.session)
 
-      // Reload application state
-      if (typeof window !== 'undefined') {
-        window.location.reload()
-      }
     } catch (err) {
       console.error('Error switching tenant:', err)
       setError(err instanceof Error ? err.message : 'Failed to switch tenant')

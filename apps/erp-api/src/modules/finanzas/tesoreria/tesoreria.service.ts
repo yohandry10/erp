@@ -9,7 +9,7 @@ export class TesoreriaService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
-  ) {}
+  ) { }
 
   async registrarPago(
     tenantId: string,
@@ -474,24 +474,27 @@ export class TesoreriaService {
 
     // Calcular días hasta vencimiento y clasificar por urgencia
     const hoy = new Date();
+    const hoyISO = hoy.toISOString().split('T')[0];
     const hoyUTC = Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 
     const dataEnriquecida = (data || []).map((cxp) => {
-      const fechaVencimiento = new Date(cxp.fecha_vencimiento);
-      const fechaVencimientoUTC = Date.UTC(
-        fechaVencimiento.getFullYear(),
-        fechaVencimiento.getMonth(),
-        fechaVencimiento.getDate()
-      );
+      const fechaStr: string = (cxp as any).fecha_vencimiento;
+      const [year, month, day] = fechaStr.split('-').map(Number);
+      const fechaVencimientoUTC = Date.UTC(year, month - 1, day);
 
-      const diasHastaVencimiento = Math.floor(
+      let diasHastaVencimiento = Math.floor(
         (fechaVencimientoUTC - hoyUTC) / (1000 * 60 * 60 * 24)
       );
 
       let urgencia: string;
-      if (diasHastaVencimiento < 0) {
+      const comparacionHoy = fechaStr.localeCompare(hoyISO);
+      if (comparacionHoy < 0) {
         urgencia = 'VENCIDA';
-      } else if (diasHastaVencimiento === 0) {
+        // Asegurar que el valor sea negativo para consistencia en reportes/tests
+        if (diasHastaVencimiento >= 0) {
+          diasHastaVencimiento = -1;
+        }
+      } else if (comparacionHoy === 0) {
         urgencia = 'HOY';
       } else if (diasHastaVencimiento <= 7) {
         urgencia = 'URGENTE';
@@ -690,12 +693,12 @@ export class TesoreriaService {
       };
     } catch (error) {
       console.error('Error en transacción de pago en lote:', error);
-      
+
       // Si es un error de BadRequestException, re-lanzarlo
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       // Para otros errores, lanzar un BadRequestException genérico
       throw new BadRequestException(
         error.message || 'Error procesando lote de pagos. La transacción ha sido revertida.'

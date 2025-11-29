@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
 import { usePosConfig } from '@/hooks/use-pos-config'
 import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus'
-import { CajaControls } from '@/components/pos/CajaControls'
+// CajaControls ya no se usa - el modal de abrir caja está inline
 import { ProductGrid, ProductoPOS } from '@/components/pos/ProductGrid'
 import { QuickActions } from '@/components/pos/QuickActions'
 import { QuickClient } from '@/components/pos/QuickClient'
-// import { showSuccessToast } from '@/components/ui/success-toast'
-// import { showErrorToast } from '@/components/ui/error-toast'
+import VentaExitosaModal from '@/components/pos/VentaExitosaModal'
+import './pos-styles.css'
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -93,6 +93,7 @@ export default function POSPage() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('')
   const [metodoPagoSeleccionado, setMetodoPagoSeleccionado] = useState<string>('')
   const [referenciaPago, setReferenciaPago] = useState('')
+  const [tipoComprobante, setTipoComprobante] = useState<'03' | '01'>('03') // 03=Boleta, 01=Factura
 
   // Nuevos estados para funcionalidades avanzadas
   const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
@@ -105,6 +106,8 @@ export default function POSPage() {
   const [mostrarModalAbrirCaja, setMostrarModalAbrirCaja] = useState(false)
   const [mostrarModalCerrarCaja, setMostrarModalCerrarCaja] = useState(false)
   const [mostrarModalPago, setMostrarModalPago] = useState(false)
+  const [mostrarVentaExitosa, setMostrarVentaExitosa] = useState(false)
+  const [ventaExitosaData, setVentaExitosaData] = useState<any>(null)
 
   // Estados de formularios
   const [montoInicialInput, setMontoInicialInput] = useState('')
@@ -118,6 +121,10 @@ export default function POSPage() {
   const [greEnabled, setGreEnabled] = useState<boolean>(true);
   const [cajaId, setCajaId] = useState<string | null>(null);
   const [sesionCajaId, setSesionCajaId] = useState<string | null>(null);
+  const [datosInicializados, setDatosInicializados] = useState(false);
+  const [hayCajasDisponibles, setHayCajasDisponibles] = useState(true);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<string | null>(null);
+  const cargandoRef = useRef(false);
 
   const formatMoney = (value: any): string => {
     const num = Number(value);
@@ -125,11 +132,17 @@ export default function POSPage() {
   };
 
   useEffect(() => {
-    cargarDatos()
+    // Solo cargar datos una vez al montar el componente
+    // Usar ref para evitar doble carga en StrictMode
+    if (!datosInicializados && !cargandoRef.current) {
+      cargandoRef.current = true;
+      cargarDatos()
+    }
   }, [])
 
   const cargarDatos = async () => {
     console.log('🔄 Cargando datos POS empresarial...')
+    setIsLoading(true)
     try {
       // Cargar productos usando el endpoint del API corregido
       const productosResponse = await api.get('/api/pos/productos');
@@ -207,25 +220,10 @@ export default function POSPage() {
       try {
         const cajasRes = await api.get('/cajas');
         const cajas = cajasRes?.data || [];
-        if (cajas.length > 0) {
-          setCajaId((prev) => prev ?? cajas[0].id);
-        }
-
-        const sesionesRes = await api.get('/cajas/sesiones?estado=ABIERTA');
-        const sesionActiva = sesionesRes?.data?.[0];
-        if (sesionActiva) {
-          setCajaId(sesionActiva.caja_id);
-          setSesionCajaId(sesionActiva.id);
-          setEstadoCaja({
-            estado: 'ABIERTA',
-            montoInicial: sesionActiva.monto_inicio || 0,
-            ventasEfectivo: 0,
-            ventasTarjeta: 0,
-            montoFinal: sesionActiva.monto_inicio || 0,
-            cajaId: sesionActiva.caja_id,
-            sesionId: sesionActiva.id,
-          });
-        } else {
+        
+        if (cajas.length === 0) {
+          console.warn('⚠️ No hay cajas configuradas para este tenant');
+          setHayCajasDisponibles(false);
           setEstadoCaja({
             estado: 'CERRADA',
             montoInicial: 0,
@@ -233,9 +231,47 @@ export default function POSPage() {
             ventasTarjeta: 0,
             montoFinal: 0,
           });
+        } else {
+          setHayCajasDisponibles(true);
+          setCajaId((prev) => prev ?? cajas[0].id);
+          console.log(`✅ ${cajas.length} caja(s) encontrada(s), usando: ${cajas[0].nombre || cajas[0].id}`);
+
+          const sesionesRes = await api.get('/cajas/sesiones?estado=ABIERTA');
+          const sesionActiva = sesionesRes?.data?.[0];
+          if (sesionActiva) {
+            console.log('✅ Sesión de caja activa encontrada:', sesionActiva.id);
+            setCajaId(sesionActiva.caja_id);
+            setSesionCajaId(sesionActiva.id);
+            setEstadoCaja({
+              estado: 'ABIERTA',
+              montoInicial: sesionActiva.monto_inicio || sesionActiva.monto_inicial || 0,
+              ventasEfectivo: 0,
+              ventasTarjeta: 0,
+              montoFinal: sesionActiva.monto_inicio || sesionActiva.monto_inicial || 0,
+              cajaId: sesionActiva.caja_id,
+              sesionId: sesionActiva.id,
+            });
+          } else {
+            console.log('ℹ️ No hay sesión de caja activa, mostrando pantalla de apertura');
+            setEstadoCaja({
+              estado: 'CERRADA',
+              montoInicial: 0,
+              ventasEfectivo: 0,
+              ventasTarjeta: 0,
+              montoFinal: 0,
+            });
+          }
         }
       } catch (cajaError) {
         console.error('❌ Error cargando cajas:', cajaError);
+        setHayCajasDisponibles(false);
+        setEstadoCaja({
+          estado: 'CERRADA',
+          montoInicial: 0,
+          ventasEfectivo: 0,
+          ventasTarjeta: 0,
+          montoFinal: 0,
+        });
       }
 
       if (empresaRes?.success) {
@@ -253,6 +289,8 @@ export default function POSPage() {
       await recargarHistorialVentas();
 
       console.log(`✅ POS cargado: ${productosData.length} productos disponibles`);
+      setDatosInicializados(true)
+      setIsLoading(false)
 
     } catch (error) {
       console.error('❌ Error general cargando POS:', error)
@@ -267,6 +305,8 @@ export default function POSPage() {
       setClientes([])
       setEstadoCaja({ estado: 'CERRADA', montoInicial: 0, ventasEfectivo: 0, ventasTarjeta: 0, montoFinal: 0 })
       setHistorialVentas([])
+      setDatosInicializados(true)
+      setIsLoading(false)
     }
   }
 
@@ -421,8 +461,8 @@ export default function POSPage() {
   const agregarAlCarrito = (producto: ProductoPOS) => {
     const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0
 
-    // Verificar stock disponible (solo si no permite venta sin stock y no es servicio)
-    if (!ventaSinStock && !producto.es_servicio && stockDisponible <= 0) {
+    // Verificar stock disponible (excepto servicios)
+    if (!producto.es_servicio && stockDisponible <= 0) {
       alert(`❌ SIN STOCK\n${producto.nombre} no tiene stock disponible`)
       return
     }
@@ -447,8 +487,8 @@ export default function POSPage() {
     const precioFinal = obtenerPrecioProducto(producto)
 
     if (itemExistente) {
-      // Verificar que no exceda el stock (solo si no permite venta sin stock)
-      if (!ventaSinStock && !producto.es_servicio && itemExistente.cantidad >= stockDisponible) {
+      // Verificar que no exceda el stock
+      if (!producto.es_servicio && itemExistente.cantidad >= stockDisponible) {
         alert(`❌ STOCK INSUFICIENTE\nSolo hay ${stockDisponible} unidades disponibles`)
         return
       }
@@ -477,6 +517,9 @@ export default function POSPage() {
         subtotal: precioFinal
       }])
     }
+
+    // Limpiar selección después de agregar
+    setProductoSeleccionado(null)
 
     // Toast de producto agregado - REMOVIDO para mejor UX
   }
@@ -528,6 +571,20 @@ export default function POSPage() {
       return
     }
 
+    // Validar documento de cliente seleccionado
+    const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
+    const documento = (clienteActual?.numero_documento || '').trim()
+    if (!documento || documento.length < 8) {
+      alert('❌ DOCUMENTO INVÁLIDO\nSeleccione un cliente con documento válido (mínimo 8 dígitos)')
+      return
+    }
+
+    // Validar que Factura requiere RUC
+    if (tipoComprobante === '01' && clienteActual?.tipo_documento !== 'RUC') {
+      alert('❌ FACTURA REQUIERE RUC\n\nPara emitir Factura, el cliente debe tener RUC.\nSeleccione Boleta o cambie el cliente.')
+      return
+    }
+
     // 2. Validaciones SUNAT antes de procesar
     const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0)
     if (totalItems > 999) {
@@ -539,7 +596,6 @@ export default function POSPage() {
 
     const totalVenta = calcularTotal()
     // SUNAT limit for boletas without RUC is S/ 700
-    const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
     const esBoletaSinRuc = clienteActual?.tipo_documento !== 'RUC'
 
     if (esBoletaSinRuc && totalVenta > 700) {
@@ -573,6 +629,7 @@ export default function POSPage() {
       const clienteActual = clientes.find(c => c.id === clienteSeleccionado);
 
       const ventaData = {
+        idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
         cliente_documento: clienteActual?.numero_documento || '00000000',
@@ -598,34 +655,43 @@ export default function POSPage() {
         permite_venta_sin_stock: ventaSinStock
       }
 
-      // 5. Procesar venta en backend
+      // 5. Procesar venta en backend con 1 reintento en caso de error de red
       console.log('📤 Enviando venta al backend...', ventaData)
       let resultado: any = null;
 
-      try {
+      const enviarVenta = async () => {
         console.log('🔄 Iniciando llamada API...')
-        resultado = await api.post('/api/pos/venta', ventaData)
-        console.log('📨 Respuesta completa del backend:', resultado)
-        console.log('📊 Tipo de respuesta:', typeof resultado)
-        console.log('📋 Keys de la respuesta:', resultado ? Object.keys(resultado) : 'null/undefined')
+        const resp = await api.post('/api/pos/venta', ventaData)
+        console.log('📨 Respuesta completa del backend:', resp)
+        console.log('📨 Tipo de respuesta:', typeof resp, 'Es null?', resp === null, 'Es undefined?', resp === undefined)
+        return resp
+      }
 
-        if (resultado && resultado.data) {
-          console.log('📦 Contenido de data:', resultado.data)
-        }
+      try {
+        resultado = await enviarVenta()
+        console.log('✅ Resultado recibido:', resultado)
       } catch (apiError: any) {
         console.error('❌ Error de conexión API:', apiError)
-        console.error('❌ Stack del error API:', apiError?.stack)
-        console.error('❌ Response del error:', apiError?.response)
-        throw new Error(`Error de conexión: ${apiError?.message || 'Error de red'}`)
+        const reintentar = confirm('Error de red al procesar la venta. ¿Desea reintentar?')
+        if (!reintentar) {
+          throw new Error(`Error de conexión: ${apiError?.message || 'Error de red'}`)
+        }
+        resultado = await enviarVenta()
       }
 
       // Verificar que se recibió una respuesta válida
-      if (!resultado) {
-        console.error('❌ No se recibió respuesta del backend')
-        throw new Error('No se recibió respuesta del servidor')
+      if (!resultado || resultado === null || resultado === undefined) {
+        console.error('❌ No se recibió respuesta del backend. Resultado:', resultado)
+        console.error('❌ La venta puede haberse procesado en el backend pero no recibimos confirmación')
+        throw new Error('No se recibió respuesta del servidor. Verifica el historial de ventas para confirmar si se procesó.')
       }
 
-      if (resultado && (resultado.success === true || resultado.venta_id)) {
+      const ventaInfo = resultado?.data || resultado || {}
+      const totalServidor = ventaInfo?.total ?? ventaInfo?.totales_servidor?.total
+      const subtotalServidor = ventaInfo?.subtotal ?? ventaInfo?.totales_servidor?.subtotal
+      const impuestosServidor = ventaInfo?.impuestos ?? ventaInfo?.totales_servidor?.impuestos
+
+      if (resultado && (resultado.success === true || ventaInfo.venta_id)) {
         // 6. Cambiar estado a PAGADA
         setEstadoVentaActual({ estado: 'PAGADA', fecha_estado: new Date().toISOString() })
 
@@ -638,51 +704,27 @@ export default function POSPage() {
         console.log('🔄 Recargando historial de ventas...')
         await recargarHistorialVentas().catch(err => console.warn('⚠️ Error recargando historial:', err))
 
-        // 9. Mostrar éxito con información del comprobante y factura
+        // 9. Mostrar modal de venta exitosa con opción de imprimir
         console.log('✅ Venta procesada exitosamente:', resultado)
-        const ventaInfo = resultado; // Ya no está envuelto en 'data'
-
-        // Check if GRE was created
-        const totalVenta = calcularTotal()
-        const greCreated = greEnabled && totalVenta > greThreshold
-
-        // Crear mensaje mejorado con enlace a CPE y GRE
-        let mensajeExito = `✅ VENTA PROCESADA EXITOSAMENTE
-
-📄 Ticket: ${ventaInfo.numero_ticket || comprobante.numero}
-💰 Total: S/ ${formatMoney(totalVenta)}
-📋 Estado: ${ventaInfo.estado || 'PAGADA'}
-🧾 Factura Electrónica: ${ventaInfo.factura_electronica ? 'GENERADA' : 'PENDIENTE'}`;
-
-        if (greCreated) {
-          mensajeExito += `\n📦 Guía de Remisión: ${ventaInfo.gre_id ? 'GENERADA' : 'EN PROCESO'}`;
-          if (ventaInfo.gre_numero) {
-            mensajeExito += `\n   Número: ${ventaInfo.gre_numero}`;
-          }
-        }
-
-        mensajeExito += `\n\n${ventaInfo.url_factura ? `🔗 Ver factura: ${ventaInfo.url_factura}\n` : ''}`;
-        mensajeExito += `\nLa caja permanece ABIERTA para continuar vendiendo.`;
-
-        alert(mensajeExito);
+        const totalVenta = totalServidor ?? calcularTotal()
+        
+        // Preparar datos para el modal de éxito
+        setVentaExitosaData({
+          venta_id: ventaInfo.venta_id,
+          numero_ticket: ventaInfo.numero_ticket || comprobante.numero,
+          total: totalVenta,
+          subtotal: subtotalServidor ?? calcularSubtotal(),
+          impuestos: impuestosServidor ?? calcularImpuestos(),
+          estado: ventaInfo.estado || 'PAGADA',
+          factura_electronica: ventaInfo.factura_electronica || false,
+          cpe_id: ventaInfo.cpe_id,
+          cliente_nombre: clienteActual?.razon_social || clienteActual?.nombres || 'Cliente General',
+          fecha: new Date().toISOString(),
+        })
+        setMostrarVentaExitosa(true)
 
         // 10. Resetear estado para nueva venta (mantener caja abierta)
         setEstadoVentaActual({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
-
-        // 11. Opcional: Abrir CPE o GRE automáticamente si está configurado
-        if (ventaInfo.url_factura) {
-          const abrirCPE = confirm("¿Desea ver la factura electrónica generada en el módulo CPE?");
-          if (abrirCPE) {
-            // Abrir CPE en nueva pestaña o redirigir
-            window.open('/dashboard/cpe', '_blank');
-          }
-        } else if (greCreated && ventaInfo.gre_id) {
-          const abrirGRE = confirm("¿Desea ver la Guía de Remisión generada en el módulo GRE?");
-          if (abrirGRE) {
-            // Abrir GRE en nueva pestaña
-            window.open('/dashboard/gre', '_blank');
-          }
-        }
       } else {
         // Error del backend - mostrar error real
         console.error('❌ Error del backend COMPLETO:', resultado)
@@ -777,14 +819,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   // Función para generar comprobante
   const generarComprobante = () => {
     const correlativo = String(Date.now()).slice(-8)
-    const serie = 'T001'
-    const tipo = '03' // Boleta por defecto en POS
+    // Serie según tipo de comprobante: B=Boleta, F=Factura
+    const serie = tipoComprobante === '01' ? 'F001' : 'B001'
 
     const comprobante = {
       serie,
       correlativo,
       numero: `${serie}-${correlativo}`,
-      tipo,
+      tipo: tipoComprobante, // 01=Factura, 03=Boleta
       fecha: new Date().toISOString(),
       cliente: clientes.find(c => c.id === clienteSeleccionado),
       items: carrito,
@@ -853,10 +895,34 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         return
       }
 
+      // Pedir confirmación con monto contado
+      const montoContado = prompt(
+        `🔒 CERRAR CAJA\n\nMonto inicial: S/ ${formatMoney(estadoCaja?.montoInicial || 0)}\n\nIngrese el monto contado en caja:`,
+        '0'
+      )
+      
+      if (montoContado === null) {
+        return // Usuario canceló
+      }
+
+      const montoFinal = parseFloat(montoContado) || 0
+      const diferencia = montoFinal - (estadoCaja?.montoInicial || 0)
+      
+      const confirmar = confirm(
+        `¿Confirmar cierre de caja?\n\n` +
+        `Monto inicial: S/ ${formatMoney(estadoCaja?.montoInicial || 0)}\n` +
+        `Monto contado: S/ ${formatMoney(montoFinal)}\n` +
+        `Diferencia: S/ ${formatMoney(diferencia)}`
+      )
+      
+      if (!confirmar) {
+        return
+      }
+
       const resultado = await api.post(`/cajas/${cajaId}/cierre`, {
         sesion_id: sesionCajaId,
-        monto_cierre: parseFloat(montoContadoInput) || 0,
-        notas: notasCierreInput
+        monto_cierre: montoFinal,
+        notas: `Cierre manual. Diferencia: S/ ${formatMoney(diferencia)}`
       })
 
       if (resultado) {
@@ -870,11 +936,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           cajaId,
         })
 
-        // Toast para cerrar caja
-        alert('🔒 ¡CAJA CERRADA!\nSesión finalizada correctamente')
+        alert(`🔒 ¡CAJA CERRADA!\n\nMonto contado: S/ ${formatMoney(montoFinal)}\nDiferencia: S/ ${formatMoney(diferencia)}`)
       }
     } catch (error) {
       console.error('❌ Error cerrando caja:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido'
+      alert(`❌ Error cerrando caja: ${errorMsg}`)
     }
   }
 
@@ -902,11 +969,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     const coincideCategoria =
       !categoriaFiltro || producto.categoria === categoriaFiltro;
 
-    // Mostrar productos sin stock solo si está habilitado
-    const stockDisponible = producto.stock_disponible ?? producto.stock_actual;
-    const tieneStock = ventaSinStock || producto.es_servicio || stockDisponible > 0;
+    // Filtrar productos sin stock (excepto servicios)
+    const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0;
+    const tieneStock = producto.es_servicio || stockDisponible > 0;
 
-    return coincideBusqueda && coincideCategoria && tieneStock;
+    // Filtrar productos sin precio válido (precio debe ser > 0)
+    const tienePrecioValido = producto.precio_venta > 0;
+
+    return coincideBusqueda && coincideCategoria && tieneStock && tienePrecioValido;
   });
 
   const categorias = [...new Set((productos || []).map((p) => p.categoria))];
@@ -933,10 +1003,25 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       .join('\n')
   }
 
+  // Mostrar loading mientras se cargan los datos iniciales
+  if (isLoading || !datosInicializados) {
+    return (
+      <div className="dashboard-container pos-page">
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="stat-card" style={{ maxWidth: '400px', textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⏳</div>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Cargando POS...</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>Verificando estado de caja</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
-      {estadoCaja?.estado === 'CERRADA' ? (
-        <div className="dashboard-container">
+      {!estadoCaja || estadoCaja.estado === 'CERRADA' ? (
+        <div className="dashboard-container pos-page">
           <div className="min-h-screen flex items-center justify-center">
             <div className="stat-card" style={{ maxWidth: '500px', textAlign: 'center' }}>
               <div style={{ marginBottom: '2rem' }}>
@@ -945,7 +1030,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     width: '120px',
                     height: '120px',
                     margin: '0 auto 2rem',
-                    background: 'var(--gradient-danger)',
+                    background: hayCajasDisponibles ? 'var(--gradient-danger)' : 'var(--gradient-warning)',
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
@@ -953,56 +1038,126 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     fontSize: '4rem',
                   }}
                 >
-                  🔒
+                  {hayCajasDisponibles ? '🔒' : '⚠️'}
                 </div>
                 <h2 className="dashboard-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
-                  CAJA CERRADA
+                  {hayCajasDisponibles ? 'CAJA CERRADA' : 'SIN CAJA CONFIGURADA'}
                 </h2>
                 <p className="dashboard-subtitle" style={{ marginBottom: '2rem' }}>
-                  Para usar el sistema POS, primero debe abrir la caja registradora con el monto inicial
+                  {hayCajasDisponibles 
+                    ? 'Para usar el sistema POS, primero debe abrir la caja registradora con el monto inicial'
+                    : 'No hay cajas registradoras configuradas. Vaya a Configuración para crear una caja primero.'}
                 </p>
-                <button
-                  onClick={abrirCaja}
-                  className="btn btn-primary"
-                  style={{
-                    width: '100%',
-                    padding: '1.5rem 2rem',
-                    fontSize: '1.2rem',
-                    background: 'var(--gradient-success)',
-                  }}
-                >
-                  💰 Abrir Caja Registradora
-                </button>
+                {hayCajasDisponibles ? (
+                  <button
+                    onClick={abrirCaja}
+                    className="btn btn-primary"
+                    style={{
+                      width: '100%',
+                      padding: '1.5rem 2rem',
+                      fontSize: '1.2rem',
+                      background: 'var(--gradient-success)',
+                    }}
+                  >
+                    💰 Abrir Caja Registradora
+                  </button>
+                ) : (
+                  <a
+                    href="/dashboard/wizard"
+                    className="btn btn-primary"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '1.5rem 2rem',
+                      fontSize: '1.2rem',
+                      background: 'var(--gradient-primary)',
+                      textDecoration: 'none',
+                      textAlign: 'center',
+                    }}
+                  >
+                    ⚙️ Ir a Configuración
+                  </a>
+                )}
               </div>
             </div>
           </div>
 
-          <CajaControls
-            estadoCaja={estadoCaja}
-            montoInicialInput={montoInicialInput}
-            setMontoInicialInput={setMontoInicialInput}
-            montoContadoInput={montoContadoInput}
-            setMontoContadoInput={setMontoContadoInput}
-            notasCierreInput={notasCierreInput}
-            setNotasCierreInput={setNotasCierreInput}
-            abrirCaja={abrirCaja}
-            confirmarAbrirCaja={confirmarAbrirCaja}
-            cerrarCaja={cerrarCaja}
-            mostrarModalAbrirCaja={mostrarModalAbrirCaja}
-            setMostrarModalAbrirCaja={setMostrarModalAbrirCaja}
-          />
+          {/* Modal para abrir caja - solo se muestra cuando mostrarModalAbrirCaja es true */}
+          {mostrarModalAbrirCaja && (
+            <div className="modal-backdrop" style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div className="stat-card" style={{ maxWidth: '400px', padding: '2rem' }}>
+                <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>💰 Abrir Caja</h3>
+                <label htmlFor="monto-inicial-caja" style={{ display: 'block', marginBottom: '0.5rem' }}>Monto inicial (S/)</label>
+                <input
+                  id="monto-inicial-caja"
+                  name="monto-inicial-caja"
+                  type="number"
+                  value={montoInicialInput}
+                  onChange={(e) => setMontoInicialInput(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    fontSize: '1.2rem',
+                    border: '2px solid var(--border-color)',
+                    borderRadius: '8px',
+                    marginBottom: '1rem'
+                  }}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    className="btn"
+                    onClick={confirmarAbrirCaja}
+                    style={{
+                      flex: 1,
+                      padding: '1rem',
+                      background: 'var(--gradient-success)',
+                      color: 'white',
+                      border: 'none'
+                    }}
+                  >
+                    ✅ Confirmar
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={() => setMostrarModalAbrirCaja(false)}
+                    style={{
+                      flex: 1,
+                      padding: '1rem',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)'
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="dashboard-container" style={{ padding: '1rem', maxWidth: '100%' }}>
+        <div className="dashboard-container pos-page">
           {/* Header del POS empresarial */}
-          <div className="dashboard-header" style={{ marginBottom: '1.5rem' }}>
+          <div className="dashboard-header pos-header">
             <div>
               <h1 className="dashboard-title" style={{ fontSize: '2.5rem' }}>
                 🛒 Sistema POS Empresarial
               </h1>
               <p className="dashboard-subtitle">
                 Caja: <span className="status-success">{estadoCaja?.estado}</span> | Productos:{' '}
-                <span style={{ fontWeight: '600' }}>{productos.length}</span> | En Carrito:{' '}
+                <span style={{ fontWeight: '600' }}>{productosFiltrados.length}</span> | En Carrito:{' '}
                 <span style={{ fontWeight: '600' }}>{carrito.length}</span>
               </p>
             </div>
@@ -1017,17 +1172,6 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 }}
               >
                 🔄 Sincronizar
-              </button>
-              <button
-                onClick={abrirCaja}
-                className="btn"
-                style={{
-                  background: 'var(--gradient-success)',
-                  color: 'white',
-                  border: 'none',
-                }}
-              >
-                🔓 Abrir Caja
               </button>
               <button
                 onClick={cerrarCaja}
@@ -1100,7 +1244,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               <div className="stat-card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                   <div style={{ flex: 1 }}>
+                    <label htmlFor="pos-busqueda" className="sr-only">Buscar productos</label>
                     <input
+                      id="pos-busqueda"
+                      name="pos-busqueda"
                       type="text"
                       placeholder="🔍 Buscar por nombre, código o código de barras..."
                       value={busqueda}
@@ -1121,7 +1268,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       ))}
                     </datalist>
                   </div>
+                  <label htmlFor="pos-categoria" className="sr-only">Filtrar por categoría</label>
                   <select
+                    id="pos-categoria"
+                    name="pos-categoria"
                     value={categoriaFiltro}
                     onChange={(e) => setCategoriaFiltro(e.target.value)}
                     style={{
@@ -1178,7 +1328,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
                   {/* Búsqueda por Código de Barras */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <label htmlFor="pos-codigo-barras" className="sr-only">Código de barras</label>
                     <input
+                      id="pos-codigo-barras"
+                      name="pos-codigo-barras"
                       type="text"
                       placeholder="📱 Código de barras"
                       value={busquedaPorCodigoBarras}
@@ -1195,8 +1348,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
                   {/* Descuento Global */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>Desc:</span>
+                    <label htmlFor="pos-descuento-tipo" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Desc:</label>
                     <select
+                      id="pos-descuento-tipo"
+                      name="pos-descuento-tipo"
                       value={descuentoGlobal.tipo}
                       onChange={(e) =>
                         setDescuentoGlobal({
@@ -1214,7 +1369,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       <option value="PORCENTAJE">%</option>
                       <option value="MONTO_FIJO">S/</option>
                     </select>
+                    <label htmlFor="pos-descuento-valor" className="sr-only">Valor del descuento</label>
                     <input
+                      id="pos-descuento-valor"
+                      name="pos-descuento-valor"
                       type="number"
                       value={descuentoGlobal.valor}
                       onChange={(e) =>
@@ -1253,23 +1411,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       />
                       ⚡ Rápida
                     </label>
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={ventaSinStock}
-                        onChange={(e) => setVentaSinStock(e.target.checked)}
-                        style={{ transform: 'scale(1.2)' }}
-                      />
-                      📦 Sin Stock
-                    </label>
+
                   </div>
                 </div>
               </div>
@@ -1288,7 +1430,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   boxShadow: 'var(--shadow-xl)',
                 }}
               >
-                <ProductGrid productos={productosFiltrados} onAgregar={agregarAlCarrito} />
+                <ProductGrid 
+                  productos={productosFiltrados} 
+                  onAgregar={agregarAlCarrito}
+                  productoSeleccionado={productoSeleccionado}
+                  onSeleccionar={setProductoSeleccionado}
+                />
               </div>
             </div>
 
@@ -1379,7 +1526,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           </div>
                         )}
                       </div>
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <h4
                           style={{
                             fontWeight: '600',
@@ -1397,15 +1544,27 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         <p style={{ fontSize: '0.7rem', color: '#9CA3AF', margin: 0 }}>
                           Stock: {item.producto.stock_disponible ?? item.producto.stock_actual ?? 0}
                         </p>
-                        <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem' }}>
-                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 5)}>
+                        <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                            onClick={() => aplicarDescuentoRapido(item.producto.id, 5)}
+                          >
                             -5%
                           </button>
-                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 10)}>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                            onClick={() => aplicarDescuentoRapido(item.producto.id, 10)}
+                          >
                             -10%
                           </button>
-                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem' }} onClick={() => aplicarDescuentoRapido(item.producto.id, 0)}>
-                            Reset
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                            onClick={() => aplicarDescuentoRapido(item.producto.id, 0)}
+                          >
+                            ↺
                           </button>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -1495,18 +1654,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       borderTop: '2px dashed var(--primary-300)',
                       paddingTop: '1rem',
                     }}
-                >
-                  <span>TOTAL</span>
-                  <span>S/ {formatMoney(calcularTotal())}</span>
-                </div>
+                  >
+                    <span>TOTAL</span>
+                    <span>S/ {formatMoney(calcularTotal())}</span>
+                  </div>
 
-                {/* Acciones rápidas */}
-                <QuickActions
-                  mensaje={mensajeAccionRapida()}
-                  emailDestino={clienteActual?.email}
-                />
-
-                {/* GRE Indicator */}
+                  {/* GRE Indicator */}
                 {greEnabled && calcularTotal() > greThreshold && (
                     <div
                       style={{
@@ -1551,7 +1704,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 gap: '1.5rem',
               }}
             >
-              {/* Selección de Cliente */}
+              {/* Selección de Cliente y Tipo de Comprobante */}
               <div
                 className="stat-card"
                 style={{
@@ -1561,39 +1714,79 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   backdropFilter: 'blur(20px)',
                 }}
               >
-                <h3 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>👤 Cliente</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <input
-                    list="clientes-pos-options"
+                <h3 id="cliente-section-title" style={{ fontWeight: 'bold', marginBottom: '1rem' }}>👤 Cliente</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <label htmlFor="pos-cliente" className="sr-only">Seleccionar cliente</label>
+                  <select
+                    id="pos-cliente"
+                    name="pos-cliente"
                     value={clienteSeleccionado}
                     onChange={(e) => setClienteSeleccionado(e.target.value)}
-                    placeholder="Selecciona cliente (buscar por documento)"
+                    aria-labelledby="cliente-section-title"
                     style={{
                       flex: 1,
                       padding: '0.75rem',
                       border: '1px solid var(--primary-300)',
                       borderRadius: '4px',
                     }}
-                  />
-                  <datalist id="clientes-pos-options">
+                  >
+                    <option value="">-- Seleccionar cliente --</option>
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
                         {(c.razon_social || `${c.nombres || ''} ${c.apellidos || ''}`.trim() || 'Cliente')} - {c.numero_documento}
                       </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
                 {clienteActual && (
-                  <div style={{ fontSize: '0.8rem', marginBottom: '0.5rem', color: 'var(--primary-600)' }}>
-                    {clienteActual.tipo_documento}: {clienteActual.numero_documento}
+                  <div style={{ fontSize: '0.875rem', padding: '0.75rem', background: 'var(--emerald-50)', borderRadius: '8px', border: '1px solid var(--emerald-200)', marginBottom: '0.75rem' }}>
+                    <div style={{ fontWeight: '600', color: 'var(--emerald-700)' }}>
+                      ✅ {clienteActual.razon_social || `${clienteActual.nombres || ''} ${clienteActual.apellidos || ''}`.trim()}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--emerald-600)' }}>
+                      {clienteActual.tipo_documento}: {clienteActual.numero_documento}
+                    </div>
                   </div>
                 )}
-                <QuickClient
-                  onCreated={(nuevo) => {
-                    setClientes((prev) => [nuevo, ...prev])
-                    setClienteSeleccionado(nuevo.id)
-                  }}
-                />
+                {!clienteActual && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ width: '100%', marginBottom: '0.75rem' }}
+                    onClick={() => window.open('/dashboard/ventas/clientes', '_blank')}
+                  >
+                    ➕ Crear nuevo cliente
+                  </button>
+                )}
+                
+                {/* Tipo de Comprobante */}
+                <div style={{ marginTop: '0.75rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--primary-600)', marginBottom: '0.5rem', display: 'block' }}>
+                    📄 Tipo de Comprobante
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className={`btn ${tipoComprobante === '03' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ flex: 1 }}
+                      onClick={() => setTipoComprobante('03')}
+                    >
+                      🧾 Boleta
+                    </button>
+                    <button
+                      className={`btn ${tipoComprobante === '01' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ flex: 1 }}
+                      onClick={() => setTipoComprobante('01')}
+                      disabled={!clienteActual || clienteActual.tipo_documento !== 'RUC'}
+                      title={!clienteActual || clienteActual.tipo_documento !== 'RUC' ? 'Factura requiere cliente con RUC' : ''}
+                    >
+                      📋 Factura
+                    </button>
+                  </div>
+                  {tipoComprobante === '01' && clienteActual?.tipo_documento !== 'RUC' && (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--red-500)', marginTop: '0.25rem' }}>
+                      ⚠️ Factura requiere cliente con RUC
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Métodos de Pago */}
@@ -1923,6 +2116,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               </div>
             </div>
           )}
+
+          {/* Modal de Venta Exitosa */}
+          <VentaExitosaModal
+            isOpen={mostrarVentaExitosa}
+            onClose={() => setMostrarVentaExitosa(false)}
+            ventaData={ventaExitosaData}
+            empresaData={empresaInfo ? {
+              nombre: empresaInfo.razon_social || empresaInfo.nombre_comercial || 'Mi Empresa',
+              ruc: empresaInfo.ruc || '20000000001',
+              direccion: empresaInfo.direccion_fiscal || empresaInfo.direccion,
+              logo_url: empresaInfo.logo_url,
+            } : undefined}
+          />
         </div>
       )}
     </>

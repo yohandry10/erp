@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, ArrowLeft, Save, AlertCircle } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 export default function NuevoPeriodoPage() {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function NuevoPeriodoPage() {
     anio: new Date().getFullYear(),
     mes: new Date().getMonth() + 1
   })
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,17 +21,14 @@ export default function NuevoPeriodoPage() {
     setError(null)
 
     try {
-      const response = await fetch('/api/contabilidad/periodos', {
+      const response = await apiCall('/contabilidad/periodos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Error al crear el período')
+      if (response?.success === false) {
+        throw new Error(response.message || 'Error al crear el período')
       }
 
       router.push('/dashboard/contabilidad/periodos')

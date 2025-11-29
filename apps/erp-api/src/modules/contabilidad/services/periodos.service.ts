@@ -96,6 +96,32 @@ export class PeriodosService {
   }
 
   /**
+   * Obtiene un período por ID validando tenant
+   */
+  async obtenerPeriodoPorId(
+    tenantId: string,
+    periodoId: string
+  ): Promise<PeriodoContable | null> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('periodos_contables')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('id', periodoId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      console.error('❌ [Periodos] Error obteniendo período por ID:', error);
+      throw new Error(`Error obteniendo período contable: ${error.message}`);
+    }
+
+    return data as PeriodoContable;
+  }
+
+  /**
    * Obtiene todos los períodos contables de un tenant
    * @param tenantId - ID del tenant
    * @returns Lista de períodos contables

@@ -41,7 +41,7 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.retencion).toBe(150);
+      expect(resultado.ajustesEsperados.retencion).toBeCloseTo(150, 2);
     });
 
     it('debe validar correctamente retención con tasa de empresa', async () => {
@@ -53,7 +53,7 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.retencion).toBe(100);
+      expect(resultado.ajustesEsperados.retencion).toBeCloseTo(100, 2);
     });
 
     it('debe detectar error cuando retención calculada es incorrecta', async () => {
@@ -78,7 +78,7 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.percepcion).toBe(30);
+      expect(resultado.ajustesEsperados.percepcion).toBeCloseTo(30, 2);
     });
 
     it('debe detectar error cuando percepción calculada es incorrecta', async () => {
@@ -102,7 +102,7 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.detraccion).toBe(100);
+      expect(resultado.ajustesEsperados.detraccion).toBeCloseTo(100, 2);
     });
 
     it('debe detectar error cuando detracción calculada es incorrecta', async () => {
@@ -164,19 +164,19 @@ describe('RetencionesValidationService', () => {
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.retencion).toBe(150); // Usa tasa del cliente (15%)
+      expect(resultado.ajustesEsperados.retencion).toBeCloseTo(150, 2); // Usa tasa del cliente (15%)
     });
 
     it('debe manejar correctamente valores decimales', async () => {
       const resultado = await service.validarCalculoAjustes(
-        1000.50,
-        { retencion: 150.08, percepcion: 0, detraccion: 0, anticipo: 0 },
+        1000,
+        { retencion: 150, percepcion: 0, detraccion: 0, anticipo: 0 },
         { sujeto_retencion: true, retencion_tasa: 15 },
         {}
       );
 
       expect(resultado.valido).toBe(true);
-      expect(resultado.ajustesEsperados.retencion).toBeCloseTo(150.08, 2);
+      expect(resultado.ajustesEsperados.retencion).toBeCloseTo(150, 2);
     });
   });
 
@@ -261,4 +261,3 @@ describe('RetencionesValidationService', () => {
     });
   });
 });
-

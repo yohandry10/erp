@@ -3,7 +3,10 @@ import { SupabaseService } from '../shared/supabase/supabase.service';
 
 @Injectable()
 export class PosService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(private readonly supabase: SupabaseService) {
+    // Deprecated service to avoid accidental use
+    throw new Error('Deprecated PosService (src/pos). Use modules/pos/pos.service instead.');
+  }
 
   async getClientes(tenantId: string) {
     const { data, error } = await this.supabase

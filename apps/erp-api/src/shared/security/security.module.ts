@@ -5,6 +5,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SecurityService } from './security.service';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { AuthRateLimitGuard } from './guards/auth-rate-limit.guard';
+import { AdaptiveRateLimitGuard } from './guards/adaptive-rate-limit.guard';
+import { AdaptiveRateLimitService } from './adaptive-rate-limit.service';
+import { PiiEncryptionService } from './pii-encryption.service';
 import { ValidationInterceptor } from './interceptors/validation.interceptor';
 
 @Module({
@@ -32,12 +35,18 @@ import { ValidationInterceptor } from './interceptors/validation.interceptor';
     SecurityService,
     RateLimitGuard,
     AuthRateLimitGuard,
+    AdaptiveRateLimitGuard,
+    AdaptiveRateLimitService,
+    PiiEncryptionService,
     ValidationInterceptor,
   ],
   exports: [
     SecurityService,
     RateLimitGuard,
     AuthRateLimitGuard,
+    AdaptiveRateLimitGuard,
+    AdaptiveRateLimitService,
+    PiiEncryptionService,
     ValidationInterceptor,
   ],
 })

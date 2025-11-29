@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Headers, Query, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { MetricsService } from './metrics.service';
 
@@ -18,7 +18,11 @@ export class MetricsController {
   @Get('summary')
   @ApiOperation({ summary: 'Obtener resumen de métricas de negocio' })
   @ApiResponse({ status: 200, description: 'Resumen de métricas' })
-  async getMetricsSummary() {
+  async getMetricsSummary(
+    @Headers('x-metrics-token') token?: string,
+    @Query('metrics_token') tokenQuery?: string,
+  ) {
+    this.validateToken(token, tokenQuery);
     return this.metricsService.getBusinessMetricsSummary();
   }
 
@@ -28,7 +32,20 @@ export class MetricsController {
   @Get('health')
   @ApiOperation({ summary: 'Obtener métricas de salud del sistema' })
   @ApiResponse({ status: 200, description: 'Métricas de salud' })
-  async getHealthMetrics() {
+  async getHealthMetrics(
+    @Headers('x-metrics-token') token?: string,
+    @Query('metrics_token') tokenQuery?: string,
+  ) {
+    this.validateToken(token, tokenQuery);
     return this.metricsService.getHealthMetrics();
+  }
+
+  private validateToken(headerToken?: string, queryToken?: string) {
+    const expected = process.env.METRICS_TOKEN;
+    if (!expected) return;
+    const provided = headerToken || queryToken;
+    if (provided !== expected) {
+      throw new UnauthorizedException('Metrics token inválido');
+    }
   }
 }

@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
 import { EventBusService, RecepcionRegistradaEvent, CompraEntregadaEvent } from '../../../shared/events/event-bus.service';
+import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { AuditService } from '../../audit/audit.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,6 +15,7 @@ export class RecepcionesService {
     private readonly supabase: SupabaseService,
     private readonly inventarioService: InventarioService,
     private readonly eventBus: EventBusService,
+    private readonly eventEmitter: EventEmitterService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -798,6 +800,23 @@ export class RecepcionesService {
         emittedAt: new Date().toISOString(),
       };
 
+      // Persistir en outbox (fuente de verdad) e igualmente emitir en caliente para compatibilidad
+      try {
+        await this.eventEmitter.emit({
+          tenantId,
+          eventType: 'recepcion.registrada',
+          aggregateType: 'recepcion',
+          aggregateId: recepcion.id,
+          eventData: { ...eventData, idempotency_key: idempotencyKey },
+          correlationId: idempotencyKey,
+          eventId,
+        });
+        this.logger.log(`✅ [Recepciones] Evento recepcion.registrada guardado en outbox (${eventId})`);
+      } catch (emitError) {
+        this.logger.error('❌ [Recepciones] Error guardando outbox recepcion.registrada:', emitError);
+      }
+
+      // Emitimos en caliente para consumidores actuales (se puede retirar cuando todos lean outbox)
       this.eventBus.emitRecepcionRegistrada(eventData);
       this.logger.log(`✅ Evento RecepcionRegistrada emitido (${eventId})`);
     } catch (error) {

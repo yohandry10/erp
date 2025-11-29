@@ -210,7 +210,7 @@ export class DashboardController {
   }
 
   @Get('activities')
-  @RequirePermission('dashboard.activities.read') // HARDENING: lista de actividades protegida.
+  @RequirePermission('dashboard.view') // Permiso más amplio para evitar 403 en panel principal.
   @ApiOperation({ summary: 'Obtener actividades recientes' })
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
   async getActivities(@CurrentTenant() tenantId: string) {

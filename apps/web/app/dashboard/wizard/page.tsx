@@ -9,10 +9,10 @@ import { CompanyTypeStep } from './steps/CompanyTypeStep'
 import { RucConfigStep } from './steps/RucConfigStep'
 import { CertificateUploadStep } from './steps/CertificateUploadStep'
 import { FiscalConfigStep } from './steps/FiscalConfigStep'
-// TODO: Descomentar cuando se tenga acceso a credenciales OSE
-// import { SunatConfigStep } from './steps/SunatConfigStep'
+import { SunatConfigStep } from './steps/SunatConfigStep'
 import { ValidationStep } from './steps/ValidationStep'
 import { CompletionStep } from './steps/CompletionStep'
+import { ConfigurationSummaryStep } from './steps/ConfigurationSummaryStep'
 
 function WizardContent() {
   const { state } = useWizardContext()
@@ -37,6 +37,12 @@ function WizardContent() {
   const renderStep = () => {
     const currentStep = state.steps[state.currentStep]
     
+    // Si el wizard ya está completado (hasPersistedConfiguration = true),
+    // mostrar el resumen de configuración en lugar del paso de completion
+    if (state.hasPersistedConfiguration && currentStep.id === 'completion') {
+      return <ConfigurationSummaryStep />
+    }
+    
     switch (currentStep.id) {
       case 'welcome':
         return <WelcomeStep />
@@ -48,9 +54,8 @@ function WizardContent() {
         return <CertificateUploadStep />
       case 'fiscal':
         return <FiscalConfigStep />
-      // TODO: Descomentar cuando se tenga acceso a credenciales OSE
-      // case 'sunat':
-      //   return <SunatConfigStep />
+      case 'sunat':
+        return <SunatConfigStep />
       case 'validation':
         return <ValidationStep />
       case 'completion':

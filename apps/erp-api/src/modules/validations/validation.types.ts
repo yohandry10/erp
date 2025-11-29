@@ -64,3 +64,16 @@ export interface ValidationStatusResponse {
   ruc: RucValidationResult;
   overallStatus: 'complete' | 'incomplete' | 'warning';
 }
+
+export interface ValidateDniLookupDto {
+  dni: string;
+}
+
+export interface DniLookupResult {
+  dni: string;
+  nombres: string;
+  apellidoPaterno: string;
+  apellidoMaterno: string;
+  nombreCompleto: string;
+  codigoVerificacion?: string;
+}

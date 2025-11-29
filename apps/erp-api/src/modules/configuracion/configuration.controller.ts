@@ -20,6 +20,7 @@ import {
   UpdateGREThresholdsDto,
   ValidateWizardCertificateDto,
 } from './configuration.types';
+import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 @ApiTags('configuration')
 @Controller('configuration')
@@ -28,7 +29,10 @@ import {
 export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
 
-  constructor(private readonly configurationService: ConfigurationService) {}
+  constructor(
+    private readonly configurationService: ConfigurationService,
+    private readonly supabaseService: SupabaseService,
+  ) {}
 
   /**
    * GET /api/configuration/status
@@ -467,6 +471,161 @@ export class ConfigurationController {
           message: 'Error al obtener los umbrales de GRE',
           error: error.message,
         },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // ============================================
+  // ENDPOINTS DE EMPRESA (migrados de /configuracion)
+  // ============================================
+
+  /**
+   * GET /api/configuration/empresa
+   * Get company data for the current tenant
+   */
+  @Get('empresa')
+  @ApiOperation({ summary: 'Get company data' })
+  @ApiResponse({ status: 200, description: 'Company data retrieved successfully' })
+  async getEmpresaData(@CurrentTenant() tenantId?: string) {
+    try {
+      if (!tenantId) {
+        throw new HttpException(
+          { success: false, message: 'Tenant requerido' },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (error) {
+        this.logger.error('Error getting empresa config:', error);
+        throw error;
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          message: 'No se encontró configuración de empresa',
+          data: null,
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: data.id,
+          ruc: data.ruc,
+          razonSocial: data.razon_social,
+          nombreComercial: data.nombre_comercial,
+          direccion: data.direccion_fiscal,
+          ubigeo: data.ubigeo,
+          departamento: data.departamento,
+          provincia: data.provincia,
+          distrito: data.distrito,
+          telefono: data.telefono,
+          email: data.email,
+          sitioWeb: data.sitio_web,
+          representanteLegal: data.representante_legal,
+          dniRepresentante: data.dni_representante,
+          regimen: data.regimen_tributario,
+          actividadEconomica: data.actividad_economica,
+          igvPorcentaje: data.igv_porcentaje,
+          retencionRentaPorcentaje: data.retencion_renta_porcentaje,
+          monedaDefecto: data.moneda_defecto,
+          logoUrl: data.logo_url,
+          tipo_empresa: data.tipo_empresa,
+          usar_flujo_logistica: data.usar_flujo_logistica,
+          gre_obligatorio: data.gre_obligatorio,
+          gre_automatico_habilitado: data.gre_automatico_habilitado,
+          umbral_gre_automatico: data.umbral_gre_automatico,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error getting empresa data:', error);
+      throw new HttpException(
+        { success: false, message: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * PUT /api/configuration/empresa
+   * Update company data for the current tenant
+   */
+  @Put('empresa')
+  @ApiOperation({ summary: 'Update company data' })
+  @ApiResponse({ status: 200, description: 'Company data updated successfully' })
+  async updateEmpresaData(
+    @Body() datosEmpresa: any,
+    @CurrentTenant() tenantId?: string,
+  ) {
+    try {
+      if (!tenantId) {
+        throw new HttpException(
+          { success: false, message: 'Tenant requerido' },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      this.logger.log(`Updating empresa data for tenant: ${tenantId}`);
+
+      const updateData: any = {};
+
+      // Mapear campos camelCase a snake_case
+      if (datosEmpresa.ruc) updateData.ruc = datosEmpresa.ruc;
+      if (datosEmpresa.razonSocial) updateData.razon_social = datosEmpresa.razonSocial;
+      if (datosEmpresa.nombreComercial) updateData.nombre_comercial = datosEmpresa.nombreComercial;
+      if (datosEmpresa.direccion) updateData.direccion_fiscal = datosEmpresa.direccion;
+      if (datosEmpresa.ubigeo) updateData.ubigeo = datosEmpresa.ubigeo;
+      if (datosEmpresa.departamento) updateData.departamento = datosEmpresa.departamento;
+      if (datosEmpresa.provincia) updateData.provincia = datosEmpresa.provincia;
+      if (datosEmpresa.distrito) updateData.distrito = datosEmpresa.distrito;
+      if (datosEmpresa.telefono) updateData.telefono = datosEmpresa.telefono;
+      if (datosEmpresa.email) updateData.email = datosEmpresa.email;
+      if (datosEmpresa.sitioWeb) updateData.sitio_web = datosEmpresa.sitioWeb;
+      if (datosEmpresa.representanteLegal) updateData.representante_legal = datosEmpresa.representanteLegal;
+      if (datosEmpresa.dniRepresentante) updateData.dni_representante = datosEmpresa.dniRepresentante;
+      if (datosEmpresa.regimen) updateData.regimen_tributario = datosEmpresa.regimen;
+      if (datosEmpresa.actividadEconomica) updateData.actividad_economica = datosEmpresa.actividadEconomica;
+      if (datosEmpresa.igvPorcentaje !== undefined) updateData.igv_porcentaje = datosEmpresa.igvPorcentaje;
+      if (datosEmpresa.logoUrl) updateData.logo_url = datosEmpresa.logoUrl;
+      if (datosEmpresa.tipo_empresa) updateData.tipo_empresa = datosEmpresa.tipo_empresa;
+      if (datosEmpresa.usar_flujo_logistica !== undefined) updateData.usar_flujo_logistica = datosEmpresa.usar_flujo_logistica;
+      if (datosEmpresa.gre_obligatorio !== undefined) updateData.gre_obligatorio = datosEmpresa.gre_obligatorio;
+      if (datosEmpresa.gre_automatico_habilitado !== undefined) updateData.gre_automatico_habilitado = datosEmpresa.gre_automatico_habilitado;
+      if (datosEmpresa.umbral_gre_automatico !== undefined) updateData.umbral_gre_automatico = datosEmpresa.umbral_gre_automatico;
+
+      updateData.updated_at = new Date().toISOString();
+
+      const { data, error } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .update(updateData)
+        .eq('tenant_id', tenantId)
+        .select()
+        .single();
+
+      if (error) {
+        this.logger.error('Error updating empresa:', error);
+        throw error;
+      }
+
+      return {
+        success: true,
+        message: 'Datos de empresa actualizados exitosamente',
+        data,
+      };
+    } catch (error) {
+      this.logger.error('Error updating empresa data:', error);
+      throw new HttpException(
+        { success: false, message: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

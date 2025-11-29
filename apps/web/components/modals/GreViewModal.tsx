@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+
 interface GreViewModalProps {
   isOpen: boolean
   onClose: () => void
@@ -83,7 +85,97 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
   }
 
   const handlePrint = () => {
-    window.print()
+    // Generar ticket térmico de 80mm en lugar de imprimir el modal completo
+    if (!greData) return
+
+    const printWindow = window.open('', '_blank', 'width=350,height=600')
+    
+    if (!printWindow) {
+      alert('Por favor permite las ventanas emergentes para imprimir')
+      return
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GRE ${greData.numero}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          @media print { 
+            html, body { width: 80mm; margin: 0; padding: 0; }
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            width: 80mm;
+            max-width: 80mm;
+            padding: 3mm;
+            background: white;
+            color: black;
+            line-height: 1.3;
+          }
+          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+          .empresa { font-size: 14px; font-weight: bold; }
+          .ruc { font-size: 10px; }
+          .tipo-doc { font-size: 11px; font-weight: bold; margin: 6px 0 2px; border: 1px solid #000; padding: 4px; }
+          .numero { font-size: 12px; font-weight: bold; }
+          .fecha { font-size: 9px; color: #333; margin-top: 4px; }
+          .seccion { border-bottom: 1px dashed #000; padding: 6px 0; margin-bottom: 6px; }
+          .label { font-size: 9px; color: #666; font-weight: bold; }
+          .valor { font-size: 10px; margin-left: 4px; }
+          .footer { text-align: center; margin-top: 10px; font-size: 8px; border-top: 1px dashed #000; padding-top: 6px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="empresa">NEON SYSTEM</div>
+          <div class="ruc">RUC: 12345678901</div>
+          <div class="tipo-doc">GUÍA DE REMISIÓN ELECTRÓNICA</div>
+          <div class="numero">${greData.numero}</div>
+          <div class="fecha">Emisión: ${new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}</div>
+        </div>
+        
+        <div class="seccion">
+          <div><span class="label">DESTINATARIO:</span></div>
+          <div class="valor">${greData.destinatario}</div>
+          <div><span class="label">DIRECCIÓN:</span></div>
+          <div class="valor">${greData.direccionDestino}</div>
+        </div>
+        
+        <div class="seccion">
+          <div><span class="label">MOTIVO:</span><span class="valor">${getMotivoText(greData.motivo)}</span></div>
+          <div><span class="label">MODALIDAD:</span><span class="valor">${getModalidadText(greData.modalidad)}</span></div>
+          <div><span class="label">PESO:</span><span class="valor">${greData.pesoTotal} Kg</span></div>
+          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}</span></div>
+        </div>
+        
+        ${greData.transportista || greData.placaVehiculo ? `
+        <div class="seccion">
+          ${greData.transportista ? `<div><span class="label">TRANSPORTISTA:</span><span class="valor">${greData.transportista}</span></div>` : ''}
+          ${greData.placaVehiculo ? `<div><span class="label">PLACA:</span><span class="valor">${greData.placaVehiculo}</span></div>` : ''}
+          ${greData.licenciaConducir ? `<div><span class="label">LICENCIA:</span><span class="valor">${greData.licenciaConducir}</span></div>` : ''}
+        </div>
+        ` : ''}
+        
+        <div class="seccion">
+          <div><span class="label">ESTADO:</span><span class="valor">${greData.estado}</span></div>
+        </div>
+        
+        <div class="footer">
+          <div>Representación impresa de GRE</div>
+          <div>Sistema certificado por SUNAT</div>
+        </div>
+      </body>
+      </html>
+    `)
+
+    printWindow.document.close()
+    printWindow.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+    }
   }
 
   const getModalidadText = (modalidad: string) => {

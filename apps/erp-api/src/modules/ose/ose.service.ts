@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { XmlSigner } from '@erp-suite/crypto';
 import * as https from 'https';
 import * as fs from 'fs';
+import { CircuitBreakerService, CircuitBreakerOpenError, CircuitStats } from '../../shared/resilience/circuit-breaker.service';
 
 export interface OseConfig {
   url: string;
@@ -25,15 +26,51 @@ export interface SunatResponse {
   ticket?: string;
 }
 
+// Q33: Nombres de circuitos para servicios SUNAT
+const CIRCUIT_SUNAT_CPE = 'SUNAT_CPE';
+const CIRCUIT_SUNAT_GRE = 'SUNAT_GRE';
+const CIRCUIT_SUNAT_QUERY = 'SUNAT_QUERY';
+
 @Injectable()
-export class OseService {
+export class OseService implements OnModuleInit {
   private readonly logger = new Logger(OseService.name);
   private xmlSigner: XmlSigner;
   private oseConfig: OseConfig;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly circuitBreaker: CircuitBreakerService,
+  ) {
     this.initializeOseConfig();
     this.initializeXmlSigner();
+  }
+
+  /**
+   * Q33: Inicializar circuit breakers para servicios SUNAT
+   */
+  onModuleInit() {
+    // Circuit breaker para envío de CPE (facturas/boletas)
+    this.circuitBreaker.registerCircuit(CIRCUIT_SUNAT_CPE, {
+      failureThreshold: 5,    // 5 fallos consecutivos para abrir
+      successThreshold: 2,    // 2 éxitos para cerrar
+      timeout: 60000,         // 1 minuto antes de probar de nuevo
+    });
+
+    // Circuit breaker para envío de GRE (guías de remisión)
+    this.circuitBreaker.registerCircuit(CIRCUIT_SUNAT_GRE, {
+      failureThreshold: 5,
+      successThreshold: 2,
+      timeout: 60000,
+    });
+
+    // Circuit breaker para consultas de estado
+    this.circuitBreaker.registerCircuit(CIRCUIT_SUNAT_QUERY, {
+      failureThreshold: 3,    // Más sensible para consultas
+      successThreshold: 1,
+      timeout: 30000,         // 30 segundos
+    });
+
+    this.logger.log('✅ Circuit breakers inicializados para servicios SUNAT');
   }
 
   private initializeOseConfig() {
@@ -81,6 +118,7 @@ export class OseService {
 
   /**
    * Enviar CPE (Factura/Boleta) a SUNAT
+   * Q33: Protegido con Circuit Breaker
    */
   async enviarCpe(xmlUnsigned: string, fileName: string): Promise<SunatResponse> {
     try {
@@ -93,8 +131,17 @@ export class OseService {
       // 2. Comprimir el XML
       const zipBuffer = await this.compressXml(xmlSigned, fileName);
 
-      // 3. Enviar a SUNAT
-      const response = await this.sendToSunat(zipBuffer, fileName);
+      // 3. Q33: Enviar a SUNAT con Circuit Breaker
+      const response = await this.circuitBreaker.execute<SunatResponse>(
+        CIRCUIT_SUNAT_CPE,
+        () => this.sendToSunat(zipBuffer, fileName),
+        // Fallback: retornar error controlado si el circuito está abierto
+        () => ({
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: 'Servicio SUNAT temporalmente no disponible. El documento será enviado automáticamente cuando el servicio se recupere.',
+        }),
+      );
 
       // 4. Procesar respuesta
       if (response.success) {
@@ -103,7 +150,7 @@ export class OseService {
           success: true,
           codigoRespuesta: response.codigoRespuesta,
           descripcionRespuesta: response.descripcionRespuesta,
-          cdr: response.cdr,
+          cdr: response.cdr || undefined,
           numeroComprobante: fileName,
           hashCPE: hash
         };
@@ -113,6 +160,16 @@ export class OseService {
       }
 
     } catch (error) {
+      // Q33: Manejar error de circuit breaker abierto
+      if (error instanceof CircuitBreakerOpenError) {
+        this.logger.warn(`⚡ Circuit breaker abierto para SUNAT CPE: ${error.message}`);
+        return {
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: error.message,
+        };
+      }
+
       this.logger.error('❌ Error en envío CPE:', error);
       return {
         success: false,
@@ -124,6 +181,7 @@ export class OseService {
 
   /**
    * Enviar GRE (Guía de Remisión) a SUNAT
+   * Q33: Protegido con Circuit Breaker
    */
   async enviarGre(xmlUnsigned: string, fileName: string): Promise<SunatResponse> {
     try {
@@ -136,8 +194,16 @@ export class OseService {
       // 2. Comprimir el XML
       const zipBuffer = await this.compressXml(xmlSigned, fileName);
 
-      // 3. Enviar a SUNAT (endpoint específico para GRE)
-      const response = await this.sendGreToSunat(zipBuffer, fileName);
+      // 3. Q33: Enviar a SUNAT con Circuit Breaker
+      const response = await this.circuitBreaker.execute<SunatResponse>(
+        CIRCUIT_SUNAT_GRE,
+        () => this.sendGreToSunat(zipBuffer, fileName),
+        () => ({
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: 'Servicio SUNAT GRE temporalmente no disponible. La guía será enviada automáticamente cuando el servicio se recupere.',
+        }),
+      );
 
       // 4. Procesar respuesta
       if (response.success) {
@@ -146,7 +212,7 @@ export class OseService {
           success: true,
           codigoRespuesta: response.codigoRespuesta,
           descripcionRespuesta: response.descripcionRespuesta,
-          cdr: response.cdr,
+          cdr: response.cdr || undefined,
           numeroComprobante: fileName,
           hashCPE: hash
         };
@@ -156,6 +222,15 @@ export class OseService {
       }
 
     } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        this.logger.warn(`⚡ Circuit breaker abierto para SUNAT GRE: ${error.message}`);
+        return {
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: error.message,
+        };
+      }
+
       this.logger.error('❌ Error en envío GRE:', error);
       return {
         success: false,
@@ -167,15 +242,34 @@ export class OseService {
 
   /**
    * Consultar estado de CPE en SUNAT
+   * Q33: Protegido con Circuit Breaker
    */
   async consultarEstadoCpe(ruc: string, tipoDocumento: string, serie: string, numero: string): Promise<SunatResponse> {
     try {
       this.logger.log(`🔍 Consultando estado CPE: ${ruc}-${tipoDocumento}-${serie}-${numero}`);
 
-      const response = await this.queryStatusInSunat(ruc, tipoDocumento, serie, numero);
+      // Q33: Consultar con Circuit Breaker
+      const response = await this.circuitBreaker.execute(
+        CIRCUIT_SUNAT_QUERY,
+        () => this.queryStatusInSunat(ruc, tipoDocumento, serie, numero),
+        () => ({
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: 'Servicio de consulta SUNAT temporalmente no disponible. Intente más tarde.',
+        }),
+      );
       
       return response;
     } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        this.logger.warn(`⚡ Circuit breaker abierto para consulta SUNAT: ${error.message}`);
+        return {
+          success: false,
+          codigoRespuesta: 'CB_OPEN',
+          descripcionRespuesta: error.message,
+        };
+      }
+
       this.logger.error('❌ Error consultando estado CPE:', error);
       return {
         success: false,
@@ -469,6 +563,34 @@ export class OseService {
       usuario: this.oseConfig.usuario ? '***configurado***' : 'no configurado',
       password: this.oseConfig.password ? '***configurado***' : 'no configurado'
     };
+  }
+
+  /**
+   * Q33: Obtener estado de los circuit breakers de SUNAT
+   * Útil para monitoreo y dashboards de operaciones
+   */
+  getCircuitBreakerStatus(): { cpe: CircuitStats; gre: CircuitStats; query: CircuitStats } {
+    return {
+      cpe: this.circuitBreaker.getStats(CIRCUIT_SUNAT_CPE),
+      gre: this.circuitBreaker.getStats(CIRCUIT_SUNAT_GRE),
+      query: this.circuitBreaker.getStats(CIRCUIT_SUNAT_QUERY),
+    };
+  }
+
+  /**
+   * Q33: Forzar reset de un circuit breaker (para recuperación manual)
+   */
+  resetCircuitBreaker(circuit: 'cpe' | 'gre' | 'query'): void {
+    const circuitName = {
+      cpe: CIRCUIT_SUNAT_CPE,
+      gre: CIRCUIT_SUNAT_GRE,
+      query: CIRCUIT_SUNAT_QUERY,
+    }[circuit];
+
+    if (circuitName) {
+      this.circuitBreaker.forceClose(circuitName);
+      this.logger.log(`✅ Circuit breaker ${circuit} reseteado manualmente`);
+    }
   }
 
   /**

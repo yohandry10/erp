@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { CajasService } from './cajas.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
 import { UpdateCajaDto } from './dto/update-caja.dto';
@@ -9,10 +9,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 
+
 @Controller('cajas')
 @UseGuards(JwtAuthGuard, PermissionGuard) // Asegura req.user y tenant_id para @CurrentTenant()
 export class CajasController {
-  constructor(private readonly service: CajasService) {}
+  constructor(private readonly service: CajasService) { }
 
   @Get()
   async listar(@CurrentTenant() tenantId: string) {
@@ -74,5 +75,38 @@ export class CajasController {
   ) {
     const data = await this.service.listarSesiones(tenantId, { estado, cajero_id, fecha_desde, fecha_hasta });
     return { success: true, data };
+  }
+
+  /**
+   * Cierre administrativo de sesión colgada
+   * 
+   * Endpoint para supervisores/admins para cerrar sesiones que quedaron abiertas
+   * por eventos inesperados (corte de luz, fallo de sistema, etc.)
+   * 
+   * Requiere permisos de supervisor/admin
+   */
+  @Post('sesiones/:sesionId/cierre-administrativo')
+  async cerrarSesionAdministrativa(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Param('sesionId') sesionId: string,
+    @Body('razon_cierre') razonCierre: string,
+  ) {
+    if (!razonCierre) {
+      throw new BadRequestException('Debe proporcionar una razón detallada para el cierre administrativo');
+    }
+
+    const data = await this.service.cerrarSesionAdministrativa(
+      tenantId,
+      sesionId,
+      razonCierre,
+      user?.id,
+    );
+
+    return {
+      success: true,
+      data,
+      message: 'Sesión cerrada administrativamente. Esta acción ha sido registrada en auditoría.',
+    };
   }
 }

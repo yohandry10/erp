@@ -783,7 +783,7 @@ export class InventarioController {
       const stockMinimo = parseFloat(productData.stockMinimo ?? productData.stock_minimo ?? updatedProduct.stock_minimo ?? 0);
       const stockReservado = parseFloat(productData.stockReservado ?? productData.stock_reservado ?? updatedProduct.stock_reservado ?? 0);
       const stockCantidad = parseFloat(productData.stock ?? updatedProduct.stock ?? 0);
-      const controlaStock = updateData.controla_stock ?? updatedProduct.controla_stock ?? true;
+      let controlaStock = updateData.controla_stock ?? updatedProduct.controla_stock ?? true;
 
       // Upsert precios por sucursal (acepta arreglo o sucursal_id individual)
       const preciosSucursal = Array.isArray(productData.precios_sucursal) ? productData.precios_sucursal : [];
@@ -814,6 +814,10 @@ export class InventarioController {
 
       // Upsert stock por sucursal/almacén si controla stock (acepta arreglo)
       const stockSucursal = Array.isArray(productData.stock_sucursal) ? productData.stock_sucursal : [];
+      // Si es servicio, nunca tocamos stock
+      if (updateData.es_servicio === true) {
+        controlaStock = false;
+      }
       if (controlaStock && sucursalId) {
         stockSucursal.push({
           sucursal_id: sucursalId,

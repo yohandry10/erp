@@ -15,6 +15,7 @@ import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { DocumentoFiscal } from '../documentos/interfaces/documento-fiscal.interface';
 import { normalizeCertificateInput } from '../../shared/utils/certificate.utils';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class CpeService {
@@ -56,7 +57,7 @@ export class CpeService {
       if (!error && empresa && empresa.certificado_pfx) {
         console.log('🔐 Usando certificado del tenant:', tenantId);
 
-        const certificadoBuffer = this.normalizeCertificateBuffer(empresa.certificado_pfx);
+        const certificadoBuffer = this.normalizeCertificateBuffer(empresa.certificado_pfx, empresa.certificado_password);
 
         if (!certificadoBuffer || certificadoBuffer.length === 0) {
           this.logger.warn(
@@ -66,7 +67,7 @@ export class CpeService {
           // Crear XmlSigner con el certificado del tenant
           return new XmlSigner({
             pfxBuffer: certificadoBuffer, // Buffer del certificado
-            pfxPassword: empresa.certificado_password || '',
+            pfxPassword: this.decryptText(empresa.certificado_password) || '',
           });
         }
       }
@@ -85,14 +86,83 @@ export class CpeService {
   /**
    * Normaliza el certificado recibido desde Supabase (puede llegar como base64, Buffer JSON o ArrayBuffer)
    */
-  private normalizeCertificateBuffer(certificado: any): Buffer | null {
-    const buffer = normalizeCertificateInput(certificado);
+  private normalizeCertificateBuffer(certificado: any, encryptedPassword?: string): Buffer | null {
+    const buffer = this.decryptCertificate(certificado);
 
     if (!buffer) {
       this.logger.warn('Formato de certificado no soportado o vacío');
     }
 
     return buffer;
+  }
+
+  private getCertKeys(): Buffer[] {
+    const keys: Buffer[] = [];
+    const main = process.env.CERT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+    const old = process.env.CERT_ENCRYPTION_KEY_OLD;
+
+    if (main && main.length >= 32) {
+      keys.push(crypto.createHash('sha256').update(main).digest());
+    }
+    if (old && old.length >= 32) {
+      keys.push(crypto.createHash('sha256').update(old).digest());
+    }
+
+    if (!keys.length) {
+      throw new Error('CERT_ENCRYPTION_KEY no configurada o demasiado corta (min 32 chars)');
+    }
+
+    return keys;
+  }
+
+  private decryptCertificate(input: any): Buffer | null {
+    const raw = normalizeCertificateInput(input);
+    if (!raw || raw.length < 12 + 16) {
+      return normalizeCertificateInput(input); // fallback
+    }
+
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const data = raw.subarray(28);
+
+    const keys = this.getCertKeys();
+    for (const key of keys) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+        return decrypted;
+      } catch {
+        /* intentar siguiente clave */
+      }
+    }
+
+    this.logger.warn('⚠️ No se pudo descifrar certificado con las claves configuradas, se usará valor crudo.');
+    return normalizeCertificateInput(input);
+  }
+
+  private decryptText(input: string | null | undefined): string {
+    if (!input) return '';
+    const raw = Buffer.from(input, 'base64');
+    if (raw.length < 12 + 16) return input;
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const data = raw.subarray(28);
+
+    const keys = this.getCertKeys();
+    for (const key of keys) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+        return decrypted;
+      } catch {
+        /* intentar siguiente clave */
+      }
+    }
+
+    this.logger.warn('⚠️ No se pudo descifrar contraseña de certificado, se usará tal cual.');
+    return input;
   }
 
   /**
@@ -725,8 +795,18 @@ export class CpeService {
         throw new Error('CPE no encontrado');
       }
 
+      // Obtener logo_url de empresa_config
+      const { data: empresaConfig } = await this.supabaseService.getClient()
+        .from('empresa_config')
+        .select('logo_url')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
       console.log('✅ CPE encontrado para vista:', cpeData);
-      return cpeData;
+      return {
+        ...cpeData,
+        logo_url: empresaConfig?.logo_url || null,
+      };
     } catch (error) {
       console.error('❌ Error obteniendo CPE:', error);
       throw new Error(`Error obteniendo CPE: ${error.message}`);

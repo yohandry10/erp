@@ -52,6 +52,10 @@ import { MetricsModule } from './modules/metrics/metrics.module';
 import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
 import { CajasModule } from './modules/cajas/cajas.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { JobsModule } from './shared/jobs/jobs.module';
+import { SharedModule } from './shared/shared.module';
+
 
 @Module({
   imports: [
@@ -59,8 +63,10 @@ import { CajasModule } from './modules/cajas/cajas.module';
       isGlobal: true,
       envFilePath: ['.env', 'apps/erp-api/.env'],
     }),
+    ScheduleModule.forRoot(),
     SecurityModule,
     SecurityDashboardModule,
+    SharedModule, // 📊 Logging estructurado con Correlation IDs
     AuthModule,
     SupabaseModule,
     PermissionsModule,
@@ -102,6 +108,7 @@ import { CajasModule } from './modules/cajas/cajas.module';
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana
     ImportExportModule,
     CajasModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [

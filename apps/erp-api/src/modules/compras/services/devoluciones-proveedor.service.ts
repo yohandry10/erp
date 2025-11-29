@@ -4,6 +4,7 @@ import { DevolucionesProveedorRepository } from '../repositories/devoluciones-pr
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
 import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
+import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class DevolucionesProveedorService {
     private readonly devolucionesRepository: DevolucionesProveedorRepository,
     private readonly inventarioService: InventarioService,
     private readonly eventBus: EventBusService,
+    private readonly eventEmitter: EventEmitterService,
     private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
@@ -366,9 +368,25 @@ export class DevolucionesProveedorService {
         tenantId,
       };
 
-      // Emitir el evento usando el método tipado
-      this.eventBus.emitDevolucionProveedorEmitida(eventData);
+      const idempotencyKey = `devolucion:${tenantId}:${devolucion.id}`;
 
+      // Persistir en outbox
+      try {
+        await this.eventEmitter.emit({
+          tenantId,
+          eventType: 'devolucion.proveedor.registrada',
+          aggregateType: 'devolucion_proveedor',
+          aggregateId: devolucion.id,
+          eventData: { ...eventData, idempotency_key: idempotencyKey },
+          correlationId: idempotencyKey,
+        });
+        console.log(`✅ Evento devolucion.proveedor.registrada guardado en outbox (${idempotencyKey})`);
+      } catch (emitError) {
+        console.error('❌ Error guardando outbox devolucion.proveedor.registrada:', emitError);
+      }
+
+      // Emitimos en caliente para compatibilidad
+      this.eventBus.emitDevolucionProveedorEmitida(eventData);
       console.log(`✅ Evento DevolucionProveedorEmitida emitido exitosamente para ${devolucion.numero}`);
     } catch (error) {
       console.error('❌ Error emitiendo evento DevolucionProveedorEmitida:', error);

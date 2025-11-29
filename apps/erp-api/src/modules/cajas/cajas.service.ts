@@ -4,12 +4,20 @@ import { CreateCajaDto } from './dto/create-caja.dto';
 import { UpdateCajaDto } from './dto/update-caja.dto';
 import { AbrirCajaDto } from './dto/abrir-caja.dto';
 import { CerrarCajaDto } from './dto/cerrar-caja.dto';
+import { ConfiguracionCajaService } from './services/configuracion-caja.service';
+import { AutorizacionesCajaService } from './services/autorizaciones-caja.service';
+import { CashReconciliationService, Denominaciones } from './services/cash-reconciliation.service';
 
 @Injectable()
 export class CajasService {
   private readonly logger = new Logger(CajasService.name);
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly configuracionService: ConfiguracionCajaService,
+    private readonly autorizacionesService: AutorizacionesCajaService,
+    private readonly reconciliationService: CashReconciliationService,
+  ) { }
 
   async listarCajas(tenantId: string) {
     const { data, error } = await this.supabase.getClient()
@@ -75,45 +83,357 @@ export class CajasService {
     return data;
   }
 
-  async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: string) {
-    // Validar caja
-    const { data: caja, error: findError } = await this.supabase.getClient()
+  /**
+   * Abre una nueva sesión de caja con validaciones exhaustivas de concurrencia
+   * 
+   * Validaciones:
+   * 1. Caja existe y está activa
+   * 2. No hay sesión abierta para esta caja específica
+   * 3. Usuario no tiene otra sesión abierta (previene multiples cajas por usuario)
+   * 4. Terminal no tiene otra sesión abierta (si se especifica terminal)
+   * 5. Monto de apertura está dentro del rango configurado (o supervisor autoriza)
+   * 6. Si se proporcionan denominaciones, validar que cuadren con monto_inicio
+   * 
+   * En caso de sesión colgada (usuario con sesión abierta pero probablemente por corte de luz):
+   * - Retorna error con información de la sesión colgada
+   * - Usuario puede usar endpoint de cierre administrativo para cerrar la sesión anterior
+   */
+  async abrirCaja(
+    tenantId: string,
+    cajaId: string,
+    dto: AbrirCajaDto,
+    userId?: string,
+  ) {
+    // Validación 1: Caja existe y está activa
+    const { data: caja, error: findError } = await this.supabase
+      .getClient()
       .from('cajas')
-      .select('id, estado')
+      .select('id, estado, nombre')
       .eq('tenant_id', tenantId)
       .eq('id', cajaId)
       .single();
-    if (findError || !caja) throw new NotFoundException('Caja no encontrada');
 
-    // Validar que no exista sesión abierta
-    const { data: abierta } = await this.supabase.getClient()
+    if (findError || !caja) {
+      throw new NotFoundException('Caja no encontrada');
+    }
+
+    if (caja.estado !== 'ACTIVO') {
+      throw new BadRequestException(
+        `La caja "${caja.nombre}" está ${caja.estado.toLowerCase()}. Debe estar activa para abrir sesión.`,
+      );
+    }
+
+    // Validación 2: No hay sesión abierta para esta caja específica
+    const { data: sesionCajaAbierta } = await this.supabase
+      .getClient()
       .from('sesiones_caja')
-      .select('id')
+      .select('id, hora_apertura, cajero_id')
       .eq('tenant_id', tenantId)
       .eq('caja_id', cajaId)
       .eq('estado', 'ABIERTA')
       .maybeSingle();
-    if (abierta?.id) {
-      throw new BadRequestException('La caja ya tiene una sesión abierta');
+
+    if (sesionCajaAbierta) {
+      throw new BadRequestException(
+        `La caja "${caja.nombre}" ya tiene una sesión abierta desde ${new Date(sesionCajaAbierta.hora_apertura).toLocaleString()}. ` +
+        `ID de sesión: ${sesionCajaAbierta.id}. Debe cerrarla antes de abrir una nueva.`,
+      );
     }
 
-    const nuevaSesion = {
+    const cajeroId = dto.cajero_id ?? userId;
+
+    // Validación 3: Usuario no tiene otra sesión abierta en NINGUNA caja
+    // Esto previene que un cajero abra múltiples cajas simultáneamente (error operativo común)
+    if (cajeroId) {
+      const { data: sesionUsuarioAbierta } = await this.supabase
+        .getClient()
+        .from('sesiones_caja')
+        .select('id, caja_id, hora_apertura, cajas(nombre)')
+        .eq('tenant_id', tenantId)
+        .eq('cajero_id', cajeroId)
+        .eq('estado', 'ABIERTA')
+        .maybeSingle();
+
+      if (sesionUsuarioAbierta) {
+        const cajaAnterior = sesionUsuarioAbierta.cajas as any;
+        throw new BadRequestException(
+          `Ya tiene una caja abierta: "${cajaAnterior?.nombre || 'Caja desconocida'}" desde ${new Date(sesionUsuarioAbierta.hora_apertura).toLocaleString()}. ` +
+          `ID de sesión: ${sesionUsuarioAbierta.id}. ` +
+          `Debe cerrar esa sesión antes de abrir otra. ` +
+          `Si la sesión quedó colgada (ej: corte de luz), use el endpoint de cierre administrativo.`,
+        );
+      }
+    }
+
+    // Validación 4: Terminal no tiene otra sesión abierta (si se especifica)
+    if (dto.dispositivo) {
+      const { data: sesionTerminalAbierta } = await this.supabase
+        .getClient()
+        .from('sesiones_caja')
+        .select('id, caja_id, hora_apertura, cajero_id, cajas(nombre)')
+        .eq('tenant_id', tenantId)
+        .eq('dispositivo', dto.dispositivo)
+        .eq('estado', 'ABIERTA')
+        .maybeSingle();
+
+      if (sesionTerminalAbierta) {
+        const cajaAnterior = sesionTerminalAbierta.cajas as any;
+        throw new BadRequestException(
+          `El terminal "${dto.dispositivo}" ya tiene una sesión abierta en la caja "${cajaAnterior?.nombre || 'Caja desconocida'}" ` +
+          `desde ${new Date(sesionTerminalAbierta.hora_apertura).toLocaleString()}. ` +
+          `ID de sesión: ${sesionTerminalAbierta.id}. ` +
+          `Cajero: ${sesionTerminalAbierta.cajero_id || 'No especificado'}. ` +
+          `Debe cerrar esa sesión antes de usar este terminal en otra caja.`,
+        );
+      }
+    }
+
+    // Validación 5: Verificar si el monto requiere autorización de supervisor
+    const config = await this.configuracionService.obtenerConfiguracion(
+      tenantId,
+      cajaId,
+    );
+
+    const validacionMonto =
+      this.configuracionService.validarMontoRequiereAutorizacion(
+        dto.monto_inicio,
+        config,
+      );
+
+    // Variables para tracking de autorización
+    let requirioAutorizacion = false;
+    let supervisorIdFinal: string | null = null;
+    let razonAutorizacionFinal: string | null = null;
+
+    if (validacionMonto.requiere) {
+      // Monto fuera de rango - verificar autorización
+      if (!dto.supervisor_id || !dto.razon_autorizacion) {
+        throw new BadRequestException({
+          error: 'AUTHORIZATION_REQUIRED',
+          message: validacionMonto.mensaje,
+          details: {
+            monto_solicitado: dto.monto_inicio,
+            monto_min: config.monto_apertura_min,
+            monto_max: config.monto_apertura_max,
+            requiere_supervisor: true,
+            tipo_validacion: validacionMonto.tipo,
+          },
+        });
+      }
+
+      // Validar que el supervisor existe
+      const { data: supervisor, error: supError } = await this.supabase
+        .getClient()
+        .from('usuarios')
+        .select('id, nombre, email')
+        .eq('id', dto.supervisor_id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (supError || !supervisor) {
+        throw new NotFoundException(
+          `Supervisor con ID ${dto.supervisor_id} no encontrado`,
+        );
+      }
+
+      // TODO: Verificar que el supervisor tenga rol apropiado (SUPERVISOR o ADMIN)
+      // Esta validación podría hacerse con PermissionGuard o servicio de roles
+
+      // Marcar que se requirió autorización
+      requirioAutorizacion = true;
+      supervisorIdFinal = dto.supervisor_id;
+      razonAutorizacionFinal = dto.razon_autorizacion;
+
+      this.logger.warn(
+        `⚠️  Apertura con monto atípico requiere autorización: ` +
+        `Caja=${caja.nombre}, Monto=$${dto.monto_inicio}, ` +
+        `Tipo=${validacionMonto.tipo}, Supervisor=${supervisor.nombre}`,
+      );
+    }
+
+    // Validación 6: Verificar denominaciones si se proporcionaron
+    if (dto.denominaciones_apertura) {
+      const validacionDenom = this.reconciliationService.validarApertura(
+        dto.monto_inicio,
+        dto.denominaciones_apertura as Denominaciones,
+      );
+
+      if (!validacionDenom.valido) {
+        throw new BadRequestException(
+          validacionDenom.mensaje ||
+          `El arqueo de denominaciones (${validacionDenom.total_calculado.toFixed(2)}) ` +
+          `no coincide con el monto declarado (${dto.monto_inicio.toFixed(2)}). ` +
+          `Diferencia: ${Math.abs(validacionDenom.diferencia).toFixed(2)}`,
+        );
+      }
+
+      this.logger.log(
+        `✅ Denominaciones validadas correctamente: Total=${validacionDenom.total_calculado}`,
+      );
+    }
+
+    // ✅ Todas las validaciones pasaron - Crear nueva sesión
+    const nuevaSesion: any = {
       caja_id: cajaId,
       tenant_id: tenantId,
-      cajero_id: dto.cajero_id ?? null,
-      abierto_por: userId ?? dto.cajero_id ?? null,
+      cajero_id: cajeroId ?? null,
+      abierto_por: userId ?? cajeroId ?? null,
       monto_inicio: dto.monto_inicio,
       moneda: dto.moneda ?? 'PEN',
       dispositivo: dto.dispositivo ?? null,
       estado: 'ABIERTA',
+      // Campos de autorización
+      requirio_autorizacion: requirioAutorizacion,
+      autorizacion_supervisor_id: supervisorIdFinal,
+      razon_autorizacion: razonAutorizacionFinal,
+      // Campos de denominaciones (si se proporcionaron)
+      denominaciones_apertura: dto.denominaciones_apertura || null,
+      // Q13: Campos de trazabilidad forense
+      ip_address: dto.ip_address || null,
+      geolocalizacion: dto.geolocalizacion || null,
+      foto_apertura: dto.foto_apertura || null,
+      user_agent: dto.user_agent || null,
     };
 
-    const { data, error } = await this.supabase.getClient()
+    const { data, error } = await this.supabase
+      .getClient()
       .from('sesiones_caja')
       .insert([nuevaSesion])
       .select()
       .single();
-    if (error) throw error;
+
+    if (error) {
+      this.logger.error(`Error al abrir sesión de caja: ${error.message}`, error);
+      throw new BadRequestException(`Error al abrir caja: ${error.message}`);
+    }
+
+    // Si hubo autorización, registrarla en la tabla de autorizaciones
+    if (requirioAutorizacion && supervisorIdFinal && razonAutorizacionFinal) {
+      try {
+        await this.autorizacionesService.registrarAutorizacion(tenantId, {
+          sesion_caja_id: data.id,
+          tipo_autorizacion:
+            validacionMonto.tipo === 'MONTO_BAJO'
+              ? 'APERTURA_MONTO_BAJO'
+              : 'APERTURA_MONTO_ALTO',
+          monto_solicitado: dto.monto_inicio,
+          monto_min_configurado: config.monto_apertura_min,
+          monto_max_configurado: config.monto_apertura_max,
+          supervisor_id: supervisorIdFinal,
+          solicitante_id: cajeroId || userId || supervisorIdFinal,
+          razon_autorizacion: razonAutorizacionFinal,
+          ip_address: null, // TODO: Extraer de request
+          dispositivo: dto.dispositivo || null,
+        });
+
+        this.logger.log(
+          `✅ Autorización registrada para sesión ${data.id}`,
+        );
+      } catch (authError) {
+        this.logger.error(
+          `Error al registrar autorización: ${authError.message}`,
+          authError,
+        );
+        // No lanzamos error - la sesión ya está creada
+        // Solo logueamos el problema para investigar
+      }
+    }
+
+    const mensajeLog = requirioAutorizacion
+      ? `Sesión de caja abierta con autorización de supervisor: Caja=${caja.nombre}, Cajero=${cajeroId}, Monto=$${dto.monto_inicio}, Supervisor=${supervisorIdFinal}`
+      : `Sesión de caja abierta: Caja=${caja.nombre}, Cajero=${cajeroId}, Monto=$${dto.monto_inicio}`;
+
+    this.logger.log(mensajeLog);
+
+    return data;
+  }
+
+  /**
+   * Cierre administrativo de sesión colgada
+   * 
+   * Permite cerrar una sesión que quedó abierta por eventos inesperados:
+   * - Corte de luz
+   * - Fallo de sistema
+   * - Cajero se fue sin cerrar
+   * 
+   * Requiere:
+   * - Rol de supervisor/admin
+   * - Razón detallada
+   * - Se registra en auditoría como cierre forzoso
+   */
+  async cerrarSesionAdministrativa(
+    tenantId: string,
+    sesionId: string,
+    razonCierre: string,
+    userId: string,
+  ) {
+    // Validar que la sesión existe y está abierta
+    const { data: sesion, error: findError } = await this.supabase
+      .getClient()
+      .from('sesiones_caja')
+      .select('*, cajas(nombre)')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionId)
+      .eq('estado', 'ABIERTA')
+      .single();
+
+    if (findError || !sesion) {
+      throw new NotFoundException(
+        'Sesión de caja no encontrada o ya está cerrada',
+      );
+    }
+
+    if (!razonCierre || razonCierre.trim().length < 10) {
+      throw new BadRequestException(
+        'Debe proporcionar una razón detallada (mínimo 10 caracteres) para el cierre administrativo',
+      );
+    }
+
+    // Calcular duración de la sesión
+    const horaApertura = new Date(sesion.hora_apertura);
+    const horaCierre = new Date();
+    const duracionHoras = Math.round(
+      (horaCierre.getTime() - horaApertura.getTime()) / (1000 * 60 * 60),
+    );
+
+    const caja = sesion.cajas as any;
+
+    // Preparar datos de cierre administrativo
+    const cierre = {
+      estado: 'CERRADA',
+      hora_cierre: horaCierre.toISOString(),
+      cerrado_por: userId,
+      cierre_administrativo: true,
+      razon_cierre_administrativo: razonCierre,
+      duracion_horas: duracionHoras,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Cerrar sesión con marcador de cierre administrativo
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('sesiones_caja')
+      .update(cierre)
+      .eq('id', sesionId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(
+        `Error en cierre administrativo: ${error.message}`,
+        error,
+      );
+      throw new BadRequestException(
+        `Error al cerrar sesión administrativamente: ${error.message}`,
+      );
+    }
+
+    this.logger.warn(
+      `⚠️ Cierre administrativo ejecutado: Caja="${caja?.nombre || 'Desconocida'}", ` +
+      `Sesión=${sesionId}, Razón="${razonCierre}", Admin=${userId}`,
+    );
+
     return data;
   }
 
@@ -171,6 +491,187 @@ export class CajasService {
 
     const { data, error } = await query.order('hora_apertura', { ascending: false });
     if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Q15: Reanudar sesión existente
+   * 
+   * Permite a un cajero retomar una sesión que quedó abierta
+   * (ej: después de un corte de luz o cierre accidental del navegador)
+   * 
+   * Validaciones:
+   * - La sesión debe existir y estar ABIERTA
+   * - El cajero debe ser el mismo que abrió la sesión (o supervisor)
+   * - La sesión no debe estar congelada (cambio de turno en proceso)
+   */
+  async reanudarSesion(
+    tenantId: string,
+    sesionId: string,
+    userId: string,
+  ) {
+    // Obtener sesión con detalles
+    const { data: sesion, error: findError } = await this.supabase
+      .getClient()
+      .from('sesiones_caja')
+      .select('*, cajas(nombre, codigo, ubicacion)')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionId)
+      .single();
+
+    if (findError || !sesion) {
+      throw new NotFoundException('Sesión no encontrada');
+    }
+
+    if (sesion.estado !== 'ABIERTA') {
+      throw new BadRequestException(
+        `La sesión ya está ${sesion.estado.toLowerCase()}. No se puede reanudar.`,
+      );
+    }
+
+    if (sesion.congelada) {
+      throw new BadRequestException(
+        'La sesión está congelada (cambio de turno en proceso). ' +
+        'Complete o cancele el cambio de turno antes de reanudar.',
+      );
+    }
+
+    // Verificar que el usuario es el cajero original o tiene permisos de supervisor
+    // TODO: Agregar validación de rol supervisor
+    if (sesion.cajero_id && sesion.cajero_id !== userId) {
+      this.logger.warn(
+        `Usuario ${userId} intentando reanudar sesión de otro cajero ${sesion.cajero_id}`,
+      );
+      // Por ahora permitimos, pero logueamos para auditoría
+    }
+
+    // Obtener último movimiento para contexto
+    const { data: ultimoMovimiento } = await this.supabase
+      .getClient()
+      .from('movimientos_caja')
+      .select('*')
+      .eq('sesion_caja_id', sesionId)
+      .order('secuencia', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Calcular saldo actual
+    const saldoActual = ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio;
+
+    // Calcular tiempo transcurrido
+    const horaApertura = new Date(sesion.hora_apertura);
+    const tiempoTranscurrido = Math.round(
+      (Date.now() - horaApertura.getTime()) / (1000 * 60),
+    ); // minutos
+
+    const caja = sesion.cajas as any;
+
+    this.logger.log(
+      `✅ Sesión reanudada: Caja="${caja?.nombre}", Sesión=${sesionId}, ` +
+      `Usuario=${userId}, Tiempo=${tiempoTranscurrido}min`,
+    );
+
+    return {
+      sesion: {
+        id: sesion.id,
+        caja_id: sesion.caja_id,
+        caja_nombre: caja?.nombre,
+        caja_codigo: caja?.codigo,
+        caja_ubicacion: caja?.ubicacion,
+        hora_apertura: sesion.hora_apertura,
+        monto_inicio: sesion.monto_inicio,
+        moneda: sesion.moneda,
+        dispositivo: sesion.dispositivo,
+        cajero_id: sesion.cajero_id,
+      },
+      contexto: {
+        saldo_actual: saldoActual,
+        tiempo_transcurrido_minutos: tiempoTranscurrido,
+        ultimo_movimiento: ultimoMovimiento ? {
+          tipo: ultimoMovimiento.tipo_movimiento,
+          monto: ultimoMovimiento.monto,
+          timestamp: ultimoMovimiento.timestamp,
+        } : null,
+        total_movimientos: ultimoMovimiento?.secuencia ?? 0,
+      },
+      mensaje: `Sesión reanudada exitosamente. Saldo actual: ${sesion.moneda} ${saldoActual.toFixed(2)}`,
+    };
+  }
+
+  /**
+   * Q15: Obtener métricas de turnos por cajero
+   * 
+   * Retorna KPIs de efectividad para un cajero específico
+   */
+  async obtenerMetricasCajero(
+    tenantId: string,
+    cajeroId: string,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .rpc('obtener_metricas_cajero', {
+        p_tenant_id: tenantId,
+        p_cajero_id: cajeroId,
+        p_fecha_desde: fechaDesde || null,
+        p_fecha_hasta: fechaHasta || null,
+      });
+
+    if (error) {
+      this.logger.error(`Error obteniendo métricas de cajero: ${error.message}`);
+      throw new BadRequestException('Error obteniendo métricas');
+    }
+
+    return data?.[0] || {
+      total_turnos: 0,
+      duracion_promedio_horas: 0,
+      total_ventas: 0,
+      promedio_ventas_turno: 0,
+      total_diferencias: 0,
+      turnos_cuadrados: 0,
+      turnos_sobrante: 0,
+      turnos_faltante: 0,
+      porcentaje_efectividad: 0,
+      transacciones_totales: 0,
+      transacciones_por_hora: 0,
+    };
+  }
+
+  /**
+   * Q15: Obtener ranking de cajeros por efectividad
+   */
+  async obtenerRankingCajeros(tenantId: string, limite: number = 10) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('vw_ranking_cajeros')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .limit(limite);
+
+    if (error) {
+      this.logger.error(`Error obteniendo ranking: ${error.message}`);
+      throw new BadRequestException('Error obteniendo ranking de cajeros');
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Q15: Obtener sesiones activas para monitoreo
+   */
+  async obtenerSesionesActivas(tenantId: string) {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('vw_sesiones_activas')
+      .select('*')
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      this.logger.error(`Error obteniendo sesiones activas: ${error.message}`);
+      throw new BadRequestException('Error obteniendo sesiones activas');
+    }
+
     return data || [];
   }
 }

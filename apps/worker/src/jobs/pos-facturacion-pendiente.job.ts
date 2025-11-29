@@ -1,6 +1,7 @@
 import winston from 'winston';
 import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -22,7 +23,6 @@ const supabase = createClient(
 );
 
 const apiBase = process.env.ERP_API_URL || 'http://localhost:3002/api';
-const apiToken = process.env.WORKER_API_TOKEN || process.env.API_SERVICE_TOKEN || '';
 
 /**
  * 🔄 JOB: Procesar ventas POS pendientes de facturación (CPE)
@@ -53,144 +53,67 @@ export async function runPosFacturaPendienteJob(): Promise<{
   };
 
   try {
-    const { data: ventasPendientes, error: queryError } = await supabase
-      .from('ventas_pos')
-      .select('id, tenant_id, numero_venta, numero_ticket, total, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, cpe_data')
-      .eq('estado', 'PENDIENTE_FACTURACION')
-      .lt('intentos_facturacion', 5)
-      .order('ultimo_intento_facturacion', { ascending: true })
-      .limit(50);
-
-    if (queryError) {
-      logger.error('❌ [POS Facturación] Error consultando ventas pendientes:', queryError);
-      return { success: false, procesadas: 0, errores: 1 };
+    const workerSecret = process.env.POS_WORKER_JWT_SECRET || '';
+    if (!workerSecret || workerSecret.length < 24) {
+      logger.error('❌ [POS Facturación] POS_WORKER_JWT_SECRET no configurado o demasiado corto');
+      return { success: false, procesadas: 0, errores: 1, tenantStats, omitidas: 0 };
+    }
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY && workerSecret === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      logger.error('❌ [POS Facturación] POS_WORKER_JWT_SECRET no debe ser igual a SUPABASE_SERVICE_ROLE_KEY');
+      return { success: false, procesadas: 0, errores: 1, tenantStats, omitidas: 0 };
     }
 
-    if (!ventasPendientes || ventasPendientes.length === 0) {
-      logger.info('ℹ️ [POS Facturación] No hay ventas pendientes');
-      return { success: true, procesadas: 0, errores: 0 };
+    const { data: tenants, error: tenantsError } = await supabase
+      .from('tenants')
+      .select('id, estado')
+      .eq('estado', 'ACTIVO');
+
+    if (tenantsError) {
+      logger.error('❌ [POS Facturación] No se pudieron obtener tenants:', tenantsError);
+      return { success: false, procesadas: 0, errores: 1, tenantStats, omitidas: 0 };
     }
 
-    for (const venta of ventasPendientes) {
-      const intentoActual = (venta.intentos_facturacion || 0) + 1;
-
-      // Backoff simple
-      if (venta.ultimo_intento_facturacion) {
-        const ultimo = new Date(venta.ultimo_intento_facturacion);
-        const minutos = (Date.now() - ultimo.getTime()) / 60000;
-        const espera = Math.pow(2, venta.intentos_facturacion || 0) * 5;
-        if (minutos < espera) {
-          logger.info(`⏳ [POS Facturación] Venta ${venta.numero_ticket} espera ${Math.max(0, espera - minutos).toFixed(1)} min`);
-          const tKey = ensureTenantStats(venta.tenant_id);
-          tenantStats[tKey].omitidas += 1;
-          omitidas++;
-          continue;
-        }
-      }
-
-      if (!venta.cpe_data) {
-        const tKey = ensureTenantStats(venta.tenant_id);
-        await supabase
-          .from('ventas_pos')
-          .update({
-            estado: 'ERROR_FACTURACION',
-            intentos_facturacion: 5,
-            ultimo_intento_facturacion: new Date().toISOString(),
-            error_facturacion: 'Sin datos CPE para facturar'
-          })
-          .eq('id', venta.id);
-        errores++;
-        tenantStats[tKey].errores += 1;
-        continue;
-      }
-
+    for (const tenant of tenants || []) {
+      const tKey = ensureTenantStats(tenant.id);
       try {
-        // 1) Crear o reutilizar CPE
-        let cpeId: string | null = (venta as any).cpe_id || null;
-        if (!cpeId) {
-          const { data: cpeCreado, error: cpeError } = await supabase
-            .from('cpe')
-            .insert({
-              tenant_id: venta.tenant_id,
-              tipo_documento: venta.cpe_data.tipo_documento,
-              serie: venta.cpe_data.serie,
-              numero: venta.cpe_data.numero,
-              ruc_emisor: venta.cpe_data.ruc_emisor,
-              razon_social_emisor: venta.cpe_data.razon_social_emisor,
-              tipo_documento_receptor: venta.cpe_data.tipo_documento_receptor,
-              documento_receptor: venta.cpe_data.documento_receptor,
-              razon_social_receptor: venta.cpe_data.razon_social_receptor,
-              direccion_receptor: venta.cpe_data.direccion_receptor || '',
-              moneda: venta.cpe_data.moneda,
-              total_gravadas: venta.cpe_data.total_gravadas,
-              total_igv: venta.cpe_data.total_igv,
-              total_venta: venta.cpe_data.total_venta,
-              items: venta.cpe_data.items,
-              fecha_emision: new Date().toISOString(),
-              estado: 'GENERADO',
-              sunat_status: 'PENDIENTE',
-              created_at: new Date().toISOString(),
-            })
-            .select('id')
-            .single();
+        const token = jwt.sign(
+          {
+            scope: 'pos.worker',
+            tenant_id: tenant.id,
+            tenant_ids: [tenant.id],
+          },
+          workerSecret,
+          { expiresIn: '10m' },
+        );
 
-          if (cpeError || !cpeCreado?.id) {
-            throw new Error(`Error creando CPE: ${cpeError?.message || 'sin detalle'}`);
-          }
-          cpeId = cpeCreado.id;
-        }
-
-        // 2) Enviar a SUNAT via API ERP
-        const url = `${apiBase}/cpe/${cpeId}/enviar-sunat`;
         const resp = await axios.post(
-          url,
+          `${apiBase}/pos/worker/procesar-pendientes`,
           {},
           {
             headers: {
-              Authorization: apiToken ? `Bearer ${apiToken}` : undefined,
-              'X-Tenant-Id': venta.tenant_id,
+              Authorization: `Bearer ${token}`,
+              'X-Tenant-Id': tenant.id,
             },
-            timeout: 30000,
-          }
+            timeout: 45000,
+          },
         );
 
-        const success = resp?.data?.success !== false;
-        if (!success) {
-          throw new Error(resp?.data?.message || 'Error enviando a SUNAT');
-        }
+        const data = resp?.data || {};
+        const proc = Number(data.procesadas || 0);
+        const err = Number(data.errores || 0);
 
-        // 3) Marcar venta como facturada
-        await supabase
-          .from('ventas_pos')
-          .update({
-            estado: 'FACTURADA',
-            cpe_pendiente: false,
-            intentos_facturacion: intentoActual,
-            ultimo_intento_facturacion: new Date().toISOString(),
-            error_facturacion: null,
-          })
-          .eq('id', venta.id);
-
-        procesadas++;
-        const tKey = ensureTenantStats(venta.tenant_id);
-        tenantStats[tKey].procesadas += 1;
+        procesadas += proc;
+        errores += err;
+        tenantStats[tKey].procesadas += proc;
+        tenantStats[tKey].errores += err;
       } catch (error: any) {
-        logger.error(`❌ [POS Facturación] Error facturando venta ${venta.numero_ticket}:`, error);
-        await supabase
-          .from('ventas_pos')
-          .update({
-            intentos_facturacion: intentoActual,
-            ultimo_intento_facturacion: new Date().toISOString(),
-            error_facturacion: error?.message || 'Error desconocido'
-          })
-          .eq('id', venta.id);
-        errores++;
-        const tKey = ensureTenantStats(venta.tenant_id);
+        errores += 1;
         tenantStats[tKey].errores += 1;
+        logger.error(`❌ [POS Facturación] Error procesando tenant ${tenant.id}:`, error?.message || error);
       }
     }
 
-    logger.info(`🧾 [POS Facturación] Finalizado: ${procesadas} ok, ${errores} con error, ${omitidas} omitidas/backoff`);
+    logger.info(`🧾 [POS Facturación] Finalizado vía API: ${procesadas} ok, ${errores} con error, ${omitidas} omitidas`);
     return { success: true, procesadas, errores, omitidas, tenantStats };
   } catch (error) {
     logger.error('❌ [POS Facturación] Error general:', error);

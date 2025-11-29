@@ -45,12 +45,12 @@ interface CobroModalProps {
   onSuccess: () => void
 }
 
-const METODOS_PAGO = [
-  { value: 'EFECTIVO', label: 'Efectivo' },
-  { value: 'TRANSFERENCIA', label: 'Transferencia bancaria' },
-  { value: 'CHEQUE', label: 'Cheque' },
-  { value: 'TARJETA', label: 'Tarjeta' },
-]
+interface MetodoPagoResumen {
+  id?: string
+  codigo?: string
+  nombre?: string
+  activo?: boolean
+}
 
 const formatCurrency = (value: number, currency: string = 'PEN') =>
   Intl.NumberFormat('es-PE', {
@@ -68,7 +68,9 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
   const [referencia, setReferencia] = useState('')
   const [notas, setNotas] = useState('')
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaResumen[]>([])
+  const [metodosPago, setMetodosPago] = useState<MetodoPagoResumen[]>([])
   const [loadingBancos, setLoadingBancos] = useState(false)
+  const [loadingMetodosPago, setLoadingMetodosPago] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -80,11 +82,32 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
     }
 
     setMonto(saldoDisponible > 0 ? String(saldoDisponible) : '')
-    setMetodoPago('EFECTIVO')
     setCuentaBancariaId('')
     setReferencia('')
     setNotas('')
     setError(null)
+
+    const loadMetodosPago = async () => {
+      try {
+        setLoadingMetodosPago(true)
+        const response = await get('/api/pos/metodos-pago')
+        const lista = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
+        const activos = lista.filter((item: any) => item.activo !== false)
+        setMetodosPago(activos)
+        if (activos.length > 0) {
+          const first = activos[0]
+          setMetodoPago((first.codigo || first.id || first.nombre || 'EFECTIVO') as string)
+        } else {
+          setMetodoPago('EFECTIVO')
+        }
+      } catch (err) {
+        console.error('Error cargando métodos de pago', err)
+        setMetodosPago([])
+        setMetodoPago('EFECTIVO')
+      } finally {
+        setLoadingMetodosPago(false)
+      }
+    }
 
     const loadBancos = async () => {
       try {
@@ -103,6 +126,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
       }
     }
 
+    loadMetodosPago()
     loadBancos()
   }, [isOpen, cuenta, saldoDisponible, get])
 
@@ -208,16 +232,29 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
 
             <div>
               <Label>Método de pago</Label>
-              <Select value={metodoPago} onValueChange={setMetodoPago}>
+              <Select
+                value={metodoPago}
+                onValueChange={setMetodoPago}
+                disabled={loadingMetodosPago}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccione método" />
+                  <SelectValue
+                    placeholder={loadingMetodosPago ? 'Cargando métodos...' : 'Seleccione método'}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {METODOS_PAGO.map((metodo) => (
-                    <SelectItem key={metodo.value} value={metodo.value}>
-                      {metodo.label}
-                    </SelectItem>
-                  ))}
+                  {metodosPago.length === 0 && (
+                    <SelectItem value="EFECTIVO">Efectivo</SelectItem>
+                  )}
+                  {metodosPago.map((metodo) => {
+                    const value = (metodo.codigo || metodo.id || metodo.nombre || '').toString()
+                    const label = metodo.nombre || metodo.codigo || metodo.id || 'Método'
+                    return (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>

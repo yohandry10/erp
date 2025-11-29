@@ -67,14 +67,13 @@ const createInitialState = (): WizardState => ({
       isComplete: false,
       isRequired: true,
     },
-    // TODO: Descomentar cuando se tenga acceso a credenciales OSE para pruebas
-    // {
-    //   id: 'sunat',
-    //   title: 'Configuración SUNAT',
-    //   description: 'Conexión con OSE',
-    //   isComplete: false,
-    //   isRequired: true,
-    // },
+    {
+      id: 'sunat',
+      title: 'Configuración SUNAT',
+      description: 'Conexión con OSE/SUNAT y credenciales',
+      isComplete: false,
+      isRequired: true,
+    },
     {
       id: 'validation',
       title: 'Validación',
@@ -94,6 +93,8 @@ const createInitialState = (): WizardState => ({
     ruc: '',
     razonSocial: '',
     direccion: '',
+    logoUrl: undefined,
+    logoBase64: undefined,
     tipo_empresa: undefined,
     usar_flujo_logistica: undefined,
     gre_obligatorio: false,

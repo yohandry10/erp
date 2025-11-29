@@ -40,7 +40,7 @@ export function useCountryContext(): CountryContext {
   const loadCountryContext = async () => {
     try {
       // Obtener configuración de la empresa que incluye país
-      const response = await api.get('/api/configuracion/empresa');
+      const response = await api.get('/api/configuration/empresa');
       
       if (response?.data) {
         const paisId = response.data.pais_id || 1;

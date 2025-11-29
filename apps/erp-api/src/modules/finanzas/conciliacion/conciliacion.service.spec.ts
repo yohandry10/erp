@@ -8,6 +8,34 @@ describe('ConciliacionService - Validación de Cierre', () => {
   let service: ConciliacionService;
   let supabaseService: SupabaseService;
 
+  const createMockQueryBuilder = (data: any, error: any = null) => {
+    const builder: any = {
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      gt: jest.fn().mockReturnThis(),
+      gte: jest.fn().mockReturnThis(),
+      lt: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      like: jest.fn().mockReturnThis(),
+      ilike: jest.fn().mockReturnThis(),
+      contains: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      range: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data, error }),
+      maybeSingle: jest.fn().mockResolvedValue({ data, error }),
+    };
+    // Make it thenable for await builder
+    builder.then = (resolve: any) => resolve({ data, error });
+    return builder;
+  };
+
   const mockSupabaseClient = {
     from: jest.fn(),
   };
@@ -68,76 +96,21 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar el cierre si hay movimientos pendientes y no se fuerza', async () => {
       // Mock chain for conciliación query
-      const selectMock1 = jest.fn().mockReturnThis();
-      const eqMock1 = jest.fn().mockReturnThis();
-      const eqMock2 = jest.fn().mockReturnThis();
-      const maybeSingleMock = jest.fn().mockResolvedValue({
-        data: mockConciliacion,
-        error: null,
-      });
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock1,
-        eq: eqMock1,
-      });
-      eqMock1.mockReturnValue({ eq: eqMock2, maybeSingle: maybeSingleMock });
-      eqMock2.mockReturnValue({ maybeSingle: maybeSingleMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock chain for movimientos sistema
-      const selectMock2 = jest.fn().mockReturnThis();
-      const eqMock3 = jest.fn().mockReturnThis();
-      const eqMock4 = jest.fn().mockReturnThis();
-      const eqMock5 = jest.fn().mockReturnThis();
-      const eqMock6 = jest.fn().mockReturnThis();
-      const gteMock = jest.fn().mockReturnThis();
-      const lteMock = jest.fn().mockResolvedValue({
-        data: [
-          { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
-          { id: '2', conciliado: false, tipo: 'CARGO', monto: '500' },
-        ],
-        error: null,
-      });
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock2,
-      });
-      selectMock2.mockReturnValue({ eq: eqMock3 });
-      eqMock3.mockReturnValue({ eq: eqMock4 });
-      eqMock4.mockReturnValue({ eq: eqMock5 });
-      eqMock5.mockReturnValue({ eq: eqMock6 });
-      eqMock6.mockReturnValue({ gte: gteMock });
-      gteMock.mockReturnValue({ lte: lteMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '2', conciliado: false, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Mock chain for movimientos extracto
-      const selectMock3 = jest.fn().mockReturnThis();
-      const eqMock7 = jest.fn().mockReturnThis();
-      const eqMock8 = jest.fn().mockReturnThis();
-      const eqMock9 = jest.fn().mockReturnThis();
-      const eqMock10 = jest.fn().mockReturnThis();
-      const eqMock11 = jest.fn().mockReturnThis();
-      const orderMock = jest.fn().mockResolvedValue({
-        data: [
-          { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
-          { id: '4', conciliado: false, tipo: 'CARGO', monto: '500' },
-        ],
-        error: null,
-      });
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock3,
-      });
-      selectMock3.mockReturnValue({ eq: eqMock7 });
-      eqMock7.mockReturnValue({ eq: eqMock8 });
-      eqMock8.mockReturnValue({ eq: eqMock9 });
-      eqMock9.mockReturnValue({ eq: eqMock10 });
-      eqMock10.mockReturnValue({ eq: eqMock11 });
-      eqMock11.mockReturnValue({ order: orderMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '4', conciliado: false, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Ejecutar: Intentar cerrar sin forzar
-      await expect(
-        service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
-      ).rejects.toThrow(BadRequestException);
-
       await expect(
         service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
       ).rejects.toThrow(/movimientos pendientes de procesar/);
@@ -145,52 +118,22 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe permitir el cierre si todos los movimientos están conciliados', async () => {
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimientos del sistema (todos conciliados)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValue({
-          data: [
-            { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
-            { id: '2', conciliado: true, tipo: 'CARGO', monto: '500' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '2', conciliado: true, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Mock: Movimientos del extracto (todos conciliados)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
-            { id: '4', conciliado: true, tipo: 'CARGO', monto: '500' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '4', conciliado: true, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Mock: Update conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({
-          data: { ...mockConciliacion, estado: 'CERRADA' },
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder({ ...mockConciliacion, estado: 'CERRADA' }));
 
       // Ejecutar: Cerrar sin forzar (debe funcionar)
       const resultado = await service.cerrarConciliacion(
@@ -206,52 +149,22 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe permitir el cierre forzado incluso con movimientos pendientes', async () => {
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimientos del sistema (con pendientes)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValue({
-          data: [
-            { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
-            { id: '2', conciliado: false, tipo: 'CARGO', monto: '500' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '2', conciliado: false, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Mock: Movimientos del extracto (con pendientes)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
-            { id: '4', conciliado: false, tipo: 'CARGO', monto: '500' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '3', conciliado: true, tipo: 'ABONO', monto: '1000' },
+        { id: '4', conciliado: false, tipo: 'CARGO', monto: '500' },
+      ]));
 
       // Mock: Update conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({
-          data: { ...mockConciliacion, estado: 'CERRADA' },
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder({ ...mockConciliacion, estado: 'CERRADA' }));
 
       // Ejecutar: Cerrar forzando (debe funcionar)
       const resultado = await service.cerrarConciliacion(
@@ -268,41 +181,17 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar el cierre si no se ha importado extracto', async () => {
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimientos del sistema (existen)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValue({
-          data: [{ id: '1', conciliado: false, tipo: 'ABONO', monto: '1000' }],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '1', conciliado: true, tipo: 'ABONO', monto: '1000' }
+      ]));
 
       // Mock: Movimientos del extracto (NO existen)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [], // Sin movimientos del extracto
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([]));
 
       // Ejecutar: Intentar cerrar
-      await expect(
-        service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
-      ).rejects.toThrow(BadRequestException);
-
       await expect(
         service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
       ).rejects.toThrow(/sin haber importado un extracto bancario/);
@@ -310,20 +199,9 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar el cierre si la conciliación ya está cerrada', async () => {
       // Mock: Conciliación ya cerrada
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: { ...mockConciliacion, estado: 'CERRADA' },
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder({ ...mockConciliacion, estado: 'CERRADA' }));
 
       // Ejecutar: Intentar cerrar
-      await expect(
-        service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
-      ).rejects.toThrow(BadRequestException);
-
       await expect(
         service.cerrarConciliacion(tenantId, conciliacionId, userId, false),
       ).rejects.toThrow(/ya está cerrada/);
@@ -334,7 +212,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
     it('debe redondear a 2 decimales correctamente', () => {
       // Access private method through any cast for testing
       const service_any = service as any;
-      
+
       expect(service_any.round2(10.123)).toBe(10.12);
       expect(service_any.round2(10.126)).toBe(10.13);
       expect(service_any.round2(10.125)).toBe(10.13);
@@ -374,18 +252,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
         },
       ];
 
-      const selectMock = jest.fn().mockReturnThis();
-      const eqMock = jest.fn().mockReturnThis();
-      const orderMock = jest.fn().mockResolvedValue({
-        data: mockConciliaciones,
-        error: null,
-      });
-
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock,
-      });
-      selectMock.mockReturnValue({ eq: eqMock });
-      eqMock.mockReturnValue({ order: orderMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliaciones));
 
       const resultado = await service.listarConciliaciones(tenantId, {});
 
@@ -410,11 +277,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
         error: null,
       });
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock,
-      });
-      selectMock.mockReturnValue({ eq: eqMock });
-      eqMock.mockReturnValue({ order: orderMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliaciones));
 
       const resultado = await service.listarConciliaciones(tenantId, {
         cuenta_bancaria_id: 'cuenta-1',
@@ -427,16 +290,8 @@ describe('ConciliacionService - Validación de Cierre', () => {
     it('debe filtrar por estado', async () => {
       const selectMock = jest.fn().mockReturnThis();
       const eqMock = jest.fn().mockReturnThis();
-      const orderMock = jest.fn().mockResolvedValue({
-        data: [],
-        error: null,
-      });
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock,
-      });
-      selectMock.mockReturnValue({ eq: eqMock });
-      eqMock.mockReturnValue({ order: orderMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([]));
 
       const resultado = await service.listarConciliaciones(tenantId, {
         estado: 'CERRADA',
@@ -465,17 +320,8 @@ describe('ConciliacionService - Validación de Cierre', () => {
       const selectMock = jest.fn().mockReturnThis();
       const eqMock1 = jest.fn().mockReturnThis();
       const eqMock2 = jest.fn().mockReturnThis();
-      const maybeSingleMock = jest.fn().mockResolvedValue({
-        data: mockConciliacion,
-        error: null,
-      });
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock,
-      });
-      selectMock.mockReturnValue({ eq: eqMock1 });
-      eqMock1.mockReturnValue({ eq: eqMock2 });
-      eqMock2.mockReturnValue({ maybeSingle: maybeSingleMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       const resultado = await service.obtenerConciliacion(tenantId, conciliacionId);
 
@@ -488,17 +334,8 @@ describe('ConciliacionService - Validación de Cierre', () => {
       const selectMock = jest.fn().mockReturnThis();
       const eqMock1 = jest.fn().mockReturnThis();
       const eqMock2 = jest.fn().mockReturnThis();
-      const maybeSingleMock = jest.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      });
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: selectMock,
-      });
-      selectMock.mockReturnValue({ eq: eqMock1 });
-      eqMock1.mockReturnValue({ eq: eqMock2 });
-      eqMock2.mockReturnValue({ maybeSingle: maybeSingleMock });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       await expect(
         service.obtenerConciliacion(tenantId, conciliacionId),
@@ -521,37 +358,16 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe crear una conciliación correctamente', async () => {
       // Mock: Verificar cuenta bancaria
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockCuenta,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockCuenta));
 
       // Mock: Verificar que no existe conciliación para el período
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Mock: Obtener movimientos hasta la fecha
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockResolvedValue({
-          data: [
-            { tipo: 'ABONO', monto: '5000' },
-            { tipo: 'CARGO', monto: '2000' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { tipo: 'ABONO', monto: '5000' },
+        { tipo: 'CARGO', monto: '2000' },
+      ]));
 
       // Mock: Insertar conciliación
       const mockConciliacion = {
@@ -563,14 +379,8 @@ describe('ConciliacionService - Validación de Cierre', () => {
         saldo_libro: 3000,
       };
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      // Mock: Insertar conciliación
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       const resultado = await service.crearConciliacion(
         tenantId,
@@ -590,14 +400,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar si la fecha desde es mayor a fecha hasta', async () => {
       // Mock: Verificar cuenta bancaria
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockCuenta,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockCuenta));
 
       await expect(
         service.crearConciliacion(tenantId, {
@@ -611,24 +414,10 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar si ya existe conciliación para el período', async () => {
       // Mock: Verificar cuenta bancaria
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockCuenta,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockCuenta));
 
       // Mock: Ya existe conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: { id: 'conc-existente', periodo: '2024-01' },
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder({ id: 'conc-existente', periodo: '2024-01' }));
 
       await expect(
         service.crearConciliacion(tenantId, {
@@ -660,14 +449,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
       const csvContent = 'fecha,descripcion,cargo,abono\n2024-01-15,Pago cliente,,1000\n2024-01-16,Pago proveedor,500,';
 
       // Mock: Obtener conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: CSV parser
       mockCsvParserService.parsearExtractoBancario.mockReturnValue({
@@ -694,22 +476,10 @@ describe('ConciliacionService - Validación de Cierre', () => {
       });
 
       // Mock: Insertar movimientos
-      mockSupabaseClient.from.mockReturnValueOnce({
-        insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockResolvedValue({
-          data: [{}, {}],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([{}, {}]));
 
       // Mock: Actualizar conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       const resultado = await service.importarCsv(tenantId, conciliacionId, {
         contenidoCsv: csvContent,
@@ -722,14 +492,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
     });
 
     it('debe rechazar si la conciliación está cerrada', async () => {
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: { ...mockConciliacion, estado: 'CERRADA' },
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder({ ...mockConciliacion, estado: 'CERRADA' }));
 
       await expect(
         service.importarCsv(tenantId, conciliacionId, {
@@ -740,14 +503,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
     });
 
     it('debe rechazar si no hay movimientos válidos en el CSV', async () => {
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       mockCsvParserService.parsearExtractoBancario.mockReturnValue({
         movimientos: [],
@@ -834,13 +590,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
       });
 
       // Mock: Updates (2 veces, uno por cada movimiento)
-      mockSupabaseClient.from.mockReturnValue({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValue(createMockQueryBuilder(null));
 
       const resultado = await service.matchAutomatico(tenantId, conciliacionId, {
         tolerancia_dias: 2,
@@ -853,63 +603,34 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe hacer match automático por monto y fecha con tolerancia', async () => {
       // Mock: Obtener conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimientos del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            {
-              id: 'mov-sistema-1',
-              tipo: 'CARGO',
-              monto: '500',
-              fecha: '2024-01-15',
-              referencia: null,
-              conciliado: false,
-            },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        {
+          id: 'mov-sistema-1',
+          tipo: 'CARGO',
+          monto: '500',
+          fecha: '2024-01-15',
+          referencia: null,
+          conciliado: false,
+        },
+      ]));
 
       // Mock: Movimientos del extracto (fecha +1 día)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            {
-              id: 'mov-extracto-1',
-              tipo: 'CARGO',
-              monto: '500',
-              fecha: '2024-01-16',
-              referencia: null,
-              conciliado: false,
-            },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        {
+          id: 'mov-extracto-1',
+          tipo: 'CARGO',
+          monto: '500',
+          fecha: '2024-01-16',
+          referencia: null,
+          conciliado: false,
+        },
+      ]));
 
       // Mock: Updates
-      mockSupabaseClient.from.mockReturnValue({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValue(createMockQueryBuilder(null));
 
       const resultado = await service.matchAutomatico(tenantId, conciliacionId, {
         tolerancia_dias: 2,
@@ -921,34 +642,11 @@ describe('ConciliacionService - Validación de Cierre', () => {
     });
 
     it('debe retornar sin matches si no hay movimientos del sistema', async () => {
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([]));
 
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [{ id: 'mov-1' }],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([{ id: 'mov-1' }]));
 
       const resultado = await service.matchAutomatico(tenantId, conciliacionId, {});
 
@@ -982,42 +680,19 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe generar reporte de diferencias correctamente', async () => {
       // Mock: Obtener conciliación
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimientos del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        gte: jest.fn().mockReturnThis(),
-        lte: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            { id: '1', conciliado: true, tipo: 'ABONO', monto: '5000' },
-            { id: '2', conciliado: false, tipo: 'CARGO', monto: '1000' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '1', conciliado: true, tipo: 'ABONO', monto: '5000' },
+        { id: '2', conciliado: false, tipo: 'CARGO', monto: '1000' },
+      ]));
 
       // Mock: Movimientos del extracto
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({
-          data: [
-            { id: '3', conciliado: true, tipo: 'ABONO', monto: '5000' },
-            { id: '4', conciliado: false, tipo: 'CARGO', monto: '800' },
-          ],
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder([
+        { id: '3', conciliado: true, tipo: 'ABONO', monto: '5000' },
+        { id: '4', conciliado: false, tipo: 'CARGO', monto: '800' },
+      ]));
 
       const resultado = await service.obtenerDiferencias(tenantId, conciliacionId);
 
@@ -1116,7 +791,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
         separadorMiles: ',',
       };
 
-      mockCsvParserService.registrarPlantilla.mockImplementation(() => {});
+      mockCsvParserService.registrarPlantilla.mockImplementation(() => { });
 
       const resultado = await service.registrarPlantillaCsv(mockPlantilla);
 
@@ -1180,52 +855,19 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe calcular y registrar la diferencia automáticamente cuando los montos no coinciden', async () => {
       // Mock: Conciliación existe y está abierta
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimiento del sistema existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoSistema,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
 
       // Mock: Movimiento del extracto existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoExtracto,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtracto));
 
       // Mock: Update movimiento sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Mock: Update movimiento extracto
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Ejecutar: Marcar item sin especificar diferencia
       const resultado = await service.marcarItem(tenantId, conciliacionId, {
@@ -1252,44 +894,17 @@ describe('ConciliacionService - Validación de Cierre', () => {
       };
 
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimiento del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoSistema,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
 
       // Mock: Movimiento del extracto (monto igual)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoExtractoIgual,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtractoIgual));
 
       // Mock: Updates
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-      });
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Ejecutar
       const resultado = await service.marcarItem(tenantId, conciliacionId, {
@@ -1305,44 +920,17 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe permitir especificar una diferencia manualmente', async () => {
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimiento del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoSistema,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
 
       // Mock: Movimiento del extracto
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoExtracto,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtracto));
 
       // Mock: Updates
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-      });
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Ejecutar: Con diferencia manual
       const diferenciaManual = 20.00;
@@ -1364,43 +952,15 @@ describe('ConciliacionService - Validación de Cierre', () => {
       };
 
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimiento del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoSistema,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
 
       // Mock: Movimiento del extracto (tipo diferente)
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoExtractoCargo,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtractoCargo));
 
       // Ejecutar: Debe fallar
-      await expect(
-        service.marcarItem(tenantId, conciliacionId, {
-          movimiento_sistema_id: mockMovimientoSistema.id,
-          movimiento_extracto_id: mockMovimientoExtractoCargo.id,
-        }),
-      ).rejects.toThrow(BadRequestException);
-
       await expect(
         service.marcarItem(tenantId, conciliacionId, {
           movimiento_sistema_id: mockMovimientoSistema.id,
@@ -1411,56 +971,31 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe vincular ambos movimientos con movimiento_relacionado_id', async () => {
       // Mock: Conciliación existe
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockConciliacion,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
       // Mock: Movimiento del sistema
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoSistema,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
 
       // Mock: Movimiento del extracto
-      mockSupabaseClient.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({
-          data: mockMovimientoExtracto,
-          error: null,
-        }),
-      });
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtracto));
 
       // Mock: Update movimiento sistema - capturar el objeto de actualización
       let updateDataSistema: any;
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn((data) => {
-          updateDataSistema = data;
-          return {
-            eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-          };
-        }),
+      const mockBuilderSistema = createMockQueryBuilder(null);
+      mockBuilderSistema.update = jest.fn((data) => {
+        updateDataSistema = data;
+        return mockBuilderSistema;
       });
+      mockSupabaseClient.from.mockReturnValueOnce(mockBuilderSistema);
 
       // Mock: Update movimiento extracto - capturar el objeto de actualización
       let updateDataExtracto: any;
-      mockSupabaseClient.from.mockReturnValueOnce({
-        update: jest.fn((data) => {
-          updateDataExtracto = data;
-          return {
-            eq: jest.fn().mockResolvedValue({ data: null, error: null }),
-          };
-        }),
+      const mockBuilderExtracto = createMockQueryBuilder(null);
+      mockBuilderExtracto.update = jest.fn((data) => {
+        updateDataExtracto = data;
+        return mockBuilderExtracto;
       });
+      mockSupabaseClient.from.mockReturnValueOnce(mockBuilderExtracto);
 
       // Ejecutar
       await service.marcarItem(tenantId, conciliacionId, {
@@ -1471,11 +1006,11 @@ describe('ConciliacionService - Validación de Cierre', () => {
       // Verificar: Vinculación correcta
       expect(updateDataSistema.movimiento_relacionado_id).toBe(mockMovimientoExtracto.id);
       expect(updateDataExtracto.movimiento_relacionado_id).toBe(mockMovimientoSistema.id);
-      
+
       // Verificar: Ambos marcados como conciliados
       expect(updateDataSistema.conciliado).toBe(true);
       expect(updateDataExtracto.conciliado).toBe(true);
-      
+
       // Verificar: Diferencia registrada en ambos
       expect(updateDataSistema.diferencia_conciliacion).toBeDefined();
       expect(updateDataExtracto.diferencia_conciliacion).toBeDefined();

@@ -4,6 +4,7 @@ import {
   Post,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from './shared/supabase/supabase.service';
@@ -32,7 +33,14 @@ export class AppController {
 
   @Get('api/health')
   @ApiOperation({ summary: 'Health check endpoint for Docker' })
-  healthCheck() {
+  healthCheck(@Req() req: Request) {
+    const token = process.env.HEALTH_TOKEN;
+    if (token) {
+      const provided = req.headers['x-health-token'] || req.query['health_token'];
+      if (provided !== token) {
+        throw new UnauthorizedException('Health token inválido');
+      }
+    }
     return {
       status: 'healthy',
       timestamp: new Date().toISOString(),

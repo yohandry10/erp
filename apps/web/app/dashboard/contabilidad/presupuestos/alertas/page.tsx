@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   CheckCircle2
 } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 interface Alerta {
   presupuesto_id: string
@@ -67,22 +68,13 @@ export default function AlertasSobregirosPage() {
   const [resumen, setResumen] = useState<ResumenAlertas | null>(null)
   const [filtroNivel, setFiltroNivel] = useState<'TODOS' | 'SOBREGIRO' | 'ADVERTENCIA'>('TODOS')
   const [error, setError] = useState<string | null>(null)
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   const fetchAlertas = async () => {
     try {
       setError(null)
-      const response = await fetch('/api/contabilidad/presupuestos/alertas/resumen', {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al cargar las alertas')
-      }
-
-      const result = await response.json()
-      setResumen(result.data)
+      const result = await apiCall('/contabilidad/presupuestos/alertas/resumen')
+      setResumen(result?.data || null)
     } catch (err) {
       console.error('Error fetching alertas:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')

@@ -7,6 +7,7 @@ import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.interface';
+import Decimal from 'decimal.js';
 
 interface ListarCxcFilters {
   estado?: 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO';
@@ -30,7 +31,7 @@ export class CxcService {
     private readonly eventBus: EventBusService,
     private readonly auditService: AuditService,
     private readonly retencionesValidation: RetencionesValidationService,
-  ) {}
+  ) { }
 
   private async registrarIntegrationLog(entry: {
     tenantId: string;
@@ -1329,8 +1330,7 @@ export class CxcService {
         }
       } catch (clienteLookupError: any) {
         this.logger.warn(
-          `⚠️ [CXC] Error buscando cliente por documento ${cpeRecord.documento_receptor}: ${
-            clienteLookupError?.message ?? clienteLookupError
+          `⚠️ [CXC] Error buscando cliente por documento ${cpeRecord.documento_receptor}: ${clienteLookupError?.message ?? clienteLookupError
           }`,
         );
       }
@@ -1504,8 +1504,13 @@ export class CxcService {
     return dias > 0 ? dias : 0;
   }
 
+  /**
+   * ✅ FIX: Usar Decimal.js para redondeo preciso a 2 decimales
+   * @param value Valor a redondear
+   * @returns Valor redondeado con precisión decimal
+   */
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    return new Decimal(value).toDecimalPlaces(2).toNumber();
   }
 
   private emitirEventoPagoFactura(

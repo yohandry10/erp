@@ -4,7 +4,7 @@ import { CreateRoleDto, UpdateRoleDto } from './dto';
 import { Role } from './types';
 
 // Re-export type for backward compatibility
-export { Role } from './types';
+export type { Role } from './types';
 
 @Injectable()
 export class RoleService {

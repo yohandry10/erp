@@ -56,7 +56,7 @@ export function EmpresaConfigProvider({ children }: { children: ReactNode }) {
       setLoading(true)
       setError(null)
       
-      const response = await get('/api/configuracion/empresa')
+      const response = await get('/api/configuration/empresa')
       
       if (response && response.success && response.data) {
         const data = response.data
@@ -142,7 +142,7 @@ export function useEmpresaConfigStandalone() {
       setLoading(true)
       setError(null)
       
-      const response = await get('/api/configuracion/empresa')
+      const response = await get('/api/configuration/empresa')
       
       if (response && response.success && response.data) {
         const data = response.data

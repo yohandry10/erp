@@ -16,9 +16,34 @@ export const QuickClient: React.FC<Props> = ({ onCreated }) => {
     email: '',
   })
   const [loading, setLoading] = useState(false)
+  const [lookupLoading, setLookupLoading] = useState(false)
 
   const handleChange = (key: string, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleLookup = async () => {
+    if (form.tipo_documento !== 'DNI' || form.numero_documento.length !== 8) {
+      alert('Para autocompletar, selecciona DNI y escribe 8 dígitos')
+      return
+    }
+    setLookupLoading(true)
+    try {
+      const resp = await post('/api/validations/dni-lookup', { dni: form.numero_documento })
+      if (resp) {
+        setForm(prev => ({
+          ...prev,
+          nombre: resp.nombreCompleto || `${resp.nombres || ''} ${resp.apellidoPaterno || ''} ${resp.apellidoMaterno || ''}`.trim(),
+        }))
+      } else {
+        alert('No se encontró información de DNI')
+      }
+    } catch (e) {
+      console.error('Error consultando DNI', e)
+      alert('No se pudo consultar el DNI')
+    } finally {
+      setLookupLoading(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -78,13 +103,7 @@ export const QuickClient: React.FC<Props> = ({ onCreated }) => {
           value={form.numero_documento}
           onChange={(e) => handleChange('numero_documento', e.target.value)}
           className="input"
-        />
-        <input
-          type="email"
-          placeholder="Email (opcional)"
-          value={form.email}
-          onChange={(e) => handleChange('email', e.target.value)}
-          className="input"
+          style={{ flex: 1 }}
         />
       </div>
       <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>

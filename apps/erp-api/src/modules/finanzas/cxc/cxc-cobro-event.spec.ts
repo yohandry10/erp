@@ -4,6 +4,7 @@ import { CxcService } from './cxc.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
+import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 
 describe('CxcService - CobroRegistrado Event', () => {
   let service: CxcService;
@@ -45,6 +46,13 @@ describe('CxcService - CobroRegistrado Event', () => {
           useValue: {
             registrarCambio: jest.fn(),
             logIntegration: jest.fn(),
+          },
+        },
+        {
+          provide: RetencionesValidationService,
+          useValue: {
+            validarCalculoAjustes: jest.fn().mockResolvedValue({ valido: true, errores: [] }),
+            validarMontoPendiente: jest.fn().mockReturnValue({ valido: true }),
           },
         },
       ],
@@ -173,7 +181,7 @@ describe('CxcService - CobroRegistrado Event', () => {
         expect.objectContaining({
           event_type: 'cobro.registrado',
           aggregate_type: 'cobro',
-          aggregate_id: cuentaId,
+          aggregate_id: 'pago-001',  // The payment ID is the aggregate for this event
           event_data: expect.objectContaining({
             tenant_id: tenantId,
             cobro_id: 'pago-001',

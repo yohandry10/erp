@@ -97,6 +97,7 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should throw error when database query fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Database error' };
       mockSupabaseClient.order.mockResolvedValueOnce({
         data: null,
@@ -106,6 +107,8 @@ describe('EstadosFinancierosService', () => {
       await expect(
         service.getBalanceComprobacion('tenant-1', 2024, 1)
       ).rejects.toEqual(dbError);
+
+      consoleSpy.mockRestore();
     });
 
     it('should use cache on subsequent calls', async () => {
@@ -206,6 +209,7 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should throw error when database query fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Database error' };
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: null,
@@ -215,6 +219,8 @@ describe('EstadosFinancierosService', () => {
       await expect(
         service.getEstadoResultados('tenant-1', 2024, 1)
       ).rejects.toEqual(dbError);
+
+      consoleSpy.mockRestore();
     });
 
     it('should calculate negative utilidad_neta when gastos exceed ingresos', async () => {
@@ -252,7 +258,7 @@ describe('EstadosFinancierosService', () => {
       // Total Pasivos: 43000
       // Total Patrimonio debe ser: 49000 (para que 43000 + 49000 = 92000)
       // Patrimonio = Capital (30000) + Resultados Acumulados (18000) + Resultado Ejercicio (1000) = 49000
-      
+
       const mockBalance = {
         tenant_id: 'tenant-1',
         anio: 2024,
@@ -301,7 +307,7 @@ describe('EstadosFinancierosService', () => {
       const result = await service.getBalanceGeneral('tenant-1', 2024, 1);
 
       expect(result).toBeDefined();
-      
+
       // Activos Corrientes
       expect(result.activos.corrientes.efectivo).toBe(10000);
       expect(result.activos.corrientes.cuentas_por_cobrar).toBe(15000);
@@ -366,6 +372,7 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should throw error when database query fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Database error' };
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: null,
@@ -375,6 +382,8 @@ describe('EstadosFinancierosService', () => {
       await expect(
         service.getBalanceGeneral('tenant-1', 2024, 1)
       ).rejects.toEqual(dbError);
+
+      consoleSpy.mockRestore();
     });
 
     it('should validate accounting equation (Assets = Liabilities + Equity)', async () => {
@@ -453,6 +462,7 @@ describe('EstadosFinancierosService', () => {
     });
 
     it('should throw error when refresh fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
       const dbError = { message: 'Refresh failed' };
       const mockRpc = jest.fn().mockResolvedValueOnce({
         data: null,
@@ -464,6 +474,8 @@ describe('EstadosFinancierosService', () => {
       await expect(
         service.refrescarEstadosFinancieros('tenant-1', 2024, 1)
       ).rejects.toEqual(dbError);
+
+      consoleSpy.mockRestore();
     });
   });
 });

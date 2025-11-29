@@ -47,7 +47,7 @@ export class SireService {
       await this.actualizarContadorRegistros(reporteSire.id, tenantId);
       
       // 3. Crear registro específico del comprobante en SIRE (detalle)
-      await this.crearRegistroDetalleComprobante(reporteSire.id, comprobante);
+          await this.crearRegistroDetalleComprobante(reporteSire.id, comprobante, tenantId);
       
       console.log(`✅ [SIRE] Comprobante ${comprobante.serie}-${comprobante.numero} registrado exitosamente en reporte ${reporteSire.id} para período ${periodo}`);
       console.log(`📈 [SIRE] Total de registros en el reporte: ${reporteSire.total_registros + 1}`);
@@ -154,7 +154,7 @@ export class SireService {
     console.log(`📊 [SIRE] Registro pendiente: ${tipoDocumento} para período ${periodo}`);
   }
 
-  private async crearRegistroDetalleComprobante(reporteId: string, comprobante: any): Promise<void> {
+  private async crearRegistroDetalleComprobante(reporteId: string, comprobante: any, tenantId?: string): Promise<void> {
     try {
       console.log(`📊 [SIRE] Creando registro detalle para comprobante ${comprobante.serie}-${comprobante.numero}`);
       
@@ -162,6 +162,7 @@ export class SireService {
       // del comprobante en una tabla de detalles SIRE
       const registroDetalle = {
         reporte_id: reporteId,
+        tenant_id: tenantId || comprobante.tenant_id || comprobante.tenantId || null,
         cpe_id: comprobante.cpeId,
         tipo_documento: comprobante.tipoDocumento,
         serie: comprobante.serie,
@@ -174,9 +175,17 @@ export class SireService {
       };
       
       console.log(`📊 [SIRE] Registro detalle creado:`, registroDetalle);
-      // TODO: Insertar en tabla sire_registros_detalle cuando esté disponible
+
+      // Insertar si existe tabla sire_registros_detalle
+      try {
+        await this.supabaseService.getClient()
+          .from('sire_registros_detalle')
+          .insert(registroDetalle);
+        console.log(`✅ [SIRE] Registro detalle guardado para comprobante ${comprobante.serie}-${comprobante.numero}`);
+      } catch (err: any) {
+        console.warn('⚠️ [SIRE] No se pudo insertar en sire_registros_detalle (puede no existir):', err?.message || err);
+      }
       
-      console.log(`✅ [SIRE] Registro detalle guardado para comprobante ${comprobante.serie}-${comprobante.numero}`);
     } catch (error) {
       console.error('❌ [SIRE] Error creando registro detalle:', error);
       throw error;
@@ -207,12 +216,24 @@ export class SireService {
       let queryRegistros = this.supabaseService
         .getClient()
         .from('sire_files')
-        .select('total_registros');
-
-      queryRegistros = queryRegistros.eq('tenant_id', currentTenantId);
+        .select('total_registros')
+        .eq('tenant_id', currentTenantId);
 
       const { data: reportes } = await queryRegistros;
       const registrosTotales = reportes?.reduce((sum, reporte) => sum + (reporte.total_registros || 0), 0) || 0;
+
+      // Count detail records if table exists
+      let totalDetalles = 0;
+      try {
+        const { count: countDetalle } = await this.supabaseService
+          .getClient()
+          .from('sire_registros_detalle')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', currentTenantId);
+        totalDetalles = countDetalle || 0;
+      } catch (err: any) {
+        console.warn('⚠️ [SIRE] No se pudo contar sire_registros_detalle (puede no existir):', err?.message || err);
+      }
 
       // Count reports sent to SUNAT (estado ENVIADO)
       let queryEnviados = this.supabaseService
@@ -239,6 +260,7 @@ export class SireService {
       const stats = {
         reportesDelMes: reportesDelMes || 0,
         registrosTotales,
+        totalDetalles,
         enviadosASunat: enviadosASunat || 0,
         pendientes: pendientes || 0,
       };

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Query, Param, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 // Remover import viejo:
 // import { AccountingIntegrationService } from '../shared/integration/accounting-integration.service';
@@ -20,6 +20,9 @@ import { AsientosService } from './contabilidad/services/asientos.service';
 import { CentrosCostoService } from './contabilidad/services/centros-costo.service';
 import { OutboxEventsService } from './contabilidad/services/outbox-events.service';
 import { AsientosGeneratorService } from './contabilidad/services/asientos-generator.service';
+import { CashflowService } from './contabilidad/services/cashflow.service';
+import { PeriodoQueryDto } from './contabilidad/dto/periodo-query.dto';
+import { CashflowResponseDto, RatiosResponseDto } from './contabilidad/dto/cashflow-response.dto';
 
 @ApiTags('contabilidad')
 @Controller('contabilidad')
@@ -35,7 +38,8 @@ export class ContabilidadController {
     private readonly asientosService: AsientosService,
     private readonly centrosCostoService: CentrosCostoService,
     private readonly outboxEventsService: OutboxEventsService,
-    private readonly asientosGeneratorService: AsientosGeneratorService
+    private readonly asientosGeneratorService: AsientosGeneratorService,
+    private readonly cashflowService: CashflowService
   ) {
     console.log('📚 [ContabilidadController] Inicializado con AccountingBooksService');
   }
@@ -2091,35 +2095,23 @@ export class ContabilidadController {
   @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Estado de Flujo de Efectivo' })
   @ApiResponse({ status: 200, description: 'Flujo de Efectivo obtenido exitosamente' })
-  getFlujoEfectivo(@Query() periodo: any) {
-    // TODO: Implement real cash flow statement
+  async getFlujoEfectivo(
+    @CurrentTenant() tenantId: string,
+    @Query() periodo: PeriodoQueryDto,
+  ) {
+    if (!periodo?.anio || !periodo?.mes) {
+      throw new BadRequestException('Los parámetros anio y mes son requeridos');
+    }
+
+    const data = await this.cashflowService.getCashFlow(
+      tenantId,
+      Number(periodo.anio),
+      Number(periodo.mes),
+    );
+
     return {
       success: true,
-      data: {
-        operacion: {
-          utilidadNeta: 0,
-          depreciacion: 0,
-          cambiosCapitalTrabajo: 0,
-          flujoOperacion: 0
-        },
-        inversion: {
-          compraActivos: 0,
-          ventaActivos: 0,
-          flujoInversion: 0
-        },
-        financiamiento: {
-          prestamosRecibidos: 0,
-          pagosPrestamos: 0,
-          aportesSocios: 0,
-          dividendos: 0,
-          flujoFinanciamiento: 0
-        },
-        resumen: {
-          flujoNetoEfectivo: 0,
-          efectivoInicial: 0,
-          efectivoFinal: 0
-        }
-      }
+      data,
     };
   }
 
@@ -2150,34 +2142,23 @@ export class ContabilidadController {
   @RequirePermission('contabilidad.reportes.read') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Obtener Ratios Financieros' })
   @ApiResponse({ status: 200, description: 'Ratios Financieros obtenidos exitosamente' })
-  getRatiosFinancieros() {
-    // TODO: Implement real financial ratios calculation
+  async getRatiosFinancieros(
+    @CurrentTenant() tenantId: string,
+    @Query() periodo: PeriodoQueryDto,
+  ) {
+    if (!periodo?.anio || !periodo?.mes) {
+      throw new BadRequestException('Los parámetros anio y mes son requeridos');
+    }
+
+    const data = await this.cashflowService.getRatios(
+      tenantId,
+      Number(periodo.anio),
+      Number(periodo.mes),
+    );
+
     return {
       success: true,
-      data: {
-        liquidez: {
-          ratioLiquidez: 0,
-          pruebaAcida: 0,
-          capitalTrabajo: 0
-        },
-        rentabilidad: {
-          margenBruto: 0,
-          margenOperativo: 0,
-          margenNeto: 0,
-          roa: 0,
-          roe: 0
-        },
-        endeudamiento: {
-          ratioDeuda: 0,
-          ratioCobertura: 0,
-          apalancamiento: 0
-        },
-        eficiencia: {
-          rotacionActivos: 0,
-          rotacionInventario: 0,
-          rotacionCuentasCobrar: 0
-        }
-      }
+      data,
     };
   }
 
@@ -2449,16 +2430,29 @@ export class ContabilidadController {
   @RequirePermission('contabilidad.cierre.ejecutar') // HARDENING: permisos granulares.
   @ApiOperation({ summary: 'Realizar cierre contable del período' })
   @ApiResponse({ status: 200, description: 'Cierre contable realizado exitosamente' })
-  realizarCierreContable(@Body() cierreData: any) {
-    // TODO: Implement real accounting period closing
+  async realizarCierreContable(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Body() cierreData: any,
+  ) {
+    const anio = Number(cierreData?.anio);
+    const mes = Number(cierreData?.mes);
+
+    if (!anio || !mes || mes < 1 || mes > 12) {
+      throw new BadRequestException('Debe enviar anio y mes (1-12) para cerrar el período');
+    }
+
+    const cerrado = await this.periodosService.cerrarPeriodo(
+      tenantId,
+      anio,
+      mes,
+      user?.id || 'system',
+    );
+
     return {
       success: true,
-      data: {
-        periodo: cierreData.periodo || '',
-        fechaCierre: new Date().toISOString(),
-        estado: 'CERRADO'
-      },
-      message: 'Cierre contable realizado exitosamente'
+      data: cerrado,
+      message: `Período ${cerrado.anio}-${String(cerrado.mes).padStart(2, '0')} cerrado`,
     };
   }
 

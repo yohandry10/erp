@@ -20,7 +20,6 @@ const healthPort = parseInt(process.env.WORKER_PORT || '3050', 10);
 const metrics = {
   posCpeRetry: { runs: 0, procesadas: 0, errores: 0, omitidas: 0 },
   posFacturacionDb: { runs: 0, procesadas: 0, errores: 0 },
-  posFacturacionApi: { runs: 0, errores: 0 },
 };
 
 // Helper para registrar cron en integration_logs (tenant_id fijo 'system' o el que se pase)
@@ -44,7 +43,8 @@ async function logCronRun(entry: {
       response_summary: entry.response_summary || null,
     });
   } catch (logErr) {
-    logger.warn(`⚠️ [Cron] No se pudo registrar integration_logs para ${entry.servicio}:`, logErr?.message || logErr);
+    const errorMsg = logErr instanceof Error ? logErr.message : String(logErr);
+    logger.warn(`⚠️ [Cron] No se pudo registrar integration_logs para ${entry.servicio}:`, errorMsg);
   }
 }
 
@@ -100,9 +100,9 @@ const sireQueue = new Queue('sire-processing', { connection: redisConnection });
 // CPE Processing Worker con configuración de reintentos
 const cpeWorker = new Worker('cpe-processing', async (job) => {
   logger.info(`Processing CPE job: ${job.id} (attempt ${job.attemptsMade + 1}/${job.opts.attempts || 3})`);
-  
+
   const { cpeId, action } = job.data;
-  
+
   try {
     switch (action) {
       case 'SEND_TO_OSE':
@@ -117,20 +117,20 @@ const cpeWorker = new Worker('cpe-processing', async (job) => {
       default:
         throw new Error(`Unknown CPE action: ${action}`);
     }
-    
+
     logger.info(`CPE job ${job.id} completed successfully`);
   } catch (error: any) {
     logger.error(`CPE job ${job.id} failed (attempt ${job.attemptsMade + 1}):`, error.message);
-    
+
     // Si es un error de "not implemented", no reintentar
     if (error.message?.includes('not implemented')) {
       logger.warn(`Skipping retry for not implemented feature: ${action}`);
       return; // Marcar como completado sin error
     }
-    
+
     throw error;
   }
-}, { 
+}, {
   connection: redisConnection,
   settings: {
     // Configuración de reintentos con backoff exponencial
@@ -143,9 +143,9 @@ const cpeWorker = new Worker('cpe-processing', async (job) => {
 // SIRE Processing Worker con límites de reintentos
 const sireWorker = new Worker('sire-processing', async (job) => {
   logger.info(`Processing SIRE job: ${job.id}`);
-  
+
   const { tenantId, period } = job.data;
-  
+
   try {
     await processSireGeneration(tenantId, period);
     logger.info(`SIRE job ${job.id} completed successfully`);
@@ -153,7 +153,7 @@ const sireWorker = new Worker('sire-processing', async (job) => {
     logger.error(`SIRE job ${job.id} failed:`, error);
     throw error;
   }
-}, { 
+}, {
   connection: redisConnection,
   limiter: {
     max: 5,
@@ -167,18 +167,38 @@ const sireWorker = new Worker('sire-processing', async (job) => {
 });
 
 // Helpers SUNAT/OSE: usar API ERP con token de servicio
-function getAuthHeaders(tenantId: string) {
-  const token =
-    process.env.WORKER_API_TOKEN ||
-    process.env.API_SERVICE_TOKEN ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    '';
-
-  const headers: Record<string, string> = { 'X-Tenant-Id': tenantId };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+// Helpers SUNAT/OSE: usar API ERP con token de servicio
+function signWorkerToken(tenantId: string) {
+  const secret = process.env.POS_WORKER_JWT_SECRET;
+  if (!secret) {
+    logger.error('❌ POS_WORKER_JWT_SECRET no configurado');
+    throw new Error('POS_WORKER_JWT_SECRET missing');
   }
-  return headers;
+
+  return jwt.sign(
+    {
+      iss: 'pos.worker',
+      sub: 'worker-service',
+      tenant_id: tenantId,
+      role: 'service_role' // O un rol específico si se configura en el API
+    },
+    secret,
+    { expiresIn: '5m' }
+  );
+}
+
+function getAuthHeaders(tenantId: string) {
+  try {
+    const token = signWorkerToken(tenantId);
+    return {
+      'Authorization': `Bearer ${token}`,
+      'X-Tenant-Id': tenantId
+    };
+  } catch (error) {
+    logger.error(`Error generando token para tenant ${tenantId}:`, error);
+    // Fallback temporal si se desea, o fallar
+    return { 'X-Tenant-Id': tenantId };
+  }
 }
 
 async function processCpeSendToOse(cpeId: string) {
@@ -345,7 +365,7 @@ async function processSireGeneration(tenantId: string, period: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', sireFile.id);
-    
+
     // Auditoría: registrar integration_logs para SIRE
     try {
       await supabase.from('integration_logs').insert({
@@ -359,7 +379,8 @@ async function processSireGeneration(tenantId: string, period: string) {
         response_summary: { file_path: generatedPath },
       });
     } catch (logErr) {
-      logger.warn('⚠️ [SIRE] No se pudo registrar integration_logs:', logErr?.message || logErr);
+      const errorMsg = logErr instanceof Error ? logErr.message : String(logErr);
+      logger.warn('⚠️ [SIRE] No se pudo registrar integration_logs:', errorMsg);
     }
 
     logger.info(`✅ SIRE file marked as completed: ${generatedPath}`);
@@ -388,7 +409,7 @@ async function processSireGeneration(tenantId: string, period: string) {
     } catch {
       /* ignore */
     }
-    
+
     throw error;
   }
 }
@@ -396,14 +417,14 @@ async function processSireGeneration(tenantId: string, period: string) {
 // Scheduled Jobs
 cron.schedule('0 */6 * * *', async () => {
   logger.info('Running scheduled CPE status check');
-  
+
   // Check pending CPE documents
   const { data: pendingCpes } = await supabase
     .from('cpe')
     .select('id')
     .eq('estado', 'SENT')
     .lt('fecha_envio', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // 30 minutes old
-  
+
   for (const cpe of pendingCpes || []) {
     await cpeQueue.add('CHECK_STATUS', { cpeId: cpe.id });
   }
@@ -416,72 +437,13 @@ const healthCheck = () => {
     timestamp: new Date().toISOString(),
     queues: {
       cpe: cpeQueue.name,
-      gre: greQueue.name, 
+      gre: greQueue.name,
       sire: sireQueue.name,
     },
     metrics,
     uptimeSeconds: Math.floor(process.uptime()),
   };
 };
-
-// POS: Procesar ventas pendientes de facturación llamando al endpoint del API (usa service role key)
-async function triggerPosFacturacionPendienteViaApi() {
-  try {
-    const workerSecret = process.env.POS_WORKER_JWT_SECRET || '';
-    if (!workerSecret || workerSecret.length < 24) {
-      logger.error('❌ [POS Facturación Cron] POS_WORKER_JWT_SECRET no configurado o demasiado corto');
-      return;
-    }
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY && workerSecret === process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      logger.error('❌ [POS Facturación Cron] POS_WORKER_JWT_SECRET no debe ser igual a SUPABASE_SERVICE_ROLE_KEY');
-      return;
-    }
-
-    const { data: tenants, error } = await supabase
-      .from('tenants')
-      .select('id, estado')
-      .eq('estado', 'ACTIVO');
-
-    if (error) {
-      logger.error('❌ [POS Facturación Cron] No se pudieron obtener tenants:', error);
-      return;
-    }
-
-    for (const tenant of tenants || []) {
-      try {
-        const token = jwt.sign(
-          {
-            scope: 'pos.worker',
-            tenant_id: tenant.id,
-            tenant_ids: [tenant.id],
-          },
-          workerSecret,
-          { expiresIn: '10m' },
-        );
-
-        await axios.post(
-          `${apiBase}/pos/worker/procesar-pendientes`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'X-Tenant-Id': tenant.id,
-            },
-            timeout: 30000,
-          }
-        );
-        logger.info(`✅ [POS Facturación Cron] Procesadas pendientes para tenant ${tenant.id}`);
-      } catch (err: any) {
-        logger.error(
-          `❌ [POS Facturación Cron] Error procesando tenant ${tenant.id}:`,
-          err?.message || err
-        );
-      }
-    }
-  } catch (err) {
-    logger.error('❌ [POS Facturación Cron] Error general:', err);
-  }
-}
 
 // Error handling
 process.on('uncaughtException', (error) => {
@@ -632,7 +594,7 @@ class BackgroundWorker {
   private async processGreRetry(data: any): Promise<boolean> {
     try {
       console.log(`📨 [Worker] Reintentando envío GRE ${data.greId} a SUNAT...`);
-      
+
       const { data: gre, error } = await supabase
         .from('gre')
         .select('*')
@@ -742,14 +704,14 @@ class BackgroundWorker {
   private async cleanupOldLogs(_data: any): Promise<boolean> {
     try {
       console.log('🧹 [Worker] Limpiando logs antiguos...');
-      
+
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 días atrás
 
       // Simular limpieza
       console.log(`🧹 [Worker] Limpiando logs anteriores a ${cutoffDate.toISOString()}`);
       console.log('✅ [Worker] Limpieza de logs completada');
-      
+
       return true;
     } catch (error) {
       console.error('❌ [Worker] Error en limpieza:', error);
@@ -817,15 +779,15 @@ class BackgroundWorker {
 
         try {
           console.log(`⚡ [Worker] Procesando tarea: ${taskId} (intento ${attempt}/${taskConfig.maxRetries})`);
-          
+
           const success = await taskConfig.processor(data);
-          
+
           if (success) {
             console.log(`✅ [Worker] Tarea ${taskId} completada exitosamente`);
           } else if (attempt < taskConfig.maxRetries) {
             // Programar reintento
             console.log(`🔄 [Worker] Reintentando tarea ${taskId} en ${taskConfig.retryDelay / 1000} segundos...`);
-            
+
             setTimeout(() => {
               this.addTask(taskId, data, attempt + 1);
             }, taskConfig.retryDelay);
@@ -943,38 +905,11 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// 🔄 SCHEDULED JOB: POS Facturación Pendiente vía API (Every 15 minutes, service role)
-cron.schedule('*/15 * * * *', async () => {
-  logger.info('🧾 [Cron] Running POS invoicing via API worker endpoint');
-  metrics.posFacturacionApi.runs += 1;
-  try {
-    await triggerPosFacturacionPendienteViaApi();
-    await logCronRun({
-      servicio: 'POS_FACTURACION_API',
-      operacion: 'CRON',
-      status: 'SUCCESS',
-      request_summary: { job: 'pos-facturacion-api' },
-    });
-  } catch (error) {
-    metrics.posFacturacionApi.errores += 1;
-    await logCronRun({
-      servicio: 'POS_FACTURACION_API',
-      operacion: 'CRON',
-      status: 'ERROR',
-      error_message: error instanceof Error ? error.message : `${error}`,
-      request_summary: { job: 'pos-facturacion-api' },
-    });
-    logger.error('❌ [Cron] POS invoicing via API failed:', error);
-  }
-});
-
 logger.info('📅 [Worker] Scheduled jobs configured:');
 logger.info('   - Certificate validation: Daily at 2:00 AM');
 logger.info('   - Configuration check: Daily at 3:00 AM');
 logger.info('   - POS CPE retry: Every 10 minutes');
 logger.info('   - POS pending invoicing: Every 10 minutes');
-logger.info('   - POS pending invoicing via API: Every 15 minutes');
-logger.info('   - POS pending invoicing via API: Every 15 minutes');
 
 // Worker is ready and waiting for real tasks
 

@@ -8,6 +8,58 @@ import { IntegrationAlertsService } from '../src/modules/notifications/integrati
 import { PedidoLockService } from '../src/shared/locks/pedido-lock.service'
 import { NotificationSeverity, NotificationType } from '../src/modules/notifications/notification.types'
 import { CxcService } from '../src/modules/finanzas/cxc/cxc.service'
+import { Logger } from '@nestjs/common'
+
+// Silenciar logger Nest para evitar ruido/EPIPE en smoke local
+Logger.overrideLogger(false)
+// Proteger stdout/err ante EPIPE en PowerShell
+const originalStdoutWrite = process.stdout.write.bind(process.stdout)
+process.stdout.write = ((chunk: any, encoding?: any, cb?: any) => {
+  try {
+    return originalStdoutWrite(chunk, encoding as any, cb)
+  } catch {
+    return false
+  }
+}) as any
+const originalStderrWrite = process.stderr.write.bind(process.stderr)
+process.stderr.write = ((chunk: any, encoding?: any, cb?: any) => {
+  try {
+    return originalStderrWrite(chunk, encoding as any, cb)
+  } catch {
+    return false
+  }
+}) as any
+process.stdout.on('error', (err) => {
+  if ((err as any).code !== 'EPIPE') {
+    throw err
+  }
+})
+process.stderr.on('error', (err) => {
+  if ((err as any).code !== 'EPIPE') {
+    throw err
+  }
+})
+// Consola segura para evitar EPIPE
+const safeLog = (...args: any[]) => {
+  try {
+    originalStdoutWrite(args.join(' ') + '\n')
+  } catch {
+    // ignore
+  }
+}
+const safeErr = (...args: any[]) => {
+  try {
+    const out = args
+      .map(arg => (arg instanceof Error ? (arg.stack ?? arg.message) : arg))
+      .join(' ')
+    originalStderrWrite(out + '\n')
+  } catch {
+    // ignore
+  }
+}
+console.log = safeLog
+console.warn = safeLog
+console.error = safeErr
 
 type AsyncTest = () => Promise<void> | void
 
@@ -40,7 +92,9 @@ const mockCPE = { generarFacturaDesdePedido: noop }
 const mockGRE = { verificarSugerenciaGRE: noop }
 const mockEventBus = {
   emitVentaProcessed: noop,
-  emitPagoFactura: noop
+  emitPagoFactura: noop,
+  emitCobroRegistrado: noop,
+  emitCuentaPorCobrarCreadaEvent: noop
 }
 
 class SupabaseIntegrationStub {
@@ -318,22 +372,22 @@ test('TenantMiddleware – propaga tenant y tokens desde headers', () => {
 
   const middleware = new TenantMiddleware(tenantContextStub as any)
   const req: any = {
-    headers: { 'x-supabase-access-token': 'access-token-123' },
+    headers: {
+      'x-supabase-access-token': 'access-token-123',
+      'x-tenant-id': 'tenant-123'
+    },
     path: '/api/pedidos',
-    user: {
-      tenant_id: 'tenant-123',
-      id: 'user-456'
-    }
+    user: undefined
   }
 
   middleware.use(req, {} as any, () => undefined)
 
   assert.strictEqual(contexts.length, 1)
   assert.strictEqual(contexts[0].tenantId, 'tenant-123')
-  assert.strictEqual(contexts[0].userId, 'user-456')
+  assert.strictEqual(contexts[0].userId, null)
   assert.strictEqual(contexts[0].supabaseAccessToken, 'access-token-123')
   assert.strictEqual(req.tenant_id, 'tenant-123')
-  assert.strictEqual(req.user_id, 'user-456')
+  assert.strictEqual(req.user_id, null)
 })
 
 test('IntegrationAlertsService – registra error y dispara alerta crítica', async () => {
@@ -557,19 +611,72 @@ test('Finanzas – Crear CxC y registrar pago con RLS habilitado', async () => {
           }
         }
         if (table === 'cxc_pagos') {
-          return {
-            insert: (data: any) => {
-              const pago = Array.isArray(data) ? data[0] : data
-              if (pago.tenant_id === tenantId) {
-                mockPagos.push({ ...pago, id: `pago-${mockPagos.length + 1}` })
-                return { error: null }
+            return {
+              select: () => {
+                const chain = {
+                  currentFilters: {} as any,
+                  eq: function (field: string, value: any) {
+                  this.currentFilters[field] = value
+                  return this
+                },
+                maybeSingle: async function () {
+                  const pago = mockPagos.find(
+                    p =>
+                      (this.currentFilters.tenant_id ? p.tenant_id === this.currentFilters.tenant_id : true) &&
+                      (this.currentFilters.cuenta_id ? p.cuenta_id === this.currentFilters.cuenta_id : true) &&
+                      (this.currentFilters.referencia ? p.referencia === this.currentFilters.referencia : true)
+                  )
+                  return pago ? { data: pago, error: null } : { data: null, error: null }
+                }
               }
-              return { error: { message: 'RLS violation' } }
+                return chain
+              },
+              update: (data: any) => ({
+                eq: (field: string, value: any) => ({
+                  eq: (field2: string, value2: any) => {
+                    const pago = mockPagos.find(p => p.id === value && p.tenant_id === value2)
+                    if (pago) {
+                      Object.assign(pago, data)
+                      return { error: null }
+                    }
+                    return { error: { message: 'Not found' } }
+                  }
+                })
+              }),
+              insert: (data: any) => {
+                const pago = Array.isArray(data) ? data[0] : data
+                return {
+                  select: () => ({
+                    single: async () => {
+                    if (pago.tenant_id !== tenantId) {
+                      return { data: null, error: { message: 'RLS violation' } }
+                      }
+                      const inserted = { ...pago, id: `pago-${mockPagos.length + 1}` }
+                      mockPagos.push(inserted)
+                      return { data: inserted, error: null }
+                    }
+                  }),
+                  update: (updateData: any) => ({
+                    eq: (field: string, value: any) => ({
+                      eq: (field2: string, value2: any) => {
+                        const pagoEncontrado = mockPagos.find(
+                          p => p.id === value && p.tenant_id === value2
+                        )
+                        if (pagoEncontrado) {
+                          Object.assign(pagoEncontrado, updateData)
+                          return { error: null }
+                        }
+                        return { error: { message: 'Not found' } }
+                      }
+                    })
+                  })
+                }
+              }
             }
           }
-        }
         return {
-          select: () => ({ data: [], error: null })
+          select: () => ({ data: [], error: null }),
+          insert: () => ({ data: null, error: null })
         }
       }
     })
@@ -598,7 +705,15 @@ test('Finanzas – Crear CxC y registrar pago con RLS habilitado', async () => {
 
   const cxcService = new (require('../src/modules/finanzas/cxc/cxc.service').CxcService)(
     mockSupabaseWithRLS as any,
-    mockEventBus as any
+    mockEventBus as any,
+    { registrarCambio: noop } as any,
+    {
+      validarCalculoAjustes: () => ({ valido: true, errores: [] }),
+      validarMontoPendiente: (_total: number, _ajustes: any, monto: number) => ({
+        valido: true,
+        montoEsperado: monto
+      })
+    } as any
   )
 
   // Test 1: Listar cuentas por cobrar solo retorna del tenant correcto
@@ -678,9 +793,9 @@ test('Contabilidad – Crear asiento y consultar balance con RLS habilitado', as
   const mockAsientos: any[] = []
   const mockDetalles: any[] = []
   const mockPlanCuentas = [
-    { id: 'cuenta-1', codigo: '10111', nombre: 'Caja', tipo_cuenta: 'ACTIVO', activo: true },
-    { id: 'cuenta-2', codigo: '70111', nombre: 'Ventas', tipo_cuenta: 'INGRESO', activo: true },
-    { id: 'cuenta-3', codigo: '40111', nombre: 'IGV por Pagar', tipo_cuenta: 'PASIVO', activo: true }
+    { id: 'cuenta-1', codigo: '10111', nombre: 'Caja', tipo_cuenta: 'ACTIVO', activo: true, tenant_id: tenantId },
+    { id: 'cuenta-2', codigo: '70111', nombre: 'Ventas', tipo_cuenta: 'INGRESO', activo: true, tenant_id: tenantId },
+    { id: 'cuenta-3', codigo: '40111', nombre: 'IGV por Pagar', tipo_cuenta: 'PASIVO', activo: true, tenant_id: tenantId }
   ]
 
   // Mock de Supabase con RLS
@@ -825,15 +940,29 @@ test('Contabilidad – Crear asiento y consultar balance con RLS habilitado', as
         }
 
         if (table === 'plan_cuentas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                order: () => ({
-                  data: mockPlanCuentas,
-                  error: null
-                })
+          const chainBuilder = {
+            currentFilters: { tenant_id: tenantId } as any,
+            select: function () {
+              return this
+            },
+            eq: function (field: string, value: any) {
+              this.currentFilters[field] = value
+              return this
+            },
+            order: function () {
+              const filtered = mockPlanCuentas.filter(pc => {
+                const matchTenant = this.currentFilters.tenant_id ? pc.tenant_id === this.currentFilters.tenant_id : true
+                const matchActivo = this.currentFilters.activo === undefined ? true : pc.activo === this.currentFilters.activo
+                return matchTenant && matchActivo
               })
-            })
+              return { data: filtered, error: null }
+            }
+          }
+
+          return {
+            select: chainBuilder.select.bind(chainBuilder),
+            eq: chainBuilder.eq.bind(chainBuilder),
+            order: chainBuilder.order.bind(chainBuilder)
           }
         }
 
@@ -845,7 +974,8 @@ test('Contabilidad – Crear asiento y consultar balance con RLS habilitado', as
   }
 
   const accountingService = new (require('../src/shared/integration/accounting-books.service').AccountingBooksService)(
-    mockSupabaseContabilidad as any
+    mockSupabaseContabilidad as any,
+    { getTenantId: () => tenantId } as any
   )
 
   // Test 1: Crear asiento contable

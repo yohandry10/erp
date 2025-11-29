@@ -14,6 +14,7 @@ import { CpeHelperService } from './cpe-helper.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto } from '@erp-suite/dtos';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
@@ -22,15 +23,25 @@ import { User } from '../auth/user.interface';
 
 @ApiTags('cpe')
 @Controller('cpe')
-@UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class CpeController {
   constructor(
     private readonly cpeService: CpeService,
     private readonly cpeHelper: CpeHelperService,
-  ) {}
+  ) { }
+
+  @Post('worker/create')
+  @UseGuards(WorkerAuthGuard)
+  @ApiOperation({ summary: 'Crear CPE desde Worker' })
+  async createFromWorker(
+    @Body() createFacturaDto: CreateFacturaDto,
+    @CurrentTenant() tenantId: string,
+  ): Promise<FacturaDto> {
+    return this.cpeService.create(createFacturaDto, tenantId, 'worker-service');
+  }
 
   @Post()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.emitir')
   @ApiOperation({ summary: 'Crear y enviar comprobante CPE' })
   @ApiResponse({
@@ -48,6 +59,7 @@ export class CpeController {
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Listar CPEs con paginación' })
   async findAll(
@@ -58,6 +70,7 @@ export class CpeController {
   }
 
   @Get('stats')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.reportes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de CPE' })
   async getStats(@CurrentTenant() tenantId: string) {
@@ -79,6 +92,7 @@ export class CpeController {
   }
 
   @Get('comprobantes')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Listar comprobantes CPE' })
   async getComprobantes(
@@ -99,6 +113,7 @@ export class CpeController {
   }
 
   @Get('comprobantes/export')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Exportar comprobantes CPE a CSV' })
   async exportComprobantes(
@@ -117,6 +132,7 @@ export class CpeController {
   }
 
   @Get('comprobantes/:id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener datos del CPE' })
   async getCpeData(
@@ -125,9 +141,9 @@ export class CpeController {
   ) {
     try {
       console.log(`📄 Obteniendo datos CPE: ${id}`);
-      
+
       const cpeData = await this.cpeService.getCpeById(id, tenantId);
-      
+
       return {
         success: true,
         data: cpeData
@@ -137,12 +153,13 @@ export class CpeController {
       return {
         success: false,
         message: 'Error obteniendo datos del CPE',
-        error: error.message 
+        error: error.message
       };
     }
   }
 
   @Get('comprobantes/:id/pdf')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.descargar_pdf')
   @ApiOperation({ summary: 'Descargar PDF del CPE' })
   async downloadPdf(
@@ -153,25 +170,26 @@ export class CpeController {
     try {
       console.log(`📄 Generando PDF para CPE: ${id}`);
       const pdfBuffer = await this.cpeService.generatePdf(id, tenantId);
-      
+
       res.set({
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="cpe-${id}.pdf"`,
         'Content-Length': pdfBuffer.length,
       });
-      
+
       res.send(pdfBuffer);
     } catch (error) {
       console.error('❌ Error generando PDF:', error);
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         message: 'Error generando PDF',
-        error: error.message 
+        error: error.message
       });
     }
   }
 
   @Post('comprobantes/:id/enviar-sunat')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.enviar')
   @ApiOperation({ summary: 'Enviar CPE a autoridad fiscal (SUNAT/DIAN)' })
   async enviarSunat(
@@ -180,10 +198,10 @@ export class CpeController {
   ) {
     try {
       console.log(`📡 Enviando CPE a autoridad fiscal: ${id}`);
-      
+
       const fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
       const result = await this.cpeService.resendToOse(id, tenantId);
-      
+
       return {
         success: true,
         message: `CPE enviado a ${fiscalAuthority} exitosamente`,
@@ -191,12 +209,12 @@ export class CpeController {
       };
     } catch (error) {
       console.error('❌ Error enviando a autoridad fiscal:', error);
-      
+
       let fiscalAuthority = 'autoridad fiscal';
       try {
         fiscalAuthority = await this.cpeHelper.getFiscalAuthorityName(tenantId);
-      } catch {}
-      
+      } catch { }
+
       return {
         success: false,
         message: `Error enviando CPE a ${fiscalAuthority}`,
@@ -206,6 +224,7 @@ export class CpeController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.ver')
   @ApiOperation({ summary: 'Obtener CPE por ID' })
   async findOne(
@@ -216,6 +235,7 @@ export class CpeController {
   }
 
   @Get(':id/xml')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.descargar_xml')
   @ApiOperation({ summary: 'Descargar XML firmado del CPE' })
   async downloadXml(
@@ -224,16 +244,17 @@ export class CpeController {
     @Res() res: Response,
   ) {
     const xmlContent = await this.cpeService.getSignedXml(id, tenantId);
-    
+
     res.set({
       'Content-Type': 'application/xml',
       'Content-Disposition': `attachment; filename="cpe-${id}.xml"`,
     });
-    
+
     res.send(xmlContent);
   }
 
   @Post(':id/resend')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.reenviar')
   @ApiOperation({ summary: 'Reenviar CPE a OSE/SUNAT' })
   async resend(
@@ -244,6 +265,7 @@ export class CpeController {
   }
 
   @Get(':id/status')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.consultar')
   @ApiOperation({ summary: 'Consultar estado del CPE en OSE' })
   async checkStatus(
@@ -254,6 +276,7 @@ export class CpeController {
   }
 
   @Post(':id/enviar-sunat')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.enviar')
   @ApiOperation({ summary: 'Enviar CPE firmado a SUNAT manualmente' })
   @ApiResponse({ status: 200, description: 'CPE enviado a SUNAT exitosamente' })
@@ -262,11 +285,11 @@ export class CpeController {
     @CurrentTenant() tenantId: string,
   ) {
     console.log(`🚀 [CPE] Envío manual a SUNAT solicitado para CPE ${id}`);
-    
+
     try {
       // Verificar que el CPE esté en estado FIRMADO
       const cpe = await this.cpeService.findOne(id, tenantId);
-      
+
       if ((cpe.estado as string) !== 'FIRMADO') {
         return {
           success: false,
@@ -277,7 +300,7 @@ export class CpeController {
       // Enviar a SUNAT usando el método existente
       const fileName = `${cpe.ruc_emisor}-${cpe.tipo_documento}-${cpe.serie}-${cpe.numero}`;
       await this.cpeService.sendToOseManual(id, cpe.xml_firmado, fileName);
-      
+
       return {
         success: true,
         message: 'CPE enviado a SUNAT exitosamente',
@@ -298,8 +321,9 @@ export class CpeController {
    * Genera nota de crédito y revierte operaciones relacionadas
    */
   @Post(':id/anular')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.anular')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Anular comprobante CPE',
     description: 'Anula un comprobante electrónico generando nota de crédito y revirtiendo operaciones'
   })

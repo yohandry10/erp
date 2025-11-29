@@ -5,6 +5,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
+import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
 
 describe('RecepcionesService', () => {
@@ -12,6 +13,7 @@ describe('RecepcionesService', () => {
   let supabaseService: jest.Mocked<SupabaseService>;
   let inventarioService: jest.Mocked<InventarioService>;
   let eventBusService: jest.Mocked<EventBusService>;
+  let eventEmitter: { emit: jest.Mock };
 
   const mockSupabaseClient = {
     from: jest.fn(),
@@ -57,6 +59,12 @@ describe('RecepcionesService', () => {
           },
         },
         {
+          provide: EventEmitterService,
+          useValue: {
+            emit: jest.fn(),
+          },
+        },
+        {
           provide: AuditService,
           useValue: {
             registrarCambio: jest.fn(),
@@ -69,6 +77,7 @@ describe('RecepcionesService', () => {
     supabaseService = module.get(SupabaseService) as jest.Mocked<SupabaseService>;
     inventarioService = module.get(InventarioService) as jest.Mocked<InventarioService>;
     eventBusService = module.get(EventBusService) as jest.Mocked<EventBusService>;
+    eventEmitter = module.get(EventEmitterService) as any;
 
     // Reset mocks
     jest.clearAllMocks();
@@ -209,8 +218,8 @@ describe('RecepcionesService', () => {
       // 4. Insert de items (no usa .single(), solo retorna error)
       Object.assign(mockQueryBuilder, { data: null, error: null });
 
-      // 5. Query final para obtener recepción completa
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: mockRecepcionCompleta, error: null });
+      // 5. Query final para obtener recepción completa (usa maybeSingle, no single)
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: mockRecepcionCompleta, error: null });
 
       const result = await service.crearRecepcion('tenant-1', createDto, 'user-1');
 
@@ -222,6 +231,10 @@ describe('RecepcionesService', () => {
     });
 
     it('should throw NotFoundException when orden not found', async () => {
+      // Reset mocks para este test
+      jest.clearAllMocks();
+      mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
+
       // Solo mock la primera llamada (query de orden)
       mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: { message: 'Not found' } });
 
@@ -231,6 +244,10 @@ describe('RecepcionesService', () => {
     });
 
     it('should throw BadRequestException when orden is not in valid state', async () => {
+      // Reset mocks para este test
+      jest.clearAllMocks();
+      mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
+
       const invalidOrden = { ...mockOrden, estado: 'BORRADOR' };
       // Solo mock la primera llamada (query de orden)
       mockQueryBuilder.single.mockResolvedValueOnce({ data: invalidOrden, error: null });
@@ -303,7 +320,7 @@ describe('RecepcionesService', () => {
       ],
     };
 
-    it('should close a recepcion successfully', async () => {
+    it('should close a recepcion successfully and emit outbox', async () => {
       const mockRecepcionCompleta = {
         ...mockRecepcion,
         items: [
@@ -369,7 +386,10 @@ describe('RecepcionesService', () => {
       expect(result).toBeDefined();
       expect(result.numero).toBe('REC-2025-0001');
       expect(inventarioService.registrarEntradaStockAtomico).toHaveBeenCalled();
-      // El evento se emite pero puede fallar silenciosamente, así que no lo verificamos
+      expect(eventEmitter.emit).toHaveBeenCalledWith(expect.objectContaining({
+        eventType: 'recepcion.registrada',
+        aggregateType: 'recepcion',
+      }));
     });
 
     it('should throw BadRequestException when recepcion is not BORRADOR', async () => {
@@ -407,7 +427,7 @@ describe('RecepcionesService', () => {
       // Resetear mocks para este test
       jest.clearAllMocks();
       mockSupabaseClient.from.mockReturnValue(mockQueryBuilder);
-      
+
       // Resetear el mock de single completamente
       mockQueryBuilder.single.mockReset();
 

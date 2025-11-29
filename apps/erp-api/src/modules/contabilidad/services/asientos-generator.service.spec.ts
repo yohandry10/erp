@@ -28,7 +28,7 @@ describe('AsientosGeneratorService', () => {
       single: jest.fn(),
       maybeSingle: jest.fn()
     };
-    
+
     // Make all methods return the mock itself for chaining
     const returnMock = () => mock;
     mock.from.mockImplementation(returnMock);
@@ -42,7 +42,7 @@ describe('AsientosGeneratorService', () => {
     mock.order.mockImplementation(returnMock);
     mock.limit.mockImplementation(returnMock);
     mock.maybeSingle.mockImplementation(returnMock);
-    
+
     return mock;
   };
 
@@ -242,7 +242,7 @@ describe('AsientosGeneratorService', () => {
 
     it('debe crear asiento con source_event_id cuando no existe uno previo', async () => {
       const sourceEventId = 'event-new-123';
-      
+
       periodosService.validarPeriodoAbierto.mockResolvedValue();
 
       // Mock para buscar asiento existente por evento - no existe
@@ -609,7 +609,7 @@ describe('AsientosGeneratorService', () => {
       expect(resultado.total_debe).toBe(resultado.total_haber);
       expect(resultado.total_debe).toBe(1180);
       expect(resultado.total_haber).toBe(1180);
-      
+
       // Validar que la suma de debe = costo + igv
       const totalDebe = evento.costo + evento.igv;
       expect(totalDebe).toBe(evento.total);
@@ -1283,7 +1283,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoVenta(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoVenta(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       // Verificar que se intentó validar el período
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       // Verificar que NO se intentó crear el asiento
@@ -1310,7 +1310,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoCompra(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoCompra(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1332,7 +1332,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoCobro(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoCobro(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1354,7 +1354,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoPago(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoPago(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1377,7 +1377,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoAjusteInventario(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoAjusteInventario(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1403,7 +1403,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoPlanilla(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoPlanilla(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1425,7 +1425,7 @@ describe('AsientosGeneratorService', () => {
 
       await expect(service.generarAsientoDepreciacion(evento)).rejects.toThrow(BadRequestException);
       await expect(service.generarAsientoDepreciacion(evento)).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1439,11 +1439,11 @@ describe('AsientosGeneratorService', () => {
       await expect(
         service.generarAsiento(tenantId, fechaCerrada, 'Asiento manual', detalles)
       ).rejects.toThrow(BadRequestException);
-      
+
       await expect(
         service.generarAsiento(tenantId, fechaCerrada, 'Asiento manual', detalles)
       ).rejects.toThrow('El período contable 2024-10 está CERRADO');
-      
+
       expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
       expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
     });
@@ -1475,11 +1475,11 @@ describe('AsientosGeneratorService', () => {
       } catch (error) {
         // Verificar que la validación de período fue lo primero que se ejecutó
         expect(periodosService.validarPeriodoAbierto).toHaveBeenCalled();
-        
+
         // Verificar que NO se realizaron otras operaciones
         expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
         expect(mockSupabaseClient.update).not.toHaveBeenCalled();
-        
+
         // Verificar el error correcto
         expect(error).toBeInstanceOf(BadRequestException);
         expect(error.message).toContain('CERRADO');
@@ -1489,6 +1489,7 @@ describe('AsientosGeneratorService', () => {
 
   describe('handleDocumentoFiscalGenerado', () => {
     it('genera asiento contable usando la plantilla configurada', async () => {
+      const tenantId = 'test-tenant-id';
       const plantilla = {
         cuenta_debe_codigo: '12',
         cuenta_haber_ventas_codigo: '70',
@@ -1541,19 +1542,19 @@ describe('AsientosGeneratorService', () => {
         'Venta F001-000123',
         [
           {
-            cuenta_id: 'cta-12',
+            cuenta_id: 'cuenta-12',
             debe: 1180,
             haber: 0,
             concepto: 'Cuenta por cobrar F001-000123'
           },
           {
-            cuenta_id: 'cta-70',
+            cuenta_id: 'cuenta-70',
             debe: 0,
             haber: 1000,
             concepto: 'Ingresos por venta F001-000123'
           },
           {
-            cuenta_id: 'cta-40',
+            cuenta_id: 'cuenta-40',
             debe: 0,
             haber: 180,
             concepto: 'Impuestos por pagar F001-000123'

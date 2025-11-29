@@ -6,6 +6,7 @@ import { CreateGuiaRemisionDto, GuiaRemisionResponseDto } from './gre.types';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { GreReporteQueryDto } from './dto/gre-reporte.dto';
 
 @ApiTags('gre')
 @Controller('gre')
@@ -13,13 +14,6 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 @ApiBearerAuth()
 export class GreController {
   constructor(private readonly greService: GreService) {}
-
-  @Get()
-  @RequirePermission('gre.guias.ver')
-  @ApiOperation({ summary: 'Get GRE list (placeholder)' })
-  findAll() {
-    return this.greService.findAll();
-  }
 
   @Get('guias')
   @RequirePermission('gre.guias.ver')
@@ -106,13 +100,16 @@ export class GreController {
   @Get('reporte')
   @RequirePermission('gre.reportes.ver')
   @ApiOperation({ summary: 'Generar reporte GRE' })
-  generateReport() {
-    // TODO: Implement real GRE report generation
-    return {
-      success: true,
-      data: null,
-      message: 'Funcionalidad en desarrollo'
-    };
+  @ApiResponse({ status: 200, description: 'CSV generado' })
+  async generateReport(
+    @CurrentTenant() tenantId: string,
+    @Res() res: any,
+    @Query() query: GreReporteQueryDto,
+  ) {
+    const csv = await this.greService.generarCsvGre(tenantId, Number(query.anio), Number(query.mes));
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="gre_${query.anio || 'all'}_${query.mes || 'all'}.csv"`);
+    return res.send(csv);
   }
 
   @Get('stats')

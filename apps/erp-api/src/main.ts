@@ -8,6 +8,9 @@ import { SupabaseService } from './shared/supabase/supabase.service';
 import { ValidationPipe } from '@nestjs/common';
 import { SecurityService } from './shared/security/security.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { CorrelationIdMiddleware } from './shared/middleware/correlation-id.middleware';
+import { LoggingInterceptor } from './shared/interceptors/logging.interceptor';
+import { StructuredLogger } from './shared/logging/structured-logger.service';
 import helmet from 'helmet';
 import compression from 'compression';
 
@@ -72,26 +75,26 @@ async function bootstrap() {
   await validateCriticalSecrets();
 
   const app = await NestFactory.create(AppModule);
-  
+
   // Definir puerto al inicio
   const port = process.env.PORT || 3002;
-  
+
   // Obtener servicio de seguridad
   const securityService = app.get(SecurityService);
-  
+
   // Configurar Helmet para headers de seguridad
   app.use(helmet(securityService.getHelmetConfig()));
-  
+
   // Configurar compresión
   app.use(compression(securityService.getCompressionConfig()));
-  
+
   // Configurar trust proxy para obtener IP real (usando getHttpAdapter)
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.getInstance().set('trust proxy', 1);
-  
+
   // Global exception filter for consistent error handling
   app.useGlobalFilters(new GlobalExceptionFilter());
-  
+
   // Validación global de DTOs con configuración más estricta
   app.useGlobalPipes(new ValidationPipe({
     transform: true,                    // Auto-transform payloads to DTO instances
@@ -103,9 +106,19 @@ async function bootstrap() {
       enableImplicitConversion: true,   // Enable implicit type conversion for primitives
     },
   }));
-  
-  // Configuración CORS mejorada
-  app.enableCors(securityService.getCorsConfig());
+
+  // Middleware de correlation ID (debe ir primero para capturar todas las requests)
+  app.use(new CorrelationIdMiddleware().use.bind(new CorrelationIdMiddleware()));
+
+  // Configuración CORS mejorada con correlation ID en headers expuestos
+  const corsConfig = securityService.getCorsConfig();
+  app.enableCors({
+    ...corsConfig,
+    exposedHeaders: [
+      ...(corsConfig.exposedHeaders || []),
+      'x-correlation-id',
+    ],
+  });
 
   // PREFIJO GLOBAL
   app.setGlobalPrefix('api');
@@ -277,14 +290,14 @@ Para más información, consulte la documentación técnica en el repositorio.
       .addServer('https://api-staging.erpsuite.com', 'Staging')
       .addServer('https://api.erpsuite.com', 'Producción')
       .build();
-    
+
     const document = SwaggerModule.createDocument(app, config, {
       operationIdFactory: (
         controllerKey: string,
         methodKey: string
       ) => methodKey,
     });
-    
+
     SwaggerModule.setup('api/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
@@ -305,23 +318,36 @@ Para más información, consulte la documentación técnica en el repositorio.
         .swagger-ui .info .title { font-size: 2.5em; }
       `,
     });
-    
+
     console.log(`📚 Documentación Swagger disponible en http://localhost:${port}/api/docs`);
   }
+
+  // Configurar logging interceptor global  
+  const logger = await app.resolve(StructuredLogger);
+  logger.setService('Bootstrap');
+  app.useGlobalInterceptors(new LoggingInterceptor(logger));
 
   // Forzar recarga de esquema de Supabase al iniciar
   const supabaseService = app.get(SupabaseService);
   await notifySchemaReload(supabaseService);
 
   await app.listen(port);
-  
+
+  // Log startup con structured logger
+  logger.log(`Servidor corriendo en puerto ${port}`, {
+    environment: process.env.NODE_ENV || 'development',
+    port,
+    features: ['Helmet', 'Rate Limiting', 'Compression', 'Correlation IDs', 'Structured Logging'],
+  });
+
   console.log(`🚀 Servidor corriendo en puerto ${port}`);
   console.log(`🔒 Seguridad habilitada: Helmet, Rate Limiting, Compression`);
-  
+  console.log(`📊 Logging estructurado activado con Correlation IDs`);
+
   if (process.env.NODE_ENV !== 'production') {
     console.log(`📚 Documentación disponible en http://localhost:${port}/api/docs`);
   }
-  
+
   console.log(`🔗 CORS configurado para entornos permitidos`);
 }
 

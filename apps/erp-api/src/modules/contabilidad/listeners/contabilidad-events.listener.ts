@@ -278,6 +278,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
       switch (evento.event_type) {
         case 'venta.procesada':
         case 'VentaFacturada':
+        case 'pos.venta.registrada':
           await this.handleVentaFacturada(evento);
           break;
 
@@ -289,6 +290,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
         case 'recepcion.registrada':
         case 'RecepcionRegistrada':
           await this.handleRecepcionRegistrada(evento);
+          break;
+
+        case 'devolucion.proveedor.registrada':
+        case 'DevolucionProveedorEmitida':
+          await this.handleDevolucionProveedorRegistrada(evento);
           break;
 
         case 'cxc.creada':
@@ -419,6 +425,37 @@ export class ContabilidadEventsListener implements OnModuleInit {
     // Por defecto, considerar errores como recuperables
     // (mejor reintentar que perder el evento)
     return true;
+  }
+
+  /**
+   * Manejo mínimo para devoluciones de proveedor emitidas (outbox only)
+   * Marca el evento como procesado en outbox para evitar reintentos.
+   */
+  private async handleDevolucionProveedorRegistrada(evento: OutboxEvent): Promise<void> {
+    const tenantId = evento.event_data?.tenantId || evento.event_data?.tenant_id;
+    this.logger.log(`📦 [Contabilidad] Devolución proveedor registrada recibida (evento ${evento.event_id}) tenant=${tenantId}`);
+
+    // Generar asiento: Dr 42 / Cr 20 / Cr 40
+    try {
+      if (!tenantId) {
+        throw new Error('Evento devolucion.proveedor.registrada sin tenantId');
+      }
+
+      const eventoAsiento = {
+        tenant_id: tenantId,
+        fecha: evento.event_data?.fechaDevolucion || evento.event_data?.fecha || new Date().toISOString(),
+        subtotal: Number(evento.event_data?.subtotal ?? 0),
+        igv: Number(evento.event_data?.igv ?? 0),
+        total: Number(evento.event_data?.total ?? 0),
+        referencia: evento.event_data?.numeroDevolucion || evento.event_data?.referencia,
+        event_id: evento.event_id,
+      };
+
+      await this.asientosGenerator.generarAsientoDevolucionProveedor(eventoAsiento);
+    } catch (err) {
+      this.logger.error('❌ [Contabilidad] Error procesando devolucion.proveedor.registrada:', err);
+      throw err;
+    }
   }
 
   /**

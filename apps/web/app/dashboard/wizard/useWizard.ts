@@ -50,13 +50,20 @@ export function useWizard() {
           (!statusData.data?.ruc?.missingFields || statusData.data.ruc.missingFields.length === 0)
         
         if (isReallyComplete) {
-          console.log('✅ Configuration already complete - redirecting to dashboard')
+          console.log('✅ Configuration already complete - showing summary view')
           
-          // Si la configuración está completa, redirigir al dashboard
-          // NO mostrar el wizard
-          if (typeof window !== 'undefined') {
-            window.location.href = '/dashboard'
-          }
+          // Marcar todos los pasos como completados
+          state.steps.forEach((_, index) => {
+            markStepComplete(index)
+          })
+          
+          // Ir al paso de resumen (último paso + 1 = modo resumen)
+          // Usamos un flag especial para indicar que estamos en modo resumen
+          setPersistedConfiguration(true)
+          
+          // Ir al último paso (completion) que ahora mostrará el resumen
+          goToStep(state.steps.length - 1)
+          
           setLoading(false)
           return
         } else if (statusData.success && statusData.data?.isComplete === true) {
