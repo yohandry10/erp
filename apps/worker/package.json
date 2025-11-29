@@ -23,7 +23,7 @@
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
     "redis": "^4.6.10",
-    "winston": "^3.11.0"
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
