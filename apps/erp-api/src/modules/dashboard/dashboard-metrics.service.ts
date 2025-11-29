@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CacheService } from '../../shared/cache/cache.service';
+import Decimal from 'decimal.js';
 
 export interface DashboardStats {
   totalCpe: number;
@@ -39,7 +40,7 @@ export interface Activity {
 @Injectable()
 export class DashboardMetricsService {
   private readonly logger = new Logger(DashboardMetricsService.name);
-  
+
   // TTL configurable: 10 minutos para stats, 5 minutos para activities (más frecuentes)
   private readonly STATS_CACHE_TTL_SECONDS = 10 * 60; // 10 minutos en segundos
   private readonly ACTIVITIES_CACHE_TTL_SECONDS = 5 * 60; // 5 minutos en segundos
@@ -76,7 +77,7 @@ export class DashboardMetricsService {
   private async getStatsFromCache(tenantId: string, periodo?: string): Promise<DashboardStats | null> {
     const key = this.getStatsCacheKey(tenantId, periodo);
     const cached = await this.cacheService.get<DashboardStats>(key);
-    
+
     if (cached) {
       this.logger.debug(`✅ [Cache] Hit para estadísticas: ${key}`);
       return cached;
@@ -91,7 +92,7 @@ export class DashboardMetricsService {
   private async getActivitiesFromCache(tenantId: string): Promise<Activity[] | null> {
     const key = this.getActivitiesCacheKey(tenantId);
     const cached = await this.cacheService.get<Activity[]>(key);
-    
+
     if (cached) {
       this.logger.debug(`✅ [Cache] Hit para actividades: ${key}`);
       return cached;
@@ -160,7 +161,7 @@ export class DashboardMetricsService {
     this.logger.log(`📊 [DashboardMetricsService] Calculando estadísticas para tenant: ${tenantId}`);
 
     const client = this.supabase.getClient();
-    
+
     // Obtener fechas para filtros
     const hoy = new Date();
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
@@ -241,7 +242,7 @@ export class DashboardMetricsService {
     // Calcular tasa de conversión de cotizaciones
     const totalCotizaciones = cotizacionesData?.length || 0;
     const cotizacionesAceptadas = cotizacionesData?.filter(c => c.estado === 'ACEPTADA').length || 0;
-    const tasaConversion = totalCotizaciones > 0 ? 
+    const tasaConversion = totalCotizaciones > 0 ?
       ((cotizacionesAceptadas / totalCotizaciones) * 100) : 0;
 
     const estadisticas: DashboardStats = {
@@ -289,7 +290,7 @@ export class DashboardMetricsService {
 
     const client = this.supabase.getClient();
     const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
+
     // Obtener actividades reales de forma segura
     const [
       cpeResult,
@@ -324,7 +325,7 @@ export class DashboardMetricsService {
     ]);
 
     const actividades: Activity[] = [];
-    
+
     // Procesar CPE
     if (cpeResult.status === 'fulfilled' && cpeResult.value.data) {
       cpeResult.value.data.forEach(cpe => {
@@ -393,32 +394,43 @@ export class DashboardMetricsService {
   }
 
   // Métodos de utilidad privados
+  // ✅ FIX: Usar Decimal.js para sumas financieras
   private sumarTotales(data: any[]): number {
     if (!Array.isArray(data)) return 0;
-    return data.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
+    return data.reduce(
+      (sum, item) => sum.plus(item.total || 0),
+      new Decimal(0)
+    ).toDecimalPlaces(2).toNumber();
   }
 
   private sumarTotalesCpe(data: any[]): number {
     if (!Array.isArray(data)) return 0;
-    return data.reduce((sum, item) => sum + (parseFloat(item.total_venta) || 0), 0);
+    return data.reduce(
+      (sum, item) => sum.plus(item.total_venta || 0),
+      new Decimal(0)
+    ).toDecimalPlaces(2).toNumber();
   }
 
   private calcularValorInventario(productos: any[]): number {
     if (!Array.isArray(productos)) return 0;
-    return productos.reduce((sum, p) => 
-      sum + ((parseFloat(p.precio) || 0) * (parseFloat(p.stock) || 0)), 0);
+    return productos.reduce(
+      (sum, p) => sum.plus(
+        new Decimal(p.precio || 0).times(p.stock || 0)
+      ),
+      new Decimal(0)
+    ).toDecimalPlaces(2).toNumber();
   }
 
   private contarProductosStockBajo(productos: any[]): number {
     if (!Array.isArray(productos)) return 0;
-    return productos.filter(p => 
+    return productos.filter(p =>
       parseFloat(p.stock || 0) <= parseFloat(p.stock_minimo || 0)
     ).length;
   }
 
   private mapearEstado(estado: string): 'success' | 'warning' | 'error' | 'pending' {
     if (!estado) return 'pending';
-    
+
     const estadosMap = {
       'COMPLETADO': 'success',
       'PAGADA': 'success',
@@ -435,7 +447,7 @@ export class DashboardMetricsService {
       'CANCELADA': 'error',
       'ERROR': 'error'
     };
-    
+
     return estadosMap[estado.toUpperCase()] || 'pending';
   }
 }

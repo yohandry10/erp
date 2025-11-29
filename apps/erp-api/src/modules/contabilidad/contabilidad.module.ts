@@ -15,6 +15,7 @@ import { ContabilidadEventsListener } from './listeners/contabilidad-events.list
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { CashflowService } from './services/cashflow.service';
 
 @Module({
   imports: [SupabaseModule, IntegrationModule, ScheduleModule.forRoot(), AuthModule, PermissionsModule],
@@ -28,6 +29,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
     OutboxEventsService,
     PresupuestosService,
     CentrosCostoService,
+    CashflowService,
     ContabilidadEventsListener,
     {
       provide: 'EstadosFinancierosService',
@@ -42,7 +44,8 @@ import { PermissionsModule } from '../permissions/permissions.module';
     OutboxEventsService,
     EstadosFinancierosService,
     PresupuestosService,
-    CentrosCostoService
+    CentrosCostoService,
+    CashflowService
   ]
 })
 export class ContabilidadModule {}

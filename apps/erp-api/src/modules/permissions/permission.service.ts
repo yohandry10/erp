@@ -3,7 +3,7 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { Permission, RolePermission } from './types';
 
 // Re-export types for backward compatibility
-export { Permission, RolePermission } from './types';
+export type { Permission, RolePermission } from './types';
 
 @Injectable()
 export class PermissionService {

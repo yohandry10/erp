@@ -2263,4 +2263,4 @@ dias_credito
 No description
 
 integer	int4		
- 
+  

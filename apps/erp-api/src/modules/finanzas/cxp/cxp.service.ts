@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CrearCxpDto, FiltrarCxpDto, ActualizarCxpDto, AplicarPagoCxpDto, AnularCxpDto, VencimientosCxpDto } from './dto';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class CxpService {
@@ -12,7 +13,7 @@ export class CxpService {
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly retencionesValidation: RetencionesValidationService,
-  ) {}
+  ) { }
 
   async crearCuentaPorPagar(
     tenantId: string,
@@ -49,7 +50,8 @@ export class CxpService {
     }
 
     // Validar que el total sea igual a subtotal + igv
-    const totalCalculado = this.round2(dto.subtotal + dto.igv);
+    // ✅ FIX: Usar Decimal.js para evitar errores de punto flotante
+    const totalCalculado = new Decimal(dto.subtotal).plus(dto.igv).toDecimalPlaces(2).toNumber();
     if (Math.abs(totalCalculado - dto.total) > 0.01) {
       throw new BadRequestException(
         `El total (${dto.total}) no coincide con subtotal + IGV (${totalCalculado})`,
@@ -132,6 +134,37 @@ export class CxpService {
     if (cxpError) {
       console.error('Error creando cuenta por pagar:', cxpError);
       throw new BadRequestException('No se pudo crear la cuenta por pagar');
+    }
+
+    // Emitir evento FacturaProveedorRegistrada
+    try {
+      const eventId = uuidv4();
+      const idempotencyKey = `cxp:factura:${tenantId}:${cxp.id}`;
+
+      const eventoPayload: any = {
+        tenantId,
+        eventId,
+        idempotencyKey,
+        facturaProvId: cxp.id,
+        numeroDocumento: cxp.numero_documento,
+        serie: null,
+        ordenId: cxp.orden_id,
+        recepcionId: cxp.recepcion_id,
+        proveedorId: cxp.proveedor_id,
+        subtotal: Number(cxp.subtotal),
+        igv: Number(cxp.igv),
+        total: Number(cxp.total),
+        moneda: cxp.moneda,
+        fechaEmision: cxp.fecha_emision,
+        fechaVencimiento: cxp.fecha_vencimiento,
+        estadoComparacion: 'OK',
+        emittedAt: new Date().toISOString(),
+      };
+
+      this.eventBus.emitFacturaProveedorRegistrada(eventoPayload);
+      console.log('✅ Evento FacturaProveedorRegistrada emitido exitosamente');
+    } catch (errorEvento) {
+      console.error('❌ Error emitiendo evento FacturaProveedorRegistrada:', errorEvento);
     }
 
     return {
@@ -626,8 +659,8 @@ export class CxpService {
         estado: 'ANULADA',
         anulado_at: new Date().toISOString(),
         anulado_by: userId ?? null,
-        observaciones: dto.observaciones 
-          ? `ANULADA: ${dto.motivo}. ${dto.observaciones}` 
+        observaciones: dto.observaciones
+          ? `ANULADA: ${dto.motivo}. ${dto.observaciones}`
           : `ANULADA: ${dto.motivo}`,
         updated_at: new Date().toISOString(),
       })
@@ -893,7 +926,7 @@ export class CxpService {
     // Calcular fecha límite (hoy + días)
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    
+
     const fechaLimite = new Date(hoy);
     fechaLimite.setDate(fechaLimite.getDate() + dias);
 
@@ -1031,8 +1064,13 @@ export class CxpService {
     };
   }
 
+  /**
+   * ✅ FIX: Usar Decimal.js para redondeo preciso a 2 decimales
+   * @param value Valor a redondear
+   * @returns Valor redondeado con precisión decimal
+   */
   private round2(value: number): number {
-    return Math.round(value * 100) / 100;
+    return new Decimal(value).toDecimalPlaces(2).toNumber();
   }
 
   /**

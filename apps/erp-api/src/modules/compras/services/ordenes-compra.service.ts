@@ -14,6 +14,7 @@ import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class OrdenesCompraService {
@@ -95,11 +96,12 @@ export class OrdenesCompraService {
     }
 
     // Calcular el total de la orden para evaluar si requiere aprobación
+    // ✅ FIX: Usar Decimal.js para evitar errores de punto flotante
     const subtotal = createDto.detalles.reduce(
-      (sum, detalle) => sum + (detalle.cantidad * detalle.precio_unitario),
-      0
-    );
-    
+      (sum, detalle) => sum.plus(new Decimal(detalle.cantidad).times(detalle.precio_unitario)),
+      new Decimal(0)
+    ).toNumber();
+
     // ✅ CORRECCIÓN SRP: Usar TaxCalculatorService centralizado
     const taxResult = await this.taxCalculator.calcularImpuestos({
       subtotal,
@@ -114,11 +116,11 @@ export class OrdenesCompraService {
     if (requiereAprobacion && !createDto.estado) {
       createDto.estado = 'APROBACION' as any;
     }
-    
+
     // Crear orden de compra pasando los totales ya calculados
     const orden = await this.ordenesRepository.create(
-      createDto, 
-      tenantId, 
+      createDto,
+      tenantId,
       userId,
       { subtotal, igv: taxResult.igv, total: taxResult.total }
     );
@@ -283,13 +285,13 @@ export class OrdenesCompraService {
         subtotal,
         tenantId,
       });
-      
+
       // Agregar totales calculados al DTO
       (updateDto as any).subtotal = subtotal;
       (updateDto as any).igv = taxResult.igv;
       (updateDto as any).total = taxResult.total;
     }
-    
+
     // Actualizar orden de compra
     const orden = await this.ordenesRepository.update(updateDto, id, tenantId, userId);
 
@@ -301,6 +303,11 @@ export class OrdenesCompraService {
    * Implementa máquina de estados explícita con validaciones de transiciones permitidas
    */
   private validarTransicionEstadoOrden(estadoActual: string, nuevoEstado: string): void {
+    // Si el estado no cambia, la transición es válida
+    if (estadoActual === nuevoEstado) {
+      return;
+    }
+
     // Definir transiciones válidas para órdenes de compra
     const transicionesValidas: Record<string, string[]> = {
       'BORRADOR': ['PENDIENTE', 'APROBACION', 'ANULADA'],
@@ -1035,13 +1042,13 @@ export class OrdenesCompraService {
 
       // Calcular totales usando TaxCalculatorService
       const subtotal = detalles?.reduce((sum, d) => sum + (d.cantidad * d.precio_unitario), 0) || 0;
-      
+
       // ✅ CORRECCIÓN: Usar servicio centralizado
       const taxResult = await this.taxCalculator.calcularImpuestos({
         subtotal,
         tenantId,
       });
-      
+
       const igv = taxResult.igv;
       const total = taxResult.total;
 

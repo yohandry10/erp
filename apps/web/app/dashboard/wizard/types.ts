@@ -28,6 +28,10 @@ export interface WizardConfiguration {
   ruc: string
   razonSocial: string
   direccion: string
+  // Logo de la empresa (multi-tenant)
+  logoFile?: File
+  logoUrl?: string
+  logoBase64?: string
   certificateFile?: File
   certificatePassword?: string
   certificateBase64?: string

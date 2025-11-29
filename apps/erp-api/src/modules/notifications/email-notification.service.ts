@@ -29,7 +29,7 @@ export class EmailNotificationService {
   constructor(
     private readonly outboxService: OutboxService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Envía un email usando Outbox Pattern
@@ -85,12 +85,12 @@ export class EmailNotificationService {
       text: emailData.text,
       attachments: emailData.attachments
         ? emailData.attachments.map((att) => ({
-            filename: att.filename,
-            content: Buffer.isBuffer(att.content)
-              ? att.content.toString('base64')
-              : att.content,
-            contentType: att.contentType,
-          }))
+          filename: att.filename,
+          content: Buffer.isBuffer(att.content)
+            ? att.content.toString('base64')
+            : att.content,
+          contentType: att.contentType,
+        }))
         : undefined,
       priority: emailData.priority || 'normal',
       metadata: {
@@ -103,7 +103,7 @@ export class EmailNotificationService {
       tenantId,
       eventType: 'email.send',
       aggregateType: 'notification',
-      aggregateId: eventData.aggregateId || emailData.to,
+      aggregateId: emailData.to,
       eventData,
       maxRetries: 5,
     });
@@ -129,10 +129,10 @@ export class EmailNotificationService {
       // Reconstruir attachments si existen
       const attachments = eventData.attachments
         ? eventData.attachments.map((att: any) => ({
-            filename: att.filename,
-            content: Buffer.from(att.content, 'base64'),
-            contentType: att.contentType,
-          }))
+          filename: att.filename,
+          content: Buffer.from(att.content, 'base64'),
+          contentType: att.contentType,
+        }))
         : undefined;
 
       const emailOptions: SendEmailOptions = {

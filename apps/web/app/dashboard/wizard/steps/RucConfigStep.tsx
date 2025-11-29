@@ -6,6 +6,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Building2 } from 'lucide-react'
+import { LogoUploader } from '@/components/configuracion/LogoUploader'
 
 export function RucConfigStep() {
   const { state, updateConfiguration } = useWizard()
@@ -13,6 +14,14 @@ export function RucConfigStep() {
 
   const handleInputChange = (field: string, value: string) => {
     updateConfiguration({ [field]: value })
+  }
+
+  const handleLogoChange = (file: File | null, previewUrl: string | null) => {
+    updateConfiguration({
+      logoFile: file || undefined,
+      logoUrl: previewUrl || undefined,
+      logoBase64: previewUrl || undefined, // El previewUrl ya es base64
+    })
   }
 
   return (
@@ -105,6 +114,18 @@ export function RucConfigStep() {
           }}>
             Dirección registrada en SUNAT
           </p>
+        </div>
+
+        {/* Logo de la empresa */}
+        <div>
+          <Label style={{ marginBottom: '0.5rem', display: 'block' }}>
+            Logo de la Empresa <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(opcional)</span>
+          </Label>
+          <LogoUploader
+            currentLogoUrl={state.configuration.logoUrl}
+            onLogoChange={handleLogoChange}
+            maxSizeMB={2}
+          />
         </div>
 
       </div>

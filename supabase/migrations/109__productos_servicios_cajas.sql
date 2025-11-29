@@ -2,6 +2,26 @@
 -- Añade campos de servicio y multi-sucursal al catálogo de productos y crea tablas de precios/stock por sucursal.
 -- Crea estructura inicial para cajas y sesiones de caja (apertura/cierre por cajero).
 
+-- Bootstrap mínimo de sucursales (y almacenes) si no existen en este entorno
+CREATE TABLE IF NOT EXISTS sucursales (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL,
+  nombre varchar(120) NOT NULL,
+  direccion text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS almacenes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id uuid NOT NULL,
+  sucursal_id uuid REFERENCES sucursales(id) ON DELETE SET NULL,
+  nombre varchar(120) NOT NULL,
+  descripcion text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- 1) Catálogo: productos con flags de servicio y afectación
 ALTER TABLE productos
   ADD COLUMN IF NOT EXISTS es_servicio boolean DEFAULT false,
@@ -55,6 +75,44 @@ CREATE TABLE IF NOT EXISTS cajas (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Si la tabla cajas ya existía sin columnas de sucursal/almacén, agrégalas antes de crear índices
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'cajas' AND column_name = 'sucursal_id'
+  ) THEN
+    ALTER TABLE cajas ADD COLUMN sucursal_id uuid;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'cajas' AND column_name = 'almacen_id'
+  ) THEN
+    ALTER TABLE cajas ADD COLUMN almacen_id uuid;
+  END IF;
+END $$;
+
+-- Asegura claves foráneas cuando la tabla existía previamente sin ellas
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'cajas_sucursal_id_fkey'
+  ) THEN
+    ALTER TABLE cajas
+      ADD CONSTRAINT cajas_sucursal_id_fkey
+      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id) ON DELETE SET NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'cajas_almacen_id_fkey'
+  ) THEN
+    ALTER TABLE cajas
+      ADD CONSTRAINT cajas_almacen_id_fkey
+      FOREIGN KEY (almacen_id) REFERENCES almacenes(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_cajas_tenant ON cajas(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_cajas_sucursal ON cajas(sucursal_id);

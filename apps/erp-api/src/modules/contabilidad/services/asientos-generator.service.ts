@@ -1059,6 +1059,53 @@ export class AsientosGeneratorService {
     }
   }
 
+  /**
+   * Genera asiento de devolución a proveedor (retorno de mercadería)
+   * Dr 42 Proveedores [total]
+   *   Cr 20 Mercaderías [costo/subtotal]
+   *   Cr 40 IGV Crédito Fiscal [igv]
+   */
+  async generarAsientoDevolucionProveedor(evento: {
+    tenant_id: string;
+    fecha: string | Date;
+    subtotal: number;
+    igv: number;
+    total: number;
+    referencia?: string;
+    event_id?: string;
+    centro_costo_id?: string;
+  }): Promise<AsientoContable> {
+    try {
+      const { tenant_id, fecha, subtotal, igv, total, referencia, event_id, centro_costo_id } = evento;
+
+      // Obtener cuentas del plan: inventario, IGV crédito fiscal, proveedores
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(tenant_id, ['20', '40', '42']);
+
+      const detalles: DetalleAsiento[] = [
+        { cuenta_id: cuentas.get('42')!.id, debe: total, haber: 0, concepto: 'Proveedores', centro_costo_id },
+        { cuenta_id: cuentas.get('20')!.id, debe: 0, haber: subtotal, concepto: 'Mercaderías devueltas', centro_costo_id },
+        { cuenta_id: cuentas.get('40')!.id, debe: 0, haber: igv, concepto: 'Reverso IGV Crédito Fiscal' },
+      ];
+
+      return await this.generarAsiento(
+        tenant_id,
+        new Date(fecha),
+        'Devolución a proveedor',
+        detalles,
+        referencia,
+        event_id
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de devolución proveedor: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
   private async obtenerPlantillaAsientoVenta(paisId: number, tipoDocumento: string) {
     const { data, error } = await this.supabaseService
       .getClient()

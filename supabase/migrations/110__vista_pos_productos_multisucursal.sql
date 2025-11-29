@@ -32,7 +32,7 @@ SELECT
   COALESCE(p.clasificador_sunat, '')::varchar          AS clasificador_sunat,
   COALESCE(p.favorito, false)                          AS favorito,
   p.created_at,
-  p.updated_at
+  p.created_at AS updated_at
 FROM productos p
 LEFT JOIN LATERAL (
   SELECT precio

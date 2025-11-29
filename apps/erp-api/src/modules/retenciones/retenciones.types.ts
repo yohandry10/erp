@@ -4,7 +4,7 @@
  */
 
 // DTOs de entrada
-export {
+export type {
   CreateRetencionDto,
   CalcularRetencionDto,
   UpdateRetencionDto,
@@ -13,7 +13,7 @@ export {
 } from './dto/retenciones-input.dto';
 
 // DTOs de respuesta
-export {
+export type {
   RetencionResponse,
   RetencionCalculada,
   ListaRetencionesResponse,
@@ -21,7 +21,7 @@ export {
 } from './dto/retenciones-response.dto';
 
 // DTOs de reportes
-export {
+export type {
   ResumenRetencionesResponse,
   ReporteRetencionesDto,
   EstadisticasRetencionesResponse,

@@ -38,12 +38,14 @@ export default function EstadosFinancierosPage() {
     { value: 12, label: 'Diciembre' }
   ]
 
+  // Trigger para refrescar componentes sin recargar la página
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const handleRefresh = async () => {
     setLoading(true)
     try {
       await get(`/api/contabilidad/estados/refrescar?anio=${anio}&mes=${mes}`)
-      // Trigger reload in child components by changing key
-      window.location.reload()
+      setRefreshKey((prev) => prev + 1)
     } catch (error) {
       console.error('Error refrescando estados financieros:', error)
     } finally {
@@ -204,15 +206,15 @@ export default function EstadosFinancierosPage() {
         </TabsList>
 
         <TabsContent value="balance-comprobacion">
-          <BalanceComprobacion anio={anio} mes={mes} showComparison={showComparison} />
+          <BalanceComprobacion key={`bc-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
         </TabsContent>
 
         <TabsContent value="estado-resultados">
-          <EstadoResultados anio={anio} mes={mes} showComparison={showComparison} />
+          <EstadoResultados key={`er-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
         </TabsContent>
 
         <TabsContent value="balance-general">
-          <BalanceGeneral anio={anio} mes={mes} showComparison={showComparison} />
+          <BalanceGeneral key={`bg-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
         </TabsContent>
       </Tabs>
     </div>

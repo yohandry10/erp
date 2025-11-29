@@ -180,7 +180,7 @@ export function WizardContainer({ children }: WizardContainerProps) {
               marginBottom: '0.75rem',
               letterSpacing: '-0.02em'
             }}>
-              {currentStepData.title}
+              {state.hasPersistedConfiguration ? 'Resumen de Configuración' : currentStepData.title}
             </h2>
             <p style={{
               fontSize: '1rem',
@@ -188,7 +188,9 @@ export function WizardContainer({ children }: WizardContainerProps) {
               fontWeight: '500',
               lineHeight: '1.6'
             }}>
-              {currentStepData.description}
+              {state.hasPersistedConfiguration 
+                ? 'Tu sistema está configurado. Aquí puedes ver y editar algunos ajustes.' 
+                : currentStepData.description}
             </p>
           </div>
 
@@ -204,8 +206,8 @@ export function WizardContainer({ children }: WizardContainerProps) {
             children
           )}
 
-          {/* Navigation Buttons */}
-          {!state.isLoading && (
+          {/* Navigation Buttons - No mostrar si el wizard ya está completado */}
+          {!state.isLoading && !state.hasPersistedConfiguration && (
             <div style={{
               display: 'flex',
               justifyContent: state.currentStep === state.steps.length - 1 ? 'flex-start' : 'space-between',

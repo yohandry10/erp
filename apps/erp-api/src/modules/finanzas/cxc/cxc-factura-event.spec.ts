@@ -110,20 +110,21 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       limit: jest.fn().mockResolvedValue({ data: [], error: null }),
     };
 
+    // Cliente lookup por ID (primera llamada en resolveClienteReferencia)
+    const clienteLookupByIdQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { id: facturaEvent.clienteId, numero_documento: null },
+        error: null,
+      }),
+    };
+
     const configQuery = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({
         data: { dias_vencimiento_factura: 30, detraccion_codigo: '104' },
-        error: null,
-      }),
-    };
-
-    const clienteLookupQuery = {
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({
-        data: { id: facturaEvent.clienteId },
         error: null,
       }),
     };
@@ -148,9 +149,9 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     };
 
     mockSupabaseClient.from
+      .mockImplementationOnce(() => clienteLookupByIdQuery) // Primera llamada: resolveClienteReferencia
       .mockImplementationOnce(() => idempotencyQuery)
       .mockImplementationOnce(() => existenciaQuery)
-      .mockImplementationOnce(() => clienteLookupQuery)
       .mockImplementationOnce(() => configQuery)
       .mockImplementationOnce(() => clienteQuery)
       .mockImplementationOnce(() => insertCuentaQuery)
@@ -173,7 +174,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       cxcId: 'cxc-999',
       cuentaId: 'cxc-999',
       facturaId: facturaEvent.facturaId,
-      cpeId: facturaEvent.cpeId,
+      cpeId: facturaEvent.facturaId, // El servicio usa el ID del documento como cpeId
       idempotencyKey: facturaEvent.idempotencyKey,
     }));
 
@@ -206,6 +207,16 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       ajustes: { retencion: 0, percepcion: 0, detraccion: 0, anticipo: 0 },
     };
 
+    // Cliente lookup mock needed for resolveClienteReferencia which is called first
+    const clienteLookupQuery = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { id: facturaEvent.clienteId, numero_documento: null },
+        error: null,
+      }),
+    };
+
     const idempotencyQuery = {
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
@@ -217,6 +228,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
     };
 
     mockSupabaseClient.from
+      .mockImplementationOnce(() => clienteLookupQuery) // Primera llamada: resolveClienteReferencia
       .mockImplementationOnce(() => idempotencyQuery)
       .mockImplementationOnce(() => integrationLogQuery);
 

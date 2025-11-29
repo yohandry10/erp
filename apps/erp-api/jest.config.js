@@ -30,8 +30,7 @@ module.exports = {
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
         skipLibCheck: true
-      },
-      isolatedModules: true
+      }
     }]
   }
 };

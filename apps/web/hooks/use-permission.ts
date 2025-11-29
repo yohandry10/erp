@@ -128,6 +128,9 @@ interface PermissionCache {
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const permissionCache = new Map<string, PermissionCache>()
 
+// Track in-flight requests to prevent duplicate API calls
+const pendingRequests = new Map<string, Promise<Permission[]>>()
+
 /**
  * Hook to check if the current user has a specific permission
  * @param modulo - Module name (e.g., 'ventas', 'compras', 'inventario')
@@ -170,25 +173,43 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
         // Use cached permissions
         userPermissions = cached.permissions
       } else {
-        // Fetch permissions from API
-        console.log(`[usePermission] Fetching permissions for user ${user.id}`)
-        const response = await get(`/usuarios-sistema/${user.id}/permissions`)
-        
-        if (!response) {
-          console.error(`[usePermission] No response from permissions API for user ${user.id}`)
-          setHasPermission(false)
-          setLoading(false)
-          return
+        // Check if there's already a pending request for this user
+        const pendingRequest = pendingRequests.get(cacheKey)
+        if (pendingRequest) {
+          // Wait for the existing request instead of making a new one
+          userPermissions = await pendingRequest
+        } else {
+          // Create new request and track it
+          const fetchPromise = (async () => {
+            console.log(`[usePermission] Fetching permissions for user ${user.id}`)
+            const response = await get(`/usuarios-sistema/${user.id}/permissions`)
+            
+            if (!response) {
+              console.error(`[usePermission] No response from permissions API for user ${user.id}`)
+              return []
+            }
+
+            const perms = Array.isArray(response) ? response : (response.data || [])
+            console.log(`[usePermission] Fetched ${perms.length} permissions for user ${user.id}`)
+
+            // Update cache
+            permissionCache.set(cacheKey, {
+              permissions: perms,
+              timestamp: Date.now(),
+            })
+
+            return perms
+          })()
+
+          pendingRequests.set(cacheKey, fetchPromise)
+          
+          try {
+            userPermissions = await fetchPromise
+          } finally {
+            // Clean up pending request after completion
+            pendingRequests.delete(cacheKey)
+          }
         }
-
-        userPermissions = Array.isArray(response) ? response : (response.data || [])
-        console.log(`[usePermission] Fetched ${userPermissions.length} permissions for user ${user.id}`, userPermissions)
-
-        // Update cache
-        permissionCache.set(cacheKey, {
-          permissions: userPermissions,
-          timestamp: now,
-        })
       }
 
       const normalizedModule = normalize(modulo)
@@ -262,23 +283,31 @@ export function useUserPermissions() {
         return
       }
 
-      // Fetch from API
-      const response = await get(`/usuarios-sistema/${user.id}/permissions`)
-      
-      if (!response) {
-        setPermissions([])
-        setLoading(false)
-        return
+      // Check if there's already a pending request
+      const pendingRequest = pendingRequests.get(cacheKey)
+      let userPermissions: Permission[]
+
+      if (pendingRequest) {
+        userPermissions = await pendingRequest
+      } else {
+        // Create new request
+        const fetchPromise = (async () => {
+          const response = await get(`/usuarios-sistema/${user.id}/permissions`)
+          if (!response) return []
+          const perms = Array.isArray(response) ? response : (response.data || [])
+          permissionCache.set(cacheKey, { permissions: perms, timestamp: Date.now() })
+          return perms
+        })()
+
+        pendingRequests.set(cacheKey, fetchPromise)
+        try {
+          userPermissions = await fetchPromise
+        } finally {
+          pendingRequests.delete(cacheKey)
+        }
       }
 
-      const userPermissions = Array.isArray(response) ? response : (response.data || [])
       setPermissions(userPermissions)
-
-      // Update cache
-      permissionCache.set(cacheKey, {
-        permissions: userPermissions,
-        timestamp: now,
-      })
     } catch (error) {
       console.error('Error fetching permissions:', error)
       setPermissions([])

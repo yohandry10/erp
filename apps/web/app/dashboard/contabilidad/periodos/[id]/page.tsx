@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { useApi } from '@/hooks/use-api'
 
 interface Periodo {
   id: string
@@ -28,6 +29,7 @@ export default function PeriodoDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [reopening, setReopening] = useState(false)
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -55,19 +57,8 @@ export default function PeriodoDetailPage() {
       setLoading(true)
       setError(null)
       
-      const response = await fetch(`/api/contabilidad/periodos/${periodoId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al obtener el período')
-      }
-
-      const result = await response.json()
-      setPeriodo(result.data)
+      const result = await apiCall(`/contabilidad/periodos/${periodoId}`)
+      setPeriodo(result?.data)
     } catch (err) {
       console.error('Error fetching período:', err)
       setError('Error al cargar el período contable')
@@ -115,19 +106,10 @@ export default function PeriodoDetailPage() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/contabilidad/periodos/${periodoId}/reabrir`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Error al reabrir el período')
+      const response = await apiCall(`/contabilidad/periodos/${periodoId}/reabrir`, { method: 'POST' })
+      if (response?.success === false) {
+        throw new Error(response.message || 'Error al reabrir el período')
       }
-
-      // Confirmación cerrada automáticamente por el componente
       await fetchPeriodo()
     } catch (err: any) {
       console.error('Error reopening período:', err)

@@ -12,6 +12,9 @@ import { UpdateOrdenCompraDto } from '../dto/update-orden-compra.dto';
 import { AprobarOrdenCompraDto } from '../dto/aprobar-orden-compra.dto';
 import { RechazarOrdenCompraDto } from '../dto/rechazar-orden-compra.dto';
 import { CancelarOrdenCompraDto } from '../dto/cancelar-orden-compra.dto';
+import { AuditService } from '../../audit/audit.service';
+import { CacheInvalidationService } from '../../../shared/cache/cache-invalidation.service';
+import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 
 describe('OrdenesCompraService', () => {
   let service: OrdenesCompraService;
@@ -21,6 +24,9 @@ describe('OrdenesCompraService', () => {
   let supabaseService: jest.Mocked<SupabaseService>;
   let notificationsService: jest.Mocked<NotificationsService>;
   let eventBusService: jest.Mocked<EventBusService>;
+  let auditService: jest.Mocked<AuditService>;
+  let cacheInvalidationService: jest.Mocked<CacheInvalidationService>;
+  let taxCalculatorService: jest.Mocked<TaxCalculatorService>;
 
   const mockOrdenCompra = {
     id: 'orden-123',
@@ -96,6 +102,22 @@ describe('OrdenesCompraService', () => {
       emitOrdenCompraAprobada: jest.fn().mockResolvedValue(undefined)
     };
 
+    const mockAuditService = {
+      registrarCambio: jest.fn().mockResolvedValue(undefined)
+    };
+
+    const mockCacheInvalidationService = {
+      onOrdenCompraCreated: jest.fn().mockResolvedValue(undefined)
+    };
+
+    const mockTaxCalculatorService = {
+      calcularImpuestos: jest.fn().mockResolvedValue({
+        subtotal: 10000,
+        igv: 1800,
+        total: 11800
+      })
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdenesCompraService,
@@ -122,6 +144,18 @@ describe('OrdenesCompraService', () => {
         {
           provide: EventBusService,
           useValue: mockEventBusService
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService
+        },
+        {
+          provide: CacheInvalidationService,
+          useValue: mockCacheInvalidationService
+        },
+        {
+          provide: TaxCalculatorService,
+          useValue: mockTaxCalculatorService
         }
       ]
     }).compile();
@@ -133,6 +167,9 @@ describe('OrdenesCompraService', () => {
     supabaseService = module.get(SupabaseService);
     notificationsService = module.get(NotificationsService);
     eventBusService = module.get(EventBusService);
+    auditService = module.get(AuditService);
+    cacheInvalidationService = module.get(CacheInvalidationService);
+    taxCalculatorService = module.get(TaxCalculatorService);
   });
 
   afterEach(() => {

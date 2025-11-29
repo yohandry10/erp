@@ -19,6 +19,7 @@ export class AccountingEntriesService {
   // HARDENING: usamos Logger para centralizar trazas y Map por tenant para evitar fugas.
   private readonly logger = new Logger(AccountingEntriesService.name);
   private cuentasCache: Map<string, string> = new Map();
+  private cuentasLoaded: Set<string> = new Set(); // tenants con cache inicializado
   private readonly cuentaFallbacks: Record<string, string[]> = {
     '101': ['10'],
     '104': ['10'],
@@ -35,21 +36,16 @@ export class AccountingEntriesService {
     private readonly periodosService: PeriodosService,
     private readonly tenantContext: TenantContextService,
   ) {
-    this.initializeCuentasCache();
     this.initializeEventListeners();
   }
 
-  // 🔓 Hacerla pública para poder llamarla desde app.module.ts
-  async initializeCuentasCache(): Promise<void> {
-    try {
-      const context = this.tenantContext.getContext();
-      const tenantId = context?.tenantId ?? null;
-      if (!tenantId) {
-        // HARDENING: evitamos inicializar cache global sin tenant para no mezclar planes contables.
-        this.logger.warn('⚠️ [AccountingEntries] Cache de cuentas no inicializado: tenant ausente.');
-        return;
-      }
+  // 🔓 Inicializa cache por tenant solo si no está cargado
+  private async initializeCuentasCache(tenantId: string): Promise<void> {
+    if (!tenantId || this.cuentasLoaded.has(tenantId)) {
+      return;
+    }
 
+    try {
       const { data: cuentas, error } = await this.supabase
         .getClient()
         .from('plan_cuentas')
@@ -67,6 +63,7 @@ export class AccountingEntriesService {
       this.logger.log(
         `✅ [AccountingEntries] Cache de cuentas inicializado para tenant ${tenantId}: ${cuentas?.length ?? 0} cuentas`,
       );
+      this.cuentasLoaded.add(tenantId);
     } catch (error) {
       this.logger.error('❌ [AccountingEntries] Error inicializando cache de cuentas:', error);
     }
@@ -78,6 +75,9 @@ export class AccountingEntriesService {
       // HARDENING: prevenir lecturas de cuentas sin tenant contextual.
       throw new Error('Tenant requerido para resolver cuentas contables');
     }
+
+    // Asegurar cache cargado para el tenant actual
+    await this.initializeCuentasCache(tenantId);
 
     const codesToTry = [codigo, ...(this.cuentaFallbacks[codigo] ?? [])];
     let lastError: Error | null = null;

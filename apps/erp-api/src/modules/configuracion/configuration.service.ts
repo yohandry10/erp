@@ -471,6 +471,8 @@ export class ConfigurationService {
           ose_username: config.ose_username,
           ose_password: config.ose_password,
           ose_activo: config.ose_activo || false,
+          // Logo de la empresa (multi-tenant)
+          logo_url: config.logoUrl || config.logoBase64 || null,
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'tenant_id'

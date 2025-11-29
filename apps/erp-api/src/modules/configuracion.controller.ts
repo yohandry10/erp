@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus, UseGuards, ForbiddenException, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, HttpException, HttpStatus, UseGuards, ForbiddenException, Req, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -7,14 +7,26 @@ import { RequirePermission } from '../common/decorators/require-permission.decor
 import { OseService } from './ose/ose.service';
 import { isProduction } from '../common/feature-flags';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { DocumentosService } from './documentos.service';
 
+/**
+ * @deprecated Este controlador está DEPRECADO. 
+ * Usar /api/configuration/* en su lugar (configuration.controller.ts)
+ * Los endpoints de este controlador se mantienen por compatibilidad pero
+ * serán eliminados en una versión futura.
+ * 
+ * Migración:
+ * - GET /configuracion/empresa → GET /api/configuration/empresa
+ * - PUT /configuracion/empresa → PUT /api/configuration/empresa
+ */
 @ApiTags('configuracion')
 @Controller('configuracion')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger configuración con permisos.
 export class ConfiguracionController {
   constructor(
     private readonly supabaseService: SupabaseService,
-    private readonly oseService: OseService
+    private readonly oseService: OseService,
+    private readonly documentosService: DocumentosService,
   ) {}
 
   private resolveTenantOrThrow(req: any): string {
@@ -260,50 +272,50 @@ export class ConfiguracionController {
 
   @Get('series')
   @ApiOperation({ summary: 'Obtener configuración de series de documentos' })
-  async getConfiguracionSeries() {
-    return {
-      success: true,
-      data: {
-        series: [
-          {
-            tipo: 'FACTURA',
-            serie: 'F001',
-            numeroActual: 1456,
-            estado: 'ACTIVO'
-          },
-          {
-            tipo: 'BOLETA', 
-            serie: 'B001',
-            numeroActual: 2890,
-            estado: 'ACTIVO'
-          },
-          {
-            tipo: 'NOTA_CREDITO',
-            serie: 'FC01',
-            numeroActual: 45,
-            estado: 'ACTIVO'
-          },
-          {
-            tipo: 'GUIA_REMISION',
-            serie: 'T001',
-            numeroActual: 234,
-            estado: 'ACTIVO'
-          }
-        ]
-      }
-    };
+  async getConfiguracionSeries(@CurrentTenant() tenantId: string) {
+    return this.documentosService.getSeries(tenantId);
   }
 
   @Put('series/:tipo')
   @ApiOperation({ summary: 'Actualizar configuración de serie' })
-  async updateSerie(@Param('tipo') tipo: string, @Body() serieData: any) {
-    console.log(`📄 Actualizando serie ${tipo}:`, serieData);
-    
-    // TODO: Implementar actualización real en BD
+  async updateSerie(
+    @Param('tipo') tipo: string,
+    @Body() serieData: any,
+    @CurrentTenant() tenantId: string,
+  ) {
+    const serie = (serieData.serie || tipo || '').toString().trim();
+    if (!serie) {
+      throw new BadRequestException('Debe enviar serie');
+    }
+
+    const payload = {
+      tenant_id: tenantId,
+      tipo_documento: tipo,
+      serie,
+      correlativo_actual: serieData.correlativo_actual ?? 0,
+      correlativo_maximo: serieData.correlativo_maximo ?? 99999999,
+      activo: serieData.activo !== false,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('documento_series')
+      .upsert(payload, { onConflict: 'tenant_id,tipo_documento,serie' })
+      .select()
+      .single();
+
+    if (error) {
+      throw new HttpException(
+        `Error actualizando serie ${tipo}: ${error.message}`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     return {
       success: true,
       message: `Serie ${tipo} actualizada exitosamente`,
-      data: { tipo, ...serieData }
+      data,
     };
   }
 

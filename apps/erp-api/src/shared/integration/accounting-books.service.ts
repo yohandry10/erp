@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { FiltrosContables } from './accounting.interfaces';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 function normalizePC(pc: any) {
   return Array.isArray(pc) ? pc?.[0] : pc;
@@ -8,17 +9,30 @@ function normalizePC(pc: any) {
 
 @Injectable()
 export class AccountingBooksService {
-  constructor(private readonly supabase: SupabaseService) {
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly tenantContext: TenantContextService,
+  ) {
     console.log('📚 [AccountingBooksService] Servicio de libros contables inicializado');
+  }
+
+  private resolveTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new Error('Tenant requerido para consultas contables');
+    }
+    return tenantId;
   }
 
   async getPlanCuentas() {
     try {
+      const tenantId = this.resolveTenantId();
       const { data: cuentas, error } = await this.supabase
         .getClient()
         .from('plan_cuentas')
         .select('*')
         .eq('activo', true)
+        .eq('tenant_id', tenantId)
         .order('codigo');
 
       if (error) throw error;
@@ -31,6 +45,7 @@ export class AccountingBooksService {
 
   async getAsientosContables(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta, numeroAsiento, estado } = filtros;
 
       let query = this.supabase
@@ -48,6 +63,7 @@ export class AccountingBooksService {
           )
         `,
         )
+        .eq('tenant_id', tenantId)
         .order('fecha', { ascending: false })
         .order('numero_asiento', { ascending: false });
 
@@ -68,6 +84,7 @@ export class AccountingBooksService {
 
   async getLibroMayorPorCuenta(cuentaCodigo: string, filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -89,6 +106,7 @@ export class AccountingBooksService {
         `,
         )
         .eq('plan_cuentas.codigo', cuentaCodigo)
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha', { ascending: true });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -114,6 +132,7 @@ export class AccountingBooksService {
 
   async getLibroMayorCompleto(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -134,6 +153,7 @@ export class AccountingBooksService {
           )
         `,
         )
+        .eq('tenant_id', tenantId)
         .order('plan_cuentas.codigo')
         .order('asientos_contables.fecha', { ascending: true });
 
@@ -171,6 +191,7 @@ export class AccountingBooksService {
 
   async getLibroDiario(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta, numeroAsiento } = filtros;
 
       let query = this.supabase
@@ -189,6 +210,7 @@ export class AccountingBooksService {
         `,
         )
         .eq('estado', 'CONFIRMADO')
+        .eq('tenant_id', tenantId)
         .order('fecha', { ascending: true })
         .order('numero_asiento', { ascending: true });
 
@@ -208,6 +230,7 @@ export class AccountingBooksService {
 
   async getBalanceComprobacion(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -229,6 +252,7 @@ export class AccountingBooksService {
         `,
         );
 
+      query = query.eq('tenant_id', tenantId);
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
 
@@ -266,6 +290,7 @@ export class AccountingBooksService {
 
   async getKardexValorizado(filtros: any = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { productoId, fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -281,6 +306,7 @@ export class AccountingBooksService {
           )
         `,
         )
+        .eq('tenant_id', tenantId)
         .order('fecha', { ascending: true });
 
       if (productoId) query = query.eq('producto_id', productoId);
@@ -317,6 +343,7 @@ export class AccountingBooksService {
 
   async getLibroCajaBancos(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta, cuentaCodigo } = filtros;
 
       // Cuentas de caja y bancos (10xxx)
@@ -341,6 +368,7 @@ export class AccountingBooksService {
         `,
         )
         .in('plan_cuentas.codigo', cuentasCajaBancos)
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha', { ascending: true });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -377,6 +405,7 @@ export class AccountingBooksService {
 
   async getLibroInventariosBalances(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -397,6 +426,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '20%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha', { ascending: true });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -437,6 +467,7 @@ export class AccountingBooksService {
 
   async getRegistroActivosFijos(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -450,6 +481,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '33%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -467,6 +499,7 @@ export class AccountingBooksService {
 
   async getLibroPlanillas(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -480,6 +513,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '62%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -497,6 +531,7 @@ export class AccountingBooksService {
 
   async getRegistroCostos(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -510,6 +545,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '9%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -527,6 +563,7 @@ export class AccountingBooksService {
 
   async getLibrosElectronicosSunat(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -541,6 +578,7 @@ export class AccountingBooksService {
           )
         `,
         )
+        .eq('tenant_id', tenantId)
         .order('fecha');
 
       if (fechaDesde) query = query.gte('fecha', fechaDesde);
@@ -558,6 +596,7 @@ export class AccountingBooksService {
 
   async getRegistroVentas(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -571,6 +610,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '70%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -588,6 +628,7 @@ export class AccountingBooksService {
 
   async getRegistroCompras(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -601,6 +642,7 @@ export class AccountingBooksService {
         `,
         )
         .like('plan_cuentas.codigo', '60%')
+        .eq('tenant_id', tenantId)
         .order('asientos_contables.fecha');
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -618,6 +660,7 @@ export class AccountingBooksService {
 
   async getRegistroConsignaciones(filtros: FiltrosContables = {}) {
     try {
+      const tenantId = this.resolveTenantId();
       const { fechaDesde, fechaHasta } = filtros;
 
       let query = this.supabase
@@ -630,6 +673,7 @@ export class AccountingBooksService {
             productos(codigo, nombre, categoria)
           )
         `)
+        .eq('tenant_id', tenantId)
         .order('fecha_registro', { ascending: false });
 
       if (fechaDesde) query = query.gte('fecha_registro', fechaDesde);
@@ -647,10 +691,12 @@ export class AccountingBooksService {
 
   async createConsignacion(consignacionData: any) {
     try {
+      const tenantId = this.resolveTenantId();
+      const payload = { ...consignacionData, tenant_id: consignacionData?.tenant_id ?? tenantId };
       const { data: consignacion, error } = await this.supabase
         .getClient()
         .from('registro_consignaciones')
-        .insert(consignacionData)
+        .insert(payload)
         .select()
         .single();
 
@@ -664,11 +710,13 @@ export class AccountingBooksService {
 
   async updateEstadoConsignacion(id: string, nuevoEstado: string) {
     try {
+      const tenantId = this.resolveTenantId();
       const { data, error } = await this.supabase
         .getClient()
         .from('registro_consignaciones')
         .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
         .eq('id', id)
+        .eq('tenant_id', tenantId)
         .select()
         .single();
 

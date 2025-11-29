@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { EventBusService, CierreVentasDiarioEvent, ProductoStockBajoEvent, VencimientoPagoEvent, ReporteSireGeneradoEvent, InventarioCiclicoEvent } from '../events/event-bus.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class BackgroundJobsService {
@@ -15,27 +16,45 @@ export class BackgroundJobsService {
 
   private initializeJobs() {
     console.log('🤖 [BackgroundJobs] Inicializando procesos automáticos...');
-    
+
+    if (process.env.BACKGROUND_JOBS_ENABLED === 'false') {
+      console.log('⏸️ [BackgroundJobs] Deshabilitado por env BACKGROUND_JOBS_ENABLED=false');
+      return;
+    }
+
+    if (process.env.BACKGROUND_JOBS_LEADER !== 'true') {
+      console.log('⏸️ [BackgroundJobs] Saltando schedule en esta instancia (BACKGROUND_JOBS_LEADER!=true)');
+      return;
+    }
+
     // Cierre de ventas diario - 11:59 PM todos los días
-    this.scheduleDaily('23:59:00', () => this.ejecutarCierreVentasDiario());
+    this.scheduleDaily('23:59:00', () => this.runPerTenant('cierre-ventas', (t) => this.ejecutarCierreVentasDiario(t)));
     
     // Verificación de stock bajo - cada 2 horas durante horario comercial
-    this.scheduleInterval(2 * 60 * 60 * 1000, () => this.verificarStockBajo());
+    this.scheduleInterval(2 * 60 * 60 * 1000, () => this.runPerTenant('stock-bajo', (t) => this.verificarStockBajo(t)));
     
     // Verificación de vencimientos - cada día a las 8:00 AM
-    this.scheduleDaily('08:00:00', () => this.verificarVencimientosPagos());
+    this.scheduleDaily('08:00:00', () => this.runPerTenant('vencimientos', (t) => this.verificarVencimientosPagos(t)));
     
     // Generación automática de reportes SIRE - primer día del mes a las 9:00 AM
-    this.scheduleMonthly(1, '09:00:00', () => this.generarReportesSireMensual());
+    this.scheduleMonthly(1, '09:00:00', () => this.runPerTenant('sire', (t) => this.generarReportesSireMensual(t)));
     
     // Consolidación de métricas del dashboard - cada 30 minutos
-    this.scheduleInterval(30 * 60 * 1000, () => this.actualizarMetricasDashboard());
+    this.scheduleInterval(30 * 60 * 1000, () => this.runPerTenant('metricas-dashboard', (t) => this.actualizarMetricasDashboard(t)));
     
-    // Inventario cíclico - cada lunes a las 6:00 AM
-    this.scheduleWeekly(1, '06:00:00', () => this.ejecutarInventarioCiclico());
+    // Inventario cíclico - cada lunes a las 6:00 AM (opcional)
+    if (process.env.BACKGROUND_JOBS_INVENTARIO_ENABLED === 'true') {
+      this.scheduleWeekly(1, '06:00:00', () => this.runPerTenant('inventario-ciclico', (t) => this.ejecutarInventarioCiclico(t)));
+    } else {
+      console.log('⏸️ [BackgroundJobs] Inventario cíclico deshabilitado (BACKGROUND_JOBS_INVENTARIO_ENABLED!=true)');
+    }
     
-    // Procesamiento de asistencias pendientes - cada hora
-    this.scheduleInterval(60 * 60 * 1000, () => this.procesarAsistenciasPendientes());
+    // Procesamiento de asistencias pendientes - cada hora (opcional)
+    if (process.env.BACKGROUND_JOBS_ASISTENCIAS_ENABLED === 'true') {
+      this.scheduleInterval(60 * 60 * 1000, () => this.runPerTenant('asistencias', (t) => this.procesarAsistenciasPendientes(t)));
+    } else {
+      console.log('⏸️ [BackgroundJobs] Asistencias pendientes deshabilitado (BACKGROUND_JOBS_ASISTENCIAS_ENABLED!=true)');
+    }
   }
 
   // ========== GESTIÓN DE SCHEDULING ==========
@@ -115,18 +134,119 @@ export class BackgroundJobsService {
 
   // ========== JOBS AUTOMÁTICOS ==========
 
-  async ejecutarCierreVentasDiario() {
+  private async runPerTenant(
+    jobName: string,
+    perTenant: (tenantId: string) => Promise<void> | void,
+  ) {
+    const tenants = await this.fetchTenants();
+    for (const tenantId of tenants) {
+      const lockKey = `${jobName}:${tenantId}`;
+      const acquired = await this.tryAcquireLock(lockKey);
+      if (!acquired) {
+        await this.logJob(jobName, tenantId, 'SKIP', 'Lock no adquirido');
+        continue;
+      }
+
+      try {
+        await this.tenantContext.run(
+          { tenantId, userId: null, supabaseAccessToken: null, isSuperAdmin: true },
+          async () => {
+            await this.supabase.prepareTenantContext();
+            await perTenant(tenantId);
+          },
+        );
+        await this.logJob(jobName, tenantId, 'SUCCESS');
+      } catch (err: any) {
+        await this.logJob(jobName, tenantId, 'ERROR', err?.message || String(err));
+      } finally {
+        await this.releaseLock(lockKey);
+      }
+    }
+  }
+
+  private async fetchTenants(): Promise<string[]> {
     try {
-      console.log('🌙 [BackgroundJobs] Iniciando cierre de ventas diario...');
+      const { data, error } = await this.supabase.getPublicClient()
+        .from('tenants')
+        .select('id')
+        .eq('estado', 'ACTIVO');
+      if (error) {
+        console.error('❌ [BackgroundJobs] Error obteniendo tenants:', error);
+        return [];
+      }
+      return (data || []).map((t: any) => t.id).filter(Boolean);
+    } catch (err: any) {
+      console.error('❌ [BackgroundJobs] Excepción obteniendo tenants:', err);
+      return [];
+    }
+  }
+
+  private async tryAcquireLock(lockKey: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .getPublicClient()
+        .rpc('acquire_job_lock', {
+          p_lock_key: lockKey,
+          p_lock_ttl_seconds: 300,
+        });
+      if (error) {
+        console.warn(`⚠️ [BackgroundJobs] No se pudo adquirir lock ${lockKey}: ${error.message}`);
+        return false;
+      }
+      return data === true || data === 'true';
+    } catch (err: any) {
+      console.warn(`⚠️ [BackgroundJobs] Error adquiriendo lock ${lockKey}: ${err?.message || err}`);
+      return false;
+    }
+  }
+
+  private async releaseLock(lockKey: string): Promise<void> {
+    try {
+      await this.supabase
+        .getPublicClient()
+        .rpc('release_job_lock', { p_lock_key: lockKey });
+    } catch (err: any) {
+      console.warn(`⚠️ [BackgroundJobs] Error liberando lock ${lockKey}: ${err?.message || err}`);
+    }
+  }
+
+  private async logJob(jobName: string, tenantId: string, status: 'SUCCESS' | 'ERROR' | 'SKIP', errorMessage?: string) {
+    try {
+      await this.supabase.getPublicClient()
+        .from('integration_logs')
+        .insert({
+          id: uuidv4(),
+          tenant_id: tenantId,
+          servicio: 'BACKGROUND_JOBS',
+          operacion: jobName,
+          status,
+          error_message: errorMessage || null,
+          timestamp: new Date().toISOString(),
+        });
+    } catch (err) {
+      console.warn(`⚠️ [BackgroundJobs] No se pudo registrar log de ${jobName} (${tenantId}): ${err?.message || err}`);
+    }
+  }
+
+  private nowInLima(): Date {
+    const now = new Date();
+    const peruString = now.toLocaleString('en-US', { timeZone: 'America/Lima' });
+    return new Date(peruString);
+  }
+
+  async ejecutarCierreVentasDiario(tenantId: string) {
+    try {
+      console.log(`🌙 [BackgroundJobs] Iniciando cierre de ventas diario (tenant ${tenantId})...`);
       
       const hoy = new Date().toISOString().split('T')[0];
       
       // Usar query builder de Supabase en lugar de getClient directamente
-      const ventasQuery = this.supabase.query('pos_ventas')
+      const ventasQuery = this.supabase.query('ventas_pos')
         .select(`
           *,
-          pos_venta_items(*)
+          detalle_ventas_pos(*)
         `)
+        .eq('tenant_id', tenantId)
         .gte('created_at', `${hoy}T00:00:00`)
         .lt('created_at', `${hoy}T23:59:59`);
 
@@ -153,8 +273,8 @@ export class BackgroundJobsService {
       // Productos vendidos
       const productosVendidos: Record<string, { cantidad: number; montoVendido: number }> = {};
       ventas.forEach(venta => {
-        if (venta.pos_venta_items) {
-          venta.pos_venta_items.forEach((item: any) => {
+        if (venta.detalle_ventas_pos) {
+          venta.detalle_ventas_pos.forEach((item: any) => {
             const productoId = item.producto_id;
             if (!productosVendidos[productoId]) {
               productosVendidos[productoId] = { cantidad: 0, montoVendido: 0 };
@@ -191,105 +311,60 @@ export class BackgroundJobsService {
     }
   }
 
-  async verificarStockBajo() {
+  async verificarStockBajo(tenantId: string) {
     try {
-      console.log('📦 [BackgroundJobs] Verificando productos con stock bajo...');
-      
-      // Obtener todos los tenants activos
-      const { data: tenants, error: tenantsError } = await this.supabase.getClient()
-        .from('tenants')
-        .select('id, nombre')
-        .eq('activo', true);
+      console.log(`📦 [BackgroundJobs] Verificando productos con stock bajo (tenant ${tenantId})...`);
+      const { data: productos, error } = await this.supabase.getClient()
+        .from('productos')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .gt('stock_minimo', 0);
 
-      if (tenantsError) {
-        console.error('❌ [BackgroundJobs] Error obteniendo tenants:', tenantsError);
+      if (error) {
+        console.error(`❌ [BackgroundJobs] Error obteniendo productos para tenant ${tenantId}:`, error);
         return;
       }
 
-      if (!tenants || tenants.length === 0) {
-        console.log('ℹ️ [BackgroundJobs] No hay tenants activos');
+      if (!productos || productos.length === 0) {
+        console.log(`ℹ️ [BackgroundJobs] No hay productos para evaluar en tenant ${tenantId}`);
         return;
       }
 
-      console.log(`📦 [BackgroundJobs] Verificando stock para ${tenants.length} tenants`);
+      const productosStockBajo = productos.filter(producto =>
+        parseFloat(producto.stock_actual || '0') <= parseFloat(producto.stock_minimo || '0')
+      );
 
-      let totalProductosStockBajo = 0;
-
-      // Procesar cada tenant con su contexto
-      for (const tenant of tenants) {
-        try {
-          // Establecer contexto de tenant para las consultas (permite operaciones multi-tenant)
-          await Promise.resolve(this.tenantContext.run(
-            {
-              tenantId: tenant.id,
-              isSuperAdmin: false, // Background jobs no son super admin
-            },
-            async () => {
-              const { data: productos, error } = await this.supabase.getClient()
-                .from('productos')
-                .select('*')
-                .eq('tenant_id', tenant.id)
-                .gt('stock_minimo', 0);
-
-              if (error) {
-                console.error(`❌ [BackgroundJobs] Error obteniendo productos para tenant ${tenant.id}:`, error);
-                return;
-              }
-
-              if (!productos || productos.length === 0) {
-                return;
-              }
-
-              // Filtrar productos con stock bajo
-              const productosStockBajo = productos.filter(producto => 
-                parseFloat(producto.stock_actual || '0') <= parseFloat(producto.stock_minimo || '0')
-              );
-
-              if (productosStockBajo.length === 0) {
-                return;
-              }
-
-              console.log(`⚠️ [BackgroundJobs] Tenant ${tenant.nombre}: ${productosStockBajo.length} productos con stock bajo`);
-
-              // Emitir eventos para cada producto con stock bajo
-              for (const producto of productosStockBajo) {
-                const eventoStockBajo: ProductoStockBajoEvent = {
-                  productoId: producto.id,
-                  codigoProducto: producto.codigo || producto.id,
-                  nombreProducto: producto.nombre || 'Producto sin nombre',
-                  stockActual: parseFloat(producto.stock_actual || '0'),
-                  stockMinimo: parseFloat(producto.stock_minimo || '0'),
-                  valorInventario: parseFloat(producto.stock_actual || '0') * parseFloat(producto.precio_venta || '0'),
-                  ubicacion: producto.ubicacion,
-                  proveedor: producto.proveedor_principal,
-                  fechaVerificacion: new Date().toISOString()
-                };
-
-                await this.eventBus.emitProductoStockBajo(eventoStockBajo, tenant.id);
-                totalProductosStockBajo++;
-              }
-            }
-          ));
-        } catch (error) {
-          console.error(`❌ [BackgroundJobs] Error procesando tenant ${tenant.id}:`, error);
-          // Continuar con otros tenants aunque uno falle
-        }
+      if (productosStockBajo.length === 0) {
+        console.log(`✅ [BackgroundJobs] Stock adecuado para tenant ${tenantId}`);
+        return;
       }
 
-      if (totalProductosStockBajo === 0) {
-        console.log('✅ [BackgroundJobs] Todos los productos tienen stock adecuado');
-      } else {
-        console.log(`📦 [BackgroundJobs] Eventos de stock bajo emitidos para ${totalProductosStockBajo} productos`);
+      for (const producto of productosStockBajo) {
+        const eventoStockBajo: ProductoStockBajoEvent = {
+          productoId: producto.id,
+          codigoProducto: (producto as any).codigo || producto.id,
+          nombreProducto: producto.nombre || 'Producto sin nombre',
+          stockActual: parseFloat(producto.stock_actual || '0'),
+          stockMinimo: parseFloat(producto.stock_minimo || '0'),
+          valorInventario: parseFloat(producto.stock_actual || '0') * parseFloat(producto.precio_venta || '0'),
+          ubicacion: (producto as any).ubicacion,
+          proveedor: (producto as any).proveedor_principal,
+          fechaVerificacion: new Date().toISOString()
+        };
+
+        await this.eventBus.emitProductoStockBajo(eventoStockBajo, tenantId);
       }
+
+      console.log(`📦 [BackgroundJobs] Eventos de stock bajo emitidos para ${productosStockBajo.length} productos (tenant ${tenantId})`);
       
     } catch (error) {
       console.error('❌ [BackgroundJobs] Error verificando stock bajo:', error);
     }
   }
 
-  async verificarVencimientosPagos() {
+  async verificarVencimientosPagos(tenantId: string) {
     try {
-      console.log('💰 [BackgroundJobs] Verificando vencimientos de pagos...');
+      console.log(`💰 [BackgroundJobs] Verificando vencimientos de pagos (tenant ${tenantId})...`);
       
       // TODO: Implement isMockMode() in SupabaseService if needed
       // if (this.supabase.isMockMode()) {
@@ -301,25 +376,35 @@ export class BackgroundJobsService {
       const proximaSemanaNuestra = new Date();
       proximaSemanaNuestra.setDate(hoy.getDate() + 7);
 
-      const facturasQuery = this.supabase.query('cpe_documentos')
+      // Usar tabla disponible en schema público
+      const facturasQuery = this.supabase.query('documentos')
         .select('*')
-        .eq('es_credito', true)
-        .neq('estado_pago', 'PAGADO')
+        .eq('tenant_id', tenantId)
         .lte('fecha_vencimiento', proximaSemanaNuestra.toISOString().split('T')[0]);
 
       const { data: facturas, error } = await facturasQuery;
 
       if (error) throw error;
 
-      if (!facturas || facturas.length === 0) {
+      const facturasFiltradas = (facturas || []).filter((factura: any) => {
+        const estadoPago = (factura as any)?.estado_pago;
+        const saldoPendiente = Number((factura as any)?.saldo_pendiente ?? 0);
+        const total = Number((factura as any)?.total ?? 0);
+        const fechaVenc = (factura as any)?.fecha_vencimiento;
+        if (!fechaVenc) return false;
+        const fechaV = new Date(fechaVenc);
+        return (estadoPago ? estadoPago !== 'PAGADO' : true) && (saldoPendiente > 0 || total > 0);
+      });
+
+      if (facturasFiltradas.length === 0) {
         console.log('✅ [BackgroundJobs] No hay facturas próximas a vencer');
         return;
       }
 
-      console.log(`⚠️ [BackgroundJobs] Encontradas ${facturas.length} facturas con vencimientos próximos`);
+      console.log(`⚠️ [BackgroundJobs] Encontradas ${facturasFiltradas.length} facturas con vencimientos próximos`);
 
       // Procesar cada factura
-      for (const factura of facturas) {
+      for (const factura of facturasFiltradas) {
         const fechaVencimiento = new Date(factura.fecha_vencimiento);
         const diasVencido = Math.floor((hoy.getTime() - fechaVencimiento.getTime()) / (1000 * 60 * 60 * 24));
         const montoVencido = parseFloat(factura.saldo_pendiente || factura.total || '0');
@@ -345,9 +430,9 @@ export class BackgroundJobsService {
     }
   }
 
-  async generarReportesSireMensual() {
+  async generarReportesSireMensual(tenantId: string) {
     try {
-      console.log('📊 [BackgroundJobs] Generando reportes SIRE mensuales automáticos...');
+      console.log(`📊 [BackgroundJobs] Generando reportes SIRE mensuales automáticos (tenant ${tenantId})...`);
       
       const mesAnterior = new Date();
       mesAnterior.setMonth(mesAnterior.getMonth() - 1);
@@ -372,7 +457,7 @@ export class BackgroundJobsService {
         return;
       }
 
-      const ventasQuery = this.supabase.query('pos_ventas')
+      const ventasQuery = this.supabase.query('ventas_pos')
         .select('*')
         .gte('created_at', `${periodo}-01T00:00:00`)
         .lt('created_at', `${periodo}-31T23:59:59`);
@@ -409,7 +494,7 @@ export class BackgroundJobsService {
     }
   }
 
-  async actualizarMetricasDashboard() {
+  async actualizarMetricasDashboard(tenantId: string) {
     try {
       const hoy = new Date().toISOString().split('T')[0];
       const mesActual = new Date().toISOString().substring(0, 7);
@@ -442,14 +527,14 @@ export class BackgroundJobsService {
       }
 
       // Obtener métricas básicas en paralelo usando query builder
-      const cpeQuery = this.supabase.query('cpe_documentos').select('id', { count: 'exact' });
-      const greQuery = this.supabase.query('gre_documentos').select('id', { count: 'exact' });
-      const usersQuery = this.supabase.query('usuarios_sistema').select('id', { count: 'exact' });
-      const productosQuery = this.supabase.query('productos').select('*');
-      const ventasHoyQuery = this.supabase.query('pos_ventas').select('total').gte('created_at', `${hoy}T00:00:00`);
-      const ventasMesQuery = this.supabase.query('pos_ventas').select('total').gte('created_at', `${mesActual}-01T00:00:00`);
-      const comprasQuery = this.supabase.query('orden_compra').select('total').gte('created_at', `${mesActual}-01T00:00:00`);
-      const cotizacionesQuery = this.supabase.query('cotizaciones').select('*');
+      const cpeQuery = this.supabase.query('cpe_documentos').select('id', { count: 'exact' }).eq('tenant_id', tenantId);
+      const greQuery = this.supabase.query('gre_documentos').select('id', { count: 'exact' }).eq('tenant_id', tenantId);
+      const usersQuery = this.supabase.query('usuarios_sistema').select('id', { count: 'exact' }).eq('tenant_id', tenantId);
+      const productosQuery = this.supabase.query('productos').select('*').eq('tenant_id', tenantId);
+      const ventasHoyQuery = this.supabase.query('ventas_pos').select('total').eq('tenant_id', tenantId).gte('created_at', `${hoy}T00:00:00`);
+      const ventasMesQuery = this.supabase.query('ventas_pos').select('total').eq('tenant_id', tenantId).gte('created_at', `${mesActual}-01T00:00:00`);
+      const comprasQuery = this.supabase.query('orden_compra').select('total').eq('tenant_id', tenantId).gte('created_at', `${mesActual}-01T00:00:00`);
+      const cotizacionesQuery = this.supabase.query('cotizaciones').select('*').eq('tenant_id', tenantId);
 
       const [
         { data: cpeData },
@@ -515,19 +600,16 @@ export class BackgroundJobsService {
     }
   }
 
-  async ejecutarInventarioCiclico() {
+  async ejecutarInventarioCiclico(tenantId: string) {
+    if (process.env.BACKGROUND_JOBS_INVENTARIO_ENABLED !== 'true') {
+      return;
+    }
     try {
-      console.log('📋 [BackgroundJobs] Ejecutando inventario cíclico automático...');
+      console.log(`📋 [BackgroundJobs] Ejecutando inventario cíclico automático (tenant ${tenantId})...`);
       
-      // TODO: Implement isMockMode() in SupabaseService if needed
-      const isMockMode = false; // Placeholder
-      if (isMockMode) {
-        console.log('📋 [BackgroundJobs] Inventario cíclico en modo mock - simulado');
-        return;
-      }
-
       const productosQuery = this.supabase.query('productos')
         .select('*')
+        .eq('tenant_id', tenantId)
         .limit(50)
         .order('updated_at', { ascending: true });
 
@@ -568,22 +650,46 @@ export class BackgroundJobsService {
     }
   }
 
-  async procesarAsistenciasPendientes() {
+  async procesarAsistenciasPendientes(tenantId: string) {
+    if (process.env.BACKGROUND_JOBS_ASISTENCIAS_ENABLED !== 'true') {
+      return;
+    }
     try {
-      // TODO: Implement isMockMode() in SupabaseService if needed
-      const isMockMode = false; // Placeholder
-      if (isMockMode) {
-        return; // Skip en modo mock
+      const nowLima = this.nowInLima();
+      const hoy = nowLima.toISOString().split('T')[0];
+
+      // Saltar feriados (si existe tabla feriados)
+      try {
+        const { data: feriados } = await this.supabase.getClient()
+          .from('feriados')
+          .select('fecha')
+          .eq('fecha', hoy)
+          .eq('pais', 'PE');
+        if (feriados && feriados.length > 0) {
+          console.log('⏸️ [BackgroundJobs] Día feriado en PE, no se marcan ausencias');
+          return;
+        }
+      } catch {
+        // Ignorar si tabla no existe
       }
 
-      const hoy = new Date().toISOString().split('T')[0];
+      // Solo marcar ausentes después de las 18:00 hora Lima (jornada diurna típica de 8h)
+      if (nowLima.getHours() < 18) {
+        return;
+      }
 
-      const empleadosQuery = this.supabase.query('empleados')
-        .select('*')
-        .eq('estado', 'ACTIVO');
+      const client = this.supabase.getClient();
 
-      const asistenciasQuery = this.supabase.query('asistencias')
-        .select('empleado_id')
+      const empleadosQuery = client
+        .from('empleados')
+        .select('id')
+        .eq('estado', 'ACTIVO')
+        .eq('tenant_id', tenantId);
+
+      const asistenciasQuery = client
+        .from('asistencias')
+        .select('empleado_id, estado')
+        .eq('tenant_id', tenantId)
         .eq('fecha', hoy);
 
       const [
@@ -597,18 +703,32 @@ export class BackgroundJobsService {
       const empleadosConAsistencia = new Set(asistenciasHoy?.map(a => a.empleado_id) || []);
       const empleadosSinAsistencia = empleados?.filter(emp => !empleadosConAsistencia.has(emp.id)) || [];
 
-      const horaActual = new Date().getHours();
-      if (horaActual >= 10) {
-        for (const empleado of empleadosSinAsistencia) {
-          this.eventBus.emitEmpleadoAsistencia({
-            empleadoId: empleado.id,
-            fecha: hoy,
-            horasExtras: 0,
-            tipoTurno: 'REGULAR',
-            estado: 'AUSENTE',
-            requierePlanilla: true
-          });
+      for (const empleado of empleadosSinAsistencia) {
+        // Insertar asistencia ausente (idempotente por empleado/fecha)
+        try {
+          await client
+            .from('asistencias')
+            .insert({
+              empleado_id: empleado.id,
+              tenant_id: tenantId,
+              fecha: hoy,
+              estado: 'AUSENTE',
+              horas_trabajadas: 0,
+              hora_entrada: null,
+              hora_salida: null,
+            });
+        } catch (err: any) {
+          console.warn(`⚠️ [BackgroundJobs] No se pudo insertar ausencia para empleado ${empleado.id}:`, err?.message || err);
         }
+
+        this.eventBus.emitEmpleadoAsistencia({
+          empleadoId: empleado.id,
+          fecha: hoy,
+          horasExtras: 0,
+          tipoTurno: 'REGULAR',
+          estado: 'AUSENTE',
+          requierePlanilla: true
+        });
       }
       
     } catch (error) {

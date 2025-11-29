@@ -6,6 +6,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
 
 describe('DevolucionesProveedorService', () => {
@@ -14,6 +15,7 @@ describe('DevolucionesProveedorService', () => {
   let supabaseService: jest.Mocked<SupabaseService>;
   let inventarioService: jest.Mocked<InventarioService>;
   let eventBusService: jest.Mocked<EventBusService>;
+  let eventEmitter: jest.Mocked<EventEmitterService>;
 
   const mockDevolucion = {
     id: 'devolucion-123',
@@ -83,7 +85,11 @@ describe('DevolucionesProveedorService', () => {
     };
 
     const mockEventBusService = {
-      emit: jest.fn()
+      emit: jest.fn(),
+      emitDevolucionProveedorEmitida: jest.fn()
+    };
+    const mockEventEmitterService = {
+      emit: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -106,9 +112,17 @@ describe('DevolucionesProveedorService', () => {
           useValue: mockEventBusService
         },
         {
+          provide: EventEmitterService,
+          useValue: mockEventEmitterService
+        },
+        {
           provide: TaxCalculatorService,
           useValue: {
-            calcularImpuestos: jest.fn().mockResolvedValue({ igv: 0, total: 0 })
+            calcularImpuestos: jest.fn().mockImplementation(({ subtotal }) => {
+              const igv = Math.round(subtotal * 0.18);
+              const total = subtotal + igv;
+              return Promise.resolve({ igv, total });
+            })
           }
         }
       ]
@@ -119,6 +133,7 @@ describe('DevolucionesProveedorService', () => {
     supabaseService = module.get(SupabaseService);
     inventarioService = module.get(InventarioService);
     eventBusService = module.get(EventBusService);
+    eventEmitter = module.get(EventEmitterService) as jest.Mocked<EventEmitterService>;
 
     // Default resolve to avoid undefined in tests that don't override
     mockSupabaseClient.single.mockResolvedValue({ data: null, error: null });
@@ -410,17 +425,19 @@ describe('DevolucionesProveedorService', () => {
         'EMITIDA',
         'user-123'
       );
-      expect(eventBusService.emit).toHaveBeenCalledWith(
-        'devolucion.proveedor.emitida',
+      expect(eventBusService.emitDevolucionProveedorEmitida).toHaveBeenCalledWith(
         expect.objectContaining({
-          devolucion_id: 'devolucion-123',
-          numero: 'DEV-2024-0001',
-          proveedor_id: 'proveedor-123',
-          orden_id: 'orden-123',
+          devolucionId: 'devolucion-123',
+          numeroDevolucion: 'DEV-2024-0001',
+          proveedorId: 'proveedor-123',
+          ordenId: 'orden-123',
           total: 11800
-        }),
-        'compras'
+        })
       );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(expect.objectContaining({
+        eventType: 'devolucion.proveedor.registrada',
+        aggregateType: 'devolucion_proveedor',
+      }));
     });
 
     it('should throw NotFoundException when devolucion not found', async () => {

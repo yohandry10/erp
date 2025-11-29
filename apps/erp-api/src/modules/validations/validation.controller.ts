@@ -17,6 +17,8 @@ import {
   RucValidationResult,
   DocumentValidationResult,
   ValidationStatusResponse,
+  ValidateDniLookupDto,
+  DniLookupResult,
 } from './validation.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -87,5 +89,16 @@ export class ValidationController {
     @CurrentTenant() tenantId: string,
   ): Promise<ValidationStatusResponse> {
     return this.validationService.getValidationStatus(tenantId);
+  }
+
+  @Post('dni-lookup')
+  @RequirePermission('validations.run')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Autocompletar datos de DNI desde ApiPeru (padrón público)' })
+  @ApiResponse({ status: 200, description: 'Datos de DNI', type: Object })
+  async lookupDni(
+    @Body() dto: ValidateDniLookupDto,
+  ): Promise<DniLookupResult> {
+    return this.validationService.lookupDni(dto);
   }
 }

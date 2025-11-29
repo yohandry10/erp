@@ -1706,3 +1706,39 @@ label {
     padding-right: 1.5rem;
   }
 }
+
+/* ==============================
+   POS - CONSISTENCIA VISUAL
+   ============================== */
+.pos-page {
+  max-width: 100%;
+  padding: 1.25rem;
+}
+
+.pos-header {
+  margin-bottom: 1.5rem;
+}
+
+.pos-page .stat-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.pos-page table {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.pos-page th {
+  background: var(--primary-50);
+  color: var(--primary-700);
+}
+
+.pos-page input,
+.pos-page select,
+.pos-page textarea {
+  border-radius: 8px;
+  border: 1px solid var(--primary-300);
+}

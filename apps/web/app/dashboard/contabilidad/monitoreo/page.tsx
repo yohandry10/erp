@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Activity, CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 interface EventStats {
   pending: number
@@ -41,6 +42,7 @@ export default function MonitoreoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const { apiCall: apiGet } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   useEffect(() => {
     fetchData()
@@ -52,45 +54,14 @@ export default function MonitoreoPage() {
   const fetchData = async () => {
     try {
       setError(null)
-      
-      // Fetch statistics
-      const statsResponse = await fetch('/api/contabilidad/eventos/estadisticas', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      const statsResult = await apiGet('/contabilidad/eventos/estadisticas')
+      if (statsResult?.data) setStats(statsResult.data)
 
-      if (statsResponse.ok) {
-        const statsResult = await statsResponse.json()
-        setStats(statsResult.data || stats)
-      }
+      const failedResult = await apiGet('/contabilidad/eventos/fallidos?limit=10')
+      if (failedResult?.data) setEventosFallidos(failedResult.data || [])
 
-      // Fetch failed events
-      const failedResponse = await fetch('/api/contabilidad/eventos/fallidos?limit=10', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (failedResponse.ok) {
-        const failedResult = await failedResponse.json()
-        setEventosFallidos(failedResult.data || [])
-      }
-
-      // Fetch asientos por tipo
-      const asientosTipoResponse = await fetch('/api/contabilidad/asientos/estadisticas/por-tipo', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (asientosTipoResponse.ok) {
-        const asientosTipoResult = await asientosTipoResponse.json()
-        setAsientosPorTipo(asientosTipoResult.data || [])
-      }
+      const asientosTipoResult = await apiGet('/contabilidad/asientos/estadisticas/por-tipo')
+      if (asientosTipoResult?.data) setAsientosPorTipo(asientosTipoResult.data || [])
     } catch (err) {
       console.error('Error fetching monitoring data:', err)
       setError('Error al cargar datos de monitoreo')
@@ -107,19 +78,11 @@ export default function MonitoreoPage() {
 
   const handleRetry = async (eventId: string) => {
     try {
-      const response = await fetch(`/api/contabilidad/eventos/${eventId}/reintentar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.ok) {
-        // Refresh data after retry
-        fetchData()
-      } else {
-        console.error('Error retrying event')
+      const response = await apiGet(`/contabilidad/eventos/${eventId}/reintentar`, { method: 'POST' })
+      if (response?.success === false) {
+        setError(response.message || 'Error al reintentar evento')
       }
+      fetchData()
     } catch (err) {
       console.error('Error retrying event:', err)
     }

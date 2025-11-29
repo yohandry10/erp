@@ -233,8 +233,29 @@ export class PdfGeneratorService {
 
     // Logo (si existe)
     if (empresaConfig.logo_url) {
-      // TODO: Cargar logo desde URL
-      // doc.image(empresaConfig.logo_url, 50, startY, { width: 80 });
+      try {
+        // Cargar logo remoto como buffer
+        const fs = require('fs');
+        const path = require('path');
+        const axios = require('axios');
+
+        const loadLogo = async () => {
+          if (empresaConfig.logo_url.startsWith('http')) {
+            const resp = await axios.get(empresaConfig.logo_url, { responseType: 'arraybuffer' });
+            return Buffer.from(resp.data);
+          }
+          const localPath = path.resolve(empresaConfig.logo_url);
+          return fs.readFileSync(localPath);
+        };
+
+        loadLogo().then((buf: Buffer) => {
+          doc.image(buf, 50, startY, { width: 80 });
+        }).catch(() => {
+          // Ignorar si falla carga del logo
+        });
+      } catch {
+        // Ignorar si falla carga del logo
+      }
     }
 
     // Información de la empresa (lado izquierdo)
@@ -454,7 +475,7 @@ export class PdfGeneratorService {
         );
     }
 
-    // Leyendas específicas según tipo de documento
+    // Montos en letras y leyendas específicas según tipo de documento
     const leyendasEspecificas = this.getLeyendasEspecificas(cpeData);
     if (leyendasEspecificas.length > 0) {
       let currentY = y + 36;
@@ -464,6 +485,12 @@ export class PdfGeneratorService {
         currentY += 10;
       });
     }
+
+    // Monto en letras
+    const total = parseFloat(cpeData.total_venta || cpeData.total || 0);
+    const totalEnLetras = this.numeroALetras(total, cpeData.moneda || 'PEN');
+    doc.fontSize(7).font('Helvetica-Bold')
+      .text(`SON: ${totalEnLetras}`, 50, doc.y + 46, { width: 495, align: 'center' });
   }
 
   /**
@@ -524,12 +551,43 @@ export class PdfGeneratorService {
   private numeroALetras(numero: number, moneda: string = 'PEN'): string {
     const monedaTexto = moneda === 'USD' ? 'DÓLARES AMERICANOS' : 'SOLES';
     
-    // Implementación simplificada
+    const unidades = ['CERO','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE'];
+    const decenas = ['VEINTE','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+    const centenas = ['CIEN','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+
+    const aLetras = (n: number): string => {
+      if (n <= 20) return unidades[n];
+      if (n < 30) return `VEINTI${unidades[n - 20].toLowerCase()}`;
+      if (n < 100) {
+        const d = decenas[Math.floor(n / 10) - 2];
+        const u = n % 10;
+        return u ? `${d} Y ${unidades[u]}` : d;
+      }
+      if (n < 1000) {
+        const c = Math.floor(n / 100);
+        const resto = n % 100;
+        const pref = c === 1 && resto > 0 ? 'CIENTO' : centenas[c - 1];
+        return resto ? `${pref} ${aLetras(resto)}` : pref;
+      }
+      if (n < 1_000_000) {
+        const miles = Math.floor(n / 1000);
+        const resto = n % 1000;
+        const pref = miles === 1 ? 'MIL' : `${aLetras(miles)} MIL`;
+        return resto ? `${pref} ${aLetras(resto)}` : pref;
+      }
+      if (n < 1_000_000_000) {
+        const millones = Math.floor(n / 1_000_000);
+        const resto = n % 1_000_000;
+        const pref = millones === 1 ? 'UN MILLÓN' : `${aLetras(millones)} MILLONES`;
+        return resto ? `${pref} ${aLetras(resto)}` : pref;
+      }
+      return n.toString();
+    };
+
     const entero = Math.floor(numero);
     const decimales = Math.round((numero - entero) * 100);
     
-    // TODO: Implementar conversión completa a letras
-    return `${entero} CON ${decimales.toString().padStart(2, '0')}/100 ${monedaTexto}`;
+    return `${aLetras(entero)} CON ${decimales.toString().padStart(2, '0')}/100 ${monedaTexto}`;
   }
 
   /**

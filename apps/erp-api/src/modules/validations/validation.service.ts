@@ -8,12 +8,13 @@ import {
   ValidationWarning,
   ValidationErrorCode,
   ValidateDocumentDto,
+  ValidateDniLookupDto,
+  DniLookupResult,
 } from './validation.types';
 import { ColombiaValidationService } from './colombia-validation.service';
-import {
-  normalizeCertificateInput,
-  parseCertificateBuffer,
-} from '../../shared/utils/certificate.utils';
+import { normalizeCertificateInput, parseCertificateBuffer } from '../../shared/utils/certificate.utils';
+import * as crypto from 'crypto';
+import { ApiPeruService } from './apiperu.service';
 
 @Injectable()
 export class ValidationService {
@@ -22,6 +23,7 @@ export class ValidationService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly colombiaValidationService: ColombiaValidationService,
+    private readonly apiPeruService: ApiPeruService,
   ) {}
 
   /**
@@ -50,7 +52,7 @@ export class ValidationService {
         return { isValid, errors, warnings };
       }
 
-      const certificadoBuffer = normalizeCertificateInput(empresa.certificado_pfx);
+      const certificadoBuffer = this.decryptCertificate(empresa.certificado_pfx);
 
       this.logger.log(
         `[ValidationService] certificado_pfx type=${typeof empresa.certificado_pfx} bufferLength=${
@@ -64,12 +66,10 @@ export class ValidationService {
         return { isValid, errors, warnings };
       }
 
-      if (!empresa.certificado_password) {
-        warnings.push('No se ha configurado la contraseña del certificado');
-      }
+      const password = this.decryptText(empresa.certificado_password);
 
       try {
-        const metadata = parseCertificateBuffer(certificadoBuffer, empresa.certificado_password || '');
+        const metadata = parseCertificateBuffer(certificadoBuffer, password || '');
         expiresAt = metadata.validTo;
 
         const now = new Date();
@@ -112,6 +112,81 @@ export class ValidationService {
         warnings,
       };
     }
+  }
+
+  private getCertKeys(): Buffer[] {
+    const keys: Buffer[] = [];
+    const main = process.env.CERT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+    const old = process.env.CERT_ENCRYPTION_KEY_OLD;
+
+    if (main && main.length >= 32) {
+      keys.push(crypto.createHash('sha256').update(main).digest());
+    }
+    if (old && old.length >= 32) {
+      keys.push(crypto.createHash('sha256').update(old).digest());
+    }
+
+    if (!keys.length) {
+      throw new Error('CERT_ENCRYPTION_KEY no configurada o demasiado corta (min 32 chars)');
+    }
+    return keys;
+  }
+
+  private decryptCertificate(input: any): Buffer | null {
+    const raw = normalizeCertificateInput(input);
+    if (!raw || raw.length < 12 + 16) {
+      return normalizeCertificateInput(input); // fallback si no está cifrado
+    }
+
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const data = raw.subarray(28);
+
+    const keys = this.getCertKeys();
+    for (const key of keys) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+        return decrypted;
+      } catch {
+        /* intentar siguiente clave */
+      }
+    }
+
+    this.logger.warn('⚠️ No se pudo descifrar certificado, se usará valor crudo.');
+    return normalizeCertificateInput(input);
+  }
+
+  private decryptText(input: string | null | undefined): string {
+    if (!input) return '';
+    const raw = Buffer.from(input, 'base64');
+    if (raw.length < 12 + 16) return input;
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const data = raw.subarray(28);
+
+    const keys = this.getCertKeys();
+    for (const key of keys) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+        return decrypted;
+      } catch {
+        /* intentar siguiente clave */
+      }
+    }
+
+    this.logger.warn('⚠️ No se pudo descifrar contraseña, se usará tal cual.');
+    return input;
+  }
+
+  /**
+   * Consulta DNI vía ApiPeru.dev (padrón público)
+   */
+  async lookupDni(dto: ValidateDniLookupDto): Promise<DniLookupResult> {
+    return this.apiPeruService.lookupDni(dto.dni);
   }
 
   /**

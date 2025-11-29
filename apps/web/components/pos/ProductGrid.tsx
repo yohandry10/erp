@@ -29,6 +29,8 @@ export interface ProductoPOS {
 type Props = {
   productos: ProductoPOS[];
   onAgregar: (producto: ProductoPOS) => void;
+  productoSeleccionado?: string | null;
+  onSeleccionar?: (productoId: string) => void;
 };
 
 const formatMoney = (value: any): string => {
@@ -36,14 +38,25 @@ const formatMoney = (value: any): string => {
   return Number.isFinite(num) ? num.toFixed(2) : '0.00';
 };
 
-export const ProductGrid: React.FC<Props> = ({ productos, onAgregar }) => {
+export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSeleccionado, onSeleccionar }) => {
   return (
     <div className="product-grid">
       {productos.map((producto) => {
         const esServicio = producto.es_servicio;
         const stockDisponible = producto.stock_disponible ?? producto.stock_actual ?? 0;
+        const estaSeleccionado = productoSeleccionado === producto.id;
+        
         return (
-          <div key={producto.id} className="product-card">
+          <div 
+            key={producto.id} 
+            className="product-card"
+            onClick={() => onSeleccionar?.(producto.id)}
+            style={{
+              border: estaSeleccionado ? '3px solid var(--blue-500)' : undefined,
+              boxShadow: estaSeleccionado ? '0 0 0 3px rgba(59, 130, 246, 0.2)' : undefined,
+              transform: estaSeleccionado ? 'scale(1.02)' : undefined,
+            }}
+          >
             <div className="product-image">
               {producto.imagen_url ? (
                 <img src={producto.imagen_url} alt={producto.nombre} />
@@ -69,7 +82,10 @@ export const ProductGrid: React.FC<Props> = ({ productos, onAgregar }) => {
                 </div>
               )}
             </div>
-            <button className="btn btn-primary w-full mt-2" onClick={() => onAgregar(producto)}>
+            <button 
+              className="btn btn-primary w-full mt-2" 
+              onClick={() => onAgregar(producto)}
+            >
               Agregar
             </button>
           </div>

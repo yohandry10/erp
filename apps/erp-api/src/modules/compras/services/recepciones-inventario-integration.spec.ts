@@ -5,6 +5,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { AuditService } from '../../audit/audit.service';
 import { CalidadRecepcion } from '../dto';
+import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 
 const createSupabaseClientMock = () => {
   const client: any = {
@@ -16,6 +17,8 @@ const createSupabaseClientMock = () => {
     insert: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
   };
 
   client.queueEqBuilder = () => client.eq.mockImplementationOnce(() => client);
@@ -76,6 +79,10 @@ describe('RecepcionesService - Inventario Integration', () => {
         {
           provide: AuditService,
           useValue: { registrarCambio: jest.fn() },
+        },
+        {
+          provide: EventEmitterService,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();
@@ -148,10 +155,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqPromise({ error: null });
 
-      // Mock cerrar recepcion
-      mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
       // Mock orden query for evento
       mockSupabaseClient.queueEqBuilder(); // eq tenant_id
       mockSupabaseClient.queueEqBuilder(); // eq id
@@ -173,6 +176,10 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      // Mock cerrar recepcion
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -254,9 +261,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqPromise({ error: null });
 
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({
         data: {
@@ -276,6 +280,9 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -357,9 +364,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqPromise({ error: null });
 
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({
         data: {
@@ -379,6 +383,9 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -453,9 +460,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqPromise({ error: null });
 
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({
         data: {
@@ -475,6 +479,9 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -553,9 +560,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqPromise({ error: null });
 
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({
         data: {
@@ -575,6 +579,9 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -653,9 +660,6 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqPromise({ error: null });
 
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({
         data: {
@@ -675,6 +679,9 @@ describe('RecepcionesService - Inventario Integration', () => {
         },
         error: null,
       });
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
 
       // Act
       await recepcionesService.cerrarRecepcion(
@@ -759,10 +766,22 @@ describe('RecepcionesService - Inventario Integration', () => {
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqPromise({ error: null });
       mockSupabaseClient.queueEqBuilder();
-      mockSupabaseClient.queueEqPromise({ error: null });
-      mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueEqBuilder();
       mockSupabaseClient.queueSingle({ data: mockOrden, error: null });
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.queueEqPromise({ error: null });
+
+      // Mock queries for events
+      mockSupabaseClient.in.mockImplementationOnce(() => Promise.resolve({
+        data: [{ id: mockDetalleId, descripcion: 'Test Prod', precio_unitario: 100 }],
+        error: null,
+      }));
+
+      mockSupabaseClient.queueEqBuilder();
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: { descripcion: 'Test Prod', precio_unitario: 100 },
+        error: null,
+      });
 
       // Act
       await recepcionesService.cerrarRecepcion(

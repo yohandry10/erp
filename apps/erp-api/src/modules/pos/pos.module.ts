@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { PosController } from './pos.controller';
 import { PosService } from './pos.service';
 import { SupabaseModule } from '../../shared/supabase/supabase.module';
@@ -11,11 +12,23 @@ import { CacheModule } from '../../shared/cache/cache.module';
 import { CxcModule } from '../finanzas/cxc/cxc.module';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { PosWorkerScheduler } from './pos.worker.scheduler';
 
 @Module({
-  imports: [SupabaseModule, IntegrationModule, CpeModule, ValidationModule, ConfiguracionModule, CacheModule, CxcModule, AuthModule, PermissionsModule],
+  imports: [
+    SupabaseModule,
+    IntegrationModule,
+    CpeModule,
+    ValidationModule,
+    ConfiguracionModule,
+    CacheModule,
+    CxcModule,
+    AuthModule,
+    PermissionsModule,
+    JwtModule.register({}), // usado para verificar JWT del worker
+  ],
   controllers: [PosController],
-  providers: [PosService, FeatureFlagGuard],
+  providers: [PosService, FeatureFlagGuard, PosWorkerScheduler],
   exports: [PosService]
 })
 export class PosModule { } 

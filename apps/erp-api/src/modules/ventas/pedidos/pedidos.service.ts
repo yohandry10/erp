@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
+import { Decimal } from 'decimal.js';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AuditService } from '../../audit/audit.service';
@@ -81,7 +82,7 @@ export class PedidosService {
     private readonly taxCalculator: TaxCalculatorService,
     private readonly tenantContext: TenantContextService,
     private readonly documentosService: DocumentosService,
-  ) {}
+  ) { }
 
   /**
    * Crear un nuevo pedido con cálculo de totales
@@ -109,7 +110,7 @@ export class PedidosService {
     // Validar stock disponible antes de crear (hard stop)
     for (const item of createPedidoDto.detalle) {
       const disponible = await this.getStockDisponible(item.producto_id, tenantId);
-      if (Number(item.cantidad ?? 0) > disponible) {
+      if (new Decimal(item.cantidad ?? 0).gt(disponible)) {
         throw new BadRequestException({
           message: 'Stock insuficiente para uno o más productos',
           warnings: [
@@ -123,64 +124,58 @@ export class PedidosService {
       }
     }
 
-    // Calcular totales
+    // Calcular totales usando decimal.js
     const { subtotal, igv, total } = await this.calcularTotales(createPedidoDto.detalle);
 
     // Generar número de pedido
     const numero = await this.generarNumero(tenantId);
 
-    // Crear pedido
-    const { data: pedido, error: pedidoError } = await client
-      .from('pedidos_venta')
-      .insert({
-        tenant_id: tenantId,
-        numero,
-        cotizacion_id: createPedidoDto.cotizacion_id || null,
-        cliente_id: createPedidoDto.cliente_id,
-        fecha_pedido: new Date().toISOString().split('T')[0],
-        estado: EstadoPedido.PENDIENTE,
-        subtotal,
-        igv,
-        total,
-        observaciones: createPedidoDto.notas || null,
-        created_by: userId || null,
-      })
-      .select()
-      .single();
-
-    if (pedidoError) {
-      console.error('Error creating pedido:', pedidoError);
-      throw new BadRequestException('Error al crear el pedido');
-    }
-
-    // Crear detalles
-    const detalleData = createPedidoDto.detalle.map((item) => ({
-      pedido_id: pedido.id,
-      producto_id: item.producto_id,
-      descripcion: item.descripcion,
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      subtotal: item.cantidad * item.precio_unitario,
-    }));
-
-    const { data: detalle, error: detalleError } = await client
-      .from('pedidos_venta_detalle')
-      .insert(detalleData)
-      .select();
-
-    if (detalleError) {
-      console.error('Error creating pedido detalle:', detalleError);
-      // Rollback: eliminar pedido
-      await client.from('pedidos_venta').delete().eq('id', pedido.id);
-      throw new BadRequestException('Error al crear el detalle del pedido');
-    }
-
-    console.log('✅ [PedidosService] Pedido creado:', pedido.id);
-
-    return {
-      ...pedido,
-      detalle: detalle || [],
+    // Preparar objeto Pedido
+    const pedidoData = {
+      tenant_id: tenantId,
+      numero,
+      cotizacion_id: createPedidoDto.cotizacion_id || null,
+      cliente_id: createPedidoDto.cliente_id,
+      fecha_pedido: new Date().toISOString().split('T')[0],
+      estado: EstadoPedido.PENDIENTE,
+      subtotal, // Already a number from calcularTotales
+      igv, // Already a number from calcularTotales
+      total, // Already a number from calcularTotales
+      observaciones: createPedidoDto.notas || null,
+      created_by: userId || null,
     };
+
+    // Preparar objeto Detalle
+    const detalleData = createPedidoDto.detalle.map((item) => {
+      const cantidad = new Decimal(item.cantidad);
+      const precio = new Decimal(item.precio_unitario);
+      const subtotalItem = cantidad.mul(precio);
+
+      return {
+        producto_id: item.producto_id,
+        descripcion: item.descripcion,
+        cantidad: cantidad.toNumber(),
+        precio_unitario: precio.toNumber(),
+        subtotal: subtotalItem.toNumber(),
+      };
+    });
+
+    // 🔴 CRÍTICO FIX: Uso de RPC para transacción atómica (Header + Detalle)
+    const { data: rpcResult, error: rpcError } = await client.rpc('crear_pedido_completo', {
+      p_pedido: pedidoData,
+      p_detalle: detalleData
+    });
+
+    if (rpcError) {
+      console.error('Error creating pedido (RPC):', rpcError);
+      throw new BadRequestException('Error al crear el pedido: ' + rpcError.message);
+    }
+
+    const pedidoId = (rpcResult as any).pedido_id;
+    console.log('✅ [PedidosService] Pedido creado atómicamente:', pedidoId);
+
+    // Retornar el pedido completo
+    return this.findOne(pedidoId, tenantId);
   }
 
   /**
@@ -230,10 +225,20 @@ export class PedidosService {
 
     // Búsqueda por número o cliente
     if (filters?.search) {
-      const searchTerm = `%${filters.search}%`;
-      query = query.or(
-        `numero.ilike.${searchTerm},clientes.razon_social.ilike.${searchTerm}`,
-      );
+      // HARDENING Q3: Sanitizar search term para evitar inyección en filtro OR de PostgREST
+      // Eliminar caracteres especiales de sintaxis PostgREST: (), commas, dots, colons, asterisks
+      const cleanSearch = filters.search
+        .replace(/[(),.:*\\]/g, '') // Caracteres de control PostgREST
+        .replace(/\s+/g, ' ')       // Normalizar espacios
+        .trim()
+        .substring(0, 100);         // Limitar longitud para evitar DoS
+      
+      if (cleanSearch.length > 0) {
+        const searchTerm = `%${cleanSearch}%`;
+        query = query.or(
+          `numero.ilike.${searchTerm},clientes.razon_social.ilike.${searchTerm}`,
+        );
+      }
     }
 
     // Ordenar y paginar
@@ -292,9 +297,9 @@ export class PedidosService {
       pedidos.map(async (pedido) => {
         const motivos = pedido.motivo_requiere_aprobacion
           ? String(pedido.motivo_requiere_aprobacion)
-              .split(';')
-              .map((motivo) => motivo.trim())
-              .filter(Boolean)
+            .split(';')
+            .map((motivo) => motivo.trim())
+            .filter(Boolean)
           : [];
 
         let resumenCredito: ResumenCredito | null = null;
@@ -381,9 +386,9 @@ export class PedidosService {
       ...aprobacion,
       motivos: aprobacion.motivos
         ? String(aprobacion.motivos)
-            .split(';')
-            .map((motivo) => motivo.trim())
-            .filter(Boolean)
+          .split(';')
+          .map((motivo) => motivo.trim())
+          .filter(Boolean)
         : [],
       aprobador: aprobacion.aprobado_por ? usuariosMap.get(aprobacion.aprobado_por) ?? null : null,
     }));
@@ -412,9 +417,9 @@ export class PedidosService {
         ? motivosEntrada
         : pedido.motivo_requiere_aprobacion
           ? String(pedido.motivo_requiere_aprobacion)
-              .split(';')
-              .map((motivo) => motivo.trim())
-              .filter(Boolean)
+            .split(';')
+            .map((motivo) => motivo.trim())
+            .filter(Boolean)
           : [];
 
     await this.registrarDecisionAprobacion(pedidoId, tenantId, decision, motivos, userId);
@@ -1032,25 +1037,38 @@ export class PedidosService {
    * Calcular totales (subtotal, IGV, total)
    * Usa TaxCalculatorService para obtener la tasa correcta según el país
    */
+  /**
+   * Calcular totales (subtotal, IGV, total)
+   * Usa TaxCalculatorService para obtener la tasa correcta según el país
+   */
   private async calcularTotales(detalle: Array<{ cantidad: number; precio_unitario: number }>) {
-    const subtotal = detalle.reduce(
-      (sum, item) => sum + item.cantidad * item.precio_unitario,
-      0,
+    // Usar Decimal para el cálculo del subtotal
+    const subtotalDecimal = detalle.reduce(
+      (sum, item) => {
+        const cantidad = new Decimal(item.cantidad);
+        const precio = new Decimal(item.precio_unitario);
+        return sum.plus(cantidad.mul(precio));
+      },
+      new Decimal(0),
     );
-    
+
     // ✅ CORRECCIÓN: Usar TaxCalculatorService
     const taxResult = await this.taxCalculator.calcularImpuestos({
-      subtotal,
+      subtotal: subtotalDecimal.toNumber(),
       tenantId: this.tenantContext.getTenantId(),
     });
-    
-    const igv = taxResult.igv;
-    const total = taxResult.total;
+
+    // Convertir resultados a Decimal para redondeo final seguro
+    const igvDecimal = new Decimal(taxResult.igv);
+    const totalDecimal = new Decimal(taxResult.total);
 
     return {
-      subtotal: Math.round(subtotal * 100) / 100,
-      igv: Math.round(igv * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      subtotal: subtotalDecimal.toDecimalPlaces(2).toNumber(), // Redondeo a 2 decimales
+      igv: igvDecimal.toDecimalPlaces(2).toNumber(),
+      total: totalDecimal.toDecimalPlaces(2).toNumber(),
+      subtotalDecimal, // Retornar también los objetos Decimal por si se necesitan
+      igvDecimal,
+      totalDecimal
     };
   }
 
@@ -1179,14 +1197,14 @@ export class PedidosService {
 
           if (reservaError) {
             console.error('❌ Error en reserva atómica de stock:', reservaError);
-            
+
             // Si es error de stock insuficiente, retornar warning específico
             if (reservaError.message?.includes('Stock insuficiente') || reservaError.message?.includes('insufficient')) {
               throw new BadRequestException(
                 `Stock insuficiente para producto ${item.descripcion}. ${reservaError.message}`,
               );
             }
-            
+
             throw new BadRequestException(
               `No se pudo reservar stock para el producto ${item.descripcion}: ${reservaError.message}`,
             );
@@ -1196,7 +1214,7 @@ export class PedidosService {
         } catch (error) {
           // Si falla alguna reserva, hacer rollback de las ya creadas
           console.error('❌ Error reservando stock, iniciando rollback...', error);
-          
+
           // Intentar liberar reservas ya creadas para este pedido
           try {
             const { data: reservasCreadas } = await client
@@ -1214,7 +1232,7 @@ export class PedidosService {
                   p_cantidad: reserva.cantidad,
                 });
               }
-              
+
               // Eliminar movimientos creados
               await client
                 .from('movimientos_inventario')
@@ -1228,7 +1246,7 @@ export class PedidosService {
             console.error('❌ Error en rollback de reservas:', rollbackError);
             // Continuar con el error original
           }
-          
+
           throw error;
         }
       }
@@ -1801,19 +1819,19 @@ export class PedidosService {
       creado_en: item.creado_en,
       gre: item.gre
         ? {
-            id: item.gre.id,
-            numero: item.gre.numero,
-            estado: item.gre.estado,
-            destinatario: item.gre.destinatario,
-            direccionDestino: item.gre.direccion_destino,
-            fechaTraslado: item.gre.fecha_traslado,
-            modalidad: item.gre.modalidad,
-            motivo: item.gre.motivo,
-            pesoTotal: item.gre.peso_total,
-            transportista: item.gre.transportista,
-            placaVehiculo: item.gre.placa_vehiculo,
-            licenciaConducir: item.gre.licencia_conducir,
-          }
+          id: item.gre.id,
+          numero: item.gre.numero,
+          estado: item.gre.estado,
+          destinatario: item.gre.destinatario,
+          direccionDestino: item.gre.direccion_destino,
+          fechaTraslado: item.gre.fecha_traslado,
+          modalidad: item.gre.modalidad,
+          motivo: item.gre.motivo,
+          pesoTotal: item.gre.peso_total,
+          transportista: item.gre.transportista,
+          placaVehiculo: item.gre.placa_vehiculo,
+          licenciaConducir: item.gre.licencia_conducir,
+        }
         : null,
     }));
   }
@@ -1971,7 +1989,7 @@ export class PedidosService {
 
       // 4. Obtener serie activa para el tipo de documento
       const serieDefault = tipoDoc === '01' ? 'F001' : 'B001';
-      
+
       const { data: serie, error: serieError } = await client
         .from('documento_series')
         .select('*')
@@ -2031,6 +2049,9 @@ export class PedidosService {
       }
 
       // 9. Crear documento en tabla documentos
+      // Resolver moneda y UOM desde configuración y producto
+      const monedaPedido = (pedido as any).moneda || (empresaConfig as any).moneda_defecto || 'PEN';
+
       const documentoData = {
         tenant_id: tenantId,
         pedido_id: pedidoId,
@@ -2039,12 +2060,12 @@ export class PedidosService {
         numero: numero,
         fecha_emision: fechaEmision.toISOString(),
         fecha_vencimiento: fechaVencimiento.toISOString(),
-        
+
         // Datos del emisor
         emisor_ruc: empresaConfig.ruc,
         emisor_razon_social: empresaConfig.razon_social,
         emisor_direccion: empresaConfig.direccion_fiscal,
-        
+
         // Datos del receptor
         cliente_id: pedido.cliente_id,
         receptor_tipo_doc: cliente.documento_tipo || 'RUC',
@@ -2054,7 +2075,7 @@ export class PedidosService {
         receptor_email: cliente.email,
 
         // Montos
-        moneda: 'PEN', // TODO: Obtener de configuración
+        moneda: monedaPedido,
         tipo_cambio: 1.0000,
         subtotal: taxResult.subtotal,
         descuentos: 0.00,
@@ -2062,11 +2083,11 @@ export class PedidosService {
         impuesto_isc: 0.00,
         otros_impuestos: 0.00,
         total: taxResult.total,
-        
+
         // Estado
         estado: 'EMITIDO',
         observaciones: `Generado desde pedido ${pedido.numero}`,
-        
+
         // Auditoría
         created_by: userId,
       };
@@ -2090,9 +2111,9 @@ export class PedidosService {
         tenant_id: tenantId,
         orden: index + 1,
         producto_id: item.producto_id,
-        codigo_producto: item.producto_id, // TODO: Obtener código real del producto
+        codigo_producto: (item as any).codigo || item.producto_id,
         descripcion: item.descripcion,
-        unidad_medida: 'NIU', // TODO: Obtener de producto
+        unidad_medida: (item as any).unidad_medida || (item as any).unidad || 'NIU',
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         descuento_unitario: 0,
@@ -2136,10 +2157,10 @@ export class PedidosService {
           total_venta: taxResult.total,
           total_igv: taxResult.igv,
           total_gravadas: taxResult.subtotal,
-          
+
           // Estado
           estado_sunat: 'PENDIENTE',
-          
+
           // Auditoría
           created_by: userId,
         };

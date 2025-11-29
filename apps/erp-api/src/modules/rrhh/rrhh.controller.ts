@@ -473,9 +473,4 @@ export class RrhhController {
     return this.rrhhService.getDashboardRrhh();
   }
 
-  // ===== DEBUG =====
-  @Get('debug/empleados-contratos')
-  async debugEmpleadosContratos() {
-    return this.rrhhService.debugEmpleadosContratos();
-  }
 } 

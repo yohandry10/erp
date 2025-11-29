@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Lock, Unlock, CheckCircle, AlertCircle, PlusCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
+import { useApi } from '@/hooks/use-api'
 
 interface Periodo {
   id: string
@@ -24,6 +25,7 @@ export default function PeriodosPage() {
   const [error, setError] = useState<string | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [selectedPeriodo, setSelectedPeriodo] = useState<Periodo | null>(null)
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   useEffect(() => {
     fetchPeriodos()
@@ -34,19 +36,8 @@ export default function PeriodosPage() {
       setLoading(true)
       setError(null)
       
-      const response = await fetch('/api/contabilidad/periodos', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al obtener períodos')
-      }
-
-      const result = await response.json()
-      const periodosData = result.data || []
+      const result = await apiCall('/contabilidad/periodos')
+      const periodosData = result?.data || []
       
       // Ordenar por año y mes descendente
       const sorted = [...periodosData].sort((a: Periodo, b: Periodo) => {

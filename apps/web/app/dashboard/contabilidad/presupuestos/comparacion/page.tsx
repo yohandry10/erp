@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Calendar, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import PresupuestoVsRealChart from '@/components/contabilidad/PresupuestoVsRealChart'
+import { useApi } from '@/hooks/use-api'
 
 interface Periodo {
   id: string
@@ -18,6 +19,7 @@ export default function ComparacionPresupuestoPage() {
   const [selectedPeriodoId, setSelectedPeriodoId] = useState<string>('')
   const [centroIdFilter, setCentroIdFilter] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
   useEffect(() => {
     fetchPeriodos()
@@ -38,18 +40,8 @@ export default function ComparacionPresupuestoPage() {
   const fetchPeriodos = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/contabilidad/periodos', {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al obtener períodos')
-      }
-
-      const result = await response.json()
-      const periodosData = result.data || []
+      const result = await apiCall('/contabilidad/periodos')
+      const periodosData = result?.data || []
       setPeriodos(periodosData)
 
       // Seleccionar el período más reciente por defecto
