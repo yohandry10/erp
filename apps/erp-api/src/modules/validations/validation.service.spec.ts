@@ -1,0 +1,330 @@
+import { ValidationService } from './validation.service';
+import { ColombiaValidationService } from './colombia-validation.service';
+import { ApiPeruService } from './apiperu.service';
+import { SupabaseService } from '../../shared/supabase/supabase.service';
+
+describe('ValidationService', () => {
+  let service: ValidationService;
+  let supabaseService: jest.Mocked<SupabaseService>;
+  let colombiaService: jest.Mocked<ColombiaValidationService>;
+  let apiPeruService: jest.Mocked<ApiPeruService>;
+
+  const mockSupabaseClient = {
+    from: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn(),
+  };
+
+  beforeEach(() => {
+    supabaseService = {
+      getClient: jest.fn().mockReturnValue(mockSupabaseClient),
+    } as any;
+
+    colombiaService = {
+      validateNIT: jest.fn(),
+    } as any;
+
+    apiPeruService = {
+      lookupDni: jest.fn(),
+    } as any;
+
+    service = new ValidationService(supabaseService, colombiaService, apiPeruService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('validateTaxIdFormat (via validateRucConfiguration)', () => {
+    const tenantId = 'tenant-123';
+
+    it('debe validar RUC peruano de 11 dígitos correctamente', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '20123456789', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'PE', nombre: 'Perú' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('debe rechazar RUC peruano con menos de 11 dígitos', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '2012345', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'PE', nombre: 'Perú' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('El RUC debe tener exactamente 11 dígitos numéricos');
+    });
+
+    it('debe validar NIT colombiano usando ColombiaValidationService', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '900123456-1', razon_social: 'Test SAS', direccion_fiscal: 'Calle 123', pais_id: 'pais-co' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'CO', nombre: 'Colombia' },
+          error: null,
+        });
+
+      colombiaService.validateNIT.mockReturnValue({ isValid: true });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(colombiaService.validateNIT).toHaveBeenCalledWith('900123456-1');
+      expect(result.isValid).toBe(true);
+    });
+
+    it('debe validar RUT chileno con formato correcto', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '12345678-9', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'CL', nombre: 'Chile' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(true);
+    });
+
+    it('debe rechazar RUT chileno con formato incorrecto', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '123456789', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'CL', nombre: 'Chile' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('El RUT debe tener formato 12345678-9 o 12345678-K');
+    });
+
+    it('debe validar RFC mexicano con formato correcto', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: 'ABC123456XYZ', razon_social: 'Test SA de CV', direccion_fiscal: 'Calle MX 123', pais_id: 'pais-mx' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'MX', nombre: 'México' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(true);
+    });
+
+    it('debe detectar campos faltantes', async () => {
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: { ruc: '', razon_social: '', direccion_fiscal: '', pais_id: 'pais-pe' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { codigo_iso: 'PE', nombre: 'Perú' },
+          error: null,
+        });
+
+      const result = await service.validateRucConfiguration(tenantId);
+
+      expect(result.isValid).toBe(false);
+      expect(result.missingFields).toContain('RUC');
+      expect(result.missingFields).toContain('Razón Social');
+      expect(result.missingFields).toContain('Dirección Fiscal');
+    });
+  });
+
+  describe('validateDocumentBeforeEmission', () => {
+    it('debe validar documento con datos correctos', async () => {
+      const document = {
+        serie: 'F001',
+        correlativo: 12345,
+        total: 1000,
+        items: [{ descripcion: 'Item 1', cantidad: 1, precio: 1000 }],
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('debe rechazar serie con formato incorrecto', async () => {
+      const document = {
+        serie: 'F00', // Solo 3 caracteres
+        correlativo: 12345,
+        total: 1000,
+        items: [],
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.code === 'DOC_003')).toBe(true);
+    });
+
+    it('debe rechazar correlativo con más de 8 dígitos', async () => {
+      const document = {
+        serie: 'F001',
+        correlativo: 123456789, // 9 dígitos
+        total: 1000,
+        items: [],
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.code === 'DOC_004')).toBe(true);
+    });
+
+    it('debe rechazar monto total negativo', async () => {
+      const document = {
+        serie: 'F001',
+        correlativo: 12345,
+        total: -100,
+        items: [],
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.code === 'DOC_002')).toBe(true);
+    });
+
+    it('debe agregar warning para documentos con más de 500 items', async () => {
+      const items = Array(501).fill({ descripcion: 'Item', cantidad: 1, precio: 10 });
+      const document = {
+        serie: 'F001',
+        correlativo: 12345,
+        total: 5010,
+        items,
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.code === 'DOC_WARN_001')).toBe(true);
+    });
+
+    it('debe rechazar documento que excede límite de items', async () => {
+      const items = Array(1000).fill({ descripcion: 'Item', cantidad: 1, precio: 10 });
+      const document = {
+        serie: 'F001',
+        correlativo: 12345,
+        total: 10000,
+        items,
+      };
+
+      const result = await service.validateDocumentBeforeEmission(document);
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.code === 'DOC_001')).toBe(true);
+    });
+  });
+
+  describe('lookupDni', () => {
+    it('debe llamar a ApiPeruService para consulta de DNI', async () => {
+      const mockResult = {
+        dni: '12345678',
+        nombres: 'Juan',
+        apellidoPaterno: 'Pérez',
+        apellidoMaterno: 'García',
+        nombreCompleto: 'Juan Pérez García',
+        codigoVerificacion: 'ABC123',
+      };
+
+      apiPeruService.lookupDni.mockResolvedValue(mockResult);
+
+      const result = await service.lookupDni({ dni: '12345678' });
+
+      expect(apiPeruService.lookupDni).toHaveBeenCalledWith('12345678');
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('getValidationStatus', () => {
+    it('debe retornar estado completo cuando todo es válido', async () => {
+      // Mock validateCertificate
+      jest.spyOn(service, 'validateCertificate').mockResolvedValue({
+        isValid: true,
+        errors: [],
+        warnings: [],
+      });
+
+      // Mock validateRucConfiguration
+      jest.spyOn(service, 'validateRucConfiguration').mockResolvedValue({
+        isValid: true,
+        missingFields: [],
+        errors: [],
+      });
+
+      const result = await service.getValidationStatus('tenant-123');
+
+      expect(result.overallStatus).toBe('complete');
+    });
+
+    it('debe retornar estado warning cuando hay advertencias de certificado', async () => {
+      jest.spyOn(service, 'validateCertificate').mockResolvedValue({
+        isValid: true,
+        errors: [],
+        warnings: ['El certificado vencerá en 15 días'],
+        daysUntilExpiration: 15,
+      });
+
+      jest.spyOn(service, 'validateRucConfiguration').mockResolvedValue({
+        isValid: true,
+        missingFields: [],
+        errors: [],
+      });
+
+      const result = await service.getValidationStatus('tenant-123');
+
+      expect(result.overallStatus).toBe('warning');
+    });
+
+    it('debe retornar estado incomplete cuando hay errores', async () => {
+      jest.spyOn(service, 'validateCertificate').mockResolvedValue({
+        isValid: false,
+        errors: ['Certificado no encontrado'],
+        warnings: [],
+      });
+
+      jest.spyOn(service, 'validateRucConfiguration').mockResolvedValue({
+        isValid: true,
+        missingFields: [],
+        errors: [],
+      });
+
+      const result = await service.getValidationStatus('tenant-123');
+
+      expect(result.overallStatus).toBe('incomplete');
+    });
+  });
+});

@@ -166,23 +166,27 @@ export class GreService {
       console.log(`🚚 [GRE] Datos del evento - CPE: ${cpeId}, Cliente: ${clienteId}, Total: S/ ${total}, Tenant: ${tenantId}`);
 
       // Buscar si el cliente tiene configuración de transporte automático
-      const requiereGREAutomatica = await this.verificarConfiguracionClienteTransporte(clienteId, total);
+      const requiereGREAutomatica = await this.verificarConfiguracionClienteTransporte(clienteId, total, tenantId);
 
       if (requiereGREAutomatica) {
         console.log('🚚 [GRE] ✅ Cliente configurado para GRE automática, creando...');
 
-        // Crear GRE automática con datos básicos (con validación de certificado)
+        if (!datos.clienteDireccion) {
+          throw new BadRequestException('No se puede crear GRE automática: falta dirección de destino del cliente');
+        }
+
+        // Crear GRE automática con datos validados (con certificado)
         const greAutomatica = await this.createGuia({
           destinatario: `Cliente ${clienteId}`,
-          direccionDestino: 'Lima, Perú - Dirección por configurar',
+          direccionDestino: datos.clienteDireccion,
           fechaTraslado: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Mañana
           modalidad: 'TRANSPORTE_PUBLICO',
           motivo: 'VENTA',
           pesoTotal: this.calcularPesoEstimado(productos, total),
           observaciones: `GRE automática generada para CPE ${cpeId} - Total: S/ ${total}`,
-          transportista: 'Transporte por definir',
-          placaVehiculo: null,
-          licenciaConducir: null,
+          transportista: datos.transportista || undefined,
+          placaVehiculo: datos.placaVehiculo || undefined,
+          licenciaConducir: datos.licenciaConducir || undefined,
           cpeRelacionado: cpeId
         }, tenantId);
 
@@ -201,20 +205,28 @@ export class GreService {
     }
   }
 
-  private async verificarConfiguracionClienteTransporte(clienteId: string, total: number): Promise<boolean> {
-    console.log(`🚚 [GRE] Verificando configuración de transporte para cliente ${clienteId} con total S/ ${total}`);
+  private async verificarConfiguracionClienteTransporte(clienteId: string, total: number, tenantId: string): Promise<boolean> {
+    console.log(`🚚 [GRE] Verificando configuración GRE para cliente ${clienteId} con total S/ ${total}`);
 
-    // Reglas automáticas para crear GRE:
-    // 1. Ventas > S/ 500 siempre requieren GRE
-    if (total > 500) {
-      console.log(`✅ [GRE] Total > S/ 500, requiere GRE automática`);
+    // Configuración por tenant: umbral y bandera
+    const { umbralGREAutomatico, greAutomaticoHabilitado, greObligatorio } = await this.getGREThresholdConfig(tenantId);
+
+    // Si no está habilitado y no es obligatorio, no crear.
+    if (!greAutomaticoHabilitado && !greObligatorio) {
+      console.log('⚠️ [GRE] GRE automática deshabilitada por configuración del tenant');
+      return false;
+    }
+
+    // Si es obligatorio, siempre crea (validado en data).
+    if (greObligatorio) {
+      console.log('✅ [GRE] GRE obligatoria por configuración del tenant');
       return true;
     }
 
-    // 2. Por ahora, todas las ventas que lleguen aquí requieren GRE
-    // En el futuro, esto se puede configurar por cliente en la base de datos
-    console.log(`✅ [GRE] Cliente configurado para crear GRE automática`);
-    return true;
+    // Caso automático: solo si supera umbral.
+    const habilitar = total >= umbralGREAutomatico;
+    console.log(`🔎 [GRE] Umbral ${umbralGREAutomatico}, total ${total}, crear=${habilitar}`);
+    return habilitar;
   }
 
   private calcularPesoEstimado(productos: any[], total: number): number {
@@ -609,12 +621,134 @@ export class GreService {
     }
   }
 
+  private async buildGreXmlPayload(greData: any) {
+    const tenantId = greData.tenant_id;
+    const client = this.supabaseService.getClient();
+
+    // Emisor desde empresa_config (requerido)
+    const { data: empresa } = await client
+      .from('empresa_config')
+      .select('ruc, razon_social, nombre_comercial, direccion_fiscal, ubigeo, departamento, provincia, distrito')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (!empresa?.ruc || !empresa?.razon_social) {
+      throw new BadRequestException('No se puede generar GRE: faltan datos de emisor (RUC/razón social) en empresa_config');
+    }
+
+    // Receptor: usar CPE relacionado si existe
+    let receptor = {
+      docTipo: null as string | null,
+      docNumero: null as string | null,
+      razonSocial: greData.destinatario as string | null,
+      direccion: greData.direccion_destino as string | null,
+    };
+
+    if (greData.cpe_relacionado) {
+      const { data: cpe } = await client
+        .from('cpe')
+        .select('tipo_documento_receptor, documento_receptor, razon_social_receptor, direccion_receptor')
+        .eq('id', greData.cpe_relacionado)
+        .maybeSingle();
+
+      if (cpe) {
+        receptor = {
+          docTipo: cpe.tipo_documento_receptor || receptor.docTipo,
+          docNumero: cpe.documento_receptor || receptor.docNumero,
+          razonSocial: cpe.razon_social_receptor || receptor.razonSocial,
+          direccion: cpe.direccion_receptor || receptor.direccion,
+        };
+      }
+    }
+
+    if (!receptor.docNumero || !receptor.razonSocial || !receptor.direccion) {
+      throw new BadRequestException('No se puede generar GRE: faltan datos del destinatario (documento, razón social o dirección)');
+    }
+
+    // Detalle: usar gre_detalles; si no hay, bloquear
+    const { data: detalles } = await client
+      .from('gre_detalles')
+      .select('descripcion, cantidad, unidad_medida, peso')
+      .eq('gre_id', greData.id)
+      .eq('tenant_id', tenantId);
+
+    if (!detalles || detalles.length === 0) {
+      throw new BadRequestException('No se puede generar GRE: requiere al menos un ítem en gre_detalles');
+    }
+
+    return {
+      emisor: {
+        ruc: empresa.ruc,
+        razonSocial: empresa.razon_social,
+        nombreComercial: empresa.nombre_comercial || empresa.razon_social,
+        direccion: empresa.direccion_fiscal,
+        ubigeo: empresa.ubigeo || '',
+        departamento: empresa.departamento || '',
+        provincia: empresa.provincia || '',
+        distrito: empresa.distrito || '',
+      },
+      receptor,
+      gre: greData,
+      detalles: detalles.map((d: any, idx: number) => ({
+        id: idx + 1,
+        descripcion: d.descripcion,
+        cantidad: Number(d.cantidad || 0),
+        unidad: d.unidad_medida || 'NIU',
+        peso: d.peso ? Number(d.peso) : undefined,
+      })),
+    };
+  }
+
   /**
    * Generar XML UBL para Guía de Remisión Electrónica
    */
-  private generateGreXmlUbl(greData: any): string {
+  private generateGreXmlUbl(payload: {
+    emisor: {
+      ruc: string;
+      razonSocial: string;
+      nombreComercial: string;
+      direccion: string;
+      ubigeo: string;
+      departamento: string;
+      provincia: string;
+      distrito: string;
+    };
+    receptor: {
+      docTipo: string | null;
+      docNumero: string | null;
+      razonSocial: string | null;
+      direccion: string | null;
+    };
+    gre: any;
+    detalles: Array<{ id: number; descripcion: string; cantidad: number; unidad: string; peso?: number }>;
+  }): string {
+    const greData = payload.gre;
     const fechaEmision = new Date().toISOString().split('T')[0];
     const horaEmision = new Date().toTimeString().split(' ')[0];
+
+    const receptorDocTipo = payload.receptor.docTipo || '1';
+    const receptorDocNumero = payload.receptor.docNumero || '00000000';
+    const receptorNombre = payload.receptor.razonSocial || 'DESTINATARIO';
+    const receptorDireccion = payload.receptor.direccion || '';
+
+    const transportistaId = greData.transportista_documento || payload.emisor.ruc;
+    const transportistaNombre = greData.transportista || payload.emisor.razonSocial;
+
+    const lines = payload.detalles
+      .map(
+        (item) => `
+  <cac:DespatchLine>
+    <cbc:ID>${item.id}</cbc:ID>
+    <cbc:DeliveredQuantity unitCode="${item.unidad}">${item.cantidad}</cbc:DeliveredQuantity>
+    <cac:OrderLineReference>
+      <cbc:LineID>${item.id}</cbc:LineID>
+    </cac:OrderLineReference>
+    <cac:Item>
+      <cbc:Description><![CDATA[${item.descripcion}]]></cbc:Description>
+    </cac:Item>
+  </cac:DespatchLine>`
+      )
+      .join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <DespatchAdvice xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2"
@@ -657,30 +791,30 @@ export class GreService {
     <cac:Consignment>
       <cac:ConsignorParty>
         <cac:PartyIdentification>
-          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">20000000001</cbc:ID>
+          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${payload.emisor.ruc}</cbc:ID>
         </cac:PartyIdentification>
         <cac:PartyName>
-          <cbc:Name><![CDATA[ERP KAME]]></cbc:Name>
+          <cbc:Name><![CDATA[${payload.emisor.razonSocial}]]></cbc:Name>
         </cac:PartyName>
       </cac:ConsignorParty>
       
       <!-- Punto de llegada -->
       <cac:ConsigneeParty>
         <cac:PartyIdentification>
-          <cbc:ID schemeID="1" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">12345678</cbc:ID>
+          <cbc:ID schemeID="${receptorDocTipo}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${receptorDocNumero}</cbc:ID>
         </cac:PartyIdentification>
         <cac:PartyName>
-          <cbc:Name><![CDATA[${greData.destinatario}]]></cbc:Name>
+          <cbc:Name><![CDATA[${receptorNombre}]]></cbc:Name>
         </cac:PartyName>
       </cac:ConsigneeParty>
       
       <!-- Transportista -->
       <cac:CarrierParty>
         <cac:PartyIdentification>
-          <cbc:ID schemeID="1" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">12345678</cbc:ID>
+          <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT">${transportistaId}</cbc:ID>
         </cac:PartyIdentification>
         <cac:PartyName>
-          <cbc:Name><![CDATA[${greData.transportista || 'Transporte Público'}]]></cbc:Name>
+          <cbc:Name><![CDATA[${transportistaNombre}]]></cbc:Name>
         </cac:PartyName>
       </cac:CarrierParty>
     </cac:Consignment>
@@ -688,7 +822,7 @@ export class GreService {
     <!-- Dirección de entrega -->
     <cac:Delivery>
       <cac:DeliveryAddress>
-        <cbc:AddressLine><![CDATA[${greData.direccion_destino}]]></cbc:AddressLine>
+        <cbc:AddressLine><![CDATA[${receptorDireccion}]]></cbc:AddressLine>
         <cac:Country>
           <cbc:IdentificationCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 3166-1">PE</cbc:IdentificationCode>
         </cac:Country>
@@ -708,19 +842,7 @@ export class GreService {
   </cac:Shipment>
 
   <!-- Líneas de la guía (productos/bienes a trasladar) -->
-  <cac:DespatchLine>
-    <cbc:ID>1</cbc:ID>
-    <cbc:DeliveredQuantity unitCode="NIU">1</cbc:DeliveredQuantity>
-    <cac:OrderLineReference>
-      <cbc:LineID>1</cbc:LineID>
-    </cac:OrderLineReference>
-    <cac:Item>
-      <cbc:Description><![CDATA[${greData.observaciones || 'Bienes diversos'}]]></cbc:Description>
-      <cac:SellersItemIdentification>
-        <cbc:ID>ITEM001</cbc:ID>
-      </cac:SellersItemIdentification>
-    </cac:Item>
-  </cac:DespatchLine>
+  ${lines}
 
 </DespatchAdvice>`;
   }
@@ -890,7 +1012,8 @@ export class GreService {
       }
 
       // Generar XML UBL
-      const xmlContent = this.generateGreXmlUbl(greData);
+      const xmlPayload = await this.buildGreXmlPayload(greData);
+      const xmlContent = this.generateGreXmlUbl(xmlPayload);
 
       // Firmar el XML (sin enviar a SUNAT)
       const xmlSigned = await this.firmarXmlGre(xmlContent);
@@ -1029,9 +1152,10 @@ export class GreService {
         { id: greId }
       );
 
-      // Generar XML UBL
-      const xmlContent = this.generateGreXmlUbl(greData);
-      const fileName = `20000000001-09-${greData.numero}`;
+      // Generar XML UBL con datos reales
+      const xmlPayload = await this.buildGreXmlPayload(greData);
+      const xmlContent = this.generateGreXmlUbl(xmlPayload);
+      const fileName = `${xmlPayload.emisor.ruc}-09-${greData.numero}`;
 
       // Enviar a SUNAT mediante OSE
       const response = await this.oseService.enviarGre(xmlContent, fileName);
@@ -1525,6 +1649,7 @@ export class GreService {
   async getGREThresholdConfig(tenantId: string): Promise<{
     umbralGREAutomatico: number;
     greAutomaticoHabilitado: boolean;
+    greObligatorio: boolean;
   }> {
     try {
       console.log(`🚚 [GRE] Getting GRE threshold config for tenant ${tenantId}`);
@@ -1540,12 +1665,14 @@ export class GreService {
         return {
           umbralGREAutomatico: 700.0,
           greAutomaticoHabilitado: true,
+          greObligatorio: false,
         };
       }
 
       return {
         umbralGREAutomatico: data?.umbral_gre_automatico || 700.0,
         greAutomaticoHabilitado: data?.gre_automatico_habilitado !== false,
+        greObligatorio: data?.gre_obligatorio === true,
       };
     } catch (error) {
       console.error(`❌ [GRE] Error getting GRE threshold config:`, error);
@@ -1553,6 +1680,7 @@ export class GreService {
       return {
         umbralGREAutomatico: 700.0,
         greAutomaticoHabilitado: true,
+        greObligatorio: false,
       };
     }
   }

@@ -942,3 +942,653 @@ No description
 
 timestamp with time zone	timestamptz		
  
+
+ Database Tables
+cajas
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+codigo
+
+No description
+
+character varying	varchar		
+nombre
+
+No description
+
+character varying	varchar		
+ubicacion
+
+No description
+
+character varying	varchar		
+estado
+
+No description
+
+character varying	varchar		
+monto_inicial
+
+No description
+
+numeric	numeric		
+activa
+
+No description
+
+boolean	bool		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+monto_proyectado
+
+No description
+
+numeric	numeric		
+categoria
+
+No description
+
+character varying	varchar		
+tenant_id
+
+ID del tenant para aislamiento multi-tenant
+
+uuid	uuid		
+sucursal_id
+
+No description
+
+uuid	uuid		
+almacen_id
+
+No description
+
+uuid	uuid		
+ Database Tables
+almacenes
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+nombre
+
+No description
+
+character varying	varchar		
+codigo
+
+No description
+
+character varying	varchar		
+es_principal
+
+No description
+
+boolean	bool		
+activo
+
+No description
+
+boolean	bool		
+direccion
+
+No description
+
+text	text		
+notas
+
+No description
+
+text	text		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+ Database Tables
+productos
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+codigo
+
+No description
+
+character varying	varchar		
+nombre
+
+No description
+
+character varying	varchar		
+precio
+
+No description
+
+numeric	numeric		
+stock
+
+No description
+
+numeric	numeric		
+categoria
+
+No description
+
+character varying	varchar		
+activo
+
+No description
+
+boolean	bool		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+codigo_barras
+
+No description
+
+character varying	varchar		
+precio_mayorista
+
+No description
+
+numeric	numeric		
+precio_especial
+
+No description
+
+numeric	numeric		
+stock_minimo
+
+No description
+
+integer	int4		
+impuesto
+
+No description
+
+numeric	numeric		
+imagen_url
+
+No description
+
+text	text		
+code
+
+No description
+
+character varying	varchar		
+name
+
+No description
+
+character varying	varchar		
+price
+
+No description
+
+numeric	numeric		
+category
+
+No description
+
+character varying	varchar		
+active
+
+No description
+
+boolean	bool		
+barcode
+
+No description
+
+character varying	varchar		
+wholesale_price
+
+No description
+
+numeric	numeric		
+special_price
+
+No description
+
+numeric	numeric		
+min_stock
+
+No description
+
+integer	int4		
+tax
+
+No description
+
+numeric	numeric		
+image_url
+
+No description
+
+text	text		
+tenant_id
+
+No description
+
+uuid	uuid		
+descripcion
+
+No description
+
+text	text		
+precio_venta
+
+No description
+
+numeric	numeric		
+stock_reservado
+
+Stock reservado por pedidos confirmados. Stock disponible = stock - stock_reservado
+
+numeric	numeric		
+precio_compra
+
+Precio de compra del producto para cálculo de costos de inventario.
+
+numeric	numeric		
+es_servicio
+
+No description
+
+boolean	bool		
+controla_stock
+
+No description
+
+boolean	bool		
+afectacion_igv
+
+No description
+
+character varying	varchar		
+tipo_operacion
+
+No description
+
+character varying	varchar		
+clasificador_sunat
+
+No description
+
+character varying	varchar		
+favorito
+
+No description
+
+boolean	bool		
+requiere_lote
+
+Si true, el producto requiere selección de lote al vender (FEFO)
+
+boolean	bool		
+ Database Tables
+lotes_productos
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+producto_id
+
+No description
+
+uuid	uuid		
+almacen_id
+
+No description
+
+uuid	uuid		
+numero_lote
+
+No description
+
+character varying	varchar		
+numero_serie
+
+No description
+
+character varying	varchar		
+fecha_fabricacion
+
+No description
+
+date	date		
+fecha_vencimiento
+
+No description
+
+date	date		
+fecha_ingreso
+
+No description
+
+timestamp with time zone	timestamptz		
+cantidad_inicial
+
+No description
+
+numeric	numeric		
+cantidad_disponible
+
+No description
+
+numeric	numeric		
+cantidad_reservada
+
+No description
+
+numeric	numeric		
+ubicacion_almacen
+
+No description
+
+character varying	varchar		
+estado
+
+No description
+
+character varying	varchar		
+proveedor_id
+
+No description
+
+uuid	uuid		
+orden_compra_id
+
+No description
+
+uuid	uuid		
+recepcion_id
+
+No description
+
+uuid	uuid		
+costo_unitario
+
+No description
+
+numeric	numeric		
+notas
+
+No description
+
+text	text		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+created_by
+
+No description
+
+uuid	uuid		
+ Database Tables
+almacenes
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+nombre
+
+No description
+
+character varying	varchar		
+codigo
+
+No description
+
+character varying	varchar		
+es_principal
+
+No description
+
+boolean	bool		
+activo
+
+No description
+
+boolean	bool		
+direccion
+
+No description
+
+text	text		
+notas
+
+No description
+
+text	text		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+Database Tables
+stock_movimientos
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+tenant_id
+
+No description
+
+uuid	uuid		
+producto_id
+
+No description
+
+uuid	uuid		
+tipo_movimiento
+
+No description
+
+character varying	varchar		
+cantidad
+
+No description
+
+numeric	numeric		
+motivo
+
+No description
+
+character varying	varchar		
+referencia
+
+No description
+
+character varying	varchar		
+usuario_id
+
+ID del usuario (VARCHAR sin foreign key)
+
+character varying	varchar		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+Database Tables
+producto_stock_sucursal
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+producto_id
+
+No description
+
+uuid	uuid		
+sucursal_id
+
+No description
+
+uuid	uuid		
+almacen_id
+
+No description
+
+uuid	uuid		
+stock
+
+No description
+
+numeric	numeric		
+reservado
+
+No description
+
+numeric	numeric		
+minimo
+
+No description
+
+numeric	numeric		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+Database Tables
+cuentas_bancarias
+Filter columns
+
+New column
+Name	Description	Data Type	Format	Nullable	
+id
+
+No description
+
+uuid	uuid		
+banco
+
+No description
+
+character varying	varchar		
+numero_cuenta
+
+No description
+
+character varying	varchar		
+tipo_cuenta
+
+No description
+
+character varying	varchar		
+moneda
+
+No description
+
+character varying	varchar		
+saldo_actual
+
+No description
+
+numeric	numeric		
+saldo_contable
+
+No description
+
+numeric	numeric		
+activa
+
+No description
+
+boolean	bool		
+created_at
+
+No description
+
+timestamp with time zone	timestamptz		
+updated_at
+
+No description
+
+timestamp with time zone	timestamptz		
+tenant_id
+
+ID del tenant para aislamiento multi-tenant
+
+uuid	uuid		
+ 

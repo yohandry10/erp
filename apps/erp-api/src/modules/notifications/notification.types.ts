@@ -35,6 +35,7 @@ export interface Notification {
   id: string;
   tenant_id: string;
   usuario_id?: string;
+  roles_destinatarios?: string[]; // Array de role_ids
   type: NotificationType;
   severity: NotificationSeverity;
   title: string;
@@ -54,6 +55,7 @@ export interface CreateNotificationDto {
   action_url?: string;
   action_label?: string;
   usuario_id?: string;
+  roles_destinatarios?: string[]; // Array de role_ids para notificar a roles específicos
 }
 
 export interface NotificationFilters {
@@ -62,3 +64,35 @@ export interface NotificationFilters {
   leida?: boolean;
   usuario_id?: string;
 }
+
+/**
+ * Mapeo de tipos de notificación a roles por defecto
+ * Esto permite configurar qué roles reciben qué tipos de notificaciones
+ */
+export const DEFAULT_NOTIFICATION_ROLES: Partial<Record<NotificationType, string[]>> = {
+  // Stock bajo → Almacenero, Gerente de Inventario, Administrador
+  [NotificationType.STOCK_BAJO]: ['Almacenero', 'Gerente de Inventario', 'Administrador'],
+  
+  // Órdenes de compra → Compras, Administrador
+  [NotificationType.OC_REQUIERE_APROBACION]: ['Gerente de Compras', 'Administrador'],
+  [NotificationType.OC_APROBADA]: ['Compras', 'Administrador'],
+  [NotificationType.OC_RECHAZADA]: ['Compras', 'Administrador'],
+  
+  // Ventas → Vendedor, Gerente de Ventas
+  [NotificationType.COTIZACION_CONVERTIDA]: ['Vendedor', 'Gerente de Ventas'],
+  [NotificationType.PEDIDO_CONFIRMADO]: ['Vendedor', 'Almacenero', 'Gerente de Ventas'],
+  [NotificationType.PEDIDO_LISTO_DESPACHO]: ['Almacenero', 'Logística'],
+  [NotificationType.PEDIDO_LISTO_FACTURAR]: ['Facturación', 'Contador'],
+  [NotificationType.FACTURA_EMITIDA]: ['Contador', 'Administrador'],
+  
+  // Certificados → Solo Administrador
+  [NotificationType.CERTIFICATE_EXPIRING]: ['Administrador'],
+  [NotificationType.CERTIFICATE_EXPIRED]: ['Administrador'],
+  
+  // Configuración → Solo Administrador
+  [NotificationType.CONFIGURATION_INCOMPLETE]: ['Administrador'],
+  
+  // Integraciones → Administrador, IT
+  [NotificationType.INTEGRACION_ERROR]: ['Administrador'],
+  [NotificationType.INTEGRACION_LENTA]: ['Administrador'],
+};

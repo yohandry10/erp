@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { NotificationsService } from './notifications/notifications.service';
@@ -13,7 +13,45 @@ import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class NotificationsController {
+  private readonly logger = new Logger(NotificationsController.name);
+
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  /**
+   * SECURITY: Sanitiza mensajes de error para no exponer información sensible
+   */
+  private sanitizeErrorMessage(error: Error): string {
+    const message = error.message || 'Error desconocido';
+    
+    // Errores conocidos que podemos mostrar al usuario
+    if (message.includes('No tiene permiso')) {
+      return message;
+    }
+    if (message.includes('no encontrada')) {
+      return message;
+    }
+    if (message.includes('Tenant no identificado')) {
+      return 'Sesión inválida. Por favor, inicie sesión nuevamente.';
+    }
+    
+    // Errores de base de datos - NO exponer detalles
+    if (message.includes('duplicate key') || message.includes('unique constraint')) {
+      this.logger.error('DB Error - duplicate key:', error);
+      return 'La notificación ya existe';
+    }
+    if (message.includes('foreign key') || message.includes('violates')) {
+      this.logger.error('DB Error - constraint violation:', error);
+      return 'Error de integridad de datos';
+    }
+    if (message.includes('connection') || message.includes('timeout')) {
+      this.logger.error('DB Error - connection:', error);
+      return 'Error de conexión. Intente nuevamente.';
+    }
+    
+    // Error genérico - log interno, mensaje genérico al usuario
+    this.logger.error('Unhandled error:', error);
+    return 'Error al procesar la solicitud';
+  }
 
   @Get()
   @RequirePermission('notifications.read') // HARDENING: lectura de notificaciones requiere permiso.
@@ -22,12 +60,21 @@ export class NotificationsController {
   async getNotifications(@Query() query: any, @CurrentTenant() tenantId: string, @Req() req: Request) {
     try {
       const user = req.user as any;
+      
+      // SECURITY: Un usuario solo puede ver sus propias notificaciones o las globales (sin usuario_id)
+      // Super admins pueden ver todas las notificaciones del tenant
+      let effectiveUsuarioId = user?.id;
+      if (user?.is_super_admin && query.usuario_id) {
+        // Super admin puede filtrar por cualquier usuario
+        effectiveUsuarioId = query.usuario_id;
+      }
+      
       // HARDENING: usamos tenant derivado del contexto, nunca del request body.
       const filters: NotificationFilters = {
         type: query.type,
         severity: query.severity,
         leida: query.leida !== undefined ? query.leida === 'true' : undefined,
-        usuario_id: query.usuario_id
+        usuario_id: effectiveUsuarioId
       };
 
       const notifications = await this.notificationsService.getNotifications(tenantId, filters, user);
@@ -40,7 +87,7 @@ export class NotificationsController {
       return {
         success: false,
         data: [],
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -62,7 +109,7 @@ export class NotificationsController {
       return {
         success: false,
         data: [],
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -84,7 +131,7 @@ export class NotificationsController {
       return {
         success: false,
         data: { unread_count: 0 },
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -110,7 +157,7 @@ export class NotificationsController {
       return {
         success: false,
         data: null,
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -136,7 +183,7 @@ export class NotificationsController {
       return {
         success: false,
         data: null,
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -158,7 +205,7 @@ export class NotificationsController {
       return {
         success: false,
         data: { updated_count: 0 },
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }
@@ -183,7 +230,7 @@ export class NotificationsController {
     } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: this.sanitizeErrorMessage(error)
       };
     }
   }

@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmpresaConfigProvider } from '@/hooks/use-empresa-config'
 import { useAuth } from '@/contexts/AuthContext'
+import { DemoBanner } from '@/components/demo/DemoBanner'
+import { HelpBot } from '@/components/help'
+import { OnboardingProvider } from '@/components/onboarding'
 
 export default function DashboardLayout({
   children,
@@ -92,28 +95,43 @@ export default function DashboardLayout({
 
   return (
     <EmpresaConfigProvider>
-      <div style={{ 
-        display: 'flex', 
-        minHeight: '100vh',
-        position: 'relative',
-        overflow: 'hidden' // Prevenir scroll horizontal en el contenedor principal
-      }}>
-        <Sidebar />
-        <main style={{ 
-          flex: 1, 
-          marginLeft: getMarginLeft(),
-          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
+      <OnboardingProvider>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
           minHeight: '100vh',
-          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          padding: isMobile ? '1rem' : isTablet ? '1.5rem' : '2rem',
-          overflow: 'auto',
-          // Corregir el cálculo del ancho para evitar overflow
-          maxWidth: isMobile ? '100vw' : `calc(100vw - ${getMarginLeft()})`,
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden'
         }}>
-          {children}
-        </main>
-      </div>
+          {/* 🎯 DEMO: Banner visible para tenants demo */}
+          <DemoBanner />
+          
+          <div style={{ 
+            display: 'flex', 
+            flex: 1,
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <Sidebar />
+              <main style={{ 
+              flex: 1, 
+              marginLeft: getMarginLeft(),
+              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
+              minHeight: '100%',
+              transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              padding: isMobile ? '1rem' : isTablet ? '1.5rem' : '2rem',
+              overflow: 'auto',
+              maxWidth: isMobile ? '100vw' : `calc(100vw - ${getMarginLeft()})`,
+              position: 'relative'
+            }}>
+              {children}
+            </main>
+          </div>
+          
+          {/* 🤖 Bot de Ayuda - Disponible en todo el dashboard */}
+          <HelpBot />
+        </div>
+      </OnboardingProvider>
     </EmpresaConfigProvider>
   )
 }

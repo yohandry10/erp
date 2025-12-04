@@ -196,8 +196,8 @@ function getAuthHeaders(tenantId: string) {
     };
   } catch (error) {
     logger.error(`Error generando token para tenant ${tenantId}:`, error);
-    // Fallback temporal si se desea, o fallar
-    return { 'X-Tenant-Id': tenantId };
+    // Fail fast: sin token no se debe llamar al API
+    throw new Error('POS_WORKER_JWT_SECRET inválido o ausente; abortando llamada');
   }
 }
 

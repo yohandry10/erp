@@ -10,42 +10,71 @@ La mayoría de los módulos críticos (Ventas, Compras, Finanzas) tienen tests d
 ## Detalle por Módulo
 
 ### 📦 Módulo 1: VENTAS
-- **Estado:** ⚠️ ALERTA (Mock-Only)
-- **Faltantes:**
-  - Tests de integración con **Base de Datos Real** (Docker/Supabase Local).
-  - Validación real de triggers y constraints de BD durante la creación de pedidos.
-  - Tests E2E que ejecuten el RPC `crear_pedido_completo` verdaderamente.
+- **Estado:** ✅ RESUELTO
+- **Implementado:**
+  - ✅ Tests E2E con BD real en `apps/erp-api/tests/e2e/ventas-e2e.test.ts`
+  - ✅ Test de RPC `crear_pedido_completo` contra Supabase local
+  - ✅ Test de constraint de stock (CHECK >= 0)
+  - ✅ Test de aislamiento RLS entre tenants
+  - ✅ Test de verificación de índices
+- **Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/ventas-e2e.test.ts`
 
 ### 📦 Módulo 2: CPE
-- **Estado:** ⚠️ ALERTA (Mock-Only)
-- **Faltantes:**
-  - Tests E2E con inserción real en tabla `cpe`.
-  - Validación de que las columnas esperadas por el código coincidan con la tabla real.
-  - Tests unitarios puros (actualmente solo hay integración mockeada).
+- **Estado:** ✅ RESUELTO
+- **Implementado:**
+  - ✅ Tests E2E con BD real en `apps/erp-api/tests/e2e/cpe-e2e.test.ts`
+  - ✅ Test de existencia y estructura de tabla cpe
+  - ✅ Test de índice de idempotencia (previene duplicados)
+  - ✅ Test de aislamiento RLS entre tenants
+  - ✅ Test de estados SUNAT válidos
+  - ✅ Test de campos de retry
+- **Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/cpe-e2e.test.ts`
 
 ### 📦 Módulo 3: INVENTARIO
-- **Estado:** 🟢 PASS (Con observaciones)
-- **Faltantes:**
-  - Tests de **Race Conditions** (simulación de 10 ventas simultáneas).
-  - Tests unitarios aislados para `inventario.service.ts` (opcional).
+- **Estado:** ✅ RESUELTO
+- **Implementado:**
+  - ✅ Tests E2E con BD real en `apps/erp-api/tests/e2e/inventario-e2e.test.ts`
+  - ✅ Constraint CHECK (stock >= 0) en migración `129__stock_constraints.sql`
+  - ✅ Test de tablas principales
+  - ✅ Test de RPC atómico
+  - ✅ Test de RLS entre tenants
+  - ✅ Test de precisión NUMERIC
+- **Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/inventario-e2e.test.ts`
+- **Pendiente (opcional):** Tests de race conditions extremos
 
 ### 📦 Módulo 4: COMPRAS
-- **Estado:** ⚠️ ALERTA (Mock-Only)
-- **Faltantes:**
-  - Tests E2E que toquen la base de datos real.
-  - Validación de triggers de cálculo (`calcular_totales_orden_compra`) desde la aplicación.
+- **Estado:** ✅ RESUELTO
+- **Implementado:**
+  - ✅ Tests E2E con BD real en `apps/erp-api/tests/e2e/compras-e2e.test.ts`
+  - ✅ Test de tablas principales (proveedores, ordenes_compra, cotizaciones, recepciones)
+  - ✅ Test de creación de proveedor con validaciones
+  - ✅ Test de RLS entre tenants
+  - ✅ Test de creación de OC con detalles
+  - ✅ Test de estados válidos de OC
+  - ✅ Test de constraint limite_credito >= 0
+- **Existente adicional:** Tests unitarios con mocks, tests Playwright E2E frontend
+- **Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/compras-e2e.test.ts`
 
 ### 📦 Módulo 5: FINANZAS
-- **Estado:** ⚠️ ALERTA (Mock-Only)
-- **Faltantes:**
-  - Tests E2E para flujos de dinero (pagos/cobros) con persistencia real.
-  - Validación de constraints de saldo (`CHECK (saldo >= 0)`) mediante tests.
+- **Estado:** ✅ RESUELTO
+- **Implementado:**
+  - ✅ Tests E2E con BD real en `apps/erp-api/tests/e2e/finanzas-e2e.test.ts`
+  - ✅ Test de tablas principales (CxC, CxP, cuentas_bancarias, movimientos)
+  - ✅ Test de creación de CxC y CxP
+  - ✅ Test de RLS entre tenants
+  - ✅ Test de cuenta bancaria con saldo
+  - ✅ Test de constraint saldo >= 0 (sin sobregiro)
+  - ✅ Test de estados válidos de CxC
+  - ✅ Test de precisión NUMERIC
+- **Existente adicional:** Tests unitarios con mocks (bancos, conciliacion, cxc, cxp, tesoreria)
+- **Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/finanzas-e2e.test.ts`
 
 ### 📦 Módulo 6: RRHH
 - **Estado:** ⏸️ PENDIENTE
 - **Faltantes:**
-  - **Todos los tests.** Implementación pendiente (batched).
-  - Prioridad: Cálculos de planilla (5ta categoría, AFP, ONP) y validación de precisión decimal.
+  - Tests de cálculos de planilla (5ta categoría, AFP, ONP)
+  - Validación de precisión decimal
+- **Prioridad:** ALTA (módulo crítico sin tests)
 
 ### 📦 Módulo 7: AUTH
 - **Estado:** ✅ PASS (Cobertura funcional)
@@ -82,8 +111,31 @@ La mayoría de los módulos críticos (Ventas, Compras, Finanzas) tienen tests d
 
 ---
 
-## Recomendación General
-Priorizar la creación de una **infraestructura de Testing E2E con Base de Datos Efímera** (Testcontainers o Supabase Local) para mitigar el riesgo de "Falsos Positivos" en los módulos críticos (1-5).
+## ✅ Infraestructura E2E Implementada
+
+Se creó infraestructura de Testing E2E con Supabase Local:
+
+**Archivos creados:**
+- `apps/erp-api/tests/e2e/helpers/supabase-test-client.ts` - Helper de conexión
+- `apps/erp-api/tests/e2e/ventas-e2e.test.ts` - Tests E2E Ventas
+- `apps/erp-api/tests/e2e/cpe-e2e.test.ts` - Tests E2E CPE
+- `apps/erp-api/tests/e2e/inventario-e2e.test.ts` - Tests E2E Inventario
+- `apps/erp-api/tests/e2e/run-all-e2e.ts` - Runner unificado
+
+**Ejecutar todos los tests E2E:**
+```bash
+npx supabase start  # Iniciar Supabase local
+npx ts-node --transpile-only apps/erp-api/tests/e2e/run-all-e2e.ts
+```
+
+**Ejecutar por módulo:**
+```bash
+npx ts-node --transpile-only apps/erp-api/tests/e2e/ventas-e2e.test.ts
+npx ts-node --transpile-only apps/erp-api/tests/e2e/cpe-e2e.test.ts
+npx ts-node --transpile-only apps/erp-api/tests/e2e/inventario-e2e.test.ts
+npx ts-node --transpile-only apps/erp-api/tests/e2e/compras-e2e.test.ts
+npx ts-node --transpile-only apps/erp-api/tests/e2e/finanzas-e2e.test.ts
+```
 
 
 

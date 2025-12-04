@@ -9,6 +9,7 @@ import {
   ResumenRetencionesResponse
 } from './retenciones.types';
 import { TenantContextService } from '../../shared/tenant/tenant-context.service';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class RetencionesService {
@@ -87,9 +88,16 @@ export class RetencionesService {
         };
       }
 
-      // Calcular retención
-      const montoRetencion = Math.round((data.monto_pago * (config.tasa_porcentaje / 100)) * 100) / 100;
-      const montoNeto = Math.round((data.monto_pago - montoRetencion) * 100) / 100;
+      // Calcular retención con Decimal.js para precisión financiera
+      const montoRetencion = new Decimal(data.monto_pago)
+        .times(config.tasa_porcentaje)
+        .dividedBy(100)
+        .toDecimalPlaces(2)
+        .toNumber();
+      const montoNeto = new Decimal(data.monto_pago)
+        .minus(montoRetencion)
+        .toDecimalPlaces(2)
+        .toNumber();
 
       return {
         monto_pago: data.monto_pago,
@@ -423,16 +431,16 @@ export class RetencionesService {
            resumen.retenciones_por_categoria.QUINTA.monto_total_pagado) * 100;
       }
 
-      // Redondear valores
-      resumen.monto_total_pagado = Math.round(resumen.monto_total_pagado * 100) / 100;
-      resumen.monto_total_retenido = Math.round(resumen.monto_total_retenido * 100) / 100;
-      resumen.monto_total_neto = Math.round(resumen.monto_total_neto * 100) / 100;
-      resumen.retenciones_por_categoria.CUARTA.monto_total_pagado = Math.round(resumen.retenciones_por_categoria.CUARTA.monto_total_pagado * 100) / 100;
-      resumen.retenciones_por_categoria.CUARTA.monto_total_retenido = Math.round(resumen.retenciones_por_categoria.CUARTA.monto_total_retenido * 100) / 100;
-      resumen.retenciones_por_categoria.CUARTA.tasa_promedio = Math.round(resumen.retenciones_por_categoria.CUARTA.tasa_promedio * 100) / 100;
-      resumen.retenciones_por_categoria.QUINTA.monto_total_pagado = Math.round(resumen.retenciones_por_categoria.QUINTA.monto_total_pagado * 100) / 100;
-      resumen.retenciones_por_categoria.QUINTA.monto_total_retenido = Math.round(resumen.retenciones_por_categoria.QUINTA.monto_total_retenido * 100) / 100;
-      resumen.retenciones_por_categoria.QUINTA.tasa_promedio = Math.round(resumen.retenciones_por_categoria.QUINTA.tasa_promedio * 100) / 100;
+      // Redondear valores con Decimal.js para precisión financiera
+      resumen.monto_total_pagado = new Decimal(resumen.monto_total_pagado).toDecimalPlaces(2).toNumber();
+      resumen.monto_total_retenido = new Decimal(resumen.monto_total_retenido).toDecimalPlaces(2).toNumber();
+      resumen.monto_total_neto = new Decimal(resumen.monto_total_neto).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.CUARTA.monto_total_pagado = new Decimal(resumen.retenciones_por_categoria.CUARTA.monto_total_pagado).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.CUARTA.monto_total_retenido = new Decimal(resumen.retenciones_por_categoria.CUARTA.monto_total_retenido).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.CUARTA.tasa_promedio = new Decimal(resumen.retenciones_por_categoria.CUARTA.tasa_promedio).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.QUINTA.monto_total_pagado = new Decimal(resumen.retenciones_por_categoria.QUINTA.monto_total_pagado).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.QUINTA.monto_total_retenido = new Decimal(resumen.retenciones_por_categoria.QUINTA.monto_total_retenido).toDecimalPlaces(2).toNumber();
+      resumen.retenciones_por_categoria.QUINTA.tasa_promedio = new Decimal(resumen.retenciones_por_categoria.QUINTA.tasa_promedio).toDecimalPlaces(2).toNumber();
 
       return resumen;
     } catch (error) {

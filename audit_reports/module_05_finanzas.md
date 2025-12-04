@@ -14,7 +14,7 @@ El módulo **FINANZAS** (CxC, CxP, Tesorería) presenta una estructura de base d
 |-----------|--------|-------------------|
 | **CÓDIGO** | ✅ FIJADO | Uso de `decimal.js` para cálculos monetarios (~~number nativo~~). |
 | **BASE DE DATOS** | ✅ SÓLIDO | Schemas `010` y `020` correctos, RLS activo, Constraints de saldo. |
-| **TESTS** | ⚠️ ALERTA | Tests de integración lógica existen pero son **100% Mocked**. |
+| **TESTS** | ✅ RESUELTO | Tests E2E con BD real implementados + tests unitarios con mocks. |
 | **DOCS** | ✅ PASS | Cumple con los requisitos de PROMP.md. |
 
 ---
@@ -52,10 +52,19 @@ El módulo **FINANZAS** (CxC, CxP, Tesorería) presenta una estructura de base d
 **Impacto:** Riesgo de discrepancias de centavos en conciliaciones bancarias o reportes contables.
 **Recomendación:** Refactorizar `cxp.service.ts` y `cxc.service.ts` para usar `decimal.js`.
 
-### ⚠️ HALLAZGO #2: Tests sin Base de Datos Real
-**Descripción:** Ausencia de tests E2E que validen la persistencia real y los constraints de BD.
-**Impacto:** Falsos positivos en tests si la BD tiene reglas que los mocks no replican.
-**Recomendación:** Implementar tests de integración con BD real para flujos críticos de dinero (pagos/cobros).
+### ✅ HALLAZGO #2: Tests sin Base de Datos Real - RESUELTO
+**Descripción:** Ausencia de tests E2E que validaran la persistencia real y los constraints de BD.
+**Resolución:** Se implementaron tests E2E reales en `apps/erp-api/tests/e2e/finanzas-e2e.test.ts`:
+- ✅ Test de tablas principales (CxC, CxP, cuentas_bancarias, movimientos_bancarios)
+- ✅ Test de creación de CxC con validaciones
+- ✅ Test de creación de CxP con validaciones
+- ✅ Test de RLS entre tenants
+- ✅ Test de cuenta bancaria con saldo
+- ✅ Test de constraint saldo >= 0 (sin sobregiro)
+- ✅ Test de estados válidos de CxC
+- ✅ Test de precisión NUMERIC para montos
+
+**Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/finanzas-e2e.test.ts`
 
 ---
 

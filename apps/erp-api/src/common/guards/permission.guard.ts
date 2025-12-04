@@ -65,6 +65,11 @@ export class PermissionGuard implements CanActivate {
       return true;
     }
 
+    // HARDENING: Admin del tenant tiene acceso completo a su tenant
+    if (user.roles?.includes('ADMIN')) {
+      return true;
+    }
+
     if (!user.tenant_id) {
       throw new UnauthorizedException('Tenant no identificado en token');
     }

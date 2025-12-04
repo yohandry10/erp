@@ -170,6 +170,25 @@ export class CotizacionesService {
       throw new BadRequestException('Error al crear el detalle de la cotización');
     }
 
+    // ✅ CORRECCIÓN BRECHA 1: Reservar stock para la cotización
+    try {
+      const { data: reservaResult, error: reservaError } = await client
+        .rpc('reservar_stock_cotizacion', {
+          p_cotizacion_id: cotizacion.id,
+          p_tenant_id: tenantId,
+        });
+
+      if (reservaError) {
+        console.error('⚠️ [CotizacionesService] Error reservando stock:', reservaError);
+        // No fallar la creación, solo loguear (el stock ya fue validado arriba)
+      } else {
+        console.log('✅ [CotizacionesService] Stock reservado:', reservaResult);
+      }
+    } catch (reservaErr) {
+      console.error('⚠️ [CotizacionesService] Error en reserva de stock:', reservaErr);
+      // Continuar sin fallar - la validación de stock ya se hizo
+    }
+
     console.log('✅ [CotizacionesService] Cotización creada:', cotizacion.id);
 
     return {
@@ -433,8 +452,10 @@ export class CotizacionesService {
    * Convertir cotización a pedido
    * Requirements: 4.2, 4.3, 4.4
    * 
-   * Nota: Este método prepara los datos para crear el pedido.
-   * La creación real del pedido se hará cuando el PedidosService esté implementado.
+   * ✅ CORRECCIÓN BRECHA 2: Usa función RPC transaccional para garantizar atomicidad
+   * - Si falla la creación del pedido, no se actualiza la cotización
+   * - Si falla la actualización de la cotización, se hace rollback del pedido
+   * - Todo en una sola transacción de base de datos
    */
   async convertirAPedido(
     id: string,
@@ -444,10 +465,10 @@ export class CotizacionesService {
   ): Promise<any> {
     const client = this.supabase.getClient();
 
-    // Obtener cotización con detalle
+    // Obtener cotización para validaciones previas y datos de respuesta
     const cotizacion = await this.findOne(id, tenantId);
 
-    // Validar que se puede convertir
+    // Validaciones previas (también se hacen en la función RPC, pero mejor fallar rápido)
     if (cotizacion.estado === EstadoCotizacion.CONVERTIDA) {
       throw new BadRequestException('Esta cotización ya fue convertida a pedido');
     }
@@ -466,51 +487,42 @@ export class CotizacionesService {
       throw new BadRequestException('La cotización no tiene productos para convertir en pedido');
     }
 
-    const pedidoDto: CreatePedidoDto = {
-      cliente_id: cotizacion.cliente_id,
-      cotizacion_id: id,
-      detalle: cotizacion.detalle.map((item) => ({
-        producto_id: item.producto_id,
-        descripcion: item.descripcion || 'Producto sin descripción',
-        cantidad: item.cantidad,
-        precio_unitario: item.precio_unitario,
-      })),
-      notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? cotizacion.notas,
-    };
+    // ✅ CORRECCIÓN BRECHA 2: Usar función RPC transaccional
+    const { data: resultado, error: rpcError } = await client
+      .rpc('convertir_cotizacion_a_pedido', {
+        p_cotizacion_id: id,
+        p_tenant_id: tenantId,
+        p_user_id: userId || null,
+        p_notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
+      });
 
-    const pedido = await this.pedidosService.create(pedidoDto, tenantId, userId);
-
-    const now = new Date().toISOString();
-    const { error: updateError } = await client
-      .from('cotizaciones')
-      .update({
-        estado: EstadoCotizacion.CONVERTIDA,
-        fecha_conversion: now,
-        convertido_por: userId || null,
-        updated_at: now,
-      })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-
-    if (updateError) {
-      console.error('❌ [CotizacionesService] Error actualizando cotización tras convertir:', updateError);
-      throw new BadRequestException('Cotización convertida pero no se pudo actualizar su estado');
+    if (rpcError) {
+      console.error('❌ [CotizacionesService] Error en conversión transaccional:', rpcError);
+      throw new BadRequestException(
+        rpcError.message || 'Error al convertir cotización a pedido',
+      );
     }
 
+    if (!resultado?.success) {
+      throw new BadRequestException('Error al convertir cotización a pedido');
+    }
+
+    console.log('✅ [CotizacionesService] Conversión transaccional exitosa:', resultado);
+
+    // Obtener cotización actualizada
     const updatedCotizacion = await this.findOne(id, tenantId);
 
-    // Emitir notificación
+    // Emitir notificación (no crítico, no falla si hay error)
     try {
       await this.notificationsService.createNotification(tenantId, {
-        type: NotificationType.CONFIGURATION_INCOMPLETE, // TODO: Agregar tipo VENTAS al enum
+        type: NotificationType.CONFIGURATION_INCOMPLETE,
         severity: NotificationSeverity.INFO,
         title: 'Cotización convertida',
-        message: `La cotización ${cotizacion.numero} ha sido convertida al pedido ${pedido.numero}`,
+        message: `La cotización ${cotizacion.numero} ha sido convertida al pedido ${resultado.pedido_numero}`,
         usuario_id: userId,
       });
     } catch (error) {
       console.error('Error creating notification:', error);
-      // No fallar si la notificación falla
     }
 
     console.log('✅ [CotizacionesService] Cotización convertida a pedido:', id);
@@ -519,8 +531,8 @@ export class CotizacionesService {
       success: true,
       message: 'Cotización convertida exitosamente',
       data: {
-        pedido_id: pedido.id,
-        pedido_numero: pedido.numero,
+        pedido_id: resultado.pedido_id,
+        pedido_numero: resultado.pedido_numero,
         cotizacion: updatedCotizacion,
       },
     };
@@ -683,6 +695,24 @@ export class CotizacionesService {
       throw new BadRequestException(
         'Solo se pueden eliminar cotizaciones en estado BORRADOR',
       );
+    }
+
+    // ✅ CORRECCIÓN: Liberar stock reservado antes de eliminar
+    try {
+      const { error: liberarError } = await client
+        .rpc('liberar_stock_cotizacion', {
+          p_cotizacion_id: id,
+          p_tenant_id: tenantId,
+        });
+
+      if (liberarError) {
+        console.error('⚠️ [CotizacionesService] Error liberando stock:', liberarError);
+        // Continuar con la eliminación aunque falle la liberación
+      } else {
+        console.log('✅ [CotizacionesService] Stock liberado para cotización:', id);
+      }
+    } catch (liberarErr) {
+      console.error('⚠️ [CotizacionesService] Error en liberación de stock:', liberarErr);
     }
 
     // Eliminar detalles primero
