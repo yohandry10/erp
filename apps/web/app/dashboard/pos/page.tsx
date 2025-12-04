@@ -12,6 +12,8 @@ import { QuickActions } from '@/components/pos/QuickActions'
 import { QuickClient } from '@/components/pos/QuickClient'
 import VentaExitosaModal from '@/components/pos/VentaExitosaModal'
 import './pos-styles.css'
+import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/ui/use-toast'
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -78,6 +80,8 @@ export default function POSPage() {
 
   const api = useApi()
   const { user } = useAuth()
+  const router = useRouter()
+  const { toast } = useToast()
 
   // Estados principales
   const [productos, setProductos] = useState<ProductoPOS[]>([])
@@ -128,20 +132,68 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const [productoSeleccionado, setProductoSeleccionado] = useState<string | null>(null);
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
   const cargandoRef = useRef(false);
+  const sesionGuardadaRef = useRef<string | null>(null);
 
   const formatMoney = (value: any): string => {
     const num = Number(value);
     return Number.isFinite(num) ? num.toFixed(2) : '0.00';
   };
 
+  // Alertar si se intenta cerrar/recargar la pestaña con caja abierta
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Tienes una caja abierta. Cierra la caja antes de salir para evitar sesiones abiertas.';
+    };
+
+    if (estadoCaja?.estado === 'ABIERTA') {
+      window.addEventListener('beforeunload', handler);
+    }
+
+    return () => {
+      window.removeEventListener('beforeunload', handler);
+    };
+  }, [estadoCaja?.estado]);
+
+  // Persistir la sesión de caja en localStorage para reanudar si el frontend recarga
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (estadoCaja?.estado === 'ABIERTA' && sesionCajaId) {
+      localStorage.setItem('pos_sesion_caja_id', sesionCajaId);
+    } else {
+      localStorage.removeItem('pos_sesion_caja_id');
+    }
+  }, [estadoCaja?.estado, sesionCajaId]);
+
   useEffect(() => {
     // Solo cargar datos una vez al montar el componente
     // Usar ref para evitar doble carga en StrictMode
     if (!datosInicializados && !cargandoRef.current) {
       cargandoRef.current = true;
-      cargarDatos()
+
+      // Rehidratar sesión almacenada (si la hay) para mostrar estado mientras valida con API
+      if (typeof window !== 'undefined') {
+        const sesionGuardada = localStorage.getItem('pos_sesion_caja_id');
+        if (sesionGuardada) {
+          sesionGuardadaRef.current = sesionGuardada;
+          setSesionCajaId(sesionGuardada);
+          setEstadoCaja((prev) => ({
+            estado: 'ABIERTA',
+            montoInicial: prev?.montoInicial || 0,
+            ventasEfectivo: prev?.ventasEfectivo || 0,
+            ventasTarjeta: prev?.ventasTarjeta || 0,
+            montoFinal: prev?.montoFinal || 0,
+            cajaId: prev?.cajaId,
+            sesionId: sesionGuardada,
+          }));
+        }
+      }
+
+      cargarDatos();
     }
-  }, [])
+  }, []);
 
   const cargarDatos = async () => {
     console.log('🔄 Cargando datos POS empresarial...')
@@ -257,7 +309,13 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
             && !sesionActiva.fecha_cierre
             && esMismoDia;
 
+          const sesionGuardada = sesionGuardadaRef.current;
+
           if (sesionValida) {
+            // Si había una sesión guardada y no coincide con la devuelta por el backend, limpiar storage
+            if (sesionGuardada && sesionGuardada !== sesionActiva.id && typeof window !== 'undefined') {
+              localStorage.removeItem('pos_sesion_caja_id');
+            }
             console.log('✅ Sesión de caja activa encontrada:', sesionActiva.id);
             const cajaActivaId = sesionActiva.caja_id || cajas[0].id;
             setCajaId(cajaActivaId);
@@ -272,6 +330,10 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
               sesionId: sesionActiva.id,
             });
           } else {
+            // Sesión no válida: limpiar storage y estado local
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('pos_sesion_caja_id');
+            }
             console.log('ℹ️ No hay sesión de caja activa, mostrando pantalla de apertura');
             setSesionCajaId(null);
             setEstadoCaja({
@@ -919,7 +981,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         setMostrarModalAbrirCaja(false)
         setMontoInicialInput('')
 
-        alert(`🔓 ¡CAJA ABIERTA!\nCaja abierta con S/ ${formatMoney(montoInicial)}`)
+        toast({
+          title: 'Caja abierta',
+          description: `Caja abierta con S/ ${formatMoney(montoInicial)}.`,
+        })
       }
     } catch (error) {
       console.error('❌ Error abriendo caja:', error)
@@ -975,7 +1040,10 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           cajaId,
         })
 
-        alert(`🔒 ¡CAJA CERRADA!\n\nMonto contado: S/ ${formatMoney(montoFinal)}\nDiferencia: S/ ${formatMoney(diferencia)}`)
+        toast({
+          title: 'Caja cerrada',
+          description: `Monto contado: S/ ${formatMoney(montoFinal)}. Diferencia: S/ ${formatMoney(diferencia)}.`,
+        })
       }
     } catch (error) {
       console.error('❌ Error cerrando caja:', error)
@@ -1198,6 +1266,18 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 }}
               >
                 🔄 Sincronizar
+              </button>
+              <button
+                onClick={() => router.push('/dashboard/cajas#cortes')}
+                className="btn"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  padding: '0.8rem 1.2rem',
+                }}
+              >
+                📄 Ver cortes
               </button>
               <button
                 onClick={cerrarCaja}

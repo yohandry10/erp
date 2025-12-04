@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CashSessionSelector } from './components/CashSessionSelector';
 import { ActiveCashSession } from './components/ActiveCashSession';
 import { CashOpenDialog } from './components/CashOpenDialog';
+import { CortesList } from './components/CortesList';
 
 export default function CashManagementPage() {
     const [sesionActiva, setSesionActiva] = useState<any | null>(null);
@@ -25,7 +26,13 @@ export default function CashManagementPage() {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div
+            className="p-6 max-w-7xl mx-auto"
+            style={{
+                background: 'var(--bg-page, linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%))',
+                backgroundImage: 'none',
+            }}
+        >
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Gestión de Cajas</h1>
@@ -47,6 +54,8 @@ export default function CashManagementPage() {
                         key={refreshKey}
                         onSelect={handleSessionSelect}
                     />
+
+                    <CortesList id="cortes" />
 
                     {/* Info Card */}
                     <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-start space-x-3">

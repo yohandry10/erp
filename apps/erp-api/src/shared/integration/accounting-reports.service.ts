@@ -207,7 +207,7 @@ export class AccountingReportsService {
         `,
         )
         .like('plan_cuentas.codigo', '6%')
-        .order('asientos_contables.fecha', { ascending: true });
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -387,8 +387,8 @@ export class AccountingReportsService {
         )
       `,
       )
-      .order('plan_cuentas.codigo')
-      .order('asientos_contables.fecha', { ascending: true });
+      .order('codigo', { foreignTable: 'plan_cuentas' })
+      .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
     if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
     if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);

@@ -199,8 +199,8 @@ export class PleExportService {
       .eq('asientos_contables.tenant_id', tenantId)
       .gte('asientos_contables.fecha', fechaInicio)
       .lte('asientos_contables.fecha', fechaFin)
-      .order('plan_cuentas(codigo)')
-      .order('asientos_contables(fecha)');
+      .order('codigo', { foreignTable: 'plan_cuentas' })
+      .order('fecha', { foreignTable: 'asientos_contables' });
 
     if (error) {
       this.logger.error('Error obteniendo movimientos:', error);

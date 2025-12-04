@@ -122,7 +122,7 @@ export class CashClosingService {
             .from('ventas_pos')
             .select('id, numero_ticket, cpe_id')
             .eq('sesion_caja_id', sesionId)
-            .is('cpe_id', null)
+            .eq('cpe_id', null)
             .eq('cpe_pendiente', false)
             .limit(10);
 

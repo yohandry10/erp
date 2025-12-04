@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CashMovementsService, TipoMovimiento } from './cash-movements.service';
 import { CashReconciliationService, Denominaciones } from './cash-reconciliation.service';
@@ -387,6 +388,36 @@ export class CashShiftChangesService {
                 resultado: 'COMPLETADO',
             },
         );
+
+        // 6. Registrar log de integración (contabilidad/seguimiento)
+        try {
+            await this.supabase.getClient()
+                .from('integration_logs')
+                .insert({
+                    id: uuidv4(),
+                    tenant_id: tenantId,
+                    servicio: 'CAJA',
+                    operacion: 'CAMBIO_TURNO',
+                    status: 'SUCCESS',
+                    error_message: null,
+                    timestamp: new Date().toISOString(),
+                    correlacion_id: cambioId,
+                    correlacion_tipo: 'CAMBIO_TURNO',
+                    request_summary: null,
+                    response_summary: JSON.stringify({
+                        sesion_caja_id: cambio.sesion_caja_id,
+                        usuario_saliente_id: cambio.usuario_saliente_id,
+                        usuario_entrante_id: cambio.usuario_entrante_id,
+                        saldo_sistema: cambio.saldo_sistema,
+                        saldo_contado: saldoContado,
+                        diferencia,
+                    }),
+                });
+        } catch (logErr) {
+            this.logger.warn(
+                `No se pudo registrar integration_logs para CAMBIO_TURNO ${cambioId}: ${logErr?.message || logErr}`,
+            );
+        }
 
         this.logger.log(
             `Cambio de turno completado: ID=${cambioId}, diferencia=S/.${diferencia.toFixed(2)}`,
