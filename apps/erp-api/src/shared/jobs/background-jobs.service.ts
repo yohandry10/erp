@@ -70,10 +70,10 @@ export class BackgroundJobsService {
     }
 
     const delay = scheduledTime.getTime() - now.getTime();
-    setTimeout(() => {
+    this.setSafeTimeout(delay, () => {
       callback();
       setInterval(callback, 24 * 60 * 60 * 1000); // Repetir cada 24 horas
-    }, delay);
+    });
 
     console.log(`📅 [BackgroundJobs] Job programado diariamente a las ${time}`);
   }
@@ -96,40 +96,50 @@ export class BackgroundJobsService {
     }
 
     const delay = scheduledTime.getTime() - now.getTime();
-    setTimeout(() => {
+    this.setSafeTimeout(delay, () => {
       callback();
       setInterval(callback, 7 * 24 * 60 * 60 * 1000); // Repetir cada semana
-    }, delay);
+    });
 
     console.log(`📅 [BackgroundJobs] Job programado semanalmente los ${['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek]} a las ${time}`);
   }
 
   private scheduleMonthly(dayOfMonth: number, time: string, callback: () => void) {
-    const [hours, minutes, seconds] = time.split(':').map(Number);
-    const now = new Date();
-    const scheduledTime = new Date();
-    
-    scheduledTime.setDate(dayOfMonth);
-    scheduledTime.setHours(hours, minutes, seconds, 0);
+    const nextRun = this.getNextMonthlyDate(dayOfMonth, time);
+    const delay = nextRun.getTime() - Date.now();
 
-    if (scheduledTime <= now) {
-      scheduledTime.setMonth(scheduledTime.getMonth() + 1);
-    }
-
-    const delay = scheduledTime.getTime() - now.getTime();
-    setTimeout(() => {
+    this.setSafeTimeout(delay, () => {
       callback();
-      
-      // Programar para el próximo mes
-      const nextMonth = new Date(scheduledTime);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      const nextDelay = nextMonth.getTime() - Date.now();
-      setTimeout(() => {
-        this.scheduleMonthly(dayOfMonth, time, callback);
-      }, nextDelay);
-    }, delay);
+      this.scheduleMonthly(dayOfMonth, time, callback); // reprogramar siguiente mes
+    });
 
     console.log(`📅 [BackgroundJobs] Job programado mensualmente el día ${dayOfMonth} a las ${time}`);
+  }
+
+  private getNextMonthlyDate(dayOfMonth: number, time: string): Date {
+    const [hours, minutes, seconds] = time.split(':').map(Number);
+    const now = new Date();
+    const next = new Date(now);
+
+    next.setDate(dayOfMonth);
+    next.setHours(hours, minutes, seconds, 0);
+
+    if (next <= now) {
+      next.setMonth(next.getMonth() + 1);
+    }
+
+    return next;
+  }
+
+  // Node timers se limitan a 2^31-1 ms; este helper divide delays largos (p.ej., >24 días) para evitar overflow.
+  private setSafeTimeout(delayMs: number, callback: () => void) {
+    const MAX_TIMEOUT_MS = 2_147_483_647;
+    if (delayMs <= MAX_TIMEOUT_MS) {
+      setTimeout(callback, delayMs);
+      return;
+    }
+
+    setTimeout(() => this.setSafeTimeout(delayMs - MAX_TIMEOUT_MS, callback), MAX_TIMEOUT_MS);
   }
 
   // ========== JOBS AUTOMÁTICOS ==========
@@ -232,6 +242,30 @@ export class BackgroundJobsService {
     const now = new Date();
     const peruString = now.toLocaleString('en-US', { timeZone: 'America/Lima' });
     return new Date(peruString);
+  }
+
+  // Revisa si ya existe un SUCCESS reciente del mismo job para evitar duplicados
+  private async hasRecentSuccess(jobName: string, tenantId: string, sinceIso: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase.getPublicClient()
+        .from('integration_logs')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('servicio', 'BACKGROUND_JOBS')
+        .eq('operacion', jobName)
+        .eq('status', 'SUCCESS')
+        .gte('timestamp', sinceIso)
+        .limit(1);
+
+      if (error) {
+        console.warn(`⚠️ [BackgroundJobs] No se pudo verificar duplicados para ${jobName} (${tenantId}): ${error.message}`);
+        return false;
+      }
+      return (data?.length || 0) > 0;
+    } catch (err: any) {
+      console.warn(`⚠️ [BackgroundJobs] Error verificando duplicados para ${jobName} (${tenantId}): ${err?.message || err}`);
+      return false;
+    }
   }
 
   async ejecutarCierreVentasDiario(tenantId: string) {
@@ -437,6 +471,15 @@ export class BackgroundJobsService {
       const mesAnterior = new Date();
       mesAnterior.setMonth(mesAnterior.getMonth() - 1);
       const periodo = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
+      const inicioPeriodoIso = new Date(Date.UTC(mesAnterior.getFullYear(), mesAnterior.getMonth(), 1)).toISOString();
+      const siguientePeriodoIso = new Date(Date.UTC(mesAnterior.getFullYear(), mesAnterior.getMonth() + 1, 1)).toISOString();
+
+      // Evitar duplicados: si ya hay SUCCESS desde el inicio del periodo, no volver a generar
+      const yaEjecutado = await this.hasRecentSuccess('sire', tenantId, inicioPeriodoIso);
+      if (yaEjecutado) {
+        console.log(`⏸️ [BackgroundJobs] Reporte SIRE ya generado para periodo ${periodo} (tenant ${tenantId}), se omite`);
+        return;
+      }
 
       // TODO: Implement isMockMode() in SupabaseService if needed
       const isMockMode = false; // Placeholder
@@ -459,8 +502,8 @@ export class BackgroundJobsService {
 
       const ventasQuery = this.supabase.query('ventas_pos')
         .select('*')
-        .gte('created_at', `${periodo}-01T00:00:00`)
-        .lt('created_at', `${periodo}-31T23:59:59`);
+        .gte('created_at', inicioPeriodoIso)
+        .lt('created_at', siguientePeriodoIso);
 
       const { data: ventas, error: ventasError } = await ventasQuery;
 

@@ -6,7 +6,17 @@ const createSupabaseMock = () => {
       case 'empresa_config':
         return { data: { ruc: '12345678901', razon_social: 'ACME S.A.C.', dias_vencimiento_factura: 30 }, error: null };
       case 'sesiones_caja':
-        return { data: null, error: { code: 'PGRST116' } }; // sin sesión abierta
+        return {
+          data: [{
+            id: 'sesion-1',
+            estado: 'ABIERTA',
+            congelada: false,
+            hora_apertura: new Date().toISOString(),
+            tenant_id: 'tenant-1',
+            cajero_id: 'user-1',
+          }],
+          error: null
+        }; // sesión abierta para flujo feliz
       case 'outbox_events':
         return { data: null, error: null };
       case 'ventas_pos':

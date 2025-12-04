@@ -107,7 +107,7 @@ export class AccountingBooksService {
         )
         .eq('plan_cuentas.codigo', cuentaCodigo)
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha', { ascending: true });
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -155,7 +155,7 @@ export class AccountingBooksService {
         )
         .eq('tenant_id', tenantId)
         .order('plan_cuentas.codigo')
-        .order('asientos_contables.fecha', { ascending: true });
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -244,7 +244,7 @@ export class AccountingBooksService {
             id,
             codigo,
             nombre,
-            tipo_cuenta
+            tipo
           ),
           asientos_contables(
             fecha
@@ -295,23 +295,38 @@ export class AccountingBooksService {
 
       let query = this.supabase
         .getClient()
-        .from('movimientos_stock')
+        .from('vw_kardex_valorizado')
         .select(
           `
-          *,
-          productos(
-            nombre,
-            codigo,
-            unidad_medida
-          )
+          recepcion_item_id,
+          recepcion_id,
+          tenant_id,
+          recepcion_numero,
+          fecha_recepcion,
+          recepcion_estado,
+          producto_id,
+          producto_codigo,
+          producto_nombre,
+          producto_sku,
+          cantidad_recibida,
+          costo_unitario,
+          valor_total,
+          almacen_id,
+          almacen_nombre,
+          ubicacion_id,
+          ubicacion_codigo,
+          lote,
+          serie,
+          fecha_expiracion,
+          moneda_detalle
         `,
         )
         .eq('tenant_id', tenantId)
-        .order('fecha', { ascending: true });
+        .order('fecha_recepcion', { ascending: true });
 
       if (productoId) query = query.eq('producto_id', productoId);
-      if (fechaDesde) query = query.gte('fecha', fechaDesde);
-      if (fechaHasta) query = query.lte('fecha', fechaHasta);
+      if (fechaDesde) query = query.gte('fecha_recepcion', fechaDesde);
+      if (fechaHasta) query = query.lte('fecha_recepcion', fechaHasta);
 
       const { data: movimientos, error } = await query;
       if (error) throw error;
@@ -320,18 +335,23 @@ export class AccountingBooksService {
       let valorAcumulado = 0;
 
       const kardex = (movimientos || []).map((mov: any) => {
-        const cantidad = mov.tipo === 'ENTRADA' ? mov.cantidad : -mov.cantidad;
-        const valor =
-          mov.tipo === 'ENTRADA'
-            ? mov.valor_unitario * mov.cantidad
-            : -mov.valor_unitario * mov.cantidad;
+        const cantidad = Number(mov.cantidad_recibida ?? 0);
+        const valor = Number(mov.valor_total ?? (mov.costo_unitario ?? 0) * cantidad);
 
         stockAcumulado += cantidad;
         valorAcumulado += valor;
 
         const costoPromedio = stockAcumulado > 0 ? valorAcumulado / stockAcumulado : 0;
 
-        return { ...mov, stockAcumulado, valorAcumulado, costoPromedio };
+        return {
+          ...mov,
+          tipo: 'ENTRADA',
+          fecha: mov.fecha_recepcion,
+          documento: mov.recepcion_numero,
+          stockAcumulado,
+          valorAcumulado,
+          costoPromedio,
+        };
       });
 
       return kardex;
@@ -369,7 +389,7 @@ export class AccountingBooksService {
         )
         .in('plan_cuentas.codigo', cuentasCajaBancos)
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha', { ascending: true });
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -427,7 +447,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '20%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha', { ascending: true });
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -482,7 +502,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '33%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha');
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -514,7 +534,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '62%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha');
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -546,7 +566,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '9%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha');
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -611,7 +631,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '70%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha');
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -643,7 +663,7 @@ export class AccountingBooksService {
         )
         .like('plan_cuentas.codigo', '60%')
         .eq('tenant_id', tenantId)
-        .order('asientos_contables.fecha');
+        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);

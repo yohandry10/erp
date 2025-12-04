@@ -241,7 +241,10 @@ export class PosService {
   async getSesionCajaActual(user: any) {
     return this.runWithTenantContext(user, async () => {
       try {
-        const { data, error } = await this.supabase.getClient()
+        const client = this.supabase.getClient();
+
+        // Traer todas las sesiones ABIERTAS de este usuario (por rol/campos) ordenadas por apertura desc
+        const { data: sesiones, error } = await client
           .from('sesiones_caja')
           .select('*')
           .eq('tenant_id', user.tenant_id)
@@ -249,37 +252,59 @@ export class PosService {
           .eq('estado', 'ABIERTA')
           .is('hora_cierre', null)
           .is('fecha_cierre', null)
-          .maybeSingle();
+          .order('hora_apertura', { ascending: false })
+          .limit(10);
 
         if (error && error.code !== 'PGRST116') throw error;
 
-        // Invalidar sesiones viejas: siempre exigir nueva apertura cada día
-        if (data) {
-          const aperturaIso = data.hora_apertura || data.fecha_apertura || data.created_at;
-          const apertura = aperturaIso ? new Date(aperturaIso) : null;
-          const hoy = new Date();
-          const mismaFecha =
-            !!apertura &&
-            apertura.getFullYear() === hoy.getFullYear() &&
-            apertura.getMonth() === hoy.getMonth() &&
-            apertura.getDate() === hoy.getDate();
+        const listaSesiones = Array.isArray(sesiones)
+          ? sesiones
+          : sesiones
+            ? [sesiones as any]
+            : [];
 
-          if (!mismaFecha) {
-            this.logger.warn(
-              `Sesión de caja abierta de un día anterior detectada y descartada. Sesión=${data.id}, Apertura=${aperturaIso}`,
-            );
-            return {
-              success: true,
-              data: null,
-              message: 'Sesión de caja expirada. Abra una nueva sesión.',
-            };
+        if (listaSesiones.length === 0) {
+          return { success: true, data: null };
+        }
+
+        const hoy = new Date();
+        const hoyString = hoy.toISOString().split('T')[0];
+
+        // Cerrar sesiones anteriores a hoy para evitar arrastre de sesiones "huérfanas"
+        const sesionesVencidas = listaSesiones.filter((s) => {
+          const aperturaIso = s.hora_apertura || s.fecha_apertura || s.created_at;
+          if (!aperturaIso) return true;
+          const apertura = new Date(aperturaIso);
+          const aperturaStr = apertura.toISOString().split('T')[0];
+          return aperturaStr !== hoyString;
+        });
+
+        if (sesionesVencidas.length > 0) {
+          const ids = sesionesVencidas.map((s) => s.id);
+          try {
+            await client
+              .from('sesiones_caja')
+              .update({
+                estado: 'CERRADA',
+                hora_cierre: new Date().toISOString(),
+                fecha_cierre: new Date().toISOString(),
+                notas: 'Cierre automático por sesión anterior al día actual',
+              })
+              .in('id', ids);
+          } catch (cerrarErr) {
+            this.logger.warn('⚠️ No se pudieron cerrar sesiones vencidas:', cerrarErr);
           }
         }
 
-        return {
-          success: true,
-          data: data ?? null,
-        };
+        // Quedarse con la sesión más reciente de hoy
+        const sesionHoy = listaSesiones.find((s) => {
+          const aperturaIso = s.hora_apertura || s.fecha_apertura || s.created_at;
+          if (!aperturaIso) return false;
+          const apertura = new Date(aperturaIso);
+          return apertura.toISOString().split('T')[0] === hoyString;
+        });
+
+        return { success: true, data: sesionHoy || null };
       } catch (error) {
         this.logger.error('Error obteniendo sesión de caja POS:', error);
         return {
@@ -979,21 +1004,23 @@ export class PosService {
 
   private async abrirCajaInternal(montoInicial: number, user: any) {
     try {
-      // Validar que no exista una sesión abierta para este usuario/tenant
-      const { data: sesionAbierta } = await this.supabase.getClient()
+      const client = this.supabase.getClient();
+
+      // Cerrar sesiones abiertas previas de este usuario/tenant (para evitar duplicados y asegurar día limpio)
+      await client
         .from('sesiones_caja')
-        .select('id')
+        .update({
+          estado: 'CERRADA',
+          hora_cierre: new Date().toISOString(),
+          fecha_cierre: new Date().toISOString(),
+          notas: 'Cierre automático al abrir nueva sesión',
+        })
         .eq('tenant_id', user.tenant_id)
         .or(`cajero_id.eq.${user.id},abierto_por.eq.${user.id}`)
         .eq('estado', 'ABIERTA')
-        .is('hora_cierre', null)
-        .maybeSingle();
+        .is('hora_cierre', null);
 
-      if (sesionAbierta) {
-        throw new Error('Ya existe una sesión de caja abierta para este usuario');
-      }
-
-      const { data: empresaCfg } = await this.supabase.getClient()
+      const { data: empresaCfg } = await client
         .from('empresa_config')
         .select('moneda_defecto')
         .eq('tenant_id', user.tenant_id)
@@ -1001,7 +1028,7 @@ export class PosService {
 
       const moneda = empresaCfg?.moneda_defecto || 'PEN';
 
-      const { data, error } = await this.supabase.getClient()
+      const { data, error } = await client
         .from('sesiones_caja')
         .insert({
           tenant_id: user.tenant_id,

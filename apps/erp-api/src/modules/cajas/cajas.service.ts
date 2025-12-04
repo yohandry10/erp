@@ -7,6 +7,7 @@ import { CerrarCajaDto } from './dto/cerrar-caja.dto';
 import { ConfiguracionCajaService } from './services/configuracion-caja.service';
 import { AutorizacionesCajaService } from './services/autorizaciones-caja.service';
 import { CashReconciliationService, Denominaciones } from './services/cash-reconciliation.service';
+import { CashReportsService } from './services/cash-reports.service';
 
 @Injectable()
 export class CajasService {
@@ -17,6 +18,7 @@ export class CajasService {
     private readonly configuracionService: ConfiguracionCajaService,
     private readonly autorizacionesService: AutorizacionesCajaService,
     private readonly reconciliationService: CashReconciliationService,
+    private readonly cashReportsService: CashReportsService,
   ) { }
 
   async listarCajas(tenantId: string) {
@@ -532,15 +534,18 @@ export class CajasService {
 
     const esperado = sesion.monto_esperado ?? sesion.monto_inicial ?? 0;
     const contado = dto.monto_cierre ?? dto.monto_contado ?? sesion.monto_contado ?? 0;
-    const cierre = {
+    const cierre: any = {
       estado: 'CERRADA',
       fecha_cierre: new Date().toISOString(),
       monto_contado: contado,
       diferencia: contado - esperado,
       usuario_cierre: userId ?? sesion.usuario_id ?? null,
       notas: dto.notas ?? sesion.notas ?? null,
-      resumen: dto.resumen ?? sesion.resumen ?? null,
     };
+    // Campo "resumen" no existe en todos los entornos; evitar error de schema cache si no está presente
+    if (dto.resumen) {
+      cierre.resumen = dto.resumen;
+    }
 
     const { data, error } = await this.supabase.getClient()
       .from('sesiones_caja')
@@ -551,6 +556,15 @@ export class CajasService {
       .select()
       .single();
     if (error) throw error;
+
+    // Registrar corte y asiento contable de cierre (no bloquea el cierre si falla)
+    try {
+      await this.cashReportsService.registrarCorte(tenantId, data.id);
+      await this.cashReportsService.registrarAsientoCierre(tenantId, data.id);
+    } catch (registrarError) {
+      this.logger.error(`No se pudo registrar corte/asiento de cierre: ${registrarError.message}`);
+    }
+
     return data;
   }
 
@@ -576,6 +590,43 @@ export class CajasService {
     const { data, error } = await query.order('fecha_apertura', { ascending: false });
     if (error) throw error;
     return data || [];
+  }
+
+  async listarCortes(tenantId: string, filtros: { fecha_desde?: string; fecha_hasta?: string; caja_id?: string }) {
+    let query = this.supabase.getClient()
+      .from('cortes_caja')
+      .select('*')
+      .eq('tenant_id', tenantId);
+
+    if (filtros.caja_id) query = query.eq('caja_id', filtros.caja_id);
+    if (filtros.fecha_desde) query = query.gte('fecha_corte', filtros.fecha_desde);
+    if (filtros.fecha_hasta) query = query.lte('fecha_corte', filtros.fecha_hasta);
+
+    const { data, error } = await query.order('fecha_corte', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async obtenerCorte(tenantId: string, corteId: string) {
+    return this.cashReportsService.obtenerCortePersistido(tenantId, corteId);
+  }
+
+  async exportarCortePdf(tenantId: string, corteId: string) {
+    const corte = await this.obtenerCorte(tenantId, corteId);
+    return this.cashReportsService.generarReporteCierrePDF(corte.sesion_caja_id, tenantId);
+  }
+
+  async exportarCorteCsv(tenantId: string, corteId: string) {
+    const corte = await this.obtenerCorte(tenantId, corteId);
+    return this.cashReportsService.generarCorteCSV(corte.sesion_caja_id, tenantId);
+  }
+
+  async obtenerCorteZ(tenantId: string, sesionId: string) {
+    if (!sesionId) {
+      throw new BadRequestException('Se requiere sesionId para generar el reporte');
+    }
+    // Reutiliza el servicio de reportes de caja (ventas, métodos de pago, fiscal, movimientos)
+    return this.cashReportsService.obtenerDatosReporteCierre(sesionId, tenantId);
   }
 
   /**

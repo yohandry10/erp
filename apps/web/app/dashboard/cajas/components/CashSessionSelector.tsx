@@ -75,6 +75,11 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
         }
     };
 
+    const formatMonto = (valor: number | null | undefined) => {
+        const num = Number(valor ?? 0);
+        return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+    };
+
     if (loading) {
         return <div className="p-4 text-center text-gray-500">Cargando sesiones...</div>;
     }
@@ -93,13 +98,97 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
         );
     }
 
+    const cardStyle: React.CSSProperties = {
+        background: 'var(--bg-card, #fff)',
+        border: '1px solid var(--border-color, #e5e7eb)',
+        borderRadius: '12px',
+        boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.06))',
+        overflow: 'hidden',
+    };
+
+    const headerStyle: React.CSSProperties = {
+        padding: '14px 16px',
+        borderBottom: '1px solid var(--border-color, #e5e7eb)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'var(--bg-subtle, #f8fafc)',
+    };
+
+    const titleStyle: React.CSSProperties = {
+        fontWeight: 600,
+        color: 'var(--text-primary, #1f2937)',
+        margin: 0,
+    };
+
+    const buttonGhostStyle: React.CSSProperties = {
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--primary, #2563eb)',
+        cursor: 'pointer',
+        fontSize: '0.9rem',
+    };
+
+    const listStyle: React.CSSProperties = {
+        maxHeight: '420px',
+        overflowY: 'auto',
+    };
+
+    const rowStyle: React.CSSProperties = {
+        padding: '14px 16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottom: '1px solid var(--border-color, #e5e7eb)',
+        cursor: 'pointer',
+        background: 'var(--bg-card, #fff)',
+    };
+
+    const pillStyle = (estado: string): React.CSSProperties => ({
+        padding: '4px 8px',
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        borderRadius: '999px',
+        border: '1px solid var(--border-color, #d1d5db)',
+        background:
+            estado === 'ABIERTA'
+                ? 'rgba(16,185,129,0.12)'
+                : estado === 'CERRADA'
+                ? 'rgba(107,114,128,0.12)'
+                : 'rgba(59,130,246,0.12)',
+        color:
+            estado === 'ABIERTA'
+                ? '#047857'
+                : estado === 'CERRADA'
+                ? '#374151'
+                : '#1d4ed8',
+    });
+
+    const labelMuted: React.CSSProperties = { color: 'var(--text-secondary, #6b7280)', fontSize: '0.9rem' };
+    const smallMuted: React.CSSProperties = { color: 'var(--text-tertiary, #9ca3af)', fontSize: '0.8rem' };
+
     if (sesiones.length === 0) {
         return (
-            <div className={`text-center p-8 bg-gray-50 rounded-lg border border-dashed border-gray-300 ${className}`}>
-                <p className="text-gray-500 mb-4">No hay sesiones recientes</p>
+            <div
+                className={className}
+                style={{
+                    ...cardStyle,
+                    padding: '18px',
+                    textAlign: 'center',
+                    borderStyle: 'dashed',
+                }}
+            >
+                <p style={{ color: 'var(--text-secondary, #6b7280)', marginBottom: '8px' }}>No hay sesiones recientes</p>
                 <button
-                    onClick={() => {/* TODO: Trigger open session dialog */ }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    onClick={() => {/* placeholder for abrir caja */}}
+                    style={{
+                        padding: '10px 14px',
+                        background: 'var(--gradient-primary, linear-gradient(90deg,#2563eb,#1d4ed8))',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                    }}
                 >
                     Abrir Nueva Caja
                 </button>
@@ -108,54 +197,57 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     }
 
     return (
-        <div className={`bg-white rounded-lg shadow overflow-hidden ${className}`}>
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                <h3 className="font-semibold text-gray-700">Sesiones de Caja</h3>
-                <button
-                    onClick={cargarSesiones}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                >
+        <div className={className} style={cardStyle}>
+            <div style={headerStyle}>
+                <h3 style={titleStyle}>Sesiones de Caja</h3>
+                <button onClick={cargarSesiones} style={buttonGhostStyle}>
                     Actualizar
                 </button>
             </div>
 
-            <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
+            <div style={listStyle}>
                 {sesiones.map((sesion) => (
                     <div
                         key={sesion.id}
                         onClick={() => onSelect(sesion)}
-                        className="p-4 hover:bg-gray-50 cursor-pointer transition-colors flex justify-between items-center group"
+                        style={rowStyle}
+                        onMouseEnter={(e) => ((e.currentTarget.style.background = 'var(--bg-subtle, #f8fafc)'))}
+                        onMouseLeave={(e) => ((e.currentTarget.style.background = 'var(--bg-card, #fff)'))}
                     >
-                        <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${getEstadoColor(sesion.estado)}`}>
-                                    {sesion.estado}
-                                </span>
-                                <span className="font-medium text-gray-900">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={pillStyle(sesion.estado)}>{sesion.estado}</span>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary, #111827)' }}>
                                     {sesion.caja?.nombre || 'Caja Principal'}
                                 </span>
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div style={labelMuted}>
                                 {formatearFecha(sesion.hora_apertura)}
                                 {sesion.hora_cierre && ` - ${formatearFecha(sesion.hora_cierre)}`}
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">
+                            <div style={smallMuted}>
                                 Por: {sesion.usuario?.nombres} {sesion.usuario?.apellidos}
                             </div>
                         </div>
 
-                        <div className="text-right">
-                            <div className="text-sm font-medium text-gray-900">
-                                Ini: S/ {sesion.monto_inicio.toFixed(2)}
+                        <div style={{ textAlign: 'right', minWidth: '120px' }}>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary, #111827)' }}>
+                                Ini: S/ {formatMonto(sesion.monto_inicio)}
                             </div>
                             {sesion.monto_cierre !== undefined && (
-                                <div className="text-sm text-gray-600">
-                                    Fin: S/ {sesion.monto_cierre.toFixed(2)}
+                                <div style={{ ...labelMuted, fontSize: '0.9rem' }}>
+                                    Fin: S/ {formatMonto(sesion.monto_cierre)}
                                 </div>
                             )}
                             {sesion.diferencia !== undefined && sesion.diferencia !== 0 && (
-                                <div className={`text-xs font-medium ${sesion.diferencia > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    Dif: {sesion.diferencia > 0 ? '+' : ''}{sesion.diferencia.toFixed(2)}
+                                <div
+                                    style={{
+                                        fontSize: '0.85rem',
+                                        fontWeight: 600,
+                                        color: sesion.diferencia > 0 ? '#16a34a' : '#dc2626',
+                                    }}
+                                >
+                                    Dif: {sesion.diferencia > 0 ? '+' : ''}{formatMonto(sesion.diferencia)}
                                 </div>
                             )}
                         </div>

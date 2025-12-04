@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, BadRequestException, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { CajasService } from './cajas.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
 import { UpdateCajaDto } from './dto/update-caja.dto';
@@ -80,6 +81,50 @@ export class CajasController {
     return { success: true, data };
   }
 
+  @Get('cortes')
+  async listarCortes(
+    @CurrentTenant() tenantId: string,
+    @Query('fecha_desde') fecha_desde?: string,
+    @Query('fecha_hasta') fecha_hasta?: string,
+    @Query('caja_id') caja_id?: string,
+  ) {
+    const data = await this.service.listarCortes(tenantId, { fecha_desde, fecha_hasta, caja_id });
+    return { success: true, data };
+  }
+
+  @Get('cortes/:corteId')
+  async obtenerCorte(
+    @CurrentTenant() tenantId: string,
+    @Param('corteId') corteId: string,
+  ) {
+    const data = await this.service.obtenerCorte(tenantId, corteId);
+    return { success: true, data };
+  }
+
+  @Get('cortes/:corteId/pdf')
+  async descargarCortePdf(
+    @CurrentTenant() tenantId: string,
+    @Param('corteId') corteId: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.service.exportarCortePdf(tenantId, corteId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="corte-${corteId}.pdf"`);
+    res.send(buffer);
+  }
+
+  @Get('cortes/:corteId/csv')
+  async descargarCorteCsv(
+    @CurrentTenant() tenantId: string,
+    @Param('corteId') corteId: string,
+    @Res() res: Response,
+  ) {
+    const csv = await this.service.exportarCorteCsv(tenantId, corteId);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="corte-${corteId}.csv"`);
+    res.send(csv);
+  }
+
   /**
    * Cierre administrativo de sesión colgada
    * 
@@ -111,5 +156,15 @@ export class CajasController {
       data,
       message: 'Sesión cerrada administrativamente. Esta acción ha sido registrada en auditoría.',
     };
+  }
+
+  @Get(':id/corte-z')
+  async obtenerCorteZ(
+    @CurrentTenant() tenantId: string,
+    @Param('id') cajaId: string,
+    @Query('sesionId') sesionId: string,
+  ) {
+    const data = await this.service.obtenerCorteZ(tenantId, sesionId);
+    return { success: true, data, cajaId, sesionId };
   }
 }
