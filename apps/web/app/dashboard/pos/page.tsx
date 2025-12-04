@@ -381,7 +381,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       // Mostrar el error real al usuario
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      alert(`❌ ERROR CARGANDO POS\n\nDetalle: ${errorMessage}\n\nPor favor:\n1. Verifica la conexión a la base de datos\n2. Asegúrate de que existe la vista 'vista_pos_productos'\n3. Revisa los logs del servidor`);
+      toast({
+        variant: 'destructive',
+        title: '❌ Error cargando POS',
+        description: `${errorMessage}. Verifica la conexión y la vista 'vista_pos_productos'.`,
+      });
 
       // Establecer valores por defecto en caso de error total
       setProductos([])
@@ -426,12 +430,19 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       // Mostrar éxito si se recargaron productos
       if (productosData.length > 0) {
-        alert(`✅ Se recargaron ${productosData.length} productos correctamente`);
+        toast({
+          title: '✅ Productos recargados',
+          description: `${productosData.length} productos cargados correctamente.`,
+        });
       }
     } catch (error) {
       console.error('❌ Error recargando productos:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      alert(`❌ ERROR RECARGANDO PRODUCTOS\n\nDetalle: ${errorMessage}\n\nVerifica:\n1. Conexión a la base de datos\n2. Existencia de vista_pos_productos\n3. Productos activos en la base de datos`);
+      toast({
+        variant: 'destructive',
+        title: '❌ Error recargando productos',
+        description: errorMessage,
+      });
     }
   }
 
@@ -547,13 +558,20 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
     // Verificar stock disponible (excepto servicios)
     if (!producto.es_servicio && stockDisponible <= 0) {
-      alert(`❌ SIN STOCK\n${producto.nombre} no tiene stock disponible`)
+      toast({
+        variant: 'destructive',
+        title: '❌ Sin stock',
+        description: `${producto.nombre} no tiene stock disponible.`,
+      })
       return
     }
 
     // Aviso de stock mínimo
     if (!producto.es_servicio && stockDisponible <= (producto.stock_minimo ?? 0)) {
-      alert(`⚠️ Stock mínimo alcanzado\n${producto.nombre} tiene stock bajo (${stockDisponible})`)
+      toast({
+        title: '⚠️ Stock bajo',
+        description: `${producto.nombre} tiene stock bajo (${stockDisponible}).`,
+      })
     }
 
     // Validar límite de items SUNAT (max 999 items)
@@ -562,9 +580,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const nuevaCantidadTotal = itemExistente ? totalItems + 1 : totalItems + 1
 
     if (nuevaCantidadTotal > 999) {
-      alert(
-        `❌ LÍMITE DE ITEMS EXCEDIDO\n\nSUNAT permite máximo 999 items por documento.\nActualmente tiene ${totalItems} items en el carrito.\n\nNo puede agregar más productos.`
-      )
+      toast({
+        variant: 'destructive',
+        title: '❌ Límite de items excedido',
+        description: `SUNAT permite máximo 999 items. Actualmente tiene ${totalItems} items.`,
+      })
       return
     }
 
@@ -573,7 +593,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     if (itemExistente) {
       // Verificar que no exceda el stock
       if (!producto.es_servicio && itemExistente.cantidad >= stockDisponible) {
-        alert(`❌ STOCK INSUFICIENTE\nSolo hay ${stockDisponible} unidades disponibles`)
+        toast({
+          variant: 'destructive',
+          title: '❌ Stock insuficiente',
+          description: `Solo hay ${stockDisponible} unidades disponibles.`,
+        })
         return
       }
 
@@ -619,9 +643,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       const nuevaCantidadTotal = totalOtrosItems + nuevaCantidad
 
       if (nuevaCantidadTotal > 999) {
-        alert(
-          `❌ LÍMITE DE ITEMS EXCEDIDO\n\nSUNAT permite máximo 999 items por documento.\nCon esta cantidad tendría ${nuevaCantidadTotal} items.\n\nReduzca la cantidad o elimine otros productos.`
-        )
+        toast({
+          variant: 'destructive',
+          title: '❌ Límite de items excedido',
+          description: `Con esta cantidad tendría ${nuevaCantidadTotal} items. Máximo permitido: 999.`,
+        })
         return
       }
 
@@ -646,12 +672,20 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const procesarVenta = async () => {
     // 1. Validaciones iniciales
     if (carrito.length === 0) {
-      alert('❌ CARRITO VACÍO\nAgregue productos antes de procesar la venta')
+      toast({
+        variant: 'destructive',
+        title: '❌ Carrito vacío',
+        description: 'Agregue productos antes de procesar la venta.',
+      })
       return
     }
 
     if (!clienteSeleccionado || !metodoPagoSeleccionado) {
-      alert('❌ DATOS INCOMPLETOS\nSeleccione cliente y método de pago')
+      toast({
+        variant: 'destructive',
+        title: '❌ Datos incompletos',
+        description: 'Seleccione cliente y método de pago.',
+      })
       return
     }
 
@@ -659,19 +693,30 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
     const documento = (clienteActual?.numero_documento || '').trim()
     if (!documento || documento.length < 8) {
-      alert('❌ DOCUMENTO INVÁLIDO\nSeleccione un cliente con documento válido (mínimo 8 dígitos)')
+      toast({
+        variant: 'destructive',
+        title: '❌ Documento inválido',
+        description: 'Seleccione un cliente con documento válido (mínimo 8 dígitos).',
+      })
       return
     }
 
     // Validar que Factura requiere RUC
     if (tipoComprobante === '01' && clienteActual?.tipo_documento !== 'RUC') {
-      alert('❌ FACTURA REQUIERE RUC\n\nPara emitir Factura, el cliente debe tener RUC.\nSeleccione Boleta o cambie el cliente.')
+      toast({
+        variant: 'destructive',
+        title: '❌ Factura requiere RUC',
+        description: 'Para emitir Factura, el cliente debe tener RUC.',
+      })
       return
     }
 
     // Validar que la caja esté abierta antes de cualquier operación
     if (!estadoCaja || estadoCaja.estado !== 'ABIERTA' || !sesionCajaId) {
-      alert('🔒 CAJA CERRADA\nDebe abrir la caja con el monto inicial antes de registrar ventas.')
+      toast({
+        title: '🔒 Caja cerrada',
+        description: 'Debe abrir la caja antes de registrar ventas.',
+      })
       setMostrarModalAbrirCaja(true)
       return
     }
@@ -679,9 +724,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     // 2. Validaciones SUNAT antes de procesar
     const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0)
     if (totalItems > 999) {
-      alert(
-        `❌ VALIDACIÓN SUNAT FALLIDA\n\nEl documento tiene ${totalItems} items.\nSUNAT permite máximo 999 items por documento.\n\nReduzca la cantidad de items antes de continuar.`
-      )
+      toast({
+        variant: 'destructive',
+        title: '❌ Validación SUNAT fallida',
+        description: `El documento tiene ${totalItems} items. Máximo permitido: 999.`,
+      })
       return
     }
 
@@ -690,22 +737,19 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     const esBoletaSinRuc = clienteActual?.tipo_documento !== 'RUC'
 
     if (esBoletaSinRuc && totalVenta > 700) {
-      const confirmar = confirm(
-        `⚠️ ADVERTENCIA SUNAT\n\nEl monto total es S/ ${formatMoney(totalVenta)}\n\nPara ventas mayores a S/ 700 sin RUC, se generará automáticamente una Guía de Remisión Electrónica (GRE).\n\n¿Desea continuar?`
-      )
-      if (!confirmar) {
-        return
-      }
+      // Para ventas > S/700 sin RUC, mostrar advertencia pero continuar
+      toast({
+        title: '⚠️ Advertencia SUNAT',
+        description: `Venta > S/ 700 sin RUC. Se generará GRE automáticamente.`,
+      })
     }
 
     // Check configuration status before processing
     if (configurationStatus && !configurationStatus.isComplete) {
-      const confirmar = confirm(
-        `⚠️ CONFIGURACIÓN INCOMPLETA\n\n${!configurationStatus.certificate.isValid ? '❌ Certificado digital inválido\n' : ''}${configurationStatus.ruc.missingFields.length > 0 ? `❌ Faltan datos: ${configurationStatus.ruc.missingFields.join(', ')}\n` : ''}\nLa venta puede fallar. ¿Desea continuar de todos modos?`
-      )
-      if (!confirmar) {
-        return
-      }
+      toast({
+        title: '⚠️ Configuración incompleta',
+        description: 'La venta puede fallar. Revise la configuración.',
+      })
     }
 
     let resultado: any = null;
@@ -769,10 +813,12 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         console.log('✅ Resultado recibido:', resultado)
       } catch (apiError: any) {
         console.error('❌ Error de conexión API:', apiError)
-        const reintentar = confirm('Error de red al procesar la venta. ¿Desea reintentar?')
-        if (!reintentar) {
-          throw new Error(`Error de conexión: ${apiError?.message || 'Error de red'}`)
-        }
+        toast({
+          variant: 'destructive',
+          title: '❌ Error de red',
+          description: 'Reintentando conexión...',
+        })
+        // Reintentar automáticamente una vez
         resultado = await enviarVenta()
       }
 
@@ -880,7 +926,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
 🚨 LA VENTA NO SE GUARDÓ - REVISA EL ERROR Y CORRIGE LA BD`;
 
-      alert(mensajeDetallado)
+      console.error(mensajeDetallado)
+      toast({
+        variant: 'destructive',
+        title: '❌ Error procesando venta',
+        description: errorMessage,
+      })
     }
   }
 
@@ -949,13 +1000,21 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     const montoInicial = parseFloat(montoInicialInput)
 
     if (isNaN(montoInicial) || montoInicial < 0) {
-      alert('❌ MONTO INVÁLIDO\nIngrese un monto inicial válido')
+      toast({
+        variant: 'destructive',
+        title: '❌ Monto inválido',
+        description: 'Ingrese un monto inicial válido.',
+      })
       return
     }
 
     try {
       if (!cajaId) {
-        alert('❌ No hay caja configurada para abrir. Cree una caja primero.')
+        toast({
+          variant: 'destructive',
+          title: '❌ Sin caja configurada',
+          description: 'No hay caja configurada. Cree una caja primero.',
+        })
         return
       }
 
@@ -994,33 +1053,30 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   const cerrarCaja = async () => {
     try {
       if (!cajaId || !sesionCajaId) {
-        alert('❌ No hay sesión de caja activa para cerrar.')
+        toast({
+          variant: 'destructive',
+          title: '❌ Sin sesión activa',
+          description: 'No hay sesión de caja activa para cerrar.',
+        })
         return
       }
 
-      // Pedir confirmación con monto contado
-      const montoContado = prompt(
-        `🔒 CERRAR CAJA\n\nMonto inicial: S/ ${formatMoney(estadoCaja?.montoInicial || 0)}\n\nIngrese el monto contado en caja:`,
-        '0'
-      )
-      
-      if (montoContado === null) {
-        return // Usuario canceló
-      }
+      // Mostrar modal de cierre de caja
+      setMostrarModalCerrarCaja(true)
+    } catch (error) {
+      console.error('❌ Error preparando cierre de caja:', error)
+      toast({
+        variant: 'destructive',
+        title: '❌ Error',
+        description: 'Error preparando cierre de caja.',
+      })
+    }
+  }
 
-      const montoFinal = parseFloat(montoContado) || 0
+  const confirmarCerrarCaja = async () => {
+    try {
+      const montoFinal = parseFloat(montoContadoInput) || 0
       const diferencia = montoFinal - (estadoCaja?.montoInicial || 0)
-      
-      const confirmar = confirm(
-        `¿Confirmar cierre de caja?\n\n` +
-        `Monto inicial: S/ ${formatMoney(estadoCaja?.montoInicial || 0)}\n` +
-        `Monto contado: S/ ${formatMoney(montoFinal)}\n` +
-        `Diferencia: S/ ${formatMoney(diferencia)}`
-      )
-      
-      if (!confirmar) {
-        return
-      }
 
       const resultado = await api.post(`/cajas/${cajaId}/cierre`, {
         sesion_id: sesionCajaId,
@@ -1037,7 +1093,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           ventasEfectivo: 0,
           ventasTarjeta: 0,
           montoFinal: 0,
-          cajaId,
+          cajaId: cajaId || undefined,
         })
 
         toast({
@@ -1045,10 +1101,16 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           description: `Monto contado: S/ ${formatMoney(montoFinal)}. Diferencia: S/ ${formatMoney(diferencia)}.`,
         })
       }
+      setMostrarModalCerrarCaja(false)
+      setMontoContadoInput('')
     } catch (error) {
       console.error('❌ Error cerrando caja:', error)
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido'
-      alert(`❌ Error cerrando caja: ${errorMsg}`)
+      toast({
+        variant: 'destructive',
+        title: '❌ Error cerrando caja',
+        description: errorMsg,
+      })
     }
   }
 
@@ -2217,6 +2279,164 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     border: '1px solid #2563eb', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
                   }}>
                     🖨️ Imprimir
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Cierre de Caja */}
+          {mostrarModalCerrarCaja && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2000,
+                padding: '2rem',
+              }}
+            >
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  borderRadius: '24px',
+                  padding: '2rem',
+                  width: '100%',
+                  maxWidth: '450px',
+                  boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  position: 'relative',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '4px',
+                    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                    borderRadius: '24px 24px 0 0',
+                  }}
+                />
+                <h3
+                  style={{
+                    fontSize: '1.5rem',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  🔒 Cerrar Caja
+                </h3>
+
+                <div
+                  style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    marginBottom: '1.5rem',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#991b1b' }}>
+                    <strong>Monto inicial:</strong> S/ {formatMoney(estadoCaja?.montoInicial || 0)}
+                  </p>
+                </div>
+
+                <label
+                  htmlFor="monto-contado-cierre"
+                  style={{
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontWeight: 600,
+                    color: '#374151',
+                  }}
+                >
+                  Ingrese el monto contado en caja:
+                </label>
+                <input
+                  id="monto-contado-cierre"
+                  name="monto-contado-cierre"
+                  type="number"
+                  value={montoContadoInput}
+                  onChange={(e) => setMontoContadoInput(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    fontSize: '1.2rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    marginBottom: '1rem',
+                  }}
+                  autoFocus
+                />
+
+                {montoContadoInput && (
+                  <div
+                    style={{
+                      background: parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
+                      border: `1px solid ${parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#a7f3d0' : '#fecaca'}`,
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      marginBottom: '1.5rem',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#065f46' : '#991b1b' }}>
+                      <strong>Diferencia:</strong> S/ {formatMoney(parseFloat(montoContadoInput || '0') - (estadoCaja?.montoInicial || 0))}
+                    </p>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    onClick={confirmarCerrarCaja}
+                    style={{
+                      flex: 1,
+                      padding: '1rem',
+                      background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    ✅ Confirmar Cierre
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMostrarModalCerrarCaja(false)
+                      setMontoContadoInput('')
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '1rem',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    Cancelar
                   </button>
                 </div>
               </div>

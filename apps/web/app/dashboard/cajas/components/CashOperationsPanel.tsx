@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CashClosingDialog } from './CashClosingDialog';
 import { CashWithdrawalDialog } from './CashWithdrawalDialog';
 import { ShiftChangeDialog } from './ShiftChangeDialog';
+import { useToast } from '@/components/ui/use-toast';
 
 interface CashOperationsPanelProps {
     sesionId: string;
@@ -10,6 +11,7 @@ interface CashOperationsPanelProps {
 }
 
 export function CashOperationsPanel({ sesionId, onOperationComplete, className = '' }: CashOperationsPanelProps) {
+    const { toast } = useToast();
     const [showClosingDialog, setShowClosingDialog] = useState(false);
     const [showWithdrawalDialog, setShowWithdrawalDialog] = useState(false);
     const [showShiftChangeDialog, setShowShiftChangeDialog] = useState(false);
@@ -74,6 +76,10 @@ export function CashOperationsPanel({ sesionId, onOperationComplete, className =
                 onClose={() => setShowClosingDialog(false)}
                 onSuccess={() => {
                     setShowClosingDialog(false);
+                    toast({
+                        title: '🔒 Caja Cerrada',
+                        description: 'La sesión de caja se ha cerrado correctamente.',
+                    });
                     onOperationComplete();
                 }}
                 sesionId={sesionId}
