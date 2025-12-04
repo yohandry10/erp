@@ -27,7 +27,7 @@
     "fix-encoding": "powershell -ExecutionPolicy Bypass -File ./scripts/fix-encoding.ps1"
   },
   "devDependencies": {
-    "@types/node": "^20.12.7",
+    "@types/node": "^24.10.1",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "turbo": "^1.13.4",
