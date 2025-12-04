@@ -59,8 +59,11 @@ export class CajasController {
     @Param('id') id: string,
     @Body() dto: CerrarCajaDto
   ) {
-    const sesionId = dto['sesion_id'] || dto['sesionId'] || null;
+    // Normalizar alias provenientes del frontend/POS
+    const sesionId = dto.sesion_id || dto.sesionId || null;
     const cajaId = id;
+    dto.monto_cierre = dto.monto_cierre ?? dto.monto_contado;
+
     const data = await this.service.cerrarCaja(tenantId, cajaId, sesionId, dto, user?.id);
     return { success: true, data };
   }

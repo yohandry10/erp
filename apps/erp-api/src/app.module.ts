@@ -55,6 +55,9 @@ import { CajasModule } from './modules/cajas/cajas.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobsModule } from './shared/jobs/jobs.module';
 import { SharedModule } from './shared/shared.module';
+import { DemoModule } from './modules/demo/demo.module';
+import { DemoExpiredGuard } from './modules/demo/guards/demo-expired.guard';
+import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-restrictions.interceptor';
 
 
 @Module({
@@ -67,6 +70,7 @@ import { SharedModule } from './shared/shared.module';
     SecurityModule,
     SecurityDashboardModule,
     SharedModule, // 📊 Logging estructurado con Correlation IDs
+    DemoModule, // 🎯 DEMO: Módulo de tenants demo con datos seed
     AuthModule,
     SupabaseModule,
     PermissionsModule,
@@ -134,6 +138,18 @@ import { SharedModule } from './shared/shared.module';
       provide: APP_INTERCEPTOR,
       useClass: TenantContextInterceptor,
     },
+    // 🎯 DEMO: Guard que valida si el tenant demo está expirado
+    // Se ejecuta después de JwtAuthGuard para tener acceso al tenant_id
+    {
+      provide: APP_GUARD,
+      useClass: DemoExpiredGuard,
+    },
+    // 🎯 DEMO: Interceptor que aplica restricciones a tenants demo
+    // Simula respuestas de SUNAT, bloquea operaciones sensibles
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DemoRestrictionsInterceptor,
+    },
   ],
 })
 export class AppModule implements NestModule {
@@ -157,6 +173,8 @@ export class AppModule implements NestModule {
         { path: 'auth/refresh', method: RequestMethod.POST },
         { path: 'auth/forgot-password', method: RequestMethod.POST },
         { path: 'auth/reset-password', method: RequestMethod.POST },
+        // Exclude demo endpoints (no requieren tenant context previo)
+        { path: 'demo/create', method: RequestMethod.POST },
         // Exclude public endpoints
         { path: 'api/paises', method: RequestMethod.GET },
         { path: 'api/paises/:id', method: RequestMethod.GET },

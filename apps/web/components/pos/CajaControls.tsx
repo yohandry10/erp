@@ -1,4 +1,5 @@
 import React from 'react';
+import { HelpIcon } from '@/components/help';
 
 type EstadoCaja = {
   estado: 'ABIERTA' | 'CERRADA';
@@ -59,10 +60,10 @@ export const CajaControls: React.FC<Props> = ({
       </div>
 
       <div className="flex gap-2">
-        <button className="btn btn-green" onClick={abrirCaja}>
+        <button className="btn btn-green" onClick={abrirCaja} data-tour="btn-abrir-caja">
           Abrir caja
         </button>
-        <button className="btn btn-red" onClick={cerrarCaja} disabled={estadoCaja?.estado !== 'ABIERTA'}>
+        <button className="btn btn-red" onClick={cerrarCaja} disabled={estadoCaja?.estado !== 'ABIERTA'} data-tour="btn-cerrar-caja">
           Cerrar caja
         </button>
       </div>
@@ -70,13 +71,18 @@ export const CajaControls: React.FC<Props> = ({
       {mostrarModalAbrirCaja && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h3 className="font-bold mb-2">Abrir Caja</h3>
-            <label className="text-sm">Monto inicial</label>
+            <h3 className="font-bold mb-2">
+              Abrir Caja <HelpIcon helpKey="pos.apertura_caja" position="right" />
+            </h3>
+            <label className="text-sm flex items-center gap-1">
+              Monto inicial <HelpIcon helpKey="pos.apertura_caja" position="top" />
+            </label>
             <input
               type="number"
               value={montoInicialInput}
               onChange={(e) => setMontoInicialInput(e.target.value)}
               className="input"
+              data-tour="input-monto-inicial"
             />
             <div className="flex gap-2 mt-3">
               <button className="btn btn-green" onClick={confirmarAbrirCaja}>
@@ -91,7 +97,9 @@ export const CajaControls: React.FC<Props> = ({
       )}
 
       <div className="mt-3">
-        <label className="text-sm">Monto contado (cierre)</label>
+        <label className="text-sm flex items-center gap-1">
+          Monto contado (cierre) <HelpIcon helpKey="pos.cierre_caja" position="top" />
+        </label>
         <input
           type="number"
           value={montoContadoInput}

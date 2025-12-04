@@ -6,6 +6,7 @@ import { TenantContextService } from '../tenant/tenant-context.service';
 export class SupabaseService {
   private supabase: SupabaseClient;
   private publicSupabase: SupabaseClient;
+  private adminSupabase: SupabaseClient; // Cliente admin para auth operations
   private readonly logger = new Logger(SupabaseService.name);
   private readonly serviceRoleKey: string;
   private readonly supabaseUrl: string;
@@ -28,6 +29,14 @@ export class SupabaseService {
           'X-Client-Info': 'erp-api-public',
         },
       },
+    });
+
+    // Cliente admin para operaciones de auth (crear/eliminar usuarios)
+    this.adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     });
 
     this.supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -107,6 +116,15 @@ export class SupabaseService {
    */
   getPublicClient(): SupabaseClient {
     return this.publicSupabase;
+  }
+
+  /**
+   * Obtiene el cliente admin para operaciones de autenticación
+   * USAR SOLO para crear/eliminar usuarios en auth.users
+   * Este cliente tiene permisos de service_role para auth admin API
+   */
+  getAdminClient(): SupabaseClient {
+    return this.adminSupabase;
   }
 
   query(table: string) {

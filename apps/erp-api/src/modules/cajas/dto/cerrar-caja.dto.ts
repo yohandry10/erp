@@ -5,6 +5,10 @@ export class CerrarCajaDto {
   @IsNotEmpty()
   monto_cierre: number;
 
+  @IsOptional()
+  @IsNumber()
+  monto_contado?: number;
+
   @IsString()
   @IsOptional()
   moneda?: string;
@@ -15,4 +19,12 @@ export class CerrarCajaDto {
 
   @IsOptional()
   resumen?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  sesion_id?: string;
+
+  @IsOptional()
+  @IsString()
+  sesionId?: string;
 }

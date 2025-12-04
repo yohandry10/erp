@@ -11,11 +11,19 @@ export class PlanillasService {
   ) { }
 
   // Obtener todas las planillas
-  async getPlanillas() {
-    const { data, error } = await this.supabaseService.getClient()
+  // ✅ FIX: Agregar soporte multi-tenant
+  async getPlanillas(tenantId?: string) {
+    let query = this.supabaseService.getClient()
       .from('planillas')
       .select('*')
       .order('periodo', { ascending: false });
+    
+    // ✅ Filtrar por tenant si se proporciona
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
     return {
       success: true,
@@ -24,25 +32,38 @@ export class PlanillasService {
   }
 
   // Crear nueva planilla
-  async crearPlanilla(planillaData: any) {
+  // ✅ FIX: Agregar soporte multi-tenant
+  async crearPlanilla(planillaData: any, tenantId?: string) {
+    const dataToInsert = tenantId 
+      ? { ...planillaData, tenant_id: tenantId }
+      : planillaData;
+      
     const { data, error } = await this.supabaseService.getClient()
       .from('planillas')
-      .insert(planillaData)
+      .insert(dataToInsert)
       .select();
     if (error) throw error;
     return data[0];
   }
 
   // Calcular planilla mensual para todos los empleados activos
-  async calcularPlanillaMensual(planillaId: string) {
+  // ✅ FIX: Agregar soporte multi-tenant
+  async calcularPlanillaMensual(planillaId: string, tenantId?: string) {
     console.log(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
 
     // Obtener empleados activos
-    const { data: empleados, error: empleadosError } = await client
+    let empleadosQuery = client
       .from('empleados')
       .select('*, contratos(*)')
       .eq('estado', 'activo');
+    
+    // ✅ Filtrar por tenant si se proporciona
+    if (tenantId) {
+      empleadosQuery = empleadosQuery.eq('tenant_id', tenantId);
+    }
+    
+    const { data: empleados, error: empleadosError } = await empleadosQuery;
 
     if (empleadosError) {
       console.error('❌ Error obteniendo empleados:', empleadosError);
@@ -336,36 +357,64 @@ export class PlanillasService {
     };
   }
 
-  // Verificar si el empleado tiene hijos (simplificado)
+  // Verificar si el empleado tiene hijos
   private tieneHijos(empleado: any): boolean {
-    // En un sistema real, esto vendría de una tabla de familiares
-    // Por ahora asumimos que algunos empleados tienen hijos
-    return Math.random() > 0.6; // 40% tienen hijos
+    // ✅ FIX: Usar datos reales del empleado en lugar de aleatorio
+    // Verificar campo tiene_hijos o cantidad_hijos del empleado
+    if (empleado.tiene_hijos === true) return true;
+    if (empleado.cantidad_hijos && empleado.cantidad_hijos > 0) return true;
+    // Verificar si tiene familiares registrados como hijos
+    if (empleado.familiares?.some((f: any) => f.parentesco === 'hijo')) return true;
+    // Por defecto, si tiene el campo asignacion_familiar activo
+    if (empleado.asignacion_familiar === true) return true;
+    return false;
   }
 
-  // Calcular impuesto a la renta (simplificado)
+  // Calcular impuesto a la renta 5ta categoría (Perú 2024-2025)
   private calcularImpuestoRenta(ingresoMensual: number): number {
-    const ingresoAnual = ingresoMensual * 12;
-    const UIT_2024 = 5150; // UIT para 2024
-    const limite = 7 * UIT_2024; // 7 UIT
+    // ✅ FIX: Usar Decimal.js para precisión en cálculos tributarios
+    const ingreso = new Decimal(ingresoMensual);
+    const ingresoAnual = ingreso.times(12);
+    const UIT_2025 = new Decimal(5350); // UIT para 2025
+    const limite = UIT_2025.times(7); // 7 UIT exoneradas
 
-    if (ingresoAnual <= limite) {
+    if (ingresoAnual.lte(limite)) {
       return 0; // No paga impuesto
     }
 
-    // Cálculo simplificado del impuesto (8% - 30% según tramos)
-    const exceso = ingresoAnual - limite;
-    let impuestoAnual = 0;
+    // Cálculo según tramos de renta de 5ta categoría
+    const exceso = ingresoAnual.minus(limite);
+    let impuestoAnual = new Decimal(0);
 
-    if (exceso <= 27 * UIT_2024) {
-      impuestoAnual = exceso * 0.08; // 8%
-    } else if (exceso <= 54 * UIT_2024) {
-      impuestoAnual = (27 * UIT_2024 * 0.08) + ((exceso - 27 * UIT_2024) * 0.14); // 14%
+    const tramo1 = UIT_2025.times(5);  // Hasta 5 UIT: 8%
+    const tramo2 = UIT_2025.times(20); // De 5 a 20 UIT: 14%
+    const tramo3 = UIT_2025.times(35); // De 20 a 35 UIT: 17%
+    const tramo4 = UIT_2025.times(45); // De 35 a 45 UIT: 20%
+    // Más de 45 UIT: 30%
+
+    if (exceso.lte(tramo1)) {
+      impuestoAnual = exceso.times(0.08);
+    } else if (exceso.lte(tramo2)) {
+      impuestoAnual = tramo1.times(0.08).plus(exceso.minus(tramo1).times(0.14));
+    } else if (exceso.lte(tramo3)) {
+      impuestoAnual = tramo1.times(0.08)
+        .plus(tramo2.minus(tramo1).times(0.14))
+        .plus(exceso.minus(tramo2).times(0.17));
+    } else if (exceso.lte(tramo4)) {
+      impuestoAnual = tramo1.times(0.08)
+        .plus(tramo2.minus(tramo1).times(0.14))
+        .plus(tramo3.minus(tramo2).times(0.17))
+        .plus(exceso.minus(tramo3).times(0.20));
     } else {
-      impuestoAnual = (27 * UIT_2024 * 0.08) + (27 * UIT_2024 * 0.14) + ((exceso - 54 * UIT_2024) * 0.17); // 17%
+      impuestoAnual = tramo1.times(0.08)
+        .plus(tramo2.minus(tramo1).times(0.14))
+        .plus(tramo3.minus(tramo2).times(0.17))
+        .plus(tramo4.minus(tramo3).times(0.20))
+        .plus(exceso.minus(tramo4).times(0.30));
     }
 
-    return Math.round(impuestoAnual / 12 * 100) / 100; // Impuesto mensual
+    // Retornar impuesto mensual con 2 decimales
+    return impuestoAnual.dividedBy(12).toDecimalPlaces(2).toNumber();
   }
 
   // Obtener detalle de planilla por empleado
@@ -465,14 +514,21 @@ export class PlanillasService {
     }
   }
 
-  async getConceptos() {
+  // ✅ FIX: Agregar soporte multi-tenant
+  async getConceptos(tenantId?: string) {
     const client = this.supabaseService.getClient();
-    const { data, error } = await client
+    let query = client
       .from('conceptos_planilla')
       .select('*')
       .eq('activo', true)
       .order('codigo', { ascending: true });
+    
+    // ✅ Filtrar por tenant si se proporciona
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
 
+    const { data, error } = await query;
     if (error) throw error;
     return {
       success: true,
@@ -809,8 +865,10 @@ export class PlanillasService {
         throw new Error('Planilla no encontrada');
       }
 
-      if (planilla.estado !== 'CALCULADA') {
-        throw new Error('Solo se pueden pagar planillas en estado CALCULADA');
+      // ✅ FIX: Normalizar comparación de estados (case-insensitive)
+      const estadoNormalizado = (planilla.estado || '').toUpperCase();
+      if (estadoNormalizado !== 'CALCULADA') {
+        throw new Error(`Solo se pueden pagar planillas en estado CALCULADA. Estado actual: ${planilla.estado}`);
       }
 
       if (planilla.estado_pago === 'PAGADO') {
@@ -1092,11 +1150,12 @@ export class PlanillasService {
         throw new Error('Planilla no encontrada');
       }
 
-      // ✅ VERIFICAR ESTADO (aceptar tanto 'calculada' como 'borrador' si tiene empleados procesados)
-      console.log(`🔍 [RRHH] Estado de la planilla: ${planilla.estado}`);
+      // ✅ FIX: Normalizar comparación de estados (case-insensitive)
+      const estadoNormalizado = (planilla.estado || '').toUpperCase();
+      console.log(`🔍 [RRHH] Estado de la planilla: ${planilla.estado} (normalizado: ${estadoNormalizado})`);
       console.log(`🔍 [RRHH] Empleados en planilla: ${planilla.empleado_planilla?.length || 0}`);
 
-      if (planilla.estado !== 'calculada' && (!planilla.empleado_planilla || planilla.empleado_planilla.length === 0)) {
+      if (estadoNormalizado !== 'CALCULADA' && (!planilla.empleado_planilla || planilla.empleado_planilla.length === 0)) {
         throw new Error(`No se pueden generar asientos - Estado: ${planilla.estado}, Empleados: ${planilla.empleado_planilla?.length || 0}`);
       }
 

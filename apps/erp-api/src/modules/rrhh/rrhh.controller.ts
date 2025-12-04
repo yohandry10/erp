@@ -76,48 +76,73 @@ export class RrhhController {
   @Get('planillas')
   async getPlanillas(@CurrentTenant() tenantId: string) {
     console.log(`📋 [RRHH] Obteniendo planillas para tenant: ${tenantId}`);
-    return this.planillasService.getPlanillas();
+    return this.planillasService.getPlanillas(tenantId);
   }
 
   @Post('planillas')
   async crearPlanilla(@CurrentTenant() tenantId: string, @Body() planillaData: any) {
     console.log(`📋 [RRHH] Creando planilla para tenant: ${tenantId}`, planillaData);
-    return this.planillasService.crearPlanilla(planillaData);
+    return this.planillasService.crearPlanilla(planillaData, tenantId);
   }
 
   @Post('planillas/:id/calcular')
-  async calcularPlanilla(@Param('id') planillaId: string) {
-    return this.planillasService.calcularPlanillaMensual(planillaId);
+  async calcularPlanilla(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string
+  ) {
+    console.log(`🧮 [RRHH] Calculando planilla ${planillaId} para tenant: ${tenantId}`);
+    return this.planillasService.calcularPlanillaMensual(planillaId, tenantId);
   }
 
   @Get('planillas/:id/detalle')
-  async getDetallePlanilla(@Param('id') planillaId: string) {
+  async getDetallePlanilla(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string
+  ) {
+    console.log(`📊 [RRHH] Obteniendo detalle planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.getDetallePlanilla(planillaId);
   }
 
   @Get('boleta/:empleadoPlanillaId')
-  async getBoleta(@Param('empleadoPlanillaId') empleadoPlanillaId: string) {
+  async getBoleta(
+    @CurrentTenant() tenantId: string,
+    @Param('empleadoPlanillaId') empleadoPlanillaId: string
+  ) {
+    console.log(`📄 [RRHH] Obteniendo boleta ${empleadoPlanillaId} para tenant: ${tenantId}`);
     return this.planillasService.getBoleta(empleadoPlanillaId);
   }
 
   @Put('planillas/:id')
-  async updatePlanilla(@Param('id') planillaId: string, @Body() updateData: any) {
+  async updatePlanilla(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string,
+    @Body() updateData: any
+  ) {
+    console.log(`✏️ [RRHH] Actualizando planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.updatePlanilla(planillaId, updateData);
   }
 
   @Delete('planillas/:id')
-  async deletePlanilla(@Param('id') planillaId: string) {
-    console.log('🗑️ Eliminando planilla:', planillaId);
+  async deletePlanilla(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string
+  ) {
+    console.log(`🗑️ [RRHH] Eliminando planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.deletePlanilla(planillaId);
   }
 
   @Get('conceptos')
-  async getConceptos() {
-    return this.planillasService.getConceptos();
+  async getConceptos(@CurrentTenant() tenantId: string) {
+    console.log(`📋 [RRHH] Obteniendo conceptos para tenant: ${tenantId}`);
+    return this.planillasService.getConceptos(tenantId);
   }
 
   @Post('planillas/:id/calcular-personalizada')
-  async calcularPlanillaPersonalizada(@Param('id') planillaId: string, @Body() empleadosData: any) {
+  async calcularPlanillaPersonalizada(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string,
+    @Body() empleadosData: any
+  ) {
     console.log('🧮 Calculando planilla personalizada:', planillaId);
     return this.planillasService.calcularPlanillaPersonalizada(planillaId, empleadosData.empleados);
   }
@@ -130,7 +155,7 @@ export class RrhhController {
     @Query('empleado_id') empleadoId?: string
   ) {
     console.log(`💰 [RRHH] Obteniendo pagos para tenant: ${tenantId}`);
-    return this.rrhhService.getPagos(periodo, empleadoId);
+    return this.rrhhService.getPagos(periodo, empleadoId, tenantId);
   }
 
   @Put('pagos/:id/procesar')
@@ -139,32 +164,54 @@ export class RrhhController {
     @Param('id') pagoId: string
   ) {
     console.log(`✅ [RRHH] Procesando pago ${pagoId} para tenant: ${tenantId}`);
-    return this.rrhhService.procesarPago(pagoId);
+    return this.rrhhService.procesarPago(pagoId, tenantId);
   }
 
   @Post('planillas/:id/pagar')
-  async pagarPlanillaCompleta(@Param('id') planillaId: string, @Body() pagoData: { metodo_pago: 'efectivo' | 'transferencia' }) {
+  async pagarPlanillaCompleta(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string,
+    @Body() pagoData: { metodo_pago: 'efectivo' | 'transferencia' }
+  ) {
+    console.log(`💰 [RRHH] Pagando planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.pagarPlanillaCompleta(planillaId, pagoData.metodo_pago);
   }
 
   @Post('planillas/:id/pagar-empleados')
-  async pagarEmpleadosSeleccionados(@Param('id') planillaId: string, @Body() pagoData: any) {
+  async pagarEmpleadosSeleccionados(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string,
+    @Body() pagoData: any
+  ) {
+    console.log(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId} para tenant: ${tenantId}`);
     return this.planillasService.pagarEmpleadosSeleccionados(planillaId, pagoData);
   }
 
   @Post('planillas/:id/generar-asientos')
-  async generarAsientosContables(@Param('id') planillaId: string) {
+  async generarAsientosContables(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string
+  ) {
+    console.log(`📊 [RRHH] Generando asientos para planilla ${planillaId}, tenant: ${tenantId}`);
     return this.planillasService.generarAsientosContables(planillaId);
   }
 
   @Get('planillas/:id/historial-pagos')
-  async getHistorialPagos(@Param('id') planillaId: string) {
+  async getHistorialPagos(
+    @CurrentTenant() tenantId: string,
+    @Param('id') planillaId: string
+  ) {
+    console.log(`📋 [RRHH] Obteniendo historial de pagos planilla ${planillaId}, tenant: ${tenantId}`);
     return this.planillasService.getHistorialPagos(planillaId);
   }
 
   @Get('pagos/:id/comprobante')
-  async generarComprobante(@Param('id') pagoId: string) {
-    return this.rrhhService.generarComprobantePago(pagoId);
+  async generarComprobante(
+    @CurrentTenant() tenantId: string,
+    @Param('id') pagoId: string
+  ) {
+    console.log(`📄 [RRHH] Generando comprobante ${pagoId}, tenant: ${tenantId}`);
+    return this.rrhhService.generarComprobantePago(pagoId, tenantId);
   }
 
   @Get('empleados/:id/boleta-pago/:mes')
@@ -179,39 +226,69 @@ export class RrhhController {
 
   // ===== CONTRATOS =====
   @Get('contratos')
-  async getContratos(@Query('empleado_id') empleadoId?: string) {
-    return this.rrhhService.getContratos(empleadoId);
+  async getContratos(
+    @CurrentTenant() tenantId: string,
+    @Query('empleado_id') empleadoId?: string
+  ) {
+    console.log(`📄 [RRHH] Obteniendo contratos para tenant: ${tenantId}`);
+    return this.rrhhService.getContratos(empleadoId, tenantId);
   }
 
   @Post('contratos')
-  async createContrato(@Body() contratoData: any) {
-    return this.rrhhService.createContrato(contratoData);
+  async createContrato(
+    @CurrentTenant() tenantId: string,
+    @Body() contratoData: any
+  ) {
+    console.log(`➕ [RRHH] Creando contrato para tenant: ${tenantId}`);
+    return this.rrhhService.createContrato(contratoData, tenantId);
   }
 
   @Post('contratos/:id/renovar')
-  async renovarContrato(@Param('id') contratoId: string, @Body() data: { meses: number }) {
-    return this.rrhhService.renovarContrato(contratoId, data.meses);
+  async renovarContrato(
+    @CurrentTenant() tenantId: string,
+    @Param('id') contratoId: string,
+    @Body() data: { meses: number }
+  ) {
+    console.log(`🔄 [RRHH] Renovando contrato ${contratoId} para tenant: ${tenantId}`);
+    return this.rrhhService.renovarContrato(contratoId, data.meses, tenantId);
   }
 
   @Put('contratos/:id/finalizar')
-  async finalizarContrato(@Param('id') contratoId: string, @Body() data: { motivo_finalizacion: string; fecha_finalizacion: string }) {
-    return this.rrhhService.finalizarContrato(contratoId, data.motivo_finalizacion, data.fecha_finalizacion);
+  async finalizarContrato(
+    @CurrentTenant() tenantId: string,
+    @Param('id') contratoId: string,
+    @Body() data: { motivo_finalizacion: string; fecha_finalizacion: string }
+  ) {
+    console.log(`🛑 [RRHH] Finalizando contrato ${contratoId} para tenant: ${tenantId}`);
+    return this.rrhhService.finalizarContrato(contratoId, data.motivo_finalizacion, data.fecha_finalizacion, tenantId);
   }
 
   @Get('contratos/:id/generar')
-  async generarContrato(@Param('id') contratoId: string) {
-    return this.rrhhService.generarContratoPDF(contratoId);
+  async generarContrato(
+    @CurrentTenant() tenantId: string,
+    @Param('id') contratoId: string
+  ) {
+    console.log(`📄 [RRHH] Generando contrato PDF ${contratoId} para tenant: ${tenantId}`);
+    return this.rrhhService.generarContratoPDF(contratoId, tenantId);
   }
 
   // ===== ASISTENCIAS MEJORADAS =====
   @Get('asistencias')
-  async getAsistenciasPorFecha(@Query('fecha') fecha: string) {
-    return this.rrhhService.getAsistenciasPorFecha(fecha);
+  async getAsistenciasPorFecha(
+    @CurrentTenant() tenantId: string,
+    @Query('fecha') fecha: string
+  ) {
+    console.log(`📋 [RRHH] Obteniendo asistencias por fecha ${fecha} para tenant: ${tenantId}`);
+    return this.rrhhService.getAsistenciasPorFecha(fecha, tenantId);
   }
 
   @Post('asistencias/marcar')
-  async marcarAsistencia(@Body() data: { empleado_id: string; fecha: string; tipo: 'entrada' | 'salida'; hora: string }) {
-    return this.rrhhService.marcarAsistencia(data.empleado_id, data.fecha, data.tipo, data.hora);
+  async marcarAsistencia(
+    @CurrentTenant() tenantId: string,
+    @Body() data: { empleado_id: string; fecha: string; tipo: 'entrada' | 'salida'; hora: string }
+  ) {
+    console.log(`⏰ [RRHH] Marcando asistencia para empleado ${data.empleado_id}, tenant: ${tenantId}`);
+    return this.rrhhService.marcarAsistencia(data.empleado_id, data.fecha, data.tipo, data.hora, tenantId);
   }
 
   // ===== RECLUTAMIENTO Y VACANTES =====
@@ -412,10 +489,12 @@ export class RrhhController {
   // ===== LIQUIDACIONES =====
   @Post('empleados/:id/liquidacion')
   async calcularLiquidacion(
+    @CurrentTenant() tenantId: string,
     @Param('id') empleadoId: string,
     @Body() data: { motivo_terminacion: string; fecha_terminacion: string }
   ) {
-    return this.rrhhService.calcularLiquidacion(empleadoId, data.motivo_terminacion, data.fecha_terminacion);
+    console.log(`💼 [RRHH] Calculando liquidación para empleado ${empleadoId}, tenant: ${tenantId}`);
+    return this.rrhhService.calcularLiquidacion(empleadoId, data.motivo_terminacion, data.fecha_terminacion, tenantId);
   }
 
   // ===== HORARIOS =====
@@ -469,8 +548,9 @@ export class RrhhController {
 
   // ===== DASHBOARD Y REPORTES =====
   @Get('dashboard')
-  async getDashboardRrhh() {
-    return this.rrhhService.getDashboardRrhh();
+  async getDashboardRrhh(@CurrentTenant() tenantId: string) {
+    console.log(`📊 [RRHH] Obteniendo dashboard para tenant: ${tenantId}`);
+    return this.rrhhService.getDashboardRrhh(tenantId);
   }
 
 } 

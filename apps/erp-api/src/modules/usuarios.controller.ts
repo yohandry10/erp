@@ -37,7 +37,7 @@ export class UsuariosController {
   }
 
   @Get('/')
-  @RequirePermission('usuarios', 'read', 'usuarios')
+  @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener todos los usuarios del sistema' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
   async getUsuarios(@Req() req: any, @Query('rol') rol?: string, @Query('estado') estado?: string) {
@@ -46,13 +46,15 @@ export class UsuariosController {
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
 
+      // NOTA: Usamos left join (sin !inner) para incluir usuarios sin rol asignado
       let query = this.supabaseService
         .getClient()
         .from('usuarios_sistema')
         .select(`
           *,
-          user_roles!inner (
+          roles_usuario:user_roles (
             roles (
+              id,
               nombre,
               descripcion,
               permisos
@@ -63,7 +65,7 @@ export class UsuariosController {
         .order('created_at', { ascending: false });
 
       if (rol && rol !== 'todos') {
-        query = query.eq('user_roles.roles.nombre', rol);
+        query = query.eq('roles_usuario.roles.nombre', rol);
       }
 
       if (estado && estado !== 'todos') {
@@ -96,7 +98,7 @@ export class UsuariosController {
   }
 
   @Get('/stats')
-  @RequirePermission('usuarios', 'read', 'estadisticas')
+  @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener estadísticas de usuarios' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@Req() req: any) {
@@ -160,7 +162,8 @@ export class UsuariosController {
   }
 
   @Get('/roles')
-  @RequirePermission('usuarios', 'read', 'roles')
+  // NOTA: Sin @RequirePermission porque se necesita para el dropdown de crear usuario
+  // y el Admin del tenant siempre tiene acceso a este módulo
   @ApiOperation({ summary: 'Obtener todos los roles disponibles' })
   @ApiResponse({ status: 200, description: 'Lista de roles obtenida exitosamente' })
   async getRoles(@Req() req: any) {
@@ -180,6 +183,12 @@ export class UsuariosController {
               nombre,
               estado
             )
+          ),
+          rol_permisos (
+            permisos (
+              modulo,
+              accion
+            )
           )
         `)
         .eq('tenant_id', tenantId)
@@ -190,12 +199,39 @@ export class UsuariosController {
         throw error;
       }
 
-      // Calcular estadísticas por rol
-      const rolesConStats = roles?.map(rol => ({
-        ...rol,
-        usuariosCount: rol.user_roles?.length || 0,
-        usuariosActivos: rol.user_roles?.filter(ru => ru.usuarios_sistema?.estado === 'ACTIVO').length || 0
-      }));
+      // Calcular estadísticas y formatear permisos por rol
+      const rolesConStats = roles?.map(rol => {
+        // Extraer permisos únicos en formato legible
+        const permisosSet = new Set<string>();
+        rol.rol_permisos?.forEach((rp: any) => {
+          if (rp.permisos) {
+            permisosSet.add(`${rp.permisos.modulo}:${rp.permisos.accion}`);
+          }
+        });
+        
+        // Agrupar por módulo para mostrar más limpio
+        const permisosPorModulo: Record<string, string[]> = {};
+        permisosSet.forEach(p => {
+          const [modulo, accion] = p.split(':');
+          if (!permisosPorModulo[modulo]) {
+            permisosPorModulo[modulo] = [];
+          }
+          permisosPorModulo[modulo].push(accion);
+        });
+        
+        // Crear lista resumida de permisos
+        const permisosResumen = Object.entries(permisosPorModulo).map(
+          ([modulo, acciones]) => `${modulo} (${acciones.length})`
+        );
+
+        return {
+          ...rol,
+          usuariosCount: rol.user_roles?.length || 0,
+          usuariosActivos: rol.user_roles?.filter((ru: any) => ru.usuarios_sistema?.estado === 'ACTIVO').length || 0,
+          permisos: permisosResumen, // Array de strings para el frontend
+          permisosDetalle: permisosPorModulo // Detalle completo si se necesita
+        };
+      });
 
       console.log(`✅ ${roles?.length || 0} roles encontrados`);
 
@@ -215,28 +251,31 @@ export class UsuariosController {
   }
 
   @Post('/crear')
-  @RequirePermission('usuarios', 'create', 'usuarios')
+  @RequirePermission('configuracion', 'crear', 'usuarios')
   @ApiOperation({ summary: 'Crear nuevo usuario del sistema' })
   @ApiResponse({ status: 201, description: 'Usuario creado exitosamente' })
   async crearUsuario(@Body() usuarioData: any, @Req() req: any) {
     try {
       console.log('👤 Creando nuevo usuario del sistema...');
-      console.log('📋 Datos recibidos:', JSON.stringify(usuarioData, null, 2));
 
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
 
       // Validar datos requeridos
-      if (!usuarioData.nombre || !usuarioData.email || !usuarioData.rol_id) {
-        throw new BadRequestException('Datos requeridos: nombre, email, rol_id');
+      if (!usuarioData.nombre || !usuarioData.email || !usuarioData.rol_id || !usuarioData.password) {
+        throw new BadRequestException('Datos requeridos: nombre, email, rol_id, password');
       }
 
-      // Verificar que el email no exista
+      // Validar contraseña
+      if (usuarioData.password.length < 8) {
+        throw new BadRequestException('La contraseña debe tener al menos 8 caracteres');
+      }
+
+      // Verificar que el email no exista en usuarios_sistema
       const { data: existeEmail } = await this.supabaseService
         .getClient()
         .from('usuarios_sistema')
         .select('id')
-        .eq('tenant_id', tenantId)
         .eq('email', usuarioData.email)
         .single();
 
@@ -244,15 +283,33 @@ export class UsuariosController {
         throw new BadRequestException('Ya existe un usuario con este email');
       }
 
-      // Crear usuario
+      // 1. Crear usuario en Supabase Auth
+      const { data: authUser, error: authError } = await this.supabaseService
+        .getAdminClient()
+        .auth.admin.createUser({
+          email: usuarioData.email,
+          password: usuarioData.password,
+          email_confirm: true, // Confirmar email automáticamente
+          user_metadata: {
+            nombre: usuarioData.nombre,
+            tenant_id: tenantId
+          }
+        });
+
+      if (authError) {
+        console.error('❌ Error creando usuario en auth:', authError);
+        throw new BadRequestException(authError.message || 'Error creando credenciales de usuario');
+      }
+
+      // 2. Crear usuario en usuarios_sistema con el mismo ID
       const nuevoUsuario = {
+        id: authUser.user.id, // Usar el mismo ID de auth.users
         tenant_id: tenantId,
         nombre: usuarioData.nombre,
         email: usuarioData.email,
         telefono: usuarioData.telefono || null,
-        cargo: usuarioData.cargo || null,
-        departamento: usuarioData.departamento || null,
         estado: usuarioData.estado || 'ACTIVO',
+        activo: true,
         fecha_ultimo_acceso: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -266,30 +323,27 @@ export class UsuariosController {
         .single();
 
       if (errorUsuario) {
-        console.error('❌ Error creando usuario:', errorUsuario);
+        console.error('❌ Error creando usuario en BD:', errorUsuario);
+        // Revertir: eliminar usuario de auth
+        await this.supabaseService.getAdminClient().auth.admin.deleteUser(authUser.user.id);
         throw errorUsuario;
       }
 
-      // Asignar rol
+      // 3. Asignar rol
       const { error: errorRol } = await this.supabaseService
         .getClient()
         .from('user_roles')
         .insert({
           usuario_sistema_id: usuarioCreado.id,
           role_id: usuarioData.rol_id,
-          user_id: user?.id || null,
           created_at: new Date().toISOString()
         });
 
       if (errorRol) {
         console.error('❌ Error asignando rol:', errorRol);
-        // Revertir creación de usuario
-        await this.supabaseService
-          .getClient()
-          .from('usuarios_sistema')
-          .delete()
-          .eq('id', usuarioCreado.id);
-        
+        // Revertir: eliminar usuario de BD y auth
+        await this.supabaseService.getClient().from('usuarios_sistema').delete().eq('id', usuarioCreado.id);
+        await this.supabaseService.getAdminClient().auth.admin.deleteUser(authUser.user.id);
         throw errorRol;
       }
 
@@ -297,8 +351,8 @@ export class UsuariosController {
 
       return {
         success: true,
-        data: usuarioCreado,
-        message: 'Usuario creado exitosamente'
+        data: { ...usuarioCreado, password: undefined },
+        message: `Usuario "${usuarioData.nombre}" creado exitosamente. Ya puede iniciar sesión con su email y contraseña.`
       };
 
     } catch (error) {
@@ -312,7 +366,7 @@ export class UsuariosController {
   }
 
   @Put('/:id')
-  @RequirePermission('usuarios', 'update', 'usuarios')
+  @RequirePermission('configuracion', 'editar', 'usuarios')
   @ApiOperation({ summary: 'Actualizar usuario del sistema' })
   @ApiResponse({ status: 200, description: 'Usuario actualizado exitosamente' })
   async actualizarUsuario(@Param('id') id: string, @Body() usuarioData: any, @Req() req: any) {
@@ -378,7 +432,7 @@ export class UsuariosController {
   }
 
   @Put('/:id/estado')
-  @RequirePermission('usuarios', 'update', 'estado')
+  @RequirePermission('configuracion', 'editar', 'usuarios')
   @ApiOperation({ summary: 'Cambiar estado de usuario (activar/desactivar)' })
   @ApiResponse({ status: 200, description: 'Estado actualizado exitosamente' })
   async cambiarEstado(@Param('id') id: string, @Body() estadoData: { estado: string }, @Req() req: any) {
@@ -386,6 +440,38 @@ export class UsuariosController {
       console.log(`🔄 Cambiando estado de usuario ${id} a ${estadoData.estado}`);
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
+
+      // VALIDACIÓN 1: No puedes desactivarte a ti mismo
+      if (id === user?.id) {
+        throw new ForbiddenException('No puedes cambiar el estado de tu propia cuenta');
+      }
+
+      // Obtener el usuario objetivo y su rol
+      const { data: targetUser, error: fetchError } = await this.supabaseService
+        .getClient()
+        .from('usuarios_sistema')
+        .select(`
+          id,
+          nombre,
+          roles_usuario:user_roles (
+            roles (
+              nombre
+            )
+          )
+        `)
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (fetchError || !targetUser) {
+        throw new BadRequestException('Usuario no encontrado');
+      }
+
+      const rolesData = targetUser.roles_usuario?.[0]?.roles as any;
+      const targetRole = Array.isArray(rolesData) ? rolesData[0]?.nombre : rolesData?.nombre || '';
+
+      // NOTA: El Admin del tenant SÍ puede desactivar otros Admins que creó
+      // Solo no puede desactivarse a sí mismo (ya validado arriba)
 
       const { data: usuarioActualizado, error } = await this.supabaseService
         .getClient()
@@ -404,7 +490,7 @@ export class UsuariosController {
         throw error;
       }
 
-      console.log('✅ Estado actualizado exitosamente');
+      console.log(`✅ Estado de usuario ${targetUser.nombre} cambiado a ${estadoData.estado} por ${user?.id}`);
 
       return {
         success: true,
@@ -423,7 +509,7 @@ export class UsuariosController {
   }
 
   @Delete('/:id')
-  @RequirePermission('usuarios', 'delete', 'usuarios')
+  @RequirePermission('configuracion', 'eliminar', 'usuarios')
   @ApiOperation({ summary: 'Eliminar usuario del sistema' })
   @ApiResponse({ status: 200, description: 'Usuario eliminado exitosamente' })
   async eliminarUsuario(@Param('id') id: string, @Req() req: any) {
@@ -431,6 +517,38 @@ export class UsuariosController {
       console.log(`🗑️ Eliminando usuario: ${id}`);
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
+
+      // VALIDACIÓN 1: No puedes eliminarte a ti mismo
+      if (id === user?.id) {
+        throw new ForbiddenException('No puedes eliminar tu propia cuenta');
+      }
+
+      // Obtener el usuario objetivo y su rol
+      const { data: targetUser, error: fetchError } = await this.supabaseService
+        .getClient()
+        .from('usuarios_sistema')
+        .select(`
+          id,
+          nombre,
+          roles_usuario:user_roles (
+            roles (
+              nombre
+            )
+          )
+        `)
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (fetchError || !targetUser) {
+        throw new BadRequestException('Usuario no encontrado');
+      }
+
+      const rolesData = targetUser.roles_usuario?.[0]?.roles as any;
+      const targetRole = Array.isArray(rolesData) ? rolesData[0]?.nombre : rolesData?.nombre || '';
+
+      // NOTA: El Admin del tenant SÍ puede eliminar otros Admins que creó
+      // Solo no puede eliminarse a sí mismo (ya validado arriba)
 
       // Eliminar relaciones de rol primero
       await this.supabaseService
@@ -452,7 +570,7 @@ export class UsuariosController {
         throw error;
       }
 
-      console.log('✅ Usuario eliminado exitosamente');
+      console.log(`✅ Usuario ${targetUser.nombre} eliminado por ${user?.id}`);
 
       return {
         success: true,
@@ -581,7 +699,7 @@ export class UsuariosController {
   }
 
   @Get('/:id')
-  @RequirePermission('usuarios', 'read', 'usuarios')
+  @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
   @ApiResponse({ status: 200, description: 'Usuario obtenido exitosamente' })
   async getUsuario(@Param('id') id: string, @Req() req: any) {

@@ -320,12 +320,23 @@ await this.eventBus.emitMovimientoStock({
 
 ## 🛠️ RECOMENDACIONES PRIORIZADAS
 
-### BAJA (Post-Producción)
-1. **Agregar CHECK constraint:** `CHECK (stock >= 0)` en productos y producto_existencias
-2. **Tests de Race Conditions:** Simular 10 ventas simultáneas del mismo producto
-3. **RPC para Salidas:** Crear `registrar_salida_stock_atomico` para consistencia
-4. **Documentar Costo Promedio:** Clarificar dónde se calcula (si aplica)
-5. **Tests Unitarios:** Agregar unit tests para `inventario.service.ts` (opcional)
+### ✅ RESUELTO (Post-Auditoría)
+1. ✅ **CHECK constraint:** Migración `129__stock_constraints.sql` implementa:
+   - `chk_productos_stock_no_negativo` en productos.stock
+   - `chk_existencias_stock_no_negativo` en producto_existencias
+   - Trigger `trg_productos_stock_no_negativo` como defensa adicional
+   - Función `validar_stock_suficiente()` para validación previa
+2. ✅ **Tests E2E:** Implementados en `apps/erp-api/tests/e2e/inventario-e2e.test.ts`
+   - Test de tablas principales
+   - Test de RPC atómico
+   - Test de constraint CHECK
+   - Test de RLS entre tenants
+   - Test de cálculo stock disponible
+   - Test de precisión NUMERIC
+
+### PENDIENTE (Opcional)
+- Tests de Race Conditions (10 ventas simultáneas)
+- Documentar cálculo de costo promedio
 
 ### NINGUNA ALTA O CRÍTICA
 - El módulo está listo para producción

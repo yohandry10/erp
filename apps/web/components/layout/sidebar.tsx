@@ -23,7 +23,8 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle,
-  DollarSign
+  DollarSign,
+  HelpCircle
 } from 'lucide-react'
 
 interface MenuItem {
@@ -39,6 +40,8 @@ interface MenuItem {
   submenu?: MenuItem[]
 }
 
+// Permisos basados en la estructura de la BD (modulo, accion, recurso)
+// Acciones en español: ver, crear, editar, eliminar, aprobar, etc.
 const menuItems: MenuItem[] = [
   {
     title: 'Super Admin',
@@ -50,15 +53,16 @@ const menuItems: MenuItem[] = [
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard
+    // Dashboard visible para todos los usuarios autenticados
   },
   {
     title: 'POS',
     href: '/dashboard/pos',
     icon: ShoppingCart,
     permission: {
-      modulo: 'ventas',
-      accion: 'read',
-      recurso: 'pos'
+      modulo: 'pos',
+      accion: 'ver',
+      recurso: 'caja'
     }
   },
   {
@@ -67,8 +71,8 @@ const menuItems: MenuItem[] = [
     icon: FileText,
     permission: {
       modulo: 'documentos',
-      accion: 'read',
-      recurso: 'documentos'
+      accion: 'ver',
+      recurso: 'facturas'
     }
   },
   {
@@ -77,8 +81,8 @@ const menuItems: MenuItem[] = [
     icon: FileText,
     permission: {
       modulo: 'contabilidad',
-      accion: 'read',
-      recurso: 'libros'
+      accion: 'ver',
+      recurso: 'asientos'
     }
   },
   {
@@ -87,8 +91,8 @@ const menuItems: MenuItem[] = [
     icon: Download,
     permission: {
       modulo: 'reportes',
-      accion: 'read',
-      recurso: 'analytics'
+      accion: 'ver',
+      recurso: 'dashboard'
     }
   },
   {
@@ -96,8 +100,8 @@ const menuItems: MenuItem[] = [
     icon: Package,
     permission: {
       modulo: 'inventario',
-      accion: 'read',
-      recurso: 'stats'
+      accion: 'ver',
+      recurso: 'productos'
     },
     submenu: [
       {
@@ -106,8 +110,8 @@ const menuItems: MenuItem[] = [
         icon: Package,
         permission: {
           modulo: 'inventario',
-          accion: 'read',
-          recurso: 'stats'
+          accion: 'ver',
+          recurso: 'productos'
         }
       },
       {
@@ -116,7 +120,7 @@ const menuItems: MenuItem[] = [
         icon: Building2,
         permission: {
           modulo: 'inventario',
-          accion: 'read',
+          accion: 'ver',
           recurso: 'almacenes'
         }
       },
@@ -126,8 +130,8 @@ const menuItems: MenuItem[] = [
         icon: Truck,
         permission: {
           modulo: 'inventario',
-          accion: 'write',
-          recurso: 'ingresos'
+          accion: 'ver',
+          recurso: 'recepciones'
         }
       },
       {
@@ -136,7 +140,7 @@ const menuItems: MenuItem[] = [
         icon: FileSpreadsheet,
         permission: {
           modulo: 'inventario',
-          accion: 'read',
+          accion: 'ver',
           recurso: 'kardex'
         }
       },
@@ -145,9 +149,9 @@ const menuItems: MenuItem[] = [
         href: '/dashboard/inventario/logistica/ordenes-pendientes',
         icon: Package,
         permission: {
-          modulo: 'inventario',
+          modulo: 'logistica',
           accion: 'ver',
-          recurso: 'logistica'
+          recurso: 'ordenes_preparacion'
         }
       },
       {
@@ -155,9 +159,9 @@ const menuItems: MenuItem[] = [
         href: '/dashboard/inventario/logistica/listo-despacho',
         icon: Truck,
         permission: {
-          modulo: 'inventario',
+          modulo: 'logistica',
           accion: 'ver',
-          recurso: 'logistica'
+          recurso: 'despachos'
         }
       }
     ]
@@ -167,9 +171,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/cpe',
     icon: FileText,
     permission: {
-      modulo: 'cpe',
-      accion: 'read',
-      recurso: 'comprobantes'
+      modulo: 'documentos',
+      accion: 'ver',
+      recurso: 'facturas'
     }
   },
   {
@@ -177,9 +181,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/gre',
     icon: Truck,
     permission: {
-      modulo: 'gre',
-      accion: 'read',
-      recurso: 'guias'
+      modulo: 'logistica',
+      accion: 'ver',
+      recurso: 'gre'
     }
   },
   {
@@ -187,9 +191,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/sire',
     icon: Download,
     permission: {
-      modulo: 'sire',
-      accion: 'read',
-      recurso: 'reportes'
+      modulo: 'reportes',
+      accion: 'ver',
+      recurso: 'ventas'
     }
   },
   {
@@ -198,7 +202,7 @@ const menuItems: MenuItem[] = [
     icon: ShoppingCart,
     permission: {
       modulo: 'compras',
-      accion: 'read',
+      accion: 'ver',
       recurso: 'ordenes'
     }
   },
@@ -207,7 +211,7 @@ const menuItems: MenuItem[] = [
     icon: FileSpreadsheet,
     permission: {
       modulo: 'ventas',
-      accion: 'read',
+      accion: 'ver',
       recurso: 'cotizaciones'
     },
     submenu: [
@@ -217,7 +221,7 @@ const menuItems: MenuItem[] = [
         icon: Users,
         permission: {
           modulo: 'ventas',
-          accion: 'read',
+          accion: 'ver',
           recurso: 'clientes'
         }
       },
@@ -227,7 +231,7 @@ const menuItems: MenuItem[] = [
         icon: FileSpreadsheet,
         permission: {
           modulo: 'ventas',
-          accion: 'read',
+          accion: 'ver',
           recurso: 'cotizaciones'
         }
       },
@@ -237,7 +241,7 @@ const menuItems: MenuItem[] = [
         icon: ShoppingCart,
         permission: {
           modulo: 'ventas',
-          accion: 'read',
+          accion: 'ver',
           recurso: 'pedidos'
         }
       },
@@ -247,8 +251,8 @@ const menuItems: MenuItem[] = [
         icon: CheckCircle,
         permission: {
           modulo: 'ventas',
-          accion: 'ver',
-          recurso: 'aprobaciones'
+          accion: 'aprobar',
+          recurso: 'pedidos'
         }
       }
     ]
@@ -279,8 +283,8 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/usuarios',
     icon: Users,
     permission: {
-      modulo: 'admin',
-      accion: 'read',
+      modulo: 'configuracion',
+      accion: 'ver',
       recurso: 'usuarios'
     }
   },
@@ -290,7 +294,7 @@ const menuItems: MenuItem[] = [
     icon: Users,
     permission: {
       modulo: 'rrhh',
-      accion: 'read',
+      accion: 'ver',
       recurso: 'empleados'
     }
   },
@@ -299,9 +303,9 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/wizard',
     icon: Settings,
     permission: {
-      modulo: 'admin',
-      accion: 'read',
-      recurso: 'configuracion'
+      modulo: 'configuracion',
+      accion: 'ver',
+      recurso: 'empresa'
     }
   },
   {
@@ -309,10 +313,16 @@ const menuItems: MenuItem[] = [
     href: '/dashboard/audit-logs',
     icon: Shield,
     permission: {
-      modulo: 'security',
-      accion: 'read',
-      recurso: 'audit'
+      modulo: 'configuracion',
+      accion: 'ver',
+      recurso: 'usuarios'
     }
+  },
+  {
+    title: 'Ayuda',
+    href: '/dashboard/ayuda',
+    icon: HelpCircle
+    // Ayuda visible para todos
   }
 ]
 
@@ -327,7 +337,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   isMobile: boolean
   onClose: () => void
 }) {
-  const { isSuperAdmin } = useTenant()
+  const { isSuperAdmin, user } = useTenant()
   const Icon = item.icon
   
   // Check if any submenu item is active
@@ -344,11 +354,23 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     }
   }, [isSubmenuActive])
 
+  // El Admin del tenant tiene acceso a todo el menú
+  // Los roles vienen del JWT como array de strings: ['ADMIN', 'VENDEDOR', etc]
+  const userRoles: string[] = user?.roles || []
+  const isAdmin = userRoles.includes('ADMIN')
+
+  // Si es Admin o SuperAdmin, mostrar todo sin verificar permisos
+  const bypassPermissions = isSuperAdmin || isAdmin
+
   // Check permission if required (only for items WITHOUT submenu)
-  // Items with submenu will be shown if user has access to at least one subitem
-  const { hasPermission, loading } = item.permission && !item.submenu
-    ? usePermission(item.permission.modulo, item.permission.accion, item.permission.recurso)
+  // IMPORTANT: keep hook order stable even if bypassPermissions changes.
+  const shouldCheckPermission = !!item.permission && !item.submenu
+  const permissionResult = shouldCheckPermission
+    ? usePermission(item.permission!.modulo, item.permission!.accion, item.permission!.recurso)
     : { hasPermission: true, loading: false }
+
+  const hasPermission = bypassPermissions ? true : permissionResult.hasPermission
+  const loading = bypassPermissions ? false : permissionResult.loading
 
   // Filter super-admin only items
   if (item.superAdminOnly && !isSuperAdmin) {
@@ -356,7 +378,8 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   }
 
   // For items WITHOUT submenu, filter based on permissions
-  if (!item.submenu && item.permission && !isSuperAdmin && !loading && !hasPermission) {
+  // Admin/SuperAdmin users bypass permission checks
+  if (!item.submenu && item.permission && !bypassPermissions && !loading && !hasPermission) {
     return null
   }
 
@@ -457,12 +480,35 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     )
   }
 
+  // Generar data-tour basado en el título del item
+  const getDataTour = (title: string): string => {
+    const tourMap: Record<string, string> = {
+      'Dashboard': 'menu-dashboard',
+      'POS': 'menu-pos',
+      'Ventas': 'menu-ventas',
+      'Clientes': 'menu-clientes',
+      'Cotizaciones': 'menu-cotizaciones',
+      'Pedidos': 'menu-pedidos',
+      'Inventario': 'menu-inventario',
+      'Finanzas': 'menu-finanzas',
+      'Configuración': 'menu-configuracion',
+      'Usuarios': 'menu-usuarios',
+      'Reportes SIRE': 'menu-reportes',
+      'Analytics': 'menu-reportes',
+      'Compras': 'menu-compras',
+      'RRHH': 'menu-rrhh',
+      'Contabilidad': 'menu-contabilidad',
+    }
+    return tourMap[title] || `menu-${title.toLowerCase().replace(/\s+/g, '-')}`
+  }
+
   // Regular menu item with link
   return (
     <Link
       key={item.href}
       href={item.href!}
       className={`nav-item ${isActive ? 'active' : ''}`}
+      data-tour={getDataTour(item.title)}
       style={{
         display: 'flex',
         alignItems: 'center',

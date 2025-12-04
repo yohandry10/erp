@@ -1,977 +1,2295 @@
-Database Functions
+Policies
+Manage Row Level Security policies for your tables
 Docs
 
 schema
 
 public
 
-Search for a function
+Filter tables and policies
+activos_fijos
 
-Return Type
+Disable RLS
 
-Security
+Create policy
 
-Create a new function
+Name	Command	Applied to	Actions
 
-Name	Arguments	Return type	Security	
+activos_fijos_tenant_isolation
+ALL	
+public
 
-_ensure_rls_if_tenant
-p_table regclass
+almacen_ubicaciones
 
-void
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+ubicaciones_delete_rls
+DELETE	
+public
 
-acknowledge_rls_alert
-p_alert_id uuid, p_acknowledged_by uuid DEFAULT NULL::uuid
 
-boolean
+ubicaciones_insert_rls
+INSERT	
+public
 
-Definer
 
+ubicaciones_select_rls
+SELECT	
+public
 
 
-acquire_job_lock
-p_lock_key text, p_lock_ttl_seconds integer DEFAULT 300
+ubicaciones_update_rls
+UPDATE	
+public
 
-boolean
+almacenes
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-actualizar_stock_reservado
-p_producto_id uuid, p_cantidad numeric, p_operacion character varying
+almacenes_delete_rls
+DELETE	
+public
 
-void
 
-Invoker
+almacenes_insert_rls
+INSERT	
+public
 
 
+almacenes_select_rls
+SELECT	
+public
 
-add_rls_audit_trigger
-p_table_name text
 
-void
+almacenes_update_rls
+UPDATE	
+public
 
-Definer
+asientos_contables
 
+Disable RLS
 
+Create policy
 
-add_tenant_id_if_missing
-p_table_name text
+Name	Command	Applied to	Actions
 
-void
+asientos_contables_tenant_isolation
+ALL	
+public
 
-Definer
 
+Enable all operations for authenticated users
+ALL	
+public
 
+asientos_contables_rrhh
 
-algorithm_sign
-signables text, secret text, algorithm text
+Disable RLS
 
-text
+Create policy
 
-Invoker
+Name	Command	Applied to	Actions
 
+asientos_contables_rrhh_authenticated_access
+ALL	
+public
 
+asignacion_costos
 
-audit_rls_access
-–
+Disable RLS
 
-trigger	
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+asignacion_costos_tenant_isolation
+ALL	
+public
 
-audit_table_changes
-–
+asistencia
 
-trigger	
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-audit_trigger_function
-–
+asistencias_authenticated_access
+ALL	
+public
 
-trigger	
-Invoker
+audit_log
 
+Disable RLS
 
+Create policy
 
-calcular_cantidad_pendiente_oc
-–
+Name	Command	Applied to	Actions
 
-trigger	
-Invoker
+audit_log_tenant_isolation
+ALL	
+public
 
+audit_log_archive
 
+Disable RLS
 
-calcular_proxima_generacion
-p_tipo_recurrencia character varying, p_dia_generacion integer, p_fecha_base date DEFAULT CURRENT_DATE
+Create policy
 
-date
+Name	Command	Applied to	Actions
 
-Invoker
+audit_log_archive_service_role_all
+ALL	
+public
 
 
+audit_log_archive_system_insert
+INSERT	
+public
 
-calcular_totales_cotizacion_compra
-–
 
-trigger	
-Invoker
+audit_log_archive_tenant_read
+SELECT	
+public
 
+auditoria
 
+Disable RLS
 
-calcular_totales_devolucion_proveedor
-–
+Create policy
 
-trigger	
-Invoker
+Name	Command	Applied to	Actions
 
+auditoria_tenant_isolation
+ALL	
+public
 
 
-calcular_totales_orden_compra
-–
+tenant_isolation_auditoria
+ALL	
+public
 
-trigger	
-Invoker
+auditoria_cotizaciones
 
+Disable RLS
 
+Create policy
 
-check_wizard_completion_validity
-–
+Name	Command	Applied to	Actions
 
-trigger	
-Invoker
+auditoria_cotizaciones_tenant_isolation
+ALL	
+public
 
+auth_login_attempts
 
+Disable RLS
 
-cleanup_expired_sessions
-–
+Create policy
 
-integer
+Name	Command	Applied to	Actions
 
-Invoker
+auth_login_attempts_insert
+INSERT	
+public
 
 
+auth_login_attempts_tenant_isolation
+ALL	
+public
 
-cleanup_old_audit_logs
-days_to_keep integer DEFAULT 365
+autorizaciones_caja
 
-integer
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+autorizaciones_caja_tenant_isolation
+ALL	
+public
 
-cleanup_old_rls_alerts
-p_retention_days integer DEFAULT 90
+beneficios
 
-integer
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+beneficios_tenant_isolation
+ALL	
+public
 
-cleanup_old_rls_audit_logs
-p_retention_days integer DEFAULT 90
+caja_audit_log
 
-integer
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+caja_audit_log_tenant_isolation
+ALL	
+public
 
-cleanup_processed_events
-–
+cajas
 
-integer
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+cajas_tenant_isolation
+ALL	
+public
 
-copiar_metodos_pago_globales_a_tenant
-p_tenant_id uuid
+calendario_empresa
 
-integer
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+calendario_empresa_tenant_isolation
+ALL	
+public
 
-crear_documento_desde_cpe
-p_cpe_id uuid
+cambios_turno
 
-uuid
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+cambios_turno_tenant_isolation
+ALL	
+public
 
-create_index_if_not_exists
-p_index_name text, p_table_name text, p_columns text, p_where_clause text DEFAULT NULL::text
+candidatos
 
-void
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+candidatos_tenant_isolation
+ALL	
+public
 
-create_tenant_isolation_policy
-p_table_name text, p_policy_suffix text DEFAULT 'tenant_isolation'::text
+capacitaciones
 
-boolean
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+capacitaciones_tenant_isolation
+ALL	
+public
 
-create_user_session
-p_user_id uuid, p_usuario_sistema_id uuid, p_tenant_id uuid, p_session_token text, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text, p_expires_in_hours integer DEFAULT 8
+centros_costo
 
-uuid
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+centros_costo_tenant_isolation
+ALL	
+public
 
-debug_tenant_context
-–
+clientes
 
-TABLE(setting_name text, setting_value text)
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+clientes_tenant_isolation
+ALL	
+public
 
-decrementar_stock_reservado
-p_producto_id uuid, p_cantidad numeric
+cobranzas
 
-void
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+cobranzas_tenant_isolation
+ALL	
+public
 
-descontar_stock
-p_producto_id uuid, p_cantidad numeric
+comunicaciones_baja
 
-void
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+comunicaciones_baja_tenant_isolation
+ALL	
+public
 
-descontar_stock_y_liberar_reserva
-p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text
+conceptos_planilla
 
-uuid
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+conceptos_planilla_tenant_isolation
+ALL	
+public
 
-diagnostico_cpe_documentos
-–
+conciliaciones_bancarias
 
-TABLE(metrica text, valor text, estado text)
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+conciliaciones_bancarias_tenant_isolation
+ALL	
+public
 
-diagnostico_pos
-p_tenant_id uuid DEFAULT NULL::uuid
+config_alertas_vencimiento
 
-TABLE(metrica text, valor text, estado text)
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+tenant_isolation_config_alertas
+ALL	
+public
 
-diagnostico_seguridad_rls
-–
+configuracion_caja
 
-TABLE(tabla text, rls_habilitado boolean, num_politicas bigint, estado text)
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+configuracion_caja_tenant_isolation
+ALL	
+public
 
-disable_rls_alert
-p_alert_name text
+configuracion_fiscal
 
-boolean
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+configuracion_fiscal_delete_super_admin
+DELETE	
+public
 
-drop_all_policies
-p_table_name text
 
-integer
+configuracion_fiscal_read_authenticated
+SELECT	
+public
 
-Invoker
 
+configuracion_fiscal_update_super_admin
+UPDATE	
+public
 
 
-enable_rls_alert
-p_alert_name text
+configuracion_fiscal_write_super_admin
+INSERT	
+public
 
-boolean
+configuracion_retenciones
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-enable_rls_on_table
-p_table_name text
+configuracion_retenciones_tenant_isolation
+ALL	
+public
 
-boolean
+contratos
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-enable_rls_tenant_isolation
-p_table_name text
+contratos_authenticated_access
+ALL	
+public
 
-void
+cotizacion_compra_detalles
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-evaluar_crecimiento
-–
+cotizacion_compra_detalles_tenant_isolation
+ALL	
+public
 
-text
+cotizacion_detalles
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-evaluar_liquidez
-efectivo numeric, cuentas_por_pagar numeric
+cotizacion_detalles_tenant_isolation
+ALL	
+public
 
-text
+cotizaciones
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-evaluar_rentabilidad
-margen_bruto numeric
+cotizaciones_tenant_isolation
+ALL	
+public
 
-text
+cotizaciones_compra
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-generar_numero_comunicacion_baja
-p_tenant_id uuid, p_fecha date
+cotizaciones_compra_tenant_isolation
+ALL	
+public
 
-character varying
+cpe
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-generar_numero_resumen_diario
-p_tenant_id uuid, p_fecha date
+cpe_tenant_isolation
+ALL	
+public
 
-character varying
+cuentas_bancarias
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-generate_gre_numero
-–
+cuentas_bancarias_tenant_isolation
+ALL	
+public
 
-trigger	
-Invoker
+cuentas_por_cobrar
 
+Disable RLS
 
+Create policy
 
-generate_rls_security_report
-p_days integer DEFAULT 7
+Name	Command	Applied to	Actions
 
-TABLE(metric text, value text)
+cuentas_por_cobrar_rls
+ALL	
+public
 
-Definer
+cuentas_por_pagar
 
+Disable RLS
 
+Create policy
 
-get_alert_statistics
-p_days integer DEFAULT 7
+Name	Command	Applied to	Actions
 
-TABLE(metric text, value text)
+cuentas_por_pagar_tenant_isolation
+ALL	
+public
 
-Definer
+cxc_pagos
 
+Disable RLS
 
+Create policy
 
-get_current_tenant_id
-–
+Name	Command	Applied to	Actions
 
-uuid
+cxc_pagos_rls
+ALL	
+public
 
-Invoker
+departamentos
 
+Disable RLS
 
+Create policy
 
-get_current_user_id
-–
+Name	Command	Applied to	Actions
 
-uuid
+departamentos_tenant_isolation
+ALL	
+public
 
-Invoker
+depreciaciones
 
+Disable RLS
 
+Create policy
 
-get_datos_historicos_completos
-meses integer DEFAULT 12
+Name	Command	Applied to	Actions
 
-TABLE(periodo text, ventas numeric, gastos numeric, utilidad numeric, cuentas_por_cobrar numeric, cuentas_por_pagar numeric)
+depreciaciones_tenant_isolation
+ALL	
+public
 
-Definer
+detalle_asientos
 
+Disable RLS
 
+Create policy
 
-get_kpis_financieros
-–
+Name	Command	Applied to	Actions
 
-TABLE(efectivo_disponible numeric, ventas_ultimos_30dias numeric, gastos_ultimos_30dias numeric, utilidad_ultimos_30dias numeric, cuentas_por_cobrar numeric, cuentas_por_pagar numeric, rotacion_inventario numeric, margen_bruto numeric, liquidez text, rentabilidad text, crecimiento text)
+detalle_asientos_authenticated_access
+ALL	
+public
 
-Definer
+detalle_comunicacion_baja
+RLS Disabled
 
+Enable RLS
 
+Create policy
 
-get_pending_outbox_events
-p_limit integer DEFAULT 100, p_tenant_id uuid DEFAULT NULL::uuid
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
 
-TABLE(id uuid, tenant_id uuid, event_type character varying, event_data jsonb, retry_count integer, max_retries integer)
+detalle_resumen_diario
+RLS Disabled
 
-Invoker
+Enable RLS
 
+Create policy
 
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
 
-incrementar_stock_reservado
-p_producto_id uuid, p_cantidad numeric
+detalle_retenciones_categoria
 
-void
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+detalle_retenciones_categoria_tenant_isolation
+ALL	
+public
 
-is_super_admin
-p_user_id uuid
+detalle_ventas_pos
 
-boolean
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+detalle_ventas_pos_tenant_isolation
+ALL	
+public
 
-log_audit_action
-p_table_name text, p_operation text, p_resource_id uuid, p_old_values jsonb DEFAULT NULL::jsonb, p_new_values jsonb DEFAULT NULL::jsonb, p_action_description text DEFAULT NULL::text, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text
+devolucion_items
 
-uuid
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+devolucion_items_tenant_isolation
+ALL	
+public
 
-log_rls_violation
-p_table_name text, p_operation text, p_attempted_tenant_id uuid DEFAULT NULL::uuid, p_violation_type text DEFAULT 'cross_tenant'::text, p_severity text DEFAULT 'WARNING'::text, p_metadata jsonb DEFAULT NULL::jsonb
+devoluciones_proveedor
 
-uuid
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+devoluciones_proveedor_tenant_isolation
+ALL	
+public
 
-mark_outbox_event_completed
-p_event_id uuid
+documento_archivos
 
-void
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+documento_archivos_tenant_isolation
+ALL	
+public
 
-mark_outbox_event_failed
-p_event_id uuid, p_error_message text
+documento_auditoria
 
-void
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+documento_auditoria_tenant_isolation
+ALL	
+public
 
-mark_outbox_event_processing
-p_event_id uuid
+documento_detalles
 
-void
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+documento_detalles_tenant_isolation
+ALL	
+public
 
-migrar_cpes_a_documentos
-–
+documento_series
 
-TABLE(cpes_procesados integer, documentos_creados integer, errores text[])
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+documento_series_tenant_isolation
+ALL	
+public
 
-migrar_detalles_ventas_pos_desde_observaciones
-–
+documentos
 
-TABLE(ventas_procesadas integer, detalles_creados integer, errores text[])
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+documentos_tenant_isolation
+ALL	
+public
 
-obtener_costos_fijos_mes_actual
-–
+egresos
 
-numeric
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+egresos_tenant_isolation
+ALL	
+public
 
-obtener_estadisticas_logs_auditoria
-–
+empleado_beneficios
 
-jsonb
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+empleado_beneficios_tenant_isolation
+ALL	
+public
 
-obtener_siguiente_numero_documento
-p_tenant_id uuid, p_tipo_documento character varying, p_serie character varying
+empleado_capacitaciones
 
-character varying
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+empleado_capacitaciones_tenant_isolation
+ALL	
+public
 
-obtener_siguiente_numero_serie
-p_tenant_id uuid, p_tipo_documento character varying, p_serie character varying
+empleado_horarios
 
-character varying
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+empleado_horarios_tenant_isolation
+ALL	
+public
 
-obtener_stock_info
-p_producto_id uuid
+empleado_planilla
 
-TABLE(producto_id uuid, stock_total numeric, stock_reservado numeric, stock_disponible numeric)
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+empleado_planilla_tenant_isolation
+ALL	
+public
 
-prevent_system_role_deletion
-–
 
-trigger	
-Invoker
+planilla_detalles_authenticated_access
+ALL	
+public
 
+empleado_planilla_conceptos
 
+Disable RLS
 
-procesar_pago_cxc_atomico
-p_tenant_id uuid, p_cxc_id uuid, p_monto numeric, p_fecha_pago date, p_metodo_pago text DEFAULT NULL::text, p_referencia text DEFAULT NULL::text, p_cuenta_bancaria_id uuid DEFAULT NULL::uuid, p_tipo text DEFAULT 'PAGO'::text, p_aplica_retencion boolean DEFAULT false, p_retencion_monto numeric DEFAULT NULL::numeric, p_user_id uuid DEFAULT NULL::uuid, p_notas text DEFAULT NULL::text
+Create policy
 
-jsonb
+Name	Command	Applied to	Actions
 
-Definer
+empleado_planilla_conceptos_tenant_isolation
+ALL	
+public
 
+empleados
 
+Disable RLS
 
-procesar_pago_cxp_atomico
-p_tenant_id uuid, p_cxp_id uuid, p_monto numeric, p_fecha_pago date, p_metodo_pago text DEFAULT NULL::text, p_referencia text DEFAULT NULL::text, p_cuenta_bancaria_id uuid DEFAULT NULL::uuid, p_user_id uuid DEFAULT NULL::uuid, p_notas text DEFAULT NULL::text
+Create policy
 
-jsonb
+Name	Command	Applied to	Actions
 
-Definer
+empleados_tenant_isolation
+ALL	
+public
 
+empresa_config
 
+Disable RLS
 
-procesar_pago_lote
-p_tenant_id uuid, p_cuenta_bancaria_id uuid, p_fecha_pago date, p_metodo_pago text, p_referencia_lote text, p_observaciones text, p_pagos jsonb, p_created_by uuid DEFAULT NULL::uuid
+Create policy
 
-jsonb
+Name	Command	Applied to	Actions
 
-Definer
+empresa_config_tenant_isolation
+ALL	
+public
 
 
+Users can read their own tenant
+SELECT	
+public
 
-refrescar_estados_financieros
-p_tenant_id uuid, p_anio integer, p_mes integer
+evaluaciones
 
-void
+Disable RLS
 
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+evaluaciones_tenant_isolation
+ALL	
+public
 
-registrar_auditoria_documento
-–
+event_processing_log
 
-trigger	
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-registrar_entrada_stock_atomico
-p_producto_id uuid, p_almacen_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion timestamp with time zone DEFAULT NULL::timestamp with time zone
+event_processing_log_tenant_isolation
+ALL	
+public
 
-uuid
+eventos_pos
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-registrar_movimiento_almacen
-p_producto_id uuid, p_almacen_id uuid, p_tipo text, p_cantidad numeric, p_referencia_tipo text, p_referencia_id uuid, p_notas text DEFAULT NULL::text, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion date DEFAULT NULL::date
+eventos_pos_tenant_isolation
+ALL	
+public
 
-void
+expediente_documentos
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-release_job_lock
-p_lock_key text
+expediente_documentos_tenant_isolation
+ALL	
+public
 
-void
+fe_configuracion
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-reservar_stock_atomico
-p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text
+fe_configuracion_tenant_isolation
+ALL	
+public
 
-uuid
+gastos
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-revoke_all_user_sessions
-p_usuario_sistema_id uuid
+gastos_tenant_isolation
+ALL	
+public
 
-integer
+gestiones_cobranza
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-revoke_user_session
-p_session_token text
+gestiones_cobranza_tenant_isolation
+ALL	
+public
 
-boolean
+gre
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-rma_retorno_inventario
-p_rma_item_id uuid, p_cantidad numeric, p_almacen_id uuid, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion date DEFAULT NULL::date
+gre_tenant_isolation
+ALL	
+public
 
-void
+gre_guias
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-rotar_logs_auditoria
-p_retention_days integer DEFAULT 365
+gre_guias_policy
+ALL	
+public
 
-jsonb
+historial_pagos_planilla
 
-Definer
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-seed_plan_cuentas_tenant
-p_tenant_id uuid
+historial_pagos_planilla_authenticated_access
+ALL	
+public
 
-void
 
-Invoker
+historial_pagos_planilla_tenant_isolation
+ALL	
+public
 
+horarios_trabajo
 
+Disable RLS
 
-send_rls_alert
-p_alert_name text, p_severity text, p_message text, p_violation_count integer DEFAULT 1, p_affected_table text DEFAULT NULL::text, p_user_email text DEFAULT NULL::text, p_user_id uuid DEFAULT NULL::uuid, p_details jsonb DEFAULT NULL::jsonb, p_tenant_id uuid DEFAULT NULL::uuid
+Create policy
 
-uuid
+Name	Command	Applied to	Actions
 
-Definer
+horarios_trabajo_tenant_isolation
+ALL	
+public
 
+integration_logs
 
+Disable RLS
 
-set_config
-setting text, value text
+Create policy
 
-text
+Name	Command	Applied to	Actions
 
-Definer
+integration_logs_insert_policy
+INSERT	
+public
 
 
+integration_logs_tenant_isolation
+SELECT	
+public
 
-sign
-payload json, secret text, algorithm text DEFAULT 'HS256'::text
+inventarios_permanentes
 
-text
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+inventarios_permanentes_tenant_isolation
+ALL	
+public
 
-stock_disponible
-p_producto_id uuid
+libro_retenciones
 
-numeric
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+libro_retenciones_tenant_isolation
+ALL	
+public
 
-sync_usuario_activo_estado
-–
+libros_electronicos_sunat
 
-trigger	
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-table_has_column
-p_table_name text, p_column_name text
+libros_electronicos_sunat_tenant_isolation
+ALL	
+public
 
-boolean
+liquidaciones
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-trigger_copiar_metodos_pago_nuevo_tenant
-–
+liquidaciones_tenant_isolation
+ALL	
+public
 
-trigger	
-Definer
+logistica_eventos
 
+Disable RLS
 
+Create policy
 
-trigger_crear_documento_para_cpe
-–
+Name	Command	Applied to	Actions
 
-trigger	
-Definer
+logistica_eventos_rls
+ALL	
+public
 
+lotes_productos
 
+Disable RLS
 
-trigger_rls_alert
-–
+Create policy
 
-trigger	
-Definer
+Name	Command	Applied to	Actions
 
+tenant_isolation_lotes
+ALL	
+public
 
+metodos_pago
 
-trigger_seed_catalogos_nuevo_tenant
-–
+Disable RLS
 
-trigger	
-Definer
+Create policy
 
+Name	Command	Applied to	Actions
 
+metodos_pago_delete_tenant
+DELETE	
+public
 
-try_cast_double
-inp text
 
-double precision
+metodos_pago_insert_tenant
+INSERT	
+public
 
-Invoker
 
+metodos_pago_select_tenant
+SELECT	
+public
 
 
-update_conciliaciones_bancarias_updated_at
-–
+metodos_pago_tenant_isolation
+ALL	
+public
 
-trigger	
-Invoker
 
+metodos_pago_update_tenant
+UPDATE	
+public
 
+movimientos_bancarios
 
-update_empresa_config_updated_at
-–
+Disable RLS
 
-trigger	
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
+movimientos_bancarios_authenticated_access
+ALL	
+public
 
-update_outbox_events_updated_at
-–
+movimientos_caja
 
-trigger	
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-update_plantillas_asientos_updated_at
-–
+movimientos_caja_tenant_isolation
+ALL	
+public
 
-trigger	
-Invoker
+movimientos_consignacion
 
+Disable RLS
 
+Create policy
 
-update_presupuestos_updated_at
-–
+Name	Command	Applied to	Actions
 
-trigger	
-Invoker
+movimientos_consignacion_tenant_isolation
+ALL	
+public
 
+movimientos_inventario
 
+Disable RLS
 
-update_session_activity
-p_session_token text
+Create policy
 
-boolean
+Name	Command	Applied to	Actions
 
-Definer
+Movimientos are immutable
+UPDATE	
+public
 
 
+Movimientos cannot be deleted
+DELETE	
+public
 
-update_updated_at_column
-–
 
-trigger	
-Invoker
+movimientos_inventario_insert
+INSERT	
+public
 
 
+movimientos_inventario_select
+SELECT	
+public
 
-update_wizard_progress_timestamp
-–
+movimientos_lotes
 
-trigger	
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-url_decode
-data text
+tenant_isolation_mov_lotes
+ALL	
+public
 
-bytea
+notificacion_tipo_roles
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-url_encode
-data bytea
+notificacion_tipo_roles_tenant_policy
+ALL	
+public
 
-text
+notificaciones
 
-Invoker
+Disable RLS
 
+Create policy
 
+Name	Command	Applied to	Actions
 
-user_has_permission
-p_modulo text, p_accion text, p_recurso text
+System can insert notifications
+INSERT	
+public
 
-boolean
 
-Definer
+Users can delete their own notifications
+DELETE	
+public
 
 
+Users can update their own notifications
+UPDATE	
+public
 
-validar_balance_plantilla
-p_plantilla_id uuid
 
-TABLE(es_valido boolean, total_debe numeric, total_haber numeric, diferencia numeric, mensaje text)
+Users can view notifications for their tenant
+SELECT	
+public
 
-Invoker
+oc_aprobaciones
 
+Disable RLS
 
+Create policy
 
-validar_stock_antes_detalle_venta
-–
+Name	Command	Applied to	Actions
 
-trigger	
-Invoker
+oc_aprobaciones_tenant_isolation
+ALL	
+public
 
+orden_compra_detalles
 
+Disable RLS
 
-validar_vigencia_cotizacion_compra
-–
+Create policy
 
-trigger	
-Invoker
+Name	Command	Applied to	Actions
 
+orden_compra_detalles_tenant_isolation
+ALL	
+public
 
+ordenes_compra
 
-validate_user_session
-p_session_token text
+Disable RLS
 
-TABLE(session_id uuid, user_id uuid, usuario_sistema_id uuid, tenant_id uuid, is_valid boolean, expires_at timestamp with time zone)
+Create policy
 
-Definer
+Name	Command	Applied to	Actions
 
+ordenes_compra_tenant_isolation
+ALL	
+public
 
+outbox_events
 
-validate_wizard_completion
-p_tenant_id uuid
+Disable RLS
 
-boolean
+Create policy
 
-Definer
+Name	Command	Applied to	Actions
 
+outbox_events_system_access
+ALL	
+public
 
 
-verificar_stock_disponible
-p_producto_id uuid, p_cantidad numeric
+Users can only insert outbox events for their tenant
+INSERT	
+public
 
-boolean
 
-Invoker
+Users can only see outbox events from their tenant
+SELECT	
+public
 
 
+Users can only update outbox events from their tenant
+UPDATE	
+public
 
-verify
-token text, secret text, algorithm text DEFAULT 'HS256'::text
+pagos_empleados
 
-TABLE(header json, payload json, valid boolean)
+Disable RLS
 
-Invoker
+Create policy
 
+Name	Command	Applied to	Actions
 
- ||| triggers   Database Triggers
-Execute a set of actions automatically on specified table events
+pagos_empleados_tenant_isolation
+ALL	
+public
+
+pagos_facturas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pagos_facturas_tenant_isolation
+ALL	
+public
+
+pagos_lote
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pagos_lote_tenant_isolation
+ALL	
+public
+
+pagos_ventas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pagos_ventas_tenant_isolation
+ALL	
+public
+
+paises
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+paises_delete_service_role
+DELETE	
+public
+
+
+paises_select_authenticated
+SELECT	
+public
+
+
+paises_update_service_role
+UPDATE	
+public
+
+
+paises_write_service_role
+INSERT	
+public
+
+pedido_aprobaciones
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pedido_aprobaciones_rls
+ALL	
+public
+
+pedido_backorders
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pedido_backorders_rls
+ALL	
+public
+
+pedido_despachos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pedido_despachos_rls
+ALL	
+public
+
+pedidos_venta
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pedidos_venta_tenant_isolation
+ALL	
+public
+
+pedidos_venta_detalle
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+pedidos_venta_detalle_tenant_isolation
+ALL	
+public
+
+periodos_contables
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+periodos_contables_tenant_isolation
+ALL	
+public
+
+permisos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+permisos_allow_read
+SELECT	
+authenticated, postgres
++ 1 more
+
+
+permisos_superadmin_write
+ALL	
+postgres, service_role
+
+
+permisos_tenant_isolation
+ALL	
+public
+
+pii_encryption_log
+RLS Disabled
+
+Enable RLS
+
+Create policy
+
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
+
+plan_cuentas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+plan_cuentas_authenticated_access
+ALL	
+public
+
+
+rls_delete_tenant
+DELETE	
+public
+
+
+rls_insert_tenant
+INSERT	
+public
+
+
+rls_select_tenant
+SELECT	
+public
+
+
+rls_update_tenant
+UPDATE	
+public
+
+planillas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+planillas_tenant_isolation
+ALL	
+public
+
+plantillas_asientos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+plantillas_asientos_tenant_isolation
+ALL	
+public
+
+plantillas_asientos_detalle
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+plantillas_detalle_tenant_isolation
+ALL	
+public
+
+plantillas_asientos_historial
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+plantillas_historial_tenant_isolation
+ALL	
+public
+
+plantillas_asientos_ventas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+plantillas_asientos_ventas_tenant_isolation
+ALL	
+public
+
+pos_numeracion
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rls_delete_tenant
+DELETE	
+public
+
+
+rls_insert_tenant
+INSERT	
+public
+
+
+rls_select_tenant
+SELECT	
+public
+
+
+rls_update_tenant
+UPDATE	
+public
+
+presupuestos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+presupuestos_tenant_isolation
+ALL	
+public
+
+producto_existencias
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+existencias_delete_rls
+DELETE	
+public
+
+
+existencias_insert_rls
+INSERT	
+public
+
+
+existencias_select_rls
+SELECT	
+public
+
+
+existencias_update_rls
+UPDATE	
+public
+
+producto_precios_sucursal
+RLS Disabled
+
+Enable RLS
+
+Create policy
+
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
+
+producto_stock_sucursal
+RLS Disabled
+
+Enable RLS
+
+Create policy
+
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
+
+productos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+productos_tenant_isolation
+ALL	
+public
+
+proveedores
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+proveedores_tenant_isolation
+ALL	
+public
+
+recepcion_items
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+recepcion_items_tenant_isolation
+ALL	
+public
+
+recepciones
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+recepciones_tenant_isolation
+ALL	
+public
+
+registro_consignaciones
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+registro_consignaciones_tenant_isolation
+ALL	
+public
+
+resumenes_diarios
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+resumenes_diarios_tenant_isolation
+ALL	
+public
+
+retiros_caja
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+retiros_caja_tenant_isolation
+ALL	
+public
+
+rls_alert_config
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rls_alert_config_superadmin_all
+ALL	
+public
+
+
+rls_alert_config_tenant_read
+SELECT	
+public
+
+rls_alert_history
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rls_alert_history_superadmin_all
+ALL	
+public
+
+
+rls_alert_history_system_insert
+INSERT	
+public
+
+
+rls_alert_history_tenant_read
+SELECT	
+public
+
+rls_audit_log
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rls_audit_log_delete_service_role
+DELETE	
+service_role
+
+
+rls_audit_log_insert_unrestricted
+INSERT	
+public
+
+
+rls_audit_log_no_update
+UPDATE	
+public
+
+
+rls_audit_log_select_service_role
+SELECT	
+service_role
+
+rma_eventos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rma_eventos_insert_rls
+INSERT	
+public
+
+
+rma_eventos_select_rls
+SELECT	
+public
+
+rma_items
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rma_items_insert_rls
+INSERT	
+public
+
+
+rma_items_select_rls
+SELECT	
+public
+
+
+rma_items_update_rls
+UPDATE	
+public
+
+rma_solicitudes
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rma_insert_rls
+INSERT	
+public
+
+
+rma_select_rls
+SELECT	
+public
+
+
+rma_update_rls
+UPDATE	
+public
+
+rol_permisos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rol_permisos_allow_read
+SELECT	
+authenticated, postgres
++ 1 more
+
+
+rol_permisos_superadmin_write
+ALL	
+postgres, service_role
+
+
+rol_permisos_tenant_isolation
+ALL	
+public
+
+roles
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+roles_allow_login_select
+SELECT	
+anon, authenticated
++ 2 more
+
+
+roles_authenticated_write
+ALL	
+public
+
+rrhh_pagos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rrhh_pagos_authenticated_access
+ALL	
+public
+
+saldos_iniciales_cuentas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+saldos_iniciales_cuentas_tenant_isolation
+ALL	
+public
+
+secret_rotation_state
+RLS Disabled
+
+Enable RLS
+
+Create policy
+
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
+
+sesiones_caja
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+sesiones_caja_tenant_isolation
+ALL	
+public
+
+sire_files
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+sire_files_tenant_isolation
+ALL	
+public
+
+solicitudes
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+solicitudes_tenant_isolation
+ALL	
+public
+
+stock_movimientos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+stock_movimientos_tenant_isolation
+ALL	
+public
+
+
+tenant_isolation_stock_movimientos
+ALL	
+public
+
+sucursales
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+rls_delete_tenant
+DELETE	
+public
+
+
+rls_insert_tenant
+INSERT	
+public
+
+
+rls_select_tenant
+SELECT	
+public
+
+
+rls_update_tenant
+UPDATE	
+public
+
+system_alerts
+RLS Disabled
+
+Enable RLS
+
+Create policy
+
+Anyone with your project's anonymous key can read, modify, or delete your data.
+No policies created yet
+
+tipos_cambio
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+tipos_cambio_delete_super_admin
+DELETE	
+public
+
+
+tipos_cambio_insert_super_admin
+INSERT	
+public
+
+
+tipos_cambio_read_authenticated
+SELECT	
+public
+
+
+tipos_cambio_update_super_admin
+UPDATE	
+public
+
+tipos_documentos_fiscales
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+tipos_doc_fiscales_delete_service_role
+DELETE	
+public
+
+
+tipos_doc_fiscales_select_authenticated
+SELECT	
+public
+
+
+tipos_doc_fiscales_update_service_role
+UPDATE	
+public
+
+
+tipos_doc_fiscales_write_service_role
+INSERT	
+public
+
+tipos_impuestos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+tipos_impuestos_delete_service_role
+DELETE	
+public
+
+
+tipos_impuestos_select_authenticated
+SELECT	
+public
+
+
+tipos_impuestos_update_service_role
+UPDATE	
+public
+
+
+tipos_impuestos_write_service_role
+INSERT	
+public
+
+user_roles
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+user_roles_allow_login_select
+SELECT	
+anon, authenticated
++ 2 more
+
+
+user_roles_authenticated_write
+ALL	
+public
+
+user_sessions
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+user_sessions_own_access
+ALL	
+public
+
+users
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+Users can view own profile
+SELECT	
+public
+
+
+users_service_role_all
+ALL	
+public
+
+
+users_update_own_profile
+UPDATE	
+public
+
+
+users_view_own_profile
+SELECT	
+public
+
+usuario_configuracion
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+usuario_configuracion_tenant_isolation
+ALL	
+public
+
+usuarios_sistema
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+usuarios_sistema_allow_login_select
+SELECT	
+anon, authenticated
++ 2 more
+
+
+usuarios_sistema_authenticated_write
+ALL	
+public
+
+vacantes
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+vacantes_tenant_isolation
+ALL	
+public
+
+validaciones_sunat
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+Users can delete validations for their tenant
+DELETE	
+public
+
+
+Users can insert validations for their tenant
+INSERT	
+public
+
+
+Users can update validations for their tenant
+UPDATE	
+public
+
+
+Users can view validations for their tenant
+SELECT	
+public
+
+venta_detalles
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+venta_detalles_tenant_isolation
+ALL	
+public
+
+ventas
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+ventas_tenant_isolation
+ALL	
+public
+
+ventas_pos
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+ventas_pos_tenant_isolation
+ALL	
+public
+
+wizard_progress
+
+Disable RLS
+
+Create policy
+
+Name	Command	Applied to	Actions
+
+Users can delete their own tenant wizard progress
+DELETE	
+authenticated
+
+
+Users can delete wizard progress for their tenant
+DELETE	
+public
+
+
+Users can insert their own tenant wizard progress
+INSERT	
+authenticated
+
+
+Users can insert wizard progress for their tenant
+INSERT	
+public
+
+
+Users can update their own tenant wizard progress
+UPDATE	
+authenticated
+
+
+Users can update wizard progress for their tenant
+UPDATE	
+public
+
+
+Users can view their own tenant wizard progress
+SELECT	
+authenticated
+
+
+Users can view wizard progress for their tenant
+SELECT	
+public
+
+triggers 
+
+Database Triggers
+Execute actions automatically when table events occur
 Docs
 
 schema
@@ -987,8 +2305,8 @@ Name	Table	Function	Events	Orientation	Enabled
 audit_asientos_contables_trigger
 asientos_contables
 audit_table_changes
-AFTER INSERT
 AFTER DELETE
+AFTER INSERT
 AFTER UPDATE
 ROW
 
@@ -997,8 +2315,8 @@ ROW
 audit_cpe_trigger
 cpe
 audit_table_changes
-AFTER DELETE
 AFTER INSERT
+AFTER DELETE
 AFTER UPDATE
 ROW
 
@@ -1007,9 +2325,9 @@ ROW
 audit_cuentas_por_cobrar_trigger
 cuentas_por_cobrar
 audit_table_changes
+AFTER INSERT
 AFTER UPDATE
 AFTER DELETE
-AFTER INSERT
 ROW
 
 
@@ -1028,8 +2346,8 @@ audit_gre_trigger
 gre
 audit_table_changes
 AFTER UPDATE
-AFTER DELETE
 AFTER INSERT
+AFTER DELETE
 ROW
 
 
@@ -1037,9 +2355,9 @@ ROW
 audit_movimientos_bancarios_trigger
 movimientos_bancarios
 audit_table_changes
-AFTER UPDATE
-AFTER DELETE
 AFTER INSERT
+AFTER DELETE
+AFTER UPDATE
 ROW
 
 
@@ -1047,9 +2365,9 @@ ROW
 audit_ordenes_compra_trigger
 ordenes_compra
 audit_table_changes
-AFTER UPDATE
-AFTER DELETE
 AFTER INSERT
+AFTER DELETE
+AFTER UPDATE
 ROW
 
 
@@ -1057,8 +2375,8 @@ ROW
 audit_pedidos_venta_trigger
 pedidos_venta
 audit_table_changes
-AFTER DELETE
 AFTER UPDATE
+AFTER DELETE
 AFTER INSERT
 ROW
 
@@ -1077,8 +2395,8 @@ ROW
 audit_rls_asignacion_costos
 asignacion_costos
 audit_rls_access
-BEFORE INSERT
 BEFORE UPDATE
+BEFORE INSERT
 BEFORE DELETE
 ROW
 
@@ -1087,8 +2405,8 @@ ROW
 audit_rls_beneficios
 beneficios
 audit_rls_access
-BEFORE UPDATE
 BEFORE INSERT
+BEFORE UPDATE
 BEFORE DELETE
 ROW
 
@@ -1098,8 +2416,8 @@ audit_rls_cajas
 cajas
 audit_rls_access
 BEFORE INSERT
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
 ROW
 
 
@@ -1107,8 +2425,8 @@ ROW
 audit_rls_calendario_empresa
 calendario_empresa
 audit_rls_access
-BEFORE INSERT
 BEFORE DELETE
+BEFORE INSERT
 BEFORE UPDATE
 ROW
 
@@ -1117,8 +2435,8 @@ ROW
 audit_rls_candidatos
 candidatos
 audit_rls_access
-BEFORE UPDATE
 BEFORE INSERT
+BEFORE UPDATE
 BEFORE DELETE
 ROW
 
@@ -1127,8 +2445,8 @@ ROW
 audit_rls_capacitaciones
 capacitaciones
 audit_rls_access
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
 BEFORE INSERT
 ROW
 
@@ -1137,9 +2455,9 @@ ROW
 audit_rls_centros_costo
 centros_costo
 audit_rls_access
-BEFORE DELETE
 BEFORE UPDATE
 BEFORE INSERT
+BEFORE DELETE
 ROW
 
 
@@ -1147,9 +2465,9 @@ ROW
 audit_rls_cobranzas
 cobranzas
 audit_rls_access
-BEFORE DELETE
 BEFORE INSERT
 BEFORE UPDATE
+BEFORE DELETE
 ROW
 
 
@@ -1158,8 +2476,8 @@ audit_rls_conceptos_planilla
 conceptos_planilla
 audit_rls_access
 BEFORE INSERT
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
 ROW
 
 
@@ -1167,9 +2485,9 @@ ROW
 audit_rls_conciliaciones_bancarias
 conciliaciones_bancarias
 audit_rls_access
+BEFORE DELETE
 BEFORE INSERT
 BEFORE UPDATE
-BEFORE DELETE
 ROW
 
 
@@ -1177,9 +2495,9 @@ ROW
 audit_rls_configuracion_retenciones
 configuracion_retenciones
 audit_rls_access
+BEFORE DELETE
 BEFORE INSERT
 BEFORE UPDATE
-BEFORE DELETE
 ROW
 
 
@@ -1187,9 +2505,9 @@ ROW
 audit_rls_cuentas_bancarias
 cuentas_bancarias
 audit_rls_access
+BEFORE INSERT
 BEFORE UPDATE
 BEFORE DELETE
-BEFORE INSERT
 ROW
 
 
@@ -1207,9 +2525,9 @@ ROW
 audit_rls_departamentos
 departamentos
 audit_rls_access
-BEFORE UPDATE
-BEFORE INSERT
 BEFORE DELETE
+BEFORE INSERT
+BEFORE UPDATE
 ROW
 
 
@@ -1217,9 +2535,9 @@ ROW
 audit_rls_depreciaciones
 depreciaciones
 audit_rls_access
-BEFORE UPDATE
 BEFORE DELETE
 BEFORE INSERT
+BEFORE UPDATE
 ROW
 
 
@@ -1237,8 +2555,8 @@ ROW
 audit_rls_egresos
 egresos
 audit_rls_access
-BEFORE INSERT
 BEFORE UPDATE
+BEFORE INSERT
 BEFORE DELETE
 ROW
 
@@ -1247,9 +2565,9 @@ ROW
 audit_rls_empleado_beneficios
 empleado_beneficios
 audit_rls_access
-BEFORE DELETE
-BEFORE UPDATE
 BEFORE INSERT
+BEFORE UPDATE
+BEFORE DELETE
 ROW
 
 
@@ -1257,8 +2575,8 @@ ROW
 audit_rls_empleado_capacitaciones
 empleado_capacitaciones
 audit_rls_access
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
 BEFORE INSERT
 ROW
 
@@ -1267,9 +2585,9 @@ ROW
 audit_rls_empleado_horarios
 empleado_horarios
 audit_rls_access
-BEFORE INSERT
 BEFORE DELETE
 BEFORE UPDATE
+BEFORE INSERT
 ROW
 
 
@@ -1287,8 +2605,8 @@ ROW
 audit_rls_evaluaciones
 evaluaciones
 audit_rls_access
-BEFORE UPDATE
 BEFORE INSERT
+BEFORE UPDATE
 BEFORE DELETE
 ROW
 
@@ -1297,9 +2615,9 @@ ROW
 audit_rls_event_processing_log
 event_processing_log
 audit_rls_access
-BEFORE INSERT
 BEFORE UPDATE
 BEFORE DELETE
+BEFORE INSERT
 ROW
 
 
@@ -1307,9 +2625,9 @@ ROW
 audit_rls_expediente_documentos
 expediente_documentos
 audit_rls_access
-BEFORE DELETE
-BEFORE INSERT
 BEFORE UPDATE
+BEFORE INSERT
+BEFORE DELETE
 ROW
 
 
@@ -1318,8 +2636,8 @@ audit_rls_gastos
 gastos
 audit_rls_access
 BEFORE INSERT
-BEFORE UPDATE
 BEFORE DELETE
+BEFORE UPDATE
 ROW
 
 
@@ -1327,9 +2645,9 @@ ROW
 audit_rls_gestiones_cobranza
 gestiones_cobranza
 audit_rls_access
-BEFORE INSERT
 BEFORE UPDATE
 BEFORE DELETE
+BEFORE INSERT
 ROW
 
 
@@ -1337,9 +2655,9 @@ ROW
 audit_rls_horarios_trabajo
 horarios_trabajo
 audit_rls_access
-BEFORE INSERT
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
+BEFORE INSERT
 ROW
 
 
@@ -1347,9 +2665,9 @@ ROW
 audit_rls_inventarios_permanentes
 inventarios_permanentes
 audit_rls_access
+BEFORE DELETE
 BEFORE INSERT
 BEFORE UPDATE
-BEFORE DELETE
 ROW
 
 
@@ -1367,9 +2685,9 @@ ROW
 audit_rls_libros_electronicos_sunat
 libros_electronicos_sunat
 audit_rls_access
-BEFORE DELETE
-BEFORE INSERT
 BEFORE UPDATE
+BEFORE INSERT
+BEFORE DELETE
 ROW
 
 
@@ -1377,9 +2695,9 @@ ROW
 audit_rls_liquidaciones
 liquidaciones
 audit_rls_access
-BEFORE UPDATE
 BEFORE INSERT
 BEFORE DELETE
+BEFORE UPDATE
 ROW
 
 
@@ -1398,8 +2716,8 @@ audit_rls_pagos_empleados
 pagos_empleados
 audit_rls_access
 BEFORE INSERT
-BEFORE UPDATE
 BEFORE DELETE
+BEFORE UPDATE
 ROW
 
 
@@ -1407,9 +2725,9 @@ ROW
 audit_rls_pagos_facturas
 pagos_facturas
 audit_rls_access
+BEFORE UPDATE
 BEFORE INSERT
 BEFORE DELETE
-BEFORE UPDATE
 ROW
 
 
@@ -1427,9 +2745,9 @@ ROW
 audit_rls_planillas
 planillas
 audit_rls_access
-BEFORE UPDATE
 BEFORE DELETE
 BEFORE INSERT
+BEFORE UPDATE
 ROW
 
 
@@ -1437,9 +2755,9 @@ ROW
 audit_rls_registro_consignaciones
 registro_consignaciones
 audit_rls_access
+BEFORE UPDATE
 BEFORE INSERT
 BEFORE DELETE
-BEFORE UPDATE
 ROW
 
 
@@ -1457,9 +2775,9 @@ ROW
 audit_rls_solicitudes
 solicitudes
 audit_rls_access
-BEFORE INSERT
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
+BEFORE INSERT
 ROW
 
 
@@ -1468,8 +2786,8 @@ audit_rls_usuario_configuracion
 usuario_configuracion
 audit_rls_access
 BEFORE INSERT
-BEFORE DELETE
 BEFORE UPDATE
+BEFORE DELETE
 ROW
 
 
@@ -1477,9 +2795,9 @@ ROW
 audit_rls_vacantes
 vacantes
 audit_rls_access
+BEFORE UPDATE
 BEFORE INSERT
 BEFORE DELETE
-BEFORE UPDATE
 ROW
 
 
@@ -1487,9 +2805,9 @@ ROW
 audit_rol_permisos
 rol_permisos
 audit_trigger_function
+AFTER DELETE
 AFTER INSERT
 AFTER UPDATE
-AFTER DELETE
 ROW
 
 
@@ -1500,6 +2818,15 @@ audit_trigger_function
 AFTER UPDATE
 AFTER INSERT
 AFTER DELETE
+ROW
+
+
+
+no_modification_cash_movements
+movimientos_caja
+prevent_cash_movement_modification
+BEFORE DELETE
+BEFORE UPDATE
 ROW
 
 
@@ -1520,6 +2847,32 @@ ROW
 
 
 
+trg_existencias_stock_no_negativo
+producto_existencias
+trigger_prevenir_stock_negativo
+BEFORE INSERT
+BEFORE UPDATE
+ROW
+
+
+
+trg_liberar_stock_cotizacion
+cotizaciones
+trigger_liberar_stock_cotizacion
+AFTER UPDATE
+ROW
+
+
+
+trg_productos_stock_no_negativo
+productos
+trigger_prevenir_stock_negativo
+BEFORE INSERT
+BEFORE UPDATE
+ROW
+
+
+
 trg_rls_alert
 rls_audit_log
 trigger_rls_alert
@@ -1528,11 +2881,20 @@ ROW
 
 
 
+trg_sync_sesiones_caja
+sesiones_caja
+sync_sesiones_caja_columns
+BEFORE INSERT
+BEFORE UPDATE
+ROW
+
+
+
 trigger_auditoria_documento
 documentos
 registrar_auditoria_documento
-AFTER UPDATE
 AFTER INSERT
+AFTER UPDATE
 ROW
 
 
@@ -1549,9 +2911,9 @@ ROW
 trigger_calcular_totales_cotizacion_compra
 cotizacion_compra_detalles
 calcular_totales_cotizacion_compra
+AFTER INSERT
 AFTER UPDATE
 AFTER DELETE
-AFTER INSERT
 ROW
 
 
@@ -1559,9 +2921,9 @@ ROW
 trigger_calcular_totales_devolucion_proveedor
 devolucion_items
 calcular_totales_devolucion_proveedor
-AFTER DELETE
-AFTER INSERT
 AFTER UPDATE
+AFTER INSERT
+AFTER DELETE
 ROW
 
 
@@ -1570,8 +2932,8 @@ trigger_calcular_totales_orden_compra
 orden_compra_detalles
 calcular_totales_orden_compra
 AFTER INSERT
-AFTER UPDATE
 AFTER DELETE
+AFTER UPDATE
 ROW
 
 
@@ -1657,6 +3019,14 @@ ROW
 
 
 
+trigger_seed_roles_permisos_on_tenant
+empresa_config
+trigger_seed_roles_permisos_on_tenant_create
+AFTER INSERT
+ROW
+
+
+
 trigger_update_conciliaciones_bancarias_updated_at
 conciliaciones_bancarias
 update_conciliaciones_bancarias_updated_at
@@ -1722,977 +3092,7 @@ BEFORE UPDATE
 ROW
 
 
-|| functions . Database Functions
-Docs
-
-schema
-
-public
-
-Search for a function
-
-Return Type
-
-Security
-
-Create a new function
-
-Name	Arguments	Return type	Security	
-
-_ensure_rls_if_tenant
-p_table regclass
-
-void
-
-Invoker
-
-
-
-acknowledge_rls_alert
-p_alert_id uuid, p_acknowledged_by uuid DEFAULT NULL::uuid
-
-boolean
-
-Definer
-
-
-
-acquire_job_lock
-p_lock_key text, p_lock_ttl_seconds integer DEFAULT 300
-
-boolean
-
-Definer
-
-
-
-actualizar_stock_reservado
-p_producto_id uuid, p_cantidad numeric, p_operacion character varying
-
-void
-
-Invoker
-
-
-
-add_rls_audit_trigger
-p_table_name text
-
-void
-
-Definer
-
-
-
-add_tenant_id_if_missing
-p_table_name text
-
-void
-
-Definer
-
-
-
-algorithm_sign
-signables text, secret text, algorithm text
-
-text
-
-Invoker
-
-
-
-audit_rls_access
-–
-
-trigger	
-Definer
-
-
-
-audit_table_changes
-–
-
-trigger	
-Definer
-
-
-
-audit_trigger_function
-–
-
-trigger	
-Invoker
-
-
-
-calcular_cantidad_pendiente_oc
-–
-
-trigger	
-Invoker
-
-
-
-calcular_proxima_generacion
-p_tipo_recurrencia character varying, p_dia_generacion integer, p_fecha_base date DEFAULT CURRENT_DATE
-
-date
-
-Invoker
-
-
-
-calcular_totales_cotizacion_compra
-–
-
-trigger	
-Invoker
-
-
-
-calcular_totales_devolucion_proveedor
-–
-
-trigger	
-Invoker
-
-
-
-calcular_totales_orden_compra
-–
-
-trigger	
-Invoker
-
-
-
-check_wizard_completion_validity
-–
-
-trigger	
-Invoker
-
-
-
-cleanup_expired_sessions
-–
-
-integer
-
-Invoker
-
-
-
-cleanup_old_audit_logs
-days_to_keep integer DEFAULT 365
-
-integer
-
-Invoker
-
-
-
-cleanup_old_rls_alerts
-p_retention_days integer DEFAULT 90
-
-integer
-
-Definer
-
-
-
-cleanup_old_rls_audit_logs
-p_retention_days integer DEFAULT 90
-
-integer
-
-Definer
-
-
-
-cleanup_processed_events
-–
-
-integer
-
-Invoker
-
-
-
-copiar_metodos_pago_globales_a_tenant
-p_tenant_id uuid
-
-integer
-
-Definer
-
-
-
-crear_documento_desde_cpe
-p_cpe_id uuid
-
-uuid
-
-Definer
-
-
-
-create_index_if_not_exists
-p_index_name text, p_table_name text, p_columns text, p_where_clause text DEFAULT NULL::text
-
-void
-
-Definer
-
-
-
-create_tenant_isolation_policy
-p_table_name text, p_policy_suffix text DEFAULT 'tenant_isolation'::text
-
-boolean
-
-Invoker
-
-
-
-create_user_session
-p_user_id uuid, p_usuario_sistema_id uuid, p_tenant_id uuid, p_session_token text, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text, p_expires_in_hours integer DEFAULT 8
-
-uuid
-
-Definer
-
-
-
-debug_tenant_context
-–
-
-TABLE(setting_name text, setting_value text)
-
-Definer
-
-
-
-decrementar_stock_reservado
-p_producto_id uuid, p_cantidad numeric
-
-void
-
-Definer
-
-
-
-descontar_stock
-p_producto_id uuid, p_cantidad numeric
-
-void
-
-Invoker
-
-
-
-descontar_stock_y_liberar_reserva
-p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text
-
-uuid
-
-Definer
-
-
-
-diagnostico_cpe_documentos
-–
-
-TABLE(metrica text, valor text, estado text)
-
-Invoker
-
-
-
-diagnostico_pos
-p_tenant_id uuid DEFAULT NULL::uuid
-
-TABLE(metrica text, valor text, estado text)
-
-Invoker
-
-
-
-diagnostico_seguridad_rls
-–
-
-TABLE(tabla text, rls_habilitado boolean, num_politicas bigint, estado text)
-
-Invoker
-
-
-
-disable_rls_alert
-p_alert_name text
-
-boolean
-
-Definer
-
-
-
-drop_all_policies
-p_table_name text
-
-integer
-
-Invoker
-
-
-
-enable_rls_alert
-p_alert_name text
-
-boolean
-
-Definer
-
-
-
-enable_rls_on_table
-p_table_name text
-
-boolean
-
-Invoker
-
-
-
-enable_rls_tenant_isolation
-p_table_name text
-
-void
-
-Definer
-
-
-
-evaluar_crecimiento
-–
-
-text
-
-Invoker
-
-
-
-evaluar_liquidez
-efectivo numeric, cuentas_por_pagar numeric
-
-text
-
-Invoker
-
-
-
-evaluar_rentabilidad
-margen_bruto numeric
-
-text
-
-Invoker
-
-
-
-generar_numero_comunicacion_baja
-p_tenant_id uuid, p_fecha date
-
-character varying
-
-Invoker
-
-
-
-generar_numero_resumen_diario
-p_tenant_id uuid, p_fecha date
-
-character varying
-
-Invoker
-
-
-
-generate_gre_numero
-–
-
-trigger	
-Invoker
-
-
-
-generate_rls_security_report
-p_days integer DEFAULT 7
-
-TABLE(metric text, value text)
-
-Definer
-
-
-
-get_alert_statistics
-p_days integer DEFAULT 7
-
-TABLE(metric text, value text)
-
-Definer
-
-
-
-get_current_tenant_id
-–
-
-uuid
-
-Invoker
-
-
-
-get_current_user_id
-–
-
-uuid
-
-Invoker
-
-
-
-get_datos_historicos_completos
-meses integer DEFAULT 12
-
-TABLE(periodo text, ventas numeric, gastos numeric, utilidad numeric, cuentas_por_cobrar numeric, cuentas_por_pagar numeric)
-
-Definer
-
-
-
-get_kpis_financieros
-–
-
-TABLE(efectivo_disponible numeric, ventas_ultimos_30dias numeric, gastos_ultimos_30dias numeric, utilidad_ultimos_30dias numeric, cuentas_por_cobrar numeric, cuentas_por_pagar numeric, rotacion_inventario numeric, margen_bruto numeric, liquidez text, rentabilidad text, crecimiento text)
-
-Definer
-
-
-
-get_pending_outbox_events
-p_limit integer DEFAULT 100, p_tenant_id uuid DEFAULT NULL::uuid
-
-TABLE(id uuid, tenant_id uuid, event_type character varying, event_data jsonb, retry_count integer, max_retries integer)
-
-Invoker
-
-
-
-incrementar_stock_reservado
-p_producto_id uuid, p_cantidad numeric
-
-void
-
-Definer
-
-
-
-is_super_admin
-p_user_id uuid
-
-boolean
-
-Definer
-
-
-
-log_audit_action
-p_table_name text, p_operation text, p_resource_id uuid, p_old_values jsonb DEFAULT NULL::jsonb, p_new_values jsonb DEFAULT NULL::jsonb, p_action_description text DEFAULT NULL::text, p_ip_address inet DEFAULT NULL::inet, p_user_agent text DEFAULT NULL::text
-
-uuid
-
-Definer
-
-
-
-log_rls_violation
-p_table_name text, p_operation text, p_attempted_tenant_id uuid DEFAULT NULL::uuid, p_violation_type text DEFAULT 'cross_tenant'::text, p_severity text DEFAULT 'WARNING'::text, p_metadata jsonb DEFAULT NULL::jsonb
-
-uuid
-
-Definer
-
-
-
-mark_outbox_event_completed
-p_event_id uuid
-
-void
-
-Invoker
-
-
-
-mark_outbox_event_failed
-p_event_id uuid, p_error_message text
-
-void
-
-Invoker
-
-
-
-mark_outbox_event_processing
-p_event_id uuid
-
-void
-
-Invoker
-
-
-
-migrar_cpes_a_documentos
-–
-
-TABLE(cpes_procesados integer, documentos_creados integer, errores text[])
-
-Invoker
-
-
-
-migrar_detalles_ventas_pos_desde_observaciones
-–
-
-TABLE(ventas_procesadas integer, detalles_creados integer, errores text[])
-
-Invoker
-
-
-
-obtener_costos_fijos_mes_actual
-–
-
-numeric
-
-Invoker
-
-
-
-obtener_estadisticas_logs_auditoria
-–
-
-jsonb
-
-Definer
-
-
-
-obtener_siguiente_numero_documento
-p_tenant_id uuid, p_tipo_documento character varying, p_serie character varying
-
-character varying
-
-Invoker
-
-
-
-obtener_siguiente_numero_serie
-p_tenant_id uuid, p_tipo_documento character varying, p_serie character varying
-
-character varying
-
-Invoker
-
-
-
-obtener_stock_info
-p_producto_id uuid
-
-TABLE(producto_id uuid, stock_total numeric, stock_reservado numeric, stock_disponible numeric)
-
-Invoker
-
-
-
-prevent_system_role_deletion
-–
-
-trigger	
-Invoker
-
-
-
-procesar_pago_cxc_atomico
-p_tenant_id uuid, p_cxc_id uuid, p_monto numeric, p_fecha_pago date, p_metodo_pago text DEFAULT NULL::text, p_referencia text DEFAULT NULL::text, p_cuenta_bancaria_id uuid DEFAULT NULL::uuid, p_tipo text DEFAULT 'PAGO'::text, p_aplica_retencion boolean DEFAULT false, p_retencion_monto numeric DEFAULT NULL::numeric, p_user_id uuid DEFAULT NULL::uuid, p_notas text DEFAULT NULL::text
-
-jsonb
-
-Definer
-
-
-
-procesar_pago_cxp_atomico
-p_tenant_id uuid, p_cxp_id uuid, p_monto numeric, p_fecha_pago date, p_metodo_pago text DEFAULT NULL::text, p_referencia text DEFAULT NULL::text, p_cuenta_bancaria_id uuid DEFAULT NULL::uuid, p_user_id uuid DEFAULT NULL::uuid, p_notas text DEFAULT NULL::text
-
-jsonb
-
-Definer
-
-
-
-procesar_pago_lote
-p_tenant_id uuid, p_cuenta_bancaria_id uuid, p_fecha_pago date, p_metodo_pago text, p_referencia_lote text, p_observaciones text, p_pagos jsonb, p_created_by uuid DEFAULT NULL::uuid
-
-jsonb
-
-Definer
-
-
-
-refrescar_estados_financieros
-p_tenant_id uuid, p_anio integer, p_mes integer
-
-void
-
-Definer
-
-
-
-registrar_auditoria_documento
-–
-
-trigger	
-Invoker
-
-
-
-registrar_entrada_stock_atomico
-p_producto_id uuid, p_almacen_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion timestamp with time zone DEFAULT NULL::timestamp with time zone
-
-uuid
-
-Definer
-
-
-
-registrar_movimiento_almacen
-p_producto_id uuid, p_almacen_id uuid, p_tipo text, p_cantidad numeric, p_referencia_tipo text, p_referencia_id uuid, p_notas text DEFAULT NULL::text, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion date DEFAULT NULL::date
-
-void
-
-Definer
-
-
-
-release_job_lock
-p_lock_key text
-
-void
-
-Definer
-
-
-
-reservar_stock_atomico
-p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text
-
-uuid
-
-Definer
-
-
-
-revoke_all_user_sessions
-p_usuario_sistema_id uuid
-
-integer
-
-Definer
-
-
-
-revoke_user_session
-p_session_token text
-
-boolean
-
-Definer
-
-
-
-rma_retorno_inventario
-p_rma_item_id uuid, p_cantidad numeric, p_almacen_id uuid, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion date DEFAULT NULL::date
-
-void
-
-Definer
-
-
-
-rotar_logs_auditoria
-p_retention_days integer DEFAULT 365
-
-jsonb
-
-Definer
-
-
-
-seed_plan_cuentas_tenant
-p_tenant_id uuid
-
-void
-
-Invoker
-
-
-
-send_rls_alert
-p_alert_name text, p_severity text, p_message text, p_violation_count integer DEFAULT 1, p_affected_table text DEFAULT NULL::text, p_user_email text DEFAULT NULL::text, p_user_id uuid DEFAULT NULL::uuid, p_details jsonb DEFAULT NULL::jsonb, p_tenant_id uuid DEFAULT NULL::uuid
-
-uuid
-
-Definer
-
-
-
-set_config
-setting text, value text
-
-text
-
-Definer
-
-
-
-sign
-payload json, secret text, algorithm text DEFAULT 'HS256'::text
-
-text
-
-Invoker
-
-
-
-stock_disponible
-p_producto_id uuid
-
-numeric
-
-Invoker
-
-
-
-sync_usuario_activo_estado
-–
-
-trigger	
-Invoker
-
-
-
-table_has_column
-p_table_name text, p_column_name text
-
-boolean
-
-Invoker
-
-
-
-trigger_copiar_metodos_pago_nuevo_tenant
-–
-
-trigger	
-Definer
-
-
-
-trigger_crear_documento_para_cpe
-–
-
-trigger	
-Definer
-
-
-
-trigger_rls_alert
-–
-
-trigger	
-Definer
-
-
-
-trigger_seed_catalogos_nuevo_tenant
-–
-
-trigger	
-Definer
-
-
-
-try_cast_double
-inp text
-
-double precision
-
-Invoker
-
-
-
-update_conciliaciones_bancarias_updated_at
-–
-
-trigger	
-Invoker
-
-
-
-update_empresa_config_updated_at
-–
-
-trigger	
-Invoker
-
-
-
-update_outbox_events_updated_at
-–
-
-trigger	
-Invoker
-
-
-
-update_plantillas_asientos_updated_at
-–
-
-trigger	
-Invoker
-
-
-
-update_presupuestos_updated_at
-–
-
-trigger	
-Invoker
-
-
-
-update_session_activity
-p_session_token text
-
-boolean
-
-Definer
-
-
-
-update_updated_at_column
-–
-
-trigger	
-Invoker
-
-
-
-update_wizard_progress_timestamp
-–
-
-trigger	
-Invoker
-
-
-
-url_decode
-data text
-
-bytea
-
-Invoker
-
-
-
-url_encode
-data bytea
-
-text
-
-Invoker
-
-
-
-user_has_permission
-p_modulo text, p_accion text, p_recurso text
-
-boolean
-
-Definer
-
-
-
-validar_balance_plantilla
-p_plantilla_id uuid
-
-TABLE(es_valido boolean, total_debe numeric, total_haber numeric, diferencia numeric, mensaje text)
-
-Invoker
-
-
-
-validar_stock_antes_detalle_venta
-–
-
-trigger	
-Invoker
-
-
-
-validar_vigencia_cotizacion_compra
-–
-
-trigger	
-Invoker
-
-
-
-validate_user_session
-p_session_token text
-
-TABLE(session_id uuid, user_id uuid, usuario_sistema_id uuid, tenant_id uuid, is_valid boolean, expires_at timestamp with time zone)
-
-Definer
-
-
-
-validate_wizard_completion
-p_tenant_id uuid
-
-boolean
-
-Definer
-
-
-
-verificar_stock_disponible
-p_producto_id uuid, p_cantidad numeric
-
-boolean
-
-Invoker
-
-
-
-verify
-token text, secret text, algorithm text DEFAULT 'HS256'::text
-
-TABLE(header json, payload json, valid boolean)
-
-Invoker
-
+ functions 
 
  Database Functions
 Docs
@@ -2738,6 +3138,15 @@ Definer
 
 
 
+acquire_pos_lock
+p_tenant_id uuid, p_lock_key text
+
+void
+
+Invoker
+
+
+
 actualizar_stock_reservado
 p_producto_id uuid, p_cantidad numeric, p_operacion character varying
 
@@ -2774,6 +3183,15 @@ Invoker
 
 
 
+asignar_rol_admin_usuario
+p_tenant_id uuid, p_user_id uuid
+
+boolean
+
+Definer
+
+
+
 audit_rls_access
 –
 
@@ -2795,6 +3213,15 @@ audit_trigger_function
 
 trigger	
 Invoker
+
+
+
+buscar_por_pii_hash
+p_table_name text, p_hash_field text, p_hash_value text, p_tenant_id uuid DEFAULT NULL::uuid
+
+TABLE(id uuid)
+
+Definer
 
 
 
@@ -2847,6 +3274,15 @@ Invoker
 
 
 
+cleanup_expired_demo_tenants
+–
+
+TABLE(tenants_desactivados integer, tenants_eliminados integer)
+
+Definer
+
+
+
 cleanup_expired_sessions
 –
 
@@ -2883,12 +3319,39 @@ Definer
 
 
 
+cleanup_old_rotation_records
+retention_days integer DEFAULT 365
+
+integer
+
+Definer
+
+
+
 cleanup_processed_events
 –
 
 integer
 
 Invoker
+
+
+
+confirmar_venta_lotes
+p_tenant_id uuid, p_lotes_reservados jsonb, p_venta_pos_id uuid, p_cliente_id uuid DEFAULT NULL::uuid, p_usuario_id uuid DEFAULT NULL::uuid
+
+boolean
+
+Definer
+
+
+
+convertir_cotizacion_a_pedido
+p_cotizacion_id uuid, p_tenant_id uuid, p_user_id uuid, p_notas text DEFAULT NULL::text
+
+jsonb
+
+Definer
 
 
 
@@ -2905,6 +3368,24 @@ crear_documento_desde_cpe
 p_cpe_id uuid
 
 uuid
+
+Definer
+
+
+
+crear_pedido_completo
+p_pedido jsonb, p_detalle jsonb
+
+jsonb
+
+Definer
+
+
+
+create_demo_tenant
+p_nombre character varying DEFAULT 'DEMO COMERCIAL SAC'::character varying, p_dias_duracion integer DEFAULT 14
+
+jsonb
 
 Definer
 
@@ -2970,6 +3451,15 @@ p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::tex
 uuid
 
 Definer
+
+
+
+detectar_patrones_sospechosos_pos
+p_tenant_id uuid, p_sesion_caja_id uuid DEFAULT NULL::uuid, p_horas_atras integer DEFAULT 24
+
+TABLE(patron character varying, cantidad bigint, descripcion text, nivel_riesgo character varying)
+
+Invoker
 
 
 
@@ -3072,6 +3562,15 @@ Invoker
 
 
 
+generar_firma_autorizacion
+p_tipo character varying, p_monto numeric, p_supervisor_id uuid, p_timestamp timestamp without time zone, p_secret text DEFAULT 'CHANGE_ME_IN_PRODUCTION'::text
+
+text
+
+Invoker
+
+
+
 generar_numero_comunicacion_baja
 p_tenant_id uuid, p_fecha date
 
@@ -3143,6 +3642,15 @@ Definer
 
 
 
+get_demo_days_remaining
+p_tenant_id uuid
+
+integer
+
+Definer
+
+
+
 get_kpis_financieros
 –
 
@@ -3161,6 +3669,15 @@ Invoker
 
 
 
+get_user_role_ids
+p_usuario_id uuid
+
+uuid[]
+
+Invoker
+
+
+
 incrementar_stock_reservado
 p_producto_id uuid, p_cantidad numeric
 
@@ -3170,10 +3687,28 @@ Definer
 
 
 
+is_demo_expired
+p_tenant_id uuid
+
+boolean
+
+Definer
+
+
+
 is_super_admin
 p_user_id uuid
 
 boolean
+
+Definer
+
+
+
+liberar_stock_cotizacion
+p_cotizacion_id uuid, p_tenant_id uuid
+
+jsonb
 
 Definer
 
@@ -3192,6 +3727,15 @@ log_rls_violation
 p_table_name text, p_operation text, p_attempted_tenant_id uuid DEFAULT NULL::uuid, p_violation_type text DEFAULT 'cross_tenant'::text, p_severity text DEFAULT 'WARNING'::text, p_metadata jsonb DEFAULT NULL::jsonb
 
 uuid
+
+Definer
+
+
+
+marcar_lotes_vencidos
+–
+
+integer
 
 Definer
 
@@ -3242,6 +3786,15 @@ Invoker
 
 
 
+obtener_configuracion_efectiva_caja
+p_tenant_id uuid, p_caja_id uuid
+
+TABLE(id uuid, tenant_id uuid, caja_id uuid, monto_apertura_min numeric, monto_apertura_max numeric, requiere_supervisor_fuera_rango boolean, tolerancia_diferencia_cierre numeric)
+
+Invoker
+
+
+
 obtener_costos_fijos_mes_actual
 –
 
@@ -3257,6 +3810,33 @@ obtener_estadisticas_logs_auditoria
 jsonb
 
 Definer
+
+
+
+obtener_lotes_fefo
+p_tenant_id uuid, p_producto_id uuid, p_cantidad_requerida numeric, p_almacen_id uuid DEFAULT NULL::uuid
+
+TABLE(lote_id uuid, numero_lote character varying, fecha_vencimiento date, cantidad_disponible numeric, cantidad_a_usar numeric, dias_para_vencer integer)
+
+Definer
+
+
+
+obtener_metricas_cajero
+p_tenant_id uuid, p_cajero_id uuid, p_fecha_desde date DEFAULT NULL::date, p_fecha_hasta date DEFAULT NULL::date
+
+TABLE(total_turnos bigint, duracion_promedio_horas numeric, total_ventas numeric, promedio_ventas_turno numeric, total_diferencias numeric, turnos_cuadrados bigint, turnos_sobrante bigint, turnos_faltante bigint, porcentaje_efectividad numeric, transacciones_totales bigint, transacciones_por_hora numeric)
+
+Invoker
+
+
+
+obtener_resumen_turnos
+p_tenant_id uuid, p_fecha_inicio timestamp with time zone DEFAULT NULL::timestamp with time zone, p_fecha_fin timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cajero_id uuid DEFAULT NULL::uuid
+
+TABLE(total_turnos bigint, duracion_promedio_horas numeric, transacciones_totales bigint, transacciones_promedio_por_turno numeric, eficiencia_promedio numeric, turnos_con_autorizacion bigint, turnos_cerrados_admin bigint)
+
+Invoker
 
 
 
@@ -3283,6 +3863,32 @@ p_producto_id uuid
 
 TABLE(producto_id uuid, stock_total numeric, stock_reservado numeric, stock_disponible numeric)
 
+Invoker
+
+
+
+obtener_top_cajeros
+p_tenant_id uuid, p_fecha_inicio timestamp with time zone DEFAULT (now() - '30 days'::interval), p_fecha_fin timestamp with time zone DEFAULT now(), p_limit integer DEFAULT 10
+
+TABLE(cajero_id uuid, cajero_nombre character varying, total_turnos bigint, duracion_total_horas numeric, transacciones_totales bigint, eficiencia_promedio numeric, ranking integer)
+
+Invoker
+
+
+
+pos_registrar_venta_tx
+p_tenant_id uuid, p_usuario_id uuid, p_cliente_id uuid, p_cliente_documento text, p_cliente_nombre text, p_metodo_pago text, p_items jsonb, p_serie text DEFAULT 'B001'::text, p_sesion_caja_id uuid DEFAULT NULL::uuid, p_vendedor text DEFAULT NULL::text, p_max_descuento_pct numeric DEFAULT 0.5
+
+jsonb
+
+Definer
+
+
+
+prevent_cash_movement_modification
+–
+
+trigger	
 Invoker
 
 
@@ -3322,6 +3928,15 @@ Definer
 
 
 
+puede_ver_notificacion
+p_notificacion_id uuid, p_usuario_id uuid
+
+boolean
+
+Invoker
+
+
+
 refrescar_estados_financieros
 p_tenant_id uuid, p_anio integer, p_mes integer
 
@@ -3348,10 +3963,28 @@ Definer
 
 
 
+registrar_evento_pos
+p_tenant_id uuid, p_sesion_caja_id uuid, p_usuario_id uuid, p_tipo_evento character varying, p_subtipo character varying DEFAULT NULL::character varying, p_venta_id uuid DEFAULT NULL::uuid, p_producto_id uuid DEFAULT NULL::uuid, p_item_index integer DEFAULT NULL::integer, p_datos jsonb DEFAULT '{}'::jsonb, p_ip_address inet DEFAULT NULL::inet, p_dispositivo character varying DEFAULT NULL::character varying, p_requiere_supervisor boolean DEFAULT false, p_supervisor_id uuid DEFAULT NULL::uuid, p_justificacion text DEFAULT NULL::text
+
+uuid
+
+Definer
+
+
+
 registrar_movimiento_almacen
 p_producto_id uuid, p_almacen_id uuid, p_tipo text, p_cantidad numeric, p_referencia_tipo text, p_referencia_id uuid, p_notas text DEFAULT NULL::text, p_ubicacion_id uuid DEFAULT NULL::uuid, p_lote text DEFAULT NULL::text, p_fecha_expiracion date DEFAULT NULL::date
 
 void
+
+Definer
+
+
+
+registrar_movimiento_caja
+p_sesion_caja_id uuid, p_tipo_movimiento character varying, p_monto numeric, p_referencia_documento character varying DEFAULT NULL::character varying, p_referencia_tipo character varying DEFAULT NULL::character varying, p_motivo text DEFAULT NULL::text, p_usuario_id uuid DEFAULT NULL::uuid, p_supervisor_id uuid DEFAULT NULL::uuid, p_ip_address inet DEFAULT NULL::inet, p_metadata jsonb DEFAULT NULL::jsonb
+
+movimientos_caja
 
 Definer
 
@@ -3366,10 +3999,37 @@ Definer
 
 
 
+release_pos_lock
+p_tenant_id uuid, p_lock_key text
+
+void
+
+Invoker
+
+
+
 reservar_stock_atomico
 p_producto_id uuid, p_cantidad numeric, p_referencia_tipo text DEFAULT NULL::text, p_referencia_id text DEFAULT NULL::text, p_notas text DEFAULT NULL::text
 
 uuid
+
+Definer
+
+
+
+reservar_stock_cotizacion
+p_cotizacion_id uuid, p_tenant_id uuid
+
+jsonb
+
+Definer
+
+
+
+reservar_stock_lote_fefo
+p_tenant_id uuid, p_producto_id uuid, p_cantidad numeric, p_documento_tipo character varying, p_documento_id uuid, p_usuario_id uuid DEFAULT NULL::uuid, p_almacen_id uuid DEFAULT NULL::uuid
+
+TABLE(success boolean, lotes_reservados jsonb, cantidad_reservada numeric, cantidad_faltante numeric, mensaje text)
 
 Definer
 
@@ -3411,12 +4071,57 @@ Definer
 
 
 
+seed_demo_tenant
+p_tenant_id uuid
+
+jsonb
+
+Definer
+
+
+
+seed_permisos_tenant
+p_tenant_id uuid
+
+integer
+
+Definer
+
+
+
 seed_plan_cuentas_tenant
 p_tenant_id uuid
 
 void
 
 Invoker
+
+
+
+seed_rol_permisos_tenant
+p_tenant_id uuid
+
+integer
+
+Definer
+
+
+
+seed_roles_permisos_tenant
+p_tenant_id uuid
+
+jsonb
+
+Definer
+
+
+
+seed_roles_tenant
+p_tenant_id uuid
+
+integer
+
+Definer
 
 
 
@@ -3456,6 +4161,14 @@ Invoker
 
 
 
+sync_sesiones_caja_columns
+–
+
+trigger	
+Invoker
+
+
+
 sync_usuario_activo_estado
 –
 
@@ -3489,6 +4202,22 @@ Definer
 
 
 
+trigger_liberar_stock_cotizacion
+–
+
+trigger	
+Invoker
+
+
+
+trigger_prevenir_stock_negativo
+–
+
+trigger	
+Invoker
+
+
+
 trigger_rls_alert
 –
 
@@ -3498,6 +4227,14 @@ Definer
 
 
 trigger_seed_catalogos_nuevo_tenant
+–
+
+trigger	
+Definer
+
+
+
+trigger_seed_roles_permisos_on_tenant_create
 –
 
 trigger	
@@ -3615,11 +4352,38 @@ Invoker
 
 
 
+validar_geolocalizacion
+geo jsonb
+
+boolean
+
+Invoker
+
+
+
+validar_integridad_sesion
+p_sesion_caja_id uuid
+
+TABLE(valido boolean, errores text[])
+
+Invoker
+
+
+
 validar_stock_antes_detalle_venta
 –
 
 trigger	
 Invoker
+
+
+
+validar_stock_suficiente
+p_producto_id uuid, p_cantidad numeric, p_almacen_id uuid DEFAULT NULL::uuid
+
+TABLE(es_valido boolean, stock_disponible numeric, mensaje text)
+
+Definer
 
 
 
@@ -3666,3 +4430,4 @@ TABLE(header json, payload json, valid boolean)
 Invoker
 
 
+ 

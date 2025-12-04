@@ -55,6 +55,33 @@ export class PosService {
   }
 
   /**
+   * Infiere tipo de documento según catálogo SUNAT básico, permitiendo override explícito.
+   */
+  private inferirTipoDocumento(doc: string, tipoExplicito?: string): string {
+    const map: Record<string, string> = {
+      DNI: '1',
+      RUC: '6',
+      CE: '4',
+      PASAPORTE: '7',
+      OTROS: '0',
+    };
+    // Permitir códigos SUNAT explícitos (catálogo 06) si ya vienen en payload
+    const catalogo06 = new Set(['0', '1', '4', '6', '7', 'A', 'B', 'C', 'D', 'E', 'F', 'G']);
+    if (tipoExplicito) {
+      const normalized = tipoExplicito.toString().toUpperCase();
+      if (catalogo06.has(normalized)) return normalized;
+      return map[normalized] || tipoExplicito;
+    }
+
+    const cleaned = (doc || '').trim();
+    if (/^(10|15|17|20)\d{9}$/.test(cleaned)) return '6'; // RUC
+    if (/^\d{8}$/.test(cleaned)) return '1'; // DNI
+    if (/^[A-Z0-9]{9}$/i.test(cleaned)) return '4'; // CE
+    if (/^[A-Z0-9]{6,12}$/i.test(cleaned)) return '7'; // Pasaporte genérico
+    return '0'; // Otros
+  }
+
+  /**
    * Normaliza el método de pago a su metadata para evitar depender de strings "efectivo"/"tarjeta"
    */
   private async getMetodoPagoInfo(metodo: string | null | undefined, tenantId: string) {
@@ -214,19 +241,40 @@ export class PosService {
   async getSesionCajaActual(user: any) {
     return this.runWithTenantContext(user, async () => {
       try {
-        const hoy = new Date().toISOString().split('T')[0];
-
         const { data, error } = await this.supabase.getClient()
           .from('sesiones_caja')
           .select('*')
           .eq('tenant_id', user.tenant_id)
-          .eq('usuario_id', user.id)
-          .gte('fecha_apertura', `${hoy}T00:00:00`)
-          .lte('fecha_apertura', `${hoy}T23:59:59`)
+          .or(`usuario_id.eq.${user.id},usuario_apertura.eq.${user.id},cajero_id.eq.${user.id},abierto_por.eq.${user.id}`)
+          .eq('estado', 'ABIERTA')
+          .is('hora_cierre', null)
           .is('fecha_cierre', null)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') throw error;
+
+        // Invalidar sesiones viejas: siempre exigir nueva apertura cada día
+        if (data) {
+          const aperturaIso = data.hora_apertura || data.fecha_apertura || data.created_at;
+          const apertura = aperturaIso ? new Date(aperturaIso) : null;
+          const hoy = new Date();
+          const mismaFecha =
+            !!apertura &&
+            apertura.getFullYear() === hoy.getFullYear() &&
+            apertura.getMonth() === hoy.getMonth() &&
+            apertura.getDate() === hoy.getDate();
+
+          if (!mismaFecha) {
+            this.logger.warn(
+              `Sesión de caja abierta de un día anterior detectada y descartada. Sesión=${data.id}, Apertura=${aperturaIso}`,
+            );
+            return {
+              success: true,
+              data: null,
+              message: 'Sesión de caja expirada. Abra una nueva sesión.',
+            };
+          }
+        }
 
         return {
           success: true,
@@ -527,8 +575,40 @@ export class PosService {
       // ===== END PRE-SALE VALIDATIONS =====
 
       // Sesión de caja actual (si existe)
-      const sesionActual = await this.getSesionCajaActual(user);
-      const sesionCajaId = sesionActual?.success ? sesionActual.data?.id ?? null : null;
+    const sesionActual = await this.getSesionCajaActual(user);
+      let sesionCajaId = sesionActual?.success ? sesionActual.data?.id ?? null : null;
+
+      // Permitir que el frontend envíe la sesión explícita (por ejemplo, recién abierta) y validarla
+      if (!sesionCajaId && ventaData.sesion_caja_id) {
+        const { data: sesionPayload } = await this.supabase.getClient()
+          .from('sesiones_caja')
+          .select('id, tenant_id, estado, hora_cierre, fecha_cierre')
+          .eq('id', ventaData.sesion_caja_id)
+          .eq('tenant_id', user.tenant_id)
+          .eq('estado', 'ABIERTA')
+          .is('hora_cierre', null)
+          .is('fecha_cierre', null)
+          .maybeSingle();
+
+        if (sesionPayload) {
+          sesionCajaId = sesionPayload.id;
+        }
+      }
+
+      if (!sesionCajaId) {
+        this.logger.warn(
+          `🚫 Venta bloqueada: sin sesión de caja abierta. Tenant=${user.tenant_id}, Usuario=${user.id}`,
+        );
+        return {
+          success: false,
+          message: 'Debe abrir la caja antes de registrar ventas en el POS.',
+          error: {
+            tipo: 'CAJA_CERRADA',
+            codigo: 'POS_CAJA_REQUERIDA',
+            mensaje: 'Abra la caja con el monto inicial para continuar.',
+          },
+        };
+      }
 
       // RPC transaccional: venta + detalles + stock + caja + outbox
       const { data: txData, error: txError } = await this.supabase.getClient()
@@ -561,7 +641,7 @@ export class PosService {
         tenant_id: user.tenant_id,
       };
 
-      this.logger.log('✅ Venta procesada exitosamente:', ventaResult.id);
+        this.logger.log('✅ Venta procesada exitosamente:', ventaResult.id);
 
       // Emitir CPE automáticamente
       let cpeEmitido = false;
@@ -574,7 +654,7 @@ export class PosService {
         // Obtener configuración de empresa para datos del emisor
         const { data: empresaData, error: empresaError } = await this.supabase.getClient()
           .from('empresa_config')
-          .select('ruc, razon_social')
+          .select('ruc, razon_social, moneda_defecto')
           .eq('tenant_id', user.tenant_id)
           .single();
 
@@ -591,40 +671,92 @@ export class PosService {
         // ✅ FIX: Obtener tasa de IGV una sola vez antes del map
         const tasaIgv = await this.taxCalculator.getTasaIgv(user.tenant_id);
 
-        // Sanitizar documento del receptor
-        const docReceptor = (ventaData.cliente_documento || '').toString().trim();
-        const tipoDocReceptor = docReceptor.length === 11 ? '6' : '1';
+        // Enriquecer datos del cliente si existe en base
+        let clienteInfo: any = null;
+        if (ventaData.cliente_id) {
+          const { data: clienteData } = await this.supabase.getClient()
+            .from('clientes')
+            .select('numero_documento, tipo_documento, razon_social, nombres, apellidos, direccion')
+            .eq('id', ventaData.cliente_id)
+            .eq('tenant_id', user.tenant_id)
+            .maybeSingle();
+          clienteInfo = clienteData;
+        }
+
+        // Tomar tipo/serie/moneda/UOM reales
+        const tipoComprobante = ventaData?.comprobante?.tipo || '03';
+        const serieCpe =
+          ventaData?.comprobante?.serie ||
+          ventaResult.numero_ticket?.split('-')[0] ||
+          (tipoComprobante === '01' ? 'F001' : 'B001');
+        const monedaCpe = (ventaData?.moneda || empresaData.moneda_defecto || 'PEN').toString();
+
+        // Sanitizar documento del receptor y validar contra tipo de comprobante
+        const docReceptor = (ventaData.cliente_documento || clienteInfo?.numero_documento || '').toString().trim();
+        const tipoDocReceptor = this.inferirTipoDocumento(docReceptor, ventaData.cliente_tipo_documento || clienteInfo?.tipo_documento);
+        if (tipoComprobante === '01' && tipoDocReceptor !== '6') {
+          return {
+            success: false,
+            message: 'Factura requiere RUC válido de 11 dígitos',
+            error: {
+              tipo: 'VALIDATION_ERROR',
+              codigo: 'FACTURA_REQUIERE_RUC',
+              mensaje: 'Proporcione un RUC válido (11 dígitos) para emitir factura',
+            },
+          };
+        }
 
         // Numero CPE seguro
-        const numeroCpe = Number(ventaResult.numero_ticket?.split('-')[1]) || Date.now();
+        const correlativoStr = ventaResult.numero_ticket?.split('-')[1] || ventaData?.comprobante?.correlativo;
+        const numeroCpe = correlativoStr ? Number(correlativoStr) : NaN;
+        if (!Number.isFinite(numeroCpe)) {
+          throw new Error('No se pudo determinar correlativo numérico para el CPE');
+        }
 
         cpeData = {
-          tipo_documento: '03' as any, // Boleta
-          serie: 'B001',
+          tipo_documento: tipoComprobante as any,
+          serie: serieCpe,
           numero: numeroCpe,
           ruc_emisor: empresaData.ruc,
           razon_social_emisor: empresaData.razon_social,
           tipo_documento_receptor: tipoDocReceptor,
           documento_receptor: docReceptor,
-          razon_social_receptor: ventaData.cliente_nombre,
-          direccion_receptor: '',
-          moneda: 'PEN',
+          razon_social_receptor:
+            ventaData.cliente_nombre ||
+            clienteInfo?.razon_social ||
+            `${(clienteInfo?.nombres || '').trim()} ${(clienteInfo?.apellidos || '').trim()}`.trim() ||
+            'Cliente',
+          direccion_receptor: ventaData.cliente_direccion || clienteInfo?.direccion || '',
+          moneda: monedaCpe,
           total_gravadas: parseFloat(subtotalCalculado.toFixed(2)),
           total_igv: parseFloat(impuestosCalculados.toFixed(2)),
           total_venta: parseFloat(totalCalculado.toFixed(2)),
-          items: (recomputed || []).map((item: any) => ({
-            cantidad: parseFloat(item.cantidad) || 1,
-            codigo_producto: item.producto?.codigo || item.codigo || item.sku || 'PROD',
-            descripcion: item.producto?.nombre || item.nombre || item.descripcion || 'Producto',
-            unidad_medida: 'NIU',
-            precio_unitario: parseFloat(item.precio_unitario) || 0,
-            valor_unitario: parseFloat(item.precio_unitario) || 0,
-            precio_venta: parseFloat(item.subtotal) || 0,
-            valor_venta: parseFloat(item.subtotal) || 0,
-            igv: parseFloat(item.subtotal) * tasaIgv || 0,
-            total_impuestos: parseFloat(item.subtotal) * tasaIgv || 0,
-            total: parseFloat(item.subtotal) * (1 + tasaIgv) || 0
-          }))
+          items: (recomputed || []).map((item: any) => {
+            const cantidad = parseFloat(item.cantidad) || 1;
+            const baseUnit = parseFloat(item.precio_unitario) || 0; // asumido sin IGV
+            const baseItem = parseFloat(item.subtotal) || 0; // base total
+            const igvItem = parseFloat((baseItem * tasaIgv).toFixed(2));
+            const totalItem = parseFloat((baseItem + igvItem).toFixed(2));
+            const uom =
+              item.producto?.unidad_medida_sunat ||
+              item.unidad_medida_sunat ||
+              item.producto?.unidad_medida ||
+              item.unidad_medida ||
+              (item.producto?.es_servicio ? 'ZZ' : 'NIU');
+            return {
+              cantidad,
+              codigo_producto: item.producto?.codigo || item.codigo || item.sku || 'PROD',
+              descripcion: item.producto?.nombre || item.nombre || item.descripcion || 'Producto',
+              unidad_medida: uom,
+              precio_unitario: parseFloat((baseUnit * (1 + tasaIgv)).toFixed(6)), // con IGV
+              valor_unitario: parseFloat(baseUnit.toFixed(6)), // sin IGV
+              precio_venta: totalItem, // con IGV
+              valor_venta: baseItem, // sin IGV
+              igv: igvItem,
+              total_impuestos: igvItem,
+              total: totalItem,
+            };
+          })
         };
 
         this.logger.log('📋 Datos CPE preparados:', JSON.stringify(cpeData, null, 2));
@@ -707,9 +839,17 @@ export class PosService {
 
           // Si aún no hay cliente y se requiere crear CxC, no crear CxC sin cliente válido
           if (!clienteId) {
-            this.logger.warn(`⚠️ [POS] No se encontró cliente para venta ${ventaResult.id}. No se creará CxC.`);
-            this.logger.warn(`⚠️ [POS] Documento cliente: ${ventaData.cliente_documento}, Nombre: ${ventaData.cliente_nombre}`);
-            // No crear CxC sin cliente válido
+            this.logger.warn(`⚠️ [POS] No se encontró cliente para venta ${ventaResult.id}. Venta a crédito no permitida sin cliente.`);
+            await this.rollbackVenta(ventaResult.id, user.tenant_id);
+            return {
+              success: false,
+              message: 'Venta a crédito requiere cliente registrado con documento válido',
+              error: {
+                tipo: 'VALIDATION_ERROR',
+                codigo: 'CLIENTE_REQUERIDO_CREDITO',
+                mensaje: 'Para ventas a crédito, el cliente debe estar registrado con documento válido',
+              },
+            };
           } else {
             // Obtener configuración para días de vencimiento
             const { data: config } = await this.supabase.getClient()
@@ -839,15 +979,38 @@ export class PosService {
 
   private async abrirCajaInternal(montoInicial: number, user: any) {
     try {
+      // Validar que no exista una sesión abierta para este usuario/tenant
+      const { data: sesionAbierta } = await this.supabase.getClient()
+        .from('sesiones_caja')
+        .select('id')
+        .eq('tenant_id', user.tenant_id)
+        .or(`cajero_id.eq.${user.id},abierto_por.eq.${user.id}`)
+        .eq('estado', 'ABIERTA')
+        .is('hora_cierre', null)
+        .maybeSingle();
+
+      if (sesionAbierta) {
+        throw new Error('Ya existe una sesión de caja abierta para este usuario');
+      }
+
+      const { data: empresaCfg } = await this.supabase.getClient()
+        .from('empresa_config')
+        .select('moneda_defecto')
+        .eq('tenant_id', user.tenant_id)
+        .maybeSingle();
+
+      const moneda = empresaCfg?.moneda_defecto || 'PEN';
+
       const { data, error } = await this.supabase.getClient()
         .from('sesiones_caja')
         .insert({
           tenant_id: user.tenant_id,
-          usuario_id: user.id,
-          monto_inicial: montoInicial,
-          total_efectivo: 0,
-          total_tarjeta: 0,
-          fecha_apertura: new Date().toISOString()
+          cajero_id: user.id,
+          abierto_por: user.id,
+          monto_inicio: montoInicial,
+          moneda,
+          estado: 'ABIERTA',
+          hora_apertura: new Date().toISOString()
         })
         .select()
         .single();
@@ -880,11 +1043,14 @@ export class PosService {
       const { data, error } = await this.supabase.getClient()
         .from('sesiones_caja')
         .update({
-          monto_contado: montoContado,
-          notas_cierre: notas,
-          fecha_cierre: new Date().toISOString()
+          monto_cierre: montoContado,
+          notas: notas,
+          hora_cierre: new Date().toISOString(),
+          cerrado_por: user.id,
+          estado: 'CERRADA'
         })
         .eq('id', sesion.id)
+        .eq('estado', 'ABIERTA')
         .select()
         .single();
 
@@ -1162,24 +1328,22 @@ export class PosService {
    * Procesa ventas pendientes que no han excedido el máximo de intentos
    */
   async procesarVentasPendientesFacturacion(tenantId?: string, limit: number = 10): Promise<{ procesadas: number; errores: number }> {
-    // Asegurar contexto de tenant para aislamiento
-    if (tenantId) {
-      return this.tenantContext.run(
-        {
-          tenantId,
-          userId: null,
-          supabaseAccessToken: null,
-          isSuperAdmin: true,
-        },
-        async () => {
-          await this.supabase.prepareTenantContext();
-          return this.procesarVentasPendientesFacturacionInternal(tenantId, limit);
-        },
-      );
+    if (!tenantId) {
+      throw new Error('procesarVentasPendientesFacturacion requiere tenantId para aislamiento');
     }
 
-    // Sin tenant explícito, procesar todas (solo para workers autorizados)
-    return this.procesarVentasPendientesFacturacionInternal(undefined, limit);
+    return this.tenantContext.run(
+      {
+        tenantId,
+        userId: null,
+        supabaseAccessToken: null,
+        isSuperAdmin: true,
+      },
+      async () => {
+        await this.supabase.prepareTenantContext();
+        return this.procesarVentasPendientesFacturacionInternal(tenantId, limit);
+      },
+    );
   }
 
   private async procesarVentasPendientesFacturacionInternal(tenantId?: string, limit: number = 10): Promise<{ procesadas: number; errores: number }> {

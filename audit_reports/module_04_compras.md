@@ -14,7 +14,7 @@ El módulo **COMPRAS** presenta una arquitectura lógica sólida y un esquema de
 |-----------|--------|-------------------|
 | **CÓDIGO** | ✅ FIJADO | Uso de `decimal.js` para cálculos monetarios (~~number nativo~~). |
 | **BASE DE DATOS** | ✅ SÓLIDO | Schema completo, RLS activo, Triggers de cálculo seguros en BD. |
-| **TESTS** | ⚠️ ALERTA | Tests de integración lógica existen pero son **100% Mocked**. |
+| **TESTS** | ✅ RESUELTO | Tests E2E con BD real implementados + tests unitarios con mocks. |
 | **DOCS** | ✅ PASS | Cumple con los requisitos de PROMP.md. |
 
 ---
@@ -56,10 +56,18 @@ El módulo **COMPRAS** presenta una arquitectura lógica sólida y un esquema de
 **Impacto:** Posibles discrepancias de centavos en órdenes con múltiples ítems o decimales complejos.
 **Recomendación:** Refactorizar `ordenes-compra.service.ts` para usar `decimal.js`, homologando con el Módulo 1.
 
-### ⚠️ HALLAZGO #2: Tests sin Base de Datos Real
-**Descripción:** Ausencia de tests E2E que toquen la base de datos.
-**Impacto:** Riesgo de errores SQL no detectados hasta runtime.
-**Recomendación:** Agregar al menos un test E2E real para el flujo de creación de Orden de Compra.
+### ✅ HALLAZGO #2: Tests sin Base de Datos Real - RESUELTO
+**Descripción:** Ausencia de tests E2E que tocaran la base de datos.
+**Resolución:** Se implementaron tests E2E reales en `apps/erp-api/tests/e2e/compras-e2e.test.ts`:
+- ✅ Test de tablas principales (proveedores, ordenes_compra, cotizaciones, recepciones)
+- ✅ Test de creación de proveedor con validaciones
+- ✅ Test de RLS entre tenants
+- ✅ Test de creación de OC con detalles
+- ✅ Test de estados válidos de OC
+- ✅ Test de constraint limite_credito >= 0
+- ✅ Test de índices para consultas frecuentes
+
+**Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/compras-e2e.test.ts`
 
 ---
 

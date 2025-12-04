@@ -58,6 +58,16 @@ export class RrhhService {
     return data;
   }
 
+  // ✅ FIX: Lista de campos permitidos para prevenir inyección de datos
+  private readonly CAMPOS_EMPLEADO_PERMITIDOS = [
+    'nombres', 'apellidos', 'tipo_documento', 'numero_documento',
+    'email', 'telefono', 'direccion', 'fecha_nacimiento', 'fecha_ingreso',
+    'id_departamento', 'puesto', 'estado', 'genero', 'estado_civil',
+    'nacionalidad', 'ubigeo', 'tiene_hijos', 'cantidad_hijos',
+    'asignacion_familiar', 'cuenta_bancaria', 'banco', 'tipo_cuenta',
+    'contacto_emergencia', 'telefono_emergencia', 'foto_url',
+  ];
+
   async createEmpleado(empleadoData: any, tenantId?: string) {
     // ✅ MULTI-TENANT: Agregar tenant_id al crear
     if (!tenantId) {
@@ -65,11 +75,23 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
+    // ✅ FIX: Filtrar solo campos permitidos para prevenir inyección
+    const datosLimpios = Object.fromEntries(
+      Object.entries(empleadoData).filter(([key]) => 
+        this.CAMPOS_EMPLEADO_PERMITIDOS.includes(key)
+      )
+    );
+
+    // Validar campos requeridos
+    if (!datosLimpios.nombres || !datosLimpios.apellidos) {
+      throw new Error('Nombres y apellidos son requeridos');
+    }
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empleados')
       .insert({
-        ...empleadoData,
+        ...datosLimpios,
         tenant_id: currentTenantId, // ✅ Incluir tenant
       })
       .select();
@@ -85,10 +107,17 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
+    // ✅ FIX: Filtrar solo campos permitidos para prevenir inyección
+    const datosLimpios = Object.fromEntries(
+      Object.entries(empleadoData).filter(([key]) => 
+        this.CAMPOS_EMPLEADO_PERMITIDOS.includes(key)
+      )
+    );
+
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empleados')
-      .update(empleadoData)
+      .update(datosLimpios)
       .eq('id', id)
       .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
@@ -278,18 +307,19 @@ export class RrhhService {
 
       if (error) throw error;
 
-      // 🎯 EMITIR EVENTO DE ASISTENCIA
-      this.eventBus.emitEmpleadoAsistencia({
-        empleadoId: empleadoId,
-        fecha: hoy,
-        horaEntrada: horaActual,
-        horasExtras: 0,
-        tipoTurno: 'REGULAR',
-        estado: 'PRESENTE',
-        requierePlanilla: true,
-      });
-
-      this.logger.log('✅ [RRHH] Evento de entrada de empleado emitido');
+      // 🎯 EMITIR EVENTO DE ASISTENCIA (si eventBus está disponible)
+      if (this.eventBus) {
+        this.eventBus.emitEmpleadoAsistencia({
+          empleadoId: empleadoId,
+          fecha: hoy,
+          horaEntrada: horaActual,
+          horasExtras: 0,
+          tipoTurno: 'REGULAR',
+          estado: 'PRESENTE',
+          requierePlanilla: true,
+        });
+        this.logger.log('✅ [RRHH] Evento de entrada de empleado emitido');
+      }
 
       return { success: true, data: data?.[0], message: 'Entrada registrada' };
     } else {
@@ -302,6 +332,14 @@ export class RrhhService {
       // Calcular horas trabajadas
       const entrada = new Date(`${hoy}T${registroExistente.hora_entrada}`);
       const salida = new Date(`${hoy}T${horaActual}`);
+      
+      // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
+      if (salida.getTime() <= entrada.getTime()) {
+        throw new Error(
+          `La hora de salida (${horaActual}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
+        );
+      }
+      
       const horasTrabajadas =
         (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
 
@@ -318,25 +356,24 @@ export class RrhhService {
 
       if (error) throw error;
 
-      // 🎯 EMITIR EVENTO DE ASISTENCIA COMPLETADA
+      // 🎯 EMITIR EVENTO DE ASISTENCIA COMPLETADA (si eventBus está disponible)
       const horasExtras = Math.max(0, horasTrabajadas - 8); // Considerar extras si excede 8 horas
 
-      this.eventBus.emitEmpleadoAsistencia({
-        empleadoId: empleadoId,
-        fecha: hoy,
-        horaEntrada: registroExistente.hora_entrada,
-        horaSalida: horaActual,
-        horasExtras: horasExtras,
-        tipoTurno: 'REGULAR',
-        estado: 'PRESENTE',
-        requierePlanilla: true,
-      });
-
-      this.logger.log(
-        `✅ [RRHH] Evento de salida emitido - ${horasTrabajadas.toFixed(
-          2,
-        )} horas trabajadas`,
-      );
+      if (this.eventBus) {
+        this.eventBus.emitEmpleadoAsistencia({
+          empleadoId: empleadoId,
+          fecha: hoy,
+          horaEntrada: registroExistente.hora_entrada,
+          horaSalida: horaActual,
+          horasExtras: horasExtras,
+          tipoTurno: 'REGULAR',
+          estado: 'PRESENTE',
+          requierePlanilla: true,
+        });
+        this.logger.log(
+          `✅ [RRHH] Evento de salida emitido - ${horasTrabajadas.toFixed(2)} horas trabajadas`,
+        );
+      }
 
       return { success: true, data: data?.[0], message: 'Salida registrada' };
     }
@@ -839,11 +876,20 @@ export class RrhhService {
     fechaIngreso: Date,
     fechaTerminacion: Date,
   ): number {
+    // ✅ FIX: Cálculo de CTS según ley peruana (D.S. 001-97-TR)
+    // CTS se deposita en mayo y noviembre (semestral)
+    // Se calcula: (Sueldo + 1/6 Gratificación) / 12 * meses trabajados
+    // Simplificado: 1 sueldo por cada año completo de servicios
+    
     const mesesTrabajados =
       (fechaTerminacion.getFullYear() - fechaIngreso.getFullYear()) * 12 +
       (fechaTerminacion.getMonth() - fechaIngreso.getMonth());
-
-    return Math.floor(mesesTrabajados * 2.5); // 30 días por año = 2.5 días por mes
+    
+    // Días de CTS = meses trabajados (se paga 1/12 del sueldo por mes)
+    // En la práctica, se acumula 1 sueldo por año = 30 días por año
+    const diasCts = Math.floor(mesesTrabajados * (30 / 12)); // 2.5 días por mes
+    
+    return diasCts;
   }
 
   // ===== HORARIOS =====
@@ -1583,6 +1629,14 @@ export class RrhhService {
       // Calcular horas trabajadas
       const entrada = new Date(`${fecha}T${registroExistente.hora_entrada}`);
       const salida = new Date(`${fecha}T${hora}`);
+      
+      // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
+      if (salida.getTime() <= entrada.getTime()) {
+        throw new Error(
+          `La hora de salida (${hora}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
+        );
+      }
+      
       const horasTrabajadas =
         (salida.getTime() - entrada.getTime()) / (1000 * 60 * 60);
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from "@/components/ui/use-toast"
+import { useApi } from '@/hooks/use-api'
 
 interface UsuarioModalProps {
   isOpen: boolean
@@ -16,14 +17,15 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
     nombre: '',
     email: '',
     telefono: '',
-    cargo: '',
-    departamento: '',
+    password: '',
+    confirmarPassword: '',
     rol_id: '',
     estado: 'ACTIVO'
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<any>({})
   const { toast } = useToast()
+  const { post, put } = useApi()
 
   const isEdit = !!usuario
 
@@ -33,9 +35,9 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         nombre: usuario.nombre || '',
         email: usuario.email || '',
         telefono: usuario.telefono || '',
-        cargo: usuario.cargo || '',
-        departamento: usuario.departamento || '',
-        rol_id: usuario.user_roles?.[0]?.roles?.id || '',
+        password: '',
+        confirmarPassword: '',
+        rol_id: usuario.roles_usuario?.[0]?.roles?.id || usuario.user_roles?.[0]?.roles?.id || '',
         estado: usuario.estado || 'ACTIVO'
       })
     } else {
@@ -43,8 +45,8 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         nombre: '',
         email: '',
         telefono: '',
-        cargo: '',
-        departamento: '',
+        password: '',
+        confirmarPassword: '',
         rol_id: '',
         estado: 'ACTIVO'
       })
@@ -65,6 +67,21 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
       newErrors.email = 'Email inválido'
     }
 
+    // Validar contraseña solo en creación
+    if (!isEdit) {
+      if (!formData.password) {
+        newErrors.password = 'La contraseña es requerida'
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'La contraseña debe tener al menos 8 caracteres'
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+        newErrors.password = 'Debe incluir mayúscula, minúscula y número'
+      }
+
+      if (formData.password !== formData.confirmarPassword) {
+        newErrors.confirmarPassword = 'Las contraseñas no coinciden'
+      }
+    }
+
     if (!formData.rol_id) {
       newErrors.rol_id = 'El rol es requerido'
     }
@@ -83,23 +100,21 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
     setLoading(true)
 
     try {
-      const url = isEdit 
-        ? `${API_BASE_URL}/api/usuarios-sistema/${usuario.id}`
-        : `${API_BASE_URL}/api/usuarios-sistema/crear`
-      
-      const method = isEdit ? 'PUT' : 'POST'
+      // Preparar datos (no enviar confirmarPassword)
+      const dataToSend = {
+        nombre: formData.nombre,
+        email: formData.email,
+        telefono: formData.telefono,
+        rol_id: formData.rol_id,
+        estado: formData.estado,
+        ...(formData.password && !isEdit ? { password: formData.password } : {})
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
+      const data = isEdit 
+        ? await put(`/usuarios-sistema/${usuario.id}`, dataToSend)
+        : await post('/usuarios-sistema/crear', dataToSend)
 
-      const data = await response.json()
-
-      if (data.success) {
+      if (data?.success) {
         toast({
           title: "✅ Éxito",
           description: data.message || `Usuario ${isEdit ? 'actualizado' : 'creado'} exitosamente`,
@@ -108,7 +123,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
         onSuccess()
         onClose()
       } else {
-        throw new Error(data.error || 'Error en la operación')
+        throw new Error(data?.error || 'Error en la operación')
       }
 
     } catch (error: any) {
@@ -329,61 +344,77 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
             />
           </div>
 
-          {/* Cargo */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
-              Cargo
-            </label>
-            <input
-              type="text"
-              value={formData.cargo}
-              onChange={(e) => handleInputChange('cargo', e.target.value)}
-              placeholder="Ej: Contador General"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-            />
-          </div>
+          {/* Contraseña - Solo en creación */}
+          {!isEdit && (
+            <>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '14px', 
+                  fontWeight: '500', 
+                  color: '#374151',
+                  marginBottom: '6px'
+                }}>
+                  Contraseña <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: errors.password ? '2px solid #ef4444' : '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                />
+                {errors.password && (
+                  <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.password}
+                  </p>
+                )}
+                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                  Debe incluir mayúscula, minúscula y número
+                </p>
+              </div>
 
-          {/* Departamento */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
-              Departamento
-            </label>
-            <input
-              type="text"
-              value={formData.departamento}
-              onChange={(e) => handleInputChange('departamento', e.target.value)}
-              placeholder="Ej: Contabilidad"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-            />
-          </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '14px', 
+                  fontWeight: '500', 
+                  color: '#374151',
+                  marginBottom: '6px'
+                }}>
+                  Confirmar Contraseña <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  value={formData.confirmarPassword}
+                  onChange={(e) => handleInputChange('confirmarPassword', e.target.value)}
+                  placeholder="Repite la contraseña"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: errors.confirmarPassword ? '2px solid #ef4444' : '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                />
+                {errors.confirmarPassword && (
+                  <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                    {errors.confirmarPassword}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Rol */}
           <div style={{ marginBottom: '20px' }}>

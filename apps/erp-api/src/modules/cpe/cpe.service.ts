@@ -72,15 +72,55 @@ export class CpeService {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Error obteniendo certificado del tenant, usando DEMO:', error.message);
+      console.warn('⚠️ Error obteniendo certificado del tenant:', error.message);
     }
 
-    // Fallback: usar certificado DEMO
-    console.log('🔐 Usando certificado DEMO');
+    // Fallback DEMO permitido en desarrollo/staging.
+    console.log('🔐 Usando certificado DEMO (entorno no productivo)');
     return new XmlSigner({
       pfxPath: this.configService.get('PFX_PATH') || '/tmp/demo.pfx',
       pfxPassword: this.configService.get('PFX_PASS') || 'demo123',
     });
+  }
+
+  private recalculateTotals(createFacturaDto: CreateFacturaDto) {
+    if (!Array.isArray(createFacturaDto.items) || createFacturaDto.items.length === 0) {
+      throw new BadRequestException('El comprobante debe incluir al menos un ítem');
+    }
+
+    const sanitizeNumber = (n: any) => {
+      const num = Number(n);
+      if (!Number.isFinite(num)) return 0;
+      return num;
+    };
+
+    let subtotal = 0;
+    let totalIgv = 0;
+
+    for (const item of createFacturaDto.items) {
+      const cantidad = sanitizeNumber((item as any).cantidad);
+      const precioUnitario = sanitizeNumber((item as any).precio_unitario ?? (item as any).precioUnitario);
+      const valorVenta = sanitizeNumber((item as any).valor_venta ?? (item as any).valorVenta ?? precioUnitario * cantidad);
+      const igvItem = sanitizeNumber((item as any).impuesto_igv ?? (item as any).igv ?? 0);
+
+      if (cantidad <= 0) {
+        throw new BadRequestException('Cada ítem debe tener cantidad > 0');
+      }
+      if (precioUnitario < 0) {
+        throw new BadRequestException('El precio unitario no puede ser negativo');
+      }
+
+      subtotal += valorVenta;
+      totalIgv += igvItem;
+    }
+
+    const total = subtotal + totalIgv;
+
+    return {
+      subtotal: Number(subtotal.toFixed(2)),
+      totalIgv: Number(totalIgv.toFixed(2)),
+      total: Number(total.toFixed(2)),
+    };
   }
 
   /**
@@ -307,7 +347,13 @@ export class CpeService {
       const eventId = randomUUID();
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
       const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
+      const { subtotal, totalIgv, total } = this.recalculateTotals(createFacturaDto);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
+
+      // Reemplazar totales con cálculo servidor
+      (createFacturaDto as any).total_gravadas = subtotal;
+      (createFacturaDto as any).total_igv = totalIgv;
+      (createFacturaDto as any).total_venta = total;
 
       (createFacturaDto as any).fecha_emision = emissionDate;
       (createFacturaDto as any).fecha_vencimiento = dueDate;
@@ -401,7 +447,7 @@ export class CpeService {
       const signedXml = xmlSigner.signXml(xmlContent);
       const hash = xmlSigner.generateHash(signedXml);
 
-      // Prepare data for database
+      // Prepare data for database (con totales recalculados server-side)
       const cpeData = {
         tenant_id: tenantId,
         tipo_documento: createFacturaDto.tipo_documento,

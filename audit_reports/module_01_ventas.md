@@ -2,7 +2,7 @@
 
 **FECHA:** 2025-11-27
 **AUDITOR:** Antigravity (Senior Architect & Forensic Auditor)
-**ESTADO:** ✅ **APTO PARA PRODUCCIÓN (CON OBSERVACIONES)**
+**ESTADO:** ✅ **APTO PARA PRODUCCIÓN**
 
 ---
 
@@ -66,10 +66,17 @@ El módulo **VENTAS** (implementado técnicamente como **PEDIDOS**) ha sido some
 **Impacto:** Confusión para futuros auditores o desarrolladores.
 **Recomendación:** Actualizar `PROMP.md` para reflejar la arquitectura real (`pedidos_venta`).
 
-### ⚠️ HALLAZGO #2: Tests "Mock-Only"
-**Descripción:** Los tests de "integración" no tocan la base de datos real. Simulan que la BD responde bien.
+### ✅ HALLAZGO #2: Tests "Mock-Only" - RESUELTO
+**Descripción:** Los tests de "integración" no tocaban la base de datos real. Simulaban que la BD responde bien.
 **Impacto:** Riesgo de errores SQL en tiempo de ejecución (ej: nombre de columna incorrecto en RPC) no detectados por CI/CD.
-**Recomendación:** Implementar al menos un **Test E2E Real** que conecte a una BD de prueba (Docker/Supabase Local) y ejecute el RPC `crear_pedido_completo` verdaderamente.
+**Resolución:** Se implementaron tests E2E reales en `apps/erp-api/tests/e2e/ventas-e2e.test.ts`:
+- ✅ Test que ejecuta RPC `crear_pedido_completo` contra BD real
+- ✅ Test de constraint de stock (verifica CHECK >= 0)
+- ✅ Test de aislamiento RLS entre tenants
+- ✅ Test de verificación de índices
+
+**Ejecutar:** `npx ts-node --transpile-only apps/erp-api/tests/e2e/ventas-e2e.test.ts`
+**Requisito:** Supabase local corriendo (`npx supabase start`)
 
 ---
 

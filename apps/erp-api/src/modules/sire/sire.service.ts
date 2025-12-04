@@ -440,7 +440,7 @@ export class SireService {
         // Execute report generation immediately in background
         setImmediate(async () => {
           try {
-            await this.simularGeneracionReporte(reporteCreado.id);
+            await this.simularGeneracionReporte(reporteCreado.id, currentTenantId);
           } catch (error) {
             console.error('❌ Error en simulación de generación:', error);
           }
@@ -488,8 +488,8 @@ export class SireService {
         throw new BadRequestException('El reporte aún no está disponible para descarga');
       }
 
-      // Generate sample SIRE content
-      const contenidoReporte = this.generarContenidoSire(reporte);
+      // Build real content from CPE/compras por tenant
+      const contenidoReporte = await this.generarContenidoSire(reporte, tenantId);
 
       return {
         success: true,
@@ -566,30 +566,38 @@ export class SireService {
     };
   }
 
-  private async simularGeneracionReporte(reporteId: string) {
+  private async simularGeneracionReporte(reporteId: string, tenantId?: string) {
     try {
-      console.log('🔄 Iniciando simulación de generación para reporte:', reporteId);
+      console.log('🔄 Generando contenido real para reporte:', reporteId);
       
       if (!reporteId) {
         console.error('❌ ID de reporte inválido:', reporteId);
         return;
       }
 
-      // Simulate processing time (reduced to 1 second)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data: reporte } = await this.supabaseService
+        .getClient()
+        .from('sire_files')
+        .select('*')
+        .eq('id', reporteId)
+        .maybeSingle();
 
-      // Generate random number of records
-      const registros = Math.floor(Math.random() * 1000) + 100;
+      if (!reporte) {
+        throw new Error('Reporte no encontrado');
+      }
+
+      const contenido = await this.generarContenidoSire(reporte, tenantId || reporte.tenant_id);
+      const totalRegistros = Math.max((contenido.split('\n').length - 1), 0); // resta header
       const nombreArchivo = `sire_${new Date().toISOString().slice(0, 10)}.txt`;
 
-      console.log('📊 Actualizando reporte a GENERADO:', { reporteId, registros, nombreArchivo });
+      console.log('📊 Actualizando reporte a GENERADO:', { reporteId, totalRegistros, nombreArchivo });
 
       const { data, error } = await this.supabaseService
         .getClient()
         .from('sire_files')
         .update({
           estado: 'GENERADO',
-          total_registros: registros,
+          total_registros: totalRegistros,
           filename: nombreArchivo,
           updated_at: new Date().toISOString(),
         })
@@ -603,17 +611,16 @@ export class SireService {
 
       console.log('✅ Reporte SIRE actualizado a GENERADO exitosamente:', data);
     } catch (error) {
-      console.error('❌ Error simulating SIRE report generation:', error);
+      console.error('❌ Error generando reporte SIRE:', error);
       
-      // Update status to ERROR only if we have a valid reporteId
       if (reporteId) {
         try {
           await this.supabaseService
             .getClient()
             .from('sire_files')
             .update({
-          estado: 'ERROR',
-          updated_at: new Date().toISOString(),
+              estado: 'ERROR',
+              updated_at: new Date().toISOString(),
             })
             .eq('id', reporteId);
           console.log('📊 Estado actualizado a ERROR para reporte:', reporteId);
@@ -624,62 +631,63 @@ export class SireService {
     }
   }
 
-  private generarContenidoSire(reporte: any): string {
-    // Generate sample SIRE file content based on report type
-    const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    
-    let contenido = ``;
-    
-    switch (reporte.tipo) {
-      case 'REGISTRO_VENTAS':
-        contenido = this.generarRegistroVentas(reporte);
-        break;
-      case 'REGISTRO_COMPRAS':
-        contenido = this.generarRegistroCompras(reporte);
-        break;
-      case 'LIBROS_ELECTRONICOS':
-        contenido = this.generarLibrosElectronicos(reporte);
-        break;
-      case 'RETENCIONES':
-        contenido = this.generarRetenciones(reporte);
-        break;
-      default:
-        contenido = `Reporte SIRE - ${reporte.tipo}\nFecha: ${fecha}\nRegistros: ${reporte.total_registros}\n`;
+  async generarContenidoSire(reporte: any, tenantId: string): Promise<string> {
+    // Layout simplificado: REG_VEN y REG_COM con columnas SUNAT
+    const periodo = reporte.periodo;
+    const tipo = reporte.tipo;
+
+    const client = this.supabaseService.getClient();
+
+    if (tipo === 'REG_VEN') {
+      const { data: ventas } = await client
+        .from('cpe')
+        .select('fecha_emision, tipo_documento, serie, numero, documento_receptor, razon_social_receptor, total_venta, total_igv, moneda')
+        .eq('tenant_id', tenantId);
+
+      const header = 'PERIODO|FECHA_EMISION|TIPO_DOCUMENTO|SERIE|NUMERO|DOC_CLIENTE|CLIENTE|VALOR_FACTURADO|IGV|TOTAL|MONEDA\n';
+      const rows = (ventas || []).map(v =>
+        [
+          periodo,
+          (v.fecha_emision || '').toString().slice(0, 10),
+          v.tipo_documento || '',
+          v.serie || '',
+          (v.numero || '').toString().padStart(8, '0'),
+          v.documento_receptor || '',
+          (v.razon_social_receptor || '').replace(/\|/g, ' '),
+          Number(v.total_venta || 0) - Number(v.total_igv || 0),
+          Number(v.total_igv || 0),
+          Number(v.total_venta || 0),
+          v.moneda || 'PEN',
+        ].join('|')
+      );
+      return header + rows.join('\n');
     }
 
-    return contenido;
-  }
+    if (tipo === 'REG_COM') {
+      const { data: compras } = await client
+        .from('cuentas_por_pagar')
+        .select('fecha_emision, numero_documento, proveedor_id, subtotal, igv, total, moneda')
+        .eq('tenant_id', tenantId);
 
-  private generarRegistroVentas(reporte: any): string {
-    const header = 'PERIODO|RUC|FECHA_EMISION|TIPO_DOCUMENTO|SERIE|NUMERO|FECHA_VENCIMIENTO|DOCUMENTO_CLIENTE|CLIENTE|VALOR_FACTURADO|ISC|IGV|OTROS|TOTAL|MONEDA|TIPO_CAMBIO|FECHA_REFERENCIA|TIPO_REFERENCIA|SERIE_REFERENCIA|NUMERO_REFERENCIA|ESTADO\n';
-    
-    let contenido = header;
-    for (let i = 1; i <= reporte.total_registros; i++) {
-      contenido += `${reporte.periodo}|20123456789|${new Date().toISOString().slice(0, 10)}|03|B001|${i.toString().padStart(8, '0')}||20345678901|CLIENTE DEMO ${i}|100.00|0.00|18.00|0.00|118.00|PEN|1.000||||| \n`;
+      const header = 'PERIODO|FECHA_EMISION|NUMERO|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA\n';
+      const rows = (compras || []).map(c =>
+        [
+          periodo,
+          (c.fecha_emision || '').toString().slice(0, 10),
+          c.numero_documento || '',
+          c.proveedor_id || '',
+          Number(c.subtotal || 0),
+          Number(c.igv || 0),
+          Number(c.total || 0),
+          c.moneda || 'PEN',
+        ].join('|')
+      );
+      return header + rows.join('\n');
     }
-    
-    return contenido;
-  }
 
-  private generarRegistroCompras(reporte: any): string {
-    const header = 'PERIODO|RUC|FECHA_EMISION|TIPO_DOCUMENTO|SERIE|NUMERO|FECHA_VENCIMIENTO|DOCUMENTO_PROVEEDOR|PROVEEDOR|VALOR_ADQUISICIONES|ISC|IGV|OTROS|TOTAL|MONEDA|TIPO_CAMBIO|ESTADO\n';
-    
-    let contenido = header;
-    for (let i = 1; i <= reporte.total_registros; i++) {
-      contenido += `${reporte.periodo}|20123456789|${new Date().toISOString().slice(0, 10)}|01|F001|${i.toString().padStart(8, '0')}||20987654321|PROVEEDOR DEMO ${i}|84.75|0.00|15.25|0.00|100.00|PEN|1.000| \n`;
-    }
-    
-    return contenido;
+    throw new BadRequestException(`Tipo de reporte SIRE no soportado para generación: ${tipo}`);
   }
-
-  private generarLibrosElectronicos(reporte: any): string {
-    return `Libro Electrónico - ${reporte.tipo}\nPeriodo: ${reporte.periodo}\nRegistros procesados: ${reporte.total_registros}\nFecha de generación: ${new Date().toISOString()}\n`;
-  }
-
-  private generarRetenciones(reporte: any): string {
-    return `Reporte de Retenciones\nPeriodo: ${reporte.periodo}\nRegistros procesados: ${reporte.total_registros}\nFecha de generación: ${new Date().toISOString()}\n`;
-  }
-
+ 
   private getNextMonth(currentMonth: string): string {
     const [year, month] = currentMonth.split('-').map(Number);
     const nextDate = new Date(year, month, 1); // month is 0-indexed in Date constructor

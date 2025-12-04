@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/use-api'
 import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
 import { usePosConfig } from '@/hooks/use-pos-config'
 import { ConfigurationStatus } from '@/app/dashboard/hooks/useConfigurationStatus'
+import { useAuth } from '@/contexts/AuthContext'
 // CajaControls ya no se usa - el modal de abrir caja está inline
 import { ProductGrid, ProductoPOS } from '@/components/pos/ProductGrid'
 import { QuickActions } from '@/components/pos/QuickActions'
@@ -76,6 +77,7 @@ export default function POSPage() {
   }
 
   const api = useApi()
+  const { user } = useAuth()
 
   // Estados principales
   const [productos, setProductos] = useState<ProductoPOS[]>([])
@@ -96,9 +98,9 @@ export default function POSPage() {
   const [tipoComprobante, setTipoComprobante] = useState<'03' | '01'>('03') // 03=Boleta, 01=Factura
 
   // Nuevos estados para funcionalidades avanzadas
-  const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
-  const [modoVentaRapida, setModoVentaRapida] = useState(false)
-  const [ventaSinStock, setVentaSinStock] = useState(true)
+const [descuentoGlobal, setDescuentoGlobal] = useState<Descuento>({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
+const [modoVentaRapida, setModoVentaRapida] = useState(false)
+const [ventaSinStock, setVentaSinStock] = useState(false)
   const [estadoVentaActual, setEstadoVentaActual] = useState<EstadoVenta>({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
   const [busquedaPorCodigoBarras, setBusquedaPorCodigoBarras] = useState('')
 
@@ -124,6 +126,7 @@ export default function POSPage() {
   const [datosInicializados, setDatosInicializados] = useState(false);
   const [hayCajasDisponibles, setHayCajasDisponibles] = useState(true);
   const [productoSeleccionado, setProductoSeleccionado] = useState<string | null>(null);
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
   const cargandoRef = useRef(false);
 
   const formatMoney = (value: any): string => {
@@ -224,6 +227,7 @@ export default function POSPage() {
         if (cajas.length === 0) {
           console.warn('⚠️ No hay cajas configuradas para este tenant');
           setHayCajasDisponibles(false);
+          setSesionCajaId(null);
           setEstadoCaja({
             estado: 'CERRADA',
             montoInicial: 0,
@@ -236,23 +240,40 @@ export default function POSPage() {
           setCajaId((prev) => prev ?? cajas[0].id);
           console.log(`✅ ${cajas.length} caja(s) encontrada(s), usando: ${cajas[0].nombre || cajas[0].id}`);
 
-          const sesionesRes = await api.get('/cajas/sesiones?estado=ABIERTA');
-          const sesionActiva = sesionesRes?.data?.[0];
-          if (sesionActiva) {
+          // Buscar sesión activa solo del usuario autenticado para evitar tomar cajas de otro cajero
+          const sesionRes = await api.get('/api/pos/sesion-caja');
+          const sesionActiva = sesionRes?.data || null;
+          const aperturaIso = sesionActiva?.hora_apertura || sesionActiva?.fecha_apertura || sesionActiva?.created_at;
+          const apertura = aperturaIso ? new Date(aperturaIso) : null;
+          const hoy = new Date();
+          const esMismoDia =
+            !!apertura &&
+            apertura.getFullYear() === hoy.getFullYear() &&
+            apertura.getMonth() === hoy.getMonth() &&
+            apertura.getDate() === hoy.getDate();
+          const sesionValida = sesionActiva
+            && sesionActiva.estado === 'ABIERTA'
+            && !sesionActiva.hora_cierre
+            && !sesionActiva.fecha_cierre
+            && esMismoDia;
+
+          if (sesionValida) {
             console.log('✅ Sesión de caja activa encontrada:', sesionActiva.id);
-            setCajaId(sesionActiva.caja_id);
+            const cajaActivaId = sesionActiva.caja_id || cajas[0].id;
+            setCajaId(cajaActivaId);
             setSesionCajaId(sesionActiva.id);
             setEstadoCaja({
               estado: 'ABIERTA',
-              montoInicial: sesionActiva.monto_inicio || sesionActiva.monto_inicial || 0,
+              montoInicial: sesionActiva.monto_inicio || sesionActiva.monto_inicial || sesionActiva.monto_esperado || 0,
               ventasEfectivo: 0,
               ventasTarjeta: 0,
-              montoFinal: sesionActiva.monto_inicio || sesionActiva.monto_inicial || 0,
-              cajaId: sesionActiva.caja_id,
+              montoFinal: sesionActiva.monto_inicio || sesionActiva.monto_inicial || sesionActiva.monto_esperado || 0,
+              cajaId: cajaActivaId,
               sesionId: sesionActiva.id,
             });
           } else {
             console.log('ℹ️ No hay sesión de caja activa, mostrando pantalla de apertura');
+            setSesionCajaId(null);
             setEstadoCaja({
               estado: 'CERRADA',
               montoInicial: 0,
@@ -265,6 +286,7 @@ export default function POSPage() {
       } catch (cajaError) {
         console.error('❌ Error cargando cajas:', cajaError);
         setHayCajasDisponibles(false);
+        setSesionCajaId(null);
         setEstadoCaja({
           estado: 'CERRADA',
           montoInicial: 0,
@@ -585,6 +607,13 @@ export default function POSPage() {
       return
     }
 
+    // Validar que la caja esté abierta antes de cualquier operación
+    if (!estadoCaja || estadoCaja.estado !== 'ABIERTA' || !sesionCajaId) {
+      alert('🔒 CAJA CERRADA\nDebe abrir la caja con el monto inicial antes de registrar ventas.')
+      setMostrarModalAbrirCaja(true)
+      return
+    }
+
     // 2. Validaciones SUNAT antes de procesar
     const totalItems = carrito.reduce((sum, item) => sum + item.cantidad, 0)
     if (totalItems > 999) {
@@ -628,8 +657,14 @@ export default function POSPage() {
       // 5. Preparar datos mejorados para envío
       const clienteActual = clientes.find(c => c.id === clienteSeleccionado);
 
+      if (!currentIdempotencyKey) {
+        setCurrentIdempotencyKey(`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
+      }
+      const idempotencyKey = currentIdempotencyKey || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
       const ventaData = {
-        idempotency_key: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        idempotency_key: idempotencyKey,
+        sesion_caja_id: sesionCajaId,
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
         cliente_documento: clienteActual?.numero_documento || '00000000',
@@ -699,6 +734,7 @@ export default function POSPage() {
         setCarrito([])
         setReferenciaPago('')
         setDescuentoGlobal({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
+        setCurrentIdempotencyKey(null)
 
         // 8. SOLO recargar historial de ventas (NO cargar todos los datos para mantener caja abierta)
         console.log('🔄 Recargando historial de ventas...')
@@ -740,6 +776,7 @@ export default function POSPage() {
     } catch (error) {
       // Error en el proceso - cambiar estado a CANCELADA
       setEstadoVentaActual({ estado: 'CANCELADA', fecha_estado: new Date().toISOString() })
+      setCurrentIdempotencyKey(null)
 
       console.error('❌ ERROR REAL procesando venta:', error)
 
@@ -861,7 +898,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       }
 
       const resultado = await api.post(`/cajas/${cajaId}/apertura`, {
-        monto_inicio: montoInicial
+        monto_inicio: montoInicial,
+        cajero_id: user?.id || undefined,
       })
 
       if (resultado) {
@@ -922,6 +960,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
       const resultado = await api.post(`/cajas/${cajaId}/cierre`, {
         sesion_id: sesionCajaId,
         monto_cierre: montoFinal,
+        monto_contado: montoFinal,
         notas: `Cierre manual. Diferencia: S/ ${formatMoney(diferencia)}`
       })
 
@@ -1082,67 +1121,54 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
             </div>
           </div>
 
-          {/* Modal para abrir caja - solo se muestra cuando mostrarModalAbrirCaja es true */}
+          {/* Panel inline para abrir caja (evita doble modal superpuesto) */}
           {mostrarModalAbrirCaja && (
-            <div className="modal-backdrop" style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}>
-              <div className="stat-card" style={{ maxWidth: '400px', padding: '2rem' }}>
-                <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>💰 Abrir Caja</h3>
-                <label htmlFor="monto-inicial-caja" style={{ display: 'block', marginBottom: '0.5rem' }}>Monto inicial (S/)</label>
-                <input
-                  id="monto-inicial-caja"
-                  name="monto-inicial-caja"
-                  type="number"
-                  value={montoInicialInput}
-                  onChange={(e) => setMontoInicialInput(e.target.value)}
-                  placeholder="0.00"
+            <div className="stat-card" style={{ maxWidth: '500px', margin: '1.5rem auto 0', padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>💰 Abrir Caja</h3>
+              <label htmlFor="monto-inicial-caja" style={{ display: 'block', marginBottom: '0.5rem' }}>Monto inicial (S/)</label>
+              <input
+                id="monto-inicial-caja"
+                name="monto-inicial-caja"
+                type="number"
+                value={montoInicialInput}
+                onChange={(e) => setMontoInicialInput(e.target.value)}
+                placeholder="0.00"
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  fontSize: '1.2rem',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '8px',
+                  marginBottom: '1rem'
+                }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className="btn"
+                  onClick={confirmarAbrirCaja}
                   style={{
-                    width: '100%',
+                    flex: 1,
                     padding: '1rem',
-                    fontSize: '1.2rem',
-                    border: '2px solid var(--border-color)',
-                    borderRadius: '8px',
-                    marginBottom: '1rem'
+                    background: 'var(--gradient-success)',
+                    color: 'white',
+                    border: 'none'
                   }}
-                  autoFocus
-                />
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button
-                    className="btn"
-                    onClick={confirmarAbrirCaja}
-                    style={{
-                      flex: 1,
-                      padding: '1rem',
-                      background: 'var(--gradient-success)',
-                      color: 'white',
-                      border: 'none'
-                    }}
-                  >
-                    ✅ Confirmar
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={() => setMostrarModalAbrirCaja(false)}
-                    style={{
-                      flex: 1,
-                      padding: '1rem',
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-color)'
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
+                >
+                  ✅ Confirmar
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setMostrarModalAbrirCaja(false)}
+                  style={{
+                    flex: 1,
+                    padding: '1rem',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           )}

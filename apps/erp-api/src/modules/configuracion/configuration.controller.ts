@@ -544,6 +544,15 @@ export class ConfigurationController {
           gre_obligatorio: data.gre_obligatorio,
           gre_automatico_habilitado: data.gre_automatico_habilitado,
           umbral_gre_automatico: data.umbral_gre_automatico,
+          // Series de comprobantes
+          serieFactura: data.serie_factura,
+          serieBoleta: data.serie_boleta,
+          serieNotaCredito: data.serie_nota_credito,
+          serieNotaDebito: data.serie_nota_debito,
+          serieGuiaRemision: data.serie_guia_remision,
+          // OSE
+          oseActivo: data.ose_activo,
+          oseUrl: data.ose_url,
         },
       };
     } catch (error) {

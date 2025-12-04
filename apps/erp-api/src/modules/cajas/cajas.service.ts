@@ -69,7 +69,7 @@ export class CajasService {
       dispositivo: dto.dispositivo ?? undefined,
       tipo: dto.tipo ?? undefined,
       estado: dto.estado ?? undefined,
-      updated_at: new Date().toISOString(),
+      // No tocar updated_at si la columna no existe en esta tabla
     };
 
     const { data, error } = await this.supabase.getClient()
@@ -127,17 +127,55 @@ export class CajasService {
     const { data: sesionCajaAbierta } = await this.supabase
       .getClient()
       .from('sesiones_caja')
-      .select('id, hora_apertura, cajero_id')
+      .select('id, fecha_apertura, hora_apertura, created_at, cajero_id')
       .eq('tenant_id', tenantId)
       .eq('caja_id', cajaId)
       .eq('estado', 'ABIERTA')
       .maybeSingle();
 
     if (sesionCajaAbierta) {
-      throw new BadRequestException(
-        `La caja "${caja.nombre}" ya tiene una sesión abierta desde ${new Date(sesionCajaAbierta.hora_apertura).toLocaleString()}. ` +
-        `ID de sesión: ${sesionCajaAbierta.id}. Debe cerrarla antes de abrir una nueva.`,
-      );
+      // Si la sesión abierta es de días anteriores, cerrarla automáticamente (cierre administrativo) y continuar
+      const aperturaIso = sesionCajaAbierta.hora_apertura || sesionCajaAbierta.fecha_apertura || sesionCajaAbierta.created_at;
+      const apertura = aperturaIso ? new Date(aperturaIso) : null;
+      const hoy = new Date();
+      const esMismoDia =
+        !!apertura &&
+        apertura.getFullYear() === hoy.getFullYear() &&
+        apertura.getMonth() === hoy.getMonth() &&
+        apertura.getDate() === hoy.getDate();
+
+      if (!esMismoDia) {
+        const ahoraIso = new Date().toISOString();
+        try {
+          await this.supabase.getClient()
+            .from('sesiones_caja')
+            .update({
+              estado: 'CERRADA',
+              fecha_cierre: ahoraIso,
+              hora_cierre: ahoraIso,
+              cierre_administrativo: true,
+              razon_cierre_administrativo: 'Cierre automático: sesión antigua detectada al abrir nueva caja',
+              usuario_cierre: userId ?? sesionCajaAbierta.cajero_id ?? null,
+            })
+            .eq('tenant_id', tenantId)
+            .eq('id', sesionCajaAbierta.id);
+          this.logger.warn(
+            `⚠️ Sesión antigua auto-cerrada para abrir nueva: Caja=${caja.nombre}, Sesión=${sesionCajaAbierta.id}, Apertura=${aperturaIso}`,
+          );
+        } catch (cerrarError) {
+          this.logger.error(
+            `❌ No se pudo cerrar la sesión antigua ${sesionCajaAbierta.id}: ${cerrarError.message}`,
+          );
+          throw new BadRequestException(
+            `No se pudo cerrar la sesión anterior (${sesionCajaAbierta.id}). Intente cierre administrativo manual.`,
+          );
+        }
+      } else {
+        throw new BadRequestException(
+          `La caja "${caja.nombre}" ya tiene una sesión abierta desde ${new Date(sesionCajaAbierta.fecha_apertura).toLocaleString()}. ` +
+          `ID de sesión: ${sesionCajaAbierta.id}. Debe cerrarla antes de abrir una nueva.`,
+        );
+      }
     }
 
     const cajeroId = dto.cajero_id ?? userId;
@@ -148,20 +186,61 @@ export class CajasService {
       const { data: sesionUsuarioAbierta } = await this.supabase
         .getClient()
         .from('sesiones_caja')
-        .select('id, caja_id, hora_apertura, cajas(nombre)')
+        .select('id, caja_id, fecha_apertura, hora_apertura, created_at, cajas(nombre)')
         .eq('tenant_id', tenantId)
         .eq('cajero_id', cajeroId)
         .eq('estado', 'ABIERTA')
         .maybeSingle();
 
       if (sesionUsuarioAbierta) {
-        const cajaAnterior = sesionUsuarioAbierta.cajas as any;
-        throw new BadRequestException(
-          `Ya tiene una caja abierta: "${cajaAnterior?.nombre || 'Caja desconocida'}" desde ${new Date(sesionUsuarioAbierta.hora_apertura).toLocaleString()}. ` +
-          `ID de sesión: ${sesionUsuarioAbierta.id}. ` +
-          `Debe cerrar esa sesión antes de abrir otra. ` +
-          `Si la sesión quedó colgada (ej: corte de luz), use el endpoint de cierre administrativo.`,
-        );
+        const aperturaIso =
+          (sesionUsuarioAbierta as any).hora_apertura ||
+          (sesionUsuarioAbierta as any).fecha_apertura ||
+          (sesionUsuarioAbierta as any).created_at;
+        const apertura = aperturaIso ? new Date(aperturaIso) : null;
+        const hoy = new Date();
+        const esMismoDia =
+          !!apertura &&
+          apertura.getFullYear() === hoy.getFullYear() &&
+          apertura.getMonth() === hoy.getMonth() &&
+          apertura.getDate() === hoy.getDate();
+
+        if (!esMismoDia) {
+          // Cerrar automáticamente la sesión colgada del usuario y continuar
+          const ahoraIso = new Date().toISOString();
+          try {
+            await this.supabase.getClient()
+              .from('sesiones_caja')
+              .update({
+                estado: 'CERRADA',
+                fecha_cierre: ahoraIso,
+                hora_cierre: ahoraIso,
+                cierre_administrativo: true,
+                razon_cierre_administrativo: 'Cierre automático: sesión antigua detectada al abrir nueva caja',
+                usuario_cierre: userId ?? cajeroId ?? null,
+              })
+              .eq('tenant_id', tenantId)
+              .eq('id', sesionUsuarioAbierta.id);
+            this.logger.warn(
+              `⚠️ Sesión antigua auto-cerrada para usuario ${cajeroId}: Sesión=${sesionUsuarioAbierta.id}, Apertura=${aperturaIso}`,
+            );
+          } catch (cerrarError) {
+            this.logger.error(
+              `❌ No se pudo cerrar la sesión antigua del usuario ${cajeroId} (${sesionUsuarioAbierta.id}): ${cerrarError.message}`,
+            );
+            throw new BadRequestException(
+              `No se pudo cerrar la sesión anterior del usuario (${sesionUsuarioAbierta.id}). Intente cierre administrativo manual.`,
+            );
+          }
+        } else {
+          const cajaAnterior = sesionUsuarioAbierta.cajas as any;
+          throw new BadRequestException(
+            `Ya tiene una caja abierta: "${cajaAnterior?.nombre || 'Caja desconocida'}" desde ${new Date(sesionUsuarioAbierta.fecha_apertura).toLocaleString()}. ` +
+            `ID de sesión: ${sesionUsuarioAbierta.id}. ` +
+            `Debe cerrarla antes de abrir otra. ` +
+            `Si la sesión quedó colgada (ej: corte de luz), use el endpoint de cierre administrativo.`,
+          );
+        }
       }
     }
 
@@ -170,7 +249,7 @@ export class CajasService {
       const { data: sesionTerminalAbierta } = await this.supabase
         .getClient()
         .from('sesiones_caja')
-        .select('id, caja_id, hora_apertura, cajero_id, cajas(nombre)')
+        .select('id, caja_id, fecha_apertura, cajero_id, cajas(nombre)')
         .eq('tenant_id', tenantId)
         .eq('dispositivo', dto.dispositivo)
         .eq('estado', 'ABIERTA')
@@ -180,7 +259,7 @@ export class CajasService {
         const cajaAnterior = sesionTerminalAbierta.cajas as any;
         throw new BadRequestException(
           `El terminal "${dto.dispositivo}" ya tiene una sesión abierta en la caja "${cajaAnterior?.nombre || 'Caja desconocida'}" ` +
-          `desde ${new Date(sesionTerminalAbierta.hora_apertura).toLocaleString()}. ` +
+          `desde ${new Date(sesionTerminalAbierta.fecha_apertura).toLocaleString()}. ` +
           `ID de sesión: ${sesionTerminalAbierta.id}. ` +
           `Cajero: ${sesionTerminalAbierta.cajero_id || 'No especificado'}. ` +
           `Debe cerrar esa sesión antes de usar este terminal en otra caja.`,
@@ -390,7 +469,7 @@ export class CajasService {
     }
 
     // Calcular duración de la sesión
-    const horaApertura = new Date(sesion.hora_apertura);
+    const horaApertura = new Date(sesion.fecha_apertura);
     const horaCierre = new Date();
     const duracionHoras = Math.round(
       (horaCierre.getTime() - horaApertura.getTime()) / (1000 * 60 * 60),
@@ -401,12 +480,11 @@ export class CajasService {
     // Preparar datos de cierre administrativo
     const cierre = {
       estado: 'CERRADA',
-      hora_cierre: horaCierre.toISOString(),
+      fecha_cierre: horaCierre.toISOString(),
       cerrado_por: userId,
       cierre_administrativo: true,
       razon_cierre_administrativo: razonCierre,
       duracion_horas: duracionHoras,
-      updated_at: new Date().toISOString(),
     };
 
     // Cerrar sesión con marcador de cierre administrativo
@@ -437,33 +515,39 @@ export class CajasService {
     return data;
   }
 
-  async cerrarCaja(tenantId: string, cajaId: string, sesionId: string, dto: CerrarCajaDto, userId?: string) {
-    const { data: sesion, error: findError } = await this.supabase.getClient()
+  async cerrarCaja(tenantId: string, cajaId: string, sesionId: string | null, dto: CerrarCajaDto, userId?: string) {
+    let query = this.supabase.getClient()
       .from('sesiones_caja')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('caja_id', cajaId)
-      .eq('id', sesionId)
-      .eq('estado', 'ABIERTA')
-      .single();
+      .eq('estado', 'ABIERTA');
+
+    if (sesionId) {
+      query = query.eq('id', sesionId);
+    }
+
+    const { data: sesion, error: findError } = await query.single();
     if (findError || !sesion) throw new NotFoundException('Sesión de caja no encontrada o ya cerrada');
 
+    const esperado = sesion.monto_esperado ?? sesion.monto_inicial ?? 0;
+    const contado = dto.monto_cierre ?? dto.monto_contado ?? sesion.monto_contado ?? 0;
     const cierre = {
       estado: 'CERRADA',
-      monto_cierre: dto.monto_cierre,
-      moneda: dto.moneda ?? sesion.moneda ?? 'PEN',
-      hora_cierre: new Date().toISOString(),
-      cerrado_por: userId ?? sesion.cajero_id ?? null,
-      notas: dto.notas ?? null,
-      resumen: dto.resumen ?? null,
-      updated_at: new Date().toISOString(),
+      fecha_cierre: new Date().toISOString(),
+      monto_contado: contado,
+      diferencia: contado - esperado,
+      usuario_cierre: userId ?? sesion.usuario_id ?? null,
+      notas: dto.notas ?? sesion.notas ?? null,
+      resumen: dto.resumen ?? sesion.resumen ?? null,
     };
 
     const { data, error } = await this.supabase.getClient()
       .from('sesiones_caja')
       .update(cierre)
-      .eq('id', sesionId)
+      .eq('id', sesion.id)
       .eq('tenant_id', tenantId)
+      .eq('estado', 'ABIERTA')
       .select()
       .single();
     if (error) throw error;
@@ -483,13 +567,13 @@ export class CajasService {
       query = query.eq('cajero_id', filters.cajero_id);
     }
     if (filters.fecha_desde) {
-      query = query.gte('hora_apertura', filters.fecha_desde);
+      query = query.gte('fecha_apertura', filters.fecha_desde);
     }
     if (filters.fecha_hasta) {
-      query = query.lte('hora_apertura', filters.fecha_hasta);
+      query = query.lte('fecha_apertura', filters.fecha_hasta);
     }
 
-    const { data, error } = await query.order('hora_apertura', { ascending: false });
+    const { data, error } = await query.order('fecha_apertura', { ascending: false });
     if (error) throw error;
     return data || [];
   }
@@ -559,7 +643,7 @@ export class CajasService {
     const saldoActual = ultimoMovimiento?.saldo_nuevo ?? sesion.monto_inicio;
 
     // Calcular tiempo transcurrido
-    const horaApertura = new Date(sesion.hora_apertura);
+    const horaApertura = new Date(sesion.fecha_apertura);
     const tiempoTranscurrido = Math.round(
       (Date.now() - horaApertura.getTime()) / (1000 * 60),
     ); // minutos
@@ -578,7 +662,7 @@ export class CajasService {
         caja_nombre: caja?.nombre,
         caja_codigo: caja?.codigo,
         caja_ubicacion: caja?.ubicacion,
-        hora_apertura: sesion.hora_apertura,
+        fecha_apertura: sesion.fecha_apertura,
         monto_inicio: sesion.monto_inicio,
         moneda: sesion.moneda,
         dispositivo: sesion.dispositivo,
