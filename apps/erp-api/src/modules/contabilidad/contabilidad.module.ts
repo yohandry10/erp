@@ -11,6 +11,7 @@ import { OutboxEventsService } from './services/outbox-events.service';
 import { EstadosFinancierosService } from './services/estados-financieros.service';
 import { PresupuestosService } from './services/presupuestos.service';
 import { CentrosCostoService } from './services/centros-costo.service';
+import { DepreciacionSchedulerService } from './services/depreciacion-scheduler.service';
 import { ContabilidadEventsListener } from './listeners/contabilidad-events.listener';
 import { EventBusService } from '../../shared/events/event-bus.service';
 import { AuthModule } from '../auth/auth.module';
@@ -30,6 +31,7 @@ import { CashflowService } from './services/cashflow.service';
     PresupuestosService,
     CentrosCostoService,
     CashflowService,
+    DepreciacionSchedulerService,
     ContabilidadEventsListener,
     {
       provide: 'EstadosFinancierosService',

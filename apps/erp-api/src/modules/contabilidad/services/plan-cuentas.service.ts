@@ -10,7 +10,7 @@ export interface PlanCuenta {
   nivel: number;
   cuenta_padre_id?: string;
   acepta_movimiento: boolean;
-  estado: 'ACTIVO' | 'INACTIVO';
+  estado?: 'ACTIVO' | 'INACTIVO';
   created_at?: string;
   updated_at?: string;
 }
@@ -35,7 +35,6 @@ export class PlanCuentasService {
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('codigo', codigo)
-      .eq('estado', 'ACTIVO')
       .single();
 
     if (error) {
@@ -72,8 +71,7 @@ export class PlanCuentasService {
       .from('plan_cuentas')
       .select('*')
       .eq('tenant_id', tenantId)
-      .in('codigo', codigos)
-      .eq('estado', 'ACTIVO');
+      .in('codigo', codigos);
 
     if (error) {
       console.error(
@@ -134,7 +132,6 @@ export class PlanCuentasService {
           .from('plan_cuentas')
           .select('*')
           .eq('tenant_id', tenantId)
-          .eq('estado', 'ACTIVO')
           .in('codigo', codigosNormalizados)
           .order('nivel', { ascending: true })
           .limit(1);
@@ -159,7 +156,6 @@ export class PlanCuentasService {
           .from('plan_cuentas')
           .select('*')
           .eq('tenant_id', tenantId)
-          .eq('estado', 'ACTIVO')
           .ilike('nombre', `%${termino}%`)
           .order('nivel', { ascending: true })
           .limit(1);

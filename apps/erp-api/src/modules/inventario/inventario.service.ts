@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, NotFoundException, Logger } from '@nes
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditService } from '../audit/audit.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
+import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
+import { v4 as uuidv4 } from 'uuid';
 
 export enum TipoMovimiento {
   ENTRADA = 'ENTRADA',
@@ -35,6 +37,7 @@ export interface MovimientoInventario {
   referencia_id?: string;
   notas?: string;
   created_by?: string;
+  centro_costo_id?: string;
 }
 
 interface ListarRecepcionesFiltros {
@@ -178,10 +181,11 @@ export class InventarioService {
               ? stockActual + movimiento.cantidad
               : stockActual; // Para AJUSTE, usar el mismo valor
 
-            // Calcular valor del movimiento (precio de compra para ENTRADA, precio de venta para SALIDA)
-            const precioUnitario = movimiento.tipo === TipoMovimiento.ENTRADA
-              ? (Number(producto.precio_compra) || 0)
-              : (Number(producto.precio_venta) || 0);
+            // Calcular valor del movimiento (precio de compra para ENTRADA/AJUSTE, precio de venta para SALIDA)
+            const precioUnitarioBase = Number(producto.precio_compra) || 0;
+            const precioUnitarioSalida = Number(producto.precio_venta) || precioUnitarioBase;
+            const precioUnitario =
+              movimiento.tipo === TipoMovimiento.SALIDA ? precioUnitarioSalida : precioUnitarioBase;
             const valorTotal = precioUnitario * movimiento.cantidad;
 
             await this.eventBus.emitMovimientoStock({
@@ -199,6 +203,32 @@ export class InventarioService {
             }, movimiento.tenant_id ?? undefined);
 
             console.log(`✅ Evento MovimientoStockEvent emitido para movimiento ${data.id}`);
+
+            // Encolar evento outbox de ajuste para contabilidad (solo para AJUSTE)
+            if (movimiento.tipo === TipoMovimiento.AJUSTE && movimiento.tenant_id) {
+              const tipoAjuste = movimiento.cantidad >= 0 ? 'SOBRANTE' : 'FALTANTE';
+              const valorAjuste = Math.abs(precioUnitarioBase * movimiento.cantidad);
+              const ajusteEvent = OutboxEventBuilder.build({
+                tenantId: movimiento.tenant_id,
+                eventType: 'ajuste.inventario.aplicado',
+                aggregateType: 'ajuste_inventario',
+                aggregateId: data.id,
+                eventData: {
+                  valor: Number.isFinite(valorAjuste) ? valorAjuste : Math.abs(valorTotal),
+                  tipo: tipoAjuste,
+                  referencia: movimiento.notas || movimiento.referencia_tipo || `Ajuste ${data.id}`,
+                  centro_costo_id: movimiento.centro_costo_id || null,
+                  eventId: uuidv4(),
+                },
+              });
+
+              try {
+                await this.supabase.getClient().from('outbox_events').insert(ajusteEvent);
+                console.log(`✅ Evento ajuste.inventario.aplicado encolado (${ajusteEvent.event_id})`);
+              } catch (err) {
+                console.error('❌ Error encolando ajuste.inventario.aplicado:', err);
+              }
+            }
           }
         } catch (error) {
           console.error('❌ Error emitiendo evento MovimientoStock:', error);

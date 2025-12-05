@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
+import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class PlanillasService {
@@ -1169,6 +1171,49 @@ export class PlanillasService {
       const totalNeto = planilla.empleado_planilla.reduce(
         (sum, emp) => sum + (parseFloat(emp.neto_pagar) || 0), 0
       );
+      const totalAportes = (planilla.total_aportes ?? 0) || totalDescuentos;
+
+      // Encolado outbox opcional para que Contabilidad genere asiento de planilla (pipeline resiliente)
+      const usarOutboxPlanilla = process.env.PLANILLA_OUTBOX_ENABLED === 'true';
+      if (usarOutboxPlanilla) {
+        const eventId = uuidv4();
+        const outboxEvent = OutboxEventBuilder.build({
+          tenantId: planilla.tenant_id,
+          eventType: 'planilla.liquidada',
+          aggregateType: 'planilla',
+          aggregateId: planillaId,
+          eventData: {
+            planillaId,
+            periodo: planilla.periodo,
+            fecha: new Date().toISOString(),
+            totalIngresos,
+            totalAportes,
+            totalDescuentos,
+            totalNeto,
+            centro_costo_id: planilla.centro_costo_id,
+            eventId,
+          },
+        });
+
+        await this.supabaseService.getClient().from('outbox_events').insert(outboxEvent);
+        await this.supabaseService.getClient()
+          .from('planillas')
+          .update({
+            asientos_generados: true,
+            fecha_asientos: new Date().toISOString(),
+          })
+          .eq('id', planillaId);
+
+        return {
+          success: true,
+          message: 'Evento planilla.liquidada encolado para generación de asiento contable',
+          data: {
+            outbox_event_id: outboxEvent.event_id,
+            planilla_id: planillaId,
+            periodo: planilla.periodo,
+          },
+        };
+      }
 
       // 🎯 CREAR ASIENTOS EN SISTEMA PRINCIPAL DIRECTAMENTE
       console.log('📝 [RRHH] Creando asientos contables en sistema principal...');

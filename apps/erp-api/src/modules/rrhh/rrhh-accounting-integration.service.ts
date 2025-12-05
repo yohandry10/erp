@@ -36,6 +36,17 @@ export class RrhhAccountingIntegrationService {
       const numeroAsiento = `PLAN-${planillaData.periodo}-${Date.now()}`;
       const fechaAsiento = new Date().toISOString();
 
+      // Generar detalles del asiento y validar cuadratura antes de persistir
+      const detalles = this.generarDetallesAsiento(planillaData);
+      const totalDebe = detalles.reduce((sum, d) => sum + Number(d.debe || 0), 0);
+      const totalHaber = detalles.reduce((sum, d) => sum + Number(d.haber || 0), 0);
+
+      if (Math.abs(totalDebe - totalHaber) > 0.01) {
+        throw new Error(
+          `El asiento de planilla no cuadra: Debe=${totalDebe.toFixed(2)}, Haber=${totalHaber.toFixed(2)}`
+        );
+      }
+
       // Crear asiento principal
       const { data: asientoCreado, error: asientoError } = await this.supabase.getClient()
         .from('asientos_contables')
@@ -44,8 +55,8 @@ export class RrhhAccountingIntegrationService {
           fecha: fechaAsiento,
           concepto: `Planilla de sueldos ${planillaData.periodo}`,
           referencia: `PLANILLA-${planillaData.planillaId}`,
-          total_debe: planillaData.totalIngresos + planillaData.totalAportes,
-          total_haber: planillaData.totalIngresos + planillaData.totalAportes,
+          total_debe: totalDebe,
+          total_haber: totalHaber,
           estado: 'BORRADOR',
           usuario_id: null,
           created_at: fechaAsiento
@@ -54,9 +65,6 @@ export class RrhhAccountingIntegrationService {
         .single();
 
       if (asientoError) throw asientoError;
-
-      // Generar detalles del asiento
-      const detalles = this.generarDetallesAsiento(planillaData);
 
       // Insertar detalles
       const detallesParaGuardar = detalles.map(detalle => ({
@@ -276,7 +284,47 @@ export class RrhhAccountingIntegrationService {
       const numeroAsiento = `LIQ-${liquidacion.empleados.numero_documento}-${Date.now()}`;
       const fechaAsiento = new Date().toISOString();
 
-      // Crear asiento de liquidación
+      // Detalles del asiento de liquidación (sin asiento_id aún)
+      const detallesLiquidacion = [];
+
+      // DEBE: Provisiones CTS
+      if (liquidacion.monto_cts > 0) {
+        detallesLiquidacion.push({
+          cuenta_id: '415', // Beneficios Sociales de los Trabajadores por Pagar
+          debe: liquidacion.monto_cts,
+          haber: 0,
+          concepto: `CTS ${liquidacion.empleados.nombres}`
+        });
+      }
+
+      // DEBE: Indemnización
+      if (liquidacion.indemnizacion > 0) {
+        detallesLiquidacion.push({
+          cuenta_id: '629', // Beneficios Sociales de los Trabajadores
+          debe: liquidacion.indemnizacion,
+          haber: 0,
+          concepto: `Indemnización ${liquidacion.empleados.nombres}`
+        });
+      }
+
+      // HABER: Total a pagar al empleado
+      detallesLiquidacion.push({
+        cuenta_id: '411', // Remuneraciones por Pagar
+        debe: 0,
+        haber: liquidacion.total_liquidacion,
+        concepto: `Liquidación por pagar ${liquidacion.empleados.nombres}`
+      });
+
+      const totalDebe = detallesLiquidacion.reduce((sum, d) => sum + Number(d.debe || 0), 0);
+      const totalHaber = detallesLiquidacion.reduce((sum, d) => sum + Number(d.haber || 0), 0);
+
+      if (Math.abs(totalDebe - totalHaber) > 0.01) {
+        throw new Error(
+          `El asiento de liquidación no cuadra: Debe=${totalDebe.toFixed(2)}, Haber=${totalHaber.toFixed(2)}`
+        );
+      }
+
+      // Crear asiento de liquidación con totales validados
       const { data: asientoCreado, error: asientoError } = await this.supabase.getClient()
         .from('asientos_contables')
         .insert({
@@ -284,8 +332,8 @@ export class RrhhAccountingIntegrationService {
           fecha: fechaAsiento,
           concepto: `Liquidación ${liquidacion.empleados.nombres} ${liquidacion.empleados.apellidos}`,
           referencia: `LIQUIDACION-${liquidacionId}`,
-          total_debe: liquidacion.total_liquidacion,
-          total_haber: liquidacion.total_liquidacion,
+          total_debe: totalDebe,
+          total_haber: totalHaber,
           estado: 'BORRADOR',
           usuario_id: null,
           created_at: fechaAsiento
@@ -295,46 +343,19 @@ export class RrhhAccountingIntegrationService {
 
       if (asientoError) throw asientoError;
 
-      // Detalles del asiento de liquidación
-      const detallesLiquidacion = [];
-
-      // DEBE: Provisiones CTS
-      if (liquidacion.monto_cts > 0) {
-        detallesLiquidacion.push({
-          asiento_id: asientoCreado.id,
-          cuenta_id: '415', // Beneficios Sociales de los Trabajadores por Pagar
-          debe: liquidacion.monto_cts,
-          haber: 0,
-          concepto: `CTS ${liquidacion.empleados.nombres}`,
-          created_at: fechaAsiento
-        });
-      }
-
-      // DEBE: Indemnización
-      if (liquidacion.indemnizacion > 0) {
-        detallesLiquidacion.push({
-          asiento_id: asientoCreado.id,
-          cuenta_id: '629', // Beneficios Sociales de los Trabajadores
-          debe: liquidacion.indemnizacion,
-          haber: 0,
-          concepto: `Indemnización ${liquidacion.empleados.nombres}`,
-          created_at: fechaAsiento
-        });
-      }
-
-      // HABER: Total a pagar al empleado
-      detallesLiquidacion.push({
+      // Mapear detalles con el asiento creado
+      const detallesParaGuardar = detallesLiquidacion.map(detalle => ({
         asiento_id: asientoCreado.id,
-        cuenta_id: '411', // Remuneraciones por Pagar
-        debe: 0,
-        haber: liquidacion.total_liquidacion,
-        concepto: `Liquidación por pagar ${liquidacion.empleados.nombres}`,
+        cuenta_id: detalle.cuenta_id,
+        debe: detalle.debe,
+        haber: detalle.haber,
+        concepto: detalle.concepto,
         created_at: fechaAsiento
-      });
+      }));
 
       const { error: detallesError } = await this.supabase.getClient()
         .from('detalle_asientos')
-        .insert(detallesLiquidacion);
+        .insert(detallesParaGuardar);
 
       if (detallesError) throw detallesError;
 

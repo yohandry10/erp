@@ -42,7 +42,8 @@ describe('OutboxEventsService', () => {
   };
 
   const mockSupabaseService = {
-    getClient: jest.fn()
+    getClient: jest.fn(),
+    getPublicClient: jest.fn()
   };
 
   beforeEach(async () => {
@@ -85,7 +86,7 @@ describe('OutboxEventsService', () => {
         data: mockEvents,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.leerEventosPendientes();
 
@@ -113,7 +114,7 @@ describe('OutboxEventsService', () => {
         data: mockEvents,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.leerEventosPendientes('tenant-1');
 
@@ -126,7 +127,7 @@ describe('OutboxEventsService', () => {
         data: [],
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.leerEventosPendientes();
 
@@ -138,7 +139,7 @@ describe('OutboxEventsService', () => {
         data: null,
         error: { message: 'Database error' }
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       await expect(service.leerEventosPendientes()).rejects.toThrow(
         'Error leyendo eventos pendientes'
@@ -161,7 +162,7 @@ describe('OutboxEventsService', () => {
         data: mockEvents,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.leerEventosPendientesConReintentos(3, 100);
 
@@ -185,7 +186,7 @@ describe('OutboxEventsService', () => {
         data: mockEvents,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.leerEventosPendientesPorTipo(
         'VentaFacturada'
@@ -208,7 +209,7 @@ describe('OutboxEventsService', () => {
         data: mockEvent,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.obtenerEventoPorId('evt-1');
 
@@ -220,7 +221,7 @@ describe('OutboxEventsService', () => {
         data: null,
         error: { code: 'PGRST116' }
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.obtenerEventoPorId('evt-999');
 
@@ -234,7 +235,7 @@ describe('OutboxEventsService', () => {
         count: 5,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.contarEventosPendientes();
 
@@ -246,7 +247,7 @@ describe('OutboxEventsService', () => {
         count: null,
         error: null
       });
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.contarEventosPendientes();
 
@@ -281,7 +282,7 @@ describe('OutboxEventsService', () => {
           error: null
         })
       };
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.obtenerEstadisticasEventos();
 
@@ -303,7 +304,7 @@ describe('OutboxEventsService', () => {
           error: null
         })
       };
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       const result = await service.obtenerEstadisticasEventos();
 
@@ -325,7 +326,7 @@ describe('OutboxEventsService', () => {
           error: { message: 'Database error' }
         })
       };
-      mockSupabaseService.getClient.mockReturnValue(mockSupabaseClient);
+      mockSupabaseService.getPublicClient.mockReturnValue(mockSupabaseClient);
 
       await expect(service.obtenerEstadisticasEventos()).rejects.toThrow(
         'Error obteniendo estadísticas'
