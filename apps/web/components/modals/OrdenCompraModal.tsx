@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+import { useApi } from '@/hooks/use-api'
 
 interface OrdenCompraModalProps {
   isOpen: boolean
@@ -29,6 +28,7 @@ export default function OrdenCompraModal({
   orden 
 }: OrdenCompraModalProps) {
   const { tasaIgv } = useTaxConfig()
+  const api = useApi()
   
   // DEBUG: Log de props recibidas
   console.log('🔍 OrdenCompraModal recibido props:', { isOpen, orden })
@@ -87,20 +87,13 @@ export default function OrdenCompraModal({
   const loadProveedores = async () => {
     try {
       console.log('🔥 [MODAL] CARGANDO PROVEEDORES...')
-      console.log('🔥 [MODAL] URL:', `${API_URL}/api/compras/proveedores`)
-      
-      const response = await fetch(`${API_URL}/api/compras/proveedores`)
-      console.log('🔥 [MODAL] Response status:', response.status)
-      
-      const data = await response.json()
-      console.log('🔥 [MODAL] Response data:', JSON.stringify(data, null, 2))
-      
-      if (data.success) {
-        console.log('🔥 [MODAL] Proveedores cargados:', data.data.length)
-        setProveedores(data.data)
-        console.log('🔥 [MODAL] Estado actualizado con proveedores')
+      const resp = await api.get('/api/compras/proveedores')
+      if ((resp as any)?.success) {
+        const proveedoresData = (resp as any).data || []
+        setProveedores(proveedoresData)
+        console.log('🔥 [MODAL] Proveedores cargados:', proveedoresData.length)
       } else {
-        console.error('🔥 [MODAL] Error en respuesta:', data.error)
+        console.error('🔥 [MODAL] Error en respuesta:', (resp as any)?.error || (resp as any)?.message)
       }
     } catch (error) {
       console.error('🔥 [MODAL] Error loading proveedores:', error)
@@ -109,10 +102,9 @@ export default function OrdenCompraModal({
 
   const loadProductos = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/compras/productos`)
-      const data = await response.json()
-      if (data.success) {
-        setProductos(data.data)
+      const resp = await api.get('/api/compras/productos')
+      if ((resp as any)?.success) {
+        setProductos((resp as any).data || [])
       }
     } catch (error) {
       console.error('Error loading productos:', error)
@@ -121,10 +113,12 @@ export default function OrdenCompraModal({
 
   const generateNumeroOrden = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/compras/next-number`)
-      const data = await response.json()
-      if (data.success) {
-        setFormData(prev => ({ ...prev, numero: data.data.numero }))
+      const resp = await api.get('/api/compras/next-number')
+      if ((resp as any)?.success) {
+        const numero = (resp as any)?.data?.numero
+        if (numero) {
+          setFormData(prev => ({ ...prev, numero }))
+        }
       }
     } catch (error) {
       console.error('Error generating order number:', error)
