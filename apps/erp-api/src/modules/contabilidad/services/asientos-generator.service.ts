@@ -79,6 +79,9 @@ export class AsientosGeneratorService {
         console.log(
           `⚠️ [Asientos] Asiento ya existe para evento ${sourceEventId}, retornando existente`
         );
+        // Si el asiento ya existe, el evento igualmente debe salir del outbox
+        // para evitar que quede en pending indefinidamente.
+        await this.marcarEventoComoProcesado(sourceEventId);
         return asientoExistente;
       }
     }
@@ -249,12 +252,20 @@ export class AsientosGeneratorService {
         .from('outbox_events')
         .select('retry_count, status')
         .eq('event_id', eventId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) {
         this.logger.error(
           `❌ [Asientos] Error obteniendo evento ${eventId}:`,
           fetchError
+        );
+        return;
+      }
+
+      // Si no existe el evento, no podemos marcarlo; evitar reventar el worker
+      if (!evento) {
+        this.logger.warn(
+          `⚠️ [Asientos] Evento ${eventId} no encontrado al marcar como fallido; se omite`
         );
         return;
       }
@@ -273,11 +284,6 @@ export class AsientosGeneratorService {
         retry_count: retryCount,
         updated_at: new Date().toISOString()
       };
-
-      // Si es fallo permanente, registrar la fecha
-      if (isPermanentFailure) {
-        updateData.failed_permanently_at = new Date().toISOString();
-      }
 
       const { error } = await this.supabaseService
         .getClient()
@@ -324,7 +330,6 @@ export class AsientosGeneratorService {
           retry_count: 0,
           error_message: null,
           processed_at: null,
-          failed_permanently_at: null,
           updated_at: new Date().toISOString()
         })
         .eq('event_id', eventId)
@@ -442,8 +447,9 @@ export class AsientosGeneratorService {
   ): Promise<string> {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1;
+    const periodo = `${anio}${String(mes).padStart(2, '0')}`;
 
-    // Obtener el último número de asiento del período
+    // Obtener números existentes del período (solo el campo para evitar payload grande)
     const { data, error } = await this.supabaseService
       .getClient()
       .from('asientos_contables')
@@ -455,9 +461,7 @@ export class AsientosGeneratorService {
         mes === 12
           ? `${anio + 1}-01-01`
           : `${anio}-${String(mes + 1).padStart(2, '0')}-01`
-      )
-      .order('numero_asiento', { ascending: false })
-      .limit(1);
+      );
 
     if (error) {
       console.error('❌ [Asientos] Error obteniendo último número:', error);
@@ -465,15 +469,19 @@ export class AsientosGeneratorService {
 
     let siguienteNumero = 1;
     if (data && data.length > 0) {
-      const ultimoNumero = data[0].numero_asiento;
-      // Extraer el número del formato "A-YYYYMM-NNNN"
-      const match = ultimoNumero.match(/-(\d+)$/);
-      if (match) {
-        siguienteNumero = parseInt(match[1], 10) + 1;
+      // Considerar solo los que cumplan el formato A-YYYYMM-NNNN con 4 dígitos
+      const numerosValidos = data
+        .map(d => d.numero_asiento as string)
+        .filter(n => new RegExp(`^A-${periodo}-\\d{4}$`).test(n))
+        .map(n => parseInt(n.slice(-4), 10));
+
+      if (numerosValidos.length > 0) {
+        const maxNumero = Math.max(...numerosValidos);
+        siguienteNumero = maxNumero + 1;
       }
     }
 
-    return `A-${anio}${String(mes).padStart(2, '0')}-${String(siguienteNumero).padStart(4, '0')}`;
+    return `A-${periodo}-${String(siguienteNumero).padStart(4, '0')}`;
   }
 
   /**

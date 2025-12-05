@@ -5,6 +5,7 @@ import { OutboxEventsService, OutboxEvent } from '../services/outbox-events.serv
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 describe('ContabilidadEventsListener', () => {
   let listener: ContabilidadEventsListener;
@@ -20,6 +21,7 @@ describe('ContabilidadEventsListener', () => {
       generarAsientoAjusteInventario: jest.fn(),
       generarAsientoPlanilla: jest.fn(),
       generarAsientoDepreciacion: jest.fn(),
+      generarAsientoDevolucionProveedor: jest.fn(),
       marcarEventoComoFallido: jest.fn()
     };
 
@@ -74,9 +76,17 @@ describe('ContabilidadEventsListener', () => {
           }
         },
         {
+          provide: TenantContextService,
+          useValue: {
+            run: <T>(ctx: any, cb: () => T) => cb(),
+            getContext: () => ({ tenantId: 'tenant-001' })
+          }
+        },
+        {
           provide: TaxCalculatorService,
           useValue: {
-            calculateTax: jest.fn()
+            calculateTax: jest.fn(),
+            calcularSubtotalDesdeTotal: jest.fn().mockResolvedValue(100)
           }
         }
       ]
@@ -399,12 +409,233 @@ describe('ContabilidadEventsListener', () => {
       );
     });
 
+    it('should handle devolucion proveedor event', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-011',
+          correlation_id: 'corr-011',
+          aggregate_type: 'devolucion',
+          aggregate_id: 'dev-001',
+          event_type: 'devolucion.proveedor.registrada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fechaDevolucion: '2025-01-20',
+            subtotal: 150,
+            igv: 27,
+            total: 177,
+            numeroDevolucion: 'DEV-001'
+          },
+          event_version: 1,
+          created_at: '2025-01-20T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'pending',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoDevolucionProveedor.mockResolvedValue({
+        id: 'asiento-005',
+        numero_asiento: 'A-202501-0005'
+      } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoDevolucionProveedor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          subtotal: 150,
+          igv: 27,
+          total: 177,
+          referencia: 'DEV-001',
+          event_id: 'evt-011'
+        })
+      );
+    });
+
+    it('should handle ajuste inventario event', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-007',
+          correlation_id: 'corr-007',
+          aggregate_type: 'ajuste',
+          aggregate_id: 'aj-001',
+          event_type: 'ajuste.inventario.aplicado',
+          event_data: {
+            tenantId: 'tenant-001',
+            valor: 50,
+            tipo: 'SOBRANTE',
+            referencia: 'AJ-001'
+          },
+          event_version: 1,
+          created_at: '2025-01-21T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'pending',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoAjusteInventario.mockResolvedValue({
+        id: 'asiento-006',
+        numero_asiento: 'A-202501-0006'
+      } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoAjusteInventario).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          valor: 50,
+          tipo: 'SOBRANTE',
+          referencia: 'AJ-001',
+          event_id: 'evt-007'
+        })
+      );
+    });
+
+    it('should handle planilla liquidada event', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-008',
+          correlation_id: 'corr-008',
+          aggregate_type: 'planilla',
+          aggregate_id: 'plan-001',
+          event_type: 'planilla.liquidada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fecha: '2025-01-31',
+            sueldos: 1000,
+            aportes: 200,
+            retenciones: 150,
+            neto: 850
+          },
+          event_version: 1,
+          created_at: '2025-01-31T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'pending',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoPlanilla.mockResolvedValue({
+        id: 'asiento-007',
+        numero_asiento: 'A-202501-0007'
+      } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoPlanilla).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          sueldos: 1000,
+          aportes: 200,
+          retenciones: 150,
+          neto: 850,
+          event_id: 'evt-008'
+        })
+      );
+    });
+
+    it('should handle depreciacion generada event', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-009',
+          correlation_id: 'corr-009',
+          aggregate_type: 'depreciacion',
+          aggregate_id: 'dep-001',
+          event_type: 'depreciacion.generada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fecha: '2025-02-01',
+            monto: 500,
+            referencia: 'ACT-001'
+          },
+          event_version: 1,
+          created_at: '2025-02-01T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'pending',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoDepreciacion.mockResolvedValue({
+        id: 'asiento-008',
+        numero_asiento: 'A-202502-0001'
+      } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoDepreciacion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          monto: 500,
+          referencia: 'ACT-001',
+          event_id: 'evt-009'
+        })
+      );
+    });
+
+    it('should handle cpe anulado event and generate reversal', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-010',
+          correlation_id: 'corr-010',
+          aggregate_type: 'cpe',
+          aggregate_id: 'cpe-001',
+          event_type: 'cpe.anulado',
+          event_data: {
+            tenantId: 'tenant-001',
+            total: 118,
+            serie: 'F001',
+            numero: '000123',
+            motivo: 'Cliente solicitó',
+            centro_costo_id: 'cc-1'
+          },
+          event_version: 1,
+          created_at: '2025-02-05T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'pending',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoVenta.mockResolvedValue({
+        id: 'asiento-009',
+        numero_asiento: 'A-202502-0002'
+      } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoVenta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          total: -118,
+          referencia: 'REV-F001-000123',
+          event_id: 'evt-010'
+        })
+      );
+    });
+
     it('should ignore unknown event types', async () => {
       const mockEventos: OutboxEvent[] = [
         {
           id: '1',
-          event_id: 'evt-006',
-          correlation_id: 'corr-006',
+          event_id: 'evt-012',
+          correlation_id: 'corr-012',
           aggregate_type: 'unknown',
           aggregate_id: 'unknown-001',
           event_type: 'unknown.event',
@@ -424,7 +655,10 @@ describe('ContabilidadEventsListener', () => {
 
       expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
       expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
-      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith(
+        'evt-012',
+        'Evento sin tenantId'
+      );
     });
   });
 });

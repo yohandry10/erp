@@ -35,7 +35,7 @@ export class OutboxEventsService {
   ): Promise<OutboxEvent[]> {
     try {
       let query = this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .is('processed_at', null)
@@ -97,7 +97,7 @@ export class OutboxEventsService {
   ): Promise<OutboxEvent[]> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient({ silent: true })
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .is('processed_at', null)
@@ -155,7 +155,7 @@ export class OutboxEventsService {
   ): Promise<OutboxEvent[]> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .is('processed_at', null)
@@ -202,7 +202,7 @@ export class OutboxEventsService {
   async obtenerEventoPorId(eventId: string): Promise<OutboxEvent | null> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .eq('event_id', eventId)
@@ -240,7 +240,7 @@ export class OutboxEventsService {
   async contarEventosPendientes(tenantId?: string): Promise<number> {
     try {
       const { count, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*', { count: 'exact', head: true })
         .is('processed_at', null);
@@ -271,7 +271,7 @@ export class OutboxEventsService {
   async leerEventosFallidos(limit: number = 100): Promise<OutboxEvent[]> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .eq('status', 'failed')
@@ -313,7 +313,7 @@ export class OutboxEventsService {
   async leerEventosDeadLetter(limit: number = 100): Promise<OutboxEvent[]> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('*')
         .eq('status', 'dead_letter')
@@ -363,7 +363,7 @@ export class OutboxEventsService {
   }> {
     try {
       const { data, error } = await this.supabaseService
-        .getClient()
+        .getPublicClient()
         .from('outbox_events')
         .select('status, processed_at, created_at');
 

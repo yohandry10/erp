@@ -7,6 +7,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { v4 as uuidv4 } from 'uuid';
+import { TenantContextService } from '../../../shared/tenant/tenant-context.service';
 
 /**
  * Listener que procesa eventos de la tabla outbox_events
@@ -22,6 +23,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
     private readonly outboxEventsService: OutboxEventsService,
     private readonly eventBus: EventBusService,
     private readonly supabaseService: SupabaseService,
+    private readonly tenantContext: TenantContextService,
     private readonly taxCalculator: TaxCalculatorService,
   ) {}
 
@@ -261,122 +263,144 @@ export class ContabilidadEventsListener implements OnModuleInit {
     const retryCount = evento.retry_count || 0;
     let logId: string | null = null;
 
-    try {
-      this.logger.log(
-        `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
-      );
+    // Extraer tenantId del evento
+    const tenantId = evento.event_data?.tenantId || evento.event_data?.tenant_id || null;
 
-      // Extraer tenantId del evento para logging
-      const tenantId = evento.event_data?.tenantId || evento.event_data?.tenant_id || null;
-      
-      // Registrar inicio del procesamiento
-      if (tenantId) {
-        logId = await this.registrarInicioProcesamiento(evento, tenantId);
-      }
-
-      // Mapear el tipo de evento al handler correspondiente
-      switch (evento.event_type) {
-        case 'venta.procesada':
-        case 'VentaFacturada':
-        case 'pos.venta.registrada':
-          await this.handleVentaFacturada(evento);
-          break;
-
-        case 'cobro.registrado':
-        case 'CobroRegistrado':
-          await this.handleCobroRegistrado(evento);
-          break;
-
-        case 'recepcion.registrada':
-        case 'RecepcionRegistrada':
-          await this.handleRecepcionRegistrada(evento);
-          break;
-
-        case 'devolucion.proveedor.registrada':
-        case 'DevolucionProveedorEmitida':
-          await this.handleDevolucionProveedorRegistrada(evento);
-          break;
-
-        case 'cxc.creada':
-        case 'CuentaPorCobrarCreada':
-          await this.handleCuentaPorCobrarCreada(evento);
-          break;
-
-        case 'pago.proveedor.registrado':
-        case 'PagoProveedorRegistrado':
-          await this.handlePagoProveedor(evento);
-          break;
-
-        case 'ajuste.inventario.aplicado':
-        case 'AjusteInventarioAplicado':
-          await this.handleAjusteInventario(evento);
-          break;
-
-        case 'planilla.liquidada':
-        case 'PlanillaLiquidada':
-          await this.handlePlanillaLiquidada(evento);
-          break;
-
-        case 'depreciacion.generada':
-        case 'DepreciacionGenerada':
-          await this.handleDepreciacion(evento);
-          break;
-
-        case 'cpe.anulado':
-        case 'CPEAnulado':
-          await this.handleCpeAnulado(evento);
-          break;
-
-        default:
-          this.logger.debug(`⚠️ [ContabilidadEventsListener] Tipo de evento no manejado: ${evento.event_type}`);
-          // No marcar como procesado, simplemente ignorar
-          return;
-      }
-
-      this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
-      
-      // Registrar finalización exitosa
-      await this.registrarFinalizacionExitosa(logId);
-    } catch (error) {
-      const errorMessage = error.message || 'Error desconocido';
-      const isRetryable = this.isRetryableError(error);
-      
-      // Registrar error en event_processing_log
-      await this.registrarErrorProcesamiento(logId, error);
-      
+    if (!tenantId) {
       this.logger.error(
-        `❌ [ContabilidadEventsListener] Error procesando evento ${evento.event_id} (intento ${retryCount + 1}/${maxRetries}):`,
-        errorMessage
+        `❌ [ContabilidadEventsListener] Evento ${evento.event_id} sin tenantId, se marca como fallido para evitar bucle`
       );
+      await this.asientosGenerator.marcarEventoComoFallido(
+        evento.event_id,
+        'Evento sin tenantId'
+      );
+      return;
+    }
 
-      // Determinar si se debe reintentar
-      if (isRetryable && retryCount < maxRetries - 1) {
-        // Marcar como fallido pero permitir reintento
-        await this.asientosGenerator.marcarEventoComoFallido(
-          evento.event_id,
-          `${errorMessage} - Se reintentará`
+    await this.tenantContext.run({ tenantId, isSuperAdmin: true }, async () => {
+      try {
+        this.logger.log(
+          `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
         );
+
+        // Registrar inicio del procesamiento
+        logId = await this.registrarInicioProcesamiento(evento, tenantId);
+
+        // Mapear el tipo de evento al handler correspondiente
+        switch (evento.event_type) {
+          case 'venta.procesada':
+          case 'VentaFacturada':
+          case 'pos.venta.registrada':
+            await this.handleVentaFacturada(evento);
+            break;
+
+          case 'cobro.registrado':
+          case 'CobroRegistrado':
+            await this.handleCobroRegistrado(evento);
+            break;
+
+          case 'recepcion.registrada':
+          case 'RecepcionRegistrada':
+            await this.handleRecepcionRegistrada(evento);
+            break;
+
+          case 'devolucion.proveedor.registrada':
+          case 'DevolucionProveedorEmitida':
+            await this.handleDevolucionProveedorRegistrada(evento);
+            break;
+
+          case 'cxc.creada':
+          case 'CuentaPorCobrarCreada':
+            await this.handleCuentaPorCobrarCreada(evento);
+            break;
+
+          case 'pago.proveedor.registrado':
+          case 'PagoProveedorRegistrado':
+            await this.handlePagoProveedor(evento);
+            break;
+
+          case 'ajuste.inventario.aplicado':
+          case 'AjusteInventarioAplicado':
+            await this.handleAjusteInventario(evento);
+            break;
+
+          case 'planilla.liquidada':
+          case 'PlanillaLiquidada':
+            await this.handlePlanillaLiquidada(evento);
+            break;
+
+      case 'depreciacion.generada':
+      case 'DepreciacionGenerada':
+        await this.handleDepreciacion(evento);
+        break;
+
+          case 'cpe.anulado':
+          case 'CPEAnulado':
+            await this.handleCpeAnulado(evento);
+            break;
+
+          case 'producto.stock_bajo':
+          case 'producto.stock.bajo':
+          case 'ProductoStockBajo':
+            await this.handleProductoStockBajo(evento);
+            break;
+
+          case 'stock.movimiento':
+          case 'StockMovimiento':
+            await this.handleStockMovimiento(evento);
+            break;
+
+          default:
+            // Marcar como dead_letter inmediatamente para que no quede en pending
+            await this.marcarEventoNoManejado(evento, `Tipo de evento no manejado: ${evento.event_type}`);
+            return;
+        }
+
+        this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
         
-        // Calcular tiempo de espera con backoff exponencial
-        const backoffMs = this.calculateBackoff(retryCount);
-        this.logger.warn(
-          `⏳ [ContabilidadEventsListener] Evento ${evento.event_id} será reintentado en ${backoffMs}ms`
-        );
-      } else {
-        // Marcar como fallido permanentemente
-        await this.asientosGenerator.marcarEventoComoFallido(
-          evento.event_id,
-          `${errorMessage} - ${isRetryable ? 'Máximo de reintentos alcanzado' : 'Error no recuperable'}`
-        );
+        // Registrar finalización exitosa
+        await this.registrarFinalizacionExitosa(logId);
+      } catch (error) {
+        const errorMessage = error.message || 'Error desconocido';
+        const isRetryable = this.isRetryableError(error);
+        
+        // Registrar error en event_processing_log
+        await this.registrarErrorProcesamiento(logId, error);
         
         this.logger.error(
-          `🚫 [ContabilidadEventsListener] Evento ${evento.event_id} marcado como fallido permanentemente`
+          `❌ [ContabilidadEventsListener] Error procesando evento ${evento.event_id} (intento ${retryCount + 1}/${maxRetries}):`,
+          errorMessage
         );
-      }
 
-      // Re-lanzar el error para que sea registrado en logs
-      throw error;
-    }
+        // Determinar si se debe reintentar
+        if (isRetryable && retryCount < maxRetries - 1) {
+          // Marcar como fallido pero permitir reintento
+          await this.asientosGenerator.marcarEventoComoFallido(
+            evento.event_id,
+            `${errorMessage} - Se reintentará`
+          );
+          
+          // Calcular tiempo de espera con backoff exponencial
+          const backoffMs = this.calculateBackoff(retryCount);
+          this.logger.warn(
+            `⏳ [ContabilidadEventsListener] Evento ${evento.event_id} será reintentado en ${backoffMs}ms`
+          );
+        } else {
+          // Marcar como fallido permanentemente
+          await this.asientosGenerator.marcarEventoComoFallido(
+            evento.event_id,
+            `${errorMessage} - ${isRetryable ? 'Máximo de reintentos alcanzado' : 'Error no recuperable'}`
+          );
+          
+          this.logger.error(
+            `🚫 [ContabilidadEventsListener] Evento ${evento.event_id} marcado como fallido permanentemente`
+          );
+        }
+
+        // Re-lanzar el error para que sea registrado en logs
+        throw error;
+      }
+    });
   }
 
   /**
@@ -475,6 +499,34 @@ export class ContabilidadEventsListener implements OnModuleInit {
     const jitter = delayMs * 0.2 * (Math.random() - 0.5);
 
     return Math.floor(delayMs + jitter);
+  }
+
+  /**
+   * Marca un evento no manejado como dead_letter (sin reintentos) para que no quede en pending
+   */
+  private async marcarEventoNoManejado(evento: OutboxEvent, motivo: string): Promise<void> {
+    try {
+      const truncated = motivo.length > 500 ? `${motivo.slice(0, 497)}...` : motivo;
+      await this.supabaseService
+        .getClient()
+        .from('outbox_events')
+        .update({
+          status: 'dead_letter',
+          retry_count: 3, // forzar salida del ciclo de reintentos
+          error_message: truncated,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('event_id', evento.event_id);
+
+      this.logger.debug(
+        `⚠️ [ContabilidadEventsListener] Evento ${evento.event_id} marcado como dead_letter por no ser manejado (${evento.event_type})`
+      );
+    } catch (err) {
+      this.logger.warn(
+        `⚠️ [ContabilidadEventsListener] No se pudo marcar evento no manejado ${evento.event_id}:`,
+        err,
+      );
+    }
   }
   /**
    * 🔴 CRÍTICO FIX: Verifica que un asiento contable se haya creado correctamente en la BD
@@ -869,6 +921,65 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePagoProveedor:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handler liviano para producto.stock_bajo:
+   * - Solo marca el evento como procesado para evitar acumulación en dead_letter.
+   * - Mantiene trazabilidad con logs; no genera asientos contables.
+   */
+  private async handleProductoStockBajo(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'producto.stock_bajo');
+
+    try {
+      this.logger.log(
+        `📦 [Contabilidad] Stock bajo recibido (evento ${evento.event_id}) tenant=${tenantId} producto=${eventData?.productoId || eventData?.sku || 'desconocido'}`
+      );
+
+      // Reemitir al EventBus para que el listener de notificaciones (InventoryStockAlertsListener)
+      // procese y genere las alertas correspondientes. Este listener ya maneja deduplicación.
+      this.eventBus.emit(evento.event_type, eventData, 'outbox-worker');
+
+      // Marcar como procesado en outbox para evitar que quede en dead_letter
+      await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handleProductoStockBajo:`, error);
+      await this.asientosGenerator.marcarEventoComoFallido(
+        evento.event_id,
+        `Error manejando stock_bajo: ${error?.message || error}`
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Handler liviano para stock.movimiento:
+   * Solo lo marca como procesado para evitar que quede en dead_letter.
+   * No genera asiento contable.
+   */
+  private async handleStockMovimiento(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'stock.movimiento');
+
+    try {
+      this.logger.log(
+        `🚚 [Contabilidad] Movimiento de stock recibido (evento ${evento.event_id}) tenant=${tenantId} producto=${eventData?.productoId || eventData?.sku || 'desconocido'}`
+      );
+
+      // Reemitir si otros listeners necesitan enterarse; no afecta contabilidad
+      this.eventBus.emit(evento.event_type, eventData, 'outbox-worker');
+
+      // Marcar como procesado para que no se reintente
+      await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handleStockMovimiento:`, error);
+      await this.asientosGenerator.marcarEventoComoFallido(
+        evento.event_id,
+        `Error manejando stock.movimiento: ${error?.message || error}`
+      );
       throw error;
     }
   }
