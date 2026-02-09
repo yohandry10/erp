@@ -35,7 +35,7 @@
   },
   "packageManager": "pnpm@8.15.6",
   "dependencies": {
-    "@swc/helpers": "^0.5.17",
+    "@swc/helpers": "^0.5.18",
     "next": "15.3.3"
   }
 }
