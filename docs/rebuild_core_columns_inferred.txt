@@ -1,0 +1,186 @@
+[audit_log]
+- email
+- id
+- new_values
+- old_values
+- operation
+- table_name
+- tenant_id
+- timestamp
+- user_id
+
+[empresa_config]
+- aplicar_detraccion
+- aplicar_percepcion
+- aplicar_retencion
+- base64
+- bytes
+- certificado_expira_en
+- certificado_password
+- certificado_pfx
+- configuracion_completa
+- demo_conversion_attempted
+- demo_created_at
+- demo_expires_at
+- demo_extended
+- departamento
+- detraccion_codigo
+- detraccion_tasa
+- dias_maximos_rma
+- dias_vencimiento_factura
+- direccion
+- direccion_fiscal
+- distrito
+- email
+- estado
+- generar_cxp_en
+- gre_automatico_habilitado
+- gre_obligatorio
+- habilitar_multialmacen
+- habilitar_rma
+- id
+- igv_porcentaje
+- is_demo
+- logo_url
+- moneda_defecto
+- monto_aprobacion_compras
+- nombre_comercial
+- pais
+- pais_id
+- percepcion_tasa
+- pfx_encrypted
+- pfx_password_encrypted
+- plan
+- provincia
+- razon_social
+- retencion_tasa
+- rma_requiere_control_calidad
+- ruc
+- serie_factura
+- tenant_id
+- ubigeo
+- ultimo_numero_factura
+- umbral_gre_automatico
+- updated_at
+
+[outbox_events]
+- aggregate_id
+- aggregate_type
+- asientos_generados
+- created_at
+- error_message
+- event_id
+- event_type
+- evento_id
+- fecha_asientos
+- id
+- idempotency_key
+- next_retry_at
+- occurred_at
+- procesado_outbox
+- processed_at
+- retry_count
+- status
+- tenant_id
+- updated_at
+
+[permisos]
+- accion
+- activo
+- descripcion
+- id
+- modulo
+- permiso_id
+- recurso
+- role_id
+- tenant_id
+
+[rol_permisos]
+- concedido
+- created_at
+- id
+- permiso_id
+- role_id
+
+[roles]
+- created_at
+- descripcion
+- email
+- id
+- is_system_role
+- nombre
+- permiso_id
+- role_id
+- tenant_id
+- updated_at
+- usuario_sistema_id
+
+[tenants]
+- activo
+- apellidos
+- codigo
+- cpe_id
+- cpe_pendiente
+- descripcion
+- estado
+- estado_integridad
+- fecha_apertura
+- fecha_ingreso
+- id
+- monto_inicial
+- nombre
+- nombres
+- numero_documento
+- pais
+- ruc
+- tenant_id
+- tipo
+- tipo_documento
+- total_efectivo
+- total_tarjeta
+- usuario_id
+
+[user_roles]
+- created_at
+- descripcion)
+- id
+- nombre
+- role_id
+- roles(id
+- tenant_id
+- usuario_sistema_id
+
+[usuarios_sistema]
+- activo
+- apellido
+- apellidos
+- created_at
+- demo_conversion_attempted
+- demo_email_temp
+- descripcion))
+- email
+- estado
+- failed_login_attempts
+- fecha_ultimo_acceso
+- id
+- is_demo_user
+- is_super_admin
+- locked_until
+- nombre
+- nombres
+- password_hash
+- password_reset_expires
+- password_reset_token
+- roles(id
+- telefono
+- tenant_id
+- updated_at
+- user_roles(role_id
+- usuario_sistema_id
+
+[wizard_progress]
+- completado
+- completado_at
+- tenant_id
+- updated_at
+

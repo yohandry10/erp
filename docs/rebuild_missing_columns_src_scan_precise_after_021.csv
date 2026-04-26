@@ -1,0 +1,8 @@
+table,column
+empresa_config,base64
+empresa_config,bytes
+empresa_config,onconflict
+integration_logs,null
+libro_retenciones,hardening
+pedidos_venta,null
+rate_limit_baselines,onconflict

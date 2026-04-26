@@ -1,0 +1,5 @@
+function=148
+materialized_view=6
+policy=162
+table=79
+view=57

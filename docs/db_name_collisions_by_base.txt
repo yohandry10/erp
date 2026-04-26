@@ -1,0 +1,40 @@
+[pedido_gres]
+- type=table name=pedido_gres first=014_pedido_gres.sql
+- type=table name=public.pedido_gres first=155__add_gre_sire_detail_tables.sql
+
+[vista_pos_productos]
+- type=view name=public.vista_pos_productos first=134__fix_vista_pos_productos.sql
+- type=view name=vista_pos_productos first=076__fix_pos_stock_y_detalle.sql
+
+[vw_cpe_documentos_auditoria]
+- type=view name=public.vw_cpe_documentos_auditoria first=117__rls_views.sql
+- type=view name=vw_cpe_documentos_auditoria first=078__fix_cpe_documentos_integridad.sql
+
+[vw_devoluciones_detalle]
+- type=view name=public.vw_devoluciones_detalle first=117__rls_views.sql
+- type=view name=vw_devoluciones_detalle first=035_compras_completo.sql
+
+[vw_inventario_kardex_resumen]
+- type=view name=public.vw_inventario_kardex_resumen first=117__rls_views.sql
+- type=view name=vw_inventario_kardex_resumen first=072__inventario_kardex_views.sql
+
+[vw_inventario_recepciones]
+- type=view name=public.vw_inventario_recepciones first=117__rls_views.sql
+- type=view name=vw_inventario_recepciones first=072__inventario_kardex_views.sql
+
+[vw_kardex_valorizado]
+- type=view name=public.vw_kardex_valorizado first=117__rls_views.sql
+- type=view name=vw_kardex_valorizado first=071__inventario_kardex_valorizado.sql
+
+[vw_ordenes_compra_abiertas]
+- type=view name=public.vw_ordenes_compra_abiertas first=117__rls_views.sql
+- type=view name=vw_ordenes_compra_abiertas first=035_compras_completo.sql
+
+[vw_recepciones_detalle]
+- type=view name=public.vw_recepciones_detalle first=117__rls_views.sql
+- type=view name=vw_recepciones_detalle first=035_compras_completo.sql
+
+[vw_ventas_pos_completas]
+- type=view name=public.vw_ventas_pos_completas first=117__rls_views.sql
+- type=view name=vw_ventas_pos_completas first=076__fix_pos_stock_y_detalle.sql
+
