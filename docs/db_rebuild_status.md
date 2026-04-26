@@ -1,0 +1,1507 @@
+# Estado de Reconstruccion de BD (Post-Reset)
+
+Fecha de corte: 2026-02-19 (actualizado)
+
+## 1) Alcance
+
+Este documento resume el estado actual de la reconstruccion en la nueva linea de migraciones `000..301`, tomando como fuente:
+- `supabase/migrations/*.sql`
+- referencias reales de codigo (`.from(...)` y `.rpc(...)`) en `apps`, `libs`, `scripts`, `test` (excluyendo `coverage/dist/html`)
+- inventario de columnas extraidas en `docs/rebuild_key_tables_columns_raw.csv`
+
+## 2) Estado actual de migraciones
+
+Migraciones activas en la nueva reconstruccion:
+- `000__baseline_init.sql`
+- `001__core_foundation.sql`
+- `002__domain_tables_skeleton.sql`
+- `003__rls_and_context.sql`
+- `004__rpc_basics.sql`
+- `005__views_basics.sql`
+- `010__module_refinements_auto.sql`
+- `011__constraints_and_indexes.sql`
+- `012__schema_normalization_runtime.sql`
+- `013__schema_normalization_business.sql`
+- `014__rpc_compatibility_pack.sql`
+- `015__views_alignment_runtime.sql`
+- `016__compatibility_and_integrity_patch.sql`
+- `017__paises_numeric_id_alignment.sql`
+- `018__tenant_auth_permissions_alignment.sql`
+- `019__runtime_columns_alignment_core.sql`
+- `020__runtime_columns_alignment_rrhh_security.sql`
+- `021__runtime_columns_alignment_final_touch.sql`
+- `022__runtime_operational_gaps_alignment.sql`
+- `023__rls_hardening_global_vs_tenant.sql`
+- `024__seed_minimum_operational_catalogs.sql`
+- `025__upsert_integrity_inventory_and_rls_helpers.sql`
+- `026__rls_empleado_relaciones.sql`
+- `027__rrhh_planillas_flow_alignment.sql`
+- `028__rrhh_planillas_tenant_integrity_rls.sql`
+- `029__rrhh_planillas_validation_pack.sql`
+- `030__finanzas_tenant_integrity_and_performance.sql`
+- `031__inventario_pos_schema_alignment.sql`
+- `032__views_pos_inventario_runtime_alignment.sql`
+- `033__views_fiscal_kpis_alignment.sql`
+- `034__runtime_views_performance_and_validation.sql`
+- `035__contabilidad_materialized_views_alignment.sql`
+- `036__contabilidad_refresh_hardening.sql`
+- `037__contabilidad_materialized_views_validation_pack.sql`
+- `038__contabilidad_base_indexes_for_mview_refresh.sql`
+- `039__finanzas_rpc_analytics_alignment.sql`
+- `040__contabilidad_rpc_estadisticas_asientos_alignment.sql`
+- `041__finanzas_rpc_validation_pack.sql`
+- `042__stock_movimientos_legacy_sync.sql`
+- `043__dashboard_query_performance_indexes.sql`
+- `044__dashboard_runtime_validation_pack.sql`
+- `045__rrhh_asistencia_legacy_sync.sql`
+- `046__rrhh_asistencia_unified_view.sql`
+- `047__rrhh_asistencia_validation_pack.sql`
+- `048__dashboard_recent_activity_rpc.sql`
+- `049__dashboard_metrics_snapshot_rpc.sql`
+- `050__dashboard_rpc_validation_pack.sql`
+- `051__cpe_comprobantes_legacy_sync.sql`
+- `052__usuarios_sistema_legacy_sync.sql`
+- `053__legacy_aliases_validation_pack.sql`
+- `054__background_jobs_compatibility_views.sql`
+- `055__ventas_pos_pagos_runtime_alignment.sql`
+- `056__accounting_reports_compatibility_pack.sql`
+- `057__permissions_legacy_alias_sync.sql`
+- `058__tenants_estado_activo_consistency.sql`
+- `059__permissions_tenants_validation_pack.sql`
+- `060__security_function_execute_hardening.sql`
+- `061__security_function_search_path_hardening.sql`
+- `062__security_definer_inventory_views.sql`
+- `063__security_definer_search_path_backfill.sql`
+- `064__security_functions_validation_pack.sql`
+- `065__rls_global_catalog_context_hardening.sql`
+- `066__rls_tenant_tables_auto_hardening.sql`
+- `067__rls_security_runtime_validation_pack.sql`
+- `068__user_roles_tenant_integrity_hardening.sql`
+- `069__rbac_permissions_tenant_integrity_hardening.sql`
+- `070__rbac_tenant_integrity_validation_pack.sql`
+- `071__usuarios_alias_bidirectional_sync.sql`
+- `072__usuarios_alias_normalization_constraints.sql`
+- `073__usuarios_alias_validation_pack.sql`
+- `074__rrhh_pagos_bidirectional_sync_hardening.sql`
+- `075__rrhh_pagos_integrity_constraints.sql`
+- `076__rrhh_pagos_validation_pack.sql`
+- `077__auth_sessions_login_attempts_hardening.sql`
+- `078__auth_sessions_login_attempts_constraints.sql`
+- `079__auth_sessions_login_attempts_validation_pack.sql`
+- `080__usuario_configuracion_runtime_alignment.sql`
+- `081__usuario_configuracion_integrity_rls.sql`
+- `082__usuario_configuracion_validation_pack.sql`
+- `083__fiscal_catalog_runtime_alignment.sql`
+- `084__fiscal_catalog_integrity_constraints.sql`
+- `085__fiscal_catalog_validation_pack.sql`
+- `086__retenciones_runtime_alignment.sql`
+- `087__retenciones_integrity_constraints.sql`
+- `088__retenciones_validation_pack.sql`
+- `089__fiscal_ui_contract_alignment.sql`
+- `090__fiscal_ui_contract_integrity.sql`
+- `091__fiscal_ui_contract_validation_pack.sql`
+- `092__retenciones_proveedores_runtime_alignment.sql`
+- `093__retenciones_proveedores_integrity_constraints.sql`
+- `094__retenciones_proveedores_validation_pack.sql`
+- `095__security_rate_limit_runtime_alignment.sql`
+- `096__security_rate_limit_integrity_constraints.sql`
+- `097__security_rate_limit_validation_pack.sql`
+- `098__rma_runtime_flow_alignment.sql`
+- `099__rma_integrity_constraints.sql`
+- `100__rma_validation_pack.sql`
+- `101__security_secrets_runtime_alignment.sql`
+- `102__security_secrets_integrity_constraints.sql`
+- `103__security_secrets_validation_pack.sql`
+- `104__demo_conversion_runtime_alignment.sql`
+- `105__demo_conversion_integrity_constraints.sql`
+- `106__demo_conversion_validation_pack.sql`
+- `107__help_knowledge_base_runtime_alignment.sql`
+- `108__help_knowledge_base_integrity_rls.sql`
+- `109__help_knowledge_base_validation_pack.sql`
+- `110__pos_ticket_numeracion_runtime_alignment.sql`
+- `111__pos_ticket_numeracion_integrity_rls.sql`
+- `112__pos_ticket_numeracion_validation_pack.sql`
+- `113__documento_series_numeracion_runtime_alignment.sql`
+- `114__documento_series_numeracion_integrity_rls.sql`
+- `115__documento_series_numeracion_validation_pack.sql`
+- `116__core_aux_tables_runtime_alignment.sql`
+- `117__core_aux_tables_integrity_rls.sql`
+- `118__core_aux_tables_validation_pack.sql`
+- `119__observabilidad_runtime_alignment.sql`
+- `120__observabilidad_integrity_rls.sql`
+- `121__observabilidad_validation_pack.sql`
+- `122__contabilidad_presupuestal_runtime_alignment.sql`
+- `123__contabilidad_presupuestal_integrity_rls.sql`
+- `124__contabilidad_presupuestal_validation_pack.sql`
+- `125__tesoreria_bancaria_runtime_alignment.sql`
+- `126__tesoreria_bancaria_integrity_rls.sql`
+- `127__tesoreria_bancaria_validation_pack.sql`
+- `128__cxc_pagos_lotes_runtime_alignment.sql`
+- `129__cxc_pagos_lotes_integrity_rls.sql`
+- `130__cxc_pagos_lotes_validation_pack.sql`
+- `131__cxc_cxp_runtime_alignment.sql`
+- `132__cxc_cxp_integrity_rls.sql`
+- `133__cxc_cxp_validation_pack.sql`
+- `134__ventas_comercial_runtime_alignment.sql`
+- `135__ventas_comercial_integrity_rls.sql`
+- `136__ventas_comercial_validation_pack.sql`
+- `137__logistica_pedidos_runtime_alignment.sql`
+- `138__logistica_pedidos_integrity_rls.sql`
+- `139__logistica_pedidos_validation_pack.sql`
+- `140__fiscal_gre_sire_runtime_alignment.sql`
+- `141__fiscal_gre_sire_integrity_rls.sql`
+- `142__fiscal_gre_sire_validation_pack.sql`
+- `143__gre_legacy_alias_runtime_alignment.sql`
+- `144__gre_legacy_alias_integrity_rls.sql`
+- `145__gre_legacy_alias_validation_pack.sql`
+- `146__compras_operational_runtime_alignment.sql`
+- `147__compras_operational_integrity_rls.sql`
+- `148__compras_operational_validation_pack.sql`
+- `149__compras_cotizaciones_devoluciones_runtime_alignment.sql`
+- `150__compras_cotizaciones_devoluciones_integrity_rls.sql`
+- `151__compras_cotizaciones_devoluciones_validation_pack.sql`
+- `152__documentos_operational_runtime_alignment.sql`
+- `153__documentos_operational_integrity_rls.sql`
+- `154__documentos_operational_validation_pack.sql`
+- `155__cajas_operational_runtime_alignment.sql`
+- `156__cajas_operational_integrity_rls.sql`
+- `157__cajas_operational_validation_pack.sql`
+- `158__finanzas_cobros_egresos_runtime_alignment.sql`
+- `159__finanzas_cobros_egresos_integrity_rls.sql`
+- `160__finanzas_cobros_egresos_validation_pack.sql`
+- `161__ventas_historicas_runtime_alignment.sql`
+- `162__ventas_historicas_integrity_rls.sql`
+- `163__ventas_historicas_validation_pack.sql`
+- `164__rrhh_talento_runtime_alignment.sql`
+- `165__rrhh_talento_integrity_rls.sql`
+- `166__rrhh_talento_validation_pack.sql`
+- `167__rrhh_personal_operativo_runtime_alignment.sql`
+- `168__rrhh_personal_operativo_integrity_rls.sql`
+- `169__rrhh_personal_operativo_validation_pack.sql`
+- `170__empresa_config_wizard_runtime_alignment.sql`
+- `171__empresa_config_wizard_integrity_rls.sql`
+- `172__empresa_config_wizard_validation_pack.sql`
+- `173__fiscal_baja_resumen_runtime_alignment.sql`
+- `174__fiscal_baja_resumen_integrity_rls.sql`
+- `175__fiscal_baja_resumen_validation_pack.sql`
+- `176__pos_inventory_aux_runtime_alignment.sql`
+- `177__pos_inventory_aux_integrity_rls.sql`
+- `178__pos_inventory_aux_validation_pack.sql`
+- `179__contabilidad_activos_consignacion_runtime_alignment.sql`
+- `180__contabilidad_activos_consignacion_integrity_rls.sql`
+- `181__contabilidad_activos_consignacion_validation_pack.sql`
+- `182__contabilidad_plantillas_runtime_alignment.sql`
+- `183__contabilidad_plantillas_integrity_rls.sql`
+- `184__contabilidad_plantillas_validation_pack.sql`
+- `185__cajas_auditoria_supervisor_runtime_alignment.sql`
+- `186__cajas_auditoria_supervisor_integrity_rls.sql`
+- `187__cajas_auditoria_supervisor_validation_pack.sql`
+- `188__auditoria_legacy_runtime_alignment.sql`
+- `189__auditoria_legacy_integrity_rls.sql`
+- `190__auditoria_legacy_validation_pack.sql`
+- `191__rrhh_core_empleados_contratos_runtime_alignment.sql`
+- `192__rrhh_core_empleados_contratos_integrity_rls.sql`
+- `193__rrhh_core_empleados_contratos_validation_pack.sql`
+- `194__rrhh_asistencia_runtime_alignment.sql`
+- `195__rrhh_asistencia_integrity_rls.sql`
+- `196__rrhh_asistencia_validation_pack.sql`
+- `197__rrhh_estado_case_insensitive_runtime_alignment.sql`
+- `198__rrhh_estado_case_insensitive_integrity_rls.sql`
+- `199__rrhh_estado_case_insensitive_validation_pack.sql`
+- `200__rrhh_planillas_estado_case_insensitive_runtime_alignment.sql`
+- `201__rrhh_planillas_estado_case_insensitive_integrity_rls.sql`
+- `202__rrhh_planillas_estado_case_insensitive_validation_pack.sql`
+- `203__contabilidad_asientos_estado_case_insensitive_runtime_alignment.sql`
+- `204__contabilidad_asientos_estado_case_insensitive_integrity_rls.sql`
+- `205__contabilidad_asientos_estado_case_insensitive_validation_pack.sql`
+- `206__contabilidad_catalogos_estado_case_insensitive_runtime_alignment.sql`
+- `207__contabilidad_catalogos_estado_case_insensitive_integrity_rls.sql`
+- `208__contabilidad_catalogos_estado_case_insensitive_validation_pack.sql`
+- `209__finanzas_estado_case_insensitive_runtime_alignment.sql`
+- `210__finanzas_estado_case_insensitive_integrity_rls.sql`
+- `211__finanzas_estado_case_insensitive_validation_pack.sql`
+- `212__compras_estado_case_insensitive_runtime_alignment.sql`
+- `213__compras_estado_case_insensitive_integrity_rls.sql`
+- `214__compras_estado_case_insensitive_validation_pack.sql`
+- `215__ventas_comercial_estado_case_insensitive_runtime_alignment.sql`
+- `216__ventas_comercial_estado_case_insensitive_integrity_rls.sql`
+- `217__ventas_comercial_estado_case_insensitive_validation_pack.sql`
+- `218__cpe_estado_case_insensitive_runtime_alignment.sql`
+- `219__cpe_estado_case_insensitive_integrity_rls.sql`
+- `220__cpe_estado_case_insensitive_validation_pack.sql`
+- `221__gre_guias_estado_case_insensitive_runtime_alignment.sql`
+- `222__gre_guias_estado_case_insensitive_integrity_rls.sql`
+- `223__gre_guias_estado_case_insensitive_validation_pack.sql`
+- `224__documentos_estado_case_insensitive_runtime_alignment.sql`
+- `225__documentos_estado_case_insensitive_integrity_rls.sql`
+- `226__documentos_estado_case_insensitive_validation_pack.sql`
+- `227__sire_estado_case_insensitive_runtime_alignment.sql`
+- `228__sire_estado_case_insensitive_integrity_rls.sql`
+- `229__sire_estado_case_insensitive_validation_pack.sql`
+- `230__fiscal_baja_resumen_estado_case_insensitive_runtime_alignment.sql`
+- `231__fiscal_baja_resumen_estado_case_insensitive_integrity_rls.sql`
+- `232__fiscal_baja_resumen_estado_case_insensitive_validation_pack.sql`
+- `233__cajas_estado_case_insensitive_runtime_alignment.sql`
+- `234__cajas_estado_case_insensitive_integrity_rls.sql`
+- `235__cajas_estado_case_insensitive_validation_pack.sql`
+- `236__logistica_pedidos_estado_case_insensitive_runtime_alignment.sql`
+- `237__logistica_pedidos_estado_case_insensitive_integrity_rls.sql`
+- `238__logistica_pedidos_estado_case_insensitive_validation_pack.sql`
+- `239__contabilidad_activos_consignacion_estado_case_insensitive_runtime_alignment.sql`
+- `240__contabilidad_activos_consignacion_estado_case_insensitive_integrity_rls.sql`
+- `241__contabilidad_activos_consignacion_estado_case_insensitive_validation_pack.sql`
+- `242__contabilidad_plantillas_estado_case_insensitive_runtime_alignment.sql`
+- `243__contabilidad_plantillas_estado_case_insensitive_integrity_rls.sql`
+- `244__contabilidad_plantillas_estado_case_insensitive_validation_pack.sql`
+- `245__cajas_auditoria_supervisor_estado_case_insensitive_runtime_alignment.sql`
+- `246__cajas_auditoria_supervisor_estado_case_insensitive_integrity_rls.sql`
+- `247__cajas_auditoria_supervisor_estado_case_insensitive_validation_pack.sql`
+- `248__auditoria_legacy_estado_case_insensitive_runtime_alignment.sql`
+- `249__auditoria_legacy_estado_case_insensitive_integrity_rls.sql`
+- `250__auditoria_legacy_estado_case_insensitive_validation_pack.sql`
+- `251__rrhh_personal_operativo_estado_case_insensitive_runtime_alignment.sql`
+- `252__rrhh_personal_operativo_estado_case_insensitive_integrity_rls.sql`
+- `253__rrhh_personal_operativo_estado_case_insensitive_validation_pack.sql`
+- `254__rrhh_talento_estado_case_insensitive_runtime_alignment.sql`
+- `255__rrhh_talento_estado_case_insensitive_integrity_rls.sql`
+- `256__rrhh_talento_estado_case_insensitive_validation_pack.sql`
+- `257__rrhh_core_estado_case_insensitive_runtime_alignment.sql`
+- `258__rrhh_core_estado_case_insensitive_integrity_rls.sql`
+- `259__rrhh_core_estado_case_insensitive_validation_pack.sql`
+- `260__ventas_historicas_estado_case_insensitive_runtime_alignment.sql`
+- `261__ventas_historicas_estado_case_insensitive_integrity_rls.sql`
+- `262__ventas_historicas_estado_case_insensitive_validation_pack.sql`
+- `263__empresa_config_wizard_estado_case_insensitive_runtime_alignment.sql`
+- `264__empresa_config_wizard_estado_case_insensitive_integrity_rls.sql`
+- `265__empresa_config_wizard_estado_case_insensitive_validation_pack.sql`
+- `266__pos_inventory_aux_estado_case_insensitive_runtime_alignment.sql`
+- `267__pos_inventory_aux_estado_case_insensitive_integrity_rls.sql`
+- `268__pos_inventory_aux_estado_case_insensitive_validation_pack.sql`
+- `269__inventario_core_estado_case_insensitive_runtime_alignment.sql`
+- `270__inventario_core_estado_case_insensitive_integrity_rls.sql`
+- `271__inventario_core_estado_case_insensitive_validation_pack.sql`
+- `272__catalogos_fiscales_pago_estado_case_insensitive_runtime_alignment.sql`
+- `273__catalogos_fiscales_pago_estado_case_insensitive_integrity_rls.sql`
+- `274__catalogos_fiscales_pago_estado_case_insensitive_validation_pack.sql`
+- `275__identidad_usuarios_tenants_estado_case_insensitive_runtime_alignment.sql`
+- `276__identidad_usuarios_tenants_estado_case_insensitive_integrity_rls.sql`
+- `277__identidad_usuarios_tenants_estado_case_insensitive_validation_pack.sql`
+- `278__security_auth_rate_limit_estado_case_insensitive_runtime_alignment.sql`
+- `279__security_auth_rate_limit_estado_case_insensitive_integrity_rls.sql`
+- `280__security_auth_rate_limit_estado_case_insensitive_validation_pack.sql`
+- `281__fiscal_retenciones_proveedores_estado_case_insensitive_runtime_alignment.sql`
+- `282__fiscal_retenciones_proveedores_estado_case_insensitive_integrity_rls.sql`
+- `283__fiscal_retenciones_proveedores_estado_case_insensitive_validation_pack.sql`
+- `284__rma_estado_case_insensitive_runtime_alignment.sql`
+- `285__rma_estado_case_insensitive_integrity_rls.sql`
+- `286__rma_estado_case_insensitive_validation_pack.sql`
+- `287__security_secrets_estado_case_insensitive_runtime_alignment.sql`
+- `288__security_secrets_estado_case_insensitive_integrity_rls.sql`
+- `289__security_secrets_estado_case_insensitive_validation_pack.sql`
+- `290__demo_conversion_estado_case_insensitive_runtime_alignment.sql`
+- `291__demo_conversion_estado_case_insensitive_integrity_rls.sql`
+- `292__demo_conversion_estado_case_insensitive_validation_pack.sql`
+- `293__help_knowledge_base_estado_case_insensitive_runtime_alignment.sql`
+- `294__help_knowledge_base_estado_case_insensitive_integrity_rls.sql`
+- `295__help_knowledge_base_estado_case_insensitive_validation_pack.sql`
+- `296__rebuild_runtime_validation_orchestrator.sql`
+- `297__rebuild_runtime_validation_views.sql`
+- `298__rebuild_runtime_validation_pack.sql`
+- `299__rebuild_smoke_tests_module_suite.sql`
+- `300__rebuild_smoke_tests_module_views.sql`
+- `301__rebuild_smoke_tests_module_validation_pack.sql`
+
+## 3) Cobertura contra uso real del codigo
+
+Resultados del barrido (2026-02-13):
+- referencias `.from(...)` unicas (limpio): `163`
+- objetos SQL (tablas/vistas/materialized views): `221`
+- faltantes `.from(...)`: `1` (`pdf`, falso positivo por `Buffer.from('pdf')`, no tabla)
+- referencias `.rpc(...)` unicas (limpio): `47`
+- funciones `public.*` definidas: `47`
+- faltantes RPC: `0`
+
+Conclusión:
+- no hay faltantes reales de tablas/vistas consumidas por Supabase client en codigo activo
+- no hay faltantes reales de RPC usadas por codigo activo
+
+## 4) Cobertura de columnas (codigo vs esquema)
+
+Cruce de columnas usadas por codigo fuente (`apps/erp-api/src`, `apps/web`, `apps/worker/src`) contra columnas definidas en migraciones:
+- faltantes despues de `019`: `201`
+- faltantes despues de `020`: `19`
+- faltantes despues de `021`: `7` (todos falsos positivos de parser, no brechas reales de esquema)
+
+Artefactos:
+- `docs/rebuild_missing_columns_src_scan_precise_after_019.csv`
+- `docs/rebuild_missing_columns_src_scan_precise_after_020.csv`
+- `docs/rebuild_missing_columns_src_scan_precise_after_021.csv`
+- `docs/rebuild_missing_columns_select_scan_after_022.csv` (escaneo adicional de cadenas `from(...).select(...)`)
+
+Actualización `022`:
+- escaneo adicional `from(...).select(...)`: `50 -> 15` faltantes léxicos
+- los 15 remanentes son ruido del parser por joins/relaciones o código comentado/tests (`tenants.*`, `user_roles.nombre`, `users.rol`, etc.)
+- no se detectaron brechas críticas nuevas en runtime para módulos activos
+
+## 5) Colisiones/alias de nombres (tablas potencialmente duplicadas)
+
+Pares detectados por analisis lexico:
+- `asistencia` / `asistencias`
+- `usuarios_sistema` / `usuarios_sistemas`
+- `usuarios` / `usuarios_sistema`
+- `cpe` / `comprobantes_electronicos` (alias funcional detectado por uso runtime)
+- `pagos_empleados` / `rrhh_pagos`
+- `permisos` / `permissions`
+- `rol_permisos` / `role_permissions`
+- `compras` / `ordenes_compra`
+
+Interpretacion:
+- son pares legacy/compatibilidad; en `042`/`045`/`051`/`052`/`057`/`071`/`074`/`146` se activaron sincronizaciones para evitar divergencia mientras se consolida.
+- aliases de vista para compatibilidad de nombres legacy (`cpe_documentos`, `gre_documentos`, `orden_compra`) se incorporaron en `054`.
+- no confundir con tablas distintas por negocio (ej: `ventas` vs `ventas_pos`, `movimientos_inventario` vs `stock_movimientos`).
+
+## 6) Ajustes aplicados en 017..301
+
+- `017`: normalización de catálogo de países a id numérico (`paises.id bigint`) y promoción de `pais_id` relacionados.
+- `018`: alineación tenant/auth/permisos:
+  - `permisos.tenant_id` + índices únicos por tenant
+  - columnas reales de `auth_login_attempts`
+  - sync automático `empresa_config -> tenants`
+- `019`: alineación core runtime en:
+  - `empresa_config` (wizard/fiscal/logística)
+  - `integration_logs`, `cxc_pagos`, `cuentas_por_cobrar`, `cuentas_por_pagar`, `movimientos_bancarios`
+  - `notificaciones`, `outbox_events`, `comprobantes_electronicos`
+- `020`: alineación RRHH/seguridad/auditoría/logística (múltiples tablas críticas)
+- `021`: cierre de columnas residuales de compatibilidad (final touch)
+- `022`: cierre de brechas operativas reales:
+  - columnas runtime en `ventas`, `venta_detalles`, `pagos_ventas`, `request_logs`, `notificaciones`, `cpe`
+  - compatibilidad `usuarios_sistema` (`nombre/apellido` vs `nombres/apellidos`)
+  - endurecimiento de índices para `rate_limit_baselines` y consultas de auditoría
+- `023`: hardening de políticas RLS para catálogos mixtos (global + tenant):
+  - `metodos_pago`, `notificacion_tipo_roles`, `tipos_documentos_fiscales`, `tipos_impuestos`
+  - `configuracion_fiscal`, `tipos_cambio`, `plan_cuentas`, `plantillas_asientos_ventas`
+  - lectura de globales solo con contexto tenant válido; escritura solo sobre tenant actual (o superadmin)
+- `024`: seed mínimo operativo:
+  - `configuracion_fiscal` base para PE/CO/CL/MX
+  - `tipos_documentos_fiscales` y `tipos_impuestos` base por país
+  - `metodos_pago` globales iniciales
+- `025`: hardening de integridad para `upsert` y helpers RLS:
+  - `pedido_backorders`: columnas runtime + `ux_pedido_backorders_detalle_id`
+  - `producto_precios_sucursal`: columnas runtime + unique key para `onConflict(producto_id,sucursal_id,moneda)`
+  - `producto_stock_sucursal`: columnas runtime + unique key para `onConflict(producto_id,sucursal_id,almacen_id)` + trigger de sincronización `stock/stock_actual`
+  - `configuracion_caja`: unique key null-safe `(tenant_id,caja_id)` para evitar colisiones en configuración default
+  - reposición de funciones históricas: `add_tenant_id_if_missing`, `enable_rls_tenant_isolation`
+- `026`: enriquecimiento de `v_rls_status_empleado_relaciones`:
+  - diagnóstico por tabla `empleado_*` con `has_tenant_id`, `rls_enabled`, conteo de políticas y resumen de FKs
+  - base operativa para auditoría de aislamiento en relaciones RRHH
+- `027`: alineación de flujo planillas RRHH:
+  - columnas canónicas UUID en `empleado_planilla`/`empleado_planilla_conceptos` con sync de aliases legacy (`id_*`)
+  - FKs efectivas y únicos para evitar duplicidad de detalle de planilla
+  - normalización numérica en `pagos_empleados` y `rrhh_pagos` + índices de consulta
+- `028`: integridad tenant + hardening RLS planillas:
+  - triggers de consistencia tenant en `empleado_planilla`, `empleado_planilla_conceptos`, `pagos_empleados`, `rrhh_pagos`, `historial_pagos_planilla`
+  - re-aplicación explícita de políticas RLS en tablas RRHH críticas
+- `029`: pack de validación operativa de planillas:
+  - `v_planillas_integridad`
+  - `validar_flujo_planillas`, `validar_flujo_planillas_final`
+  - `v_planillas_validacion_actual`
+- `030`: hardening tenant/performance en finanzas:
+  - tenant_id y FK a tenants reforzados en tablas financieras core
+  - backfill de tenant_id por relaciones (`clientes/proveedores/cuentas_bancarias/cuentas_por_cobrar`)
+  - índices por patrones runtime de CxC/CxP/bancos/conciliación
+  - vista `v_tenant_id_status_finanzas` enriquecida con estado RLS/políticas
+- `031`: alineación de esquema para inventario/POS:
+  - columnas faltantes en `productos` para POS (`codigo_barras`, precios alternos, flags de servicio/stock, etc.)
+  - aliases de documento en `proveedores` (`documento_tipo/documento_numero`)
+  - columnas runtime en `recepcion_items` (`ubicacion_id`, `lote`, `serie`, `fecha_expiracion`, `moneda`) y `recepciones.gre_proveedor`
+  - FKs/índices de soporte para consultas de recepciones y catálogo POS
+- `032`: reemplazo de vistas operativas de runtime:
+  - `vista_pos_productos` con shape completo consumido por frontend POS
+  - `vw_inventario_recepciones` con agregados de ítems/costos por recepción
+  - `vw_kardex_valorizado` con columnas requeridas por Inventario y Accounting Books
+- `033`: alineación fiscal/reporting:
+  - `vw_cpe_documentos_auditoria` con `estado_integridad` y trazabilidad CPE↔documentos
+  - `v_kpis_sunat_multitenant` por periodo con métricas `aceptados/observados/rechazados/pendientes/total`
+- `034`: hardening de performance + validación estructural:
+  - índices dirigidos a filtros reales de POS, inventario y fiscal
+  - función `validar_vistas_operacionales_core` + vista `v_vistas_operacionales_core_status`
+    para verificar columnas esperadas en vistas críticas
+- `035`: alineación fuerte de materialized views contables:
+  - `mv_balance_comprobacion` rediseñada con columnas runtime (`tenant_id/anio/mes/cuenta/nombre_cuenta/saldo_inicial/debe/haber/saldo_final`)
+  - `mv_estado_resultados` con columnas consumidas por servicios (`ventas`, `otros_ingresos`, `costo_ventas`, `gastos_*`, `resultado_ejercicio`)
+  - `mv_balance_general` con rubros esperados por API (`efectivo`, `cuentas_por_cobrar`, `inventarios`, pasivos y patrimonio por categoría)
+  - índices únicos y de búsqueda por tenant/período/cuenta
+- `036`: hardening de RPC de refresh contable:
+  - validación estricta de período (`anio/mes`)
+  - lock advisory transaccional para evitar refresh concurrente conflictivo
+  - `v_contabilidad_materialized_views_status` para observabilidad de población/tamaño/última generación
+- `037`: pack de validación operativa para materialized views contables:
+  - función `validar_materialized_views_contabilidad(...)`
+  - vista `v_contabilidad_materialized_views_validacion_actual` con estado para tenant/período actual
+- `038`: performance de tablas base para refresh contable:
+  - índices compuestos en `asientos_contables`, `detalle_asientos`, `plan_cuentas`
+  - refuerzo FK en `detalle_asientos` (`asiento_id`, `cuenta_id`) para joins de contabilidad
+- `039`: alineación de RPC financieras al contrato runtime:
+  - `get_resumen_financiero_mensual` ahora retorna serie mensual tabular (`periodo`, `ventas`, `gastos`, `utilidad`, `margen_porcentaje`)
+  - `get_kpis_financieros` ahora retorna KPIs tabulares consumidos por backend (`efectivo_disponible`, `ventas_30_dias`, `gastos_30_dias`, `utilidad_30_dias`, `cuentas_por_*`, `valor_inventario`, `margen_bruto`)
+  - `get_analisis_crecimiento` ahora retorna tendencia y métricas de crecimiento en formato tabular
+  - helper `app.resolve_request_tenant_id` para resolver tenant por contexto interno/header/JWT en RPC sin parámetros
+- `040`: alineación RPC de estadísticas de asientos:
+  - `get_asientos_por_tipo` retorna `tipo` y `cantidad` (más totales) como espera el controlador
+  - clasificación preferente por `outbox_events.event_type` con fallback a `tipo_asiento`
+  - índices de soporte en `asientos_contables` por `tenant_id/tipo_asiento` y `source_event_id`
+- `041`: pack de validación de RPC financieras:
+  - función `validar_rpc_finanzas_runtime(...)`
+  - vista `v_finanzas_rpc_status_actual` para verificación rápida de contratos RPC en tenant actual
+- `042`: sincronización canónico/legacy en movimientos de stock:
+  - trigger `stock_movimientos -> movimientos_stock` para mantener consistencia en nombres históricos
+  - backfill inicial para reconstrucción (upsert por `id`) desde `stock_movimientos` hacia `movimientos_stock`
+- `043`: índices de performance para dashboard:
+  - índices por tenant/fecha/estado en `ventas_pos`, `ordenes_compra`, `cotizaciones`, `cpe`, `gre`, `sire_files`
+  - índices por tenant/created_at para `usuarios_sistema`, `movimientos_stock`, `stock_movimientos`
+- `044`: pack de validación runtime de dashboard:
+  - función `validar_dashboard_runtime(...)`
+  - vistas `v_dashboard_runtime_status_actual` y `v_dashboard_stock_sync_gap`
+  - chequeo explícito de trigger de sync y cobertura de registros `stock_movimientos` vs `movimientos_stock`
+- `045`: sincronización bidireccional de asistencia RRHH:
+  - triggers `asistencia -> asistencias` y `asistencias -> asistencia`
+  - índices únicos por `(tenant_id, empleado, fecha)` para idempotencia diaria
+  - backfill bidireccional inicial entre ambas tablas
+- `046`: capa de lectura unificada para asistencia:
+  - vista `v_asistencia_unificada` con resolución de duplicados por prioridad de fuente
+  - función `get_asistencia_unificada(...)` para consumo parametrizado por tenant y rango de fechas
+- `047`: pack de validación de consistencia RRHH-asistencia:
+  - función `validar_rrhh_asistencia_consistencia(...)`
+  - vista `v_rrhh_asistencia_validacion_actual`
+  - chequeos de conteos, gaps cruzados y duplicados entre `asistencia` y `asistencias`
+- `048`: RPC de actividad reciente del dashboard:
+  - función `get_dashboard_recent_activity(...)` (con y sin parámetros)
+  - consolidación multifuente (ventas/compras/cotizaciones/CPE/GRE) filtrada por tenant y período
+- `049`: RPC de snapshot de métricas dashboard:
+  - función `get_dashboard_metrics_snapshot(...)` (con y sin parámetros)
+  - agrega métricas de ventas, compras, CPE/GRE/SIRE, usuarios, stock bajo y movimientos del día
+- `050`: pack de validación de RPC dashboard:
+  - función `validar_dashboard_rpc_runtime(...)`
+  - vista `v_dashboard_rpc_status_actual`
+- `051`: alineación y sincronización CPE/legacy comprobantes:
+  - columnas faltantes para anulación y notas de crédito en `cpe`/`comprobantes_electronicos`
+  - triggers bidireccionales `cpe <-> comprobantes_electronicos`
+  - backfill inicial en ambos sentidos para cerrar gaps históricos
+- `052`: sincronización de usuarios legacy:
+  - ampliación de columnas operativas en `usuarios_sistemas`
+  - trigger de espejo `usuarios_sistema -> usuarios_sistemas`
+  - backfill inicial para mantener contexto en consultas heredadas
+- `053`: pack de validación de aliases legacy:
+  - función `validar_aliases_legacy_runtime(...)`
+  - vista `v_aliases_legacy_status_actual`
+  - chequeos de triggers, columnas y gaps de sincronización en `cpe/comprobantes` y `usuarios_*`
+- `054`: compatibilidad de nombres para BackgroundJobs:
+  - vistas `cpe_documentos`, `gre_documentos`, `orden_compra` como aliases sobre tablas canónicas
+  - evita fallas por nombres legacy en consolidación de métricas automáticas
+- `055`: alineación runtime de pagos POS:
+  - columnas operativas en `ventas_pos_pagos` (`venta_pos_id`, `metodo_pago_id`, `moneda`, etc.)
+  - FK a `ventas_pos` y trigger de consistencia tenant
+  - índices para reportes de cierre de caja por método de pago
+- `056`: compatibilidad para reportes contables:
+  - enriquecimiento de `compras`/`activos_fijos` con columnas usadas por `AccountingReportsService`
+  - tabla legacy `detalle_planillas` con sync automático desde `empleado_planilla`
+  - validación `validar_accounting_reports_runtime(...)` + vista `v_accounting_reports_runtime_status_actual`
+- `057`: compatibilidad legacy en seguridad/permisos:
+  - `permisos.codigo` normalizado para contratos tipo `modulo.accion` (ej: `compras.aprobar`)
+  - tabla `permissions` sincronizada bidireccionalmente con `permisos`
+  - tabla `role_permissions` sincronizada bidireccionalmente con `rol_permisos`
+  - cobertura para nested selects legacy `user_roles.roles.role_permissions.permissions.codigo`
+- `058`: consistencia de estado de tenants:
+  - trigger de normalización `trg_normalize_tenants_estado_activo`
+  - backfill de filas inconsistentes entre `estado` y `activo`
+  - constraints validadas para coherencia + vista `v_tenants_estado_activo`
+- `059`: pack de validación de runtime permisos/tenants:
+  - función `validar_permissions_tenants_runtime(...)`
+  - vista `v_permissions_tenants_runtime_status_actual`
+  - chequeos de existencia de triggers, gaps de sync y consistencia `tenants.estado/activo`
+- `060`: hardening de permisos `EXECUTE` en funciones sensibles:
+  - helper `app.revoke_execute_if_exists(...)` + `app.grant_execute_if_exists(...)`
+  - revocación de ejecución a `PUBLIC/anon/authenticated`
+  - grants explícitos a `service_role/postgres/supabase_admin` (si existen)
+- `061`: hardening de `search_path` en funciones sensibles:
+  - helper `app.set_function_search_path_if_exists(...)`
+  - `search_path` explícito en funciones de contexto tenant, locks/outbox y wrappers de infraestructura
+- `062`: inventario forense de funciones `SECURITY DEFINER`:
+  - vista `v_security_definer_inventory`
+  - vista `v_security_definer_risk_summary`
+  - clasificación por nivel de riesgo (`CRITICAL/WARN/OK`)
+- `063`: backfill automático de `search_path` en funciones `SECURITY DEFINER`:
+  - aplica `ALTER FUNCTION ... SET search_path = pg_catalog, public, app, pg_temp`
+  - sólo sobre funciones de `public/app` sin `search_path` configurado
+- `064`: pack de validación de hardening de funciones:
+  - función `validar_security_functions_runtime(...)`
+  - vista `v_security_functions_runtime_status_actual`
+  - chequeos de existencia, grants/revokes, `search_path` esperado y riesgo global de `SECURITY DEFINER`
+- `065`: hardening de políticas RLS en catálogos global+tenant:
+  - ajuste de `roles_tenant_or_global`, `permisos_tenant_select`, `permissions_tenant_select`, `role_permissions_tenant_select`
+  - filas globales (`tenant_id IS NULL`) visibles solo con `app.current_tenant_id()` no nulo (o superadmin)
+- `066`: reaplicación automática de RLS para tablas `public` con `tenant_id`:
+  - habilita/forcea RLS donde falte
+  - aplica `app.apply_tenant_policy` solo en tablas sin políticas
+  - vistas de auditoría `v_rls_tenant_tables_audit` y `v_rls_tenant_tables_audit_summary`
+- `067`: pack de validación de seguridad RLS:
+  - función `validar_rls_security_runtime(...)`
+  - vista `v_rls_security_runtime_status_actual`
+  - chequeos de cobertura RLS en tablas core y guard de contexto para filas globales
+- `068`: hardening de integridad tenant en `user_roles`:
+  - backfill de `tenant_id` desde `roles`/`usuarios_sistema`
+  - trigger `trg_enforce_tenant_user_roles` para impedir asignaciones cross-tenant
+  - índices de soporte por `tenant_id`
+- `069`: hardening de integridad tenant en relaciones rol-permiso:
+  - trigger `trg_enforce_tenant_rol_permisos` en `rol_permisos`
+  - trigger `trg_enforce_tenant_role_permissions` en `role_permissions` (legacy)
+  - backfill de `role_permissions.tenant_id` desde `roles`/`permissions`
+- `070`: pack de validación RBAC multi-tenant:
+  - función `validar_rbac_tenant_integrity_runtime(...)`
+  - vista `v_rbac_tenant_integrity_status_actual`
+  - chequeos de triggers, gaps cross-tenant en `user_roles/rol_permisos/role_permissions` y sync `permisos/permissions`
+- `071`: sincronización bidireccional de alias de usuarios:
+  - triggers `usuarios_sistema -> usuarios` y `usuarios -> usuarios_sistema` con guard de recursividad
+  - backfill inicial controlado en ambos sentidos
+- `072`: normalización y constraints de usuarios:
+  - trigger común de normalización (`email`, `nombre`, `apellido`, `estado`, `activo`)
+  - checks de consistencia `estado/activo` en `usuarios` y `usuarios_sistema`
+- `073`: pack de validación runtime de alias de usuarios:
+  - función `validar_usuarios_alias_runtime(...)`
+  - vista `v_usuarios_alias_runtime_status_actual`
+  - chequeos de triggers, gaps de sync y mismatches de campos
+- `074`: hardening de pagos RRHH canónico/alias:
+  - sincronización bidireccional `pagos_empleados <-> rrhh_pagos` con triggers
+  - normalización de pagos (`estado/periodo/metodo/montos`) y backfill inicial
+  - compatibilidad de runtime para `usuario_id='sistema'` en ambas tablas
+- `075`: integridad de pagos RRHH:
+  - dedupe por llave lógica (`tenant_id`, `planilla_id`, `empleado_id`)
+  - constraints de formato/estado/montos/fecha_pago y refuerzo de índices
+- `076`: pack de validación de pagos RRHH:
+  - función `validar_rrhh_pagos_runtime(...)`
+  - vista `v_rrhh_pagos_runtime_status_actual`
+  - chequeos de triggers, gaps entre canónico/alias, duplicados y mismatches
+- `077`: hardening de autenticación/sesiones:
+  - normalización de `auth_login_attempts` y `user_sessions` con triggers dedicados
+  - compatibilidad de tipo para `auth_login_attempts.ip_address` (texto en runtime)
+  - consistencia tenant en `user_sessions` respecto a `usuarios_sistema`
+- `078`: integridad de auth/sesiones:
+  - dedupe por `session_token` en `user_sessions`
+  - constraints de calidad para sesión/login attempts e índices de consulta reales
+  - helpers operativos `revoke_user_session(...)` y `cleanup_expired_user_sessions(...)`
+- `079`: pack de validación auth/sesiones:
+  - función `validar_auth_sessions_runtime(...)`
+  - vista `v_auth_sessions_runtime_status_actual`
+  - chequeos de triggers, tokens duplicados, sesiones expiradas activas y calidad de intentos de login
+- `080`: alineación runtime de configuración de usuario por país:
+  - columnas operativas en `usuario_configuracion` (`pais_preferido_id`, `idioma`, `zona_horaria`)
+  - normalización de datos y consistencia tenant/usuario por trigger
+  - sincronía entre `pais_id` y `pais_preferido_id` para compatibilidad de API
+- `081`: integridad y hardening RLS de `usuario_configuracion`:
+  - FKs canónicas hacia `usuarios_sistema` y `paises` (vía `pais_id`)
+  - constraints de formato/consistencia (`estado`, `idioma`, `zona_horaria`, país)
+  - reaplicación explícita de política tenant en tabla de preferencias
+- `082`: pack de validación runtime de `usuario_configuracion`:
+  - función `validar_usuario_configuracion_runtime(...)`
+  - vista `v_usuario_configuracion_runtime_status_actual`
+  - chequeos de trigger, FKs, mismatches tenant/usuario y calidad de preferencias
+- `083`: alineación runtime de catálogos fiscales:
+  - columnas operativas faltantes en `configuracion_fiscal` (`tasa_igv`, `moneda_principal`, `retencion_iva_porcentaje`, etc.)
+  - aliases de `paises` para compatibilidad UI (`codigo_fiscal`, `moneda_principal`, `zona_horaria`)
+  - trigger de normalización de tasas/impuestos/estado en `configuracion_fiscal`
+- `084`: integridad y dedupe de catálogos fiscales:
+  - FKs canónicas de `configuracion_fiscal`, `tipos_documentos_fiscales`, `tipos_impuestos` hacia `paises`
+  - constraints de rangos/estado/calidad para tasas y códigos
+  - unicidad activa por país en `configuracion_fiscal` para prevenir ambigüedad en lecturas `.single()`
+- `085`: pack de validación runtime de catálogos fiscales:
+  - función `validar_fiscal_catalog_runtime(...)`
+  - vista `v_fiscal_catalog_runtime_status_actual`
+  - chequeos de trigger, columnas runtime, duplicados activos, FKs y rangos de tasas
+- `086`: alineación runtime de retenciones:
+  - columnas operativas faltantes en `configuracion_retenciones` (`tasa_porcentaje`, `monto_minimo`, `descripcion`, `activo`)
+  - trigger de normalización (`trg_normalize_configuracion_retenciones_row`) para categoría/tasa/estado
+  - seed mínimo por tenant para categorías `CUARTA` y `QUINTA`
+- `087`: integridad de retenciones:
+  - constraints de calidad (categoría válida, rangos de tasa y monto mínimo, estado válido)
+  - dedupe de filas activas por `tenant+categoria`
+  - unicidad activa por `tenant+categoria` para soportar consultas `.single()`
+- `088`: pack de validación runtime de retenciones:
+  - función `validar_retenciones_runtime(...)`
+  - vista `v_retenciones_runtime_status_actual`
+  - chequeos de trigger, columnas requeridas, duplicados y cobertura `CUARTA/QUINTA` por tenant
+- `089`: alineación de contrato UI fiscal:
+  - columnas UI en `configuracion_fiscal` (`requiere_registro_*`, `permite_multiples_monedas`, `requiere_autorizacion_sunat`, `url_webservice`)
+  - metadatos de validación en `tipos_documentos_fiscales` (`longitud_minima`, `longitud_maxima`, `patron_validacion`)
+  - alias de tasa/retención en `tipos_impuestos` (`tasa_porcentaje`, `es_retencion`)
+- `090`: integridad de contrato UI fiscal:
+  - triggers de normalización en `tipos_documentos_fiscales` y `tipos_impuestos`
+  - hardening de nullabilidad para flags UI en `configuracion_fiscal`
+  - constraints de longitudes/patrones y sincronía de tasas (`porcentaje` vs `tasa_porcentaje`)
+- `091`: pack de validación de contrato UI fiscal:
+  - función `validar_fiscal_ui_contract_runtime(...)`
+  - vista `v_fiscal_ui_contract_runtime_status_actual`
+  - chequeos de triggers, columnas UI, rangos y sincronía de tasa fiscal
+- `092`: alineación runtime retenciones/proveedores:
+  - normalización documental de `proveedores` (`tipo_documento`/`numero_documento` y aliases `documento_*`)
+  - normalización de `proveedores_cuarta_categoria` y `libro_retenciones` (montos, categoría, estado, timestamps)
+  - índices de soporte para consultas por tenant/categoría/fecha y búsqueda de proveedores
+- `093`: integridad retenciones/proveedores:
+  - FKs explícitas `libro_retenciones.proveedor_id -> proveedores.id` y `proveedores_cuarta_categoria.proveedor_id -> proveedores.id`
+  - triggers de consistencia tenant contra proveedor padre en tablas de retenciones
+  - dedupe + unicidad activa (`proveedores` por `tenant+ruc`, cuarta categoría por `tenant+proveedor`) y unicidad de correlativo en libro
+  - constraints de calidad de montos/categorías/estados y reaplicación de RLS tenant
+- `094`: pack de validación runtime retenciones/proveedores:
+  - función `validar_retenciones_proveedores_runtime(...)`
+  - vista `v_retenciones_proveedores_runtime_status_actual`
+  - chequeos de triggers/FKs/índices únicos, consistencia tenant y duplicados operativos
+- `095`: alineación runtime de seguridad/rate limiting:
+  - columnas faltantes usadas por `AdaptiveRateLimitService` en `trusted_ips` y `rate_limit_blocks` (`description`, `reason`, etc.)
+  - shape forense en `rate_limit_anomalies` y contrato de configuración en `rate_limit_configs`
+  - triggers de normalización por tabla + seed global mínimo de endpoint configs + índices runtime
+- `096`: integridad de seguridad/rate limiting:
+  - backfill de calidad + dedupe para `trusted_ips` y `rate_limit_configs`
+  - constraints de rangos/formato en baselines, logs, bloques, anomalías y configs
+  - unicidad por alcance global/tenant y hardening RLS (tenant-scoped + global/tenant para catálogos de seguridad)
+- `097`: pack de validación runtime security/rate limiting:
+  - función `validar_security_rate_limit_runtime(...)`
+  - vista `v_security_rate_limit_runtime_status_actual`
+  - chequeos de triggers, columnas runtime, índices únicos, rangos y duplicados operativos
+- `098`: alineación runtime del flujo RMA:
+  - columnas faltantes en `rma_solicitudes` (`numero`), `rma_items` (`motivo_item`, `lote`, `fecha_expiracion`) y `rma_eventos` (`usuario_id`)
+  - triggers de normalización para solicitudes/items/eventos y backfill de datos operativos
+  - índices runtime para listados por tenant/estado, relaciones por `rma_id` y búsqueda de detalle
+- `099`: integridad del flujo RMA:
+  - FKs para embeds PostgREST (`rma_items.rma_id` y `rma_eventos.rma_id` hacia `rma_solicitudes`)
+  - constraints de calidad de estado/tipo/cantidades + dedupe de número por tenant
+  - trigger de consistencia tenant en relaciones RMA y hardening RLS explícito
+- `100`: pack de validación runtime del flujo RMA:
+  - función `validar_rma_runtime(...)`
+  - vista `v_rma_runtime_status_actual`
+  - chequeos de triggers, columnas, FKs, huérfanos, mismatches tenant y duplicados operativos
+- `101`: alineación runtime de secretos/alertas/PII:
+  - columnas operativas en `secret_rotation_state`, `system_alerts` y `pii_encryption_log`
+  - triggers de normalización por tabla y backfill idempotente de datos
+  - índices runtime + actualización de `v_secrets_rotation_status` al shape operativo
+- `102`: integridad + hardening RLS de secretos/alertas/PII:
+  - constraints de calidad (secret key/hash, severidad de alertas, acciones PII, timelines)
+  - FKs opcionales a `usuarios_sistema` en alertas/PII
+  - unicidad por scope (`secret_rotation_state`, `system_alerts`) y reaplicación de políticas RLS explícitas
+- `103`: pack de validación runtime de secretos/alertas/PII:
+  - función `validar_security_secrets_runtime(...)`
+  - vista `v_security_secrets_runtime_status_actual`
+  - chequeos de triggers/columnas/índices únicos/RLS, filas inválidas y duplicados operativos
+- `104`: alineación runtime de conversiones demo:
+  - columnas operativas faltantes en `demo_conversiones_pendientes` (`monto`, `moneda`, `checkout_provider`, `failed_at`, `failure_reason`, `processing_attempts`)
+  - trigger de normalización para `email/ruc/plan/periodo/estado` y backfill idempotente
+  - índices runtime para lookup de webhook por `stripe_session_id` y monitoreo por tenant/estado
+- `105`: integridad y seguridad de conversiones demo:
+  - dedupe de pendientes por `stripe_session_id` y por tenant para evitar doble procesamiento
+  - constraints de negocio (`plan_id`, `periodo`, `estado`, `monto`, forma de `email/ruc`, timelines)
+  - hardening RLS explícito con política `superadmin-only` por sensibilidad de `password_hash`
+- `106`: pack de validación runtime de conversiones demo:
+  - función `validar_demo_conversion_runtime(...)`
+  - vista `v_demo_conversion_runtime_status_actual`
+  - chequeos de trigger, columnas, índices únicos, RLS y duplicados/filas inválidas
+- `107`: alineación runtime del módulo de ayuda:
+  - columnas operativas en `knowledge_base` (`idioma`, `usage_count`, `last_used_at`)
+  - trigger de normalización `trg_normalize_knowledge_base_row` + backfill idempotente
+  - actualización de RPC `buscar_ayuda` y `obtener_sugerencias_ayuda` con filtro tenant/global y ordenación por relevancia/uso
+- `108`: integridad + hardening RLS de ayuda:
+  - normalización defensiva + dedupe de preguntas activas por `scope+categoria+rol+pregunta`
+  - constraints de calidad (`pregunta/respuesta`, `idioma`, `orden`, `usage_count`, `url_modulo`, `pasos`)
+  - RLS explícito en `knowledge_base` con políticas `knowledge_base_tenant_or_global_select` y `knowledge_base_tenant_write`
+- `109`: pack de validación runtime de ayuda:
+  - función `validar_help_knowledge_base_runtime(...)`
+  - vista `v_help_knowledge_base_runtime_status_actual`
+  - chequeos de trigger/columnas/índices/RLS/RPC, filas inválidas y duplicados activos
+- `110`: alineación runtime de numeración POS/tickets:
+  - `ventas_pos`: `numero_ticket` a `text`, `impuestos` a `numeric`, `ultimo_intento_facturacion` a `timestamptz`
+  - columnas operativas (`serie`, `correlativo`, `idempotency_key`, `cliente_id`, `usuario_id`) + backfill de formato `SERIE-XXXXXXXX`
+  - `pos_numeracion` operativo (`serie`, `tipo_documento`, `correlativo_actual/maximo`, `caja_id`, `activo`) y RPC `obtener_siguiente_numero_pos(...)`
+  - actualización de `pos_registrar_venta_tx` para emitir ticket consistente por correlativo POS
+- `111`: integridad + hardening RLS de numeración POS:
+  - trigger `trg_normalize_ventas_pos_ticket_row` para normalizar ticket en escritura
+  - dedupe de scopes activos en `pos_numeracion` + constraints de calidad en `pos_numeracion`/`ventas_pos`
+  - trigger `trg_enforce_pos_numeracion_tenant_consistency` para coherencia tenant-caja
+  - RLS reaplicado en `pos_numeracion` con `tenant_isolation`
+- `112`: pack de validación runtime de numeración POS:
+  - función `validar_pos_ticket_numeracion_runtime(...)`
+  - vista `v_pos_ticket_numeracion_runtime_status_actual`
+  - chequeos de tipos/columnas, triggers, RPC, índice de unicidad por scope activo, RLS y consistencia de tickets
+- `113`: alineación runtime de numeración fiscal:
+  - `documento_series`: columnas operativas (`longitud_correlativo`, `reiniciar_por_periodo`, `periodo_actual`) + trigger `trg_normalize_documento_series_row`
+  - índices runtime por scope y tipo de documento
+  - RPC `obtener_siguiente_numero_serie(...)` reforzada con lock por fila, guard de máximo y padding configurable
+  - wrapper `obtener_siguiente_numero_documento(...)` alineado
+- `114`: integridad + hardening RLS de numeración fiscal:
+  - dedupe de filas activas por `tenant+tipo_documento+serie`
+  - constraints de calidad (forma de serie, correlativos, longitud, tenant requerido cuando activo)
+  - unicidad operativa case-insensitive de series activas (`ux_documento_series_scope_active_upper`)
+  - reaplicación explícita de `tenant_isolation` en `documento_series`
+- `115`: pack de validación runtime de numeración fiscal:
+  - función `validar_documento_series_numeracion_runtime(...)`
+  - vista `v_documento_series_numeracion_runtime_status_actual`
+  - chequeos de trigger/columnas/índices/RLS/RPC, filas inválidas y duplicados de scope activo
+- `116`: alineación runtime de tablas auxiliares críticas:
+  - `fe_configuracion` (columnas FE mínimas + trigger de normalización)
+  - `asientos_contables_rrhh` (planilla/cuenta/descr./debe/haber + índice por tenant/fecha)
+  - `feriados` (normalización país/fecha + columnas operativas para jobs)
+  - `profiles` (user_id/email/full_name + trigger de normalización)
+- `117`: integridad + hardening RLS de tablas auxiliares críticas:
+  - dedupe operativo en `fe_configuracion` y `feriados`
+  - constraints de calidad para `fe_configuracion`, `asientos_contables_rrhh`, `feriados`, `profiles`
+  - índices únicos operativos (`ux_fe_configuracion_tenant_active`, `ux_feriados_scope_pais_fecha_active`, `ux_profiles_tenant_user`)
+  - reaplicación explícita de `tenant_isolation` en las cuatro tablas
+- `118`: pack de validación runtime de tablas auxiliares críticas:
+  - función `validar_core_aux_tables_runtime(...)`
+  - vista `v_core_aux_tables_runtime_status_actual`
+  - chequeos de triggers/columnas/índices/RLS, filas inválidas y duplicados operativos
+- `119`: alineación runtime de observabilidad:
+  - trigger `trg_normalize_integration_logs_row` + índices por `tenant/timestamp`, `servicio/operacion`, `status`
+  - trigger `trg_normalize_notificaciones_row` + índices por `tenant/tipo`, `tenant/severidad`, `tenant/usuario/leída` + GIN en `roles_destinatarios`
+  - trigger `trg_normalize_audit_log_row` + índices por `tenant/tabla/timestamp` y `tenant/usuario/timestamp`
+- `120`: integridad + hardening RLS de observabilidad:
+  - backfill defensivo de calidad en `integration_logs`, `notificaciones`, `audit_log`
+  - constraints de calidad para estado/severidad/operaciones/timestamps/rangos
+  - reaplicación explícita de `tenant_isolation` en `integration_logs`, `notificaciones`, `audit_log`
+- `121`: pack de validación runtime de observabilidad:
+  - función `validar_observabilidad_runtime(...)`
+  - vista `v_observabilidad_runtime_status_actual`
+  - chequeos de triggers/columnas/índices/RLS y filas inválidas por tabla
+- `122`: alineación runtime de contabilidad presupuestal:
+  - `periodos_contables`: normalización de `anio/mes/estado/cierre`, generación de `codigo/nombre` e índices por tenant/período
+  - `centros_costo`: normalización de `codigo/nombre/descripcion/activo/estado` e índices por tenant/código
+  - `presupuestos`: columnas financieras runtime (`monto_*`, `porcentaje_ejecutado`, `created_by/updated_by`), cálculo automático de disponible/porcentaje e índices por tenant/scope
+- `123`: integridad + hardening RLS de contabilidad presupuestal:
+  - FKs de `presupuestos` a `centros_costo`, `plan_cuentas`, `periodos_contables` y usuarios
+  - trigger `trg_enforce_presupuestos_tenant_consistency` para evitar cruces de tenant en referencias
+  - constraints de negocio (estados, rangos, fórmulas financieras) + unicidades operativas por scope
+  - reaplicación explícita de `tenant_isolation` en `periodos_contables`, `centros_costo`, `presupuestos`
+- `124`: pack de validación runtime de contabilidad presupuestal:
+  - función `validar_contabilidad_presupuestal_runtime(...)`
+  - vista `v_contabilidad_presupuestal_runtime_status_actual`
+  - chequeos de triggers/columnas/índices/RLS, duplicados por scope y filas inválidas de reglas contables
+- `125`: alineación runtime de tesorería bancaria:
+  - normalización y tipado fuerte de `cuentas_bancarias`, `movimientos_bancarios`, `conciliaciones_bancarias`
+  - triggers de normalización + backfill defensivo e índices por patrones de consulta
+- `126`: integridad + hardening RLS de tesorería bancaria:
+  - FKs con nombres operativos para embeds PostgREST (`movimientos_bancarios_*_fkey`)
+  - dedupe por scope (`tenant+numero_cuenta`, `tenant+cuenta+periodo`) con remapeo de referencias
+  - triggers `trg_enforce_movimientos_bancarios_tenant_consistency` y `trg_enforce_conciliaciones_bancarias_tenant_consistency`
+  - constraints de negocio (tipos, montos, conciliación, período, cierre) + unicidades operativas + reaplicación de RLS
+- `127`: pack de validación runtime de tesorería bancaria:
+  - función `validar_tesoreria_bancaria_runtime(...)`
+  - vista `v_tesoreria_bancaria_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant por relaciones
+- `128`: alineación runtime de cobros/lotes:
+  - `cxc_pagos`: normalización de tipos/montos/fechas/retenciones/idempotencia y trigger `trg_normalize_cxc_pagos_row`
+  - `pagos_lote`: normalización de referencia/método/estado/json y trigger `trg_normalize_pagos_lote_row`
+  - índices runtime para filtros de cobros por cuenta/tipo/fecha y lotes por cuenta/fecha/estado
+- `129`: integridad + hardening RLS de cobros/lotes:
+  - FKs operativas para embeds PostgREST (`cxc_pagos_cuenta_id_fkey`, `cxc_pagos_cuenta_bancaria_id_fkey`, etc.)
+  - dedupe por `referencia`/`idempotency_key`/`event_id` en `cxc_pagos` y por `referencia_lote` en `pagos_lote`
+  - triggers `trg_enforce_cxc_pagos_tenant_consistency` y `trg_enforce_pagos_lote_tenant_consistency`
+  - constraints de negocio (montos, retención, estados, json shape) + reaplicación explícita de `tenant_isolation`
+- `130`: pack de validación runtime de cobros/lotes:
+  - función `validar_cxc_pagos_lotes_runtime(...)`
+  - vista `v_cxc_pagos_lotes_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados operativos y mismatches tenant por relaciones
+- `131`: alineación runtime de CxC/CxP:
+  - normalización y tipado fuerte en `cuentas_por_cobrar` y `cuentas_por_pagar`
+  - triggers `trg_normalize_cuentas_por_cobrar_row` y `trg_normalize_cuentas_por_pagar_row`
+  - índices runtime para filtros reales por tenant/estado/vencimiento/documento/proveedor/referencia
+- `132`: integridad + hardening RLS de CxC/CxP:
+  - FKs con nombres operativos para embeds PostgREST (`cuentas_por_cobrar_*_fkey`, `cuentas_por_pagar_*_fkey`)
+  - dedupe por scope (`documento`, `idempotency`, `event_id`, `proveedor+numero_documento`, `referencia`)
+  - triggers `trg_enforce_cuentas_por_cobrar_tenant_consistency` y `trg_enforce_cuentas_por_pagar_tenant_consistency`
+  - constraints de negocio + unicidades operativas + reaplicación explícita de `tenant_isolation`
+- `133`: pack de validación runtime de CxC/CxP:
+  - función `validar_cxc_cxp_runtime(...)`
+  - vista `v_cxc_cxp_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados operativos, filas inválidas y mismatches tenant por relaciones
+- `134`: alineación runtime de ventas comercial:
+  - normalización fuerte y tipado en `cotizaciones`, `cotizacion_detalles`, `pedidos_venta`, `pedidos_venta_detalle`
+  - triggers `trg_normalize_*` para estados, montos, numeración y sincronía de fechas/campos legacy (`observaciones/notas`)
+  - índices runtime por `tenant+estado+fecha`, `tenant+numero` y relaciones de detalle
+- `135`: integridad + hardening RLS de ventas comercial:
+  - FKs operativas para embeds PostgREST (`cotizaciones_*_fkey`, `pedidos_venta_*_fkey`, `*_detalle_*_fkey`)
+  - dedupe por scope (`tenant+numero`) y ordenamiento canónico de `cotizacion_detalles.orden`
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `136`: pack de validación runtime de ventas comercial:
+  - función `validar_ventas_comercial_runtime(...)`
+  - vista `v_ventas_comercial_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant en relaciones
+- `137`: alineación runtime de logística de pedidos:
+  - normalización y tipado fuerte en `logistica_eventos`, `pedido_backorders`, `pedido_despachos`, `pedido_gres`
+  - triggers `trg_normalize_*` para estados/tipos/cantidades/fechas y compatibilidad `notas`/`observaciones`
+  - índices runtime para timeline logístico, backorders priorizados y trazabilidad pedido↔GRE
+- `138`: integridad + hardening RLS de logística de pedidos:
+  - backfill de `tenant_id` por relaciones parent (`pedidos_venta`, `pedidos_venta_detalle`, `gre_guias`)
+  - FKs operativas para embeds PostgREST (`pedido_despachos_*_fkey`, `pedido_gres_*_fkey`, `logistica_eventos_pedido_id_fkey`)
+  - dedupe por scope en `pedido_gres`, constraints de negocio y triggers `trg_enforce_*_tenant_consistency`
+- `139`: pack de validación runtime de logística de pedidos:
+  - función `validar_logistica_pedidos_runtime(...)`
+  - vista `v_logistica_pedidos_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados operativos, filas inválidas y mismatches tenant por relaciones
+- `140`: alineación runtime de fiscal GRE/SIRE:
+  - normalización y tipado fuerte en `gre_guias`, `gre_detalles`, `sire_files`, `sire_registros_detalle`
+  - compatibilidad explícita de contratos `estado/periodo` (API) vs `status/period` (worker)
+  - triggers `trg_normalize_*` y índices runtime para consultas de guías, reintentos y reportes SIRE
+- `141`: integridad + hardening RLS de fiscal GRE/SIRE:
+  - backfill de `tenant_id` por relaciones (`cpe`, `gre_guias`, `sire_files`)
+  - FKs operativas para embeds PostgREST y dedupe por scopes (`idempotency`, `serie+correlativo`, `tenant+periodo+tipo`, `tenant+cpe_id`)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación de `tenant_isolation`
+- `142`: pack de validación runtime de fiscal GRE/SIRE:
+  - función `validar_fiscal_gre_sire_runtime(...)`
+  - vista `v_fiscal_gre_sire_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y gaps de sincronización de aliases
+- `143`: alineación runtime de alias legacy GRE:
+  - expansión de shape en `public.gre` para contrato runtime (`numero/serie/correlativo`, `sunat_status`, `retry_count`, `idempotency_key`, etc.)
+  - funciones de mapeo de estados entre `gre_guias` y `gre`
+  - sync bidireccional `gre_guias -> gre` y `gre -> gre_guias` con triggers + backfill inicial
+- `144`: integridad + hardening RLS de alias legacy GRE:
+  - backfill de consistencia tenant/cpe entre alias y canónico
+  - FKs operativas (`gre_tenant_id_fkey`, `gre_cpe_relacionado_fkey`)
+  - dedupe por scope (`tenant+numero`, `tenant+idempotency_key`), constraints de negocio y trigger `trg_enforce_gre_tenant_consistency`
+  - reaplicación explícita de `tenant_isolation` para `gre` y `gre_guias`
+- `145`: pack de validación runtime de alias legacy GRE:
+  - función `validar_gre_legacy_alias_runtime(...)`
+  - vista `v_gre_legacy_alias_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y gaps/mismatches de sincronización `gre <-> gre_guias`
+- `146`: alineación runtime de compras operativo + alias legacy:
+  - shape runtime en `ordenes_compra` (números/fechas/montos/estado/metadata/items + columnas operativas de flujo)
+  - `orden_compra_detalles.cantidad_pendiente` y normalización de tipos para detalle
+  - `recepciones.numero` textual para patrón `REC-*` y tipado UUID en usuarios
+  - sync bidireccional `ordenes_compra <-> compras` con mapeo de estados (`ENTREGADA`/`RECIBIDA`)
+- `147`: integridad + hardening RLS de compras operativo:
+  - backfill tenant/proveedor en tablas hijas (`orden_compra_detalles`, `recepciones`, `recepcion_items`, `compras`)
+  - FKs runtime para joins/embeds y triggers `trg_enforce_*_tenant_consistency`
+  - dedupe por scope y unicidades operativas (`ux_ordenes_compra_tenant_numero_runtime`, `ux_compras_tenant_numero_documento_runtime`)
+  - constraints de negocio de estados/montos/cantidades + reaplicación explícita de `tenant_isolation`
+- `148`: pack de validación runtime de compras operativo:
+  - función `validar_compras_operational_runtime(...)`
+  - vista `v_compras_operational_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, null-tenant en tablas hijas y mismatch/gap de sync `compras <-> ordenes_compra`
+- `149`: alineación runtime de cotizaciones/devoluciones de compras:
+  - normalización y tipado fuerte en `cotizaciones_compra`, `cotizacion_compra_detalles`, `oc_aprobaciones`, `devoluciones_proveedor`, `devolucion_items`
+  - compatibilidad explícita para `oc_aprobaciones.aprobador_id` textual (UUID o `SYSTEM`)
+  - triggers `trg_normalize_*` e índices runtime por tenant/estado/proveedor/orden/devolución
+- `150`: integridad + hardening RLS de cotizaciones/devoluciones de compras:
+  - backfill de `tenant_id` por relaciones parent y FKs operativas para embeds PostgREST
+  - dedupe por scope en numeración (`cotizaciones_compra`, `devoluciones_proveedor`) + constraints de negocio
+  - triggers `trg_enforce_*_tenant_consistency` en las cinco tablas y reaplicación explícita de `tenant_isolation`
+- `151`: pack de validación runtime de cotizaciones/devoluciones de compras:
+  - función `validar_compras_cotizaciones_devoluciones_runtime(...)`
+  - vista `v_compras_cotizaciones_devoluciones_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant por relaciones
+- `152`: alineación runtime de documentos operativos:
+  - normalización y tipado fuerte en `documentos`, `documento_detalles`, `documento_auditoria` y `documento_archivos`
+  - triggers `trg_normalize_*` para contratos API/CPE/CxC (tipos de documento, estados, numeración, montos y adjuntos)
+  - índices runtime para filtros por tenant/estado/fecha y trazabilidad por documento
+- `153`: integridad + hardening RLS de documentos operativos:
+  - backfill de `tenant_id` por relaciones parent (`pedidos_venta`, `clientes`, `cotizaciones`, `cpe`)
+  - FKs operativas para embeds PostgREST + dedupe de numeración fiscal por scope tenant/tipo/serie/número
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `154`: pack de validación runtime de documentos operativos:
+  - función `validar_documentos_operational_runtime(...)`
+  - vista `v_documentos_operational_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant por relaciones
+- `155`: alineación runtime de cajas operativo:
+  - normalización y tipado fuerte en `cajas`, `sesiones_caja`, `movimientos_caja`, `retiros_caja`, `cambios_turno`, `cortes_caja`, `autorizaciones_caja`
+  - triggers `trg_normalize_*` para estados/montos/fechas y shape operacional de auditoría de caja
+  - índices runtime para filtros por tenant/estado/caja/sesión/secuencia/supervisor
+- `156`: integridad + hardening RLS de cajas operativo:
+  - backfill de `tenant_id` por relaciones parent (`cajas` <-> `sesiones_caja` y tablas hijas)
+  - FKs operativas para embeds PostgREST + dedupe de scopes críticos (sesión abierta, secuencia, autorizaciones pendientes)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `157`: pack de validación runtime de cajas operativo:
+  - función `validar_cajas_operational_runtime(...)`
+  - vista `v_cajas_operational_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant por relaciones
+- `158`: alineación runtime de finanzas cobros/egresos:
+  - normalización y tipado fuerte en `gastos`, `egresos`, `cobranzas`, `gestiones_cobranza`, `pagos_facturas`
+  - triggers `trg_normalize_*` para estados/montos/fechas, normalización documental y llaves idempotentes
+  - índices runtime por tenant/fecha/estado y claves operativas de evento
+- `159`: integridad + hardening RLS de finanzas cobros/egresos:
+  - backfill de `tenant_id` por relaciones parent (`cuentas_por_*`, `proveedores`, `clientes`, `documentos`, `cuentas_bancarias`)
+  - FKs runtime para embeds PostgREST, dedupe por `referencia/idempotency/event_id` y unicidades operativas por scope
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `160`: pack de validación runtime de finanzas cobros/egresos:
+  - función `validar_finanzas_cobros_egresos_runtime(...)`
+  - vista `v_finanzas_cobros_egresos_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant por relaciones
+- `161`: alineación runtime de ventas históricas:
+  - normalización y tipado fuerte en `ventas`, `venta_detalles`, `pagos_ventas`
+  - triggers `trg_normalize_*` para estados/montos/fechas, metadatos legacy e idempotencia
+  - índices runtime por tenant/estado/fecha/documento y trazabilidad por venta
+- `162`: integridad + hardening RLS de ventas históricas:
+  - backfill de `tenant_id` por relaciones parent (`clientes`, `sucursales`, `usuarios_sistema`, `cuentas_por_cobrar`, `ventas`)
+  - FKs operativas para embeds PostgREST, dedupe por scope (`tenant+numero_documento`, `tenant+referencia`, `tenant+idempotency`)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `163`: pack de validación runtime de ventas históricas:
+  - función `validar_ventas_historicas_runtime(...)`
+  - vista `v_ventas_historicas_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant por relaciones
+- `164`: alineación runtime de RRHH talento:
+  - normalización y tipado fuerte en `vacantes`, `candidatos`, `solicitudes`, `evaluaciones`
+  - triggers `trg_normalize_*` para estados/rangos/fechas, compatibilidad de aliases y contratos de UI
+  - índices runtime por tenant/estado/fecha y relaciones de proceso de selección
+- `165`: integridad + hardening RLS de RRHH talento:
+  - backfill tenant por relaciones parent y FKs operativas para embeds
+  - dedupe por scope operativo (vacantes/candidatos/solicitudes/evaluaciones)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `166`: pack de validación runtime de RRHH talento:
+  - función `validar_rrhh_talento_runtime(...)`
+  - vista `v_rrhh_talento_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados, filas inválidas, huérfanos y mismatches tenant
+- `167`: alineación runtime de RRHH personal operativo:
+  - normalización y tipado fuerte en `beneficios`, `capacitaciones`, `horarios_trabajo`, `empleado_*`, `expediente_documentos`, `liquidaciones`, `historial_pagos_planilla`
+  - triggers `trg_normalize_*` por tabla, backfill defensivo y helper `app.to_time_or_null(...)`
+  - índices runtime para consultas por tenant/estado/fecha/relaciones de empleado
+- `168`: integridad + hardening RLS de RRHH personal operativo:
+  - backfill tenant por relaciones parent, FKs operativas para embeds y dedupe por scopes críticos
+  - triggers `trg_enforce_*_tenant_consistency` en relaciones RRHH operativo
+  - constraints de negocio + unicidades operativas y reaplicación explícita de `tenant_isolation`
+- `169`: pack de validación runtime de RRHH personal operativo:
+  - función `validar_rrhh_personal_operativo_runtime(...)`
+  - vista `v_rrhh_personal_operativo_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant
+- `170`: alineación runtime de configuracion central (`empresa_config` + `wizard_progress`):
+  - columnas faltantes usadas por API/Web/Worker (`ultima_validacion`, `fecha_validacion_certificado`, `errores_configuracion`, parametros de facturacion legacy y aliases `nombre/moneda`)
+  - backfill de `pais_id/pais/moneda_defecto` desde `paises` y normalizacion defensiva de estado/plan/porcentajes/fechas
+  - triggers `trg_normalize_empresa_config_row` y `trg_normalize_wizard_progress_row` + indices runtime de consulta
+- `171`: integridad + hardening RLS de configuracion central:
+  - FK runtime `empresa_config.pais_id -> paises.id` y backfill fuerte para `pais/moneda`
+  - constraints de calidad de datos en `empresa_config` (estado, pais/moneda, rangos financieros, fechas, reglas demo)
+  - constraints de flujo en `wizard_progress` (rangos de pasos, array valido, json object, coherencia completado/completado_at)
+  - reaplicacion explicita de `tenant_isolation` en `empresa_config` y `wizard_progress`
+- `172`: pack de validación runtime de configuracion central:
+  - función `validar_empresa_config_wizard_runtime(...)`
+  - vista `v_empresa_config_wizard_runtime_status_actual`
+  - chequeos de triggers/columnas/constraints/indices/RLS, filas invalidas, mismatches pais-moneda, duplicados operativos y orfandad wizard
+- `173`: alineación runtime de flujo SUNAT RA/RC:
+  - normalización y tipado fuerte en `comunicaciones_baja`, `detalle_comunicacion_baja`, `resumenes_diarios`, `detalle_resumen_diario`, `validaciones_sunat`
+  - triggers `trg_normalize_*` para contratos de servicio CPE (estados, numeración RA/RC, totales y payloads)
+  - índices runtime por tenant/estado/fecha/ticket y relaciones detalle->CPE
+- `174`: integridad + hardening RLS de flujo SUNAT RA/RC:
+  - backfill tenant por relaciones parent (`comunicaciones_baja`/`resumenes_diarios`/`cpe`/`documentos`) y FKs operativas para embeds
+  - triggers `trg_enforce_*_tenant_consistency` en `detalle_*` y `validaciones_sunat`
+  - constraints de negocio (estados, patrones RA/RC, totales, reglas de fecha) + dedupe por scope y reaplicación explícita de `tenant_isolation`
+- `175`: pack de validación runtime de flujo SUNAT RA/RC:
+  - función `validar_fiscal_baja_resumen_runtime(...)`
+  - vista `v_fiscal_baja_resumen_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/constraints/RLS, duplicados por scope, huérfanos y mismatches tenant
+- `176`: alineación runtime de POS + inventario auxiliar:
+  - normalización y tipado fuerte en `configuracion_caja`, `detalle_ventas_pos`, `producto_existencias`, `eventos_pos`
+  - triggers `trg_normalize_*` por tabla con defaults operativos para montos/estados/metadata
+  - índices runtime para consultas operativas de caja, detalle POS, stock por almacén y auditoría POS por riesgo/sesión
+- `177`: integridad + hardening RLS de POS + inventario auxiliar:
+  - backfill de `tenant_id` por relaciones parent (`cajas`, `ventas_pos`, `productos`, `almacenes`, `sesiones_caja`, `usuarios_sistema`)
+  - FKs runtime para embeds/joins, dedupe por scope (`configuracion_caja`, `detalle_ventas_pos`, `producto_existencias`)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `178`: pack de validación runtime de POS + inventario auxiliar:
+  - función `validar_pos_inventory_aux_runtime(...)`
+  - vista `v_pos_inventory_aux_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/constraints/RLS, duplicados por scope, filas inválidas y mismatches tenant/huérfanos
+- `179`: alineación runtime de contabilidad activos/consignación:
+  - normalización y tipado fuerte en `activos_fijos`, `depreciaciones`, `registro_consignaciones`, `movimientos_consignacion`
+  - expansión de shape operativo en `inventarios_permanentes`, `asignacion_costos`, `calendario_empresa`, `saldos_iniciales_cuentas`
+  - helper `app.normalize_periodo_yyyy_mm(...)` para coherencia de períodos
+- `180`: integridad + hardening RLS de contabilidad activos/consignación:
+  - backfill `tenant_id` por relaciones parent y FKs runtime para joins/embeds
+  - dedupe por scope operativo (activos, depreciaciones, consignaciones, inventarios)
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `181`: pack de validación runtime de contabilidad activos/consignación:
+  - función `validar_contabilidad_activos_consignacion_runtime(...)`
+  - vista `v_contabilidad_activos_consignacion_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant/huérfanos
+- `182`: alineación runtime de plantillas contables:
+  - normalización y tipado fuerte en `plantillas_asientos`, `plantillas_asientos_detalle`, `plantillas_asientos_historial`, `plantillas_asientos_ventas`
+  - triggers `trg_normalize_*` por tabla con defaults operativos para estados, códigos, periodos y cuentas contables
+  - seed mínimo global de `plantillas_asientos_ventas` para `PE` y tipos `01/03/07/08`
+- `183`: integridad + hardening RLS de plantillas contables:
+  - backfill tenant/pais por relaciones parent y FKs runtime para joins/embeds (`plantilla_id`, `asiento_id`, `usuario_id`, `pais_id`)
+  - dedupe por scope operativo (código de plantilla, orden de detalle y plantilla activa por `pais+tipo_documento`)
+  - triggers `trg_enforce_*_tenant_consistency` y hardening de scope global para activas en `plantillas_asientos_ventas`
+- `184`: pack de validación runtime de plantillas contables:
+  - función `validar_contabilidad_plantillas_runtime(...)`
+  - vista `v_contabilidad_plantillas_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant en relaciones
+- `185`: alineación runtime de auditoría de cajas y supervisor PIN:
+  - normalización y tipado fuerte en `caja_audit_log` y `supervisor_pins`
+  - triggers `trg_normalize_*` para eventos de auditoría, niveles de riesgo y ciclo de vida de PINs
+  - índices runtime para consultas por `tenant/evento/usuario/sesión` y bloqueo de PIN
+- `186`: integridad + hardening RLS de auditoría de cajas y supervisor PIN:
+  - backfill de `tenant_id` por relaciones parent (`sesiones_caja`, `usuarios_sistema`)
+  - FKs runtime para joins/embeds y dedupe de PIN activo por `tenant+usuario`
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `187`: pack de validación runtime de auditoría de cajas y supervisor PIN:
+  - función `validar_cajas_auditoria_supervisor_runtime(...)`
+  - vista `v_cajas_auditoria_supervisor_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant
+- `188`: alineación runtime de auditoría legacy:
+  - normalización y tipado fuerte en `audit_log_archive`, `auditoria`, `auditoria_cotizaciones`
+  - triggers `trg_normalize_*` para operaciones/criticidad/timestamps y payloads de auditoría
+  - índices runtime para consultas por `tenant/tabla/acción/fecha` y trazabilidad de cotizaciones
+- `189`: integridad + hardening RLS de auditoría legacy:
+  - backfill de `tenant_id` por relaciones parent (`usuarios_sistema`, `cotizaciones`)
+  - FKs runtime para joins/embeds y dedupe conservador de `audit_log_archive` por scope temporal
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `190`: pack de validación runtime de auditoría legacy:
+  - función `validar_auditoria_legacy_runtime(...)`
+  - vista `v_auditoria_legacy_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas y mismatches tenant
+- `191`: alineación runtime de RRHH core:
+  - normalización y tipado fuerte en `departamentos`, `empleados`, `contratos`
+  - triggers `trg_normalize_*` para contratos reales de API/UI (documento, estado, fechas, salario y aliases `id_*`)
+  - índices runtime por tenant/estado/documento y consultas de contratos por empleado
+- `192`: integridad + hardening RLS de RRHH core:
+  - backfill tenant por relaciones parent y sincronización fuerte de aliases (`id_departamento/departamento_id`, `id_empleado/empleado_id`)
+  - FKs runtime no ambiguas para embeds (`empleados -> departamentos`, `contratos -> empleados`)
+  - dedupe por scope, triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `193`: pack de validación runtime de RRHH core:
+  - función `validar_rrhh_core_empleados_contratos_runtime(...)`
+  - vista `v_rrhh_core_empleados_contratos_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos y mismatches tenant
+- `194`: alineación runtime de asistencia RRHH (canónico + legacy):
+  - expansión y tipado fuerte de `asistencia` y `asistencias` con aliases (`id_empleado`/`empleado_id`) y campos operativos (`tardanza_minutos`, `turno`, `origen`, `marcado_por`)
+  - helpers `app.normalize_asistencia_estado(...)` y `app.calc_horas_trabajadas(...)` para normalización de estado y cálculo consistente de horas
+  - triggers `trg_normalize_*` + sincronización bidireccional reforzada con backfill entre ambas tablas
+- `195`: integridad + hardening RLS de asistencia RRHH:
+  - backfill de tenant por relación con `empleados` y FKs runtime no ambiguas (`asistencia -> empleados`, `asistencias -> empleados`)
+  - dedupe por scope operativo y unicidad por `tenant+empleado+fecha`
+  - triggers `trg_enforce_*_tenant_consistency`, constraints de negocio y reaplicación explícita de `tenant_isolation`
+- `196`: pack de validación runtime de asistencia RRHH:
+  - función `validar_rrhh_asistencia_runtime(...)`
+  - vista `v_rrhh_asistencia_runtime_status_actual`
+  - chequeos de triggers/columnas/FKs/índices/RLS, duplicados por scope, filas inválidas, huérfanos, mismatch tenant y gaps/mismatch de sync `asistencia <-> asistencias`
+- `197`: alineación runtime de estados RRHH case-insensitive:
+  - adopción de `citext` en `empleados.estado`, `asistencia.estado` y `asistencias.estado` para tolerar filtros `ACTIVO/activo` y `AUSENTE/ausente`
+  - normalización defensiva de valores y defaults de estado en tablas RRHH críticas de asistencia
+  - índices runtime `*_estado_ci_runtime` para mantener rendimiento en filtros de estado
+- `198`: integridad + hardening RLS de contrato case-insensitive RRHH:
+  - constraints reforzadas con `lower(estado::text)` para reglas de estados permitidos y consistencia `empleados.estado/activo`
+  - `SET NOT NULL` en `estado` de `empleados`, `asistencia` y `asistencias`
+  - reaplicación explícita de `tenant_isolation` en tablas afectadas
+- `199`: pack de validación runtime de estados RRHH case-insensitive:
+  - función `validar_rrhh_estado_case_insensitive_runtime(...)`
+  - vista `v_rrhh_estado_case_insensitive_runtime_status_actual`
+  - chequeos de extensión `citext`, tipado de columnas, constraints/índices/RLS y contrato de filtros equivalentes por mayúsculas/minúsculas
+- `200`: alineación runtime de estados de planillas para compatibilidad contable:
+  - helpers `app.normalize_planilla_estado(...)` y `app.normalize_planilla_estado_pago(...)` para canonizar estados de flujo RRHH
+  - adopción de `citext` en `planillas.estado`, `planillas.estado_pago` y `detalle_planillas.estado` para tolerar filtros `PAGADA/pagada` y `PAGADO/pagado`
+  - trigger `trg_normalize_planillas_estado_row` + sync legacy `empleado_planilla -> detalle_planillas` con estado normalizado
+- `201`: integridad + hardening RLS del contrato de planillas:
+  - constraints de dominio en `planillas` (`estado`, `estado_pago`) y consistencia entre ambos estados
+  - trigger `trg_enforce_tenant_detalle_planillas` para asegurar tenant consistente entre `detalle_planillas`, `planillas` y `empleados`
+  - reaplicación explícita de `tenant_isolation` en `planillas`, `empleado_planilla`, `detalle_planillas`, `pagos_empleados`, `rrhh_pagos`
+- `202`: pack de validación runtime de estados de planillas:
+  - función `validar_rrhh_planillas_estado_case_insensitive_runtime(...)`
+  - vista `v_rrhh_planillas_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, constraints/triggers/índices/RLS, contrato case-insensitive y gap de sync `empleado_planilla -> detalle_planillas`
+- `203`: alineación runtime de estados en asientos contables:
+  - helper `app.normalize_asientos_contables_estado(...)` para canonizar estados (`BORRADOR/CONFIRMADO/ANULADO`)
+  - adopción de `citext` en `asientos_contables.estado` para filtros case-insensitive en reportes/libros
+  - trigger `trg_normalize_asientos_contables_row` e índice `idx_asientos_contables_tenant_estado_ci_runtime_203`
+- `204`: integridad + hardening RLS de asientos contables:
+  - constraints de dominio/montos/cuadre para `asientos_contables`
+  - trigger `trg_enforce_detalle_asientos_tenant_consistency_203` para coherencia tenant en `detalle_asientos`
+  - reaplicación explícita de `tenant_isolation` en `asientos_contables`, `detalle_asientos`, `asientos_contables_rrhh`
+- `205`: pack de validación runtime de asientos contables:
+  - función `validar_contabilidad_asientos_estado_runtime(...)`
+  - vista `v_contabilidad_asientos_estado_runtime_status_actual`
+  - chequeos de `citext`, functions/triggers/constraints/índices/RLS, contrato case-insensitive y consistencia tenant en detalle
+- `206`: alineación runtime de catálogos contables case-insensitive:
+  - adopción de `citext` en `estado` de `periodos_contables`, `centros_costo`, `presupuestos` y `plan_cuentas`
+  - normalizadores de estado por dominio + trigger `trg_normalize_plan_cuentas_estado_row_206`
+  - alineación de `plan_cuentas` para runtime de API (`acepta_movimiento` boolean, alias `tipo_cuenta` y `cuenta_padre_id`)
+- `207`: integridad + hardening RLS de catálogos contables case-insensitive:
+  - constraints de dominio usando `lower(estado::text)` y consistencia `estado/activo`
+  - trigger `trg_enforce_plan_cuentas_tenant_consistency_206` para jerarquía de cuentas por tenant
+  - reaplicación explícita de `tenant_isolation` en `periodos_contables`, `centros_costo`, `presupuestos` y `plan_cuentas`
+- `208`: pack de validación runtime de catálogos contables case-insensitive:
+  - función `validar_contabilidad_catalogos_estado_case_insensitive_runtime(...)`
+  - vista `v_contabilidad_catalogos_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, tipos/aliases de `plan_cuentas`, constraints/triggers/índices/RLS, contrato case-insensitive e integridad de jerarquía tenant
+- `209`: alineación runtime de estados financieros case-insensitive:
+  - adopción de `citext` en `cuentas_por_cobrar.estado`, `cuentas_por_pagar.estado`, `cuentas_por_pagar.estado_comparacion` y `conciliaciones_bancarias.estado`
+  - helpers de normalización (`app.normalize_cxc_estado_209`, `app.normalize_cxp_estado_209`, `app.normalize_cxp_estado_comparacion_209`, `app.normalize_conciliacion_estado_209`)
+  - índices runtime por `tenant+estado` para CxC/CxP/conciliaciones
+- `210`: integridad + hardening RLS de estados financieros case-insensitive:
+  - constraints de dominio/consistencia reescritas con `lower(estado::text)` en CxC/CxP/conciliaciones
+  - endurecimiento de consistencia de saldo según estado (`PAGADA/CANCELADO/ANULADA/...`)
+  - reaplicación explícita de `tenant_isolation` en `cuentas_por_cobrar`, `cuentas_por_pagar`, `conciliaciones_bancarias`
+- `211`: pack de validación runtime de estados financieros case-insensitive:
+  - función `validar_finanzas_estado_case_insensitive_runtime(...)`
+  - vista `v_finanzas_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/índices/constraints/RLS, contrato case-insensitive y filas inválidas por dominio
+- `212`: alineación runtime case-insensitive de estados en Compras:
+  - adopción de `citext` en `ordenes_compra.estado`, `recepciones.estado`, `compras.estado`, `cotizaciones_compra.estado`, `oc_aprobaciones.estado` y `devoluciones_proveedor.estado`
+  - helpers de normalización por tabla (`app.normalize_*_estado_212`) para canonizar estados y compatibilizar filtros por case en API
+  - triggers de normalización de fila en órdenes/recepciones e índices runtime por `tenant+estado` para consultas de compras
+- `213`: integridad + hardening RLS de estados case-insensitive en Compras:
+  - constraints de dominio reescritas con `lower(estado::text)` y validación explícita en `ordenes_compra/recepciones/compras/cotizaciones_compra/oc_aprobaciones/devoluciones_proveedor`
+  - índice parcial pending de `oc_aprobaciones` reforzado con predicado case-insensitive (`lower(estado::text)='pendiente'`)
+  - reaplicación explícita de `tenant_isolation` en tablas críticas del vertical Compras
+- `214`: pack de validación runtime de estados case-insensitive en Compras:
+  - función `validar_compras_estado_case_insensitive_runtime(...)`
+  - vista `v_compras_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `215`: alineación runtime case-insensitive de estados en Ventas comercial:
+  - adopción de `citext` en `cotizaciones.estado`, `pedidos_venta.estado` y `pedidos_venta_detalle.estado_item`
+  - helpers de normalización (`app.normalize_cotizaciones_estado_215`, `app.normalize_pedidos_venta_estado_215`, `app.normalize_pedidos_venta_detalle_estado_item_215`)
+  - backfill defensivo de estados e índices runtime por `tenant+estado` y `tenant+estado_item`
+- `216`: integridad + hardening RLS de estados case-insensitive en Ventas comercial:
+  - constraints de dominio reescritas con `lower(...::text)` para `cotizaciones`, `pedidos_venta` y `pedidos_venta_detalle`
+  - consistencia de `pedidos_venta` (`estado='pendiente_aprobacion'` requiere `requiere_aprobacion=true`) en forma case-insensitive
+  - `NOT NULL` contractual en columnas de estado y reaplicación explícita de `tenant_isolation`
+- `217`: pack de validación runtime de estados case-insensitive en Ventas comercial:
+  - función `validar_ventas_comercial_estado_case_insensitive_runtime(...)`
+  - vista `v_ventas_comercial_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `218`: alineación runtime case-insensitive de estados en CPE:
+  - adopción de `citext` en `cpe.estado`, `cpe.sunat_status`, `cpe.estado_sunat`
+  - helpers de normalización (`app.normalize_cpe_estado_218`, `app.normalize_cpe_sunat_status_218`, `app.map_cpe_estado_sunat_218`)
+  - trigger `trg_normalize_cpe_row_218`, backfill defensivo e índices runtime por `tenant+estado` y `tenant+sunat_status`
+- `219`: integridad + hardening RLS de estados en CPE:
+  - constraints de dominio case-insensitive para `estado` y `sunat_status`
+  - constraint de consistencia `estado/sunat_status` para flujo fiscal (`ACEPTADO->ACCEPTED`, `RECHAZADO->REJECTED|ERROR`, etc.)
+  - `NOT NULL` contractual en `estado` y `sunat_status` + reaplicación explícita de `tenant_isolation` en `cpe`/`comprobantes_electronicos`
+- `220`: pack de validación runtime de estados en CPE:
+  - función `validar_cpe_estado_case_insensitive_runtime(...)`
+  - vista `v_cpe_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/trigger/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio/consistencia
+- `221`: alineación runtime case-insensitive de estados en GRE canónica:
+  - adopción de `citext` en `gre_guias.estado` y `gre_guias.sunat_status`
+  - helpers de normalización (`app.normalize_gre_guias_estado_221`, `app.normalize_gre_guias_sunat_status_221`)
+  - backfill defensivo e índices runtime por `tenant+estado` / `tenant+sunat_status`
+- `222`: integridad + hardening RLS de estados en GRE canónica:
+  - constraints de dominio case-insensitive para `estado` y `sunat_status`
+  - constraint de consistencia `estado/sunat_status` para flujo GRE
+  - `NOT NULL` contractual y refuerzo de índice de cola de reintentos con predicado CI (`lower(estado::text) IN ('rechazado','error')`)
+- `223`: pack de validación runtime de estados en GRE canónica:
+  - función `validar_gre_guias_estado_case_insensitive_runtime(...)`
+  - vista `v_gre_guias_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio/consistencia
+- `224`: alineación runtime case-insensitive de estados en documentos:
+  - adopción de `citext` en `documentos.estado` y `documento_archivos.estado`
+  - helpers de normalización (`app.normalize_documentos_estado_224`, `app.normalize_documento_archivos_estado_224`)
+  - backfill defensivo e índices runtime por `tenant+estado`
+- `225`: integridad + hardening RLS de estados en documentos:
+  - constraints de dominio reescritas en forma case-insensitive para `documentos` y `documento_archivos`
+  - `NOT NULL` contractual en estados y reaplicación explícita de `tenant_isolation` para tablas del vertical documentos
+- `226`: pack de validación runtime de estados en documentos:
+  - función `validar_documentos_estado_case_insensitive_runtime(...)`
+  - vista `v_documentos_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `227`: alineación runtime case-insensitive de estados en SIRE:
+  - adopción de `citext` en `sire_files.estado`, `sire_files.status` y `sire_registros_detalle.estado`
+  - helpers de normalización (`app.normalize_sire_files_estado_227`, `app.map_sire_files_status_227`, `app.normalize_sire_registros_detalle_estado_227`)
+  - backfill defensivo e índices runtime por `tenant+estado` y `tenant+status`
+- `228`: integridad + hardening RLS de estados en SIRE:
+  - constraints de dominio case-insensitive para `sire_files.estado`, `sire_files.status` y `sire_registros_detalle.estado`
+  - constraint de consistencia `estado/status` para el alias operativo de `sire_files`
+  - `NOT NULL` contractual en estados y reaplicación explícita de `tenant_isolation` en `sire_files` y `sire_registros_detalle`
+- `229`: pack de validación runtime de estados en SIRE:
+  - función `validar_sire_estado_case_insensitive_runtime(...)`
+  - vista `v_sire_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio/consistencia
+- `230`: alineación runtime case-insensitive de estados en fiscal RA/RC:
+  - adopción de `citext` en `comunicaciones_baja.estado`, `resumenes_diarios.estado`, `detalle_comunicacion_baja.estado`, `detalle_resumen_diario.estado`, `validaciones_sunat.estado`
+  - helpers de normalización (`app.normalize_fiscal_baja_estado_230`, `app.normalize_fiscal_baja_detalle_estado_230`, `app.normalize_validaciones_sunat_estado_230`)
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `231`: integridad + hardening RLS de estados en fiscal RA/RC:
+  - constraints de dominio de estado reescritas en forma case-insensitive para las 5 tablas del flujo
+  - `NOT NULL` contractual en columnas `estado`
+  - reaplicación explícita de `tenant_isolation` en `comunicaciones_baja`, `detalle_comunicacion_baja`, `resumenes_diarios`, `detalle_resumen_diario`, `validaciones_sunat`
+- `232`: pack de validación runtime de estados en fiscal RA/RC:
+  - función `validar_fiscal_baja_resumen_estado_case_insensitive_runtime(...)`
+  - vista `v_fiscal_baja_resumen_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `233`: alineación runtime case-insensitive de estados en Cajas:
+  - adopción de `citext` en `cajas.estado`, `sesiones_caja.estado`, `retiros_caja.estado_conciliacion`, `cambios_turno.estado`, `autorizaciones_caja.estado`
+  - helpers de normalización (`app.normalize_cajas_estado_233`, `app.normalize_sesiones_caja_estado_233`, `app.normalize_retiros_caja_estado_conciliacion_233`, `app.normalize_cambios_turno_estado_233`, `app.normalize_autorizaciones_caja_estado_233`)
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `234`: integridad + hardening RLS de estados en Cajas:
+  - constraints de dominio reescritas en forma case-insensitive para `cajas`, `sesiones_caja`, `retiros_caja`, `cambios_turno`, `autorizaciones_caja`
+  - constraint de consistencia de `cambios_turno` reescrita con `lower(estado::text)` (`EN_PROCESO` requiere `timestamp_fin IS NULL`, cerrados requieren `timestamp_fin IS NOT NULL`)
+  - `NOT NULL` contractual en columnas de estado y reaplicación explícita de `tenant_isolation` en tablas críticas del vertical
+- `235`: pack de validación runtime de estados en Cajas:
+  - función `validar_cajas_estado_case_insensitive_runtime(...)`
+  - vista `v_cajas_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `236`: alineación runtime case-insensitive de estados en Logística de pedidos:
+  - adopción de `citext` en `logistica_eventos.estado`, `pedido_backorders.estado`, `pedido_despachos.estado`, `pedido_gres.estado`
+  - helpers de normalización (`app.normalize_logistica_eventos_estado_236`, `app.normalize_pedido_backorders_estado_236`, `app.normalize_pedido_despachos_estado_236`, `app.normalize_pedido_gres_estado_236`)
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `237`: integridad + hardening RLS de estados en Logística de pedidos:
+  - constraints de dominio reescritas en forma case-insensitive para `pedido_backorders`, `pedido_despachos` y `pedido_gres`
+  - constraint de estado no vacío para `logistica_eventos` y `NOT NULL` contractual en estados del vertical
+  - reaplicación explícita de `tenant_isolation` en tablas críticas de logística (`logistica_eventos`, `pedido_backorders`, `pedido_despachos`, `pedido_gres`)
+- `238`: pack de validación runtime de estados en Logística de pedidos:
+  - función `validar_logistica_pedidos_estado_case_insensitive_runtime(...)`
+  - vista `v_logistica_pedidos_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `239`: alineación runtime case-insensitive de estados en contabilidad de activos/consignación:
+  - adopción de `citext` en `activos_fijos.estado`, `depreciaciones.estado`, `registro_consignaciones.estado`, `movimientos_consignacion.estado`, `inventarios_permanentes.estado`, `asignacion_costos.estado`, `calendario_empresa.estado`, `saldos_iniciales_cuentas.estado`
+  - helpers de normalización (`app.normalize_*_estado_239`) por tabla para canonizar estados del vertical
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `240`: integridad + hardening RLS de estados en contabilidad de activos/consignación:
+  - constraints runtime reescritas con chequeo case-insensitive (`lower(estado::text)`) manteniendo reglas de negocio existentes
+  - `NOT NULL` contractual en columnas `estado` de las 8 tablas del vertical
+  - recreación de unicidades activas con predicados CI y reaplicación explícita de `tenant_isolation`
+- `241`: pack de validación runtime de estados en contabilidad de activos/consignación:
+  - función `validar_contabilidad_activos_consignacion_estado_case_insensitive_runtime(...)`
+  - vista `v_contabilidad_activos_consignacion_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `242`: alineación runtime case-insensitive de estados en plantillas contables:
+  - adopción de `citext` en `plantillas_asientos.estado`, `plantillas_asientos_detalle.estado`, `plantillas_asientos_historial.estado`, `plantillas_asientos_ventas.estado`
+  - helpers de normalización (`app.normalize_plantilla_estado_242`, `app.normalize_plantillas_asientos_historial_estado_242`) para canonizar estados por dominio
+  - backfill defensivo e índices runtime CI por `estado` para el vertical
+- `243`: integridad + hardening RLS de estados en plantillas contables:
+  - constraints runtime reescritas con chequeo case-insensitive (`lower(estado::text)`) manteniendo reglas de negocio de plantillas
+  - `NOT NULL` contractual en columnas `estado` de las 4 tablas del vertical
+  - reaplicación explícita de políticas (`tenant` y `global_or_tenant`) en tablas de plantillas
+- `244`: pack de validación runtime de estados en plantillas contables:
+  - función `validar_contabilidad_plantillas_estado_case_insensitive_runtime(...)`
+  - vista `v_contabilidad_plantillas_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y filas inválidas por dominio
+- `245`: alineación runtime case-insensitive de estados en auditoría de cajas/supervisor:
+  - adopción de `citext` en `caja_audit_log.estado` y `supervisor_pins.estado`
+  - helpers de normalización (`app.normalize_caja_audit_estado_245`, `app.normalize_supervisor_pin_estado_245`)
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `246`: integridad + hardening RLS de estados en auditoría de cajas/supervisor:
+  - constraints runtime reescritas con chequeo case-insensitive (`lower(estado::text)`) en `caja_audit_log` y `supervisor_pins`
+  - `NOT NULL` contractual en columnas `estado`
+  - reaplicación explícita de políticas `tenant_isolation`
+- `247`: pack de validación runtime de estados en auditoría de cajas/supervisor:
+  - función `validar_cajas_auditoria_supervisor_estado_case_insensitive_runtime(...)`
+  - vista `v_cajas_auditoria_supervisor_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive, duplicados por scope e inválidos por dominio
+- `248`: alineación runtime case-insensitive de estados en auditoría legacy:
+  - adopción de `citext` en `audit_log_archive.estado`, `auditoria.estado`, `auditoria_cotizaciones.estado`
+  - helper de normalización `app.normalize_auditoria_legacy_estado_248(...)`
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `249`: integridad + hardening RLS de estados en auditoría legacy:
+  - constraints runtime reescritas con chequeo case-insensitive (`lower(estado::text)`) en `audit_log_archive`, `auditoria`, `auditoria_cotizaciones`
+  - `NOT NULL` contractual en columnas `estado`
+  - recreación de `ux_audit_log_archive_scope_runtime` con predicado CI (`lower(estado::text) <> 'inactivo'`) y reaplicación explícita de `tenant_isolation`
+- `250`: pack de validación runtime de estados en auditoría legacy:
+  - función `validar_auditoria_legacy_estado_case_insensitive_runtime(...)`
+  - vista `v_auditoria_legacy_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contrato case-insensitive, duplicados por scope e integridad tenant
+- `251`: alineación runtime case-insensitive de estados en RRHH personal operativo:
+  - adopción de `citext` en `estado` de `beneficios`, `capacitaciones`, `horarios_trabajo`, `empleado_beneficios`, `empleado_capacitaciones`, `empleado_horarios`, `expediente_documentos`, `liquidaciones`, `historial_pagos_planilla`
+  - helpers de normalización por dominio (`app.normalize_*_estado_251`) con canonicalización defensiva de aliases legacy
+  - backfill defensivo e índices runtime CI por `tenant+estado` en las 9 tablas del vertical
+- `252`: integridad + hardening RLS de estados en RRHH personal operativo:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en las 9 tablas del vertical
+  - `NOT NULL` contractual en columnas `estado`
+  - recreación de unicidades activas con predicados CI (`ux_beneficios_*`, `ux_capacitaciones_*`, `ux_horarios_trabajo_*`, `ux_empleado_beneficios_*`, `ux_liquidaciones_*`) y reaplicación explícita de `tenant_isolation`
+- `253`: pack de validación runtime de estados en RRHH personal operativo:
+  - función `validar_rrhh_personal_operativo_estado_case_insensitive_runtime(...)`
+  - vista `v_rrhh_personal_operativo_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive e inválidos por dominio
+- `254`: alineación runtime case-insensitive de estados en RRHH talento:
+  - adopción de `citext` en `vacantes.estado`, `candidatos.estado`, `solicitudes.estado`, `evaluaciones.estado`
+  - helpers de normalización por dominio (`app.normalize_*_estado_254`) con canonicalización defensiva de aliases legacy
+  - backfill defensivo e índices runtime CI por `tenant+estado` en las 4 tablas del vertical
+- `255`: integridad + hardening RLS de estados en RRHH talento:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en `vacantes`, `candidatos`, `solicitudes`, `evaluaciones`
+  - `NOT NULL` contractual en columnas `estado`
+  - recreación de unicidades activas con predicados CI (`ux_vacantes_*`, `ux_candidatos_*`, `ux_solicitudes_*`, `ux_evaluaciones_*`) y reaplicación explícita de `tenant_isolation`
+- `256`: pack de validación runtime de estados en RRHH talento:
+  - función `validar_rrhh_talento_estado_case_insensitive_runtime(...)`
+  - vista `v_rrhh_talento_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive, duplicados por scope e inválidos por dominio
+- `257`: alineación runtime case-insensitive de estados en RRHH core:
+  - adopción de `citext` en `departamentos.estado` y `contratos.estado`
+  - helpers de normalización por dominio (`app.normalize_departamentos_estado_257`, `app.normalize_contratos_estado_257`)
+  - backfill defensivo e índices runtime CI por `tenant+estado` en el vertical
+- `258`: integridad + hardening RLS de estados en RRHH core:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en `departamentos` y `contratos`
+  - `NOT NULL` contractual en columnas `estado`
+  - recreación de unicidades activas con predicados CI (`ux_departamentos_*`, `ux_contratos_*`) y reaplicación explícita de `tenant_isolation`
+- `259`: pack de validación runtime de estados en RRHH core:
+  - función `validar_rrhh_core_estado_case_insensitive_runtime(...)`
+  - vista `v_rrhh_core_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive, duplicados por scope e inválidos por dominio
+- `260`: alineación runtime case-insensitive de estados en ventas históricas:
+  - adopción de `citext` en `ventas.estado`, `venta_detalles.estado`, `pagos_ventas.estado`
+  - helpers de normalización por dominio (`app.normalize_ventas_estado_260`, `app.normalize_venta_detalles_estado_260`, `app.normalize_pagos_ventas_estado_260`)
+  - backfill defensivo e índices runtime CI por `tenant+estado` en el vertical
+- `261`: integridad + hardening RLS de estados en ventas históricas:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en `ventas`, `venta_detalles`, `pagos_ventas`
+  - `NOT NULL` contractual en columnas `estado`
+  - recreación de unicidades activas con predicados CI (`ux_ventas_*`, `ux_pagos_ventas_*`) y reaplicación explícita de `tenant_isolation`
+- `262`: pack de validación runtime de estados en ventas históricas:
+  - función `validar_ventas_historicas_estado_case_insensitive_runtime(...)`
+  - vista `v_ventas_historicas_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive, duplicados por scope e inválidos por dominio
+- `263`: alineación runtime case-insensitive de estado en empresa_config/wizard:
+  - adopción de `citext` en `empresa_config.estado`
+  - helper de normalización `app.normalize_empresa_config_estado_263`
+  - backfill defensivo e índice runtime CI por `tenant+estado`
+- `264`: integridad + hardening RLS de estado en empresa_config/wizard:
+  - constraint de estado reescrita con chequeo case-insensitive (`lower(estado::text)`) en `empresa_config`
+  - `NOT NULL` contractual en `empresa_config.estado`
+  - reaplicación explícita de `tenant_isolation` en `empresa_config` y `wizard_progress`
+- `265`: pack de validación runtime de estado en empresa_config/wizard:
+  - función `validar_empresa_config_wizard_estado_case_insensitive_runtime(...)`
+  - vista `v_empresa_config_wizard_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contrato case-insensitive e inválidos de wizard/configuración
+- `266`: alineación runtime case-insensitive de estado en POS/inventario auxiliar:
+  - adopción de `citext` en `configuracion_caja.estado`, `detalle_ventas_pos.estado`, `producto_existencias.estado`, `eventos_pos.estado`
+  - helpers de normalización (`app.normalize_*_estado_266`) por tabla para canonizar estados del vertical
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `267`: integridad + hardening RLS de estado en POS/inventario auxiliar:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en `configuracion_caja`, `detalle_ventas_pos`, `producto_existencias`, `eventos_pos`
+  - `NOT NULL` contractual en columnas `estado`
+  - reaplicación explícita de `tenant_isolation` en el vertical
+- `268`: pack de validación runtime de estado en POS/inventario auxiliar:
+  - función `validar_pos_inventory_aux_estado_case_insensitive_runtime(...)`
+  - vista `v_pos_inventory_aux_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive e inválidos por dominio
+- `269`: alineación runtime case-insensitive de estado en inventario core:
+  - adopción de `citext` en `productos.estado`, `almacenes.estado`, `almacen_ubicaciones.estado`, `movimientos_inventario.estado`, `stock_movimientos.estado`, `producto_stock_sucursal.estado`
+  - helpers de normalización (`app.normalize_*_estado_269`) y triggers de normalización por tabla
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `270`: integridad + hardening RLS de estado en inventario core:
+  - constraints de estado reescritas con chequeo case-insensitive (`lower(estado::text)`) en las 6 tablas del vertical
+  - `NOT NULL` contractual en columnas `estado`
+  - reaplicación explícita de `tenant_isolation` en el vertical
+- `271`: pack de validación runtime de estado en inventario core:
+  - función `validar_inventario_core_estado_case_insensitive_runtime(...)`
+  - vista `v_inventario_core_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive e inválidos por dominio
+- `272`: alineación runtime case-insensitive de estado en catálogos fiscales/pago:
+  - adopción de `citext` en `paises.estado`, `metodos_pago.estado`, `tipos_documentos_fiscales.estado`, `tipos_impuestos.estado`, `tipos_cambio.estado`
+  - helper común `app.normalize_estado_activo_inactivo_272` y sincronía de `estado/activo` por backfill
+  - triggers de normalización en `paises`, `metodos_pago` y `tipos_cambio` + índices runtime CI por estado
+- `273`: integridad + hardening RLS de estado en catálogos fiscales/pago:
+  - constraints de dominio case-insensitive (`lower(estado::text)`) y consistencia `estado<->activo` para las 5 tablas del vertical
+  - `NOT NULL` contractual en `estado` y `activo`
+  - reaplicación explícita de `app.apply_global_or_tenant_policy` en `metodos_pago`, `tipos_documentos_fiscales`, `tipos_impuestos`, `tipos_cambio`
+- `274`: pack de validación runtime de estado en catálogos fiscales/pago:
+  - función `validar_catalogos_fiscales_pago_estado_case_insensitive_runtime(...)`
+  - vista `v_catalogos_fiscales_pago_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contrato case-insensitive y consistencia `estado/activo`
+- `275`: alineación runtime case-insensitive de estado en identidad:
+  - adopción de `citext` en `tenants.estado`, `usuarios_sistema.estado`, `usuarios.estado`, `usuarios_sistemas.estado`, `users.estado`
+  - helper común `app.normalize_identity_estado_275` y sincronía de `estado/activo` por backfill
+  - normalizadores runtime en `tenants`, `usuarios*` y `users` (manteniendo triggers operativos existentes) + índices CI por `tenant+estado`
+- `276`: integridad + hardening RLS de estado en identidad:
+  - constraints case-insensitive y consistencia `estado<->activo` en `tenants`, `usuarios_sistema`, `usuarios`, `usuarios_sistemas`, `users`
+  - `NOT NULL` contractual en `estado` y `activo`
+  - reaplicación explícita de `tenant_isolation` en `usuarios`, `usuarios_sistema`, `usuarios_sistemas`
+- `277`: pack de validación runtime de estado en identidad:
+  - función `validar_identidad_usuarios_tenants_estado_case_insensitive_runtime(...)`
+  - vista `v_identidad_usuarios_tenants_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helpers/triggers/constraints/índices/RLS, contratos case-insensitive y consistencia `estado/activo` + sync alias canónico
+- `278`: alineación runtime case-insensitive de estado en seguridad/auth/rate-limit:
+  - adopción de `citext` en `auth_login_attempts`, `user_sessions`, `trusted_ips`, `rate_limit_blocks`, `rate_limit_configs`, `rate_limit_anomalies`, `rate_limit_baselines`, `request_logs`
+  - helper común `app.normalize_security_auth_rate_limit_estado_278` para dominios de estado por tabla
+  - normalización de triggers operativos existentes + normalizadores nuevos para `rate_limit_baselines` y `request_logs`
+  - backfill defensivo e índices runtime CI por `tenant+estado`
+- `279`: integridad + hardening RLS de estado en seguridad/auth/rate-limit:
+  - constraints case-insensitive de dominio/consistencia (`estado`, `estado<->success`, `estado<->active/enabled`, `estado<->reviewed_at/revoked_at`)
+  - `NOT NULL` contractual en columnas `estado` y flags operativas (`active`, `enabled`)
+  - recreación de unicidades activas de `trusted_ips` y `rate_limit_configs` con predicados CI por estado
+  - reaplicación explícita de políticas RLS tenant/global en todo el vertical
+- `280`: pack de validación runtime de estado en seguridad/auth/rate-limit:
+  - función `validar_security_auth_rate_limit_estado_case_insensitive_runtime(...)`
+  - vista `v_security_auth_rate_limit_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contratos case-insensitive, consistencias de estado y duplicados activos por scope
+- `281`: alineación runtime case-insensitive de estado en fiscal/retenciones/proveedores:
+  - adopción de `citext` en `configuracion_fiscal.estado`, `configuracion_retenciones.estado`, `proveedores.estado`, `proveedores_cuarta_categoria.estado`, `libro_retenciones.estado`
+  - helper común `app.normalize_fiscal_retenciones_proveedores_estado_281` para dominios de estado del vertical
+  - normalización de triggers operativos existentes + backfill defensivo e índices runtime CI por `tenant+estado`
+- `282`: integridad + hardening RLS de estado en fiscal/retenciones/proveedores:
+  - constraints case-insensitive de dominio/consistencia (`estado`, `estado<->activo`) y `NOT NULL` contractual en el vertical
+  - recreación de unicidades activas de `configuracion_fiscal`, `configuracion_retenciones`, `proveedores`, `proveedores_cuarta_categoria` con predicados CI
+  - reaplicación explícita de políticas RLS tenant/global en `configuracion_fiscal`, `configuracion_retenciones`, `proveedores`, `proveedores_cuarta_categoria`, `libro_retenciones`
+- `283`: pack de validación runtime de estado en fiscal/retenciones/proveedores:
+  - función `validar_fiscal_retenciones_proveedores_estado_case_insensitive_runtime(...)`
+  - vista `v_fiscal_retenciones_proveedores_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contratos case-insensitive, consistencias de estado y duplicados por scope
+- `284`: alineación runtime case-insensitive de estado en RMA:
+  - adopción de `citext` en `rma_solicitudes.estado` y `rma_items.estado`
+  - helper común `app.normalize_rma_estado_284` con canonicalización por tabla/dominio
+  - normalización de triggers operativos existentes + backfill defensivo e índices runtime CI por `tenant+estado`
+- `285`: integridad + hardening RLS de estado en RMA:
+  - constraint de dominio de estado reescrita en forma case-insensitive para `rma_solicitudes`
+  - constraint de dominio CI agregada para `rma_items`, `NOT NULL` contractual y dedupe de items activos por `(rma_id, detalle_id)`
+  - recreación de `ux_rma_items_rma_detalle_activo` con predicado CI y reaplicación explícita de `tenant_isolation` en tablas RMA
+- `286`: pack de validación runtime de estado en RMA:
+  - función `validar_rma_estado_case_insensitive_runtime(...)`
+  - vista `v_rma_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contrato case-insensitive, consistencia tenant y duplicados activos por scope
+- `287`: alineación runtime case-insensitive de estado en secretos/alertas/PII:
+  - adopción de `citext` en `secret_rotation_state.estado`, `system_alerts.estado`, `pii_encryption_log.estado`
+  - helper canónico `app.normalize_security_secrets_estado_287` por tabla/dominio
+  - normalización de triggers operativos existentes + backfill defensivo e índices runtime CI por `tenant+estado`
+- `288`: integridad + hardening RLS de estado en secretos/alertas/PII:
+  - constraints case-insensitive de dominio/consistencia (`estado`, `estado<->resolved_at`, `estado<->success`) y `NOT NULL` contractual
+  - dedupe de `system_alerts` activo por `scope+alert_key` y recreación de `ux_system_alerts_scope_alert_key_unresolved` con predicado CI
+  - reaplicación explícita de políticas RLS tenant/global en `secret_rotation_state`, `system_alerts`, `pii_encryption_log`
+- `289`: pack de validación runtime de estado en secretos/alertas/PII:
+  - función `validar_security_secrets_estado_case_insensitive_runtime(...)`
+  - vista `v_security_secrets_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/triggers/constraints/índices/RLS, contratos case-insensitive, consistencias de estado y duplicados por scope
+- `290`: alineación runtime case-insensitive de estado en conversión demo:
+  - adopción de `citext` en `demo_conversiones_pendientes.estado`
+  - helper canónico `app.normalize_demo_conversion_estado_290(...)` para estados y transición defensiva por sesión/timestamps
+  - normalización de trigger operativo + backfill defensivo e índices runtime CI por `tenant+estado` y `session+estado`
+- `291`: integridad + hardening RLS de estado en conversión demo:
+  - constraints case-insensitive de dominio/consistencia (`estado`, `completada=>completed_at`, `pendiente=>stripe_session_id`, `fallida/cancelada/expirada=>failed_at`)
+  - dedupe de pendientes por `stripe_session_id` y por `tenant_id`, y recreación de `ux_demo_conv_tenant_pending` con predicado CI
+  - reaplicación explícita de RLS con policy `demo_conversiones_superadmin_only`
+- `292`: pack de validación runtime de estado en conversión demo:
+  - función `validar_demo_conversion_estado_case_insensitive_runtime(...)`
+  - vista `v_demo_conversion_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/trigger/constraints/índices/RLS, contratos case-insensitive y duplicados por scope
+- `293`: alineación runtime case-insensitive de estado en help knowledge base:
+  - adopción de `citext` en `knowledge_base.estado`
+  - helper canónico `app.normalize_help_knowledge_base_estado_293(...)` para normalización de estado
+  - normalización de trigger operativo + backfill defensivo e índices runtime CI por estado
+- `294`: integridad + hardening RLS de estado en help knowledge base:
+  - constraints case-insensitive de dominio/consistencia (`estado`, `estado<->activo`) y `NOT NULL` contractual
+  - dedupe activo por scope (`tenant/categoria/rol/pregunta`) y recreación de unicidad con predicado CI
+  - reaplicación explícita de policies RLS `knowledge_base_tenant_or_global_select` y `knowledge_base_tenant_write`
+- `295`: pack de validación runtime de estado en help knowledge base:
+  - función `validar_help_knowledge_base_estado_case_insensitive_runtime(...)`
+  - vista `v_help_knowledge_base_estado_case_insensitive_runtime_status_actual`
+  - chequeos de `citext`, helper/trigger/constraints/índices/RLS, contrato case-insensitive, consistencia `estado/activo` y duplicados activos por scope
+- `296`: orquestador transversal de validaciones runtime:
+  - función `validar_rebuild_runtime_orchestrator(p_tenant_id, p_only_failed)` para ejecutar de forma agregada todos los packs `validar_*_runtime` compatibles
+  - captura de errores internos por función y salida homogénea `pack_name/check_name/ok/detail`
+  - vista `v_rebuild_runtime_checks_actual` para consulta directa del estado completo
+- `297`: vistas y resumen operativo del orquestador:
+  - función `validar_rebuild_runtime_summary(...)` con KPIs globales (`total/passed/failed/packs`)
+  - vistas `v_rebuild_runtime_summary_actual`, `v_rebuild_runtime_failures_actual`, `v_rebuild_runtime_pack_metrics_actual`
+- `298`: pack de validación del orquestador:
+  - función `validar_rebuild_orchestrator_runtime(...)`
+  - vista `v_rebuild_orchestrator_runtime_status_actual`
+  - chequeos de existencia, cobertura mínima de packs, errores internos y consistencia entre salida full vs `only_failed`
+- `299`: suite de smoke tests por módulo:
+  - función `ejecutar_smoke_tests_modulos_runtime(...)` con verificación de objetos críticos por vertical (núcleo, ventas, POS, compras, inventario, finanzas, fiscal, RRHH, observabilidad, gate runtime)
+  - chequeos meta de cardinalidad mínima (`tablas public`, cantidad de `validar_*_runtime`) y estado de fallas del orquestador
+- `300`: vistas y resumen operativo de smoke tests por módulo:
+  - función `resumen_smoke_tests_modulos_runtime(...)`
+  - vistas `v_smoke_tests_modulos_runtime_actual`, `v_smoke_tests_modulos_summary_actual`, `v_smoke_tests_modulos_failures_actual`, `v_smoke_tests_modulos_global_actual`
+- `301`: pack de validación de infraestructura de smoke tests:
+  - función `validar_smoke_tests_modulos_runtime(...)`
+  - vista `v_smoke_tests_modulos_validation_status_actual`
+  - chequeos de existencia, cobertura mínima de módulos/checks, consistencia de conteos de fallas y estado global del suite
+
+## 7) Riesgos pendientes
+
+- no se pudo compilar/ejecutar la secuencia completa `000..301` en PostgreSQL temporal porque Docker daemon local no estaba disponible durante esta corrida.
+- pendiente validacion de ejecucion real de migraciones en una BD limpia para detectar errores de runtime SQL y permisos.
+
+## 8) Siguiente paso recomendado
+
+1. levantar PostgreSQL/Supabase local
+2. aplicar en orden `000..301`
+3. ejecutar smoke tests por modulo (Ventas, Inventario, CxP/CxC, POS, Seguridad)
+4. ejecutar `v_rebuild_orchestrator_runtime_status_actual`, `v_rebuild_runtime_summary_actual`, `v_rebuild_runtime_failures_actual`, `v_smoke_tests_modulos_global_actual` y `v_smoke_tests_modulos_failures_actual` como gate final

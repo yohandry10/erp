@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: erp-config
+  namespace: erp-system
+data:
+  # API Configuration
+  NODE_ENV: "production"
+  PORT: "3001"
+  
+  # Frontend Configuration
+  NEXT_PUBLIC_API_URL: "https://api.erp-system.com"
+  
+  # Redis Configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  
+  # Database Configuration
+  SUPABASE_URL: "https://your-project.supabase.co"
+  
+  # Peru Tax Settings
+  SUNAT_ENVIRONMENT: "production"
+  OSE_ENDPOINT: "https://ose.com/api" 

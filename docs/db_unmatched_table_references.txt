@@ -1,0 +1,61 @@
+[asientos_contables_rrhh]
+  - apps\erp-api\src\modules\contabilidad.controller.ts
+
+[asistencias]
+  - apps\erp-api\src\shared\jobs\background-jobs.service.ts
+
+[compras]
+  - apps\erp-api\src\shared\integration\accounting-reports.service.ts
+
+[comprobantes_electronicos]
+  - apps\erp-api\src\modules\cpe\cpe.service.ts
+  - apps\erp-api\src\modules\gre\gre.service.ts
+
+[fe_configuracion]
+  - apps\erp-api\src\modules\documentos.service.ts
+
+[feriados]
+  - apps\erp-api\src\shared\jobs\background-jobs.service.ts
+
+[movimientos_stock]
+  - apps\erp-api\src\shared\integration\dashboard-integration.service.ts
+
+[pagos_ventas]
+  - apps\erp-api\src\shared\integration\financial-integration.service.ts
+
+[pdf]
+  - apps\erp-api\src\modules\ventas\pedidos\cpe-integration.verify.spec.ts
+
+[profiles]
+  - apps\erp-api\src\app.controller.ts
+
+[proveedores_cuarta_categoria]
+  - apps\erp-api\src\modules\retenciones\retenciones.service.ts
+
+[rrhh_pagos]
+  - apps\erp-api\src\modules\rrhh\planillas.service.ts
+  - apps\erp-api\src\modules\rrhh\rrhh.service.ts
+
+[supervisor_pins]
+  - apps\erp-api\src\modules\cajas\services\cash-authorization.service.ts
+
+[tipos_documentos_fiscales]
+  - apps\erp-api\src\modules\paises\paises.service.ts
+
+[tipos_impuestos]
+  - apps\erp-api\src\modules\paises\paises.service.ts
+
+[user_sessions]
+  - apps\erp-api\src\modules\auth\auth.service.ts
+  - apps\erp-api\src\modules\tenants\tenant-management.service.ts
+  - apps\erp-api\src\modules\usuarios\user-management.service.ts
+
+[usuarios]
+  - apps\erp-api\src\modules\cajas\cajas.service.ts
+  - apps\erp-api\src\modules\cajas\services\autorizaciones-caja.service.ts
+  - apps\erp-api\src\modules\compras\services\ordenes-compra.service.ts
+  - apps\erp-api\src\modules\ventas\cotizaciones\cotizaciones.service.ts
+  - apps\web\app\api\configuracion-fiscal\route.ts
+  - apps\web\app\api\help\search\route.ts
+  - apps\web\app\api\help\sugerencias\route.ts
+

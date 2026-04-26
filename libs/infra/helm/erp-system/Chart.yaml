@@ -1,0 +1,24 @@
+apiVersion: v2
+name: erp-system
+description: Complete ERP system for Peru tax compliance
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - erp
+  - peru
+  - sunat
+  - cpe
+  - gre
+  - sire
+home: https://github.com/your-org/erp-system
+sources:
+  - https://github.com/your-org/erp-system
+maintainers:
+  - name: ERP Team
+    email: team@yourcompany.com
+dependencies:
+  - name: redis
+    version: "^17.0.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled 

@@ -1,0 +1,183 @@
+{
+  "dashboard": {
+    "title": "ERP Suite - Métricas de Negocio",
+    "tags": ["erp", "business", "kpi"],
+    "timezone": "browser",
+    "editable": true,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Órdenes de Compra - Últimas 24h",
+        "type": "stat",
+        "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(erp_ordenes_compra_creadas_total[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Facturas Emitidas - Últimas 24h",
+        "type": "stat",
+        "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(erp_facturas_emitidas_total[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Pagos Registrados - Últimas 24h",
+        "type": "stat",
+        "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(erp_pagos_registrados_total[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Movimientos de Inventario - Últimas 24h",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "sum(increase(erp_inventario_movimientos_total[24h]))",
+            "legendFormat": "Total"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Órdenes de Compra por Estado",
+        "type": "piechart",
+        "gridPos": { "x": 0, "y": 4, "w": 8, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (estado) (erp_ordenes_compra_creadas_total)",
+            "legendFormat": "{{estado}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Facturas por Tipo de Documento",
+        "type": "piechart",
+        "gridPos": { "x": 8, "y": 4, "w": 8, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (tipo_documento) (erp_facturas_emitidas_total)",
+            "legendFormat": "{{tipo_documento}}"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Pagos por Método",
+        "type": "piechart",
+        "gridPos": { "x": 16, "y": 4, "w": 8, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (metodo_pago) (erp_pagos_registrados_total)",
+            "legendFormat": "{{metodo_pago}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Tasa de Creación de Órdenes (por hora)",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(erp_ordenes_compra_creadas_total[1h])",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Órdenes/segundo"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Tasa de Emisión de Facturas (por hora)",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(erp_facturas_emitidas_total[1h])",
+            "legendFormat": "{{tenant_id}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Facturas/segundo"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Actividad por Tenant (Últimas 24h)",
+        "type": "table",
+        "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (tenant_id) (increase(erp_ordenes_compra_creadas_total[24h]))",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "sum by (tenant_id) (increase(erp_facturas_emitidas_total[24h]))",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "sum by (tenant_id) (increase(erp_pagos_registrados_total[24h]))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge"
+          }
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    }
+  }
+}

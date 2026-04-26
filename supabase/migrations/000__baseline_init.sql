@@ -1,0 +1,16 @@
+-- Baseline de reconstruccion desde cero
+-- Fecha: 2026-02-13
+--
+-- Orden sugerido de ejecucion:
+-- 000__baseline_init.sql            (este archivo, solo metadata)
+-- 001__core_foundation.sql          (core multi-tenant, auth, outbox)
+-- 002__domain_tables_skeleton.sql   (tablas de dominio por nombre)
+-- 003__rls_and_context.sql          (RLS generico + helpers)
+-- 004__rpc_basics.sql               (RPC base para compatibilidad)
+-- 005__views_basics.sql             (vistas base para compatibilidad)
+--
+-- Notas:
+-- 1) Este baseline prioriza reconstruccion operativa y trazabilidad.
+-- 2) Las tablas de dominio en fase 2 son esqueletos; se refinan por modulo.
+-- 3) El mapa forense de referencia esta en docs/db_forensic_baseline.md
+

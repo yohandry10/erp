@@ -1,0 +1,22 @@
+﻿# Rebuild Runtime Coverage Report
+
+Fecha: 2026-02-13
+
+FROM_REFS_CLEAN=163
+RPC_REFS_CLEAN=47
+SQL_OBJECTS=221
+SQL_FUNCTIONS=47
+MISSING_FROM=1
+MISSING_RPC=0
+
+MISSING_FROM_LIST=
+pdf
+
+MISSING_RPC_LIST=
+(none)
+
+POTENTIAL_LEXICAL_DUPLICATES=2
+[asistencia] -> asistencia, asistencias
+[usuarios_sistema] -> usuarios_sistema, usuarios_sistemas
+
+NOTE: 'pdf' aparece por Buffer.from('pdf') y no es tabla SQL.

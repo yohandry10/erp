@@ -1,0 +1,48 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Next.js
+apps/**/.next/
+apps/**/out/
+.next/
+out/
+
+# Nest / build outputs
+dist/
+apps/**/dist/
+libs/**/dist/
+
+# Turbo
+.turbo/
+apps/**/.turbo/
+
+# Webpack/pack caches
+apps/**/.next/cache/
+**/webpack/**/*.pack*
+**/*.hot-update.*
+
+# Env files
+*.env
+*.env.*
+!*.env.example
+
+# Tauri / Rust
+apps/**/src-tauri/target/
+apps/**/src-tauri/gen/
+*.exe
+*.dmg
+*.app
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

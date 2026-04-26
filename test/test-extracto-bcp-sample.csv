@@ -1,0 +1,7 @@
+Fecha,Descripción,Cargo,Abono,Saldo
+26/10/2025,Transferencia recibida de cliente ABC,0,1500.50,15000.50
+26/10/2025,Pago a proveedor XYZ,800.00,0,14200.50
+27/10/2025,Depósito en efectivo,0,2500.00,16700.50
+27/10/2025,Comisión bancaria,15.50,0,16685.00
+28/10/2025,Transferencia recibida,0,3200.75,19885.75
+28/10/2025,Pago de servicios,450.00,0,19435.75

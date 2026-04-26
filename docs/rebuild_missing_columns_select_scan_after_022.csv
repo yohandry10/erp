@@ -1,0 +1,16 @@
+table,column,path
+caja_audit_log,diferencia,apps\erp-api\src\modules\cajas\services\cash-fraud-detection.service.ts
+caja_audit_log,hora_apertura,apps\erp-api\src\modules\cajas\services\cash-fraud-detection.service.ts
+movimientos_bancarios,banco,apps\erp-api\src\modules\finanzas\bancos\bancos.service.ts
+movimientos_bancarios,numero_cuenta,apps\erp-api\src\modules\finanzas\bancos\bancos.service.ts
+paises,impuesto_principal_nombre,apps\erp-api\src\modules\cpe\fiscal-adapter.service.ts
+paises,impuesto_principal_porcentaje,apps\erp-api\src\modules\cpe\fiscal-adapter.service.ts
+pedidos_venta,razon_social,apps\erp-api\src\modules\ventas\pedidos\pedidos.service.ts
+tenants,cpe_pendiente,apps\erp-api\tests\e2e\pos-e2e.test.ts
+tenants,precio,apps\erp-api\tests\e2e\inventario-e2e.test.ts
+tenants,stock_actual,apps\erp-api\tests\e2e\inventario-e2e.test.ts
+tenants,stock_reservado,apps\erp-api\tests\e2e\inventario-e2e.test.ts
+user_roles,nombre,apps\erp-api\src\modules\auth\auth.service.ts
+user_sessions,email,apps\erp-api\src\modules\usuarios\user-management.service.ts
+users,rol,apps\erp-api\src\modules\cajas\services\cash-authorization.service.ts
+users,rol,apps\erp-api\src\modules\cajas\services\cash-concurrency.service.ts

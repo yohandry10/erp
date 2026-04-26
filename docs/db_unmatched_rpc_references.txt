@@ -1,0 +1,24 @@
+[acquire_job_lock]
+  - apps\erp-api\src\shared\jobs\background-jobs.service.ts
+
+[calcular_balance_comprobacion]
+  - apps\erp-api\src\modules\contabilidad\services\ple-export.service.ts
+
+[get_analisis_crecimiento]
+  - apps\erp-api\src\shared\integration\financial-integration.service.ts
+
+[get_asientos_por_tipo]
+  - apps\erp-api\src\modules\contabilidad\services\asientos.service.ts
+
+[get_kpis_financieros]
+  - apps\erp-api\src\shared\integration\financial-integration.service.ts
+
+[get_resumen_financiero_mensual]
+  - apps\erp-api\src\shared\integration\financial-integration.service.ts
+
+[obtener_siguiente_numero_serie]
+  - apps\erp-api\src\modules\documentos.service.ts
+
+[release_job_lock]
+  - apps\erp-api\src\shared\jobs\background-jobs.service.ts
+

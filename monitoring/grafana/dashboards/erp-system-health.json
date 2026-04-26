@@ -1,0 +1,270 @@
+{
+  "dashboard": {
+    "title": "ERP Suite - Salud del Sistema",
+    "tags": ["erp", "system", "health"],
+    "timezone": "browser",
+    "editable": true,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Requests por Segundo",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(erp_http_requests_total[5m])) by (method)",
+            "legendFormat": "{{method}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps",
+            "label": "Requests/seg"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Latencia P50, P95, P99",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(erp_http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(erp_http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(erp_http_request_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latencia"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Tasa de Errores HTTP",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(erp_http_request_errors_total[5m])) by (error_type)",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Errores/seg"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "Alta tasa de errores",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Uso de Memoria",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "RSS (MB)"
+          },
+          {
+            "expr": "nodejs_heap_size_used_bytes / 1024 / 1024",
+            "legendFormat": "Heap Used (MB)"
+          },
+          {
+            "expr": "nodejs_heap_size_total_bytes / 1024 / 1024",
+            "legendFormat": "Heap Total (MB)"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "decmbytes",
+            "label": "Memoria"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Uso de CPU",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_user_seconds_total[5m]) * 100",
+            "legendFormat": "User CPU %"
+          },
+          {
+            "expr": "rate(process_cpu_system_seconds_total[5m]) * 100",
+            "legendFormat": "System CPU %"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "label": "CPU %",
+            "max": 100
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Event Loop Lag",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "nodejs_eventloop_lag_seconds",
+            "legendFormat": "Event Loop Lag"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Lag"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Duración de Queries DB (P95)",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(erp_db_query_duration_seconds_bucket[5m])) by (le, operation))",
+            "legendFormat": "{{operation}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duración"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "gridPos": { "x": 12, "y": 24, "w": 6, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(erp_cache_hits_total[5m])) / (sum(rate(erp_cache_hits_total[5m])) + sum(rate(erp_cache_misses_total[5m])))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "red" },
+                { "value": 0.7, "color": "yellow" },
+                { "value": 0.9, "color": "green" }
+              ]
+            },
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Conexiones DB Activas",
+        "type": "stat",
+        "gridPos": { "x": 18, "y": 24, "w": 6, "h": 8 },
+        "targets": [
+          {
+            "expr": "erp_db_connections_active",
+            "legendFormat": "Conexiones"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 10,
+        "title": "Requests por Endpoint (Top 10)",
+        "type": "table",
+        "gridPos": { "x": 0, "y": 32, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "topk(10, sum by (route, method) (rate(erp_http_requests_total[5m])))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "route": 0,
+                "method": 1,
+                "Value": 2
+              },
+              "renameByName": {
+                "route": "Endpoint",
+                "method": "Método",
+                "Value": "Req/seg"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
