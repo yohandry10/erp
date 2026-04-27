@@ -30,7 +30,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/schedule": "^2.0.0",
     "@nestjs/swagger": "^11.2.0",
-    "@nestjs/throttler": "^3.1.0",
+    "@nestjs/throttler": "^6.5.0",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/postgrest-js": "^1.19.4",
     "@supabase/supabase-js": "^2.50.0",
