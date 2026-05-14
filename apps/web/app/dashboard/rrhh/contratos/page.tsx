@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PromptDialog from '@/components/ui/PromptDialog';
@@ -15,7 +15,7 @@ const ContratosPage = () => {
   const [contratoEdit, setContratoEdit] = useState<any>(null);
   const [contratoDetail, setContratoDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const api = useApi();
+  const { get, post, put } = useApi();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   // Estado para diálogo de confirmación
@@ -50,32 +50,24 @@ const ContratosPage = () => {
     variant: 'default'
   });
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
-      // HARDENING: evitar llamadas a RRHH cuando la función está deshabilitada.
       setContratos([]);
       setEmpleados([]);
       setLoading(false);
-      return;
-    }
-    loadData();
-  }, [rrhhEnabled]);
-
-  const loadData = async () => {
-    if (!rrhhEnabled) {
       return;
     }
     try {
       setLoading(true);
       
       // Cargar contratos
-      const contratosData = await api.get('/api/rrhh/contratos');
+      const contratosData = await get('/api/rrhh/contratos');
       if (contratosData && Array.isArray(contratosData)) {
         setContratos(contratosData);
       }
 
       // Cargar empleados
-      const empleadosData = await api.get('/api/rrhh/empleados');
+      const empleadosData = await get('/api/rrhh/empleados');
       if (empleadosData && Array.isArray(empleadosData)) {
         setEmpleados(empleadosData);
       }
@@ -84,7 +76,11 @@ const ContratosPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const renovarContrato = async (contratoId: string) => {
     setPromptDialog({
@@ -96,7 +92,7 @@ const ContratosPage = () => {
       onConfirm: async (meses: string) => {
         if (!isNaN(Number(meses))) {
           try {
-            await api.post(`/api/rrhh/contratos/${contratoId}/renovar`, {
+            await post(`/api/rrhh/contratos/${contratoId}/renovar`, {
               meses: parseInt(meses)
             });
             loadData();
@@ -118,7 +114,7 @@ const ContratosPage = () => {
       multiline: true,
       onConfirm: async (motivo: string) => {
         try {
-          await api.put(`/api/rrhh/contratos/${contratoId}/finalizar`, {
+          await put(`/api/rrhh/contratos/${contratoId}/finalizar`, {
             motivo_finalizacion: motivo,
             fecha_finalizacion: new Date().toISOString().split('T')[0]
           });

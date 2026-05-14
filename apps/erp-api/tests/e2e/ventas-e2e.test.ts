@@ -123,12 +123,9 @@ test('E2E Ventas – RPC crear_pedido_completo ejecuta transacción atómica', a
 
   // Verificar resultado
   if (rpcError) {
-    // Si el error es por RLS/tenant, es esperado en algunos casos
     if (rpcError.message.includes('Tenant ID mismatch') || rpcError.message.includes('app.current_tenant_id')) {
-      console.log('⚠️ RPC requiere contexto de tenant configurado (esperado)');
-      // Limpiar datos de prueba
       await cleanupTestData(supabase, tenantId, clienteId, productoId);
-      return; // Test pasa - el RPC existe y valida correctamente
+      assert.fail(`RPC crear_pedido_completo no debe pasar sin persistencia real por contexto tenant faltante: ${rpcError.message}`);
     }
     throw new Error(`Error en RPC: ${rpcError.message}`);
   }
@@ -300,12 +297,7 @@ test('E2E Ventas – Índices existen para consultas frecuentes', async () => {
     rpcError = { message: 'RPC no existe o error de conexión' };
   }
 
-  if (rpcError) {
-    // Si el RPC no existe, el test es informativo
-    console.log('⚠️ No se pudo verificar índices via RPC:', rpcError.message);
-    console.log('   Esto es esperado si get_table_indexes no está expuesto.');
-    return; // Test informativo, no falla
-  }
+  assert.ok(!rpcError, `RPC get_table_indexes debe estar disponible para validar índices críticos: ${rpcError?.message}`);
 
   // Verificar índices esperados
   const indexNames = indices?.map((i: any) => i.indexname) || [];
@@ -313,9 +305,7 @@ test('E2E Ventas – Índices existen para consultas frecuentes', async () => {
 
   for (const expected of expectedIndexes) {
     const hasIndex = indexNames.some((name: string) => name.includes(expected));
-    if (!hasIndex) {
-      console.warn(`⚠️ Falta índice para columna: ${expected}`);
-    }
+    assert.ok(hasIndex, `Debe existir índice de pedidos_venta para columna frecuente: ${expected}`);
   }
 });
 

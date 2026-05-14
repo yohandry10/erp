@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from './use-api'
+import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 
 // Interfaces actualizadas para coincidir con la API
 export interface Pais {
@@ -41,24 +42,30 @@ export function usePaises() {
   const { get, put, request } = useApi()
 
   // Cargar países desde la API real
-  const loadPaises = async () => {
+  const loadPaises = async (signal?: AbortSignal) => {
+    const requestController = new AbortController()
+    const timeoutId = window.setTimeout(() => requestController.abort(), 10000)
+    const abortFromParent = () => requestController.abort()
+    signal?.addEventListener('abort', abortFromParent, { once: true })
+
     try {
       setLoading(true)
       setError(null)
       
-      // Hacer petición directa sin autenticación (endpoint público)
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const response = await fetch(`${API_BASE_URL}/api/paises`, {
+      // Endpoint público same-origin: login debe cargar países antes de tener sesión.
+      const response = await fetch('/api/public/paises/', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: requestController.signal,
       })
       
       if (response.ok) {
         const data = await response.json()
-        if (data.success && data.data) {
-          setPaises(data.data)
+        const paises = unwrapApiArray<Pais>(data)
+        if (apiSucceeded(data) && paises.length > 0) {
+          setPaises(paises)
         } else {
           throw new Error('Error al obtener países')
         }
@@ -66,8 +73,11 @@ export function usePaises() {
         throw new Error(`Error ${response.status}: ${response.statusText}`)
       }
     } catch (err) {
+      if (signal?.aborted) {
+        return
+      }
       setError('Error de conexión con el servidor')
-      console.error('Error loading países:', err)
+      console.warn('Error loading países:', err)
       
       // Fallback a datos básicos en caso de error
       setPaises([
@@ -91,7 +101,11 @@ export function usePaises() {
         }
       ])
     } finally {
-      setLoading(false)
+      window.clearTimeout(timeoutId)
+      signal?.removeEventListener('abort', abortFromParent)
+      if (!signal?.aborted) {
+        setLoading(false)
+      }
     }
   }
 
@@ -99,7 +113,7 @@ export function usePaises() {
   const getConfiguracionFiscal = async (codigoPais: string): Promise<ConfiguracionFiscal | null> => {
     try {
       const response = await get(`/api/paises/${codigoPais}/configuracion-fiscal`)
-      return response?.success ? response.data : null
+      return apiSucceeded(response) ? unwrapApiData<ConfiguracionFiscal | null>(response, null) : null
     } catch (err) {
       console.error('Error getting fiscal configuration:', err)
       return null
@@ -124,7 +138,7 @@ export function usePaises() {
         headers,
       })
 
-      return response?.success ? response.data : null
+      return apiSucceeded(response) ? unwrapApiData<UsuarioConfiguracion | null>(response, null) : null
     } catch (err) {
       console.error('Error getting user configuration:', err)
       return null
@@ -135,7 +149,7 @@ export function usePaises() {
   const updateUserConfiguration = async (configuracion: Partial<UsuarioConfiguracion>) => {
     try {
       const response = await put('/api/paises/usuario/configuracion', configuracion)
-      return response?.success
+      return apiSucceeded(response)
     } catch (err) {
       console.error('Error updating user configuration:', err)
       return false
@@ -146,7 +160,7 @@ export function usePaises() {
   const validateDocument = async (codigoPais: string, documento: string) => {
     try {
       const response = await get(`/api/paises/${codigoPais}/validar-documento/${documento}`)
-      return response?.success ? response.data : null
+      return apiSucceeded(response) ? unwrapApiData(response, null) : null
     } catch (err) {
       console.error('Error validating document:', err)
       return null
@@ -157,7 +171,7 @@ export function usePaises() {
   const getLibrosRequeridos = async (codigoPais: string) => {
     try {
       const response = await get(`/api/paises/${codigoPais}/libros-requeridos`)
-      return response?.success ? response.data : null
+      return apiSucceeded(response) ? unwrapApiData(response, null) : null
     } catch (err) {
       console.error('Error getting required books:', err)
       return null
@@ -165,7 +179,9 @@ export function usePaises() {
   }
 
   useEffect(() => {
-    loadPaises()
+    const controller = new AbortController()
+    loadPaises(controller.signal)
+    return () => controller.abort()
   }, [])
 
   return {

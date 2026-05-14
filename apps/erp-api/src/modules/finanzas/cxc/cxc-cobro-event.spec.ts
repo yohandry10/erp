@@ -182,7 +182,7 @@ describe('CxcService - CobroRegistrado Event', () => {
           event_type: 'cobro.registrado',
           aggregate_type: 'cobro',
           aggregate_id: 'pago-001',  // The payment ID is the aggregate for this event
-          event_data: expect.objectContaining({
+          payload: expect.objectContaining({
             tenant_id: tenantId,
             cobro_id: 'pago-001',
             cxc_id: cuentaId,
@@ -200,7 +200,7 @@ describe('CxcService - CobroRegistrado Event', () => {
             eventId: expect.any(String),
             idempotency_key: expect.any(String),
           }),
-          status: 'PENDING',
+          status: 'pending',
           retry_count: 0,
         }),
       );
@@ -299,7 +299,7 @@ describe('CxcService - CobroRegistrado Event', () => {
         expect.objectContaining({
           event_type: 'cobro.registrado',
           aggregate_type: 'cobro',
-          status: 'PENDING',
+          status: 'pending',
         }),
       );
     });

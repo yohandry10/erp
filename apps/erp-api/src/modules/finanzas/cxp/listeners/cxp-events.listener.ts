@@ -68,6 +68,12 @@ export class CxpEventsListener implements OnModuleInit {
         `✅ [CxP] Cuenta por pagar creada automáticamente para recepción ${data.numeroRecepcion}`,
       );
     } catch (error: any) {
+      if (/Ya existe una cuenta por pagar/i.test(error?.message || '')) {
+        this.logger.log(
+          `⏭️ [CxP] Cuenta por pagar ya existente para recepción ${data.numeroRecepcion}; evento idempotente omitido`,
+        );
+        return;
+      }
       // No bloquear el flujo de eventos; solo registrar.
       this.logger.error(
         `❌ [CxP] Error creando CxP automática para recepción ${data.numeroRecepcion}: ${error?.message}`,

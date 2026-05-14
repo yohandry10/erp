@@ -313,7 +313,7 @@ export class OrdenesCompraService {
 
     // Definir transiciones válidas para órdenes de compra
     const transicionesValidas: Record<string, string[]> = {
-      'BORRADOR': ['PENDIENTE', 'APROBACION', 'ANULADA'],
+      'BORRADOR': ['PENDIENTE', 'APROBACION', 'APROBADA', 'ANULADA'],
       'PENDIENTE': ['APROBACION', 'APROBADA', 'ANULADA'],
       'APROBACION': ['PENDIENTE', 'APROBADA', 'ANULADA'],
       'APROBADA': ['PARCIAL', 'RECIBIDA', 'ANULADA'],
@@ -381,14 +381,20 @@ export class OrdenesCompraService {
 
     if (aprobacionExistente) {
       if (aprobacionExistente.estado === 'APROBADA') {
-        throw new BadRequestException('Este aprobador ya ha aprobado esta orden de compra');
+        if (existingOrden.estado === 'APROBADA') {
+          throw new BadRequestException('Este aprobador ya ha aprobado esta orden de compra');
+        }
+        console.warn(
+          `⚠️ [ORDEN-COMPRA] Aprobación previa detectada para orden ${id}; se continuará transición de estado pendiente.`,
+        );
+      } else {
+        // Si existe pero está PENDIENTE, actualizar el estado
+        await this.ocAprobacionesRepository.updateEstado(
+          aprobacionExistente.id,
+          'APROBADA',
+          aprobarDto.comentarios
+        );
       }
-      // Si existe pero está PENDIENTE, actualizar el estado
-      await this.ocAprobacionesRepository.updateEstado(
-        aprobacionExistente.id,
-        'APROBADA',
-        aprobarDto.comentarios
-      );
     } else {
       // Crear nuevo registro en oc_aprobaciones
       try {

@@ -13,25 +13,20 @@ export function HelpBot() {
   const [suggestions, setSuggestions] = useState<HelpSuggestion[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false)
-  
+
   const { user } = useTenant()
   const userRole = (user?.roles?.[0] || (user?.is_super_admin ? 'superadmin' : null)) as string | null
 
-  // Cargar sugerencias al abrir
-  useEffect(() => {
-    if (isOpen && suggestions.length === 0) {
-      loadSuggestions()
-    }
-  }, [isOpen])
-
-  const loadSuggestions = async () => {
+  const loadSuggestions = useCallback(async () => {
     setIsSuggestionsLoading(true)
     try {
       const params = new URLSearchParams()
       if (userRole) params.append('rol', userRole)
       params.append('limite', '5')
 
-      const response = await fetch(`/api/help/sugerencias?${params}`)
+      const response = await fetch(`/backend/api/help/sugerencias?${params}`, {
+        credentials: 'include',
+      })
       if (response.ok) {
         const data = await response.json()
         setSuggestions(data.sugerencias || [])
@@ -41,14 +36,23 @@ export function HelpBot() {
     } finally {
       setIsSuggestionsLoading(false)
     }
-  }
+  }, [userRole])
 
-  const searchHelp = async (searchQuery: string): Promise<HelpSearchResult | null> => {
+  // Cargar sugerencias al abrir
+  useEffect(() => {
+    if (isOpen && suggestions.length === 0) {
+      loadSuggestions()
+    }
+  }, [isOpen, loadSuggestions, suggestions.length])
+
+  const searchHelp = useCallback(async (searchQuery: string): Promise<HelpSearchResult | null> => {
     try {
       const params = new URLSearchParams({ q: searchQuery })
       if (userRole) params.append('rol', userRole)
 
-      const response = await fetch(`/api/help/search?${params}`)
+      const response = await fetch(`/backend/api/help/search?${params}`, {
+        credentials: 'include',
+      })
       if (response.ok) {
         const data = await response.json()
         return data.resultado || null
@@ -57,7 +61,7 @@ export function HelpBot() {
       console.error('Error searching help:', error)
     }
     return null
-  }
+  }, [userRole])
 
   const handleSubmit = useCallback(async () => {
     const trimmedQuery = query.trim()
@@ -81,26 +85,17 @@ export function HelpBot() {
     const botMessage: HelpBotMessage = {
       id: `bot-${Date.now()}`,
       type: 'bot',
-      content: result 
-        ? result.respuesta 
+      content: result
+        ? result.respuesta
         : 'No encontré información sobre eso. ¿Puedes reformular tu pregunta?',
       result: result || undefined,
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, botMessage])
     setIsLoading(false)
-  }, [query, userRole])
+  }, [query, searchHelp])
 
-  const handleSuggestionSelect = useCallback((pregunta: string) => {
-    setQuery(pregunta)
-    // Auto-submit después de seleccionar sugerencia
-    setTimeout(() => {
-      const submitEvent = new Event('submit')
-      handleSubmitWithQuery(pregunta)
-    }, 100)
-  }, [])
-
-  const handleSubmitWithQuery = async (searchQuery: string) => {
+  const handleSubmitWithQuery = useCallback(async (searchQuery: string) => {
     // Agregar mensaje del usuario
     const userMessage: HelpBotMessage = {
       id: `user-${Date.now()}`,
@@ -119,15 +114,23 @@ export function HelpBot() {
     const botMessage: HelpBotMessage = {
       id: `bot-${Date.now()}`,
       type: 'bot',
-      content: result 
-        ? result.respuesta 
+      content: result
+        ? result.respuesta
         : 'No encontré información sobre eso. ¿Puedes reformular tu pregunta?',
       result: result || undefined,
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, botMessage])
     setIsLoading(false)
-  }
+  }, [searchHelp])
+
+  const handleSuggestionSelect = useCallback((pregunta: string) => {
+    setQuery(pregunta)
+    // Auto-submit después de seleccionar sugerencia
+    setTimeout(() => {
+      handleSubmitWithQuery(pregunta)
+    }, 100)
+  }, [handleSubmitWithQuery])
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => !prev)

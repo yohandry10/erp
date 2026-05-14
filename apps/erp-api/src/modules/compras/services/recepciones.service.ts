@@ -107,10 +107,10 @@ export class RecepcionesService {
         .select(
           `
             *,
-            orden:ordenes_compra(
+            orden:ordenes_compra!recepciones_orden_id_fkey_runtime(
               id,
               numero,
-              proveedor:proveedores(id, razon_social, ruc)
+              proveedor:proveedores!fk_ordenes_compra_proveedor_id(id, razon_social, ruc)
             )
           `,
         )
@@ -182,7 +182,7 @@ export class RecepcionesService {
         .from('recepciones')
         .select(`
           *,
-          orden:ordenes_compra(
+          orden:ordenes_compra!recepciones_orden_id_fkey_runtime(
             id,
             numero,
             subtotal,
@@ -191,10 +191,10 @@ export class RecepcionesService {
             moneda,
             proveedor:proveedores(id, razon_social, ruc, documento_tipo, documento_numero, condiciones_pago, dias_credito)
           ),
-          items:recepcion_items(
+          items:recepcion_items!recepcion_items_recepcion_id_fkey_runtime(
             *,
-            producto:productos(id, codigo, nombre, sku),
-            detalle:orden_compra_detalles( // HARDENING: obtenemos metadata directa para eventos contables.
+            producto:productos!recepcion_items_producto_id_fkey_runtime(id, codigo, nombre, sku),
+            detalle:orden_compra_detalles!recepcion_items_detalle_id_fkey_runtime(
               id,
               descripcion,
               cantidad,
@@ -257,7 +257,7 @@ export class RecepcionesService {
         .from('ordenes_compra')
         .select(`
           *,
-          detalles:orden_compra_detalles(*)
+          detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(*)
         `)
         .eq('tenant_id', tenantId)
         .eq('id', dto.orden_id)
@@ -324,7 +324,9 @@ export class RecepcionesService {
           lote: item.lote || dto.lote || null,
           serie: item.serie || null,
           fecha_expiracion: item.fecha_expiracion || null,
-          observaciones: item.observaciones || null,
+          metadata: {
+            observaciones: item.observaciones || null,
+          },
         });
       }
 
@@ -925,6 +927,7 @@ export class RecepcionesService {
         condicionesPago: proveedor.condiciones_pago ?? null,
         almacenId: recepcion.items?.[0]?.almacen_id ?? null,
         observaciones: recepcion.observaciones ?? null,
+        inventarioAplicado: true,
         items: itemsWithPrices,
         emittedAt: new Date().toISOString(),
       };

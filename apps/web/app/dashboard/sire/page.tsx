@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import SireReportModal from '@/components/modals/SireReportModal'
+import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 
 interface SireReport {
   id: string
@@ -36,17 +37,64 @@ export default function SIREPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [filters, setFilters] = useState({
     periodo: '',
-    tipoReporte: ''
+    tipoReporte: '',
+    estado: ''
   })
 
-  const api = useApiCall<SireReport[]>()
-  const statsApi = useApiCall<SireStats>()
+  const { get, post, loading } = useApiCall<SireReport[]>()
+  const { get: getStats } = useApiCall<SireStats>()
+
+  const loadReports = useCallback(async () => {
+    const queryParams = new URLSearchParams()
+    if (filters.periodo) queryParams.append('periodo', filters.periodo)
+    if (filters.tipoReporte) queryParams.append('tipoReporte', filters.tipoReporte)
+    if (filters.estado) queryParams.append('estado', filters.estado)
+
+    const response = await get(`/api/sire/reportes?${queryParams}`)
+    const reports = unwrapApiArray<SireReport>(response)
+    if (apiSucceeded(response)) {
+      console.log('📊 SIRE Reports recibidos:', reports)
+      setReports(reports)
+    } else {
+      console.log('❌ No hay reportes SIRE o respuesta incorrecta:', response)
+      setReports([])
+    }
+  }, [get, filters])
+
+  const loadStats = useCallback(async () => {
+    const response = await getStats('/api/sire/stats')
+    if (apiSucceeded(response)) {
+      const stats = unwrapApiObject<SireStats>(response, {
+        reportesDelMes: 0,
+        registrosTotales: 0,
+        enviadosASunat: 0,
+        pendientes: 0
+      })
+      console.log('📊 SIRE Stats recibidas:', stats)
+      setStats(stats)
+    } else {
+      console.log('❌ No hay estadísticas SIRE o respuesta incorrecta:', response)
+      setStats({
+        reportesDelMes: 0,
+        registrosTotales: 0,
+        enviadosASunat: 0,
+        pendientes: 0
+      })
+    }
+  }, [getStats])
+
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      loadReports(),
+      loadStats()
+    ])
+  }, [loadReports, loadStats])
 
   useEffect(() => {
     if (!country.loading && isPeru) {
       loadData()
     }
-  }, [filters, country.loading, isPeru])
+  }, [country.loading, isPeru, loadData])
 
   // Auto-reload when there are reports in GENERANDO state
   useEffect(() => {
@@ -63,7 +111,7 @@ export default function SIREPage() {
 
       return () => clearInterval(interval)
     }
-  }, [reports, isPeru])
+  }, [isPeru, loadData, reports])
 
   if (!country.loading && !isPeru) {
     return (
@@ -78,49 +126,12 @@ export default function SIREPage() {
     )
   }
 
-  const loadData = async () => {
-    await Promise.all([
-      loadReports(),
-      loadStats()
-    ])
-  }
-
-  const loadReports = async () => {
-    const queryParams = new URLSearchParams()
-    if (filters.periodo) queryParams.append('periodo', filters.periodo)
-    if (filters.tipoReporte) queryParams.append('tipoReporte', filters.tipoReporte)
-
-    const response = await api.get(`/api/sire/reportes?${queryParams}`)
-    if (response && response.success && response.data) {
-      console.log('📊 SIRE Reports recibidos:', response.data)
-      setReports(response.data)
-    } else {
-      console.log('❌ No hay reportes SIRE o respuesta incorrecta:', response)
-      setReports([])
-    }
-  }
-
-  const loadStats = async () => {
-    const response = await statsApi.get('/api/sire/stats')
-    if (response && response.success && response.data) {
-      console.log('📊 SIRE Stats recibidas:', response.data)
-      setStats(response.data)
-    } else {
-      console.log('❌ No hay estadísticas SIRE o respuesta incorrecta:', response)
-      setStats({
-        reportesDelMes: 0,
-        registrosTotales: 0,
-        enviadosASunat: 0,
-        pendientes: 0
-      })
-    }
-  }
-
   const downloadReport = async (reportId: string, filename: string) => {
-    const response = await api.get(`/api/sire/reportes/${reportId}/download`)
-    if (response && response.success && response.data) {
+    const response = await get(`/api/sire/reportes/${reportId}/download`)
+    const content = unwrapApiData<string | Blob | null>(response, null)
+    if (apiSucceeded(response) && content) {
       // Create and download the file
-      const blob = new Blob([response.data], { type: 'text/plain' })
+      const blob = new Blob([content], { type: 'text/plain' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -133,8 +144,8 @@ export default function SIREPage() {
   }
 
   const sendToSunat = async (reportId: string) => {
-    const response = await api.post(`/api/sire/reportes/${reportId}/enviar-sunat`)
-    if (response && response.success) {
+    const response = await post(`/api/sire/reportes/${reportId}/enviar-sunat`)
+    if (apiSucceeded(response)) {
       loadReports() // Reload reports to update status
     }
   }
@@ -173,17 +184,17 @@ export default function SIREPage() {
     loadData() // Reload all data when a new report is generated
   }
 
-  if (api.loading && reports.length === 0) {
+  if (loading && reports.length === 0) {
     return (
       <div className="dashboard-container">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              border: '4px solid #f3f4f6', 
-              borderTop: '4px solid #3b82f6', 
-              borderRadius: '50%', 
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
@@ -200,7 +211,7 @@ export default function SIREPage() {
       <div className="dashboard-header">
         <h1 className="dashboard-title">SIRE - Sistema de Registros Electrónicos</h1>
         <p className="dashboard-subtitle">Genera tus reportes para SUNAT</p>
-        <button 
+        <button
           className="refresh-btn"
           onClick={() => setIsModalOpen(true)}
         >
@@ -256,22 +267,22 @@ export default function SIREPage() {
               type="month"
               value={filters.periodo}
               onChange={(e) => setFilters(prev => ({ ...prev, periodo: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.2)',
                 background: 'rgba(255,255,255,0.1)',
                 color: 'white'
               }}
             />
-            
-            <select 
+
+            <select
               value={filters.tipoReporte}
               onChange={(e) => setFilters(prev => ({ ...prev, tipoReporte: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.2)',
                 background: 'rgba(255,255,255,0.1)',
                 color: 'white'
               }}
@@ -281,6 +292,25 @@ export default function SIREPage() {
               <option value="REGISTRO_COMPRAS">Registro de Compras</option>
               <option value="LIBROS_ELECTRONICOS">Libros Electrónicos</option>
               <option value="RETENCIONES">Retenciones</option>
+            </select>
+
+            <select
+              value={filters.estado}
+              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.1)',
+                color: 'white'
+              }}
+            >
+              <option value="">Todos los estados</option>
+              <option value="GENERANDO">Generando</option>
+              <option value="GENERADO">Generado</option>
+              <option value="ENVIADO">Enviado</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="ERROR">Error</option>
             </select>
 
             <button
@@ -338,11 +368,11 @@ export default function SIREPage() {
                         {(report.total_registros || 0).toLocaleString()}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <span style={{ 
+                        <span style={{
                           background: statusColor.background,
-                          color: statusColor.color, 
-                          padding: '0.25rem 0.75rem', 
-                          borderRadius: '20px', 
+                          color: statusColor.color,
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '20px',
                           fontSize: '0.8rem',
                           fontWeight: '500'
                         }}>
@@ -353,28 +383,28 @@ export default function SIREPage() {
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                           {report.estado === 'GENERADO' && (
                             <>
-                              <button 
+                              <button
                                 onClick={() => downloadReport(report.id, report.filename || 'reporte.txt')}
-                                style={{ 
-                                  background: 'rgba(59, 130, 246, 0.1)', 
-                                  border: '1px solid rgba(59, 130, 246, 0.2)', 
-                                  padding: '0.5rem 1rem', 
-                                  borderRadius: '6px', 
-                                  color: '#3b82f6', 
+                                style={{
+                                  background: 'rgba(59, 130, 246, 0.1)',
+                                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '6px',
+                                  color: '#3b82f6',
                                   cursor: 'pointer',
                                   fontSize: '0.8rem'
                                 }}
                               >
                                 Descargar
                               </button>
-                              <button 
+                              <button
                                 onClick={() => sendToSunat(report.id)}
-                                style={{ 
-                                  background: 'rgba(16, 185, 129, 0.1)', 
-                                  border: '1px solid rgba(16, 185, 129, 0.2)', 
-                                  padding: '0.5rem 1rem', 
-                                  borderRadius: '6px', 
-                                  color: '#10b981', 
+                                style={{
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '6px',
+                                  color: '#10b981',
                                   cursor: 'pointer',
                                   fontSize: '0.8rem'
                                 }}
@@ -384,14 +414,14 @@ export default function SIREPage() {
                             </>
                           )}
                           {report.estado === 'ENVIADO' && (
-                            <button 
+                            <button
                               onClick={() => downloadReport(report.id, report.filename || 'reporte.txt')}
-                              style={{ 
-                                background: 'rgba(59, 130, 246, 0.1)', 
-                                border: '1px solid rgba(59, 130, 246, 0.2)', 
-                                padding: '0.5rem 1rem', 
-                                borderRadius: '6px', 
-                                color: '#3b82f6', 
+                              style={{
+                                background: 'rgba(59, 130, 246, 0.1)',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                color: '#3b82f6',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem'
                               }}
@@ -400,8 +430,8 @@ export default function SIREPage() {
                             </button>
                           )}
                           {report.estado === 'GENERANDO' && (
-                            <span style={{ 
-                              padding: '0.5rem 1rem', 
+                            <span style={{
+                              padding: '0.5rem 1rem',
                               fontSize: '0.8rem',
                               color: '#f59e0b'
                             }}>
@@ -409,14 +439,14 @@ export default function SIREPage() {
                             </span>
                           )}
                           {report.estado === 'ERROR' && (
-                            <button 
+                            <button
                               onClick={() => setIsModalOpen(true)}
-                              style={{ 
-                                background: 'rgba(239, 68, 68, 0.1)', 
-                                border: '1px solid rgba(239, 68, 68, 0.2)', 
-                                padding: '0.5rem 1rem', 
-                                borderRadius: '6px', 
-                                color: '#ef4444', 
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                color: '#ef4444',
                                 cursor: 'pointer',
                                 fontSize: '0.8rem'
                               }}
@@ -432,7 +462,7 @@ export default function SIREPage() {
               </tbody>
             </table>
 
-            {reports.length === 0 && !api.loading && (
+            {reports.length === 0 && !loading && (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
                 <h3 style={{ marginBottom: '0.5rem' }}>No hay reportes SIRE</h3>

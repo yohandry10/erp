@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
-import { 
-  FileText, 
-  Filter, 
+import {
+  FileText,
+  Filter,
   RefreshCw,
   ChevronDown,
   ChevronRight,
@@ -16,6 +16,7 @@ import {
   User
 } from 'lucide-react'
 import './audit-logs.css'
+import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
 
 interface AuditLog {
   id: string
@@ -63,21 +64,21 @@ export default function AuditLogsViewer() {
   const [searchTerm, setSearchTerm] = useState('')
   const [users, setUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const response = await get('/api/users')
-      if (response?.success && response.data) {
-        const usersData = Array.isArray(response.data) ? response.data : response.data.data || []
+      if (apiSucceeded(response)) {
+        const usersData = unwrapApiArray<any>(response)
         setUsers(usersData.map((u: any) => ({ id: u.id, nombre: u.nombre || u.email, email: u.email })))
       }
     } catch (err) {
       console.error('Error cargando usuarios:', err)
     }
-  }
+  }, [get])
 
-  useEffect(() => { loadUsers() }, [])
+  useEffect(() => { loadUsers() }, [loadUsers])
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -93,11 +94,12 @@ export default function AuditLogsViewer() {
 
       const response = await get(`/api/audit-logs?${params.toString()}`)
 
-      if (response) {
-        const logsData = response.data?.data ?? response.data ?? []
-        const paginationData = response.data?.pagination ?? response.pagination ?? pagination
+      if (apiSucceeded(response)) {
+        const payload = unwrapApiData<any>(response, {})
+        const logsData = Array.isArray(payload) ? payload : payload.data ?? []
+        const paginationData = payload.pagination ?? (response as any)?.pagination
         setLogs(Array.isArray(logsData) ? logsData : [])
-        setPagination(paginationData)
+        setPagination(prev => paginationData ?? prev)
       } else {
         throw new Error('Error al cargar logs de auditoría')
       }
@@ -107,11 +109,11 @@ export default function AuditLogsViewer() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
 
   useEffect(() => {
     loadLogs()
-  }, [filters.page, filters.limit, filters.table_name, filters.operation, filters.user_id, filters.start_date, filters.end_date])
+  }, [loadLogs])
 
   const toggleExpand = (logId: string) => {
     const newExpanded = new Set(expandedLogs)
@@ -325,7 +327,7 @@ export default function AuditLogsViewer() {
                         <span className="audit-record-id">ID: {log.record_id.substring(0, 8)}...</span>
                       )}
                     </div>
-                    
+
                     <div className="audit-log-meta">
                       <span className="audit-meta-item">
                         <Clock size={14} />

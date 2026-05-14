@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApi } from './use-api'
+import { apiSucceeded, unwrapApiData } from '@/lib/api-contract'
 
 interface FiscalConfig {
   paisCodigo: string
@@ -23,8 +24,9 @@ export function useFiscalConfig() {
       try {
         const response = await get('/cpe/fiscal-config')
         
-        if (response.success && response.data) {
-          setConfig(response.data)
+        const config = unwrapApiData<FiscalConfig | null>(response, null)
+        if (apiSucceeded(response) && config) {
+          setConfig(config)
         } else {
           // Default to Peru if no config
           setConfig({

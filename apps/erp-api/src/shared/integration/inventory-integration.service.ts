@@ -85,6 +85,13 @@ export class InventoryIntegrationService {
 
   async procesarVentaParaInventario(venta: VentaProcessedEvent): Promise<void> {
     try {
+      if (venta.inventarioAplicado) {
+        this.logger.log(
+          `⏭️ [Inventario] Venta ${venta.numeroTicket} omitida: inventario ya aplicado por el flujo de pedidos`,
+        );
+        return;
+      }
+
       // ✅ MULTI-TENANT: Extraer tenant_id del evento
       const tenantId = venta.tenantId;
       if (!tenantId) {
@@ -122,6 +129,13 @@ export class InventoryIntegrationService {
 
   async procesarCompraParaInventario(compra: CompraEntregadaEvent): Promise<void> {
     try {
+      if (compra.inventarioAplicado) {
+        this.logger.log(
+          `⏭️ [Inventario] Compra ${compra.numeroOrden} omitida: inventario ya aplicado por recepción`,
+        );
+        return;
+      }
+
       // ✅ MULTI-TENANT: Extraer tenant_id del evento
       const tenantId = compra.tenantId;
       if (!tenantId) {
@@ -289,7 +303,7 @@ export class InventoryIntegrationService {
           cantidad: movimiento.cantidad,
           motivo: movimiento.motivo,
           referencia: movimiento.referencia || null,
-          usuario_id: 'sistema', // Usar string fijo para evitar problemas de foreign key
+          usuario_id: null,
           created_at: new Date().toISOString()
         })
         .select()

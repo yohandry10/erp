@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import DocumentoModal from '@/components/modals/DocumentoModal'
+import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 
 interface Documento {
   id: string
@@ -44,31 +45,25 @@ export default function DocumentosPage() {
     serie: ''
   })
 
-  const api = useApiCall<Documento[]>()
-  const statsApi = useApiCall<DocumentoStats>()
+  const {
+    get: getDocumentos,
+    post: postDocumentoAction,
+    loading: documentosLoading,
+  } = useApiCall<Documento[]>()
+  const { get: getStats } = useApiCall<DocumentoStats>()
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
-    await Promise.all([
-      loadDocumentos(),
-      loadStats()
-    ])
-  }
-
-  const loadDocumentos = async () => {
+  const loadDocumentos = useCallback(async () => {
     try {
       const queryParams = new URLSearchParams()
       Object.entries(filters).forEach(([key, value]) => {
         if (value) queryParams.append(key, value)
       })
 
-      const response = await api.get(`/api/documentos/lista?${queryParams}`)
-      if (response && response.success && response.data) {
-        console.log('📊 Documentos recibidos:', response.data)
-        setDocumentos(response.data)
+      const response = await getDocumentos(`/api/documentos/lista?${queryParams}`)
+      const documentos = unwrapApiArray<Documento>(response)
+      if (apiSucceeded(response)) {
+        console.log('📊 Documentos recibidos:', documentos)
+        setDocumentos(documentos)
       } else {
         console.log('❌ No hay documentos o respuesta incorrecta:', response)
         setDocumentos([])
@@ -77,14 +72,22 @@ export default function DocumentosPage() {
       console.error('💥 Error al cargar documentos:', error)
       setDocumentos([])
     }
-  }
+  }, [filters, getDocumentos])
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
-      const response = await statsApi.get('/api/documentos/stats')
-      if (response && response.success && response.data) {
-        console.log('📊 Stats documentos recibidas:', response.data)
-        setStats(response.data)
+      const response = await getStats('/api/documentos/stats')
+      if (apiSucceeded(response)) {
+        const stats = unwrapApiObject<DocumentoStats>(response, {
+          totalDocumentos: 0,
+          facturas: 0,
+          boletas: 0,
+          notasCredito: 0,
+          contratos: 0,
+          pendientesEnvio: 0
+        })
+        console.log('📊 Stats documentos recibidas:', stats)
+        setStats(stats)
       } else {
         console.log('❌ No hay estadísticas documentos o respuesta incorrecta:', response)
         setStats({
@@ -107,11 +110,22 @@ export default function DocumentosPage() {
         pendientesEnvio: 0
       })
     }
-  }
+  }, [getStats])
+
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      loadDocumentos(),
+      loadStats()
+    ])
+  }, [loadDocumentos, loadStats])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const enviarFiscal = async (documentoId: string) => {
-    const response = await api.post(`/api/documentos/${documentoId}/enviar-sunat`)
-    if (response && response.success) {
+    const response = await postDocumentoAction(`/api/documentos/${documentoId}/enviar-sunat`)
+    if (apiSucceeded(response)) {
       loadDocumentos() // Reload documents to update status
       showSuccessToast(`Documento enviado a ${country.servicioFiscal} correctamente`)
     } else {
@@ -120,8 +134,8 @@ export default function DocumentosPage() {
   }
 
   const generarXML = async (documentoId: string) => {
-    const response = await api.post(`/api/documentos/${documentoId}/generar-xml`)
-    if (response && response.success) {
+    const response = await postDocumentoAction(`/api/documentos/${documentoId}/generar-xml`)
+    if (apiSucceeded(response)) {
       loadDocumentos() // Reload documents
       showSuccessToast('XML generado correctamente')
     } else {
@@ -130,10 +144,11 @@ export default function DocumentosPage() {
   }
 
   const descargarPDF = async (documentoId: string, filename: string) => {
-    const response = await api.get(`/api/documentos/${documentoId}/descargar-pdf`)
-    if (response && response.success && response.data) {
+    const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-pdf`)
+    const pdf = unwrapApiData<string | Blob | null>(response, null)
+    if (apiSucceeded(response) && pdf) {
       // Create and download the file
-      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const blob = new Blob([pdf], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -147,10 +162,11 @@ export default function DocumentosPage() {
   }
 
   const descargarXML = async (documentoId: string, filename: string) => {
-    const response = await api.get(`/api/documentos/${documentoId}/descargar-xml`)
-    if (response && response.success && response.data) {
+    const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-xml`)
+    const xml = unwrapApiData<string | Blob | null>(response, null)
+    if (apiSucceeded(response) && xml) {
       // Create and download the file
-      const blob = new Blob([response.data], { type: 'application/xml' })
+      const blob = new Blob([xml], { type: 'application/xml' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -164,8 +180,8 @@ export default function DocumentosPage() {
   }
 
   const anularDocumento = async (documentoId: string, motivo: string) => {
-    const response = await api.post(`/api/documentos/${documentoId}/anular`, { motivo })
-    if (response && response.success) {
+    const response = await postDocumentoAction(`/api/documentos/${documentoId}/anular`, { motivo })
+    if (apiSucceeded(response)) {
       loadDocumentos()
       showSuccessToast('Documento anulado correctamente')
     } else {
@@ -288,17 +304,17 @@ export default function DocumentosPage() {
     }
   }
 
-  if (api.loading && documentos.length === 0) {
+  if (documentosLoading && documentos.length === 0) {
     return (
       <div className="dashboard-container">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              border: '4px solid #f3f4f6', 
-              borderTop: '4px solid #3b82f6', 
-              borderRadius: '50%', 
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
@@ -315,7 +331,7 @@ export default function DocumentosPage() {
       <div className="dashboard-header">
         <h1 className="dashboard-title">Gestión Documental y Facturación Electrónica</h1>
         <p className="dashboard-subtitle">Gestiona facturas, boletas, notas y contratos con validación {country.servicioFiscal}</p>
-        <button 
+        <button
           className="refresh-btn"
           onClick={() => setIsModalOpen(true)}
         >
@@ -381,18 +397,18 @@ export default function DocumentosPage() {
       </div>
 
       {/* Filters */}
-      <div style={{ 
-        background: 'white', 
-        padding: '1.5rem', 
-        borderRadius: '12px', 
+      <div style={{
+        background: 'white',
+        padding: '1.5rem',
+        borderRadius: '12px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         marginBottom: '1.5rem'
       }}>
         <h3 style={{ marginBottom: '1rem', color: '#1f2937' }}>Filtros de búsqueda</h3>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '1rem' 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1rem'
         }}>
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Tipo de Documento</label>
@@ -525,14 +541,14 @@ export default function DocumentosPage() {
       </div>
 
       {/* Documents List */}
-      <div style={{ 
-        background: 'white', 
-        borderRadius: '12px', 
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
         overflow: 'hidden',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        <div style={{ 
-          padding: '1.5rem', 
+        <div style={{
+          padding: '1.5rem',
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           justifyContent: 'space-between',
@@ -626,31 +642,31 @@ export default function DocumentosPage() {
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       {documento.estado === 'BORRADOR' && (
                         <>
-                          <button 
+                          <button
                             onClick={() => generarXML(documento.id)}
-                            style={{ 
-                              background: 'rgba(59, 130, 246, 0.1)', 
-                              border: '1px solid rgba(59, 130, 246, 0.2)', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '6px', 
-                              color: '#3b82f6', 
+                            style={{
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              border: '1px solid rgba(59, 130, 246, 0.2)',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              color: '#3b82f6',
                               cursor: 'pointer',
                               fontSize: '0.75rem'
                             }}
                           >
                             Generar XML
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               setSelectedDocumento(documento)
                               setIsModalOpen(true)
                             }}
-                            style={{ 
-                              background: 'rgba(107, 114, 128, 0.1)', 
-                              border: '1px solid rgba(107, 114, 128, 0.2)', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '6px', 
-                              color: '#6b7280', 
+                            style={{
+                              background: 'rgba(107, 114, 128, 0.1)',
+                              border: '1px solid rgba(107, 114, 128, 0.2)',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              color: '#6b7280',
                               cursor: 'pointer',
                               fontSize: '0.75rem'
                             }}
@@ -660,14 +676,14 @@ export default function DocumentosPage() {
                         </>
                       )}
                       {documento.estado === 'EMITIDO' && (
-                        <button 
+                        <button
                           onClick={() => enviarFiscal(documento.id)}
-                          style={{ 
-                            background: 'rgba(16, 185, 129, 0.1)', 
-                            border: '1px solid rgba(16, 185, 129, 0.2)', 
-                            padding: '0.25rem 0.75rem', 
-                            borderRadius: '6px', 
-                            color: '#10b981', 
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            color: '#10b981',
                             cursor: 'pointer',
                             fontSize: '0.75rem'
                           }}
@@ -677,28 +693,28 @@ export default function DocumentosPage() {
                       )}
                       {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
                         <>
-                          <button 
+                          <button
                             onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)}
-                            style={{ 
-                              background: 'rgba(239, 68, 68, 0.1)', 
-                              border: '1px solid rgba(239, 68, 68, 0.2)', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '6px', 
-                              color: '#ef4444', 
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.2)',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              color: '#ef4444',
                               cursor: 'pointer',
                               fontSize: '0.75rem'
                             }}
                           >
                             PDF
                           </button>
-                          <button 
+                          <button
                             onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)}
-                            style={{ 
-                              background: 'rgba(59, 130, 246, 0.1)', 
-                              border: '1px solid rgba(59, 130, 246, 0.2)', 
-                              padding: '0.25rem 0.75rem', 
-                              borderRadius: '6px', 
-                              color: '#3b82f6', 
+                            style={{
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              border: '1px solid rgba(59, 130, 246, 0.2)',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              color: '#3b82f6',
                               cursor: 'pointer',
                               fontSize: '0.75rem'
                             }}
@@ -708,19 +724,19 @@ export default function DocumentosPage() {
                         </>
                       )}
                       {!['ANULADO'].includes(documento.estado) && (
-                        <button 
+                        <button
                           onClick={() => {
                             const motivo = prompt('Ingrese el motivo de anulación:')
                             if (motivo) {
                               anularDocumento(documento.id, motivo)
                             }
                           }}
-                          style={{ 
-                            background: 'rgba(220, 38, 38, 0.1)', 
-                            border: '1px solid rgba(220, 38, 38, 0.2)', 
-                            padding: '0.25rem 0.75rem', 
-                            borderRadius: '6px', 
-                            color: '#dc2626', 
+                          style={{
+                            background: 'rgba(220, 38, 38, 0.1)',
+                            border: '1px solid rgba(220, 38, 38, 0.2)',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            color: '#dc2626',
                             cursor: 'pointer',
                             fontSize: '0.75rem'
                           }}
@@ -735,7 +751,7 @@ export default function DocumentosPage() {
             </tbody>
           </table>
 
-          {documentos.length === 0 && !api.loading && (
+          {documentos.length === 0 && !documentosLoading && (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
               <h3 style={{ marginBottom: '0.5rem' }}>No hay documentos registrados</h3>
@@ -778,4 +794,4 @@ export default function DocumentosPage() {
       `}</style>
     </div>
   )
-} 
+}

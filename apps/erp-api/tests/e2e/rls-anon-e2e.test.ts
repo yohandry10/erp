@@ -14,7 +14,7 @@
 
 import assert from 'assert';
 import { createClient } from '@supabase/supabase-js';
-import { getTestClient, skipIfNoSupabase } from './helpers/supabase-test-client';
+import { getTestClient, requireSupabaseAvailable } from './helpers/supabase-test-client';
 
 type AsyncTest = () => Promise<void>;
 
@@ -30,15 +30,14 @@ function test(name: string, fn: AsyncTest) {
 }
 
 test('E2E RLS/GRANTS – anon no debe poder leer tablas de auth/roles', async () => {
-  if (await skipIfNoSupabase()) return;
+  await requireSupabaseAvailable();
 
   const supabaseServiceRole = getTestClient().getClient();
   const url = process.env.SUPABASE_URL || 'http://localhost:54321';
   const anonKey = process.env.SUPABASE_ANON_KEY || '';
 
   if (!anonKey) {
-    console.warn('⚠️ SUPABASE_ANON_KEY no configurada. Saltando test de anon.');
-    return;
+    assert.fail('SUPABASE_ANON_KEY es requerida para validar RLS/GRANTS del rol anon');
   }
 
   const supabaseAnon = createClient(url, anonKey, {
@@ -80,7 +79,7 @@ test('E2E RLS/GRANTS – anon no debe poder leer tablas de auth/roles', async ()
   });
 
   if (authCreateError || !authUser?.user?.id) {
-    console.warn('⚠️ No se pudo crear usuario auth (saltando seed usuarios_sistema):', authCreateError?.message);
+    assert.fail(`No se pudo crear usuario auth para seed RLS anon: ${authCreateError?.message}`);
   } else {
     const userId = authUser.user.id;
     await supabaseServiceRole.from('usuarios_sistema').insert({
@@ -138,7 +137,7 @@ test('E2E RLS/GRANTS – anon no debe poder leer tablas de auth/roles', async ()
 });
 
 async function run() {
-  if (await skipIfNoSupabase()) return;
+  await requireSupabaseAvailable();
   for (const t of tests) {
     try {
       console.log(`\n🧪 ${t.name}`);
@@ -153,4 +152,3 @@ async function run() {
 }
 
 void run();
-

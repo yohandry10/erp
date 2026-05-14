@@ -43,8 +43,7 @@ test('E2E RRHH – Tablas principales existen', async () => {
   
   if (empError) {
     if (empError.message.includes('does not exist') || empError.message.includes('relation')) {
-      console.warn('⚠️ Tabla empleados no existe - módulo RRHH puede no estar configurado');
-      return;
+      assert.fail('Tabla empleados no existe para validar el flujo RRHH real');
     }
   }
   assert.ok(!empError, `Tabla empleados debe existir: ${empError?.message}`);
@@ -104,9 +103,8 @@ test('E2E RRHH – Crear departamento', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla departamentos no existe - saltando test');
+    assert.fail('Tabla departamentos no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear departamento
@@ -153,9 +151,8 @@ test('E2E RRHH – Crear empleado con departamento', async () => {
 
   if ((checkEmp && checkEmp.message.includes('does not exist')) ||
       (checkDep && checkDep.message.includes('does not exist'))) {
-    console.warn('⚠️ Tablas de RRHH no existen - saltando test');
+    assert.fail('Tablas de RRHH no existen para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear departamento
@@ -218,10 +215,9 @@ test('E2E RRHH – RLS aísla empleados entre tenants', async () => {
   // Verificar si tabla empleados existe
   const { error: checkError } = await supabase.from('empleados').select('id').limit(1);
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla empleados no existe - saltando test');
+    assert.fail('Tabla empleados no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantA);
     await supabase.from('tenants').delete().eq('id', tenantB);
-    return;
   }
 
   // Crear empleados en cada tenant
@@ -301,9 +297,8 @@ test('E2E RRHH – Crear contrato de empleado', async () => {
 
   if ((checkEmp && checkEmp.message.includes('does not exist')) ||
       (checkCont && checkCont.message.includes('does not exist'))) {
-    console.warn('⚠️ Tablas de RRHH no existen - saltando test');
+    assert.fail('Tablas de RRHH no existen para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear empleado
@@ -370,9 +365,8 @@ test('E2E RRHH – Registrar asistencia', async () => {
 
   if ((checkEmp && checkEmp.message.includes('does not exist')) ||
       (checkAsist && checkAsist.message.includes('does not exist'))) {
-    console.warn('⚠️ Tablas de RRHH no existen - saltando test');
+    assert.fail('Tablas de RRHH no existen para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear empleado
@@ -438,9 +432,8 @@ test('E2E RRHH – Crear solicitud de vacaciones', async () => {
 
   if ((checkEmp && checkEmp.message.includes('does not exist')) ||
       (checkSol && checkSol.message.includes('does not exist'))) {
-    console.warn('⚠️ Tablas de RRHH no existen - saltando test');
+    assert.fail('Tablas de RRHH no existen para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear empleado
@@ -512,9 +505,8 @@ test('E2E RRHH – Tipos NUMERIC correctos para sueldos', async () => {
 
   if ((checkEmp && checkEmp.message.includes('does not exist')) ||
       (checkCont && checkCont.message.includes('does not exist'))) {
-    console.warn('⚠️ Tablas de RRHH no existen - saltando test');
+    assert.fail('Tablas de RRHH no existen para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear empleado

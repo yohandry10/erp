@@ -74,14 +74,15 @@ export class SupabaseTestClient {
   async setTenantContext(tenantId: string): Promise<void> {
     this.tenantId = tenantId;
     // Configurar el tenant_id en la sesión de PostgreSQL
-    await this.client.rpc('set_config', {
+    const { error } = await this.client.rpc('set_config', {
       setting: 'app.current_tenant_id',
       value: tenantId,
       is_local: true,
-    }).catch(() => {
-      // Si la función no existe, intentar con SET directo
-      console.warn('set_config RPC no disponible, usando alternativa');
     });
+
+    if (error) {
+      throw new Error(`No se pudo configurar contexto tenant ${tenantId}: ${error.message}`);
+    }
   }
 
   /**
@@ -221,18 +222,22 @@ export function getTestClient(): SupabaseTestClient {
 }
 
 /**
- * Helper para saltar tests si Supabase no está disponible
+ * Helper estricto para tests E2E reales: la suite debe fallar si Supabase
+ * no está disponible, no pasar como "saltada".
  */
-export async function skipIfNoSupabase(): Promise<boolean> {
+export async function requireSupabaseAvailable(): Promise<void> {
   try {
     const client = getTestClient();
     const available = await client.isAvailable();
     if (!available) {
-      console.warn('⚠️ Supabase local no disponible. Saltando tests E2E.');
-      console.warn('   Ejecuta: npx supabase start');
+      throw new Error('Supabase local no disponible. Ejecuta `npx supabase start` y aplica migraciones antes de correr E2E.');
     }
-    return !available;
-  } catch {
-    return true;
+  } catch (error: any) {
+    throw new Error(error?.message || 'Supabase local no disponible para E2E.');
   }
+}
+
+export async function skipIfNoSupabase(): Promise<boolean> {
+  await requireSupabaseAvailable();
+  return false;
 }

@@ -113,4 +113,77 @@ describe('UserManagementService', () => {
     it('should have resetPassword method', () => {
         expect(service.resetPassword).toBeDefined();
     });
+
+    describe('Aislamiento multi-tenant (P2.2)', () => {
+        it('getUserById debe filtrar por tenant y no devolver datos de otro tenant', async () => {
+            const tenantA = 'tenant-a';
+            const tenantB = 'tenant-b';
+            const userId = 'user-b';
+
+            mockSupabaseClient.single.mockResolvedValue({
+                data: null,
+                error: { message: 'No encontrado' },
+            });
+
+            await expect(service.getUserById(tenantA, userId)).rejects.toThrow(NotFoundException);
+
+            expect(mockSupabaseClient.from).toHaveBeenCalledWith('usuarios_sistema');
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
+            expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', tenantB);
+        });
+
+        it('updateUser no debe actualizar usuario fuera de su tenant', async () => {
+            const tenantA = 'tenant-a';
+            const tenantB = 'tenant-b';
+            const userId = 'user-cross-tenant';
+
+            mockSupabaseClient.single.mockResolvedValue({
+                data: null,
+                error: { message: 'No encontrado' },
+            });
+
+            await expect(
+                service.updateUser(tenantA, userId, {
+                    nombre: 'Nombre',
+                }),
+            ).rejects.toThrow(NotFoundException);
+
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
+            expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', tenantB);
+        });
+
+        it('createUser debe insertar con el tenant del contexto y no con valores externos', async () => {
+            const tenantA = 'tenant-a';
+            const dto = {
+                nombre: 'Usuario Test',
+                apellido: 'Apellido',
+                email: 'tenant-a@example.com',
+                telefono: '+51999999999',
+                cargo: 'Analista',
+                departamento: 'IT',
+                roles: [],
+            };
+
+            mockSupabaseClient.single
+                .mockResolvedValueOnce({ data: null, error: null }) // No existe duplicado
+                .mockResolvedValueOnce({ // Registro insertado
+                    data: {
+                        id: 'user-created',
+                        tenant_id: tenantA,
+                        nombre: dto.nombre,
+                        apellido: dto.apellido,
+                        email: dto.email,
+                    },
+                    error: null,
+                });
+
+            await service.createUser(tenantA, dto);
+
+            const insertedPayload = mockSupabaseClient.insert.mock.calls[0][0];
+            expect(insertedPayload).toMatchObject({
+                tenant_id: tenantA,
+            });
+            expect(insertedPayload).not.toHaveProperty('tenant_id', 'tenant-b');
+        });
+    });
 });

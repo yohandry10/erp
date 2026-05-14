@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import GreModal from '@/components/modals/GreModal'
 import GreViewModal from '@/components/modals/GreViewModal'
+import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 
 interface GreDocument {
   id: string
@@ -42,42 +43,38 @@ export default function GREPage() {
     fechaHasta: ''
   })
 
-  const api = useApiCall<GreDocument[]>()
-  const statsApi = useApiCall<GreStats>()
+  const { get, loading } = useApiCall<GreDocument[]>({ timeoutMs: 6000, retries: 1 })
+  const { get: getStats } = useApiCall<GreStats>({ timeoutMs: 6000, retries: 1 })
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
-    await Promise.all([
-      loadDocuments(),
-      loadStats()
-    ])
-  }
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     const queryParams = new URLSearchParams()
     if (filters.modalidad) queryParams.append('modalidad', filters.modalidad)
     if (filters.estado) queryParams.append('estado', filters.estado)
     if (filters.fechaDesde) queryParams.append('fechaDesde', filters.fechaDesde)
     if (filters.fechaHasta) queryParams.append('fechaHasta', filters.fechaHasta)
 
-    const response = await api.get(`/api/gre/guias?${queryParams}`)
-    if (response && response.success && response.data) {
-      console.log('📋 GRE Data recibida:', response.data)
-      setDocuments(response.data)
+    const response = await get(`/api/gre/guias?${queryParams}`)
+    const documents = unwrapApiArray<GreDocument>(response)
+    if (apiSucceeded(response)) {
+      console.log('📋 GRE Data recibida:', documents)
+      setDocuments(documents)
     } else {
       console.log('❌ No hay datos de GRE o respuesta incorrecta:', response)
       setDocuments([])
     }
-  }
+  }, [get, filters])
 
-  const loadStats = async () => {
-    const response = await statsApi.get('/api/gre/stats')
-    if (response && response.success && response.data) {
-      console.log('📊 GRE Stats recibidas:', response.data)
-      setStats(response.data)
+  const loadStats = useCallback(async () => {
+    const response = await getStats('/api/gre/stats')
+    if (apiSucceeded(response)) {
+      const stats = unwrapApiObject<GreStats>(response, {
+        greEmitidas: 0,
+        totalGre: 0,
+        enTransito: 0,
+        completados: 0
+      })
+      console.log('📊 GRE Stats recibidas:', stats)
+      setStats(stats)
     } else {
       console.log('❌ No hay estadísticas de GRE o respuesta incorrecta:', response)
       setStats({
@@ -87,10 +84,21 @@ export default function GREPage() {
         completados: 0
       })
     }
-  }
+  }, [getStats])
+
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      loadDocuments(),
+      loadStats()
+    ])
+  }, [loadDocuments, loadStats])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const generateReport = async () => {
-    const data = await api.get('/api/gre/reporte')
+    const data = await get('/api/gre/reporte')
     if (data) {
       // Create and download the report
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -153,17 +161,17 @@ export default function GREPage() {
     setIsViewModalOpen(true)
   }
 
-  if (api.loading && documents.length === 0) {
+  if (loading && documents.length === 0) {
     return (
       <div className="dashboard-container">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              border: '4px solid #f3f4f6', 
-              borderTop: '4px solid #3b82f6', 
-              borderRadius: '50%', 
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
@@ -181,14 +189,14 @@ export default function GREPage() {
         <h1 className="dashboard-title">Guías de Remisión Electrónica (GRE)</h1>
         <p className="dashboard-subtitle">Gestiona guías de remisión y transportes</p>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
+          <button
             className="refresh-btn"
             onClick={generateReport}
             style={{ background: 'rgba(16, 185, 129, 0.2)', borderColor: '#10b981' }}
           >
             + Generar Reporte
           </button>
-          <button 
+          <button
             className="refresh-btn"
             onClick={() => setIsModalOpen(true)}
           >
@@ -241,13 +249,13 @@ export default function GREPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="activity-title">Lista de Guías de Remisión</h2>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <select 
+            <select
               value={filters.modalidad}
               onChange={(e) => setFilters(prev => ({ ...prev, modalidad: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.2)',
                 background: 'rgba(255,255,255,0.1)',
                 color: 'white'
               }}
@@ -256,14 +264,14 @@ export default function GREPage() {
               <option value="TRANSPORTE_PUBLICO">Transporte Público</option>
               <option value="TRANSPORTE_PRIVADO">Transporte Privado</option>
             </select>
-            
-            <select 
+
+            <select
               value={filters.estado}
               onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
-              style={{ 
-                padding: '0.5rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid rgba(255,255,255,0.2)', 
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.2)',
                 background: 'rgba(255,255,255,0.1)',
                 color: 'white'
               }}
@@ -370,11 +378,11 @@ export default function GREPage() {
                         {doc.pesoTotal} Kg
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <span style={{ 
+                        <span style={{
                           background: statusColor.background,
-                          color: statusColor.color, 
-                          padding: '0.25rem 0.75rem', 
-                          borderRadius: '20px', 
+                          color: statusColor.color,
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '20px',
                           fontSize: '0.8rem',
                           fontWeight: '500'
                         }}>
@@ -383,27 +391,33 @@ export default function GREPage() {
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                          <button 
+                          <button
                             onClick={() => viewDocument(doc.id)}
-                            style={{ 
-                              background: 'rgba(59, 130, 246, 0.1)', 
-                              border: '1px solid rgba(59, 130, 246, 0.2)', 
-                              padding: '0.5rem 1rem', 
-                              borderRadius: '6px', 
-                              color: '#3b82f6', 
+                            style={{
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              border: '1px solid rgba(59, 130, 246, 0.2)',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '6px',
+                              color: '#3b82f6',
                               cursor: 'pointer',
                               fontSize: '0.8rem'
                             }}
                           >
                             Ver
                           </button>
-                          <button style={{ 
-                            background: 'rgba(16, 185, 129, 0.1)', 
-                            border: '1px solid rgba(16, 185, 129, 0.2)', 
-                            padding: '0.5rem 1rem', 
-                            borderRadius: '6px', 
-                            color: '#10b981', 
-                            cursor: 'pointer',
+                          <button
+                            type="button"
+                            disabled
+                            title="Representación PDF GRE no disponible en este entorno"
+                            aria-label="PDF GRE no disponible"
+                            style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '6px',
+                            color: '#10b981',
+                            cursor: 'not-allowed',
+                            opacity: 0.65,
                             fontSize: '0.8rem'
                           }}>
                             PDF
@@ -416,7 +430,7 @@ export default function GREPage() {
               </tbody>
             </table>
 
-            {Array.isArray(documents) && documents.length === 0 && !api.loading && (
+            {Array.isArray(documents) && documents.length === 0 && !loading && (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🚚</div>
                 <h3 style={{ marginBottom: '0.5rem' }}>No hay guías de remisión</h3>

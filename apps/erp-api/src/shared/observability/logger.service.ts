@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TracingService } from '../tracing/tracing.service';
 import { MetricsService } from './metrics.service';
+import { redactSensitiveData } from '../utils/redact-sensitive';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
@@ -103,7 +104,7 @@ export class LoggerService {
       operation: options?.operation,
       duration: options?.duration,
       statusCode: options?.statusCode,
-      metadata,
+      metadata: metadata ? (redactSensitiveData(metadata) as Record<string, any>) : undefined,
       tags: options?.tags,
     };
 
@@ -119,11 +120,11 @@ export class LoggerService {
 
     // Enviar a diferentes destinos
     if (this.config.enableConsole) {
-      this.logToConsole(logEntry);
+      this.logToConsole(redactSensitiveData(logEntry) as LogEntry);
     }
 
     if (this.config.enableFile) {
-      this.logToFile(logEntry);
+      this.logToFile(redactSensitiveData(logEntry) as LogEntry);
     }
 
     // Registrar métricas de logging

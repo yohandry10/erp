@@ -212,6 +212,8 @@ ON public.usuario_configuracion (usuario_id);
 -- ----------------------------------------------------------------------------
 -- Inventario y stock (tipos/columnas usadas por RPC)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vista_pos_productos;
+
 ALTER TABLE IF EXISTS public.productos
   ADD COLUMN IF NOT EXISTS stock numeric(14,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS precio_unitario numeric(14,2) DEFAULT 0;
@@ -230,6 +232,18 @@ ALTER TABLE IF EXISTS public.productos
   ALTER COLUMN stock SET DEFAULT 0,
   ALTER COLUMN stock_actual SET DEFAULT 0,
   ALTER COLUMN stock_reservado SET DEFAULT 0;
+
+CREATE OR REPLACE VIEW public.vista_pos_productos AS
+SELECT
+  p.id,
+  p.tenant_id,
+  p.codigo,
+  p.nombre,
+  COALESCE(p.activo, true) AS activo,
+  COALESCE(p.precio_venta, p.precio, 0::numeric) AS precio_venta,
+  COALESCE(p.stock_actual, 0::numeric) AS stock_actual,
+  COALESCE(p.stock_reservado, 0::numeric) AS stock_reservado
+FROM public.productos p;
 
 ALTER TABLE IF EXISTS public.producto_existencias
   ADD COLUMN IF NOT EXISTS almacen_id uuid,
@@ -250,6 +264,8 @@ ALTER TABLE IF EXISTS public.producto_existencias
 CREATE UNIQUE INDEX IF NOT EXISTS ux_producto_existencias_tenant_producto_almacen
 ON public.producto_existencias (tenant_id, producto_id, almacen_id);
 
+DROP VIEW IF EXISTS public.vw_kardex_valorizado;
+
 ALTER TABLE IF EXISTS public.movimientos_inventario
   ADD COLUMN IF NOT EXISTS almacen_id uuid,
   ADD COLUMN IF NOT EXISTS ubicacion_id uuid,
@@ -262,9 +278,24 @@ ALTER TABLE IF EXISTS public.movimientos_inventario
 CREATE INDEX IF NOT EXISTS idx_movimientos_inventario_tenant_producto_created
 ON public.movimientos_inventario (tenant_id, producto_id, created_at DESC);
 
+CREATE OR REPLACE VIEW public.vw_kardex_valorizado AS
+SELECT
+  m.id AS movimiento_id,
+  m.tenant_id,
+  m.producto_id,
+  m.tipo_movimiento,
+  m.cantidad,
+  m.created_at
+FROM public.movimientos_inventario m;
+
 -- ----------------------------------------------------------------------------
 -- Caja/POS (tipos y columnas para RPC)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_turnos_metrics;
+DROP VIEW IF EXISTS public.vw_sesiones_caja_resumen;
+DROP VIEW IF EXISTS public.vw_sesiones_activas;
+DROP VIEW IF EXISTS public.vw_ranking_cajeros;
+
 ALTER TABLE IF EXISTS public.sesiones_caja
   ADD COLUMN IF NOT EXISTS abierto_por uuid,
   ADD COLUMN IF NOT EXISTS monto_esperado numeric(14,2) DEFAULT 0,
@@ -298,6 +329,41 @@ ALTER TABLE IF EXISTS public.sesiones_caja
 
 CREATE INDEX IF NOT EXISTS idx_sesiones_caja_tenant_estado_apertura
 ON public.sesiones_caja (tenant_id, estado, hora_apertura DESC);
+
+CREATE OR REPLACE VIEW public.vw_ranking_cajeros AS
+SELECT
+  s.tenant_id,
+  s.cajero_id,
+  COUNT(*) AS total_sesiones,
+  COALESCE(SUM(s.total_efectivo), 0) AS total_efectivo,
+  COALESCE(SUM(s.total_tarjeta), 0) AS total_tarjeta
+FROM public.sesiones_caja s
+GROUP BY s.tenant_id, s.cajero_id;
+
+CREATE OR REPLACE VIEW public.vw_sesiones_activas AS
+SELECT
+  s.*
+FROM public.sesiones_caja s
+WHERE s.estado = 'ABIERTA';
+
+CREATE OR REPLACE VIEW public.vw_sesiones_caja_resumen AS
+SELECT
+  s.tenant_id,
+  s.id AS sesion_id,
+  s.estado,
+  COALESCE(s.total_efectivo, 0) AS total_efectivo,
+  COALESCE(s.total_tarjeta, 0) AS total_tarjeta,
+  COALESCE(s.total_efectivo, 0) + COALESCE(s.total_tarjeta, 0) AS total_sesion
+FROM public.sesiones_caja s;
+
+CREATE OR REPLACE VIEW public.vw_turnos_metrics AS
+SELECT
+  s.tenant_id,
+  s.cajero_id,
+  COUNT(*) AS total_turnos,
+  SUM(COALESCE(s.total_efectivo, 0) + COALESCE(s.total_tarjeta, 0)) AS total_vendido
+FROM public.sesiones_caja s
+GROUP BY s.tenant_id, s.cajero_id;
 
 ALTER TABLE IF EXISTS public.movimientos_caja
   ADD COLUMN IF NOT EXISTS saldo_anterior numeric(14,2) DEFAULT 0,
@@ -424,7 +490,7 @@ WHERE activo = true;
 
 CREATE INDEX IF NOT EXISTS idx_kb_fulltext_search
 ON public.knowledge_base
-USING gin (to_tsvector('spanish', COALESCE(pregunta, '') || ' ' || COALESCE(array_to_string(palabras_clave, ' '), '')));
+USING gin (to_tsvector('spanish', COALESCE(pregunta, '')));
 
 -- ----------------------------------------------------------------------------
 -- RMA columnas requeridas por RPC de retorno

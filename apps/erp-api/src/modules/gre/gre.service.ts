@@ -399,6 +399,7 @@ export class GreService {
     try {
       this.logger.log(`🚚 [GRE] Creando nueva guía de remisión para tenant: ${tenantId}`);
       console.log('🚚 [GRE] Datos recibidos:', greData);
+      this.assertCreateGreDataValida(greData);
 
       // VALIDACIÓN: GRE es exclusivo de Perú
       const { data: empresaConfig } = await supabase
@@ -423,6 +424,8 @@ export class GreService {
           });
         }
       }
+
+      await this.assertOrigenGreExiste(greData, tenantId);
 
       const eventId = randomUUID();
       const idempotencyKey = this.resolveGreIdempotencyKey(greData, tenantId);
@@ -531,6 +534,44 @@ export class GreService {
       console.log('✅ GRE creada exitosamente:', data);
 
       if (greData.pedidoId) {
+        const { data: pedidoDetalles, error: pedidoDetallesError } = await supabase
+          .from('pedidos_venta_detalle')
+          .select('producto_id, descripcion, cantidad')
+          .eq('pedido_id', greData.pedidoId)
+          .eq('tenant_id', tenantId);
+
+        if (pedidoDetallesError) {
+          throw new Error(`Error obteniendo detalle del pedido para GRE: ${pedidoDetallesError.message}`);
+        }
+
+        if (!pedidoDetalles || pedidoDetalles.length === 0) {
+          throw new Error('No se puede generar GRE: el pedido no tiene items para gre_detalles');
+        }
+
+        const detalleInvalido = pedidoDetalles.find((item: any) => Number(item.cantidad || 0) <= 0);
+        if (detalleInvalido) {
+          throw new BadRequestException('No se puede generar GRE: el pedido contiene cantidades inválidas');
+        }
+
+        const greDetalles = pedidoDetalles.map((item: any) => ({
+          gre_id: data.id,
+          tenant_id: tenantId,
+          producto_id: item.producto_id,
+          descripcion: item.descripcion,
+          cantidad: Number(item.cantidad || 0),
+          unidad_medida: 'NIU',
+          peso: Number(greData.pesoTotal || 0) / Math.max(pedidoDetalles.length, 1),
+          estado: 'ACTIVO',
+        }));
+
+        const { error: greDetallesError } = await supabase
+          .from('gre_detalles')
+          .insert(greDetalles);
+
+        if (greDetallesError) {
+          throw new Error(`Error creando detalle de GRE: ${greDetallesError.message}`);
+        }
+
         await this.registrarRelacionPedidoGre({
           pedidoId: greData.pedidoId,
           greId: data.id,
@@ -638,8 +679,8 @@ export class GreService {
 
     // Receptor: usar CPE relacionado si existe
     let receptor = {
-      docTipo: null as string | null,
-      docNumero: null as string | null,
+      docTipo: (greData.datos_adicionales?.destinatarioDocumentoTipo || greData.datos_adicionales?.documentoTipoDestinatario || null) as string | null,
+      docNumero: (greData.datos_adicionales?.destinatarioDocumento || greData.datos_adicionales?.documentoDestinatario || null) as string | null,
       razonSocial: greData.destinatario as string | null,
       direccion: greData.direccion_destino as string | null,
     };
@@ -697,6 +738,86 @@ export class GreService {
         peso: d.peso ? Number(d.peso) : undefined,
       })),
     };
+  }
+
+  private assertCreateGreDataValida(dto: CreateGuiaRemisionDto): void {
+    const requiredText: Array<[keyof CreateGuiaRemisionDto, string]> = [
+      ['destinatario', 'destinatario'],
+      ['direccionDestino', 'dirección de destino'],
+      ['fechaTraslado', 'fecha de traslado'],
+      ['modalidad', 'modalidad de transporte'],
+      ['motivo', 'motivo de traslado'],
+    ];
+
+    for (const [field, label] of requiredText) {
+      const value = dto[field];
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new BadRequestException(`No se puede generar GRE: falta ${label}`);
+      }
+    }
+
+    if (!['TRANSPORTE_PUBLICO', 'TRANSPORTE_PRIVADO'].includes(dto.modalidad)) {
+      throw new BadRequestException('No se puede generar GRE: modalidad de transporte inválida');
+    }
+
+    const fechaTraslado = new Date(dto.fechaTraslado);
+    if (Number.isNaN(fechaTraslado.getTime())) {
+      throw new BadRequestException('No se puede generar GRE: fecha de traslado inválida');
+    }
+
+    const pesoTotal = Number(dto.pesoTotal);
+    if (!Number.isFinite(pesoTotal) || pesoTotal <= 0) {
+      throw new BadRequestException('No se puede generar GRE: peso total debe ser mayor a cero');
+    }
+
+    if (dto.modalidad === 'TRANSPORTE_PUBLICO' && !dto.transportista?.trim()) {
+      throw new BadRequestException('No se puede generar GRE: transporte público requiere transportista');
+    }
+
+    if (dto.modalidad === 'TRANSPORTE_PRIVADO') {
+      if (!dto.placaVehiculo?.trim()) {
+        throw new BadRequestException('No se puede generar GRE: transporte privado requiere placa del vehículo');
+      }
+      if (!dto.licenciaConducir?.trim()) {
+        throw new BadRequestException('No se puede generar GRE: transporte privado requiere licencia de conducir');
+      }
+    }
+  }
+
+  private async assertOrigenGreExiste(dto: CreateGuiaRemisionDto, tenantId: string): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+
+    if (dto.cpeRelacionado) {
+      const { data, error } = await supabase
+        .from('cpe')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cpeRelacionado)
+        .maybeSingle();
+
+      if (error) {
+        throw new BadRequestException(`No se pudo validar CPE relacionado para GRE: ${error.message}`);
+      }
+      if (!data) {
+        throw new BadRequestException('No se puede generar GRE: documento origen CPE no existe');
+      }
+    }
+
+    if (dto.pedidoId) {
+      const { data, error } = await supabase
+        .from('pedidos_venta')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.pedidoId)
+        .maybeSingle();
+
+      if (error) {
+        throw new BadRequestException(`No se pudo validar pedido relacionado para GRE: ${error.message}`);
+      }
+      if (!data) {
+        throw new BadRequestException('No se puede generar GRE: documento origen pedido no existe');
+      }
+    }
   }
 
   /**

@@ -433,7 +433,7 @@ export class TesoreriaService {
         ),
         recepcion:recepciones!cuentas_por_pagar_recepcion_id_fkey(
           id,
-          numero_recepcion,
+          numero,
           fecha_recepcion
         )
       `, { count: 'exact' })
@@ -748,7 +748,24 @@ export class TesoreriaService {
     }
 
     if (!cuentas || cuentas.length === 0) {
-      throw new NotFoundException('No se encontraron cuentas bancarias activas');
+      return {
+        success: true,
+        data: {
+          periodo: {
+            fecha_desde: fechaDesde.toISOString().split('T')[0],
+            fecha_hasta: fechaHasta.toISOString().split('T')[0],
+            dias: Math.ceil((fechaHasta.getTime() - fechaDesde.getTime()) / (1000 * 60 * 60 * 24)),
+          },
+          cuentas_bancarias: [],
+          resumen: [],
+          proyeccion: [],
+          estadisticas: {
+            total_cxp_pendientes: 0,
+            total_cxc_pendientes: 0,
+            total_movimientos: 0,
+          },
+        },
+      };
     }
 
     // 2. Obtener CxP pendientes (egresos proyectados)

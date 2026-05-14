@@ -138,8 +138,8 @@ WITH ranked AS (
 )
 UPDATE public.solicitudes s
 SET
-  fecha_fin = s.fecha_fin + (r.rn - 1),
-  dias = GREATEST((s.fecha_fin + (r.rn - 1) - s.fecha_inicio) + 1, 0),
+  fecha_fin = s.fecha_fin + (r.rn - 1)::integer,
+  dias = GREATEST((s.fecha_fin + (r.rn - 1)::integer - s.fecha_inicio) + 1, 0),
   updated_at = now()
 FROM ranked r
 WHERE s.id = r.id
@@ -159,7 +159,7 @@ WITH ranked AS (
 )
 UPDATE public.evaluaciones e
 SET
-  fecha_evaluacion = e.fecha_evaluacion + (r.rn - 1),
+  fecha_evaluacion = e.fecha_evaluacion + (r.rn - 1)::integer,
   updated_at = now()
 FROM ranked r
 WHERE e.id = r.id

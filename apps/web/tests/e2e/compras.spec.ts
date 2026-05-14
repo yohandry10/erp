@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login } from './helpers/auth';
+import { gotoAuthenticated, login } from './helpers/auth';
 
 /**
  * E2E Tests for Compras Module
@@ -9,11 +9,12 @@ import { login } from './helpers/auth';
  */
 
 // Test data
+const testRunId = Date.now().toString().slice(-9);
 const testProveedor = {
-  ruc: '20123456789',
-  razonSocial: 'DISTRIBUIDORA TEST E2E S.A.C.',
+  ruc: `20${testRunId}`,
+  razonSocial: `DISTRIBUIDORA TEST E2E ${testRunId} S.A.C.`,
   nombreComercial: 'Test E2E Distribuidora',
-  email: 'test-e2e@distribuidora.com',
+  email: `test-e2e-${testRunId}@distribuidora.com`,
   telefono: '+51 999 888 777',
   direccion: 'Av. Test E2E 123, Lima',
   contacto: 'Juan Pérez Test',
@@ -29,7 +30,7 @@ test.describe('Compras - Proveedores', () => {
 
   test('Crear proveedor desde UI', async ({ page }) => {
     // Navigate to proveedores page
-    await page.goto('/dashboard/compras/proveedores');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores');
     
     // Wait for page to load
     await expect(page.locator('h1')).toContainText('Proveedores');
@@ -38,7 +39,7 @@ test.describe('Compras - Proveedores', () => {
     await page.click('button:has-text("Nuevo Proveedor")');
     
     // Wait for navigation to nuevo proveedor page
-    await page.waitForURL('**/proveedores/nuevo');
+    await page.waitForURL('**/proveedores/nuevo**');
     await expect(page.locator('h1')).toContainText('Nuevo Proveedor');
     
     // Fill in the form - Información Básica
@@ -59,28 +60,39 @@ test.describe('Compras - Proveedores', () => {
     // Take a screenshot before submitting
     await page.screenshot({ path: 'tests/screenshots/proveedor-form-filled.png', fullPage: true });
     
-    // Submit the form
-    await page.click('button[type="submit"]:has-text("Crear Proveedor")');
-    
     // Wait for success alert or navigation
     // Note: Adjust this based on your actual success handling
     page.on('dialog', async dialog => {
       expect(dialog.message()).toContain('exitosamente');
       await dialog.accept();
     });
+
+    // Submit the form
+    await page.click('button[type="submit"]:has-text("Crear Proveedor")');
     
     // Wait for navigation back to proveedores list
-    await page.waitForURL('**/proveedores', { timeout: 10000 });
+    await page.waitForURL(/\/dashboard\/compras\/proveedores\/?$/, { timeout: 30000 });
     
     // Verify the proveedor appears in the list
-    await page.waitForTimeout(1000); // Give time for the list to reload
-    
     // Search for the newly created proveedor
+    const searchResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/compras/proveedores') &&
+        response.url().includes(`search=${testProveedor.ruc}`) &&
+        response.status() >= 200 &&
+        response.status() < 300,
+      { timeout: 30000 },
+    );
     await page.fill('input[placeholder*="Buscar"]', testProveedor.ruc);
-    await page.waitForTimeout(500); // Wait for search to execute
+    await searchResponsePromise;
     
     // Verify the proveedor is in the table
-    const proveedorRow = page.locator('table tbody tr').first();
+    const proveedorRow = page.locator('table tbody tr').filter({
+      hasText: testProveedor.ruc,
+    }).filter({
+      hasText: testProveedor.razonSocial,
+    }).first();
+    await expect(proveedorRow).toBeVisible({ timeout: 30000 });
     await expect(proveedorRow).toContainText(testProveedor.ruc);
     await expect(proveedorRow).toContainText(testProveedor.razonSocial);
     
@@ -90,7 +102,7 @@ test.describe('Compras - Proveedores', () => {
 
   test('Validar campos requeridos en formulario de proveedor', async ({ page }) => {
     // Navigate to nuevo proveedor page
-    await page.goto('/dashboard/compras/proveedores/nuevo');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores/nuevo');
     
     // Try to submit empty form
     await page.click('button[type="submit"]:has-text("Crear Proveedor")');
@@ -103,7 +115,7 @@ test.describe('Compras - Proveedores', () => {
 
   test('Validar formato de RUC', async ({ page }) => {
     // Navigate to nuevo proveedor page
-    await page.goto('/dashboard/compras/proveedores/nuevo');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores/nuevo');
     
     // Fill with invalid RUC (too short)
     await page.fill('input[name="ruc"]', '12345');
@@ -119,7 +131,7 @@ test.describe('Compras - Proveedores', () => {
 
   test('Validar formato de email', async ({ page }) => {
     // Navigate to nuevo proveedor page
-    await page.goto('/dashboard/compras/proveedores/nuevo');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores/nuevo');
     
     // Fill with invalid email
     await page.fill('input[name="ruc"]', '20123456789');
@@ -135,7 +147,7 @@ test.describe('Compras - Proveedores', () => {
 
   test('Cancelar creación de proveedor', async ({ page }) => {
     // Navigate to nuevo proveedor page
-    await page.goto('/dashboard/compras/proveedores/nuevo');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores/nuevo');
     
     // Fill some data
     await page.fill('input[name="ruc"]', testProveedor.ruc);
@@ -151,73 +163,57 @@ test.describe('Compras - Proveedores', () => {
     await page.click('button:has-text("Cancelar")');
     
     // Verify navigation back to proveedores list
-    await page.waitForURL('**/proveedores');
+    await page.waitForURL(/\/dashboard\/compras\/proveedores\/?$/);
     await expect(page.locator('h1')).toContainText('Proveedores');
   });
 
-  test('Buscar proveedor por RUC', async ({ page }) => {
+  test('Buscar proveedor por término existente', async ({ page }) => {
     // Navigate to proveedores page
-    await page.goto('/dashboard/compras/proveedores');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores');
     
     // Wait for page to load
     await expect(page.locator('h1')).toContainText('Proveedores');
     
-    // Use search input
+    // Use a known search term from the seeded/provider-created dataset.
     const searchInput = page.locator('input[placeholder*="Buscar"]');
-    await searchInput.fill('20123456789');
-    
-    // Wait for search results
-    await page.waitForTimeout(500);
+    await searchInput.fill('PROVEEDOR');
     
     // Verify filtered results
     const tableRows = page.locator('table tbody tr');
-    const count = await tableRows.count();
-    
-    if (count > 0) {
-      // If there are results, verify they contain the search term
-      const firstRow = tableRows.first();
-      await expect(firstRow).toContainText('20123456789');
-    }
+    await expect(tableRows.first(), 'La búsqueda de proveedores debe devolver al menos un resultado real').toBeVisible({ timeout: 30000 });
+    await expect(tableRows.first()).toContainText(/PROVEEDOR|Proveedor/i);
   });
 
   test('Filtrar proveedores por estado', async ({ page }) => {
     // Navigate to proveedores page
-    await page.goto('/dashboard/compras/proveedores');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores');
     
     // Select "Activos" filter
     await page.selectOption('select', 'true');
     
-    // Wait for filter to apply
-    await page.waitForTimeout(500);
-    
     // Verify all visible proveedores have "ACTIVO" badge
     const activoBadges = page.locator('span:has-text("ACTIVO")');
-    const count = await activoBadges.count();
-    
-    // Should have at least one active proveedor or show empty state
-    expect(count).toBeGreaterThanOrEqual(0);
+    await expect(activoBadges.first(), 'El filtro de proveedores activos debe mostrar al menos un proveedor activo').toBeVisible({ timeout: 30000 });
   });
 
   test('Navegar a detalle de proveedor', async ({ page }) => {
     // Navigate to proveedores page
-    await page.goto('/dashboard/compras/proveedores');
+    await gotoAuthenticated(page, '/dashboard/compras/proveedores');
     
     // Wait for table to load
-    await page.waitForSelector('table tbody tr', { timeout: 5000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 30000 });
     
     // Click on the first "Ver detalle" button (eye icon)
     const viewButton = page.locator('button[title="Ver detalle"]').first();
+    await expect(viewButton, 'Cada fila de proveedor debe exponer acción Ver detalle').toBeVisible({ timeout: 30000 });
+    await viewButton.click();
     
-    if (await viewButton.count() > 0) {
-      await viewButton.click();
-      
-      // Verify navigation to detail page
-      await page.waitForURL('**/proveedores/**');
-      
-      // Verify we're not on the edit or nuevo page
-      expect(page.url()).not.toContain('/editar');
-      expect(page.url()).not.toContain('/nuevo');
-    }
+    // Verify navigation to detail page
+    await page.waitForURL(/\/dashboard\/compras\/proveedores\/[^/]+\/?$/, { timeout: 30000 });
+    
+    // Verify we're not on the edit or nuevo page
+    expect(page.url()).not.toContain('/editar');
+    expect(page.url()).not.toContain('/nuevo');
   });
 });
 
@@ -229,14 +225,14 @@ test.describe('Compras - Órdenes de Compra', () => {
 
   test('Crear OC completa', async ({ page }) => {
     // Navigate to ordenes de compra page
-    await page.goto('/dashboard/compras/ordenes');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes');
     
     // Wait for page to load
-    await page.waitForSelector('h1', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Órdenes de Compra');
     
     // Wait for the page to fully load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Click "Nueva Orden" button
     const nuevaOrdenBtn = page.locator('button:has-text("Nueva Orden")');
@@ -244,11 +240,11 @@ test.describe('Compras - Órdenes de Compra', () => {
     await nuevaOrdenBtn.click();
     
     // Wait for navigation to nueva orden page
-    await page.waitForURL('**/ordenes/nueva', { timeout: 10000 });
+    await page.waitForURL('**/ordenes/nueva**', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Nueva Orden de Compra');
     
     // Verify wizard is displayed with step 1
-    await expect(page.locator('text=Información Básica')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Información Básica' })).toBeVisible();
     
     // STEP 1: Fill basic information
     // Número de orden should be auto-generated
@@ -256,13 +252,10 @@ test.describe('Compras - Órdenes de Compra', () => {
     expect(numeroOrden).toMatch(/OC-\d{4}-\d{6}/);
     
     // Select a proveedor (wait for dropdown to load)
-    await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+    await expect(page.locator('select[name="proveedor_id"] option:not([value=""])').first()).toBeAttached({ timeout: 15000 });
     const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
     
-    if (proveedorOptions === 0) {
-      console.log('⚠️ No hay proveedores disponibles. Saltando test.');
-      return;
-    }
+    expect(proveedorOptions, 'Debe existir al menos un proveedor para crear una OC real').toBeGreaterThan(0);
     
     // Select the first available proveedor
     await page.selectOption('select[name="proveedor_id"]', { index: 1 });
@@ -301,14 +294,11 @@ test.describe('Compras - Órdenes de Compra', () => {
     // STEP 2: Add products
     await expect(page.locator('text=Agregar Productos')).toBeVisible();
     
-    // Wait for productos dropdown to load
-    await page.waitForSelector('select option:not([value=""])', { timeout: 5000 });
+    // Wait for productos dropdown to load; if there is no seed data, skip below.
+    await expect(page.locator('select option:not([value=""])').first()).toBeAttached({ timeout: 15000 });
     const productoOptions = await page.locator('select option:not([value=""])').count();
     
-    if (productoOptions === 0) {
-      console.log('⚠️ No hay productos disponibles. Saltando test.');
-      return;
-    }
+    expect(productoOptions, 'Debe existir al menos un producto para crear una OC real').toBeGreaterThan(0);
     
     // Add first product
     const productSelect = page.locator('select').first();
@@ -329,29 +319,33 @@ test.describe('Compras - Órdenes de Compra', () => {
     await addButton.click();
     
     // Wait a bit for the product to be added
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Verify product was added to the table
     await expect(page.locator('table tbody tr')).toHaveCount(1);
     
-    // Add second product
-    await productSelect.selectOption({ index: 2 });
-    await cantidadInput.clear();
-    await cantidadInput.fill('5');
-    await precioInput.clear();
-    await precioInput.fill('250.00');
-    await addButton.click();
-    
-    // Wait a bit for the second product to be added
-    await page.waitForTimeout(500);
-    
-    // Verify two products in table
-    await expect(page.locator('table tbody tr')).toHaveCount(2);
+    let expectedProductRows = 1;
+    if (productoOptions > 1) {
+      // Add second product when the environment has more than one item available.
+      await productSelect.selectOption({ index: 2 });
+      await cantidadInput.clear();
+      await cantidadInput.fill('5');
+      await precioInput.clear();
+      await precioInput.fill('250.00');
+      await addButton.click();
+
+      // Wait a bit for the second product to be added
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
+      expectedProductRows = 2;
+    }
+
+    // Verify products in table
+    await expect(page.locator('table tbody tr')).toHaveCount(expectedProductRows);
     
     // Verify totals are calculated
-    await expect(page.locator('text=Subtotal:')).toBeVisible();
-    await expect(page.locator('text=IGV (18%):')).toBeVisible();
-    await expect(page.locator('text=Total:')).toBeVisible();
+    await expect(page.getByText('Subtotal:', { exact: true })).toBeVisible();
+    await expect(page.getByText('IGV (18%):', { exact: true })).toBeVisible();
+    await expect(page.getByText('Total:', { exact: true })).toBeVisible();
     
     // Take screenshot of step 2
     await page.screenshot({ path: 'tests/screenshots/oc-step2-products.png', fullPage: true });
@@ -363,16 +357,16 @@ test.describe('Compras - Órdenes de Compra', () => {
     await expect(page.locator('text=Revisión Final')).toBeVisible();
     
     // Verify basic information is displayed
-    await expect(page.locator('text=Información Básica')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Información Básica' })).toBeVisible();
     await expect(page.locator(`text=${numeroOrden}`)).toBeVisible();
     
     // Verify products summary
-    await expect(page.locator('text=Productos (2)')).toBeVisible();
+    await expect(page.locator(`text=Productos (${expectedProductRows})`)).toBeVisible();
     
     // Verify totals are displayed
-    await expect(page.locator('text=Subtotal:')).toBeVisible();
-    await expect(page.locator('text=IGV (18%):')).toBeVisible();
-    await expect(page.locator('text=Total:')).toBeVisible();
+    await expect(page.getByText('Subtotal:', { exact: true })).toBeVisible();
+    await expect(page.getByText('IGV (18%):', { exact: true })).toBeVisible();
+    await expect(page.getByText('Total:', { exact: true })).toBeVisible();
     
     // Take screenshot of step 3
     await page.screenshot({ path: 'tests/screenshots/oc-step3-review.png', fullPage: true });
@@ -387,10 +381,10 @@ test.describe('Compras - Órdenes de Compra', () => {
     await page.click('button:has-text("Crear Orden de Compra")');
     
     // Wait for navigation back to ordenes list
-    await page.waitForURL('**/ordenes', { timeout: 10000 });
+    await page.waitForURL(/\/dashboard\/compras\/ordenes\/?$/, { timeout: 30000 });
     
     // Wait for the list to reload
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Verify we're back on the ordenes page
     await expect(page.locator('h1')).toContainText('Órdenes de Compra');
@@ -401,16 +395,13 @@ test.describe('Compras - Órdenes de Compra', () => {
 
   test('Validar que se requiere al menos un producto', async ({ page }) => {
     // Navigate to nueva orden page
-    await page.goto('/dashboard/compras/ordenes/nueva');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes/nueva');
     
     // Fill step 1 with minimal data
-    await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+    await expect(page.locator('select[name="proveedor_id"] option:not([value=""])').first()).toBeAttached({ timeout: 5000 });
     const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
     
-    if (proveedorOptions === 0) {
-      console.log('⚠️ No hay proveedores disponibles. Saltando test.');
-      return;
-    }
+    expect(proveedorOptions, 'Debe existir al menos un proveedor para validar el wizard de OC').toBeGreaterThan(0);
     
     await page.selectOption('select[name="proveedor_id"]', { index: 1 });
     
@@ -431,19 +422,16 @@ test.describe('Compras - Órdenes de Compra', () => {
 
   test('Navegar entre pasos del wizard', async ({ page }) => {
     // Navigate to nueva orden page
-    await page.goto('/dashboard/compras/ordenes/nueva');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes/nueva');
     
     // Verify step 1 is active
-    await expect(page.locator('text=Información Básica')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Información Básica' })).toBeVisible();
     
     // Fill minimal data for step 1
-    await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+    await expect(page.locator('select[name="proveedor_id"] option:not([value=""])').first()).toBeAttached({ timeout: 5000 });
     const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
     
-    if (proveedorOptions === 0) {
-      console.log('⚠️ No hay proveedores disponibles. Saltando test.');
-      return;
-    }
+    expect(proveedorOptions, 'Debe existir al menos un proveedor para navegar el wizard de OC').toBeGreaterThan(0);
     
     await page.selectOption('select[name="proveedor_id"]', { index: 1 });
     
@@ -453,7 +441,7 @@ test.describe('Compras - Órdenes de Compra', () => {
     
     // Go back to step 1
     await page.click('button:has-text("Anterior")');
-    await expect(page.locator('text=Información Básica')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Información Básica' })).toBeVisible();
     
     // Verify data is preserved
     const selectedProveedor = await page.inputValue('select[name="proveedor_id"]');
@@ -462,10 +450,10 @@ test.describe('Compras - Órdenes de Compra', () => {
 
   test('Cancelar creación de OC desde step 1', async ({ page }) => {
     // Navigate to nueva orden page
-    await page.goto('/dashboard/compras/ordenes/nueva');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes/nueva');
     
-    // Fill some data
-    await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+    // Fill some data when seed suppliers are available.
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
     
     if (proveedorOptions > 0) {
@@ -482,20 +470,20 @@ test.describe('Compras - Órdenes de Compra', () => {
     await page.click('button:has-text("Cancelar")');
     
     // Verify navigation back to ordenes list
-    await page.waitForURL('**/ordenes');
+    await page.waitForURL(/\/dashboard\/compras\/ordenes\/?$/);
     await expect(page.locator('h1')).toContainText('Órdenes de Compra');
   });
 
   test('Aprobar OC', async ({ page }) => {
     // Navigate to ordenes de compra page
-    await page.goto('/dashboard/compras/ordenes');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes');
     
     // Wait for page to load
-    await page.waitForSelector('h1', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Órdenes de Compra');
     
     // Wait for the page to fully load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Look for an order in APROBACION or BORRADOR state that can be approved
     // Try to find an order card in the kanban view (cards with orden.numero)
@@ -514,7 +502,7 @@ test.describe('Compras - Órdenes de Compra', () => {
       await ordenCards.first().click();
       
       // Wait for navigation to detail page
-      await page.waitForURL('**/ordenes/**', { timeout: 10000 });
+      await page.waitForURL('**/ordenes/**', { timeout: 30000 });
       
       // Extract orden ID from URL
       const url = page.url();
@@ -532,16 +520,14 @@ test.describe('Compras - Órdenes de Compra', () => {
       await nuevaOrdenBtn.click();
       
       // Wait for navigation to nueva orden page
-      await page.waitForURL('**/ordenes/nueva', { timeout: 10000 });
+      await page.waitForURL('**/ordenes/nueva**', { timeout: 30000 });
       
       // STEP 1: Fill basic information
-      await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+      await page.inputValue('input[name="numero"]');
+      await expect(page.locator('select[name="proveedor_id"] option:not([value=""])').first()).toBeAttached({ timeout: 5000 });
       const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
       
-      if (proveedorOptions === 0) {
-        console.log('⚠️ No hay proveedores disponibles. Saltando test.');
-        return;
-      }
+      expect(proveedorOptions, 'Debe existir al menos un proveedor para crear la OC de aprobación').toBeGreaterThan(0);
       
       await page.selectOption('select[name="proveedor_id"]', { index: 1 });
       
@@ -563,13 +549,10 @@ test.describe('Compras - Órdenes de Compra', () => {
       await page.click('button:has-text("Siguiente")');
       
       // STEP 2: Add products
-      await page.waitForSelector('select option:not([value=""])', { timeout: 5000 });
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       const productoOptions = await page.locator('select option:not([value=""])').count();
       
-      if (productoOptions === 0) {
-        console.log('⚠️ No hay productos disponibles. Saltando test.');
-        return;
-      }
+      expect(productoOptions, 'Debe existir al menos un producto para crear la OC de aprobación').toBeGreaterThan(0);
       
       const productSelect = page.locator('select').first();
       await productSelect.selectOption({ index: 1 });
@@ -585,41 +568,33 @@ test.describe('Compras - Órdenes de Compra', () => {
       const addButton = page.locator('button.refresh-btn').filter({ hasText: '' }).first();
       await addButton.click();
       
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       
       await page.click('button:has-text("Siguiente")');
       
       // STEP 3: Review and create
-      page.on('dialog', async dialog => {
-        await dialog.accept();
-      });
-      
+      const crearOrdenResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().includes('/api/compras/ordenes') &&
+          response.status() >= 200 &&
+          response.status() < 300,
+        { timeout: 30000 },
+      );
       await page.click('button:has-text("Crear Orden de Compra")');
+      const crearOrdenResponse = await crearOrdenResponsePromise;
+      const crearOrdenBody = await crearOrdenResponse.json().catch(() => null);
+      ordenId = crearOrdenBody?.data?.id ?? crearOrdenBody?.id ?? null;
       
       // Wait for navigation back to ordenes list
-      await page.waitForURL('**/ordenes', { timeout: 10000 });
-      await page.waitForTimeout(1000);
-      
-      // Now find the newly created order
-      const newOrdenCards = page.locator('[data-testid="orden-card"]');
-      const newOrdenCount = await newOrdenCards.count();
-      
-      if (newOrdenCount > 0) {
-        await newOrdenCards.first().click();
-        await page.waitForURL('**/ordenes/**', { timeout: 10000 });
-        
-        const url = page.url();
-        const match = url.match(/\/ordenes\/([^\/]+)/);
-        if (match) {
-          ordenId = match[1];
-        }
-      }
+      await page.waitForURL(/\/dashboard\/compras\/ordenes\/?$/, { timeout: 30000 });
+      await expect(page.getByText('Cargando órdenes de compra...')).toHaveCount(0, { timeout: 20000 });
+
+      expect(ordenId, 'La respuesta de creación debe incluir el id de la OC').toBeTruthy();
+      await gotoAuthenticated(page, `/dashboard/compras/ordenes/${ordenId}`);
     }
     
-    if (!ordenId) {
-      console.log('⚠️ No se pudo obtener el ID de la orden. Saltando test.');
-      return;
-    }
+    expect(ordenId, 'La prueba debe obtener o crear una OC para aprobar').toBeTruthy();
     
     // Now we should be on the orden detail page
     await expect(page.locator('h1')).toContainText('Orden de Compra');
@@ -631,10 +606,7 @@ test.describe('Compras - Órdenes de Compra', () => {
     const estadoBadge = page.locator('span').filter({ hasText: /Borrador|En Aprobación|Pendiente/i });
     const canApprove = await estadoBadge.count() > 0;
     
-    if (!canApprove) {
-      console.log('⚠️ La orden no está en un estado que permita aprobación. Saltando test.');
-      return;
-    }
+    expect(canApprove, 'La OC seleccionada debe estar en estado aprobable').toBe(true);
     
     // Look for the "Aprobar Orden" button
     const aprobarButton = page.locator('button:has-text("Aprobar Orden")');
@@ -661,25 +633,18 @@ test.describe('Compras - Órdenes de Compra', () => {
     // Take screenshot with comments filled
     await page.screenshot({ path: 'tests/screenshots/oc-approval-modal-filled.png', fullPage: true });
     
-    // Handle success alert
-    page.on('dialog', async dialog => {
-      expect(dialog.message()).toContain('exitosamente');
-      await dialog.accept();
-    });
-    
     // Click the "Aprobar Orden" button in the modal
     const confirmarAprobarButton = page.locator('button:has-text("Aprobar Orden")').last();
     await confirmarAprobarButton.click();
     
     // Wait for the modal to close and the page to update
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Verify the modal is closed
     await expect(page.locator('h2:has-text("Aprobar Orden de Compra")')).not.toBeVisible();
     
     // Verify the orden state has changed to APROBADA
-    const estadoAprobada = page.locator('span').filter({ hasText: /Aprobada/i });
-    await expect(estadoAprobada).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Aprobada', { exact: true })).toBeVisible({ timeout: 30000 });
     
     // Take screenshot of the approved orden
     await page.screenshot({ path: 'tests/screenshots/oc-approved.png', fullPage: true });
@@ -692,27 +657,25 @@ test.describe('Compras - Órdenes de Compra', () => {
     await expect(crearRecepcionButton).toBeVisible({ timeout: 5000 });
     
     // Verify the approvals panel is visible
-    const aprobacionesPanel = page.locator('text=Aprobaciones');
-    if (await aprobacionesPanel.count() > 0) {
-      await expect(aprobacionesPanel).toBeVisible();
-      
-      // Take screenshot of the approvals panel
-      await page.screenshot({ path: 'tests/screenshots/oc-approvals-panel.png', fullPage: true });
-    }
+    const aprobacionesPanel = page.getByRole('heading', { name: 'Aprobaciones' });
+    await expect(aprobacionesPanel, 'La OC aprobada debe mostrar trazabilidad de aprobaciones').toBeVisible({ timeout: 30000 });
+    
+    // Take screenshot of the approvals panel
+    await page.screenshot({ path: 'tests/screenshots/oc-approvals-panel.png', fullPage: true });
     
     console.log('✅ Test de aprobación de OC completado exitosamente');
   });
 
   test('Recepcionar mercancía', async ({ page }) => {
     // Navigate to ordenes de compra page
-    await page.goto('/dashboard/compras/ordenes');
+    await gotoAuthenticated(page, '/dashboard/compras/ordenes');
     
     // Wait for page to load
-    await page.waitForSelector('h1', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Órdenes de Compra');
     
     // Wait for the page to fully load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Look for an order in APROBADA state that can be received
     const ordenCards = page.locator('div').filter({ 
@@ -734,7 +697,7 @@ test.describe('Compras - Órdenes de Compra', () => {
         
         if (cardText?.includes('Aprobada')) {
           await card.click();
-          await page.waitForURL('**/ordenes/**', { timeout: 10000 });
+          await page.waitForURL('**/ordenes/**', { timeout: 30000 });
           
           const url = page.url();
           const match = url.match(/\/ordenes\/([^\/]+)/);
@@ -755,22 +718,20 @@ test.describe('Compras - Órdenes de Compra', () => {
       console.log('⚠️ No hay órdenes aprobadas. Creando y aprobando una nueva orden...');
       
       // Create a new order first
-      await page.goto('/dashboard/compras/ordenes');
+      await gotoAuthenticated(page, '/dashboard/compras/ordenes');
       
       const nuevaOrdenBtn = page.locator('button:has-text("Nueva Orden")');
       await nuevaOrdenBtn.waitFor({ state: 'visible', timeout: 5000 });
       await nuevaOrdenBtn.click();
       
-      await page.waitForURL('**/ordenes/nueva', { timeout: 10000 });
+      await page.waitForURL('**/ordenes/nueva**', { timeout: 30000 });
       
       // STEP 1: Fill basic information
-      await page.waitForSelector('select[name="proveedor_id"] option:not([value=""])', { timeout: 5000 });
+      const numeroOrdenCreada = await page.inputValue('input[name="numero"]');
+      await expect(page.locator('select[name="proveedor_id"] option:not([value=""])').first()).toBeAttached({ timeout: 5000 });
       const proveedorOptions = await page.locator('select[name="proveedor_id"] option:not([value=""])').count();
       
-      if (proveedorOptions === 0) {
-        console.log('⚠️ No hay proveedores disponibles. Saltando test.');
-        return;
-      }
+      expect(proveedorOptions, 'Debe existir al menos un proveedor para crear la OC de recepción').toBeGreaterThan(0);
       
       await page.selectOption('select[name="proveedor_id"]', { index: 1 });
       
@@ -783,22 +744,18 @@ test.describe('Compras - Órdenes de Compra', () => {
       await page.fill('input[name="dias_credito"]', '30');
       
       const almacenOptions = await page.locator('select[name="almacen_destino_id"] option:not([value=""])').count();
-      if (almacenOptions > 0) {
-        await page.selectOption('select[name="almacen_destino_id"]', { index: 1 });
-      }
+      expect(almacenOptions, 'Debe existir al menos un almacén destino para crear una OC recepcionable').toBeGreaterThan(0);
+      await page.selectOption('select[name="almacen_destino_id"]', { index: 1 });
       
       await page.fill('textarea[name="observaciones"]', 'Orden para test de recepción E2E');
       
       await page.click('button:has-text("Siguiente")');
       
       // STEP 2: Add products
-      await page.waitForSelector('select option:not([value=""])', { timeout: 5000 });
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       const productoOptions = await page.locator('select option:not([value=""])').count();
       
-      if (productoOptions === 0) {
-        console.log('⚠️ No hay productos disponibles. Saltando test.');
-        return;
-      }
+      expect(productoOptions, 'Debe existir al menos un producto para crear la OC de recepción').toBeGreaterThan(0);
       
       const productSelect = page.locator('select').first();
       await productSelect.selectOption({ index: 1 });
@@ -814,70 +771,61 @@ test.describe('Compras - Órdenes de Compra', () => {
       const addButton = page.locator('button.refresh-btn').filter({ hasText: '' }).first();
       await addButton.click();
       
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       
       await page.click('button:has-text("Siguiente")');
       
       // STEP 3: Review and create
-      page.on('dialog', async dialog => {
-        await dialog.accept();
-      });
-      
+      const crearOrdenResponsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().includes('/api/compras/ordenes') &&
+          response.status() >= 200 &&
+          response.status() < 300,
+        { timeout: 30000 },
+      );
       await page.click('button:has-text("Crear Orden de Compra")');
+      await crearOrdenResponsePromise;
       
-      await page.waitForURL('**/ordenes', { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await page.waitForURL(/\/dashboard\/compras\/ordenes\/?$/, { timeout: 30000 });
+      await expect(page.getByText('Cargando órdenes de compra...')).toHaveCount(0, { timeout: 20000 });
       
       // Find the newly created order and approve it
-      const newOrdenCards = page.locator('div').filter({ 
-        has: page.locator('div[style*="fontFamily: monospace"]')
-      }).filter({
-        has: page.locator('div:has-text("OC-")')
-      });
-      
-      const newOrdenCount = await newOrdenCards.count();
-      
-      if (newOrdenCount > 0) {
-        await newOrdenCards.first().click();
-        await page.waitForURL('**/ordenes/**', { timeout: 10000 });
-        
-        const url = page.url();
-        const match = url.match(/\/ordenes\/([^\/]+)/);
-        if (match) {
-          ordenId = match[1];
-          
-          const numeroElement = page.locator('div[style*="fontFamily: monospace"]').first();
-          ordenNumero = await numeroElement.textContent();
-        }
-        
-        // Approve the order
-        const aprobarButton = page.locator('button:has-text("Aprobar Orden")');
-        if (await aprobarButton.count() > 0) {
-          await aprobarButton.click();
-          await expect(page.locator('h2:has-text("Aprobar Orden de Compra")')).toBeVisible({ timeout: 5000 });
-          
-          const comentariosTextarea = page.locator('textarea[placeholder*="comentarios"]');
-          await comentariosTextarea.fill('Aprobación automática para test de recepción');
-          
-          const confirmarAprobarButton = page.locator('button:has-text("Aprobar Orden")').last();
-          await confirmarAprobarButton.click();
-          
-          await page.waitForTimeout(2000);
-        }
+      const nuevaOrdenCard = page.getByText(numeroOrdenCreada, { exact: true });
+      await expect(nuevaOrdenCard).toBeVisible({ timeout: 20000 });
+      await nuevaOrdenCard.click();
+      await page.waitForURL(/\/dashboard\/compras\/ordenes\/[^/]+\/?$/, { timeout: 30000 });
+
+      const url = page.url();
+      const match = url.match(/\/ordenes\/([^\/]+)/);
+      if (match) {
+        ordenId = match[1];
+        ordenNumero = numeroOrdenCreada;
       }
+        
+      // Approve the order
+      const aprobarButton = page.locator('button:has-text("Aprobar Orden")');
+      await expect(aprobarButton).toBeVisible({ timeout: 5000 });
+      await aprobarButton.click();
+      await expect(page.locator('h2:has-text("Aprobar Orden de Compra")')).toBeVisible({ timeout: 5000 });
+      
+      const comentariosTextarea = page.locator('textarea[placeholder*="comentarios"]');
+      await comentariosTextarea.fill('Aprobación automática para test de recepción');
+      
+      const confirmarAprobarButton = page.locator('button:has-text("Aprobar Orden")').last();
+      await confirmarAprobarButton.click();
+      
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     }
     
-    if (!ordenId) {
-      console.log('⚠️ No se pudo obtener el ID de la orden. Saltando test.');
-      return;
-    }
+    expect(ordenId, 'La prueba debe obtener o crear una OC aprobada para recepcionar').toBeTruthy();
     
     // Now we should be on the orden detail page with APROBADA state
+    await expect(page.getByText('Cargando orden de compra...')).toHaveCount(0, { timeout: 20000 });
     await expect(page.locator('h1')).toContainText('Orden de Compra');
     
     // Verify the orden is APROBADA
-    const estadoAprobada = page.locator('span').filter({ hasText: /Aprobada/i });
-    await expect(estadoAprobada).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Aprobada', { exact: true })).toBeVisible({ timeout: 30000 });
     
     // Take screenshot before creating reception
     await page.screenshot({ path: 'tests/screenshots/recepcion-orden-aprobada.png', fullPage: true });
@@ -888,11 +836,11 @@ test.describe('Compras - Órdenes de Compra', () => {
     await crearRecepcionButton.click();
     
     // Wait for navigation to nueva recepcion page
-    await page.waitForURL('**/recepciones/nueva**', { timeout: 10000 });
+    await page.waitForURL('**/recepciones/nueva**', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Nueva Recepción de Mercancía');
     
     // Verify wizard is displayed
-    await expect(page.locator('text=Paso 1 de 4')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ingrese las cantidades recibidas' })).toBeVisible();
     
     // Take screenshot of wizard step 1
     await page.screenshot({ path: 'tests/screenshots/recepcion-wizard-step1.png', fullPage: true });
@@ -902,31 +850,22 @@ test.describe('Compras - Órdenes de Compra', () => {
       await expect(page.locator(`text=${ordenNumero}`)).toBeVisible();
     }
     
-    // Verify products table is displayed with pending items
-    await expect(page.locator('table')).toBeVisible();
-    await expect(page.locator('table tbody tr')).toHaveCount(await page.locator('table tbody tr').count());
+    // Verify pending items are displayed and receive the whole pending quantity.
+    await expect(page.getByText(/productos? pendientes?/i)).toBeVisible();
+    await page.getByRole('button', { name: /Recibir todo/ }).first().click();
+    await expect(page.getByText(/Total de items a recibir:/)).toBeVisible();
     
     // Click "Siguiente" to go to step 2
     await page.click('button:has-text("Siguiente")');
     
-    // STEP 2: Enter quantities and quality
-    await expect(page.locator('text=Paso 2 de 4')).toBeVisible();
-    await expect(page.locator('text=Ingresar Cantidades y Calidad')).toBeVisible();
+    // STEP 2: Enter quality
+    await expect(page.getByRole('heading', { name: 'Evaluación de Calidad' })).toBeVisible();
     
     // Take screenshot of step 2
     await page.screenshot({ path: 'tests/screenshots/recepcion-wizard-step2-initial.png', fullPage: true });
     
-    // Get the first product row
-    const firstProductRow = page.locator('table tbody tr').first();
-    
-    // Fill cantidad to receive (use input within the first row)
-    const cantidadRecibir = firstProductRow.locator('input[type="number"]').first();
-    await cantidadRecibir.clear();
-    await cantidadRecibir.fill('10');
-    
-    // Select quality as OK (should be default, but let's click it)
-    const okButton = firstProductRow.locator('button:has-text("OK")');
-    await okButton.click();
+    // Select quality as OK
+    await page.getByRole('button', { name: /^OK$/ }).first().click();
     
     // Take screenshot after filling quantities
     await page.screenshot({ path: 'tests/screenshots/recepcion-wizard-step2-filled.png', fullPage: true });
@@ -935,8 +874,7 @@ test.describe('Compras - Órdenes de Compra', () => {
     await page.click('button:has-text("Siguiente")');
     
     // STEP 3: Assign lotes/series/ubicaciones
-    await expect(page.locator('text=Paso 3 de 4')).toBeVisible();
-    await expect(page.locator('text=Asignar Lotes, Series y Ubicaciones')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Asignar Almacén, Ubicación, Lotes y Series' })).toBeVisible();
     
     // Take screenshot of step 3
     await page.screenshot({ path: 'tests/screenshots/recepcion-wizard-step3-initial.png', fullPage: true });
@@ -944,20 +882,18 @@ test.describe('Compras - Órdenes de Compra', () => {
     // Select almacen (required)
     const almacenSelect = page.locator('select').first();
     const almacenOptionsCount = await almacenSelect.locator('option:not([value=""])').count();
+    expect(almacenOptionsCount, 'La recepción debe permitir asignar un almacén operativo').toBeGreaterThan(0);
+    await almacenSelect.selectOption({ index: 1 });
     
-    if (almacenOptionsCount > 0) {
-      await almacenSelect.selectOption({ index: 1 });
-      
-      // Wait for ubicaciones to load
-      await page.waitForTimeout(500);
-      
-      // Optionally select ubicacion if available
-      const ubicacionSelect = page.locator('select').nth(1);
-      const ubicacionOptionsCount = await ubicacionSelect.locator('option:not([value=""])').count();
-      
-      if (ubicacionOptionsCount > 0) {
-        await ubicacionSelect.selectOption({ index: 1 });
-      }
+    // Wait for ubicaciones to load
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
+    
+    // Select ubicacion when the warehouse has locations configured.
+    const ubicacionSelect = page.locator('select').nth(1);
+    const ubicacionOptionsCount = await ubicacionSelect.locator('option:not([value=""])').count();
+    
+    if (ubicacionOptionsCount > 0) {
+      await ubicacionSelect.selectOption({ index: 1 });
     }
     
     // Fill lote for the first product
@@ -983,12 +919,11 @@ test.describe('Compras - Órdenes de Compra', () => {
     await page.click('button:has-text("Siguiente")');
     
     // STEP 4: Review and confirm
-    await expect(page.locator('text=Paso 4 de 4')).toBeVisible();
-    await expect(page.locator('text=Revisión Final')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Confirmar Recepción' })).toBeVisible();
     
     // Verify summary cards are displayed
     await expect(page.locator('text=Total Items')).toBeVisible();
-    await expect(page.locator('text=Items OK')).toBeVisible();
+    await expect(page.getByText('OK', { exact: true }).first()).toBeVisible();
     
     // Verify the review table shows the items
     await expect(page.locator('table')).toBeVisible();
@@ -996,22 +931,32 @@ test.describe('Compras - Órdenes de Compra', () => {
     // Take screenshot of review step
     await page.screenshot({ path: 'tests/screenshots/recepcion-wizard-step4-review.png', fullPage: true });
     
-    // Handle success alert
-    page.on('dialog', async dialog => {
-      expect(dialog.message()).toContain('exitosamente');
-      await dialog.accept();
-    });
-    
-    // Click "Cerrar Recepción" button
-    const cerrarRecepcionButton = page.locator('button:has-text("Cerrar Recepción")');
+    // Click "Completar Recepción" button
+    const cerrarRecepcionButton = page.locator('button:has-text("Completar Recepción")');
     await expect(cerrarRecepcionButton).toBeVisible();
+    const successDialogPromise = page.waitForEvent('dialog', { timeout: 30000 });
+    const cerrarRecepcionResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/compras/recepciones/') &&
+        /\/cerrar\/?(\?|$)/.test(response.url()) &&
+        response.status() >= 200 &&
+        response.status() < 300,
+      { timeout: 30000 },
+    );
     await cerrarRecepcionButton.click();
+    const cerrarRecepcionResponse = await cerrarRecepcionResponsePromise;
+    expect(cerrarRecepcionResponse.status(), 'La API debe aceptar el cierre de recepción').toBe(200);
+
+    const successDialog = await successDialogPromise;
+    expect(successDialog.message()).toContain('exitosamente');
+    await successDialog.accept();
     
     // Wait for navigation back to recepciones list
-    await page.waitForURL('**/recepciones', { timeout: 10000 });
+    await page.waitForURL(/\/dashboard\/compras\/recepciones\/?$/, { timeout: 30000 });
     
     // Wait for the list to reload
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Verify we're back on the recepciones page
     await expect(page.locator('h1')).toContainText('Recepciones');
@@ -1019,36 +964,23 @@ test.describe('Compras - Órdenes de Compra', () => {
     // Take final screenshot
     await page.screenshot({ path: 'tests/screenshots/recepcion-created.png', fullPage: true });
     
-    // Verify the reception appears in the list
-    const recepcionesTable = page.locator('table tbody tr');
-    const recepcionCount = await recepcionesTable.count();
-    
-    if (recepcionCount > 0) {
-      // Verify at least one reception exists
-      expect(recepcionCount).toBeGreaterThan(0);
-      
-      // Optionally verify the orden numero appears in the list
-      if (ordenNumero) {
-        const firstRecepcion = recepcionesTable.first();
-        const recepcionText = await firstRecepcion.textContent();
-        // The reception should reference the orden
-        expect(recepcionText).toBeTruthy();
-      }
-    }
+    await expect(page.getByRole('heading', { name: 'ÓRDENES PENDIENTES', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'APROBADAS', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'PARCIALES', exact: true })).toBeVisible();
     
     console.log('✅ Test de recepción de mercancía completado exitosamente');
   });
 
   test('Crear devolución', async ({ page }) => {
     // Navigate to devoluciones page
-    await page.goto('/dashboard/compras/devoluciones');
+    await gotoAuthenticated(page, '/dashboard/compras/devoluciones');
     
     // Wait for page to load
-    await page.waitForSelector('h1', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Devoluciones');
     
     // Wait for the page to fully load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Take screenshot of devoluciones list
     await page.screenshot({ path: 'tests/screenshots/devoluciones-list.png', fullPage: true });
@@ -1059,7 +991,7 @@ test.describe('Compras - Órdenes de Compra', () => {
     await nuevaDevolucionBtn.click();
     
     // Wait for navigation to nueva devolución page
-    await page.waitForURL('**/devoluciones/nueva', { timeout: 10000 });
+    await page.waitForURL('**/devoluciones/nueva**', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Nueva Devolución a Proveedor');
     
     // Verify wizard is displayed with step 1
@@ -1070,22 +1002,19 @@ test.describe('Compras - Órdenes de Compra', () => {
     
     // STEP 1: Select a closed reception
     // Wait for recepciones to load
-    await page.waitForTimeout(1000);
+    await expect(page.getByText('Cargando recepciones...')).toBeHidden({ timeout: 30000 });
     
     // Check if there are any recepciones available
-    const recepcionCards = page.locator('div').filter({ hasText: /REC-\d{4}-\d{6}/ });
+    const recepcionCards = page.locator('div').filter({ hasText: /REC-\d{4}-\d{4,6}/ });
     const recepcionCount = await recepcionCards.count();
     
-    if (recepcionCount === 0) {
-      console.log('⚠️ No hay recepciones cerradas disponibles. Saltando test.');
-      return;
-    }
+    expect(recepcionCount, 'Debe existir al menos una recepción cerrada para validar devoluciones').toBeGreaterThan(0);
     
     // Click on the first recepcion
     await recepcionCards.first().click();
     
     // Wait for step 2 to load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // STEP 2: Configure items to return
     await expect(page.locator('text=Items a Devolver')).toBeVisible();
@@ -1113,18 +1042,14 @@ test.describe('Compras - Órdenes de Compra', () => {
       await addItemBtn.click();
       
       // Wait for the item form to appear
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       
       // Fill the item details
       // Note: In a real scenario, we would need to select from available products
       // For this test, we'll fill with a product ID if the field is available
       const productoInput = page.locator('input[placeholder*="ID del producto"]').first();
-      if (await productoInput.count() > 0) {
-        // This would need a real product ID from the database
-        console.log('⚠️ Se requiere un producto ID válido. En producción, esto vendría de la recepción.');
-        // For now, we'll skip if no pre-loaded items
-        return;
-      }
+      await expect(productoInput, 'La devolución debe precargar items desde una recepción real; no debe requerir ID manual').toHaveCount(0);
+      expect(preLoadedItems, 'Debe haber items precargados para una devolución real').toBeGreaterThan(0);
     } else {
       // If there are pre-loaded items, verify and optionally modify them
       console.log(`✅ ${preLoadedItems} items pre-cargados desde la recepción`);
@@ -1157,51 +1082,49 @@ test.describe('Compras - Órdenes de Compra', () => {
     // Take screenshot after filling data
     await page.screenshot({ path: 'tests/screenshots/devolucion-step2-filled.png', fullPage: true });
     
-    // Handle success alert
-    page.on('dialog', async dialog => {
-      expect(dialog.message()).toContain('exitosamente');
-      await dialog.accept();
-    });
-    
     // Click "Crear Devolución" button
     const crearDevolucionBtn = page.locator('button:has-text("Crear Devolución")');
     await expect(crearDevolucionBtn).toBeVisible();
     
     // Verify button is enabled (has items and motivo)
     const isDisabled = await crearDevolucionBtn.isDisabled();
-    if (isDisabled) {
-      console.log('⚠️ El botón "Crear Devolución" está deshabilitado. Verificando requisitos...');
-      
-      // Check if motivo general is filled
-      const motivoValue = await motivoSelect.inputValue();
-      console.log('Motivo general:', motivoValue);
-      
-      // Check if there are items
-      const itemsCount = await page.locator('div').filter({ hasText: /Items a Devolver \(\d+\)/ }).textContent();
-      console.log('Items:', itemsCount);
-      
-      return;
-    }
-    
+    expect(isDisabled, 'Crear Devolución debe estar habilitado con recepción, motivo e items válidos').toBe(false);
+
+    const crearDevolucionResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/compras/devoluciones') &&
+        response.status() >= 200 &&
+        response.status() < 300,
+      { timeout: 30000 },
+    );
+    const successDialogPromise = page.waitForEvent('dialog', { timeout: 30000 });
     await crearDevolucionBtn.click();
-    
+
+    const crearDevolucionResponse = await crearDevolucionResponsePromise;
+    expect(crearDevolucionResponse.status(), 'La API debe crear la devolución').toBe(201);
+
+    const successDialog = await successDialogPromise;
+    expect(successDialog.message()).toContain('exitosamente');
+    await successDialog.accept();
+
     // Wait for navigation to devolucion detail page
-    await page.waitForURL('**/devoluciones/**', { timeout: 10000 });
+    await page.waitForURL(/\/dashboard\/compras\/devoluciones\/[0-9a-f-]{36}\/?$/i, { timeout: 30000 });
     
     // Verify we're on the detail page (not on /nueva)
     expect(page.url()).not.toContain('/nueva');
     
     // Wait for the detail page to load
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // Verify we're on the devolucion detail page
     await expect(page.locator('h1')).toContainText('Devolución');
     
     // Verify the devolucion number is displayed
-    await expect(page.locator('text=/DEV-\d{4}-\d{6}/')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Devolución DEV-\d{4}-\d{4,6}/ })).toBeVisible();
     
     // Verify estado badge is visible (should be PENDIENTE)
-    const estadoBadge = page.locator('span').filter({ hasText: /Pendiente/i });
+    const estadoBadge = page.locator('span').filter({ hasText: /PENDIENTE|Pendiente/i });
     await expect(estadoBadge).toBeVisible({ timeout: 5000 });
     
     // Take screenshot of the created devolucion
@@ -1215,9 +1138,9 @@ test.describe('Compras - Órdenes de Compra', () => {
     await expect(page.locator('text=/DEFECTUOSO|Defectuoso/')).toBeVisible();
     
     // Verify totals are displayed
-    await expect(page.locator('text=Subtotal')).toBeVisible();
-    await expect(page.locator('text=IGV')).toBeVisible();
-    await expect(page.locator('text=Total')).toBeVisible();
+    await expect(page.getByText('Subtotal:', { exact: true })).toBeVisible();
+    await expect(page.getByText('IGV (18%):', { exact: true })).toBeVisible();
+    await expect(page.getByText('Total:', { exact: true })).toBeVisible();
     
     // Verify "Emitir Devolución" button is visible (for PENDIENTE state)
     const emitirButton = page.locator('button:has-text("Emitir Devolución")');

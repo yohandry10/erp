@@ -41,6 +41,7 @@ describe('AuthService', () => {
         ['from', 'select', 'eq', 'lt', 'gte', 'lte', 'is', 'in', 'order', 'limit', 'range', 'insert', 'update', 'delete'].forEach(method => {
             mockChain[method] = jest.fn(() => mockChain);
         });
+        mockChain.rpc = jest.fn().mockResolvedValue({ data: [], error: null });
 
         // Terminal methods return promises
         mockChain.single = jest.fn();
@@ -57,6 +58,7 @@ describe('AuthService', () => {
         const mockSupabase = {
             getClient: jest.fn(() => mockClient),
             getServiceClient: jest.fn(() => mockClient),
+            getAdminClient: jest.fn(() => mockClient),
             getPublicClient: jest.fn(() => mockClient),
         };
 
@@ -232,6 +234,8 @@ describe('AuthService', () => {
 
             expect(result).toBeDefined();
             expect(result.email).toBe('test@example.com');
+            expect(result).not.toHaveProperty('password_hash');
+            expect(result).not.toHaveProperty('password_reset_token');
             expect(jwtService.verify).toHaveBeenCalledWith('valid-token');
         });
 
@@ -287,7 +291,18 @@ describe('AuthService', () => {
     // ==================== REFRESH TOKEN ====================
     describe('refreshToken', () => {
         it('should return new access token with correct payload', async () => {
-            const result = await service.refreshToken(mockUser);
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.single
+                .mockResolvedValueOnce({
+                    data: {
+                        session_token: 'session-123',
+                        expires_at: new Date(Date.now() + 3600000).toISOString(),
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({ data: mockUser, error: null });
+
+            const result = await service.refreshToken({ ...mockUser, session_token: 'session-123' });
 
             expect(result).toHaveProperty('access_token');
             expect(result.access_token).toBe('mock-jwt-token');
@@ -296,14 +311,25 @@ describe('AuthService', () => {
                     sub: mockUser.id,
                     email: mockUser.email,
                     tenant_id: mockUser.tenant_id,
+                    session_token: 'session-123',
                 })
             );
         });
 
         it('should include is_super_admin in payload', async () => {
             const superAdmin = { ...mockUser, is_super_admin: true };
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.single
+                .mockResolvedValueOnce({
+                    data: {
+                        session_token: 'session-123',
+                        expires_at: new Date(Date.now() + 3600000).toISOString(),
+                    },
+                    error: null,
+                })
+                .mockResolvedValueOnce({ data: superAdmin, error: null });
 
-            await service.refreshToken(superAdmin);
+            await service.refreshToken({ ...superAdmin, session_token: 'session-123' });
 
             expect(jwtService.sign).toHaveBeenCalledWith(
                 expect.objectContaining({

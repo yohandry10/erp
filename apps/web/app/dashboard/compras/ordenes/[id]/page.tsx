@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
-import { 
+import {
   ArrowLeft,
   FileText,
   Calendar,
@@ -118,19 +118,23 @@ export default function OrdenCompraDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
-  
+
   const [orden, setOrden] = useState<OrdenCompra | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAprobarModal, setShowAprobarModal] = useState(false)
   const [showRechazarModal, setShowRechazarModal] = useState(false)
 
-  const loadOrden = async () => {
+  const ordenId = params.id as string | undefined
+
+  const loadOrden = useCallback(async () => {
+    if (!ordenId) return
+
     try {
       setLoading(true)
       setError(null)
-      const response = await get(`/api/compras/ordenes/${params.id}`)
-      
+      const response = await get(`/api/compras/ordenes/${ordenId}`)
+
       if (response?.success && response.data) {
         setOrden(response.data)
       } else {
@@ -142,13 +146,11 @@ export default function OrdenCompraDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, ordenId])
 
   useEffect(() => {
-    if (params.id) {
-      loadOrden()
-    }
-  }, [params.id])
+    loadOrden()
+  }, [loadOrden])
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return '-'
@@ -169,9 +171,9 @@ export default function OrdenCompraDetallePage() {
   const getEstadoBadge = (estado: string) => {
     const config = ESTADOS_CONFIG[estado as EstadoOrden]
     if (!config) return null
-    
+
     const Icon = config.icon
-    
+
     return (
       <span style={{
         display: 'inline-flex',
@@ -347,9 +349,9 @@ export default function OrdenCompraDetallePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Provider Information */}
           <div className="activity-card">
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.75rem',
               marginBottom: '1.5rem',
               paddingBottom: '1rem',
@@ -374,10 +376,10 @@ export default function OrdenCompraDetallePage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600', 
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
                   color: 'var(--primary-500)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -391,10 +393,10 @@ export default function OrdenCompraDetallePage() {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600', 
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
                   color: 'var(--primary-500)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -409,10 +411,10 @@ export default function OrdenCompraDetallePage() {
 
               {orden.proveedores?.email && (
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
                     color: 'var(--primary-500)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
@@ -428,10 +430,10 @@ export default function OrdenCompraDetallePage() {
 
               {orden.proveedores?.telefono && (
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
                     color: 'var(--primary-500)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
@@ -449,9 +451,9 @@ export default function OrdenCompraDetallePage() {
 
           {/* Order Details - Items Table */}
           <div className="activity-card">
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.75rem',
               marginBottom: '1.5rem',
               paddingBottom: '1rem',
@@ -478,67 +480,67 @@ export default function OrdenCompraDetallePage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--primary-200)' }}>
-                    <th style={{ 
-                      textAlign: 'left', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'left',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
                       Producto
                     </th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'right',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
                       Cantidad
                     </th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'right',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
                       Recibido
                     </th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'right',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
                       Pendiente
                     </th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'right',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
                       Precio Unit.
                     </th>
-                    <th style={{ 
-                      textAlign: 'right', 
-                      padding: '0.75rem', 
-                      fontWeight: '600', 
-                      fontSize: '0.75rem', 
-                      textTransform: 'uppercase', 
+                    <th style={{
+                      textAlign: 'right',
+                      padding: '0.75rem',
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
                       color: 'var(--primary-600)',
                       letterSpacing: '0.05em'
                     }}>
@@ -601,9 +603,9 @@ export default function OrdenCompraDetallePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {/* Order Summary */}
           <div className="activity-card">
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.75rem',
               marginBottom: '1.5rem',
               paddingBottom: '1rem',
@@ -641,9 +643,9 @@ export default function OrdenCompraDetallePage() {
                 </span>
               </div>
 
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 paddingTop: '1rem',
                 borderTop: '2px solid var(--primary-200)'
@@ -654,7 +656,7 @@ export default function OrdenCompraDetallePage() {
                 </span>
               </div>
 
-              <div style={{ 
+              <div style={{
                 background: 'var(--blue-50)',
                 borderRadius: '8px',
                 padding: '0.75rem',
@@ -672,9 +674,9 @@ export default function OrdenCompraDetallePage() {
 
           {/* Order Dates */}
           <div className="activity-card">
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.75rem',
               marginBottom: '1.5rem',
               paddingBottom: '1rem',
@@ -699,10 +701,10 @@ export default function OrdenCompraDetallePage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600', 
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  fontWeight: '600',
                   color: 'var(--primary-500)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
@@ -717,10 +719,10 @@ export default function OrdenCompraDetallePage() {
 
               {orden.fecha_entrega_esperada && (
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
                     color: 'var(--primary-500)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
@@ -736,10 +738,10 @@ export default function OrdenCompraDetallePage() {
 
               {orden.condiciones_pago && (
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: '600',
                     color: 'var(--primary-500)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
@@ -759,9 +761,9 @@ export default function OrdenCompraDetallePage() {
           {/* Reception Progress */}
           {(orden.estado === 'PARCIAL' || orden.estado === 'RECIBIDA') && (
             <div className="activity-card">
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.75rem',
                 marginBottom: '1.5rem',
                 paddingBottom: '1rem',
@@ -785,9 +787,9 @@ export default function OrdenCompraDetallePage() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: '0.5rem'
                 }}>
@@ -848,9 +850,9 @@ export default function OrdenCompraDetallePage() {
           {/* Approval Actions */}
           {(orden.estado === 'APROBACION' || orden.estado === 'BORRADOR' || orden.estado === 'PENDIENTE') && (
             <div className="activity-card">
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.75rem',
                 marginBottom: '1.5rem',
                 paddingBottom: '1rem',
@@ -945,9 +947,9 @@ export default function OrdenCompraDetallePage() {
           {/* Actions */}
           {orden.estado === 'APROBADA' && (
             <div className="activity-card">
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.75rem',
                 marginBottom: '1.5rem',
                 paddingBottom: '1rem',
@@ -994,9 +996,9 @@ export default function OrdenCompraDetallePage() {
       {/* Observations */}
       {orden.observaciones && (
         <div className="activity-card">
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '0.75rem',
             marginBottom: '1rem',
             paddingBottom: '1rem',
@@ -1018,9 +1020,9 @@ export default function OrdenCompraDetallePage() {
               Observaciones
             </h2>
           </div>
-          <p style={{ 
-            fontSize: '0.875rem', 
-            color: 'var(--primary-700)', 
+          <p style={{
+            fontSize: '0.875rem',
+            color: 'var(--primary-700)',
             lineHeight: '1.6',
             margin: 0,
             whiteSpace: 'pre-wrap'

@@ -441,6 +441,15 @@ $$;
 -- ----------------------------------------------------------------------------
 -- Migracion de estado a citext.
 -- ----------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS trg_normalize_auth_login_attempts_row ON public.auth_login_attempts;
+DROP TRIGGER IF EXISTS trg_normalize_user_sessions_row ON public.user_sessions;
+DROP TRIGGER IF EXISTS trg_normalize_trusted_ips_row ON public.trusted_ips;
+DROP TRIGGER IF EXISTS trg_normalize_rate_limit_blocks_row ON public.rate_limit_blocks;
+DROP TRIGGER IF EXISTS trg_normalize_rate_limit_configs_row ON public.rate_limit_configs;
+DROP TRIGGER IF EXISTS trg_normalize_rate_limit_anomalies_row ON public.rate_limit_anomalies;
+DROP TRIGGER IF EXISTS trg_normalize_rate_limit_baselines_row_278 ON public.rate_limit_baselines;
+DROP TRIGGER IF EXISTS trg_normalize_request_logs_row_278 ON public.request_logs;
+
 ALTER TABLE public.auth_login_attempts
   ALTER COLUMN estado TYPE citext
   USING app.normalize_security_auth_rate_limit_estado_278('auth_login_attempts', estado::text, COALESCE(success, false));

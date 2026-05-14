@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useCountryContext } from '@/hooks/use-country-context'
 
 interface TicketPrintProps {
@@ -35,15 +35,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
   const currencySymbol = country.simboloMoneda || 'S/'
   const documentoLabel = country.paisCodigo === 'PE' ? 'BOLETA' : 'TICKET'
 
-  useEffect(() => {
-    // Auto-imprimir cuando se monta el componente
-    const timer = setTimeout(() => {
-      handlePrint()
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [])
-
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     if (!ticketRef.current) return
 
     const printContent = ticketRef.current.innerHTML
@@ -165,7 +157,15 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
         onPrintComplete?.()
       }
     }
-  }
+  }, [onPrintComplete, ventaData.numero_ticket])
+
+  useEffect(() => {
+    // Auto-imprimir cuando se monta el componente
+    const timer = setTimeout(() => {
+      handlePrint()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [handlePrint])
 
   const formatMoney = (value: number) => `${currencySymbol} ${value.toFixed(2)}`
   const formatDate = (dateStr?: string) => {

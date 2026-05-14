@@ -24,9 +24,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [selectedCountry, setSelectedCountry] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [countryLoadExpired, setCountryLoadExpired] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { signIn } = useAuth()
+  const { signIn, session, loading: authLoading } = useAuth()
 
   const {
     paises,
@@ -37,6 +38,22 @@ export default function LoginPage() {
     // saveUserCountryPreference,
     // createUserConfiguration,
   } = usePaises()
+
+  useEffect(() => {
+    if (!paisesLoading) {
+      setCountryLoadExpired(false)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => setCountryLoadExpired(true), 10000)
+    return () => window.clearTimeout(timeoutId)
+  }, [paisesLoading])
+
+  useEffect(() => {
+    if (!authLoading && session) {
+      router.replace('/dashboard')
+    }
+  }, [authLoading, session, router])
 
   useEffect(() => {
     const list = (paises as Pais[]) || []
@@ -120,6 +137,7 @@ export default function LoginPage() {
   }
 
   const paisesList = (paises as Pais[]) || []
+  const showCountryLoading = paisesLoading && !countryLoadExpired
 
   return (
     <div className="login-container">
@@ -156,10 +174,10 @@ export default function LoginPage() {
                 <Select
                   value={selectedCountry}
                   onValueChange={(v) => setSelectedCountry(v)}
-                  disabled={paisesLoading}
+                  disabled={showCountryLoading}
                 >
                   <SelectTrigger id="country" className="select-trigger">
-                    <SelectValue placeholder={paisesLoading ? 'Cargando países...' : 'Selecciona un país'} />
+                    <SelectValue placeholder={showCountryLoading ? 'Cargando países...' : 'Selecciona un país'} />
                   </SelectTrigger>
                   <SelectContent className="select-content">
                     {paisesList.map((pais) => (
@@ -183,7 +201,8 @@ export default function LoginPage() {
                 </Label>
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   placeholder="tu@empresa.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -218,7 +237,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               onClick={handleLogin}
-              disabled={loading || paisesLoading}
+              disabled={loading}
               className="login-button primary"
             >
               {loading && <Loader2 className="button-spinner" />}
@@ -232,7 +251,7 @@ export default function LoginPage() {
             <Button
               variant="outline"
               onClick={handleDemoLogin}
-              disabled={loading || paisesLoading}
+              disabled={loading}
               className="login-button demo"
             >
               {loading && <Loader2 className="button-spinner" />}

@@ -66,7 +66,7 @@ export function CompanyTypeStep() {
         umbral_gre_automatico: 700,
       })
     }
-  }, [])
+  }, [state.configuration.tipo_empresa, updateConfiguration])
 
   return (
     <div style={{ padding: '1rem 0' }}>
@@ -94,7 +94,7 @@ export function CompanyTypeStep() {
         <Label style={{ marginBottom: '1rem', display: 'block', fontSize: '1rem', fontWeight: '600' }}>
           Tipo de Empresa <span style={{ color: '#ef4444' }}>*</span>
         </Label>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',

@@ -4,12 +4,13 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 export interface OutboxEvent {
   id: string;
   event_id: string;
-  correlation_id: string;
+  correlation_id?: string;
   aggregate_type: string;
   aggregate_id: string;
   event_type: string;
   event_data: any;
-  event_version: number;
+  payload?: any;
+  event_version?: number;
   created_at: string;
   processed_at: string | null;
   retry_count: number;
@@ -22,6 +23,17 @@ export class OutboxEventsService {
   private readonly logger = new Logger(OutboxEventsService.name);
 
   constructor(private readonly supabaseService: SupabaseService) {}
+
+  private normalizeEvent(row: any): OutboxEvent {
+    if (row.event_data !== undefined || row.payload !== undefined) {
+      return {
+        ...row,
+        event_data: row.event_data ?? row.payload ?? {},
+      } as OutboxEvent;
+    }
+
+    return row as OutboxEvent;
+  }
 
   /**
    * Lee eventos pendientes de la tabla outbox_events
@@ -64,7 +76,7 @@ export class OutboxEventsService {
       );
 
       // Filtrar por tenant si se proporciona
-      let eventos = data as OutboxEvent[];
+      let eventos = data.map((row: any) => this.normalizeEvent(row));
       if (tenantId) {
         eventos = eventos.filter(evento => {
           const eventData = evento.event_data;
@@ -101,7 +113,7 @@ export class OutboxEventsService {
         .from('outbox_events')
         .select('*')
         .is('processed_at', null)
-        .or(`status.eq.PENDING,status.eq.FAILED`)
+        .or(`status.eq.pending,status.eq.failed,status.eq.PENDING,status.eq.FAILED`)
         .lt('retry_count', maxRetries)
         .order('created_at', { ascending: true })
         .limit(limit);
@@ -127,7 +139,7 @@ export class OutboxEventsService {
         `✅ [OutboxEvents] ${data.length} eventos pendientes con reintentos encontrados`
       );
 
-      return data as OutboxEvent[];
+      return data.map((row: any) => this.normalizeEvent(row));
     } catch (error) {
       // Silenciar errores de tenant context - es normal cuando no hay eventos con tenant
       if (error.message === 'Tenant context required') {
@@ -184,7 +196,7 @@ export class OutboxEventsService {
         `✅ [OutboxEvents] ${data.length} eventos tipo ${eventType} encontrados`
       );
 
-      return data as OutboxEvent[];
+      return data.map((row: any) => this.normalizeEvent(row));
     } catch (error) {
       this.logger.error(
         `❌ [OutboxEvents] Excepción leyendo eventos tipo ${eventType}:`,
@@ -222,7 +234,7 @@ export class OutboxEventsService {
         throw new Error(`Error obteniendo evento ${eventId}: ${error.message}`);
       }
 
-      return data as OutboxEvent;
+      return this.normalizeEvent(data);
     } catch (error) {
       this.logger.error(
         `❌ [OutboxEvents] Excepción obteniendo evento ${eventId}:`,
@@ -295,7 +307,7 @@ export class OutboxEventsService {
         `✅ [OutboxEvents] ${data.length} eventos fallidos encontrados`
       );
 
-      return data as OutboxEvent[];
+      return data.map((row: any) => this.normalizeEvent(row));
     } catch (error) {
       this.logger.error(
         '❌ [OutboxEvents] Excepción leyendo eventos fallidos:',
@@ -339,7 +351,7 @@ export class OutboxEventsService {
         `✅ [OutboxEvents] ${data.length} eventos dead letter encontrados`
       );
 
-      return data as OutboxEvent[];
+      return data.map((row: any) => this.normalizeEvent(row));
     } catch (error) {
       this.logger.error(
         '❌ [OutboxEvents] Excepción leyendo eventos dead letter:',

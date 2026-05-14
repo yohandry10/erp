@@ -8,6 +8,8 @@ BEGIN;
 -- ----------------------------------------------------------------------------
 -- Vista de auditoría CPE + documentos
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_cpe_documentos_auditoria;
+
 CREATE OR REPLACE VIEW public.vw_cpe_documentos_auditoria AS
 SELECT
   c.id AS cpe_id,
@@ -48,6 +50,8 @@ LEFT JOIN public.documentos d ON d.id = c.documento_id;
 -- ----------------------------------------------------------------------------
 -- KPIs SUNAT multitenant por periodo (día)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v_kpis_sunat_multitenant;
+
 CREATE OR REPLACE VIEW public.v_kpis_sunat_multitenant AS
 WITH docs_base AS (
   SELECT

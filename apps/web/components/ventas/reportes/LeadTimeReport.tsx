@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DollarSign, Clock, TrendingDown, TrendingUp } from 'lucide-react'
@@ -37,17 +37,13 @@ export default function LeadTimeReport({ filters }: Props) {
   const [data, setData] = useState<LeadTimeData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/lead-time', {
         params: filters
       })
-      
+
       if (response?.success) {
         setData(response.data)
       }
@@ -61,14 +57,18 @@ export default function LeadTimeReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const getTendenciaIcon = () => {
     if (!data || data.tendencia.length < 2) return null
-    
+
     const primero = data.tendencia[0].promedio_dias
     const ultimo = data.tendencia[data.tendencia.length - 1].promedio_dias
-    
+
     if (ultimo < primero) {
       return <TrendingDown className="w-5 h-5 text-green-600" />
     } else if (ultimo > primero) {
@@ -79,11 +79,11 @@ export default function LeadTimeReport({ filters }: Props) {
 
   const getTendenciaText = () => {
     if (!data || data.tendencia.length < 2) return 'Sin datos suficientes'
-    
+
     const primero = data.tendencia[0].promedio_dias
     const ultimo = data.tendencia[data.tendencia.length - 1].promedio_dias
     const diferencia = Math.abs(ultimo - primero)
-    
+
     if (ultimo < primero) {
       return `Mejora de ${diferencia.toFixed(1)} días`
     } else if (ultimo > primero) {

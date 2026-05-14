@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   AlertTriangle, 
@@ -70,7 +70,7 @@ export default function AlertasSobregirosPage() {
   const [error, setError] = useState<string | null>(null)
   const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
-  const fetchAlertas = async () => {
+  const fetchAlertas = useCallback(async () => {
     try {
       setError(null)
       const result = await apiCall('/contabilidad/presupuestos/alertas/resumen')
@@ -82,11 +82,11 @@ export default function AlertasSobregirosPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [apiCall])
 
   useEffect(() => {
     fetchAlertas()
-  }, [])
+  }, [fetchAlertas])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -189,6 +189,7 @@ export default function AlertasSobregirosPage() {
       <div className="dashboard-header" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
+            aria-label="Volver a presupuestos"
             onClick={() => router.push('/dashboard/contabilidad/presupuestos')}
             style={{
               padding: '0.5rem',

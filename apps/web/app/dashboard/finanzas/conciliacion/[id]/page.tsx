@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ interface Conciliacion {
   saldo_banco: number;
   diferencia: number;
   cuentas_bancarias: {
+    id: string;
     banco: string;
     numero_cuenta: string;
     moneda: string;
@@ -52,39 +53,11 @@ export default function ConciliacionDetailPage() {
   const [closingConciliacion, setClosingConciliacion] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const API_BASE_URL = '/backend';
 
-  useEffect(() => {
-    if (conciliacionId) {
-      loadConciliacion();
-    }
-  }, [conciliacionId]);
-
-  const loadConciliacion = async () => {
-    setLoading(true);
+  const loadMovimientos = useCallback(async (conciliacionData: Conciliacion) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setConciliacion(data.data);
-        await loadMovimientos(data.data);
-      }
-    } catch (error) {
-      console.error('Error loading conciliación:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMovimientos = async (conciliacionData: Conciliacion) => {
-    try {
-      const cuentaBancariaId = conciliacionData.cuentas_bancarias;
+      const cuentaBancariaId = conciliacionData.cuentas_bancarias.id;
       const fechaDesde = conciliacionData.fecha_desde;
       const fechaHasta = conciliacionData.fecha_hasta;
 
@@ -124,7 +97,35 @@ export default function ConciliacionDetailPage() {
     } catch (error) {
       console.error('Error loading movimientos:', error);
     }
-  };
+  }, [API_BASE_URL, conciliacionId]);
+
+  const loadConciliacion = useCallback(async () => {
+    if (!conciliacionId) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setConciliacion(data.data);
+        await loadMovimientos(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading conciliación:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, conciliacionId, loadMovimientos]);
+
+  useEffect(() => {
+    loadConciliacion();
+  }, [loadConciliacion]);
 
   const handleMatchSuccess = () => {
     // Reload data after successful match
@@ -410,7 +411,7 @@ export default function ConciliacionDetailPage() {
             <div className="p-6">
               <ImportarExtractoCSV
                 conciliacionId={conciliacionId}
-                cuentaBancariaId={conciliacion.cuentas_bancarias as any}
+                cuentaBancariaId={conciliacion.cuentas_bancarias.id}
                 banco={conciliacion.cuentas_bancarias.banco}
                 onImportSuccess={handleImportSuccess}
                 onCancel={() => setShowImportModal(false)}

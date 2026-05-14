@@ -8,6 +8,8 @@ BEGIN;
 -- ----------------------------------------------------------------------------
 -- Vista POS productos (shape esperado por web + API)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vista_pos_productos;
+
 CREATE OR REPLACE VIEW public.vista_pos_productos AS
 WITH base AS (
   SELECT
@@ -52,6 +54,8 @@ FROM base b;
 -- ----------------------------------------------------------------------------
 -- Recepciones consolidadas para inventario
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_inventario_recepciones;
+
 CREATE OR REPLACE VIEW public.vw_inventario_recepciones AS
 WITH item_totals AS (
   SELECT
@@ -110,6 +114,8 @@ LEFT JOIN item_totals it ON it.recepcion_id = r.id;
 -- ----------------------------------------------------------------------------
 -- Kardex valorizado por recepciones (shape usado por backend)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_kardex_valorizado;
+
 CREATE OR REPLACE VIEW public.vw_kardex_valorizado AS
 WITH items AS (
   SELECT

@@ -1,15 +1,16 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { customAuth } from '@/lib/auth-service'
 import { useToast } from '@/components/ui/use-toast'
-import { 
-  Building2, 
-  FileText, 
-  Truck, 
-  Download, 
+import {
+  Building2,
+  FileText,
+  Truck,
+  Download,
   Package,
   ShoppingCart,
   FileSpreadsheet,
@@ -340,14 +341,14 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
 }) {
   const { isSuperAdmin, user } = useTenant()
   const Icon = item.icon
-  
+
   // Check if any submenu item is active
   const isSubmenuActive = item.submenu?.some(subItem => pathname === subItem.href) || false
   const isActive = pathname === item.href || isSubmenuActive
-  
+
   // Initialize expanded state based on whether submenu is active
   const [isExpanded, setIsExpanded] = useState(isSubmenuActive)
-  
+
   // Update expanded state when pathname changes and submenu becomes active
   useEffect(() => {
     if (isSubmenuActive) {
@@ -364,14 +365,15 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   const bypassPermissions = isSuperAdmin || isAdmin
 
   // Check permission if required (only for items WITHOUT submenu)
-  // IMPORTANT: keep hook order stable even if bypassPermissions changes.
+  // Always call hook to maintain stable hook order per Rules of Hooks.
+  const permissionResult = usePermission(
+    item.permission?.modulo ?? '',
+    item.permission?.accion ?? '',
+    item.permission?.recurso ?? '',
+  )
   const shouldCheckPermission = !!item.permission && !item.submenu
-  const permissionResult = shouldCheckPermission
-    ? usePermission(item.permission!.modulo, item.permission!.accion, item.permission!.recurso)
-    : { hasPermission: true, loading: false }
-
-  const hasPermission = bypassPermissions ? true : permissionResult.hasPermission
-  const loading = bypassPermissions ? false : permissionResult.loading
+  const hasPermission = bypassPermissions || !shouldCheckPermission ? true : permissionResult.hasPermission
+  const loading = bypassPermissions || !shouldCheckPermission ? false : permissionResult.loading
 
   // Filter super-admin only items
   if (item.superAdminOnly && !isSuperAdmin) {
@@ -405,7 +407,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
         }}
       >
         <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-        <span style={{ 
+        <span style={{
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -444,7 +446,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
         >
           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
             <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-            <span style={{ 
+            <span style={{
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -459,9 +461,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
             <ChevronRight size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
           )}
         </button>
-        
+
         {isExpanded && (
-          <div style={{ 
+          <div style={{
             marginLeft: isTablet ? '1rem' : '1.5rem',
             marginTop: '0.25rem'
           }}>
@@ -530,7 +532,7 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
       onClick={onClose}
     >
       <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-      <span style={{ 
+      <span style={{
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -630,6 +632,8 @@ export default function Sidebar() {
       {/* Mobile menu button */}
       <button
         className="mobile-menu-btn"
+        aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
+        title={isOpen ? 'Cerrar menú' : 'Abrir menú'}
         onClick={() => setIsOpen(!isOpen)}
         style={{
           position: 'fixed',
@@ -653,7 +657,7 @@ export default function Sidebar() {
       </button>
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}
         style={{
           position: 'fixed',
@@ -675,26 +679,29 @@ export default function Sidebar() {
         }}
       >
         {/* Logo */}
-        <div style={{ 
-          padding: isTablet ? '1rem 1.5rem' : '1.5rem 2rem', 
+        <div style={{
+          padding: isTablet ? '1rem 1.5rem' : '1.5rem 2rem',
           borderBottom: '1px solid var(--primary-200)',
           flexShrink: 0
         }}>
           <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img 
-              src="/logo.png" 
-              alt="NEON SYSTEM" 
-              style={{ 
+            <Image
+              src="/logo.png"
+              alt="NEON SYSTEM"
+              width={180}
+              height={60}
+              priority
+              style={{
                 width: isTablet ? '140px' : '180px',
                 height: 'auto',
                 objectFit: 'contain'
-              }} 
+              }}
             />
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav style={{ 
+        <nav style={{
           padding: isTablet ? '1.5rem 0.75rem' : '2rem 1rem',
           flex: 1,
           overflowY: 'auto'
@@ -712,8 +719,8 @@ export default function Sidebar() {
         </nav>
 
         {/* User Section */}
-        <div style={{ 
-          padding: isTablet ? '0.75rem' : '1rem', 
+        <div style={{
+          padding: isTablet ? '0.75rem' : '1rem',
           borderTop: '1px solid var(--primary-200)',
           flexShrink: 0,
           display: 'flex',
@@ -721,30 +728,30 @@ export default function Sidebar() {
           gap: isTablet ? '0.75rem' : '1rem'
         }}>
           {/* User Info Card */}
-          <div style={{ 
-            padding: isTablet ? '0.75rem' : '1rem', 
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%)', 
+          <div style={{
+            padding: isTablet ? '0.75rem' : '1rem',
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%)',
             borderRadius: 'var(--border-radius)',
             border: '1px solid rgba(59, 130, 246, 0.2)'
           }}>
-            <div style={{ 
-              fontSize: isTablet ? '0.85rem' : '0.9rem', 
-              fontWeight: '700', 
+            <div style={{
+              fontSize: isTablet ? '0.85rem' : '0.9rem',
+              fontWeight: '700',
               color: 'var(--primary-800)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>{user?.nombre || 'Usuario'}</div>
-            <div style={{ 
-              fontSize: isTablet ? '0.75rem' : '0.8rem', 
-              color: 'var(--primary-500)', 
+            <div style={{
+              fontSize: isTablet ? '0.75rem' : '0.8rem',
+              color: 'var(--primary-500)',
               fontWeight: '500',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}>{user?.email || ''}</div>
           </div>
-          
+
           {/* Logout Button */}
           <button
             onClick={handleLogout}

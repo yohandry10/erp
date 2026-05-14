@@ -1,6 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
@@ -11,7 +13,8 @@ import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
  * Expone la tasa de IGV/IVA y otras configuraciones fiscales
  */
 @Controller('configuracion-fiscal')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@RequirePermission('configuracion.read')
 export class ConfiguracionFiscalController {
   constructor(
     private readonly supabase: SupabaseService,

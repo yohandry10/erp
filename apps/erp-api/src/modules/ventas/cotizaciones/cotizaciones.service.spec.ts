@@ -81,11 +81,62 @@ describe('CotizacionesService', () => {
     jest.clearAllMocks();
   });
 
+  describe('create', () => {
+    it('crea detalles con el contrato runtime de cotizacion_detalles', async () => {
+      const mockClient = supabaseService.getClient() as any;
+      const createDto = {
+        cliente_id: 'cliente-123',
+        detalle: [
+          {
+            producto_id: 'prod-123',
+            descripcion: 'Producto venta',
+            cantidad: 2,
+            precio_unitario: 100,
+          },
+        ],
+      };
+
+      mockClient.maybeSingle.mockResolvedValue({
+        data: { stock_actual: 10, stock_reservado: 0 },
+        error: null,
+      });
+      mockClient.single
+        .mockResolvedValueOnce({ data: { id: 'cliente-123' }, error: null })
+        .mockResolvedValueOnce({
+          data: {
+            id: 'cot-123',
+            tenant_id: tenantId,
+            numero: 'COT-2026-0001',
+          },
+          error: null,
+        });
+      mockClient.rpc.mockResolvedValue({ data: { success: true }, error: null });
+
+      await service.create(createDto as any, tenantId);
+
+      const detalleInsert = mockClient.insert.mock.calls.find(([payload]) => Array.isArray(payload))?.[0];
+
+      expect(detalleInsert).toEqual([
+        expect.objectContaining({
+          tenant_id: tenantId,
+          cotizacion_id: 'cot-123',
+          producto_id: 'prod-123',
+          descripcion: 'Producto venta',
+          cantidad: 2,
+          precio_unitario: 100,
+          subtotal: 200,
+          orden: 1,
+        }),
+      ]);
+      expect(detalleInsert?.[0]).not.toHaveProperty('producto_codigo');
+    });
+  });
+
   describe('convertirAPedido', () => {
     const convertirDto = { notas: 'Convertido desde cotización' };
 
     it('debe convertir cotización a pedido usando RPC transaccional', async () => {
-      const mockClient = supabaseService.getClient();
+      const mockClient = supabaseService.getClient() as any;
       
       // Mock findOne
       jest.spyOn(service, 'findOne').mockResolvedValue({
@@ -146,6 +197,20 @@ describe('CotizacionesService', () => {
         .rejects.toThrow('Solo se pueden convertir cotizaciones en estado BORRADOR, ENVIADA o APROBADA');
     });
 
+    it('debe rechazar cotización con fecha de vencimiento pasada aunque siga en borrador', async () => {
+      const yesterday = new Date(Date.now() - 86400000).toISOString();
+
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'cot-123',
+        estado: EstadoCotizacion.BORRADOR,
+        fecha_vencimiento: yesterday,
+        detalle: [{ id: 'det-1' }],
+      } as any);
+
+      await expect(service.convertirAPedido('cot-123', convertirDto, tenantId, userId))
+        .rejects.toThrow('No se puede convertir una cotización vencida');
+    });
+
     it('debe rechazar cotización sin detalle', async () => {
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -158,7 +223,7 @@ describe('CotizacionesService', () => {
     });
 
     it('debe manejar error de RPC', async () => {
-      const mockClient = supabaseService.getClient();
+      const mockClient = supabaseService.getClient() as any;
       
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -173,6 +238,32 @@ describe('CotizacionesService', () => {
 
       await expect(service.convertirAPedido('cot-123', convertirDto, tenantId, userId))
         .rejects.toThrow('Error en transacción');
+    });
+
+    it('genera número de pedido usando solo el sufijo correlativo real', async () => {
+      const year = new Date().getFullYear();
+      const query = {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        like: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue({
+          data: [
+            { numero: `PED-${year}-2026` },
+            { numero: `PED-${year}-0009` },
+          ],
+          error: null,
+        }),
+      };
+      const client = {
+        from: jest.fn().mockReturnValue(query),
+      };
+      supabaseService.getClient.mockReturnValueOnce(client as any);
+
+      const numero = await (service as any).generarNumeroPedidoSeguro(tenantId);
+
+      expect(numero).toBe(`PED-${year}-2027`);
+      expect(query.like).toHaveBeenCalledWith('numero', `PED-${year}-%`);
     });
   });
 
@@ -249,7 +340,7 @@ describe('CotizacionesService', () => {
 
   describe('Estados de cotización', () => {
     it('debe permitir convertir cotización en estado BORRADOR', async () => {
-      const mockClient = supabaseService.getClient();
+      const mockClient = supabaseService.getClient() as any;
       
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -269,7 +360,7 @@ describe('CotizacionesService', () => {
     });
 
     it('debe permitir convertir cotización en estado ENVIADA', async () => {
-      const mockClient = supabaseService.getClient();
+      const mockClient = supabaseService.getClient() as any;
       
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -289,7 +380,7 @@ describe('CotizacionesService', () => {
     });
 
     it('debe permitir convertir cotización en estado APROBADA', async () => {
-      const mockClient = supabaseService.getClient();
+      const mockClient = supabaseService.getClient() as any;
       
       jest.spyOn(service, 'findOne').mockResolvedValue({
         id: 'cot-123',
@@ -314,6 +405,70 @@ describe('CotizacionesService', () => {
       // Verificar que el servicio tiene la dependencia
       expect(taxCalculator).toBeDefined();
       expect(taxCalculator.calcularImpuestos).toBeDefined();
+    });
+  });
+
+  describe('Aislamiento multi-tenant (P2.2)', () => {
+    it('findOne debe filtrar por tenant y rechazar id del otro tenant', async () => {
+      const mockClient = supabaseService.getClient() as any;
+
+      mockClient.single.mockResolvedValue({
+        data: null,
+        error: { message: 'No encontrado' },
+      });
+
+      await expect(service.findOne('cotizacion-cross', tenantId)).rejects.toThrow(NotFoundException);
+
+      expect(mockClient.from).toHaveBeenCalledWith('cotizaciones');
+      expect(mockClient.eq).toHaveBeenCalledWith('id', 'cotizacion-cross');
+      expect(mockClient.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+      expect(mockClient.eq).not.toHaveBeenCalledWith('tenant_id', 'tenant-b');
+    });
+
+    it('findOne no debe consultar sin tenant para recursos sensibles', async () => {
+      const mockClient = supabaseService.getClient() as any;
+
+      mockClient.single.mockResolvedValue({
+        data: {
+          id: 'cot-1',
+          tenant_id: tenantId,
+          estado: EstadoCotizacion.BORRADOR,
+          detalle: [],
+        },
+        error: null,
+      });
+
+      await service.findOne('cot-1', tenantId);
+
+      expect(mockClient.from).toHaveBeenCalledWith('cotizaciones');
+      expect(mockClient.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+    });
+
+    it('create debe validar cliente solo dentro del tenant actual', async () => {
+      const mockClient = supabaseService.getClient() as any;
+      const createDto = {
+        cliente_id: 'cliente-cross',
+        detalle: [
+          {
+            producto_id: 'prod-cross',
+            descripcion: 'producto',
+            cantidad: 1,
+            precio_unitario: 100,
+          },
+        ],
+      };
+
+      mockClient.single.mockResolvedValue({
+        data: null,
+        error: { message: 'No encontrado' },
+      });
+
+      await expect(service.create(createDto as any, tenantId, userId)).rejects.toThrow(NotFoundException);
+
+      expect(mockClient.from).toHaveBeenCalledWith('clientes');
+      expect(mockClient.eq).toHaveBeenCalledWith('tenant_id', tenantId);
+      expect(mockClient.eq).toHaveBeenCalledWith('id', 'cliente-cross');
+      expect(mockClient.eq).not.toHaveBeenCalledWith('tenant_id', 'tenant-b');
     });
   });
 });

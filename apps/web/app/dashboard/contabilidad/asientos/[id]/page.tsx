@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -75,16 +75,19 @@ export default function AsientoDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get } = useApi()
+  const asientoId = params.id as string | undefined
   
   const [asiento, setAsiento] = useState<AsientoContable | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const loadAsiento = async () => {
+  const loadAsiento = useCallback(async () => {
+    if (!asientoId) return
+
     try {
       setLoading(true)
       setError(null)
-      const response = await get(`/api/contabilidad/asientos/${params.id}`)
+      const response = await get(`/api/contabilidad/asientos/${asientoId}`)
       
       if (response?.success && response.data) {
         setAsiento(response.data)
@@ -97,13 +100,11 @@ export default function AsientoDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [asientoId, get])
 
   useEffect(() => {
-    if (params.id) {
-      loadAsiento()
-    }
-  }, [params.id])
+    loadAsiento()
+  }, [loadAsiento])
 
   const formatCurrency = (amount: number | undefined) => {
     if (!amount) return 'S/ 0.00'

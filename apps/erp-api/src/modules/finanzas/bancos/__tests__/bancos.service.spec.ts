@@ -44,7 +44,7 @@ describe('BancosService', () => {
   describe('crearCuentaBancaria', () => {
     it('debe crear una cuenta bancaria exitosamente', async () => {
       const tenantId = 'test-tenant-id';
-      const dto = {
+      const dto: any = {
         nombre: 'Cuenta Corriente BCP',
         banco: 'BCP',
         numero_cuenta: '191-1234567-0-01',
@@ -79,7 +79,7 @@ describe('BancosService', () => {
 
     it('debe rechazar cuenta duplicada con mismo número', async () => {
       const tenantId = 'test-tenant-id';
-      const dto = {
+      const dto: any = {
         nombre: 'Cuenta Test',
         banco: 'BCP',
         numero_cuenta: '191-1234567-0-01',
@@ -290,6 +290,30 @@ describe('BancosService', () => {
   });
 
   describe('obtenerMovimientosBancarios', () => {
+    it('debe interpretar conciliado=\"false\" como no conciliado y no como true', () => {
+      const queryBuilder = {
+        eq: jest.fn().mockReturnThis(),
+        or: jest.fn().mockReturnThis(),
+      };
+
+      (service as any).applyConciliadoFilter(queryBuilder, 'false');
+
+      expect(queryBuilder.eq).not.toHaveBeenCalledWith('conciliado', true);
+      expect(queryBuilder.or).toHaveBeenCalledWith('conciliado.is.false,conciliado.is.null');
+    });
+
+    it('debe interpretar conciliado=\"true\" como conciliado real', () => {
+      const queryBuilder = {
+        eq: jest.fn().mockReturnThis(),
+        or: jest.fn().mockReturnThis(),
+      };
+
+      (service as any).applyConciliadoFilter(queryBuilder, 'true');
+
+      expect(queryBuilder.eq).toHaveBeenCalledWith('conciliado', true);
+      expect(queryBuilder.or).not.toHaveBeenCalled();
+    });
+
     it('debe obtener movimientos bancarios con paginación', async () => {
       const tenantId = 'test-tenant-id';
       const cuentaId = 'cuenta-id';
@@ -347,7 +371,7 @@ describe('BancosService', () => {
       const query = {
         fecha_desde: '2025-01-01',
         fecha_hasta: '2025-01-31',
-        tipo: 'ABONO',
+        tipo: 'ABONO' as const,
         page: 1,
         limit: 10,
       };

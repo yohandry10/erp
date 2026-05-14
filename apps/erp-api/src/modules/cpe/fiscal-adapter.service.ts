@@ -191,8 +191,9 @@ export class FiscalAdapterService {
       .select('codigo_iso')
       .eq('id', paisId)
       .single();
-    
-    return data?.codigo_iso || 'PE';
+
+    const typedData = data as any;
+    return typedData?.codigo_iso || 'PE';
   }
 
   /**
@@ -228,21 +229,23 @@ export class FiscalAdapterService {
       `)
       .eq('id', paisId)
       .single();
-    
+
     const { data: configFiscal } = await this.supabaseService.getClient()
       .from('configuracion_fiscal')
       .select('impuesto_principal_nombre, impuesto_principal_porcentaje')
       .eq('pais_id', paisId)
       .single();
-    
+
+    const typedPais = pais as any;
+    const typedConfigFiscal = configFiscal as any;
     return {
       paisId,
-      paisCodigo: pais?.codigo_iso || 'PE',
-      paisNombre: pais?.nombre || 'Perú',
+      paisCodigo: typedPais?.codigo_iso || 'PE',
+      paisNombre: typedPais?.nombre || 'Perú',
       servicioFiscal: await this.obtenerNombreServicioFiscal(tenantId),
-      impuestoPrincipal: configFiscal?.impuesto_principal_nombre || 'IGV',
-      tasaImpuesto: configFiscal?.impuesto_principal_porcentaje || 0.18,
-      moneda: pais?.moneda_codigo || 'PEN',
+      impuestoPrincipal: typedConfigFiscal?.impuesto_principal_nombre || 'IGV',
+      tasaImpuesto: typedConfigFiscal?.impuesto_principal_porcentaje || 0.18,
+      moneda: typedPais?.moneda_codigo || 'PEN',
       requiereGRE: paisId === 1
     };
   }
@@ -286,23 +289,24 @@ export class FiscalAdapterService {
         this.logger.warn(`Error leyendo configuracion de emision: ${error.message}`);
       }
 
-      const modo = (data?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
-      const activo = data?.ose_activo === true;
+      const typedData = data as any;
+      const modo = (typedData?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
+      const activo = typedData?.ose_activo === true;
 
       if (modo !== 'OSE_API') {
         return { modo, activo };
       }
 
-      const authTipo = (data?.ose_auth_tipo || 'BASIC').toString().toUpperCase() as OseAuthTipo;
+      const authTipo = (typedData?.ose_auth_tipo || 'BASIC').toString().toUpperCase() as OseAuthTipo;
       const config: OseApiConfig = {
-        url: data?.ose_url || '',
-        statusUrl: data?.ose_status_url || null,
+        url: typedData?.ose_url || '',
+        statusUrl: typedData?.ose_status_url || null,
         authTipo,
-        username: data?.ose_username || null,
-        password: data?.ose_password || null,
-        apiKey: data?.ose_api_key || null,
-        apiHeader: data?.ose_api_header || null,
-        bearerToken: data?.ose_bearer_token || null,
+        username: typedData?.ose_username || null,
+        password: typedData?.ose_password || null,
+        apiKey: typedData?.ose_api_key || null,
+        apiHeader: typedData?.ose_api_header || null,
+        bearerToken: typedData?.ose_bearer_token || null,
       };
 
       return { modo, activo, config };
@@ -331,12 +335,13 @@ export class FiscalAdapterService {
         .eq('tenant_id', tenantId)
         .single();
 
-      if (error || !data) {
+      const typedPaisData = data as any;
+      if (error || !typedPaisData) {
         this.logger.warn(`⚠️ No se encontró país para tenant ${tenantId}, usando Perú por defecto`);
         return 1; // Default: Perú
       }
 
-      const paisId = data.pais_id || 1;
+      const paisId = typedPaisData.pais_id || 1;
       
       // Guardar en cache
       this.paisCache.set(tenantId, paisId);

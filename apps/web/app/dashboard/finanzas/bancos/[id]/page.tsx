@@ -125,7 +125,7 @@ export default function CuentaBancariaDetallePage() {
       
       if (response?.success) {
         setMovimientos(response.data || [])
-        setPagination(response.pagination || pagination)
+        setPagination(prev => response.pagination || prev)
       }
     } catch (error) {
       console.error('Error loading movimientos:', error)
@@ -141,7 +141,7 @@ export default function CuentaBancariaDetallePage() {
 
   useEffect(() => {
     loadMovimientos(1)
-  }, [filters])
+  }, [loadMovimientos])
 
   const handleFilterChange = (key: keyof Filters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }))

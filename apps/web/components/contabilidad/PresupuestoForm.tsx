@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { DollarSign, Save, X, AlertCircle } from 'lucide-react'
@@ -70,11 +70,6 @@ export default function PresupuestoForm({
   const [cuentas, setCuentas] = useState<Cuenta[]>([])
   const [periodos, setPeriodos] = useState<Periodo[]>([])
 
-  // Load catalog data
-  useEffect(() => {
-    loadCatalogData()
-  }, [])
-
   // Load initial data if editing
   useEffect(() => {
     if (initialData) {
@@ -89,7 +84,7 @@ export default function PresupuestoForm({
     }
   }, [initialData])
 
-  const loadCatalogData = async () => {
+  const loadCatalogData = useCallback(async () => {
     try {
       setLoadingData(true)
       setError(null)
@@ -125,7 +120,12 @@ export default function PresupuestoForm({
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [get])
+
+  // Load catalog data
+  useEffect(() => {
+    loadCatalogData()
+  }, [loadCatalogData])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

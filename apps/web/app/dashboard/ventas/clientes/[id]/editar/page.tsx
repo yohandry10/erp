@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import ClienteForm from '@/components/ventas/ClienteForm'
@@ -15,15 +15,11 @@ export default function EditarClientePage() {
   const [cliente, setCliente] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadCliente()
-  }, [clienteId])
-
-  const loadCliente = async () => {
+  const loadCliente = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/ventas/clientes/${clienteId}`)
-      
+
       if (response?.id) {
         setCliente(response)
       } else {
@@ -36,12 +32,16 @@ export default function EditarClientePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [clienteId, get, router])
+
+  useEffect(() => {
+    loadCliente()
+  }, [loadCliente])
 
   const handleSubmit = async (data: any) => {
     try {
       const response = await put(`/api/ventas/clientes/${clienteId}`, data)
-      
+
       if (response?.id) {
         alert('✅ Cliente actualizado exitosamente')
         router.push(`/dashboard/ventas/clientes/${clienteId}`)

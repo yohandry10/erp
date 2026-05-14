@@ -19,6 +19,23 @@ import { PermissionService } from './permissions/permission.service';
 import { TenantContextService } from '../shared/tenant/tenant-context.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
+import { AuditService } from './audit/audit.service';
+import * as bcrypt from 'bcrypt';
+
+const USUARIO_SAFE_COLUMNS = `
+  id,
+  tenant_id,
+  email,
+  nombre,
+  apellido,
+  telefono,
+  activo,
+  estado,
+  is_super_admin,
+  fecha_ultimo_acceso,
+  created_at,
+  updated_at
+`;
 
 @ApiTags('usuarios-sistema')
 @Controller('usuarios-sistema')
@@ -28,7 +45,67 @@ export class UsuariosController {
     private readonly supabaseService: SupabaseService,
     private readonly permissionService: PermissionService,
     private readonly tenantContext: TenantContextService,
+    private readonly auditService: AuditService,
   ) {}
+
+  private normalizeEstado(estado: string | undefined): 'ACTIVO' | 'INACTIVO' | 'SUSPENDIDO' {
+    const normalized = (estado || 'ACTIVO').trim().toUpperCase();
+    if (!['ACTIVO', 'INACTIVO', 'SUSPENDIDO'].includes(normalized)) {
+      throw new BadRequestException('Estado de usuario inválido');
+    }
+    return normalized as 'ACTIVO' | 'INACTIVO' | 'SUSPENDIDO';
+  }
+
+  private async assertNotLastSuperAdmin(
+    tenantId: string,
+    targetUser: any,
+    nextEstado: string,
+  ): Promise<void> {
+    if (!targetUser?.is_super_admin || nextEstado === 'ACTIVO') {
+      return;
+    }
+
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('usuarios_sistema')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('is_super_admin', true)
+      .eq('activo', true)
+      .neq('id', targetUser.id);
+
+    if (error) {
+      throw new BadRequestException(`No se pudo validar superadmins activos: ${error.message}`);
+    }
+
+    if ((count || 0) === 0) {
+      throw new ForbiddenException('No se puede inactivar o eliminar el último super admin activo');
+    }
+  }
+
+  private async registrarAuditoriaUsuario(
+    tableName: string,
+    operation: 'INSERT' | 'UPDATE' | 'DELETE',
+    req: any,
+    tenantId: string,
+    recordId: string,
+    oldValues?: Record<string, any> | null,
+    newValues?: Record<string, any> | null,
+    metadata?: Record<string, any>,
+  ): Promise<void> {
+    await this.auditService.registrarCambio(
+      tableName,
+      operation,
+      req?.user?.id || 'SYSTEM',
+      {
+        old: oldValues || undefined,
+        new: newValues || undefined,
+      },
+      tenantId,
+      recordId,
+      metadata,
+    );
+  }
 
   private resolveTenantOrThrow(req: any): string {
     const fromUser = req?.user?.tenant_id;
@@ -67,13 +144,12 @@ export class UsuariosController {
         .getClient()
         .from('usuarios_sistema')
         .select(`
-          *,
+          ${USUARIO_SAFE_COLUMNS},
           roles_usuario:user_roles (
             roles (
               id,
               nombre,
-              descripcion,
-              permisos
+              descripcion
             )
           )
         `)
@@ -178,8 +254,7 @@ export class UsuariosController {
   }
 
   @Get('/roles')
-  // NOTA: Sin @RequirePermission porque se necesita para el dropdown de crear usuario
-  // y el Admin del tenant siempre tiene acceso a este módulo
+  @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener todos los roles disponibles' })
   @ApiResponse({ status: 200, description: 'Lista de roles obtenida exitosamente' })
   async getRoles(@Req() req: any) {
@@ -318,14 +393,17 @@ export class UsuariosController {
       }
 
       // 2. Crear usuario en usuarios_sistema con el mismo ID
+      const estado = this.normalizeEstado(usuarioData.estado);
+      const passwordHash = await bcrypt.hash(usuarioData.password, 10);
       const nuevoUsuario = {
         id: authUser.user.id, // Usar el mismo ID de auth.users
         tenant_id: tenantId,
         nombre: usuarioData.nombre,
         email: usuarioData.email,
+        password_hash: passwordHash,
         telefono: usuarioData.telefono || null,
-        estado: usuarioData.estado || 'ACTIVO',
-        activo: true,
+        estado,
+        activo: estado === 'ACTIVO',
         fecha_ultimo_acceso: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -335,7 +413,7 @@ export class UsuariosController {
         .getClient()
         .from('usuarios_sistema')
         .insert(nuevoUsuario)
-        .select()
+        .select(USUARIO_SAFE_COLUMNS)
         .single();
 
       if (errorUsuario) {
@@ -352,6 +430,7 @@ export class UsuariosController {
         .insert({
           usuario_sistema_id: usuarioCreado.id,
           role_id: usuarioData.rol_id,
+          tenant_id: tenantId,
           created_at: new Date().toISOString()
         });
 
@@ -365,6 +444,17 @@ export class UsuariosController {
 
       console.log('✅ Usuario creado exitosamente:', usuarioCreado.id);
 
+      await this.registrarAuditoriaUsuario(
+        'usuarios_sistema',
+        'INSERT',
+        req,
+        tenantId,
+        usuarioCreado.id,
+        null,
+        usuarioCreado,
+        { accion: 'CREAR_USUARIO', rol_id: usuarioData.rol_id },
+      );
+
       return {
         success: true,
         data: { ...usuarioCreado, password: undefined },
@@ -373,11 +463,10 @@ export class UsuariosController {
 
     } catch (error) {
       console.error('❌ Error creando usuario:', error);
-      return {
-        success: false,
-        data: null,
-        error: error.message
-      };
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message || 'Error creando usuario');
     }
   }
 
@@ -395,7 +484,7 @@ export class UsuariosController {
       const { data: usuarioExistente } = await this.supabaseService
         .getClient()
         .from('usuarios_sistema')
-        .select('id')
+        .select(USUARIO_SAFE_COLUMNS)
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .single();
@@ -409,11 +498,24 @@ export class UsuariosController {
         ...usuarioData,
         updated_at: new Date().toISOString()
       };
+      const requestedRoleId = datosActualizacion.rol_id;
 
       // Remover campos que no deben actualizarse directamente
       delete datosActualizacion.id;
       delete datosActualizacion.tenant_id;
       delete datosActualizacion.created_at;
+      delete datosActualizacion.password;
+      delete datosActualizacion.password_hash;
+      delete datosActualizacion.password_reset_token;
+      delete datosActualizacion.password_reset_expires;
+      delete datosActualizacion.failed_login_attempts;
+      delete datosActualizacion.locked_until;
+      delete datosActualizacion.is_super_admin;
+      delete datosActualizacion.rol_id;
+      if (datosActualizacion.estado !== undefined) {
+        datosActualizacion.estado = this.normalizeEstado(datosActualizacion.estado);
+        datosActualizacion.activo = datosActualizacion.estado === 'ACTIVO';
+      }
 
       const { data: usuarioActualizado, error } = await this.supabaseService
         .getClient()
@@ -421,13 +523,58 @@ export class UsuariosController {
         .update(datosActualizacion)
         .eq('id', id)
         .eq('tenant_id', tenantId)
-        .select()
+        .select(USUARIO_SAFE_COLUMNS)
         .single();
 
       if (error) {
         console.error('❌ Error actualizando usuario:', error);
         throw error;
       }
+
+      if (requestedRoleId) {
+        const { data: role, error: roleError } = await this.supabaseService
+          .getClient()
+          .from('roles')
+          .select('id')
+          .eq('id', requestedRoleId)
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (roleError || !role) {
+          throw new BadRequestException('Rol no válido para este tenant');
+        }
+
+        await this.supabaseService
+          .getClient()
+          .from('user_roles')
+          .delete()
+          .eq('usuario_sistema_id', id);
+
+        const { error: roleAssignError } = await this.supabaseService
+          .getClient()
+          .from('user_roles')
+          .insert({
+            usuario_sistema_id: id,
+            role_id: requestedRoleId,
+            tenant_id: tenantId,
+            created_at: new Date().toISOString(),
+          });
+
+        if (roleAssignError) {
+          throw new BadRequestException(`Error asignando rol: ${roleAssignError.message}`);
+        }
+      }
+
+      await this.registrarAuditoriaUsuario(
+        'usuarios_sistema',
+        'UPDATE',
+        req,
+        tenantId,
+        id,
+        usuarioExistente,
+        usuarioActualizado,
+        { accion: 'ACTUALIZAR_USUARIO', rol_id: requestedRoleId || null },
+      );
 
       console.log('✅ Usuario actualizado exitosamente');
 
@@ -439,11 +586,10 @@ export class UsuariosController {
 
     } catch (error) {
       console.error('❌ Error actualizando usuario:', error);
-      return {
-        success: false,
-        data: null,
-        error: error.message
-      };
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message || 'Error actualizando usuario');
     }
   }
 
@@ -453,7 +599,8 @@ export class UsuariosController {
   @ApiResponse({ status: 200, description: 'Estado actualizado exitosamente' })
   async cambiarEstado(@Param('id') id: string, @Body() estadoData: { estado: string }, @Req() req: any) {
     try {
-      console.log(`🔄 Cambiando estado de usuario ${id} a ${estadoData.estado}`);
+      const estado = this.normalizeEstado(estadoData.estado);
+      console.log(`🔄 Cambiando estado de usuario ${id} a ${estado}`);
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
 
@@ -469,6 +616,10 @@ export class UsuariosController {
         .select(`
           id,
           nombre,
+          email,
+          estado,
+          activo,
+          is_super_admin,
           roles_usuario:user_roles (
             roles (
               nombre
@@ -483,22 +634,19 @@ export class UsuariosController {
         throw new BadRequestException('Usuario no encontrado');
       }
 
-      const rolesData = targetUser.roles_usuario?.[0]?.roles as any;
-      const targetRole = Array.isArray(rolesData) ? rolesData[0]?.nombre : rolesData?.nombre || '';
-
-      // NOTA: El Admin del tenant SÍ puede desactivar otros Admins que creó
-      // Solo no puede desactivarse a sí mismo (ya validado arriba)
+      await this.assertNotLastSuperAdmin(tenantId, targetUser, estado);
 
       const { data: usuarioActualizado, error } = await this.supabaseService
         .getClient()
         .from('usuarios_sistema')
         .update({
-          estado: estadoData.estado,
+          estado,
+          activo: estado === 'ACTIVO',
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .eq('tenant_id', tenantId)
-        .select()
+        .select(USUARIO_SAFE_COLUMNS)
         .single();
 
       if (error) {
@@ -506,21 +654,37 @@ export class UsuariosController {
         throw error;
       }
 
-      console.log(`✅ Estado de usuario ${targetUser.nombre} cambiado a ${estadoData.estado} por ${user?.id}`);
+      await this.registrarAuditoriaUsuario(
+        'usuarios_sistema',
+        'UPDATE',
+        req,
+        tenantId,
+        id,
+        {
+          id: targetUser.id,
+          email: targetUser.email,
+          estado: targetUser.estado,
+          activo: targetUser.activo,
+          is_super_admin: targetUser.is_super_admin,
+        },
+        usuarioActualizado,
+        { accion: 'CAMBIAR_ESTADO_USUARIO', estado },
+      );
+
+      console.log(`✅ Estado de usuario ${targetUser.nombre} cambiado a ${estado} por ${user?.id}`);
 
       return {
         success: true,
         data: usuarioActualizado,
-        message: `Usuario ${estadoData.estado.toLowerCase()} exitosamente`
+        message: `Usuario ${estado.toLowerCase()} exitosamente`
       };
 
     } catch (error) {
       console.error('❌ Error cambiando estado:', error);
-      return {
-        success: false,
-        data: null,
-        error: error.message
-      };
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message || 'Error cambiando estado');
     }
   }
 
@@ -546,6 +710,10 @@ export class UsuariosController {
         .select(`
           id,
           nombre,
+          email,
+          estado,
+          activo,
+          is_super_admin,
           roles_usuario:user_roles (
             roles (
               nombre
@@ -560,55 +728,148 @@ export class UsuariosController {
         throw new BadRequestException('Usuario no encontrado');
       }
 
-      const rolesData = targetUser.roles_usuario?.[0]?.roles as any;
-      const targetRole = Array.isArray(rolesData) ? rolesData[0]?.nombre : rolesData?.nombre || '';
+      await this.assertNotLastSuperAdmin(tenantId, targetUser, 'INACTIVO');
 
-      // NOTA: El Admin del tenant SÍ puede eliminar otros Admins que creó
-      // Solo no puede eliminarse a sí mismo (ya validado arriba)
-
-      // Eliminar relaciones de rol primero
-      await this.supabaseService
-        .getClient()
-        .from('user_roles')
-        .delete()
-        .eq('usuario_sistema_id', id);
-
-      // Eliminar usuario
-      const { error } = await this.supabaseService
+      // Mantener trazabilidad: el borrado lógico preserva usuario, roles y auditoría.
+      const { data: usuarioActualizado, error } = await this.supabaseService
         .getClient()
         .from('usuarios_sistema')
-        .delete()
+        .update({
+          estado: 'INACTIVO',
+          activo: false,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', tenantId)
+        .select(USUARIO_SAFE_COLUMNS)
+        .single();
 
       if (error) {
-        console.error('❌ Error eliminando usuario:', error);
+        console.error('❌ Error inactivando usuario:', error);
         throw error;
       }
 
-      console.log(`✅ Usuario ${targetUser.nombre} eliminado por ${user?.id}`);
+      await this.registrarAuditoriaUsuario(
+        'usuarios_sistema',
+        'DELETE',
+        req,
+        tenantId,
+        id,
+        {
+          id: targetUser.id,
+          email: targetUser.email,
+          estado: targetUser.estado,
+          activo: targetUser.activo,
+          is_super_admin: targetUser.is_super_admin,
+        },
+        usuarioActualizado,
+        { accion: 'INACTIVAR_USUARIO_POR_DELETE_LOGICO' },
+      );
+
+      console.log(`✅ Usuario ${targetUser.nombre} inactivado por ${user?.id}`);
 
       return {
         success: true,
-        message: 'Usuario eliminado exitosamente'
+        message: 'Usuario inactivado exitosamente'
       };
 
     } catch (error) {
       console.error('❌ Error eliminando usuario:', error);
+      if (error instanceof BadRequestException || error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message || 'Error eliminando usuario');
+    }
+  }
+
+  @Get('/me/permissions')
+  @ApiOperation({ summary: 'Obtener permisos del usuario autenticado' })
+  @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
+  async getMyPermissions(@Req() req: any) {
+    try {
+      const user = req.user as any;
+      const tenantId = this.resolveTenantOrThrow(req);
+      const requestedUserId = (user?.id || '').trim();
+
+      if (!requestedUserId) {
+        throw new ForbiddenException('Usuario no autenticado');
+      }
+
+      this.tenantContext.setContext({
+        tenantId,
+        userId: requestedUserId,
+        isSuperAdmin: user?.is_super_admin ?? false,
+      });
+
+      const { data: userRoles, error: rolesError } = await this.supabaseService
+        .getClient()
+        .from('user_roles')
+        .select(`
+          role_id,
+          roles!inner (
+            id,
+            nombre
+          )
+        `)
+        .eq('usuario_sistema_id', requestedUserId);
+
+      if (rolesError) {
+        throw rolesError;
+      }
+
+      if (!userRoles || userRoles.length === 0) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+
+      const roleIds = userRoles.map(ur => ur.role_id);
+
+      const { data: rolePermissions, error: permError } = await this.supabaseService
+        .getClient()
+        .from('rol_permisos')
+        .select(`
+          permiso_id,
+          permisos!inner (
+            id,
+            tenant_id,
+            modulo,
+            accion,
+            recurso,
+            descripcion
+          )
+        `)
+        .in('role_id', roleIds);
+
+      if (permError) {
+        throw permError;
+      }
+
+      const permissions = rolePermissions?.map(rp => rp.permisos).flat() || [];
+      const uniquePermissions = Array.from(
+        new Map(permissions.map((p: any) => [p.id, p])).values(),
+      );
+
+      return {
+        success: true,
+        data: uniquePermissions,
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo permisos del usuario autenticado:', error);
       return {
         success: false,
-        error: error.message
+        data: [],
+        error: error.message,
       };
     }
   }
 
   @Get('/:id/permissions')
+  @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener permisos del usuario' })
   @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
   async getUserPermissions(@Param('id') id: string, @Req() req: any) {
-    // NOTA: Este endpoint NO tiene @RequirePermission porque se usa durante el login
-    // para obtener los permisos del usuario. Si tuviera @RequirePermission, crearía
-    // una dependencia circular (necesitas permisos para obtener permisos).
     try {
       console.log(`🔑 Obteniendo permisos del usuario: ${id}`);
       const user = req.user as any;
@@ -728,13 +989,12 @@ export class UsuariosController {
         .getClient()
         .from('usuarios_sistema')
         .select(`
-          *,
+          ${USUARIO_SAFE_COLUMNS},
           user_roles!inner (
             roles (
               id,
               nombre,
-              descripcion,
-              permisos
+              descripcion
             )
           )
         `)

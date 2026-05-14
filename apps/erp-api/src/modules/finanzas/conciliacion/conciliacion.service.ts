@@ -470,8 +470,10 @@ export class ConciliacionService {
           .from('movimientos_bancarios')
           .update({
             conciliado: true,
+            conciliacion_id: conciliacionId,
             match_automatico: true,
             match_id: match.extracto_id,
+            movimiento_relacionado_id: match.extracto_id,
             updated_at: new Date().toISOString(),
           })
           .eq('id', match.sistema_id)
@@ -487,8 +489,10 @@ export class ConciliacionService {
           .from('movimientos_bancarios')
           .update({
             conciliado: true,
+            conciliacion_id: conciliacionId,
             match_automatico: true,
             match_id: match.sistema_id,
+            movimiento_relacionado_id: match.sistema_id,
             updated_at: new Date().toISOString(),
           })
           .eq('id', match.extracto_id)
@@ -618,6 +622,7 @@ export class ConciliacionService {
       .from('movimientos_bancarios')
       .update({
         conciliado: true,
+        conciliacion_id: conciliacionId,
         match_automatico: false,
         match_id: dto.movimiento_extracto_id,
         diferencia_conciliacion: diferencia,
@@ -636,6 +641,7 @@ export class ConciliacionService {
       .from('movimientos_bancarios')
       .update({
         conciliado: true,
+        conciliacion_id: conciliacionId,
         match_automatico: false,
         match_id: dto.movimiento_sistema_id,
         diferencia_conciliacion: diferencia,

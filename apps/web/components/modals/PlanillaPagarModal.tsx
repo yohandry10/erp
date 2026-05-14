@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 
@@ -47,21 +47,9 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([])
   const [pagando, setPagando] = useState(false)
 
-  useEffect(() => {
-    if (isOpen && planilla) {
-      loadDetallePlanilla()
-      loadHistorialPagos()
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
+  const loadDetallePlanilla = useCallback(async () => {
+    if (!planilla?.id) return
 
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, planilla])
-
-  const loadDetallePlanilla = async () => {
     try {
       setLoading(true)
       const response = await get(`/api/rrhh/planillas/${planilla.id}/detalle`)
@@ -95,9 +83,11 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, planilla])
 
-  const loadHistorialPagos = async () => {
+  const loadHistorialPagos = useCallback(async () => {
+    if (!planilla?.id) return
+
     try {
       const response = await get(`/api/rrhh/planillas/${planilla.id}/historial-pagos`)
       if (response?.success && response.data) {
@@ -106,7 +96,21 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
     } catch (error) {
       console.error('Error cargando historial:', error)
     }
-  }
+  }, [get, planilla])
+
+  useEffect(() => {
+    if (isOpen && planilla) {
+      loadDetallePlanilla()
+      loadHistorialPagos()
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen, loadDetallePlanilla, loadHistorialPagos, planilla])
 
   const toggleEmpleado = (empleadoId: string) => {
     setEmpleadosSeleccionados(prev => {

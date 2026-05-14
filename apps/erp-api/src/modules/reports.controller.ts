@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
 import { Response } from 'express';
 import * as ExcelJS from 'exceljs';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -12,6 +13,7 @@ import Decimal from 'decimal.js';
 
 @ApiTags('reports')
 @Controller('reports')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiBearerAuth()
 export class ReportsController {
@@ -81,6 +83,7 @@ export class ReportsController {
   }
 
   @Get('/ventas/export/excel')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @RequirePermission('reports.ventas.export')
   @ApiOperation({ summary: 'Exportar reporte de ventas a Excel' })
   @ApiResponse({ status: 200, description: 'Archivo Excel generado exitosamente' })

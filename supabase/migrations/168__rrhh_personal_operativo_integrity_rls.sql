@@ -209,7 +209,7 @@ WITH ranked AS (
 )
 UPDATE public.empleado_beneficios eb
 SET
-  fecha_inicio = eb.fecha_inicio + (r.rn - 1),
+  fecha_inicio = eb.fecha_inicio + (r.rn - 1)::integer,
   updated_at = now()
 FROM ranked r
 WHERE eb.id = r.id
@@ -230,7 +230,7 @@ WITH ranked AS (
 )
 UPDATE public.empleado_capacitaciones ec
 SET
-  fecha_inscripcion = ec.fecha_inscripcion + (r.rn - 1),
+  fecha_inscripcion = ec.fecha_inscripcion + (r.rn - 1)::integer,
   updated_at = now()
 FROM ranked r
 WHERE ec.id = r.id
@@ -251,7 +251,7 @@ WITH ranked AS (
 )
 UPDATE public.empleado_horarios eh
 SET
-  fecha_inicio = eh.fecha_inicio + (r.rn - 1),
+  fecha_inicio = eh.fecha_inicio + (r.rn - 1)::integer,
   updated_at = now()
 FROM ranked r
 WHERE eh.id = r.id
@@ -294,8 +294,8 @@ WITH ranked AS (
 )
 UPDATE public.liquidaciones l
 SET
-  fecha_terminacion = l.fecha_terminacion + (r.rn - 1),
-  ultimo_dia_trabajado = COALESCE(l.ultimo_dia_trabajado, l.fecha_terminacion + (r.rn - 1)),
+  fecha_terminacion = l.fecha_terminacion + (r.rn - 1)::integer,
+  ultimo_dia_trabajado = COALESCE(l.ultimo_dia_trabajado, l.fecha_terminacion + (r.rn - 1)::integer),
   updated_at = now()
 FROM ranked r
 WHERE l.id = r.id

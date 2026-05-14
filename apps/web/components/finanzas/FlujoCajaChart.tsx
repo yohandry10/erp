@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { TrendingUp, RefreshCw, AlertTriangle, TrendingDown, Calendar } from 'lucide-react'
 
@@ -68,7 +68,7 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
   const [selectedMoneda, setSelectedMoneda] = useState<string>('PEN')
   const [vistaDetallada, setVistaDetallada] = useState(false)
 
-  const loadFlujoCaja = async () => {
+  const loadFlujoCaja = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -88,11 +88,11 @@ export default function FlujoCajaChart({ diasProyeccion = 90, cuentaBancariaId }
     } finally {
       setLoading(false)
     }
-  }
+  }, [cuentaBancariaId, diasProyeccion, get])
 
   useEffect(() => {
     loadFlujoCaja()
-  }, [diasProyeccion, cuentaBancariaId])
+  }, [loadFlujoCaja])
 
   const formatCurrency = (amount: number, currency: string = 'PEN') => {
     return new Intl.NumberFormat('es-PE', {

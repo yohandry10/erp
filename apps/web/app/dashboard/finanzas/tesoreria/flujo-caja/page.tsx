@@ -140,6 +140,7 @@ export default function FlujoCajaPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
             onClick={() => router.push('/dashboard/finanzas/tesoreria')}
+            aria-label="Volver a tesorería"
             style={{
               padding: '0.5rem',
               borderRadius: '6px',

@@ -10,6 +10,8 @@ SET LOCAL search_path = public, extensions, app, pg_temp;
 
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
+DROP VIEW IF EXISTS public.gre_documentos;
+
 -- ----------------------------------------------------------------------------
 -- Helpers de normalizacion de estado.
 -- ----------------------------------------------------------------------------
@@ -114,5 +116,18 @@ ON public.gre_guias (tenant_id, sunat_status, retry_count, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_gre_guias_retry_rechazado_runtime_221
 ON public.gre_guias (tenant_id, updated_at DESC)
 WHERE lower(estado::text) = 'rechazado';
+
+CREATE OR REPLACE VIEW public.gre_documentos AS
+SELECT
+  g.id,
+  g.tenant_id,
+  g.serie,
+  g.numero,
+  COALESCE(NULLIF(btrim(g.estado::text), ''), 'BORRADOR') AS estado,
+  g.fecha_emision,
+  COALESCE(g.total, 0)::numeric(14,2) AS total,
+  g.created_at,
+  g.updated_at
+FROM public.gre_guias g;
 
 COMMIT;

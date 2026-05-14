@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { PedidoVenta, EstadoPedido } from '@/types/ventas'
@@ -39,7 +39,7 @@ const ESTADO_LABELS: Record<EstadoPedido, string> = {
 export default function PedidosPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [pedidos, setPedidos] = useState<PedidoVenta[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -49,11 +49,7 @@ export default function PedidosPage() {
   const [fechaHasta, setFechaHasta] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  useEffect(() => {
-    loadPedidos()
-  }, [])
-
-  const loadPedidos = async () => {
+  const loadPedidos = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/api/ventas/pedidos')
@@ -66,7 +62,11 @@ export default function PedidosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadPedidos()
+  }, [loadPedidos])
 
   const filteredPedidos = pedidos.filter(pedido => {
     if (searchTerm) {
@@ -197,15 +197,15 @@ export default function PedidosPage() {
       <div className="activity-section">
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '300px', position: 'relative' }}>
-            <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: '1rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                color: '#9ca3af' 
-              }} 
+            <Search
+              size={20}
+              style={{
+                position: 'absolute',
+                left: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9ca3af'
+              }}
             />
             <input
               type="text"
@@ -254,10 +254,10 @@ export default function PedidosPage() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '1rem', 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
             marginBottom: '1.5rem',
             padding: '1rem',
             background: '#f9fafb',

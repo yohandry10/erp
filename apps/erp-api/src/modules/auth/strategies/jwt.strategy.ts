@@ -4,6 +4,26 @@ import { Strategy, ExtractJwt } from 'passport-jwt';
 import { AuthService } from '../auth.service';
 import { ConfigService } from '@nestjs/config';
 
+const cookieExtractor = (req: any) => {
+  const parsedToken = req?.cookies?.['access_token'];
+  if (typeof parsedToken === 'string' && parsedToken.length > 0) {
+    return parsedToken;
+  }
+
+  const cookieHeader = req?.headers?.cookie;
+  if (typeof cookieHeader !== 'string') {
+    return null;
+  }
+
+  const token = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('access_token='))
+    ?.slice('access_token='.length);
+
+  return token ? decodeURIComponent(token) : null;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -11,7 +31,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        cookieExtractor,
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
@@ -33,6 +56,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         console.warn('⚠️ [JWT Strategy] Token sin tenant_id detectado');
         throw new UnauthorizedException('Token inválido: falta tenant_id');
       }
+
+      if (!payload.session_token) {
+        throw new UnauthorizedException('Token inválido: falta sesión');
+      }
+
+      const sessionIsActive = await this.authService.validateSession(payload.session_token);
+      if (!sessionIsActive) {
+        throw new UnauthorizedException('Sesión expirada o revocada');
+      }
       
       return {
         id: payload.sub,
@@ -40,7 +72,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         username: payload.username,
         roles: payload.roles || [],
         tenant_id: payload.tenant_id, // ✅ Incluir tenant_id en request.user
-        is_super_admin: payload.is_super_admin || false // ✅ Incluir is_super_admin en request.user
+        is_super_admin: payload.is_super_admin || false, // ✅ Incluir is_super_admin en request.user
+        session_token: payload.session_token
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {

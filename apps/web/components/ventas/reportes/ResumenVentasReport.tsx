@@ -115,7 +115,13 @@ export default function ResumenVentasReport({ filters }: Props) {
   }, [data])
 
   const handleExport = () => {
-    if (!csvData) return
+    if (!csvData) {
+      toast({
+        title: 'Sin datos para exportar',
+        description: 'No hay ventas en el rango seleccionado',
+      })
+      return
+    }
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -153,7 +159,7 @@ export default function ResumenVentasReport({ filters }: Props) {
               <CardTitle>IGV</CardTitle>
               <CardDescription>Impuesto calculado</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={!data.length}>
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download size={16} className="mr-2" /> Exportar CSV
             </Button>
           </CardHeader>

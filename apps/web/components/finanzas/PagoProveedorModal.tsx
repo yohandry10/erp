@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -59,15 +59,7 @@ export default function PagoProveedorModal({
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
-  useEffect(() => {
-    if (isOpen) {
-      loadCuentasBancarias();
-      // Set default monto to saldo pendiente
-      setMonto(saldoPendiente.toString());
-    }
-  }, [isOpen, saldoPendiente]);
-
-  const loadCuentasBancarias = async () => {
+  const loadCuentasBancarias = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -89,16 +81,21 @@ export default function PagoProveedorModal({
       setCuentasBancarias(cuentas);
 
       // Auto-select first account if available
-      if (cuentas.length > 0 && !cuentaBancariaId) {
-        setCuentaBancariaId(cuentas[0].id);
-      }
+      setCuentaBancariaId((prev) => (cuentas.length > 0 && !prev ? cuentas[0].id : prev));
     } catch (err) {
       console.error('Error loading cuentas bancarias:', err);
       setError('Error al cargar las cuentas bancarias');
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL, moneda]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadCuentasBancarias();
+      setMonto(saldoPendiente.toString());
+    }
+  }, [isOpen, loadCuentasBancarias, saldoPendiente]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProveedoresService } from '../services/proveedores.service';
@@ -27,6 +28,7 @@ export class ProveedoresController {
   constructor(private readonly proveedoresService: ProveedoresService) {}
 
   @Post()
+  @RequirePermission('compras.proveedores.crear')
   @ApiOperation({ summary: 'Crear nuevo proveedor' })
   @ApiResponse({ status: 201, description: 'Proveedor creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -45,14 +47,12 @@ export class ProveedoresController {
         data: proveedor
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Get()
+  @RequirePermission('compras.proveedores.ver')
   @ApiOperation({ summary: 'Obtener lista de proveedores con filtros' })
   @ApiResponse({ status: 200, description: 'Proveedores obtenidos exitosamente' })
   @ApiQuery({ name: 'tenant_id', required: false, description: 'ID del tenant' })
@@ -112,15 +112,12 @@ export class ProveedoresController {
         count: proveedores.length
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: []
-      };
+      throw error;
     }
   }
 
   @Get('buscar-ruc/:ruc')
+  @RequirePermission('compras.proveedores.ver')
   @ApiOperation({ summary: 'Buscar proveedor por RUC' })
   @ApiResponse({ status: 200, description: 'Proveedor encontrado' })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
@@ -132,11 +129,7 @@ export class ProveedoresController {
       const proveedor = await this.proveedoresService.findByRuc(ruc, tenantId);
       
       if (!proveedor) {
-        return {
-          success: false,
-          message: 'Proveedor no encontrado',
-          data: null
-        };
+        throw new NotFoundException('Proveedor no encontrado');
       }
 
       return {
@@ -144,15 +137,12 @@ export class ProveedoresController {
         data: proveedor
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      };
+      throw error;
     }
   }
 
   @Get(':id')
+  @RequirePermission('compras.proveedores.ver')
   @ApiOperation({ summary: 'Obtener proveedor por ID' })
   @ApiResponse({ status: 200, description: 'Proveedor encontrado' })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
@@ -167,15 +157,12 @@ export class ProveedoresController {
         data: proveedor
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      };
+      throw error;
     }
   }
 
   @Put(':id')
+  @RequirePermission('compras.proveedores.editar')
   @ApiOperation({ summary: 'Actualizar proveedor' })
   @ApiResponse({ status: 200, description: 'Proveedor actualizado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -194,14 +181,12 @@ export class ProveedoresController {
         data: proveedor
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Delete(':id')
+  @RequirePermission('compras.proveedores.eliminar')
   @ApiOperation({ summary: 'Desactivar proveedor (soft delete)' })
   @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
   @ApiResponse({ status: 404, description: 'Proveedor no encontrado' })
@@ -217,10 +202,7 @@ export class ProveedoresController {
         data: proveedor
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 }

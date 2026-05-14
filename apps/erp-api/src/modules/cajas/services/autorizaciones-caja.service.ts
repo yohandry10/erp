@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
 export interface AutorizacionCaja {
@@ -49,9 +50,19 @@ export interface RegistrarAutorizacionDto {
 @Injectable()
 export class AutorizacionesCajaService {
     private readonly logger = new Logger(AutorizacionesCajaService.name);
-    private readonly SECRET = process.env.AUTH_SIGNATURE_SECRET || 'CHANGE_ME_IN_PRODUCTION';
+    private readonly SECRET: string;
 
-    constructor(private readonly supabase: SupabaseService) { }
+    constructor(
+        private readonly supabase: SupabaseService,
+        private readonly configService: ConfigService,
+    ) {
+        const authSignatureSecret = this.configService.get<string>('AUTH_SIGNATURE_SECRET');
+        if (!authSignatureSecret) {
+            throw new Error('AUTH_SIGNATURE_SECRET is required for caja authorization signatures');
+        }
+
+        this.SECRET = authSignatureSecret;
+    }
 
     /**
      * Registra una autorización de supervisor

@@ -75,9 +75,10 @@ export default function DevolucionesPage() {
       const url = `/api/compras/devoluciones${queryString ? `?${queryString}` : ''}`
       
       const response = await get(url)
+      const devolucionesData = Array.isArray(response) ? response : response?.data
       
-      if (response?.success) {
-        setDevoluciones(response.data || [])
+      if (Array.isArray(devolucionesData)) {
+        setDevoluciones(devolucionesData)
       }
     } catch (error) {
       console.error('Error loading devoluciones:', error)

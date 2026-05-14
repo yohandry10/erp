@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -11,19 +11,15 @@ export default function EditarPresupuestoPage() {
   const params = useParams()
   const { get } = useApi()
   
-  const presupuestoId = params.id as string
+  const presupuestoId = params.id as string | undefined
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [presupuesto, setPresupuesto] = useState<any>(null)
 
-  useEffect(() => {
-    if (presupuestoId) {
-      loadPresupuesto()
-    }
-  }, [presupuestoId])
+  const loadPresupuesto = useCallback(async () => {
+    if (!presupuestoId) return
 
-  const loadPresupuesto = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -41,7 +37,11 @@ export default function EditarPresupuestoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, presupuestoId])
+
+  useEffect(() => {
+    loadPresupuesto()
+  }, [loadPresupuesto])
 
   const handleSuccess = () => {
     router.push('/dashboard/contabilidad/presupuestos/lista')

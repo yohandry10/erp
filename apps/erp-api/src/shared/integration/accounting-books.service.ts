@@ -54,9 +54,9 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          detalle_asientos(
+          detalle_asientos!fk_detalle_asientos_asiento_id(
             *,
-            plan_cuentas(
+            plan_cuentas!fk_detalle_asientos_cuenta_id(
               codigo,
               nombre
             )
@@ -93,20 +93,20 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(
             fecha,
             numero_asiento,
             concepto,
             referencia
           ),
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
         `,
         )
         .eq('plan_cuentas.codigo', cuentaCodigo)
-        .eq('tenant_id', tenantId)
+        .eq('asientos_contables.tenant_id', tenantId)
         .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
@@ -141,21 +141,21 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(
             fecha,
             numero_asiento,
             concepto,
             referencia
           ),
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
         `,
         )
-        .eq('tenant_id', tenantId)
-        .order('plan_cuentas.codigo')
-        .order('fecha', { ascending: true, foreignTable: 'asientos_contables' });
+        .eq('asientos_contables.tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(5000);
 
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
@@ -163,9 +163,21 @@ export class AccountingBooksService {
       const { data: movimientos, error } = await query;
       if (error) throw error;
 
+      const movimientosOrdenados = (movimientos || []).slice().sort((a: any, b: any) => {
+        const cuentaA = normalizePC(a?.plan_cuentas)?.codigo ?? '';
+        const cuentaB = normalizePC(b?.plan_cuentas)?.codigo ?? '';
+        if (cuentaA !== cuentaB) return cuentaA.localeCompare(cuentaB);
+        const asientoA = normalizePC(a?.asientos_contables);
+        const asientoB = normalizePC(b?.asientos_contables);
+        const fechaA = asientoA?.fecha ?? '';
+        const fechaB = asientoB?.fecha ?? '';
+        if (fechaA !== fechaB) return fechaA.localeCompare(fechaB);
+        return Number(asientoA?.numero_asiento ?? 0) - Number(asientoB?.numero_asiento ?? 0);
+      });
+
       const cuentasMap = new Map<string, any>();
 
-      (movimientos || []).forEach((mov: any) => {
+      movimientosOrdenados.forEach((mov: any) => {
         const pc = normalizePC(mov?.plan_cuentas);
         const cuentaCodigo = pc?.codigo;
 
@@ -200,9 +212,9 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          detalle_asientos(
+          detalle_asientos!fk_detalle_asientos_asiento_id(
             *,
-            plan_cuentas(
+            plan_cuentas!fk_detalle_asientos_cuenta_id(
               codigo,
               nombre
             )
@@ -240,19 +252,19 @@ export class AccountingBooksService {
           `
           debe,
           haber,
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             id,
             codigo,
             nombre,
             tipo
           ),
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id!inner(
             fecha
           )
         `,
         );
 
-      query = query.eq('tenant_id', tenantId);
+      query = query.eq('asientos_contables.tenant_id', tenantId);
       if (fechaDesde) query = query.gte('asientos_contables.fecha', fechaDesde);
       if (fechaHasta) query = query.lte('asientos_contables.fecha', fechaHasta);
 
@@ -375,13 +387,13 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id(
             fecha,
             numero_asiento,
             concepto,
             referencia
           ),
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
@@ -434,12 +446,12 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id(
             fecha,
             numero_asiento,
             concepto
           ),
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
@@ -496,8 +508,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(fecha, concepto, numero_asiento),
-          plan_cuentas(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '33%')
@@ -528,8 +540,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(fecha, concepto, numero_asiento),
-          plan_cuentas(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '62%')
@@ -560,8 +572,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(fecha, concepto, numero_asiento, referencia),
-          plan_cuentas(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento, referencia),
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '9%')
@@ -592,9 +604,9 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          detalle_asientos(
+          detalle_asientos!fk_detalle_asientos_asiento_id(
             *,
-            plan_cuentas(codigo, nombre)
+            plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
           )
         `,
         )
@@ -625,8 +637,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(fecha, concepto, numero_asiento),
-          plan_cuentas(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '70%')
@@ -657,8 +669,8 @@ export class AccountingBooksService {
         .select(
           `
           *,
-          asientos_contables(fecha, concepto, numero_asiento),
-          plan_cuentas(codigo, nombre)
+          asientos_contables!fk_detalle_asientos_asiento_id(fecha, concepto, numero_asiento),
+          plan_cuentas!fk_detalle_asientos_cuenta_id(codigo, nombre)
         `,
         )
         .like('plan_cuentas.codigo', '60%')

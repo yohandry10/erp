@@ -55,7 +55,15 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || state.isActive) return
 
-    const userRole = (user.roles?.[0] || (user.is_super_admin ? 'superadmin' : 'user')).toLowerCase()
+    const rawRole = user.roles?.[0] as unknown
+    const roleName = typeof rawRole === 'string'
+      ? rawRole
+      : rawRole && typeof rawRole === 'object' && 'nombre' in rawRole
+        ? String(rawRole.nombre)
+        : user.is_super_admin
+          ? 'superadmin'
+          : 'user'
+    const userRole = roleName.toLowerCase()
     const tour = getTourByRole(userRole)
     
     if (tour && !state.completedTours.includes(tour.id)) {

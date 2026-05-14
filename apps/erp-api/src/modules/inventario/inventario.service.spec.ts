@@ -290,4 +290,67 @@ describe('InventarioService', () => {
         });
     });
 
+    describe('Aislamiento multi-tenant (P2.2)', () => {
+        it('getStockDisponible debe consultar con tenant_id explícito', async () => {
+            const tenantA = 'tenant-a';
+            const productoId = 'prod-stock';
+
+            mockSupabaseClient.single.mockResolvedValue({
+                data: {
+                    stock_actual: '50',
+                    stock_reservado: '10',
+                },
+                error: null,
+            });
+
+            const stock = await service.getStockDisponible(productoId, tenantA);
+
+            expect(stock).toBe(40);
+            expect(mockSupabaseClient.from).toHaveBeenCalledWith('productos');
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', productoId);
+        });
+
+        it('crearMovimiento debe persistir tenant del contexto en insert', async () => {
+            const tenantA = 'tenant-a';
+            const movimiento = {
+                tenant_id: tenantA,
+                producto_id: 'prod-mov',
+                tipo: TipoMovimiento.ENTRADA as TipoMovimiento.ENTRADA,
+                cantidad: 8,
+                referencia_tipo: 'AJUSTE',
+                referencia_id: 'ref-001',
+                notas: 'Ajuste inicial',
+                created_by: 'user-1',
+            };
+
+            mockSupabaseClient.single
+                .mockResolvedValueOnce({
+                    data: { id: 'mov-1' },
+                    error: null,
+                })
+                .mockResolvedValueOnce({
+                    data: {
+                        stock_actual: '100',
+                        precio_venta: 12.5,
+                        precio_compra: 10,
+                    },
+                    error: null,
+                });
+
+            await service.crearMovimiento(movimiento);
+
+            expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tenant_id: tenantA,
+                    producto_id: movimiento.producto_id,
+                    tipo: TipoMovimiento.ENTRADA,
+                }),
+            );
+
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
+            expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', movimiento.producto_id);
+        });
+    });
+
 });

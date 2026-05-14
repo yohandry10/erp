@@ -151,7 +151,7 @@ BEGIN
       FROM pg_indexes i
       WHERE i.schemaname = 'public'
         AND i.tablename = e.tablename
-        AND i.indexname = e.indexname
+        AND i.indexname = left(e.indexname, 63)
     ),
     e.detail::text
   FROM expected e;

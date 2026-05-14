@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { useApi } from '@/hooks/use-api'
@@ -111,16 +111,7 @@ export default function KardexPage() {
   const [almacenes, setAlmacenes] = useState<any[]>([])
   const [productos, setProductos] = useState<any[]>([])
 
-  useEffect(() => {
-    loadCatalogs()
-  }, [])
-
-  useEffect(() => {
-    loadKardex()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
-
-  const buildQuery = (source: FilterState) => {
+  const buildQuery = useCallback((source: FilterState) => {
     const params = new URLSearchParams()
     if (source.productoId) params.append('productoId', source.productoId)
     if (source.almacenId) params.append('almacenId', source.almacenId)
@@ -129,9 +120,9 @@ export default function KardexPage() {
     params.append('limit', '250')
     const query = params.toString()
     return query ? `?${query}` : ''
-  }
+  }, [])
 
-  const loadCatalogs = async () => {
+  const loadCatalogs = useCallback(async () => {
     try {
       setCatalogLoading(true)
       const [almacenesResp, productosResp] = await Promise.all([
@@ -151,9 +142,9 @@ export default function KardexPage() {
     } finally {
       setCatalogLoading(false)
     }
-  }
+  }, [get])
 
-  const loadKardex = async () => {
+  const loadKardex = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -217,7 +208,15 @@ export default function KardexPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [buildQuery, filters, get])
+
+  useEffect(() => {
+    loadCatalogs()
+  }, [loadCatalogs])
+
+  useEffect(() => {
+    loadKardex()
+  }, [loadKardex])
 
   const applyFilters = (event: FormEvent) => {
     event.preventDefault()

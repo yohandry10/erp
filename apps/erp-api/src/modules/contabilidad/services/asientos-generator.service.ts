@@ -8,7 +8,8 @@ import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.s
 export interface AsientoContable {
   id?: string;
   tenant_id: string;
-  numero_asiento: string;
+  numero_asiento: number;
+  codigo?: string;
   fecha: string;
   concepto: string;
   referencia?: string;
@@ -87,7 +88,7 @@ export class AsientosGeneratorService {
     }
 
     // Generar número de asiento
-    const numeroAsiento = await this.generarNumeroAsiento(tenantId, fecha);
+    const asientoNumbering = await this.generarNumeroAsiento(tenantId, fecha);
 
     // Crear asiento contable
     const { data: asiento, error: asientoError } = await this.supabaseService
@@ -95,9 +96,11 @@ export class AsientosGeneratorService {
       .from('asientos_contables')
       .insert({
         tenant_id: tenantId,
-        numero_asiento: numeroAsiento,
+        numero_asiento: asientoNumbering.numero,
+        codigo: asientoNumbering.codigo,
         fecha: fecha.toISOString(),
         concepto,
+        descripcion: concepto,
         referencia,
         total_debe: totalDebe,
         total_haber: totalHaber,
@@ -114,11 +117,12 @@ export class AsientosGeneratorService {
 
     // Crear detalles del asiento
     const detallesConAsientoId = detalles.map(detalle => ({
+      tenant_id: tenantId,
       asiento_id: asiento.id,
       cuenta_id: detalle.cuenta_id,
       debe: detalle.debe,
       haber: detalle.haber,
-      concepto: detalle.concepto,
+      nombre: detalle.concepto,
       centro_costo_id: detalle.centro_costo_id
     }));
 
@@ -139,7 +143,7 @@ export class AsientosGeneratorService {
     }
 
     console.log(
-      `✅ [Asientos] Asiento ${numeroAsiento} creado exitosamente para tenant ${tenantId}`
+      `✅ [Asientos] Asiento ${asientoNumbering.codigo} creado exitosamente para tenant ${tenantId}`
     );
 
     // Marcar evento como procesado en outbox si existe sourceEventId
@@ -208,8 +212,10 @@ export class AsientosGeneratorService {
         .getClient()
         .from('outbox_events')
         .update({
-          status: 'COMPLETED',
-          processed_at: new Date().toISOString()
+          status: 'completed',
+          processed_at: new Date().toISOString(),
+          error_message: null,
+          updated_at: new Date().toISOString()
         })
         .eq('event_id', eventId);
 
@@ -326,7 +332,7 @@ export class AsientosGeneratorService {
         .getClient()
         .from('outbox_events')
         .update({
-          status: 'PENDING',
+          status: 'pending',
           retry_count: 0,
           error_message: null,
           processed_at: null,
@@ -444,7 +450,7 @@ export class AsientosGeneratorService {
   private async generarNumeroAsiento(
     tenantId: string,
     fecha: Date
-  ): Promise<string> {
+  ): Promise<{ numero: number; codigo: string }> {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1;
     const periodo = `${anio}${String(mes).padStart(2, '0')}`;
@@ -469,11 +475,9 @@ export class AsientosGeneratorService {
 
     let siguienteNumero = 1;
     if (data && data.length > 0) {
-      // Considerar solo los que cumplan el formato A-YYYYMM-NNNN con 4 dígitos
       const numerosValidos = data
-        .map(d => d.numero_asiento as string)
-        .filter(n => new RegExp(`^A-${periodo}-\\d{4}$`).test(n))
-        .map(n => parseInt(n.slice(-4), 10));
+        .map((d) => Number(d.numero_asiento))
+        .filter((n) => Number.isInteger(n) && n > 0);
 
       if (numerosValidos.length > 0) {
         const maxNumero = Math.max(...numerosValidos);
@@ -481,7 +485,10 @@ export class AsientosGeneratorService {
       }
     }
 
-    return `A-${periodo}-${String(siguienteNumero).padStart(4, '0')}`;
+    return {
+      numero: siguienteNumero,
+      codigo: `A-${periodo}-${String(siguienteNumero).padStart(6, '0')}`,
+    };
   }
 
   /**

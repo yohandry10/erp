@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -74,7 +74,7 @@ export function PermissionViewer({ userId }: PermissionViewerProps) {
     }
 
     const colorClass = actionColors[accion.toLowerCase()] || 'bg-gray-500 hover:bg-gray-600'
-    
+
     return (
       <Badge className={`${colorClass} text-white text-xs`}>
         {accion}
@@ -195,8 +195,8 @@ export function PermissionViewer({ userId }: PermissionViewerProps) {
       <div className="text-sm text-muted-foreground border-l-4 border-primary pl-4 py-2">
         <p className="font-medium">Note:</p>
         <p>
-          These permissions are aggregated from all roles assigned to this user. 
-          To modify permissions, update the user's roles or the permissions assigned to those roles.
+          These permissions are aggregated from all roles assigned to this user.
+          To modify permissions, update the user&apos;s roles or the permissions assigned to those roles.
         </p>
       </div>
     </div>

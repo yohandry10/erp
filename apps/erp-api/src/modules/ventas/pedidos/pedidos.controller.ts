@@ -323,6 +323,7 @@ export class PedidosController {
    * Requirements: Flujo completo Ventas → Documentos → CPE → CxC → Contabilidad
    */
   @Post(':id/generar-documento')
+  @RequirePermission('ventas.pedidos.generar_factura')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Generar documento fiscal desde pedido',

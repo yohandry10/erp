@@ -26,7 +26,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
  */
 @ApiTags('Compras - Recepciones')
 @ApiBearerAuth()
-@Controller('api/compras/recepciones')
+@Controller('compras/recepciones')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: recepciones protegidas por permisos.
 export class RecepcionesController {
   constructor(private readonly recepcionesService: RecepcionesService) {}
@@ -36,6 +36,7 @@ export class RecepcionesController {
    * Lista todas las recepciones con filtros opcionales
    */
   @Get()
+  @RequirePermission('compras.recepciones.ver')
   @ApiOperation({
     summary: 'Listar recepciones',
     description: 'Obtiene la lista de recepciones de mercancía con filtros opcionales',
@@ -54,6 +55,7 @@ export class RecepcionesController {
    * Obtiene una recepción específica por ID
    */
   @Get(':id')
+  @RequirePermission('compras.recepciones.ver')
   @ApiOperation({
     summary: 'Obtener recepción por ID',
     description: 'Obtiene los detalles completos de una recepción incluyendo sus items',
@@ -72,6 +74,7 @@ export class RecepcionesController {
    * Crea una nueva recepción para una orden de compra
    */
   @Post('/ordenes/:ordenId')
+  @RequirePermission('compras.recepciones.crear')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Crear recepción',
@@ -96,6 +99,7 @@ export class RecepcionesController {
    * Actualiza una recepción en estado BORRADOR
    */
   @Put(':id')
+  @RequirePermission('compras.recepciones.editar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Actualizar recepción',
@@ -118,6 +122,7 @@ export class RecepcionesController {
    * Cierra una recepción y actualiza el inventario
    */
   @Post(':id/cerrar')
+  @RequirePermission('compras.recepciones.cerrar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Cerrar recepción',

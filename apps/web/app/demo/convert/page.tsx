@@ -23,7 +23,7 @@ export default function ConvertDemoPage() {
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/demo/convert-to-real`, {
+      const response = await fetch(`${apiUrl}/api/demo/convert-to-real`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

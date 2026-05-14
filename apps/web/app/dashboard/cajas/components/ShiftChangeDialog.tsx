@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 
@@ -31,17 +31,7 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (isOpen) {
-            cargarUsuarios();
-            setStep('USER_SELECT');
-            setError(null);
-            setCambioId('');
-            setFotoArqueo('');
-        }
-    }, [isOpen]);
-
-    const cargarUsuarios = async () => {
+    const cargarUsuarios = useCallback(async () => {
         try {
             setLoading(true);
             // Fetch users (cajeros)
@@ -59,7 +49,17 @@ export function ShiftChangeDialog({ isOpen, onClose, onSuccess, sesionId }: Shif
         } finally {
             setLoading(false);
         }
-    };
+    }, [api]);
+
+    useEffect(() => {
+        if (isOpen) {
+            cargarUsuarios();
+            setStep('USER_SELECT');
+            setError(null);
+            setCambioId('');
+            setFotoArqueo('');
+        }
+    }, [cargarUsuarios, isOpen]);
 
     const handleUserSelect = async () => {
         if (!selectedUserId) {

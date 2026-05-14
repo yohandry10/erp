@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Lock, Unlock, CheckCircle, AlertCircle, PlusCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
@@ -27,11 +27,7 @@ export default function PeriodosPage() {
   const [selectedPeriodo, setSelectedPeriodo] = useState<Periodo | null>(null)
   const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
-  useEffect(() => {
-    fetchPeriodos()
-  }, [])
-
-  const fetchPeriodos = async () => {
+  const fetchPeriodos = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -52,7 +48,11 @@ export default function PeriodosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall])
+
+  useEffect(() => {
+    fetchPeriodos()
+  }, [fetchPeriodos])
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [

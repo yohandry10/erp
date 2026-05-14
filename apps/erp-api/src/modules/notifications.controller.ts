@@ -93,7 +93,6 @@ export class NotificationsController {
   }
 
   @Get('unread')
-  @RequirePermission('notifications.read') // HARDENING: lectura restringida.
   @ApiOperation({ summary: 'Get unread notifications' })
   @ApiResponse({ status: 200, description: 'Unread notifications retrieved successfully' })
   async getUnreadNotifications(@CurrentTenant() tenantId: string, @Req() req: Request) {
@@ -115,7 +114,6 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  @RequirePermission('notifications.read') // HARDENING: conteo protegido.
   @ApiOperation({ summary: 'Get unread notifications count' })
   @ApiResponse({ status: 200, description: 'Unread count retrieved successfully' })
   async getUnreadCount(@CurrentTenant() tenantId: string, @Req() req: Request) {

@@ -6,6 +6,55 @@
 BEGIN;
 
 -- ----------------------------------------------------------------------------
+-- Alineacion minima para vistas base
+-- ----------------------------------------------------------------------------
+-- Estas vistas se crean antes de los refinamientos amplios de 010+.
+-- Las columnas aqui declaradas son contratos de lectura usados por las vistas.
+ALTER TABLE IF EXISTS public.productos
+  ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true,
+  ADD COLUMN IF NOT EXISTS precio numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS precio_venta numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS stock_actual numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS stock_reservado numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.cpe
+  ADD COLUMN IF NOT EXISTS documento_id uuid,
+  ADD COLUMN IF NOT EXISTS estado_sunat text,
+  ADD COLUMN IF NOT EXISTS serie text,
+  ADD COLUMN IF NOT EXISTS numero integer,
+  ADD COLUMN IF NOT EXISTS total numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS error_message text;
+
+ALTER TABLE IF EXISTS public.documentos
+  ADD COLUMN IF NOT EXISTS tipo_documento text;
+
+ALTER TABLE IF EXISTS public.recepciones
+  ADD COLUMN IF NOT EXISTS fecha_recepcion timestamptz;
+
+ALTER TABLE IF EXISTS public.recepcion_items
+  ADD COLUMN IF NOT EXISTS recepcion_id uuid,
+  ADD COLUMN IF NOT EXISTS producto_id uuid,
+  ADD COLUMN IF NOT EXISTS cantidad_recibida numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.movimientos_inventario
+  ADD COLUMN IF NOT EXISTS producto_id uuid,
+  ADD COLUMN IF NOT EXISTS tipo_movimiento text,
+  ADD COLUMN IF NOT EXISTS cantidad numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.sesiones_caja
+  ADD COLUMN IF NOT EXISTS cajero_id uuid,
+  ADD COLUMN IF NOT EXISTS total_efectivo numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_tarjeta numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.ordenes_compra
+  ADD COLUMN IF NOT EXISTS proveedor_id uuid,
+  ADD COLUMN IF NOT EXISTS total numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.empresa_config
+  ADD COLUMN IF NOT EXISTS is_demo boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS demo_expires_at timestamptz;
+
+-- ----------------------------------------------------------------------------
 -- Materialized views contables base
 -- ----------------------------------------------------------------------------
 DROP MATERIALIZED VIEW IF EXISTS public.mv_balance_comprobacion;

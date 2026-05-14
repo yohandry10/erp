@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 
 export default function ContabilidadPage() {
   const [vistaActual, setVistaActual] = useState('registro-compras')
   const [loading, setLoading] = useState(false)
-  
+
   // Estados para todos los libros contables
   const [registroCompras, setRegistroCompras] = useState<any>(null)
   const [balanceComprobacion, setBalanceComprobacion] = useState<any>(null)
@@ -18,8 +18,8 @@ export default function ContabilidadPage() {
   const [registroCostos, setRegistroCostos] = useState<any>(null)
   const [librosElectronicosSunat, setLibrosElectronicosSunat] = useState<any>(null)
   const [registroConsignaciones, setRegistroConsignaciones] = useState<any>(null) // ✨ NUEVO
-  
-  const api = useApi()
+
+  const { get } = useApi()
 
   const formatearMoneda = (valor: number) => {
     return new Intl.NumberFormat('es-PE', {
@@ -28,10 +28,10 @@ export default function ContabilidadPage() {
     }).format(valor)
   }
 
-  const cargarRegistroCompras = async () => {
+  const cargarRegistroCompras = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/registro-compras')
+      const response = await get('/api/contabilidad/registro-compras')
       if (response && response.success) {
         setRegistroCompras(response.data)
       }
@@ -40,12 +40,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarBalanceComprobacion = async () => {
+  const cargarBalanceComprobacion = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/balance-comprobacion')
+      const response = await get('/api/contabilidad/balance-comprobacion')
       if (response && response.success) {
         setBalanceComprobacion(response.data)
       }
@@ -54,12 +54,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarKardexValorizado = async () => {
+  const cargarKardexValorizado = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/kardex-valorizado')
+      const response = await get('/api/contabilidad/kardex-valorizado')
       if (response && response.success) {
         setKardexValorizado(response.data)
       }
@@ -68,12 +68,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarLibroCajaBancos = async () => {
+  const cargarLibroCajaBancos = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/libro-caja-bancos')
+      const response = await get('/api/contabilidad/libro-caja-bancos')
       if (response && response.success) {
         setLibroCajaBancos(response.data)
       }
@@ -82,12 +82,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarRegistroActivosFijos = async () => {
+  const cargarRegistroActivosFijos = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/registro-activos-fijos')
+      const response = await get('/api/contabilidad/registro-activos-fijos')
       if (response && response.success) {
         setRegistroActivosFijos(response.data)
       }
@@ -96,12 +96,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarLibroPlanillas = async () => {
+  const cargarLibroPlanillas = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/libro-planillas')
+      const response = await get('/api/contabilidad/libro-planillas')
       if (response && response.success) {
         setLibroPlanillas(response.data)
       }
@@ -110,12 +110,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarLibroInventariosBalances = async () => {
+  const cargarLibroInventariosBalances = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/libro-inventarios-balances')
+      const response = await get('/api/contabilidad/libro-inventarios-balances')
       if (response && response.success) {
         setLibroInventariosBalances(response.data)
       }
@@ -124,12 +124,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarRegistroCostos = async () => {
+  const cargarRegistroCostos = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/registro-costos')
+      const response = await get('/api/contabilidad/registro-costos')
       if (response && response.success) {
         setRegistroCostos(response.data)
       }
@@ -138,12 +138,12 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarLibrosElectronicosSunat = async () => {
+  const cargarLibrosElectronicosSunat = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/libros-electronicos-sunat')
+      const response = await get('/api/contabilidad/libros-electronicos-sunat')
       if (response && response.success) {
         setLibrosElectronicosSunat(response.data)
       }
@@ -152,9 +152,9 @@ export default function ContabilidadPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     if (vistaActual === 'registro-compras') {
       await cargarRegistroCompras()
     } else if (vistaActual === 'balance-comprobacion') {
@@ -174,11 +174,22 @@ export default function ContabilidadPage() {
     } else if (vistaActual === 'libros-electronicos-sunat') {
       await cargarLibrosElectronicosSunat()
     }
-  }
+  }, [
+    cargarBalanceComprobacion,
+    cargarKardexValorizado,
+    cargarLibroCajaBancos,
+    cargarLibroInventariosBalances,
+    cargarLibroPlanillas,
+    cargarLibrosElectronicosSunat,
+    cargarRegistroActivosFijos,
+    cargarRegistroCompras,
+    cargarRegistroCostos,
+    vistaActual
+  ])
 
   useEffect(() => {
     cargarDatos()
-  }, [vistaActual])
+  }, [cargarDatos])
 
   const renderRegistroCompras = () => {
     if (loading) {
@@ -565,7 +576,7 @@ export default function ContabilidadPage() {
   const cargarRegistroConsignaciones = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/contabilidad/registro-consignaciones')
+      const response = await get('/api/contabilidad/registro-consignaciones')
       if (response && response.success) {
         setRegistroConsignaciones(response.data)
       }
@@ -608,20 +619,20 @@ export default function ContabilidadPage() {
             + Nueva Consignación
           </button>
         </div>
-        
+
         <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
           Control de bienes en consignación según normativa SUNAT
         </p>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '1rem',
           marginBottom: '2rem'
         }}>
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: '#f3f4f6', 
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
             textAlign: 'center'
           }}>
@@ -630,10 +641,10 @@ export default function ContabilidadPage() {
               {registroConsignaciones?.totalConsignaciones || 0}
             </p>
           </div>
-          
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: '#f3f4f6', 
+
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
             textAlign: 'center'
           }}>
@@ -642,10 +653,10 @@ export default function ContabilidadPage() {
               {formatearMoneda(registroConsignaciones?.valorTotal || 0)}
             </p>
           </div>
-          
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: '#f3f4f6', 
+
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
             textAlign: 'center'
           }}>
@@ -654,10 +665,10 @@ export default function ContabilidadPage() {
               {registroConsignaciones?.pendientes || 0}
             </p>
           </div>
-          
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: '#f3f4f6', 
+
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#f3f4f6',
             borderRadius: '8px',
             textAlign: 'center'
           }}>
@@ -709,9 +720,9 @@ export default function ContabilidadPage() {
                         borderRadius: '4px',
                         fontSize: '0.75rem',
                         fontWeight: '600',
-                        backgroundColor: consignacion.estado === 'VENDIDA' ? '#dcfce7' : 
+                        backgroundColor: consignacion.estado === 'VENDIDA' ? '#dcfce7' :
                                        consignacion.estado === 'DEVUELTA' ? '#fef3c7' : '#fee2e2',
-                        color: consignacion.estado === 'VENDIDA' ? '#166534' : 
+                        color: consignacion.estado === 'VENDIDA' ? '#166534' :
                                consignacion.estado === 'DEVUELTA' ? '#92400e' : '#991b1b'
                       }}>
                         {consignacion.estado}
@@ -723,45 +734,19 @@ export default function ContabilidadPage() {
             </table>
           </div>
         ) : (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '3rem', 
+          <div style={{
+            textAlign: 'center',
+            padding: '3rem',
             color: '#6b7280',
             backgroundColor: '#f9fafb',
             borderRadius: '8px',
             border: '2px dashed #d1d5db'
           }}>
             <p style={{ margin: '0', fontSize: '1.125rem' }}>📋 No hay consignaciones registradas</p>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>Haz clic en "Nueva Consignación" para comenzar</p>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>Haz clic en &quot;Nueva Consignación&quot; para comenzar</p>
           </div>
         )}
       </div>
     )
   }
-
-  // En la sección de botones de navegación, agregar:
-  <button
-    onClick={() => {
-      setVistaActual('registro-consignaciones')
-      if (!registroConsignaciones) {
-        cargarRegistroConsignaciones()
-      }
-    }}
-    style={{
-      padding: '0.75rem 1.5rem',
-      backgroundColor: vistaActual === 'registro-consignaciones' ? '#3b82f6' : 'white',
-      color: vistaActual === 'registro-consignaciones' ? 'white' : '#374151',
-      border: '1px solid #d1d5db',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      fontWeight: '600'
-    }}
-  >
-    📋 Registro Consignaciones
-  </button>
-
-  // ... existing code ...
-
-  // En la sección de renderizado condicional, agregar:
-  {vistaActual === 'registro-consignaciones' && renderRegistroConsignaciones()}
 }

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { NotificationPanel } from './NotificationPanel'
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 
 interface NotificationBellProps {
@@ -21,7 +21,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const [unreadCount, setUnreadCount] = useState(0)
   const { get } = useApi()
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await get('/api/notifications/unread')
       if (response?.success) {
@@ -41,16 +41,16 @@ export function NotificationBell({ className }: NotificationBellProps) {
     } catch (error) {
       console.error('Error fetching unread count:', error)
     }
-  }
+  }, [get])
 
   useEffect(() => {
     fetchUnreadCount()
-    
+
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000)
-    
+
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchUnreadCount])
 
   const handleNotificationRead = () => {
     // Refresh count when a notification is read
@@ -109,11 +109,11 @@ export function NotificationBell({ className }: NotificationBellProps) {
           </span>
         )}
       </button>
-      
+
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div 
+          <div
             style={{
               position: 'fixed',
               inset: 0,
@@ -124,7 +124,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
             }}
             onClick={() => setIsOpen(false)}
           />
-          
+
           {/* Dropdown */}
           <div
             style={{
@@ -155,27 +155,27 @@ export function NotificationBell({ className }: NotificationBellProps) {
             <div style={{
               animation: 'contentFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards'
             }}>
-              <NotificationPanel 
+              <NotificationPanel
                 onNotificationRead={handleNotificationRead}
                 onClose={() => setIsOpen(false)}
               />
             </div>
           </div>
-          
+
           <style jsx>{`
             @keyframes overlayAppear {
-              0% { 
+              0% {
                 opacity: 0;
                 backdropFilter: blur(0px) saturate(100%);
               }
-              100% { 
+              100% {
                 opacity: 1;
                 backdropFilter: blur(8px) saturate(150%);
               }
             }
-            
+
             @keyframes notificationSlide {
-              0% { 
+              0% {
                 opacity: 0;
                 transform: translateY(-30px) translateX(20px) scale(0.85) rotateX(10deg) rotateZ(-2deg);
                 filter: blur(10px) brightness(1.2);
@@ -190,13 +190,13 @@ export function NotificationBell({ className }: NotificationBellProps) {
                 transform: translateY(2px) translateX(-2px) scale(1.01) rotateX(-1deg) rotateZ(0.2deg);
                 filter: blur(0px) brightness(1);
               }
-              100% { 
+              100% {
                 opacity: 1;
                 transform: translateY(0) translateX(0) scale(1) rotateX(0deg) rotateZ(0deg);
                 filter: blur(0px) brightness(1);
               }
             }
-            
+
             @keyframes contentFade {
               0% {
                 opacity: 0;

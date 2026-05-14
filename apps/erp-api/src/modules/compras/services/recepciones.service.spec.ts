@@ -124,6 +124,12 @@ describe('RecepcionesService', () => {
 
       expect(result).toEqual(mockRecepciones);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('recepciones');
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        expect.stringContaining('orden:ordenes_compra!recepciones_orden_id_fkey_runtime'),
+      );
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        expect.stringContaining('proveedor:proveedores!fk_ordenes_compra_proveedor_id'),
+      );
     });
 
     it('should filter recepciones by estado', async () => {

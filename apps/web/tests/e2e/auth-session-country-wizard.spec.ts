@@ -1,0 +1,254 @@
+import { expect, request, test, type APIRequestContext, type Page } from '@playwright/test';
+import path from 'node:path';
+
+const adminAuthFile = path.join(__dirname, '.auth', 'admin.json');
+const adminEmail = process.env.TEST_USER_EMAIL || 'admin@erp.local';
+const adminPassword = process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+const standardPassword = 'StdUserProd2026!';
+
+type BrowserEvidence = {
+  consoleErrors: string[];
+  failedResponses: string[];
+  chunkFailures: string[];
+};
+
+function getBaseURL(testInfo: { project: { use: Record<string, unknown> } }) {
+  return String(testInfo.project.use.baseURL || process.env.BASE_URL || 'http://localhost:3001');
+}
+
+function attachBrowserEvidence(page: Page): BrowserEvidence {
+  const evidence: BrowserEvidence = {
+    consoleErrors: [],
+    failedResponses: [],
+    chunkFailures: [],
+  };
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      evidence.consoleErrors.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => {
+    evidence.consoleErrors.push(error.message);
+  });
+  page.on('response', (response) => {
+    const url = response.url();
+    if (response.status() >= 500) {
+      evidence.failedResponses.push(`${response.status()} ${url}`);
+    }
+    if (url.includes('/_next/static/') && response.status() >= 400) {
+      evidence.chunkFailures.push(`${response.status()} ${url}`);
+    }
+  });
+
+  return evidence;
+}
+
+async function expectCleanBrowserEvidence(
+  evidence: BrowserEvidence,
+  options: { allowUnauthorizedResourceErrors?: boolean } = {},
+) {
+  expect(evidence.failedResponses, 'No debe haber 500 inesperados en la navegación').toEqual([]);
+  expect(evidence.chunkFailures, 'No debe haber 404/errores de chunks de Next').toEqual([]);
+  expect(
+    evidence.consoleErrors.filter((message) => {
+      if (message.includes('Download the React DevTools')) return false;
+      if (
+        options.allowUnauthorizedResourceErrors &&
+        /Failed to load resource: the server responded with a status of 401/i.test(message)
+      ) {
+        return false;
+      }
+      return true;
+    }),
+    'No debe haber errores fatales en consola',
+  ).toEqual([]);
+}
+
+async function expectDashboardReady(page: Page) {
+  await expect(page).toHaveURL(/\/dashboard\/?(?:$|\?)/, { timeout: 30000 });
+  await expect(page.locator('body')).toContainText(/Dashboard/i, { timeout: 30000 });
+  await expect(page.locator('body')).toContainText(/Panel de control ejecutivo/i, { timeout: 30000 });
+
+  const bodyText = await page.locator('body').innerText({ timeout: 15000 });
+  expect(bodyText).not.toMatch(/Cargando país configurado/i);
+  expect(bodyText).not.toMatch(/Redirigiendo al asistente de configuración/i);
+  expect(bodyText).not.toMatch(/Cargando datos del dashboard/i);
+  expect(bodyText).not.toMatch(/Application error|Internal Server Error|ChunkLoadError|Cannot find module/i);
+}
+
+async function closeTourIfVisible(page: Page) {
+  const closeTour = page.getByRole('button', { name: /Cerrar tour/i });
+  if (await closeTour.isVisible().catch(() => false)) {
+    await closeTour.click();
+    await expect(closeTour).toBeHidden({ timeout: 10000 });
+  }
+}
+
+async function loginThroughUi(page: Page, email: string, password: string) {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByLabel(/Correo Electrónico/i).fill(email);
+  await page.getByLabel(/Contraseña/i).fill(password);
+  await page.getByRole('button', { name: /^Iniciar Sesión$/i }).click();
+  await expectDashboardReady(page);
+  await closeTourIfVisible(page);
+}
+
+async function adminContext(baseURL: string): Promise<APIRequestContext> {
+  return request.newContext({ baseURL, storageState: adminAuthFile });
+}
+
+async function createStandardUser(baseURL: string) {
+  const api = await adminContext(baseURL);
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const email = `standard-auth-${unique}@erp-e2e.local`;
+
+  try {
+    const response = await api.post('/backend/api/users', {
+      data: {
+        nombre: 'Usuario',
+        apellido: 'Estandar Auth',
+        email,
+        password: standardPassword,
+        cargo: 'Auditor funcional',
+        departamento: 'QA',
+        roles: [],
+      },
+    });
+
+    expect(response.ok(), `creación de usuario estándar HTTP ${response.status()}: ${await response.text()}`).toBe(
+      true,
+    );
+
+    const body = await response.json();
+    expect(body.id, 'la API debe persistir el usuario y devolver id real').toBeTruthy();
+
+    return { email, password: standardPassword, id: body.id as string };
+  } finally {
+    await api.dispose();
+  }
+}
+
+async function loginApi(baseURL: string, email: string, password: string) {
+  const api = await request.newContext({ baseURL });
+  const login = await api.post('/backend/api/auth/login', { data: { email, password } });
+  expect(login.ok(), `login API HTTP ${login.status()}: ${await login.text()}`).toBe(true);
+  return api;
+}
+
+test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
+  test('sin sesión redirige rutas protegidas a login y no deja pantalla en blanco', async ({ browser }, testInfo) => {
+    const context = await browser.newContext({
+      baseURL: getBaseURL(testInfo),
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+    const evidence = attachBrowserEvidence(page);
+
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/login/, { timeout: 30000 });
+    await expect(page.getByRole('button', { name: /^Iniciar Sesión$/i })).toBeVisible();
+    await expect(page.locator('body')).toContainText(/\S/);
+
+    await expectCleanBrowserEvidence(evidence, { allowUnauthorizedResourceErrors: true });
+    await context.close();
+  });
+
+  test('admin inicia sesión por UI, persiste sesión, refresca token, redirige desde login y cierra sesión', async ({ browser }, testInfo) => {
+    const baseURL = getBaseURL(testInfo);
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const evidence = attachBrowserEvidence(page);
+
+    await loginThroughUi(page, adminEmail, adminPassword);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expectDashboardReady(page);
+
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await expectDashboardReady(page);
+
+    const api = await request.newContext({ baseURL, storageState: await context.storageState() });
+    const refresh = await api.post('/backend/api/auth/refresh');
+    expect(refresh.ok(), `refresh de sesión HTTP ${refresh.status()}: ${await refresh.text()}`).toBe(true);
+    const profile = await api.get('/backend/api/auth/profile');
+    expect(profile.ok(), `profile post-refresh HTTP ${profile.status()}: ${await profile.text()}`).toBe(true);
+    await api.dispose();
+
+    await page.getByRole('button', { name: /Cerrar Sesión/i }).click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 30000 });
+
+    await expectCleanBrowserEvidence(evidence, { allowUnauthorizedResourceErrors: true });
+    await context.close();
+  });
+
+  test('usuario estándar entra al dashboard sin falso wizard ni loader de país, pero no puede configurar', async ({ browser }, testInfo) => {
+    const baseURL = getBaseURL(testInfo);
+    const standardUser = await createStandardUser(baseURL);
+    const context = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    const evidence = attachBrowserEvidence(page);
+
+    await loginThroughUi(page, standardUser.email, standardUser.password);
+    await expectDashboardReady(page);
+    await expect(page).not.toHaveURL(/\/dashboard\/wizard/);
+
+    const standardApi = await loginApi(baseURL, standardUser.email, standardUser.password);
+    const status = await standardApi.get('/backend/api/configuration/context/status');
+    expect(status.ok(), `estado seguro de configuración HTTP ${status.status()}: ${await status.text()}`).toBe(true);
+    const country = await standardApi.get('/backend/api/configuration/context/country');
+    expect(country.ok(), `contexto de país HTTP ${country.status()}: ${await country.text()}`).toBe(true);
+    const countryBody = await country.json();
+    expect(countryBody.data.pais).toBeTruthy();
+    expect(countryBody.data.pais_id).toBeTruthy();
+
+    const forbiddenWizardWrite = await standardApi.post('/backend/api/configuration/wizard/step', {
+      data: { pasoActual: 1, configuracionTemporal: { prueba: true } },
+    });
+    expect(forbiddenWizardWrite.status(), 'usuario sin permiso no debe guardar wizard').toBe(403);
+    await standardApi.dispose();
+
+    await expectCleanBrowserEvidence(evidence, { allowUnauthorizedResourceErrors: true });
+    await context.close();
+  });
+
+  test('admin puede actualizar configuración de empresa y usuario estándar recibe 403 en escritura', async ({}, testInfo) => {
+    const baseURL = getBaseURL(testInfo);
+    const standardUser = await createStandardUser(baseURL);
+
+    const adminApi = await adminContext(baseURL);
+    const empresa = await adminApi.get('/backend/api/configuration/empresa');
+    expect(empresa.ok(), `lectura empresa admin HTTP ${empresa.status()}: ${await empresa.text()}`).toBe(true);
+    const empresaBody = await empresa.json();
+    expect(empresaBody.data.pais).toBeTruthy();
+    expect(empresaBody.data.pais_id).toBeTruthy();
+
+    const adminWrite = await adminApi.put('/backend/api/configuration/empresa', {
+      data: {
+        pais: empresaBody.data.pais,
+        pais_id: empresaBody.data.pais_id,
+        razonSocial: empresaBody.data.razonSocial,
+        ruc: empresaBody.data.ruc,
+        direccion: empresaBody.data.direccion || 'Av. Produccion 123',
+        monedaDefecto: empresaBody.data.monedaDefecto,
+      },
+    });
+    expect(adminWrite.ok(), `admin debe poder configurar empresa HTTP ${adminWrite.status()}: ${await adminWrite.text()}`).toBe(
+      true,
+    );
+    await adminApi.dispose();
+
+    const standardApi = await loginApi(baseURL, standardUser.email, standardUser.password);
+    const standardWrite = await standardApi.put('/backend/api/configuration/empresa', {
+      data: {
+        pais: empresaBody.data.pais,
+        pais_id: empresaBody.data.pais_id,
+        razonSocial: empresaBody.data.razonSocial,
+        ruc: empresaBody.data.ruc,
+        direccion: empresaBody.data.direccion || 'Av. Produccion 123',
+      },
+    });
+    expect(standardWrite.status(), 'usuario estándar sin permiso no debe actualizar empresa').toBe(403);
+    await standardApi.dispose();
+  });
+});

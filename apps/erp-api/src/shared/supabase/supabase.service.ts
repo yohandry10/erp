@@ -1,12 +1,36 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
   private publicSupabase: SupabaseClient;
   private adminSupabase: SupabaseClient; // Cliente admin para auth operations
+  private readonly publicQueryAllowlist = new Set([
+    'auth_login_attempts',
+    'user_roles',
+    'usuarios_sistema',
+    'user_sessions',
+    'outbox_events',
+    'empresa_config',
+    'paises',
+    'configuracion_fiscal',
+    'tipos_documentos_fiscales',
+    'tipos_impuestos',
+    'tenants',
+    'integration_logs',
+    'audit_log',
+    'demo_conversiones_pendientes',
+  ]);
+
+  private readonly publicRpcAllowlist = new Set([
+    'pgrst_reload_schema',
+    'create_demo_tenant',
+    'acquire_job_lock',
+    'release_job_lock',
+  ]);
   private readonly logger = new Logger(SupabaseService.name);
   private readonly serviceRoleKey: string;
   private readonly supabaseUrl: string;
@@ -16,13 +40,15 @@ export class SupabaseService {
   private readonly networkBackoffMs: number;
   private lastNetworkFailureAt: number | null = null;
 
-  constructor(private readonly tenantContext: TenantContextService) {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  constructor(
+    private readonly tenantContext: TenantContextService,
+    private readonly configService: ConfigService,
+  ) {
+    const supabaseUrl =
+      this.configService.get<string>('SUPABASE_URL') ??
+      this.configService.get<string>('NEXT_PUBLIC_SUPABASE_URL');
     // Usar SERVICE_ROLE_KEY para el backend (tiene permisos completos)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const publicSupabaseKey =
-      process.env.SUPABASE_ANON_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
     this.serviceRoleKey = serviceRoleKey ?? '';
     this.supabaseUrl = supabaseUrl ?? '';
     this.fetchTimeoutMs = this.readIntEnv('SUPABASE_FETCH_TIMEOUT_MS', 8000);
@@ -34,8 +60,9 @@ export class SupabaseService {
       throw new Error('Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
     }
 
-    // Cliente público para datos de catálogo (sin tenant)
-    this.publicSupabase = createClient(supabaseUrl, publicSupabaseKey || serviceRoleKey, {
+    // Cliente backend sin contexto tenant para rutas allowlisted (login, catálogo y jobs).
+    // Usa service_role del servidor porque RLS no puede evaluar tenant antes del login.
+    const publicRawClient = createClient(supabaseUrl, serviceRoleKey, {
       global: {
         headers: {
           'X-Client-Info': 'erp-api-public',
@@ -43,6 +70,7 @@ export class SupabaseService {
         fetch: (input, init = {}) => this.fetchWithRetry(input, init, 'supabase-public'),
       },
     });
+    this.publicSupabase = this.wrapPublicClient(publicRawClient);
 
     // Cliente admin para operaciones de auth (crear/eliminar usuarios)
     this.adminSupabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -105,7 +133,7 @@ export class SupabaseService {
   }
 
   private readIntEnv(key: string, fallback: number): number {
-    const raw = process.env[key];
+    const raw = this.configService.get<string>(key);
     if (!raw) {
       return fallback;
     }
@@ -231,6 +259,48 @@ export class SupabaseService {
    */
   getPublicClient(): SupabaseClient {
     return this.publicSupabase;
+  }
+
+  private wrapPublicClient(client: SupabaseClient): SupabaseClient {
+    return new Proxy(client as any, {
+      get: (target: any, prop: PropertyKey, receiver: any) => {
+        if (prop === 'from') {
+          return (table: string) => {
+            const normalizedTable = (table || '').toString().trim();
+            this.assertPublicTableAllowed(normalizedTable);
+            return target.from(normalizedTable);
+          };
+        }
+
+        if (prop === 'rpc') {
+          return (fn: string, params?: Record<string, unknown>) => {
+            const normalizedFn = (fn || '').toString().trim();
+            this.assertPublicRpcAllowed(normalizedFn);
+            return target.rpc(normalizedFn, params);
+          };
+        }
+
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as SupabaseClient;
+  }
+
+  private assertPublicTableAllowed(table: string): void {
+    if (!this.publicQueryAllowlist.has(table)) {
+      throw new Error(
+        `Public Supabase client blocked for table "${table}". ` +
+        'Use getClient() with tenant context o documente esta operación en la auditoría.',
+      );
+    }
+  }
+
+  private assertPublicRpcAllowed(fn: string): void {
+    if (!this.publicRpcAllowlist.has(fn)) {
+      throw new Error(
+        `Public Supabase client blocked for RPC "${fn}". ` +
+        'Use getClient() con contexto tenant o getAdminClient() para operaciones sensibles.',
+      );
+    }
   }
 
   /**

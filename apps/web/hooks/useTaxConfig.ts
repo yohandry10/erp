@@ -4,6 +4,7 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { useApi } from '@/hooks/use-api'
+import { apiSucceeded, unwrapApiData } from '@/lib/api-contract'
 
 export interface TaxConfig {
   tasa_igv: number
@@ -20,8 +21,9 @@ export function useTaxConfig() {
     queryKey: ['tax-config'],
     queryFn: async () => {
       const response = await api.get('/api/configuracion-fiscal')
-      if (response?.success && response?.data) {
-        return response.data as TaxConfig
+      const config = unwrapApiData<TaxConfig | null>(response, null)
+      if (apiSucceeded(response) && config) {
+        return config
       }
       // Retornar valores por defecto si no hay respuesta
       return {

@@ -2,6 +2,7 @@
 
 interface CpeDocument {
   id: string
+  tipoDocumento?: string
   tipoComprobante: string
   serie: string
   numero: number
@@ -70,7 +71,7 @@ export function ComprobantesTable({ documents, onView, onSend, onGre, fiscalLabe
                 </span>
               </td>
               <td className="p-2 space-x-2">
-                <button className="btn btn-xs" onClick={() => onView(doc.id, doc.tipoComprobante)}>Ver</button>
+                <button className="btn btn-xs" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Ver</button>
                 <button
                   className="btn btn-xs"
                   onClick={() => canSend && onSend(doc.id)}

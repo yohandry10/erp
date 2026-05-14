@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { CheckCircle2, AlertCircle, RefreshCw, XCircle, DollarSign, Clock, FileText } from 'lucide-react'
 
@@ -53,7 +53,7 @@ export default function AprobacionesPage() {
     [data],
   )
 
-  const loadPendientes = async () => {
+  const loadPendientes = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/pedidos/aprobaciones/pendientes')
@@ -71,11 +71,11 @@ export default function AprobacionesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
   useEffect(() => {
     loadPendientes()
-  }, [])
+  }, [loadPendientes])
 
   const handleDecision = async (pedido: PedidoPendiente, decision: 'APROBADO' | 'RECHAZADO') => {
     const observaciones = window.prompt(

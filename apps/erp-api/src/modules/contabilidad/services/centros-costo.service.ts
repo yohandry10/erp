@@ -194,7 +194,7 @@ export class CentrosCostoService {
       console.log(`📊 [CentrosCosto] Obteniendo asientos para centro de costo ${centroCostoId}`);
 
       // Verificar que el centro de costo existe y pertenece al tenant
-      await this.obtenerCentroCosto(tenantId, centroCostoId);
+      const centroCosto = await this.obtenerCentroCosto(tenantId, centroCostoId);
 
       const page = filters?.page || 1;
       const limit = filters?.limit || 50;
@@ -272,11 +272,8 @@ export class CentrosCostoService {
               haber,
               concepto,
               centro_costo_id,
-              plan_cuentas:cuenta_id (
+              plan_cuentas!fk_detalle_asientos_cuenta_id (
                 codigo,
-                nombre
-              ),
-              centros_costo:centro_costo_id (
                 nombre
               )
             `
@@ -294,7 +291,7 @@ export class CentrosCostoService {
               haber: detalle.haber,
               concepto: detalle.concepto,
               centro_costo_id: detalle.centro_costo_id,
-              centro_costo_nombre: detalle.centros_costo?.nombre || undefined
+              centro_costo_nombre: detalle.centro_costo_id === centroCostoId ? centroCosto.nombre : undefined
             }))
           };
         })
@@ -370,7 +367,7 @@ export class CentrosCostoService {
           debe,
           haber,
           asiento_id,
-          plan_cuentas:cuenta_id (
+          plan_cuentas!fk_detalle_asientos_cuenta_id (
             codigo,
             nombre,
             tipo_cuenta

@@ -21,15 +21,14 @@ export function useDemoStatus() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const token = session?.access_token;
-      if (!token) {
+      if (!session?.user) {
         setLoading(false);
         return;
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/demo/status`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`${apiUrl}/api/demo/status`, {
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -47,7 +46,7 @@ export function useDemoStatus() {
     } finally {
       setLoading(false);
     }
-  }, [session?.access_token]);
+  }, [session?.user]);
 
   useEffect(() => {
     fetchStatus();

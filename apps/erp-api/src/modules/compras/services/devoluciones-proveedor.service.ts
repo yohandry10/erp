@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { DevolucionesProveedorRepository } from '../repositories/devoluciones-proveedor.repository';
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
-import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
+import { InventarioService } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
@@ -67,6 +67,10 @@ export class DevolucionesProveedorService {
       // Validar que los items tienen cantidades válidas
       if (!createDto.items || createDto.items.length === 0) {
         throw new BadRequestException('Debe especificar al menos un item para devolver');
+      }
+
+      if (createDto.recepcion_id) {
+        await this.validarItemsContraRecepcion(tenantId, createDto);
       }
 
       // Calcular totales
@@ -203,27 +207,12 @@ export class DevolucionesProveedorService {
 
       console.log(`📦 Procesando ${devolucion.items.length} items de la devolución ${devolucion.numero}`);
 
-      // 2. Crear movimientos de inventario para cada item (SALIDA)
-      // y actualizar stock de productos
+      // 2. Actualizar stock e inventario para cada item. `descontarStock` ya crea el
+      // movimiento SALIDA, por lo que no se debe registrar otro movimiento manual.
       for (const item of devolucion.items) {
         console.log(`  📤 Procesando item: ${item.producto?.nombre || item.producto_id} - Cantidad: ${item.cantidad}`);
 
         try {
-          // Crear movimiento de inventario tipo SALIDA
-          // Esto representa la salida de mercancía que se devuelve al proveedor
-          await this.inventarioService.crearMovimiento({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: TipoMovimiento.SALIDA,
-            cantidad: item.cantidad,
-            referencia_tipo: 'DEVOLUCION_PROVEEDOR',
-            referencia_id: devolucionId,
-            notas: `Devolución a proveedor ${devolucion.numero} - ${item.motivo_detalle || devolucion.motivo}`,
-            created_by: userId,
-          });
-
-          // Descontar stock del producto
-          // Esto actualiza stock por almacén (producto_existencias.stock_actual) y stock_reservado si aplica
           await this.inventarioService.descontarStock(
             item.producto_id,
             item.cantidad,
@@ -421,6 +410,102 @@ export class DevolucionesProveedorService {
     } catch (error) {
       console.warn(`⚠️ [Devoluciones] Error obteniendo moneda_defecto:`, error);
       return null;
+    }
+  }
+
+  private async validarItemsContraRecepcion(
+    tenantId: string,
+    createDto: CreateDevolucionProveedorDto,
+  ): Promise<void> {
+    const recepcionItemIds = createDto.items
+      .map((item) => item.recepcion_item_id)
+      .filter((id): id is string => Boolean(id));
+
+    if (recepcionItemIds.length !== createDto.items.length) {
+      throw new BadRequestException('Toda devolución asociada a una recepción debe referenciar sus items de recepción');
+    }
+
+    const { data: recepcionItems, error: recepcionItemsError } = await this.supabase
+      .getClient()
+      .from('recepcion_items')
+      .select('id, recepcion_id, producto_id, cantidad_recibida')
+      .eq('recepcion_id', createDto.recepcion_id)
+      .in('id', recepcionItemIds);
+
+    if (recepcionItemsError) {
+      throw new BadRequestException('No se pudieron validar los items de la recepción');
+    }
+
+    const recibidosPorItem = new Map(
+      (recepcionItems || []).map((item: any) => [
+        item.id,
+        {
+          productoId: item.producto_id,
+          cantidadRecibida: Number(item.cantidad_recibida || 0),
+        },
+      ]),
+    );
+
+    for (const item of createDto.items) {
+      const recibido = recibidosPorItem.get(item.recepcion_item_id!);
+      if (!recibido) {
+        throw new BadRequestException('El item de devolución no pertenece a la recepción seleccionada');
+      }
+
+      if (recibido.productoId !== item.producto_id) {
+        throw new BadRequestException('El producto de la devolución no coincide con el item de recepción');
+      }
+    }
+
+    const { data: devolucionesPrevias, error: devolucionesPreviasError } = await this.supabase
+      .getClient()
+      .from('devolucion_items')
+      .select(
+        `
+          recepcion_item_id,
+          cantidad,
+          devolucion:devoluciones_proveedor!inner(
+            id,
+            estado,
+            tenant_id,
+            recepcion_id
+          )
+        `,
+      )
+      .in('recepcion_item_id', recepcionItemIds);
+
+    if (devolucionesPreviasError) {
+      throw new BadRequestException('No se pudieron validar devoluciones previas de la recepción');
+    }
+
+    const devueltoPorItem = new Map<string, number>();
+    for (const row of devolucionesPrevias || []) {
+      const devolucion = Array.isArray((row as any).devolucion)
+        ? (row as any).devolucion[0]
+        : (row as any).devolucion;
+
+      if (
+        devolucion?.tenant_id !== tenantId ||
+        devolucion?.recepcion_id !== createDto.recepcion_id ||
+        devolucion?.estado === 'ANULADA'
+      ) {
+        continue;
+      }
+
+      const itemId = (row as any).recepcion_item_id;
+      devueltoPorItem.set(itemId, (devueltoPorItem.get(itemId) || 0) + Number((row as any).cantidad || 0));
+    }
+
+    for (const item of createDto.items) {
+      const recibido = recibidosPorItem.get(item.recepcion_item_id!)!;
+      const devueltoPrevio = devueltoPorItem.get(item.recepcion_item_id!) || 0;
+      const disponible = recibido.cantidadRecibida - devueltoPrevio;
+
+      if (item.cantidad > disponible) {
+        throw new BadRequestException(
+          `La cantidad a devolver (${item.cantidad}) excede la cantidad disponible de la recepción (${disponible})`,
+        );
+      }
     }
   }
 }

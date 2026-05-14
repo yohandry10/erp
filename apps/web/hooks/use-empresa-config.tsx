@@ -45,6 +45,35 @@ const defaultConfig: EmpresaConfig = {
   umbral_gre_automatico: 700,
 }
 
+function normalizeEmpresaConfig(response: any): EmpresaConfig {
+  const data = response?.data ?? response ?? {}
+
+  return {
+    id: data.id,
+    ruc: data.ruc,
+    razonSocial: data.razonSocial,
+    nombreComercial: data.nombreComercial,
+    direccion: data.direccion,
+    telefono: data.telefono,
+    email: data.email,
+    sitioWeb: data.sitioWeb,
+    representanteLegal: data.representanteLegal,
+    regimen: data.regimen,
+    igvPorcentaje: data.igvPorcentaje,
+    tipo_empresa: data.tipo_empresa || defaultConfig.tipo_empresa,
+    usar_flujo_logistica: data.usar_flujo_logistica !== undefined
+      ? data.usar_flujo_logistica
+      : defaultConfig.usar_flujo_logistica,
+    gre_obligatorio: data.gre_obligatorio !== undefined
+      ? data.gre_obligatorio
+      : defaultConfig.gre_obligatorio,
+    gre_automatico_habilitado: data.gre_automatico_habilitado !== undefined
+      ? data.gre_automatico_habilitado
+      : defaultConfig.gre_automatico_habilitado,
+    umbral_gre_automatico: data.umbral_gre_automatico || defaultConfig.umbral_gre_automatico,
+  }
+}
+
 export function EmpresaConfigProvider({ children }: { children: ReactNode }) {
   const { get } = useApi()
   const [config, setConfig] = useState<EmpresaConfig | null>(null)
@@ -56,35 +85,10 @@ export function EmpresaConfigProvider({ children }: { children: ReactNode }) {
       setLoading(true)
       setError(null)
       
-      const response = await get('/api/configuration/empresa')
+      const response = await get('/api/configuration/context/country')
       
-      if (response && response.success && response.data) {
-        const data = response.data
-        const empresaConfig: EmpresaConfig = {
-          id: data.id,
-          ruc: data.ruc,
-          razonSocial: data.razonSocial,
-          nombreComercial: data.nombreComercial,
-          direccion: data.direccion,
-          telefono: data.telefono,
-          email: data.email,
-          sitioWeb: data.sitioWeb,
-          representanteLegal: data.representanteLegal,
-          regimen: data.regimen,
-          igvPorcentaje: data.igvPorcentaje,
-          tipo_empresa: data.tipo_empresa || defaultConfig.tipo_empresa,
-          usar_flujo_logistica: data.usar_flujo_logistica !== undefined 
-            ? data.usar_flujo_logistica 
-            : defaultConfig.usar_flujo_logistica,
-          gre_obligatorio: data.gre_obligatorio !== undefined 
-            ? data.gre_obligatorio 
-            : defaultConfig.gre_obligatorio,
-          gre_automatico_habilitado: data.gre_automatico_habilitado !== undefined 
-            ? data.gre_automatico_habilitado 
-            : defaultConfig.gre_automatico_habilitado,
-          umbral_gre_automatico: data.umbral_gre_automatico || defaultConfig.umbral_gre_automatico,
-        }
-        setConfig(empresaConfig)
+      if (response) {
+        setConfig(normalizeEmpresaConfig(response))
       } else {
         setConfig(defaultConfig)
       }
@@ -142,35 +146,10 @@ export function useEmpresaConfigStandalone() {
       setLoading(true)
       setError(null)
       
-      const response = await get('/api/configuration/empresa')
+      const response = await get('/api/configuration/context/country')
       
-      if (response && response.success && response.data) {
-        const data = response.data
-        const empresaConfig: EmpresaConfig = {
-          id: data.id,
-          ruc: data.ruc,
-          razonSocial: data.razonSocial,
-          nombreComercial: data.nombreComercial,
-          direccion: data.direccion,
-          telefono: data.telefono,
-          email: data.email,
-          sitioWeb: data.sitioWeb,
-          representanteLegal: data.representanteLegal,
-          regimen: data.regimen,
-          igvPorcentaje: data.igvPorcentaje,
-          tipo_empresa: data.tipo_empresa || defaultConfig.tipo_empresa,
-          usar_flujo_logistica: data.usar_flujo_logistica !== undefined 
-            ? data.usar_flujo_logistica 
-            : defaultConfig.usar_flujo_logistica,
-          gre_obligatorio: data.gre_obligatorio !== undefined 
-            ? data.gre_obligatorio 
-            : defaultConfig.gre_obligatorio,
-          gre_automatico_habilitado: data.gre_automatico_habilitado !== undefined 
-            ? data.gre_automatico_habilitado 
-            : defaultConfig.gre_automatico_habilitado,
-          umbral_gre_automatico: data.umbral_gre_automatico || defaultConfig.umbral_gre_automatico,
-        }
-        setConfig(empresaConfig)
+      if (response) {
+        setConfig(normalizeEmpresaConfig(response))
       } else {
         setConfig(defaultConfig)
       }

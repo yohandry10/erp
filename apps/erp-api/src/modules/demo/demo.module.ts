@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DemoController } from './demo.controller';
 import { WebhookController } from './webhook.controller';
 import { DemoService } from './demo.service';
@@ -11,9 +12,20 @@ import { SupabaseModule } from '../../shared/supabase/supabase.module';
 @Module({
   imports: [
     SupabaseModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'demo-secret-key',
-      signOptions: { expiresIn: '30d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const jwtSecret = configService.get<string>('JWT_SECRET');
+        if (!jwtSecret) {
+          throw new Error('JWT_SECRET is required for DemoModule JWT signing');
+        }
+
+        return {
+          secret: jwtSecret,
+          signOptions: { expiresIn: '30d' },
+        };
+      },
     }),
   ],
   controllers: [DemoController, WebhookController],

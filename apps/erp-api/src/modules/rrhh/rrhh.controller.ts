@@ -184,7 +184,7 @@ export class RrhhController {
     @Body() pagoData: any
   ) {
     console.log(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.pagarEmpleadosSeleccionados(planillaId, pagoData);
+    return this.planillasService.pagarEmpleadosSeleccionados(planillaId, pagoData, tenantId);
   }
 
   @Post('planillas/:id/generar-asientos')
@@ -193,7 +193,7 @@ export class RrhhController {
     @Param('id') planillaId: string
   ) {
     console.log(`📊 [RRHH] Generando asientos para planilla ${planillaId}, tenant: ${tenantId}`);
-    return this.planillasService.generarAsientosContables(planillaId);
+    return this.planillasService.generarAsientosContables(planillaId, tenantId);
   }
 
   @Get('planillas/:id/historial-pagos')

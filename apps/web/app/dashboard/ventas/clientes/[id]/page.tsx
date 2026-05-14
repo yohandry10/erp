@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Edit, Mail, Phone, MapPin } from 'lucide-react'
@@ -14,15 +14,11 @@ export default function ClienteDetallePage() {
   const [cliente, setCliente] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadCliente()
-  }, [clienteId])
-
-  const loadCliente = async () => {
+  const loadCliente = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/ventas/clientes/${clienteId}`)
-      
+
       if (response?.id) {
         setCliente(response)
       } else {
@@ -35,7 +31,11 @@ export default function ClienteDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [clienteId, get, router])
+
+  useEffect(() => {
+    loadCliente()
+  }, [loadCliente])
 
   if (loading) {
     return (
@@ -98,7 +98,7 @@ export default function ClienteDetallePage() {
         <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: 'var(--primary-900)' }}>
           Información General
         </h2>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           <div>
             <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'block', marginBottom: '0.5rem' }}>

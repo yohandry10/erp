@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -39,11 +39,7 @@ export default function CentrosCostoPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<string>('TODOS')
 
-  useEffect(() => {
-    loadCentrosCosto()
-  }, [])
-
-  const loadCentrosCosto = async () => {
+  const loadCentrosCosto = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -61,7 +57,11 @@ export default function CentrosCostoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadCentrosCosto()
+  }, [loadCentrosCosto])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE', {

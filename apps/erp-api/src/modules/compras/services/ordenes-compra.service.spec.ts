@@ -487,7 +487,7 @@ describe('OrdenesCompraService', () => {
     });
 
     it('should throw BadRequestException when already approved by same user', async () => {
-      ordenesRepository.findById.mockResolvedValue({ ...mockOrdenCompra, estado: 'APROBACION' });
+      ordenesRepository.findById.mockResolvedValue({ ...mockOrdenCompra, estado: 'APROBADA' });
       ocAprobacionesRepository.findByOrdenId.mockResolvedValue([
         {
           id: 'aprobacion-1',

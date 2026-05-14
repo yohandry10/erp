@@ -104,7 +104,8 @@ export default function CuentasPorPagarPage() {
       if (vencimientoDesde) params.append('vencimiento_desde', vencimientoDesde)
       if (vencimientoHasta) params.append('vencimiento_hasta', vencimientoHasta)
 
-      const response = await get(`/api/finanzas/cxp?${params.toString()}`)
+      const queryString = params.toString()
+      const response = await get(`/api/finanzas/cxp${queryString ? `?${queryString}` : ''}`)
       
       if (response?.success) {
         const data = response.data || []

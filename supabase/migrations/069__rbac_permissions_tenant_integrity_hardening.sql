@@ -172,4 +172,45 @@ BEGIN
 END
 $$;
 
+ALTER TABLE public.rol_permisos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rol_permisos FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS rol_permisos_tenant_select ON public.rol_permisos;
+CREATE POLICY rol_permisos_tenant_select ON public.rol_permisos
+FOR SELECT
+USING (
+  app.is_superadmin()
+  OR EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = rol_permisos.role_id
+      AND (
+        r.tenant_id = app.current_tenant_id()
+        OR (app.current_tenant_id() IS NOT NULL AND r.tenant_id IS NULL)
+      )
+  )
+);
+
+DROP POLICY IF EXISTS rol_permisos_tenant_write ON public.rol_permisos;
+CREATE POLICY rol_permisos_tenant_write ON public.rol_permisos
+FOR ALL
+USING (
+  app.is_superadmin()
+  OR EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = rol_permisos.role_id
+      AND r.tenant_id = app.current_tenant_id()
+  )
+)
+WITH CHECK (
+  app.is_superadmin()
+  OR EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = rol_permisos.role_id
+      AND r.tenant_id = app.current_tenant_id()
+  )
+);
+
 COMMIT;

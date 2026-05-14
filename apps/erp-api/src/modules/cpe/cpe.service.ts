@@ -43,7 +43,7 @@ export class CpeService {
 
   /**
    * Obtiene el XmlSigner configurado para el tenant
-   * Si el tenant tiene certificado propio, lo usa. Si no, usa el certificado DEMO.
+   * Si el tenant tiene certificado propio, lo usa. Si no, usa la configuración global válida.
    */
   private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     try {
@@ -54,20 +54,21 @@ export class CpeService {
         .eq('tenant_id', tenantId)
         .single();
 
-      if (!error && empresa && empresa.certificado_pfx) {
+      const typedEmpresa = empresa as any;
+      if (!error && typedEmpresa && typedEmpresa.certificado_pfx) {
         console.log('🔐 Usando certificado del tenant:', tenantId);
 
-        const certificadoBuffer = this.normalizeCertificateBuffer(empresa.certificado_pfx, empresa.certificado_password);
+        const certificadoBuffer = this.normalizeCertificateBuffer(typedEmpresa.certificado_pfx, typedEmpresa.certificado_password);
 
         if (!certificadoBuffer || certificadoBuffer.length === 0) {
           this.logger.warn(
-            `El certificado almacenado para el tenant ${tenantId} no tiene un formato válido (string/base64/Buffer). Se utilizará modo DEMO.`,
+            `El certificado almacenado para el tenant ${tenantId} no tiene un formato válido (string/base64/Buffer). Se intentará fallback de configuración global.`,
           );
         } else {
           // Crear XmlSigner con el certificado del tenant
           return new XmlSigner({
             pfxBuffer: certificadoBuffer, // Buffer del certificado
-            pfxPassword: this.decryptText(empresa.certificado_password) || '',
+            pfxPassword: this.decryptText(typedEmpresa.certificado_password) || '',
           });
         }
       }
@@ -75,12 +76,24 @@ export class CpeService {
       console.warn('⚠️ Error obteniendo certificado del tenant:', error.message);
     }
 
-    // Fallback DEMO permitido en desarrollo/staging.
-    console.log('🔐 Usando certificado DEMO (entorno no productivo)');
-    return new XmlSigner({
-      pfxPath: this.configService.get('PFX_PATH') || '/tmp/demo.pfx',
-      pfxPassword: this.configService.get('PFX_PASS') || 'demo123',
-    });
+    const demoSignerConfig = this.resolveDemoSignerConfig(tenantId);
+    this.logger.warn(`🔐 Usando certificado de configuración global para tenant ${tenantId}`);
+
+    return new XmlSigner(demoSignerConfig);
+  }
+
+  private resolveDemoSignerConfig(tenantId: string): { pfxPath: string; pfxPassword: string } {
+    const pfxPath = this.configService.get<string>('PFX_PATH');
+    const pfxPassword = this.configService.get<string>('PFX_PASS');
+
+    if (!pfxPath || !pfxPassword) {
+      throw new BadRequestException(
+        `No hay configuración de certificado fiscal para el tenant ${tenantId}. ` +
+          'Configure PFX_PATH y PFX_PASS para fallback global o cargue el certificado del tenant.',
+      );
+    }
+
+    return { pfxPath, pfxPassword };
   }
 
   private recalculateTotals(createFacturaDto: CreateFacturaDto) {
@@ -123,6 +136,51 @@ export class CpeService {
     };
   }
 
+  private assertProvidedTotalsMatch(dto: CreateFacturaDto, calculated: { subtotal: number; totalIgv: number; total: number }) {
+    const fields: Array<[string, any, number]> = [
+      ['total_gravadas', (dto as any).total_gravadas, calculated.subtotal],
+      ['total_igv', (dto as any).total_igv, calculated.totalIgv],
+      ['total_venta', (dto as any).total_venta, calculated.total],
+    ];
+
+    for (const [field, provided, expected] of fields) {
+      if (provided === undefined || provided === null || provided === '') continue;
+      const numeric = Number(provided);
+      if (!Number.isFinite(numeric)) {
+        throw new BadRequestException(`El campo ${field} debe ser numérico`);
+      }
+      const providedCents = Math.round(numeric * 100);
+      const expectedCents = Math.round(expected * 100);
+      if (Math.abs(providedCents - expectedCents) > 1) {
+        throw new BadRequestException(
+          `Totales inconsistentes para CPE: ${field}=${numeric.toFixed(2)} no coincide con el total calculado ${expected.toFixed(2)}`,
+        );
+      }
+    }
+  }
+
+  private assertReceptorValido(dto: CreateFacturaDto) {
+    const tipo = String((dto as any).tipo_documento_receptor ?? '').trim();
+    const documento = String((dto as any).documento_receptor ?? '').trim();
+    const tipoDocumento = String((dto as any).tipo_documento ?? '').trim();
+
+    if (!tipo || !documento) {
+      throw new BadRequestException('El receptor del CPE requiere tipo y número de documento');
+    }
+
+    if (tipo === '6' && !/^\d{11}$/.test(documento)) {
+      throw new BadRequestException('El RUC del receptor debe tener 11 dígitos');
+    }
+
+    if (tipo === '1' && !/^\d{8}$/.test(documento)) {
+      throw new BadRequestException('El DNI del receptor debe tener 8 dígitos');
+    }
+
+    if (tipoDocumento === '01' && tipo !== '6') {
+      throw new BadRequestException('La factura requiere receptor con RUC');
+    }
+  }
+
   /**
    * Normaliza el certificado recibido desde Supabase (puede llegar como base64, Buffer JSON o ArrayBuffer)
    */
@@ -138,8 +196,10 @@ export class CpeService {
 
   private getCertKeys(): Buffer[] {
     const keys: Buffer[] = [];
-    const main = process.env.CERT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
-    const old = process.env.CERT_ENCRYPTION_KEY_OLD;
+    const main =
+      this.configService.get<string>('CERT_ENCRYPTION_KEY') ??
+      this.configService.get<string>('ENCRYPTION_KEY');
+    const old = this.configService.get<string>('CERT_ENCRYPTION_KEY_OLD');
 
     if (main && main.length >= 32) {
       keys.push(crypto.createHash('sha256').update(main).digest());
@@ -205,10 +265,81 @@ export class CpeService {
     return input;
   }
 
+  private getDocumentoKeyFromCpe(cpeRecord: any) {
+    const tipoDocumento =
+      cpeRecord.tipo_documento === '03' || cpeRecord.tipo_documento === 'BOLETA'
+        ? 'BOLETA'
+        : 'FACTURA';
+    const numero =
+      cpeRecord.numero != null
+        ? String(cpeRecord.numero).padStart(8, '0')
+        : '';
+
+    if (!cpeRecord.serie || !numero) {
+      throw new BadRequestException('El CPE requiere serie y número para crear el documento operativo');
+    }
+
+    return {
+      tipoDocumento,
+      serie: String(cpeRecord.serie).trim().toUpperCase(),
+      numero,
+    };
+  }
+
+  private assertDocumentoOperativoCoincideConCpe(documento: any, cpeRecord: any): void {
+    const totalDocumentoCents = Math.round(Number(documento?.total ?? 0) * 100);
+    const totalCpeCents = Math.round(Number(cpeRecord?.total_venta ?? 0) * 100);
+    const receptorDocumento = String(
+      documento?.receptor_numero_doc ??
+      documento?.receptor_documento ??
+      '',
+    ).trim();
+    const receptorCpe = String(cpeRecord?.documento_receptor ?? '').trim();
+
+    if (Math.abs(totalDocumentoCents - totalCpeCents) > 1 || (receptorDocumento && receptorCpe && receptorDocumento !== receptorCpe)) {
+      throw new BadRequestException(
+        `Conflicto de numeración CPE ${cpeRecord.serie}-${String(cpeRecord.numero).padStart(8, '0')}: ` +
+          'ya existe un documento operativo con total o receptor distinto',
+      );
+    }
+  }
+
+  private async findDocumentoOperativoParaCpe(client: any, tenantId: string, cpeRecord: any): Promise<string | null> {
+    const key = this.getDocumentoKeyFromCpe(cpeRecord);
+    const { data, error } = await client
+      .from('documentos')
+      .select('id,total,receptor_numero_doc,receptor_documento')
+      .eq('tenant_id', tenantId)
+      .eq('tipo_documento', key.tipoDocumento)
+      .eq('serie', key.serie)
+      .eq('numero', key.numero)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(`No se pudo consultar documento operativo del CPE: ${error.message}`);
+    }
+
+    if (data?.id) {
+      this.assertDocumentoOperativoCoincideConCpe(data, cpeRecord);
+    }
+
+    return data?.id ?? null;
+  }
+
+  private async vincularDocumentoCpe(client: any, cpeId: string, documentoId: string): Promise<void> {
+    const { error } = await client
+      .from('cpe')
+      .update({ documento_id: documentoId })
+      .eq('id', cpeId);
+
+    if (error) {
+      throw new BadRequestException(`No se pudo vincular CPE con documento operativo: ${error.message}`);
+    }
+  }
+
   /**
-   * Garantiza que exista un registro en documentos vinculado al CPE.
-   * Usa la función crear_documento_desde_cpe() cuando está disponible
-   * y cae a una inserción mínima en caso de que la RPC falle.
+   * Garantiza que exista un documento operativo real e idempotente para el CPE.
+   * No usa el ID del CPE como sustituto de factura/documento.
    */
   private async ensureDocumentoParaCpe(cpeRecord: any, tenantId: string): Promise<string | null> {
     if (!cpeRecord?.id) {
@@ -222,31 +353,12 @@ export class CpeService {
     const client = this.supabaseService.getClient();
 
     try {
-      const { data: documentoId, error } = await client.rpc('crear_documento_desde_cpe', {
-        p_cpe_id: cpeRecord.id,
-      });
-
-      if (error) {
-        const rpcMessage = error.message ?? '';
-        const isMissingEmisorData = rpcMessage.includes('emisor_ruc');
-        const logMessage = `⚠️ [CPE] RPC crear_documento_desde_cpe falló para ${cpeRecord.id}: ${rpcMessage || 'sin detalle'}`;
-        if (isMissingEmisorData) {
-          this.logger.log(`${logMessage} (se usará fallback controlado con datos del tenant)`);
-        } else {
-          this.logger.warn(logMessage);
-        }
-      } else if (documentoId) {
-        return documentoId as string;
+      const documentoExistente = await this.findDocumentoOperativoParaCpe(client, tenantId, cpeRecord);
+      if (documentoExistente) {
+        await this.vincularDocumentoCpe(client, cpeRecord.id, documentoExistente);
+        return documentoExistente;
       }
-    } catch (rpcError: any) {
-      this.logger.warn(
-        `⚠️ [CPE] Error invocando crear_documento_desde_cpe para ${cpeRecord.id}: ${
-          rpcError?.message ?? rpcError
-        }`,
-      );
-    }
 
-    try {
       const emisorInfo = await this.getEmpresaEmisorInfo(tenantId);
       const safeEmisorRuc = this.pickFirstNonEmpty(
         [cpeRecord.ruc_emisor, emisorInfo.ruc, this.configService.get<string>('EMPRESA_RUC')],
@@ -260,20 +372,13 @@ export class CpeService {
         [cpeRecord.direccion_emisor, emisorInfo.direccion],
         'DIRECCION NO DEFINIDA',
       );
-      const tipoDocumentoNormalizado =
-        cpeRecord.tipo_documento === '03' || cpeRecord.tipo_documento === 'BOLETA'
-          ? 'BOLETA'
-          : 'FACTURA';
-      const numeroNormalizado =
-        cpeRecord.numero != null
-          ? String(cpeRecord.numero).padStart(8, '0')
-          : cpeRecord.id;
+      const documentoKey = this.getDocumentoKeyFromCpe(cpeRecord);
 
-      const documentoFallback = {
+      const documentoOperativo = {
         tenant_id: tenantId,
-        tipo_documento: tipoDocumentoNormalizado,
-        serie: cpeRecord.serie,
-        numero: numeroNormalizado,
+        tipo_documento: documentoKey.tipoDocumento,
+        serie: documentoKey.serie,
+        numero: documentoKey.numero,
         fecha_emision: cpeRecord.fecha_emision ?? new Date().toISOString(),
         fecha_vencimiento: cpeRecord.fecha_vencimiento ?? cpeRecord.fecha_emision ?? null,
         emisor_ruc: safeEmisorRuc,
@@ -291,38 +396,40 @@ export class CpeService {
         estado: 'BORRADOR',
         observaciones: `Documento generado automáticamente desde CPE ${cpeRecord.serie}-${cpeRecord.numero}`,
         created_at: cpeRecord.created_at ?? new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
 
       const { data: documentoInsertado, error: insertError } = await client
         .from('documentos')
-        .insert(documentoFallback)
+        .insert(documentoOperativo)
         .select('id')
         .single();
 
       if (insertError) {
-        this.logger.error(
-          `❌ [CPE] Error creando documento fallback para CPE ${cpeRecord.id}:`,
-          insertError,
-        );
-        return null;
+        if ((insertError as any)?.code === '23505') {
+          const documentoCreadoPorOtroProceso = await this.findDocumentoOperativoParaCpe(client, tenantId, cpeRecord);
+          if (documentoCreadoPorOtroProceso) {
+            await this.vincularDocumentoCpe(client, cpeRecord.id, documentoCreadoPorOtroProceso);
+            return documentoCreadoPorOtroProceso;
+          }
+        }
+
+        throw new BadRequestException(`No se pudo crear documento operativo para CPE: ${insertError.message}`);
       }
 
       const documentoId = documentoInsertado?.id ?? null;
 
       if (documentoId) {
-        await client
-          .from('cpe')
-          .update({ documento_id: documentoId })
-          .eq('id', cpeRecord.id);
+        await this.vincularDocumentoCpe(client, cpeRecord.id, documentoId);
       }
 
       return documentoId;
-    } catch (fallbackError) {
+    } catch (documentError) {
       this.logger.error(
-        `❌ [CPE] Error general creando documento para CPE ${cpeRecord.id}:`,
-        fallbackError,
+        `❌ [CPE] Error creando documento operativo para CPE ${cpeRecord.id}:`,
+        documentError,
       );
-      return null;
+      throw documentError;
     }
   }
 
@@ -343,16 +450,17 @@ export class CpeService {
       .eq('tenant_id', tenantId)
       .maybeSingle();
 
+    const typedData = data as any;
     return {
-      ruc: data?.ruc ?? '20000000000',
-      razonSocial: data?.razon_social ?? 'EMPRESA',
-      direccion: data?.direccion_fiscal ?? 'DIRECCION NO DEFINIDA',
-      ciudad: data?.provincia ?? '',
-      departamento: data?.departamento ?? '',
-      codigoUbigeo: data?.ubigeo ?? '',
+      ruc: typedData?.ruc ?? '20000000000',
+      razonSocial: typedData?.razon_social ?? 'EMPRESA',
+      direccion: typedData?.direccion_fiscal ?? 'DIRECCION NO DEFINIDA',
+      ciudad: typedData?.provincia ?? '',
+      departamento: typedData?.departamento ?? '',
+      codigoUbigeo: typedData?.ubigeo ?? '',
       codigoDepartamento: '',
-      regimenFiscal: data?.dian_regimen_fiscal ?? '',
-      tipoContribuyente: data?.dian_tipo_contribuyente ?? '',
+      regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
+      tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
     };
   }
 
@@ -363,6 +471,8 @@ export class CpeService {
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
       const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
       const { subtotal, totalIgv, total } = this.recalculateTotals(createFacturaDto);
+      this.assertProvidedTotalsMatch(createFacturaDto, { subtotal, totalIgv, total });
+      this.assertReceptorValido(createFacturaDto);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
 
       // Reemplazar totales con cálculo servidor
@@ -473,6 +583,7 @@ export class CpeService {
         tipo_documento_receptor: createFacturaDto.tipo_documento_receptor,
         documento_receptor: createFacturaDto.documento_receptor,
         razon_social_receptor: createFacturaDto.razon_social_receptor,
+        cliente_id: (createFacturaDto as any).cliente_id ?? null,
         direccion_receptor: createFacturaDto.direccion_receptor,
         moneda: createFacturaDto.moneda,
         total_gravadas: createFacturaDto.total_gravadas,
@@ -525,9 +636,7 @@ export class CpeService {
       const documentoReferenciaId = (createdCpe as any).documento_id ?? documentoId ?? null;
 
       if (!documentoReferenciaId) {
-        this.logger.warn(
-          `⚠️ [CPE] CPE ${cpeId} no tiene documento asociado, se utilizará ID del CPE como fallback`,
-        );
+        throw new BadRequestException(`CPE ${cpeId} no tiene documento operativo asociado`);
       }
 
       const comprobanteCreadoEventId = randomUUID();
@@ -541,7 +650,7 @@ export class CpeService {
         tipoDocumento: createFacturaDto.tipo_documento,
         serie: createFacturaDto.serie,
         numero: createFacturaDto.numero,
-        clienteId: createFacturaDto.documento_receptor,
+        clienteId: (createFacturaDto as any).cliente_id ?? createFacturaDto.documento_receptor,
         total: createFacturaDto.total_venta,
         esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
         ventaId: undefined, // Se puede agregar referencia si viene de POS
@@ -556,10 +665,10 @@ export class CpeService {
         tenantId,
         idempotencyKey,
         cpeId,
-        facturaId: documentoReferenciaId ?? cpeId,
+        facturaId: documentoReferenciaId,
         serie: createFacturaDto.serie,
         numero: String(createFacturaDto.numero),
-        clienteId: createFacturaDto.documento_receptor,
+        clienteId: (createFacturaDto as any).cliente_id ?? createFacturaDto.documento_receptor,
         subtotal: createFacturaDto.total_gravadas,
         impuestos: createFacturaDto.total_igv,
         total: createFacturaDto.total_venta,
@@ -875,10 +984,11 @@ export class CpeService {
         .eq('tenant_id', tenantId)
         .maybeSingle();
 
+      const typedEmpresaConfig = empresaConfig as any;
       console.log('✅ CPE encontrado para vista:', cpeData);
       return {
         ...cpeData,
-        logo_url: empresaConfig?.logo_url || null,
+        logo_url: typedEmpresaConfig?.logo_url || null,
       };
     } catch (error) {
       console.error('❌ Error obteniendo CPE:', error);
@@ -1689,6 +1799,7 @@ ${new Date().toLocaleString()}
       // Transformar datos al formato esperado por el frontend
       const comprobantesFormateados = (cpeData || []).map(cpe => ({
         id: cpe.id,
+        tipoDocumento: cpe.tipo_documento,
         tipoComprobante: this.getTipoComprobanteText(cpe.tipo_documento),
         serie: cpe.serie,
         numero: cpe.numero,

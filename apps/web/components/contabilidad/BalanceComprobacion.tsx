@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Download, AlertCircle, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
@@ -28,18 +28,26 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
   const [data, setData] = useState<BalanceComprobacionItem[]>([])
   const [previousData, setPreviousData] = useState<BalanceComprobacionItem[]>([])
 
-  useEffect(() => {
-    loadData()
-  }, [anio, mes, showComparison])
+  const normalizeBalanceResponse = (payload: unknown): BalanceComprobacionItem[] => {
+    if (Array.isArray(payload)) {
+      return payload as BalanceComprobacionItem[]
+    }
 
-  const getPreviousPeriod = () => {
+    if (payload && typeof payload === 'object' && Array.isArray((payload as { cuentas?: unknown }).cuentas)) {
+      return (payload as { cuentas: BalanceComprobacionItem[] }).cuentas
+    }
+
+    return []
+  }
+
+  const getPreviousPeriod = useCallback(() => {
     if (mes === 1) {
       return { anio: anio - 1, mes: 12 }
     }
     return { anio, mes: mes - 1 }
-  }
+  }, [anio, mes])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -47,7 +55,7 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
       const response = await get(`/api/contabilidad/estados/balance-comprobacion?anio=${anio}&mes=${mes}`)
       
       if (response?.success && response.data) {
-        setData(response.data)
+        setData(normalizeBalanceResponse(response.data))
       } else {
         setError('No se pudieron cargar los datos')
       }
@@ -58,7 +66,7 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
         const prevResponse = await get(`/api/contabilidad/estados/balance-comprobacion?anio=${prevAnio}&mes=${prevMes}`)
         
         if (prevResponse?.success && prevResponse.data) {
-          setPreviousData(prevResponse.data)
+          setPreviousData(normalizeBalanceResponse(prevResponse.data))
         } else {
           setPreviousData([])
         }
@@ -71,7 +79,11 @@ export function BalanceComprobacion({ anio, mes, showComparison = false }: Balan
     } finally {
       setLoading(false)
     }
-  }
+  }, [anio, get, getPreviousPeriod, mes, showComparison])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {

@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
+const path = require('path')
+const isTauriBuild = process.env.NODE_ENV === 'production' && process.env.TAURI_BUILD
 const nextConfig = {
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   // Para Tauri necesitamos static export solo en build para producción
-  output: process.env.NODE_ENV === 'production' && process.env.TAURI_BUILD ? 'export' : undefined,
+  output: isTauriBuild ? 'export' : undefined,
   trailingSlash: true,
   images: {
     unoptimized: true,
@@ -21,6 +24,9 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: false,
+  },
+  compiler: {
+    reactRemoveProperties: false,
   },
   webpack: (config, { isServer }) => {
     // Ignore warnings for Supabase realtime dependencies

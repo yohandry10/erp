@@ -176,9 +176,14 @@ describe('PermissionService', () => {
         });
 
         it('should clear cache for specific user', () => {
+            const cache = (service as any).permissionCache as Map<string, any>;
+            cache.set('user-123:tenant-1:ventas:read:pedidos', { permissions: ['x'], timestamp: Date.now() });
+            cache.set('other-user:tenant-1:ventas:read:pedidos', { permissions: ['x'], timestamp: Date.now() });
+
             service.invalidateUserPermissions('user-123');
-            service.invalidateUserPermissions('user-123');
-            expect(true).toBe(true);
+
+            expect(cache.has('user-123:tenant-1:ventas:read:pedidos')).toBe(false);
+            expect(cache.has('other-user:tenant-1:ventas:read:pedidos')).toBe(true);
         });
     });
 });

@@ -6,6 +6,44 @@
 BEGIN;
 
 -- ----------------------------------------------------------------------------
+-- Alineacion minima de contabilidad para RPC/vistas base
+-- ----------------------------------------------------------------------------
+-- Las RPC de este pack y las vistas de 005 consultan estas columnas antes de
+-- que 010 aplique el refinamiento completo del vertical contable.
+ALTER TABLE IF EXISTS public.asientos_contables
+  ADD COLUMN IF NOT EXISTS fecha timestamptz,
+  ADD COLUMN IF NOT EXISTS tipo_asiento text,
+  ADD COLUMN IF NOT EXISTS total_debe numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_haber numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.detalle_asientos
+  ADD COLUMN IF NOT EXISTS asiento_id uuid,
+  ADD COLUMN IF NOT EXISTS centro_costo_id uuid,
+  ADD COLUMN IF NOT EXISTS cuenta_id uuid,
+  ADD COLUMN IF NOT EXISTS debe numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS fecha timestamptz,
+  ADD COLUMN IF NOT EXISTS haber numeric(14,2) DEFAULT 0;
+
+-- ----------------------------------------------------------------------------
+-- Alineacion minima de finanzas para RPC base
+-- ----------------------------------------------------------------------------
+ALTER TABLE IF EXISTS public.cuentas_por_cobrar
+  ADD COLUMN IF NOT EXISTS monto_pendiente numeric(14,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS saldo_pendiente numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.cuentas_por_pagar
+  ADD COLUMN IF NOT EXISTS saldo_pendiente numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.cuentas_bancarias
+  ADD COLUMN IF NOT EXISTS saldo_actual numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.movimientos_bancarios
+  ADD COLUMN IF NOT EXISTS monto numeric(14,2) DEFAULT 0;
+
+ALTER TABLE IF EXISTS public.ventas_pos
+  ADD COLUMN IF NOT EXISTS total numeric(14,2) DEFAULT 0;
+
+-- ----------------------------------------------------------------------------
 -- Lock table para jobs distribuidos
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app.job_locks (

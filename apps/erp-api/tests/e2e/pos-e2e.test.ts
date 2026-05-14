@@ -43,8 +43,7 @@ test('E2E POS – Tablas principales existen', async () => {
   
   if (ventasError) {
     if (ventasError.message.includes('does not exist') || ventasError.message.includes('relation')) {
-      console.warn('⚠️ Tabla ventas_pos no existe - módulo POS puede no estar configurado');
-      return;
+      assert.fail('Tabla ventas_pos no existe para validar el flujo POS real');
     }
   }
   assert.ok(!ventasError, `Tabla ventas_pos debe existir: ${ventasError?.message}`);
@@ -105,9 +104,8 @@ test('E2E POS – Crear sesión de caja', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla sesiones_caja no existe - saltando test');
+    assert.fail('Tabla sesiones_caja no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear sesión de caja
@@ -157,9 +155,8 @@ test('E2E POS – Crear venta básica', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla ventas_pos no existe - saltando test');
+    assert.fail('Tabla ventas_pos no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear venta POS
@@ -209,10 +206,9 @@ test('E2E POS – RLS aísla ventas entre tenants', async () => {
   // Verificar si tabla ventas_pos existe
   const { error: checkError } = await supabase.from('ventas_pos').select('id').limit(1);
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla ventas_pos no existe - saltando test');
+    assert.fail('Tabla ventas_pos no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantA);
     await supabase.from('tenants').delete().eq('id', tenantB);
-    return;
   }
 
   // Crear ventas en cada tenant
@@ -297,9 +293,8 @@ test('E2E POS – Crear método de pago', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla metodos_pago no existe - saltando test');
+    assert.fail('Tabla metodos_pago no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear método de pago
@@ -350,9 +345,8 @@ test('E2E POS – Cerrar sesión de caja', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla sesiones_caja no existe - saltando test');
+    assert.fail('Tabla sesiones_caja no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear sesión de caja abierta
@@ -414,9 +408,8 @@ test('E2E POS – Tipos NUMERIC correctos para montos', async () => {
     .limit(1);
 
   if (checkError && checkError.message.includes('does not exist')) {
-    console.warn('⚠️ Tabla ventas_pos no existe - saltando test');
+    assert.fail('Tabla ventas_pos no existe para validar el flujo E2E real');
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear venta con decimales precisos
@@ -471,12 +464,11 @@ test('E2E POS – Venta pendiente de facturación', async () => {
 
   if (checkError) {
     if (checkError.message.includes('does not exist')) {
-      console.warn('⚠️ Tabla ventas_pos no existe - saltando test');
+      assert.fail('Tabla ventas_pos no existe para validar el flujo E2E real');
     } else if (checkError.message.includes('cpe_pendiente')) {
-      console.warn('⚠️ Columna cpe_pendiente no existe - saltando test');
+      assert.fail('Columna cpe_pendiente no existe para validar el flujo E2E real');
     }
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
   }
 
   // Crear venta con CPE pendiente

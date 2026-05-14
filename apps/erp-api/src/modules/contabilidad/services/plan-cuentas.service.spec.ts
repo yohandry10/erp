@@ -12,6 +12,7 @@ describe('PlanCuentasService', () => {
     mockSupabaseClient = {};
     mockSupabaseClient.from = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.select = jest.fn().mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.insert = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.eq = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.in = jest.fn().mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.or = jest.fn().mockReturnValue(mockSupabaseClient);
@@ -138,7 +139,7 @@ describe('PlanCuentasService', () => {
       expect(result.get('12')).toEqual(mockCuentas[1]);
     });
 
-    it('debe lanzar error si faltan cuentas', async () => {
+    it('debe lanzar error si faltan cuentas no estandarizadas', async () => {
       const mockCuentas = [
         {
           id: '1',
@@ -158,8 +159,54 @@ describe('PlanCuentasService', () => {
       });
 
       await expect(
-        service.obtenerCuentasPorCodigos('tenant-1', ['10', '12', '20'])
-      ).rejects.toThrow('No se encontraron las siguientes cuentas: 12, 20');
+        service.obtenerCuentasPorCodigos('tenant-1', ['10', '98', '99'])
+      ).rejects.toThrow('No se encontraron las siguientes cuentas: 98, 99');
+    });
+
+    it('debe crear cuentas operativas estándar faltantes para eventos contables', async () => {
+      const mockCuentas = [
+        {
+          id: '1',
+          tenant_id: 'tenant-1',
+          codigo: '10',
+          nombre: 'Efectivo',
+          tipo: 'ACTIVO',
+          nivel: 1,
+          acepta_movimiento: true,
+          estado: 'ACTIVO'
+        }
+      ];
+      const cuentaClientes = {
+        id: '12-id',
+        tenant_id: 'tenant-1',
+        codigo: '12',
+        nombre: 'Cuentas por cobrar comerciales',
+        tipo: 'ACTIVO',
+        nivel: 2,
+        acepta_movimiento: true,
+        estado: 'ACTIVO'
+      };
+
+      mockSupabaseClient.in.mockResolvedValueOnce({
+        data: mockCuentas,
+        error: null
+      });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: cuentaClientes,
+        error: null
+      });
+
+      const result = await service.obtenerCuentasPorCodigos('tenant-1', ['10', '12']);
+
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-1',
+          codigo: '12',
+          acepta_movimiento: true,
+          estado: 'ACTIVO',
+        })
+      );
+      expect(result.get('12')).toEqual(cuentaClientes);
     });
 
     it('debe lanzar error si alguna cuenta no acepta movimientos', async () => {

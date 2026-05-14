@@ -1,50 +1,66 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface EmpleadoModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: any) => void
   departamentos: any[]
+  initialData?: any | null
 }
+
+const createEmptyForm = () => ({
+  nombres: '',
+  apellidos: '',
+  tipo_documento: 'DNI',
+  numero_documento: '',
+  fecha_nacimiento: '',
+  direccion: '',
+  telefono: '',
+  email: '',
+  puesto: '',
+  id_departamento: '',
+  fecha_ingreso: '',
+  estado: 'activo'
+})
 
 const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  departamentos
+  departamentos,
+  initialData = null
 }) => {
-  const [formData, setFormData] = useState({
-    nombres: '',
-    apellidos: '',
-    tipo_documento: 'DNI',
-    numero_documento: '',
-    fecha_nacimiento: '',
-    direccion: '',
-    telefono: '',
-    email: '',
-    puesto: '',
-    id_departamento: '',
-    fecha_ingreso: ''
-  })
+  const [formData, setFormData] = useState(createEmptyForm)
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!initialData) {
+      setFormData(createEmptyForm())
+      return
+    }
+
+    setFormData({
+      nombres: initialData.nombres || '',
+      apellidos: initialData.apellidos || '',
+      tipo_documento: initialData.tipo_documento || 'DNI',
+      numero_documento: initialData.numero_documento || '',
+      fecha_nacimiento: initialData.fecha_nacimiento || '',
+      direccion: initialData.direccion || '',
+      telefono: initialData.telefono || '',
+      email: initialData.email || '',
+      puesto: initialData.puesto || '',
+      id_departamento: initialData.id_departamento || '',
+      fecha_ingreso: initialData.fecha_ingreso || '',
+      estado: initialData.estado || 'activo'
+    })
+  }, [isOpen, initialData])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSubmit(formData)
-    setFormData({
-      nombres: '',
-      apellidos: '',
-      tipo_documento: 'DNI',
-      numero_documento: '',
-      fecha_nacimiento: '',
-      direccion: '',
-      telefono: '',
-      email: '',
-      puesto: '',
-      id_departamento: '',
-      fecha_ingreso: ''
-    })
+    setFormData(createEmptyForm())
   }
 
   const handleChange = (field: string, value: string) => {
@@ -99,7 +115,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
             backgroundClip: 'text',
             margin: 0
           }}>
-            👤 Agregar Nuevo Empleado
+            👤 {initialData ? 'Editar Empleado' : 'Agregar Nuevo Empleado'}
           </h2>
           <button
             onClick={onClose}
@@ -488,6 +504,35 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
                 }}
               />
             </div>
+
+            {initialData ? (
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '0.5rem',
+                  fontWeight: '600',
+                  color: 'var(--primary-700)'
+                }}>
+                  Estado
+                </label>
+                <select
+                  value={formData.estado}
+                  onChange={(e) => handleChange('estado', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    border: '2px solid var(--primary-200)',
+                    borderRadius: 'var(--border-radius)',
+                    fontSize: '1rem',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)'
+                  }}
+                >
+                  <option value="activo">Activo</option>
+                  <option value="inactivo">Inactivo</option>
+                </select>
+              </div>
+            ) : null}
           </div>
 
           {/* Dirección (campo completo) */}
@@ -544,7 +589,7 @@ const EmpleadoModal: React.FC<EmpleadoModalProps> = ({
               type="submit"
               className="btn btn-primary"
             >
-              💾 Guardar Empleado
+              💾 {initialData ? 'Actualizar Empleado' : 'Guardar Empleado'}
             </button>
           </div>
         </form>

@@ -9,6 +9,8 @@ export default function NuevoProductoPage() {
   const router = useRouter()
   const { post } = useApi()
   const [isLoading, setIsLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     codigo: '',
     nombre: '',
@@ -22,11 +24,42 @@ export default function NuevoProductoPage() {
     impuesto: '18'
   })
 
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {}
+    const precioVenta = Number(formData.precioVenta)
+    const precioCompra = formData.precioCompra === '' ? 0 : Number(formData.precioCompra)
+    const stock = formData.stock === '' ? 0 : Number(formData.stock)
+    const stockMinimo = formData.stockMinimo === '' ? 0 : Number(formData.stockMinimo)
+    const impuesto = formData.impuesto === '' ? 0 : Number(formData.impuesto)
+
+    if (!formData.codigo.trim()) nextErrors.codigo = 'El código es requerido'
+    if (!formData.nombre.trim()) nextErrors.nombre = 'El nombre es requerido'
+    if (!formData.categoria) nextErrors.categoria = 'La categoría es requerida'
+    if (!formData.precioVenta || Number.isNaN(precioVenta) || precioVenta <= 0) {
+      nextErrors.precioVenta = 'El precio de venta debe ser mayor a 0'
+    }
+    if (Number.isNaN(precioCompra) || precioCompra < 0) {
+      nextErrors.precioCompra = 'El precio de compra no puede ser negativo'
+    }
+    if (Number.isNaN(stock) || stock < 0) {
+      nextErrors.stock = 'El stock inicial no puede ser negativo'
+    }
+    if (Number.isNaN(stockMinimo) || stockMinimo < 0) {
+      nextErrors.stockMinimo = 'El stock mínimo no puede ser negativo'
+    }
+    if (Number.isNaN(impuesto) || impuesto < 0 || impuesto > 100) {
+      nextErrors.impuesto = 'El impuesto debe estar entre 0 y 100'
+    }
+
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.codigo || !formData.nombre || !formData.categoria) {
-      alert('Por favor complete los campos obligatorios')
+
+    setSubmitError(null)
+    if (!validateForm()) {
       return
     }
 
@@ -42,14 +75,23 @@ export default function NuevoProductoPage() {
       }
     } catch (error: any) {
       console.error('Error:', error)
-      alert(`❌ Error: ${error.message}`)
+      setSubmitError(error.message || 'Error al crear producto')
     } finally {
       setIsLoading(false)
     }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+    if (errors[name]) {
+      setErrors(prev => {
+        const next = { ...prev }
+        delete next[name]
+        return next
+      })
+    }
+    if (submitError) setSubmitError(null)
   }
 
   return (
@@ -101,7 +143,23 @@ export default function NuevoProductoPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
+        {(submitError || Object.keys(errors).length > 0) && (
+          <div
+            role="alert"
+            style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              padding: '0.875rem 1rem',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              fontSize: '0.875rem'
+            }}
+          >
+            {submitError || 'Revise los campos marcados antes de crear el producto.'}
+          </div>
+        )}
         <div className="activity-card" style={{ marginBottom: '2rem' }}>
           <h2 className="activity-title">Información Básica</h2>
           <div className="modal-grid">
@@ -112,9 +170,15 @@ export default function NuevoProductoPage() {
                 name="codigo"
                 value={formData.codigo}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.codigo)}
+                aria-describedby={errors.codigo ? 'producto-codigo-error' : undefined}
                 placeholder="Ej: PROD001"
               />
+              {errors.codigo && (
+                <p id="producto-codigo-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.codigo}
+                </p>
+              )}
             </div>
             <div>
               <label>Código de Barras</label>
@@ -135,9 +199,15 @@ export default function NuevoProductoPage() {
               name="nombre"
               value={formData.nombre}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.nombre)}
+              aria-describedby={errors.nombre ? 'producto-nombre-error' : undefined}
               placeholder="Nombre del producto"
             />
+            {errors.nombre && (
+              <p id="producto-nombre-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.nombre}
+              </p>
+            )}
           </div>
 
           <div style={{ marginTop: '1rem' }}>
@@ -157,7 +227,8 @@ export default function NuevoProductoPage() {
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.categoria)}
+              aria-describedby={errors.categoria ? 'producto-categoria-error' : undefined}
             >
               <option value="">Seleccione una categoría</option>
               <option value="ELECTRONICA">Electrónica</option>
@@ -167,6 +238,11 @@ export default function NuevoProductoPage() {
               <option value="OFICINA">Oficina</option>
               <option value="OTROS">Otros</option>
             </select>
+            {errors.categoria && (
+              <p id="producto-categoria-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                {errors.categoria}
+              </p>
+            )}
           </div>
         </div>
 
@@ -182,8 +258,15 @@ export default function NuevoProductoPage() {
                 onChange={handleChange}
                 step="0.01"
                 min="0"
+                aria-invalid={Boolean(errors.precioCompra)}
+                aria-describedby={errors.precioCompra ? 'producto-precio-compra-error' : undefined}
                 placeholder="0.00"
               />
+              {errors.precioCompra && (
+                <p id="producto-precio-compra-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.precioCompra}
+                </p>
+              )}
             </div>
             <div>
               <label>Precio de Venta <span style={{ color: 'var(--red-500)' }}>*</span></label>
@@ -194,9 +277,15 @@ export default function NuevoProductoPage() {
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required
+                aria-invalid={Boolean(errors.precioVenta)}
+                aria-describedby={errors.precioVenta ? 'producto-precio-venta-error' : undefined}
                 placeholder="0.00"
               />
+              {errors.precioVenta && (
+                <p id="producto-precio-venta-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.precioVenta}
+                </p>
+              )}
             </div>
             <div>
               <label>Impuesto (%)</label>
@@ -208,8 +297,15 @@ export default function NuevoProductoPage() {
                 step="0.01"
                 min="0"
                 max="100"
+                aria-invalid={Boolean(errors.impuesto)}
+                aria-describedby={errors.impuesto ? 'producto-impuesto-error' : undefined}
                 placeholder="18"
               />
+              {errors.impuesto && (
+                <p id="producto-impuesto-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.impuesto}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -225,8 +321,15 @@ export default function NuevoProductoPage() {
                 value={formData.stock}
                 onChange={handleChange}
                 min="0"
+                aria-invalid={Boolean(errors.stock)}
+                aria-describedby={errors.stock ? 'producto-stock-error' : undefined}
                 placeholder="0"
               />
+              {errors.stock && (
+                <p id="producto-stock-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.stock}
+                </p>
+              )}
             </div>
             <div>
               <label>Stock Mínimo</label>
@@ -236,8 +339,15 @@ export default function NuevoProductoPage() {
                 value={formData.stockMinimo}
                 onChange={handleChange}
                 min="0"
+                aria-invalid={Boolean(errors.stockMinimo)}
+                aria-describedby={errors.stockMinimo ? 'producto-stock-minimo-error' : undefined}
                 placeholder="0"
               />
+              {errors.stockMinimo && (
+                <p id="producto-stock-minimo-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.stockMinimo}
+                </p>
+              )}
             </div>
           </div>
         </div>

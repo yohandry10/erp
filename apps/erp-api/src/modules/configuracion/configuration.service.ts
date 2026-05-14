@@ -87,52 +87,53 @@ export class ConfigurationService {
         missingItems.push(...rucValidation.missingFields);
       }
 
-      const paisCodigo = (empresaConfig?.pais || 'PE').toString().toUpperCase();
-      const emisionModo = (empresaConfig?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
-      const oseAuthTipo = (empresaConfig?.ose_auth_tipo || 'BASIC').toString().toUpperCase();
-      const oseActivo = empresaConfig?.ose_activo === true;
+      const typedEmpresaConfig = empresaConfig as any;
+      const paisCodigo = (typedEmpresaConfig?.pais || 'PE').toString().toUpperCase();
+      const emisionModo = (typedEmpresaConfig?.emision_cpe_modo || 'SUNAT_DIRECTO').toString().toUpperCase();
+      const oseAuthTipo = (typedEmpresaConfig?.ose_auth_tipo || 'BASIC').toString().toUpperCase();
+      const oseActivo = typedEmpresaConfig?.ose_activo === true;
       const requiereOse = emisionModo === 'OSE_API';
-      const dianEnvironment = (empresaConfig?.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
-      const dianActivo = empresaConfig?.dian_activo === true;
+      const dianEnvironment = (typedEmpresaConfig?.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
+      const dianActivo = typedEmpresaConfig?.dian_activo === true;
       const requiereDian = paisCodigo === 'CO';
 
       if (requiereOse) {
         if (!oseActivo) {
           missingItems.push('Activar OSE API');
         }
-        if (!empresaConfig?.ose_url) {
+        if (!typedEmpresaConfig?.ose_url) {
           missingItems.push('URL de OSE');
         }
 
         if (oseAuthTipo === 'BASIC') {
-          if (!empresaConfig?.ose_username) missingItems.push('Usuario OSE');
-          if (!empresaConfig?.ose_password) missingItems.push('Password OSE');
+          if (!typedEmpresaConfig?.ose_username) missingItems.push('Usuario OSE');
+          if (!typedEmpresaConfig?.ose_password) missingItems.push('Password OSE');
         } else if (oseAuthTipo === 'BEARER') {
-          if (!empresaConfig?.ose_bearer_token) missingItems.push('Bearer token OSE');
+          if (!typedEmpresaConfig?.ose_bearer_token) missingItems.push('Bearer token OSE');
         } else if (oseAuthTipo === 'API_KEY') {
-          if (!empresaConfig?.ose_api_key) missingItems.push('API key OSE');
-          if (!empresaConfig?.ose_api_header) missingItems.push('Header API key OSE');
+          if (!typedEmpresaConfig?.ose_api_key) missingItems.push('API key OSE');
+          if (!typedEmpresaConfig?.ose_api_header) missingItems.push('Header API key OSE');
         }
       }
 
       if (requiereDian) {
         if (!dianActivo) missingItems.push('Activar DIAN');
-        if (!empresaConfig?.dian_url) missingItems.push('URL DIAN');
-        if (!empresaConfig?.dian_usuario) missingItems.push('Usuario DIAN');
-        if (!empresaConfig?.dian_password) missingItems.push('Password DIAN');
-        if (!empresaConfig?.dian_software_id) missingItems.push('Software ID DIAN');
-        if (!empresaConfig?.dian_software_pin) missingItems.push('Software PIN DIAN');
-        if (!empresaConfig?.dian_regimen_fiscal) missingItems.push('Régimen fiscal DIAN');
-        if (!empresaConfig?.dian_tipo_contribuyente) missingItems.push('Tipo contribuyente DIAN');
-        if (dianEnvironment === 'HOMOLOGACION' && !empresaConfig?.dian_test_set_id) {
+        if (!typedEmpresaConfig?.dian_url) missingItems.push('URL DIAN');
+        if (!typedEmpresaConfig?.dian_usuario) missingItems.push('Usuario DIAN');
+        if (!typedEmpresaConfig?.dian_password) missingItems.push('Password DIAN');
+        if (!typedEmpresaConfig?.dian_software_id) missingItems.push('Software ID DIAN');
+        if (!typedEmpresaConfig?.dian_software_pin) missingItems.push('Software PIN DIAN');
+        if (!typedEmpresaConfig?.dian_regimen_fiscal) missingItems.push('Régimen fiscal DIAN');
+        if (!typedEmpresaConfig?.dian_tipo_contribuyente) missingItems.push('Tipo contribuyente DIAN');
+        if (dianEnvironment === 'HOMOLOGACION' && !typedEmpresaConfig?.dian_test_set_id) {
           missingItems.push('Test Set ID DIAN');
         }
-        if (!empresaConfig?.dian_resolucion_numero) missingItems.push('Resolución DIAN');
-        if (!empresaConfig?.dian_resolucion_prefijo) missingItems.push('Prefijo DIAN');
-        if (empresaConfig?.dian_resolucion_desde == null) missingItems.push('Rango inicio DIAN');
-        if (empresaConfig?.dian_resolucion_hasta == null) missingItems.push('Rango fin DIAN');
-        if (!empresaConfig?.dian_resolucion_fecha_inicio) missingItems.push('Vigencia inicio DIAN');
-        if (!empresaConfig?.dian_resolucion_fecha_fin) missingItems.push('Vigencia fin DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_numero) missingItems.push('Resolución DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_prefijo) missingItems.push('Prefijo DIAN');
+        if (typedEmpresaConfig?.dian_resolucion_desde == null) missingItems.push('Rango inicio DIAN');
+        if (typedEmpresaConfig?.dian_resolucion_hasta == null) missingItems.push('Rango fin DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_fecha_inicio) missingItems.push('Vigencia inicio DIAN');
+        if (!typedEmpresaConfig?.dian_resolucion_fecha_fin) missingItems.push('Vigencia fin DIAN');
       }
 
       // Calculate completion percentage
@@ -306,9 +307,10 @@ export class ConfigurationService {
         throw error;
       }
 
+      const typedData = data as any;
       return {
-        umbralGREAutomatico: data?.umbral_gre_automatico || 700.0,
-        greAutomaticoHabilitado: data?.gre_automatico_habilitado !== false,
+        umbralGREAutomatico: typedData?.umbral_gre_automatico || 700.0,
+        greAutomaticoHabilitado: typedData?.gre_automatico_habilitado !== false,
       };
     } catch (error) {
       this.logger.error(`Error getting GRE thresholds for tenant ${tenantId}:`, error);
@@ -374,16 +376,17 @@ export class ConfigurationService {
         throw error;
       }
 
+      const typedData = data as any;
       return {
-        id: data.id,
-        tenantId: data.tenant_id,
-        pasoActual: data.paso_actual,
-        pasosCompletados: data.pasos_completados || [],
-        configuracionTemporal: data.configuracion_temporal,
-        completado: data.completado,
-        completadoAt: data.completado_at ? new Date(data.completado_at) : undefined,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
+        id: typedData.id,
+        tenantId: typedData.tenant_id,
+        pasoActual: typedData.paso_actual,
+        pasosCompletados: typedData.pasos_completados || [],
+        configuracionTemporal: typedData.configuracion_temporal,
+        completado: typedData.completado,
+        completadoAt: typedData.completado_at ? new Date(typedData.completado_at) : undefined,
+        createdAt: new Date(typedData.created_at),
+        updatedAt: new Date(typedData.updated_at),
       };
     } catch (error) {
       this.logger.error(`Error getting wizard progress for tenant ${tenantId}:`, error);
@@ -437,16 +440,17 @@ export class ConfigurationService {
           throw error;
         }
 
+        const typedData = data as any;
         return {
-          id: data.id,
-          tenantId: data.tenant_id,
-          pasoActual: data.paso_actual,
-          pasosCompletados: data.pasos_completados,
-          configuracionTemporal: data.configuracion_temporal,
-          completado: data.completado,
-          completadoAt: data.completado_at ? new Date(data.completado_at) : undefined,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
+          id: typedData.id,
+          tenantId: typedData.tenant_id,
+          pasoActual: typedData.paso_actual,
+          pasosCompletados: typedData.pasos_completados,
+          configuracionTemporal: typedData.configuracion_temporal,
+          completado: typedData.completado,
+          completadoAt: typedData.completado_at ? new Date(typedData.completado_at) : undefined,
+          createdAt: new Date(typedData.created_at),
+          updatedAt: new Date(typedData.updated_at),
         };
       } else {
         // Create new
@@ -462,16 +466,17 @@ export class ConfigurationService {
           throw error;
         }
 
+        const typedInsertData = data as any;
         return {
-          id: data.id,
-          tenantId: data.tenant_id,
-          pasoActual: data.paso_actual,
-          pasosCompletados: data.pasos_completados,
-          configuracionTemporal: data.configuracion_temporal,
-          completado: data.completado,
-          completadoAt: data.completado_at ? new Date(data.completado_at) : undefined,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
+          id: typedInsertData.id,
+          tenantId: typedInsertData.tenant_id,
+          pasoActual: typedInsertData.paso_actual,
+          pasosCompletados: typedInsertData.pasos_completados,
+          configuracionTemporal: typedInsertData.configuracion_temporal,
+          completado: typedInsertData.completado,
+          completadoAt: typedInsertData.completado_at ? new Date(typedInsertData.completado_at) : undefined,
+          createdAt: new Date(typedInsertData.created_at),
+          updatedAt: new Date(typedInsertData.updated_at),
         };
       }
     } catch (error) {
@@ -662,8 +667,9 @@ export class ConfigurationService {
         throw verifyError;
       }
 
+      const typedVerifyData = verifyData as any;
       try {
-        const storedBuffer = normalizeCertificateInput(verifyData.certificado_pfx);
+        const storedBuffer = normalizeCertificateInput(typedVerifyData.certificado_pfx);
         if (!storedBuffer) {
           throw new Error('El certificado almacenado está vacío');
         }
@@ -676,7 +682,7 @@ export class ConfigurationService {
             `Hash mismatch between payload and stored certificate for tenant ${tenantId}`,
           );
         }
-        parseCertificateBuffer(storedBuffer, verifyData.certificado_password || '');
+        parseCertificateBuffer(storedBuffer, typedVerifyData.certificado_password || '');
       } catch (verifyParseError) {
         this.logger.error(
           `Error verifying stored certificate for tenant ${tenantId}:`,

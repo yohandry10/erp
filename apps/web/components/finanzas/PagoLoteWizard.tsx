@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Label } from '../ui/label';
@@ -104,10 +104,10 @@ export function PagoLoteWizard({
     : false;
 
   // Manejar cambio de selección de CxPs
-  const handleSelectionChange = (ids: string[], montos: Record<string, number>) => {
+  const handleSelectionChange = useCallback((ids: string[], montos: Record<string, number>) => {
     setSelectedCxpIds(ids);
     setMontosParciales(montos);
-  };
+  }, []);
 
   // Manejar envío del formulario
   const handleSubmit = async () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Download, AlertCircle, Building2, CreditCard, PiggyBank, FileText } from 'lucide-react'
 import { ActivosVsPasivosChart } from './ActivosVsPasivosChart'
@@ -61,18 +61,14 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
   const [data, setData] = useState<BalanceGeneralData | null>(null)
   const [previousData, setPreviousData] = useState<BalanceGeneralData | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [anio, mes, showComparison])
-
-  const getPreviousPeriod = () => {
+  const getPreviousPeriod = useCallback(() => {
     if (mes === 1) {
       return { anio: anio - 1, mes: 12 }
     }
     return { anio, mes: mes - 1 }
-  }
+  }, [anio, mes])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -104,7 +100,11 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     } finally {
       setLoading(false)
     }
-  }
+  }, [anio, get, getPreviousPeriod, mes, showComparison])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {

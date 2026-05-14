@@ -54,6 +54,7 @@ describe('ContabilidadEventsListener', () => {
         {
           provide: SupabaseService,
           useValue: {
+            getNetworkBackoffRemainingMs: jest.fn().mockReturnValue(0),
             getClient: jest.fn().mockReturnValue({
               from: jest.fn().mockReturnThis(),
               insert: jest.fn().mockReturnThis(),
@@ -79,7 +80,7 @@ describe('ContabilidadEventsListener', () => {
         {
           provide: TenantContextService,
           useValue: {
-            run: <T>(ctx: any, cb: () => T) => cb(),
+            run: async <T>(ctx: any, cb: () => T | Promise<T>) => cb(),
             getContext: () => ({ tenantId: 'tenant-001' })
           }
         },
@@ -152,7 +153,8 @@ describe('ContabilidadEventsListener', () => {
       asientosGenerator.generarAsientoVenta.mockResolvedValue({
         id: 'asiento-001',
         tenant_id: 'tenant-001',
-        numero_asiento: 'A-202501-0001',
+        numero_asiento: 1,
+        codigo: 'A-202501-000001',
         fecha: '2025-01-15',
         concepto: 'Venta de mercadería',
         total_debe: 118,
@@ -313,7 +315,8 @@ describe('ContabilidadEventsListener', () => {
       asientosGenerator.generarAsientoCobro.mockResolvedValue({
         id: 'asiento-002',
         tenant_id: 'tenant-001',
-        numero_asiento: 'A-202501-0002',
+        numero_asiento: 2,
+        codigo: 'A-202501-000002',
         fecha: '2025-01-15',
         concepto: 'Cobro de factura',
         total_debe: 100,
@@ -362,7 +365,8 @@ describe('ContabilidadEventsListener', () => {
       asientosGenerator.generarAsientoCompra.mockResolvedValue({
         id: 'asiento-003',
         tenant_id: 'tenant-001',
-        numero_asiento: 'A-202501-0003',
+        numero_asiento: 3,
+        codigo: 'A-202501-000003',
         fecha: '2025-01-15',
         concepto: 'Compra de mercadería',
         total_debe: 118,
@@ -377,6 +381,61 @@ describe('ContabilidadEventsListener', () => {
           tenant_id: 'tenant-001',
           total: 118,
           event_id: 'evt-004'
+        })
+      );
+    });
+
+    it('should use partial reception amounts when present', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-004-partial',
+          correlation_id: 'corr-004-partial',
+          aggregate_type: 'recepcion',
+          aggregate_id: 'recepcion-001',
+          event_type: 'recepcion.registrada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fechaRecepcion: '2025-01-15',
+            total: 236,
+            subtotal: 200,
+            igv: 36,
+            totalParcial: 118,
+            subtotalParcial: 100,
+            igvParcial: 18,
+            numeroRecepcion: 'REC-001'
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoCompra.mockResolvedValue({
+        id: 'asiento-003',
+        tenant_id: 'tenant-001',
+        numero_asiento: 3,
+        codigo: 'A-202501-000003',
+        fecha: '2025-01-15',
+        concepto: 'Compra de mercadería',
+        total_debe: 118,
+        total_haber: 118,
+        estado: 'CONFIRMADO'
+      });
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoCompra).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: 'tenant-001',
+          total: 118,
+          costo: 100,
+          igv: 18,
+          event_id: 'evt-004-partial'
         })
       );
     });
@@ -409,7 +468,8 @@ describe('ContabilidadEventsListener', () => {
       asientosGenerator.generarAsientoPago.mockResolvedValue({
         id: 'asiento-004',
         tenant_id: 'tenant-001',
-        numero_asiento: 'A-202501-0004',
+        numero_asiento: 4,
+        codigo: 'A-202501-000004',
         fecha: '2025-01-15',
         concepto: 'Pago a proveedor',
         total_debe: 100,

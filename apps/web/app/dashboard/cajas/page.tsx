@@ -184,7 +184,7 @@ export default function CashManagementPage() {
                                 }}
                             >
                                 Seleccione una sesión activa para ver detalles, registrar movimientos o realizar el cierre.
-                                Si no hay sesiones abiertas, puede iniciar una nueva con el botón "Abrir Nueva Caja".
+                                Si no hay sesiones abiertas, puede iniciar una nueva con el botón &quot;Abrir Nueva Caja&quot;.
                             </p>
                         </div>
                     </div>

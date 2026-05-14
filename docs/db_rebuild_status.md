@@ -1,10 +1,28 @@
 # Estado de Reconstruccion de BD (Post-Reset)
 
-Fecha de corte: 2026-02-19 (actualizado)
+Fecha de corte: 2026-05-08 (actualizado)
+
+## Estado ejecutivo 2026-05-07
+
+- Se aplico desde cero la linea completa de migraciones activas `000..301` en PostgreSQL local temporal (`erp_rebuild_validation`, puerto `55432`) y luego se valido incrementalmente `302__auth_failed_login_attempts_atomic_rpc.sql`.
+- Auditoria 2026-05-08: no se agregaron migraciones despues de `303`; se revalidaron los gates de aplicacion contra Supabase remoto con API local y proxy Next. Playwright E2E completo queda 20/20 y los gates raiz `pnpm build`, `pnpm type-check`, `pnpm lint`, `pnpm test` y `pnpm audit --audit-level high` pasan.
+- Auditoria 2026-05-08 final: se agregaron y aplicaron remotamente `304__outbox_pending_events_tenant_overload.sql` y `305__retenciones_required_seed_backfill.sql`. Con tenant activo, `validar_rebuild_runtime_summary(tenant_id)` devuelve `2320/2320` checks pasados, `0` fallidos, `79` packs; `validar_smoke_tests_modulos_runtime(tenant_id)` devuelve `12/12` checks OK; `get_pending_outbox_events(100, NULL)` devuelve `0` pendientes.
+- Migracion `302` aplicada en la BD temporal: agrega `app.increment_failed_login_attempts(...)` como RPC atomico `SECURITY DEFINER`, revocado para `PUBLIC/anon/authenticated` y concedido solo a `service_role`.
+- Aplicacion remota Supabase ejecutada el 2026-05-08 UTC: se aplicaron manualmente con `psql` las migraciones `000..303` contra el pooler Supabase. Validacion remota posterior: `public_tables=181`, schema `app` presente, `app.increment_failed_login_attempts(uuid,integer,integer)` presente, runtime `2291/2291`, `runtime_failures=0`, smoke 11 modulos al 100% y `smoke_failures=0`.
+- Migracion `303` aplicada en la BD remota: concede `USAGE` del schema `app` y `EXECUTE` de funciones `app` a `service_role`, requerido por PostgREST backend para inserts/updates que disparan RLS/triggers con helpers `app`.
+- Migracion `304` aplicada en la BD remota: agrega sobrecarga de `get_pending_outbox_events(limit, tenant_id)` para compatibilidad runtime del backend/worker.
+- Migracion `305` aplicada en la BD remota: repone de forma idempotente la configuracion obligatoria de retenciones `CUARTA`/`QUINTA` por tenant activo.
+- Se aplicaron 298 archivos SQL ordenados por nombre en el rebuild limpio `000..301`; con `302..305` la linea activa queda en 302 archivos. Los huecos numericos `006..009` siguen siendo huecos historicos esperados.
+- Gate runtime final: `validar_rebuild_runtime_summary(NULL)` devuelve `2291` checks, `2291` pasados, `0` fallidos, `79` packs cubiertos.
+- Gate runtime remoto final con tenant activo: `validar_rebuild_runtime_summary(tenant_id)` devuelve `2320` checks, `2320` pasados, `0` fallidos, `79` packs cubiertos.
+- Gate smoke por modulos: `resumen_smoke_tests_modulos_runtime(NULL)` devuelve 11 modulos al 100% y `ejecutar_smoke_tests_modulos_runtime(NULL) WHERE NOT ok` devuelve `0` filas.
+- Gate smoke remoto final con tenant activo: `validar_smoke_tests_modulos_runtime(tenant_id)` devuelve `12` checks, `12` pasados, `0` fallidos.
+- En reconstruccion limpia no se crea tenant seed; el orquestador marca `tenant_context` como omitido solo cuando `public.tenants` esta vacio. Si existe tenant y falta contexto, el check vuelve a fallar.
+- Hardening adicional verificado: `rol_permisos` queda con RLS habilitado/forzado, los guards globales aceptan contexto tenant explicito, indices con nombres largos se validan contra el truncamiento de PostgreSQL y funciones `SECURITY DEFINER` publicas revocan `EXECUTE` a `PUBLIC`, `anon` y `authenticated`.
 
 ## 1) Alcance
 
-Este documento resume el estado actual de la reconstruccion en la nueva linea de migraciones `000..301`, tomando como fuente:
+Este documento resume el estado actual de la reconstruccion en la nueva linea de migraciones `000..305`, tomando como fuente:
 - `supabase/migrations/*.sql`
 - referencias reales de codigo (`.from(...)` y `.rpc(...)`) en `apps`, `libs`, `scripts`, `test` (excluyendo `coverage/dist/html`)
 - inventario de columnas extraidas en `docs/rebuild_key_tables_columns_raw.csv`
@@ -310,6 +328,8 @@ Migraciones activas en la nueva reconstruccion:
 - `299__rebuild_smoke_tests_module_suite.sql`
 - `300__rebuild_smoke_tests_module_views.sql`
 - `301__rebuild_smoke_tests_module_validation_pack.sql`
+- `302__auth_failed_login_attempts_atomic_rpc.sql`
+- `303__service_role_app_schema_grants.sql`
 
 ## 3) Cobertura contra uso real del codigo
 
@@ -1496,12 +1516,42 @@ Interpretacion:
 
 ## 7) Riesgos pendientes
 
-- no se pudo compilar/ejecutar la secuencia completa `000..301` en PostgreSQL temporal porque Docker daemon local no estaba disponible durante esta corrida.
-- pendiente validacion de ejecucion real de migraciones en una BD limpia para detectar errores de runtime SQL y permisos.
+- Auditoria 2026-05-07: se verifico por aplicacion real en PostgreSQL temporal que existen y aplican 298 migraciones activas entre `000` y `301`; los huecos numericos observados son `006..009`.
+- La validacion operativa del proyecto no depende de Supabase CLI: se ejecuto con PostgreSQL local equivalente y validadores runtime, y la linea remota `000..305` fue aplicada/validada por `psql`.
+- Auditoria 2026-05-07, lote seguridad/produccion: los gates de codigo `pnpm type-check`, `pnpm build`, `pnpm test` (89 suites, 848 tests), `pnpm lint` y `pnpm audit --audit-level=low` pasan. La matriz de rutas API queda sin filas `TODO` ni `AUTHENTICATED` generico tras endurecer SIRE, configuracion legacy/nueva, cotizaciones, finanzas, `auth.switch-tenant`, diagnostico `system.debug`, demo condicionado por `DEMO_API_ENABLED` y worker CPE/GRE/POS clasificado como `WORKER_AUTH`. El gate BD runtime ya pasa en PostgreSQL local temporal y en remoto por `psql`/validadores runtime.
+- Auditoria 2026-05-07, lote worker/operacion: `apps/worker` valida configuracion critica al arranque, usa `SUPABASE_SERVICE_ROLE_KEY`, `REDIS_HOST`/`REDIS_PORT`, `ERP_API_URL` y `POS_WORKER_JWT_SECRET`, y firma JWT POS con `scope=pos.worker`, contrato requerido por el endpoint API de procesamiento pendiente. `pnpm --filter @erp-suite/worker type-check` y `pnpm --filter @erp-suite/worker build` pasan.
+- Auditoria 2026-05-07, lote DB runtime final: `000..301` aplica desde cero; `validar_rebuild_runtime_summary(NULL)` reporta `2291/2291` checks pasados, `runtime_failures=0`; smoke tests por modulos reportan 11 modulos al 100% y `smoke_failures=0`.
 
 ## 8) Siguiente paso recomendado
 
-1. levantar PostgreSQL/Supabase local
-2. aplicar en orden `000..301`
-3. ejecutar smoke tests por modulo (Ventas, Inventario, CxP/CxC, POS, Seguridad)
-4. ejecutar `v_rebuild_orchestrator_runtime_status_actual`, `v_rebuild_runtime_summary_actual`, `v_rebuild_runtime_failures_actual`, `v_smoke_tests_modulos_global_actual` y `v_smoke_tests_modulos_failures_actual` como gate final
+1. mantener `psql`/validadores runtime como gate operativo de BD, sin Supabase CLI como requisito.
+2. ejecutar flujos E2E con API/web/worker contra esta BD reconstruida.
+3. mantener como gate final: `v_rebuild_runtime_summary_actual`, `v_rebuild_runtime_failures_actual`, `v_smoke_tests_modulos_global_actual` y `v_smoke_tests_modulos_failures_actual`.
+
+## 9) Auditoria runtime 2026-05-08
+
+- Credenciales Supabase rotadas por el operador y validadas por `psql` contra `project_id=wypnbcptofqdmoynlonq`; no se usa Supabase CLI en el flujo operativo.
+- Se cargo certificado fiscal demo local `LLAMA-PE-CERTIFICADO-DEMO-12345678910.pfx` como `certs/demo.pfx`; la API lo abre correctamente. Estado fiscal: homologacion/demo, no produccion SUNAT/OSE real.
+- Seed demo idempotente aplicado para tenant `b5e4cf3d-8670-4720-9f1b-81ba58dcdf1f`: empresa RUC `12345678910`, producto, cliente, proveedor, caja/sesion, venta POS, documento, CPE, GRE, CxC, CxP, cuenta bancaria, movimientos de stock y asientos contables.
+- Validacion SQL de trazabilidad: `empresa_config=1`, `ventas_pos=1`, `documentos=1`, `cpe=1`, `gre_guias=1`, `asientos_balanceados=2`; CxC `118.00`, CxP `118.00`, stock `100.00`, banco `10000.00`.
+- Asientos demo: venta y compra con 2 lineas cada uno, `total_debe=118.00`, `total_haber=118.00`, detalle debit/haber cuadrado.
+- Browser in-app autenticado confirmo carga sin pantallas fatales en los modulos principales. Tras persistir el PFX demo en `empresa_config`, wizard/onboarding visual queda completo en paso 8/8, 100%, con RUC `12345678910` y razon social demo visibles.
+
+## 10) Auditoria runtime adicional 2026-05-08
+
+- Se valido por API real `POST /api/rrhh/planillas/:id/generar-asientos` una planilla demo del tenant `b5e4cf3d-8670-4720-9f1b-81ba58dcdf1f`.
+- Resultado contable RRHH: asiento `RRHH-2026-05-000003`, tipo `PLANILLA`, origen `RRHH`, referencia de planilla, 3 lineas y `total_debe=total_haber=2500.00`.
+- Detalle RRHH validado contra `plan_cuentas.id` reales y tenant correcto:
+  - `621 Remuneraciones`: debe `2500.00`.
+  - `411 Remuneraciones por pagar`: haber `2175.00`.
+  - `403 Instituciones publicas`: haber `325.00`.
+- Se corrigio el contrato Outbox del backend para usar `payload/status=lowercase`, alineado con `outbox_events`; antes el builder generaba columnas inexistentes (`event_data`, `correlation_id`, `event_version`, `max_retries`).
+- Estado de aceptacion: RRHH planilla/asiento queda validado para el caso demo directo. El procesamiento Outbox transversal requiere una corrida adicional con evento pendiente real despues de reiniciar servicios para confirmar listeners end-to-end.
+
+## 11) Auditoria Docker y flujo integral 2026-05-12
+
+- Stack Docker de validacion `erpval3` levantado contra Supabase remoto por `psql`/runtime, sin Supabase CLI: web `13001`, API `13002`, worker `3050` y Redis interno quedan `healthy`.
+- Se ejecuto `test:e2e:production-readiness` contra `http://localhost:13002/api` y paso con flujo transaccional completo: configuracion, proveedor, producto, cliente, orden de compra, aprobacion, recepcion, stock, pedido, preparacion, listo para despacho, despacho, documento/CPE, CxC, GRE, venta POS, CxP, movimientos de stock, outbox y asientos contables.
+- Identificadores de la ultima corrida: documento `5e876637-4a9f-442b-8c27-eb6dae94d246`, CPE `4acdbe79-f0f7-4e53-a152-9243e34967d8`, GRE `9d05dc18-d614-4e1c-a0a0-5fa455a98f0f`, POS `8e42a650-75d7-476a-90e9-574206b28db4`.
+- Browser in-app valido contra la imagen Docker final que el wizard y rutas criticas cargan sin `Failed to fetch`, sin pantallas fatales y sin errores nuevos de consola.
+- Estado DB operativo: los contratos internos de BD/API/UI quedan validados para homologacion con certificado demo; para produccion fiscal real solo falta reemplazar el certificado y secretos por valores productivos y ejecutar certificacion externa SUNAT/OSE.

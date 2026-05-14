@@ -42,6 +42,15 @@ ALTER TABLE IF EXISTS public.activos_fijos
   ADD COLUMN IF NOT EXISTS moneda text DEFAULT 'PEN',
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.activos_fijos;
+DROP POLICY IF EXISTS tenant_isolation ON public.depreciaciones;
+DROP POLICY IF EXISTS tenant_isolation ON public.registro_consignaciones;
+DROP POLICY IF EXISTS tenant_isolation ON public.movimientos_consignacion;
+DROP POLICY IF EXISTS tenant_isolation ON public.inventarios_permanentes;
+DROP POLICY IF EXISTS tenant_isolation ON public.asignacion_costos;
+DROP POLICY IF EXISTS tenant_isolation ON public.calendario_empresa;
+DROP POLICY IF EXISTS tenant_isolation ON public.saldos_iniciales_cuentas;
+
 ALTER TABLE IF EXISTS public.activos_fijos
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN centro_costo_id TYPE uuid USING app.to_uuid_or_null(COALESCE(centro_costo_id::text, '')),
@@ -501,5 +510,14 @@ ON public.calendario_empresa (tenant_id, fecha, tipo_dia);
 
 CREATE INDEX IF NOT EXISTS idx_saldos_iniciales_cuentas_tenant_periodo_runtime
 ON public.saldos_iniciales_cuentas (tenant_id, periodo, cuenta_id);
+
+SELECT app.apply_tenant_policy('public', 'activos_fijos');
+SELECT app.apply_tenant_policy('public', 'depreciaciones');
+SELECT app.apply_tenant_policy('public', 'registro_consignaciones');
+SELECT app.apply_tenant_policy('public', 'movimientos_consignacion');
+SELECT app.apply_tenant_policy('public', 'inventarios_permanentes');
+SELECT app.apply_tenant_policy('public', 'asignacion_costos');
+SELECT app.apply_tenant_policy('public', 'calendario_empresa');
+SELECT app.apply_tenant_policy('public', 'saldos_iniciales_cuentas');
 
 COMMIT;

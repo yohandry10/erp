@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { AlertTriangle, X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 
@@ -31,11 +31,7 @@ export default function VencimientosAlert({
   const [expanded, setExpanded] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
-  useEffect(() => {
-    loadVencimientos()
-  }, [diasAdelante, proveedorId])
-
-  const loadVencimientos = async () => {
+  const loadVencimientos = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -54,7 +50,11 @@ export default function VencimientosAlert({
     } finally {
       setLoading(false)
     }
-  }
+  }, [diasAdelante, get, proveedorId])
+
+  useEffect(() => {
+    loadVencimientos()
+  }, [loadVencimientos])
 
   const formatCurrency = (amount: number, moneda: string = 'PEN') => {
     const currency = moneda === 'USD' ? 'USD' : 'PEN'
@@ -169,6 +169,8 @@ export default function VencimientosAlert({
           </button>
           <button
             onClick={() => setDismissed(true)}
+            aria-label="Cerrar alerta de vencimientos"
+            title="Cerrar alerta de vencimientos"
             style={{
               padding: '0.5rem',
               borderRadius: '8px',

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 
 const AsistenciaPage = () => {
@@ -8,35 +8,27 @@ const AsistenciaPage = () => {
   const [asistencias, setAsistencias] = useState<any[]>([]);
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
-  const api = useApi();
+  const { get, post } = useApi();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
-      // HARDENING: no consultar API RRHH cuando la función está deshabilitada.
       setEmpleados([]);
       setAsistencias([]);
       setLoading(false);
-      return;
-    }
-    loadData();
-  }, [fecha, rrhhEnabled]);
-
-  const loadData = async () => {
-    if (!rrhhEnabled) {
       return;
     }
     try {
       setLoading(true);
       
       // Cargar empleados
-      const empleadosData = await api.get('/api/rrhh/empleados');
+      const empleadosData = await get('/api/rrhh/empleados');
       if (empleadosData && Array.isArray(empleadosData)) {
         setEmpleados(empleadosData);
       }
 
       // Cargar asistencias del día
-      const asistenciasData = await api.get(`/api/rrhh/asistencias?fecha=${fecha}`);
+      const asistenciasData = await get(`/api/rrhh/asistencias?fecha=${fecha}`);
       if (asistenciasData && Array.isArray(asistenciasData)) {
         setAsistencias(asistenciasData);
       }
@@ -45,11 +37,15 @@ const AsistenciaPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fecha, get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const marcarAsistencia = async (empleadoId: string, tipo: 'entrada' | 'salida') => {
     try {
-      await api.post('/api/rrhh/asistencias/marcar', {
+      await post('/api/rrhh/asistencias/marcar', {
         empleado_id: empleadoId,
         fecha,
         tipo,

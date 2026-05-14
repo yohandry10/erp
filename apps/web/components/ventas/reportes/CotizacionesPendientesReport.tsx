@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,17 +41,13 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
   const [data, setData] = useState<CotizacionPendiente[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/cotizaciones-pendientes', {
         params: filters
       })
-      
+
       if (response?.success) {
         setData(response.data || [])
       }
@@ -65,7 +61,11 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleVerDetalle = (cotizacionId: string) => {
     router.push(`/dashboard/ventas/cotizaciones/${cotizacionId}`)
@@ -230,7 +230,7 @@ export default function CotizacionesPendientesReport({ filters }: Props) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {cotizacion.fecha_vencimiento 
+                          {cotizacion.fecha_vencimiento
                             ? format(new Date(cotizacion.fecha_vencimiento), 'dd/MM/yyyy', { locale: es })
                             : 'Sin fecha'}
                         </div>

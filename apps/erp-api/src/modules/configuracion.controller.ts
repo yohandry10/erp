@@ -22,6 +22,7 @@ import { DocumentosService } from './documentos.service';
 @ApiTags('configuracion')
 @Controller('configuracion')
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: proteger configuración con permisos.
+@RequirePermission('configuracion.read')
 export class ConfiguracionController {
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -82,6 +83,7 @@ export class ConfiguracionController {
   }
 
   @Post('ose/verificar')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Verificar conectividad con SUNAT' })
   async verificarConectividadSunat() {
     try {
@@ -211,6 +213,7 @@ export class ConfiguracionController {
   }
 
   @Put('empresa')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar datos de la empresa' })
   async updateDatosEmpresa(@Body() datosEmpresa: any, @CurrentTenant() tenantId: string) {
     try {
@@ -277,6 +280,7 @@ export class ConfiguracionController {
   }
 
   @Put('series/:tipo')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar configuración de serie' })
   async updateSerie(
     @Param('tipo') tipo: string,
@@ -368,6 +372,7 @@ export class ConfiguracionController {
   }
 
   @Put('parametros-facturacion')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Actualizar parámetros de facturación' })
   async updateParametrosFacturacion(@Body() parametros: any, @CurrentTenant() tenantId: string) {
     try {
@@ -411,6 +416,7 @@ export class ConfiguracionController {
   }
 
   @Post('certificado/upload')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Cargar certificado digital' })
   async uploadCertificado(@Body() certificadoData: any) {
     console.log('🔐 Cargando certificado digital...');

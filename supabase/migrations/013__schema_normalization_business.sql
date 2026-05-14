@@ -57,6 +57,9 @@ ALTER TABLE IF EXISTS public.documentos
 CREATE INDEX IF NOT EXISTS idx_documentos_tenant_fecha
 ON public.documentos (tenant_id, fecha_emision DESC);
 
+DROP VIEW IF EXISTS public.v_kpis_sunat_multitenant;
+DROP VIEW IF EXISTS public.vw_cpe_documentos_auditoria;
+
 ALTER TABLE IF EXISTS public.cpe
   ADD COLUMN IF NOT EXISTS documento_id uuid,
   ADD COLUMN IF NOT EXISTS tipo_documento text,
@@ -79,6 +82,29 @@ ALTER TABLE IF EXISTS public.cpe
 
 CREATE INDEX IF NOT EXISTS idx_cpe_tenant_serie_numero
 ON public.cpe (tenant_id, serie, numero);
+
+CREATE OR REPLACE VIEW public.vw_cpe_documentos_auditoria AS
+SELECT
+  c.id AS cpe_id,
+  c.tenant_id,
+  c.estado,
+  c.estado_sunat,
+  c.serie,
+  c.numero,
+  c.total,
+  c.created_at,
+  d.id AS documento_id,
+  d.tipo_documento
+FROM public.cpe c
+LEFT JOIN public.documentos d ON d.id = c.documento_id;
+
+CREATE OR REPLACE VIEW public.v_kpis_sunat_multitenant AS
+SELECT
+  tenant_id,
+  COUNT(*) AS total_cpe,
+  SUM(CASE WHEN estado_sunat = 'ACEPTADO' THEN 1 ELSE 0 END) AS aceptados
+FROM public.cpe
+GROUP BY tenant_id;
 
 -- ----------------------------------------------------------------------------
 -- Comunicacion baja / resumen diario

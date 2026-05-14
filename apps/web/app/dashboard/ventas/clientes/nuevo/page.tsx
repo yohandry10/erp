@@ -1,11 +1,11 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
 import ClienteForm from '@/components/ventas/ClienteForm'
 import { toast } from '@/components/ui/use-toast'
 import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 export default function NuevoClientePage() {
   const router = useRouter()
@@ -54,8 +54,8 @@ export default function NuevoClientePage() {
         alignItems: 'center',
         gap: '1rem'
       }}>
-        <button
-          onClick={handleCancel}
+        <Link
+          href="/dashboard/ventas/clientes"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -68,7 +68,8 @@ export default function NuevoClientePage() {
             border: '1px solid var(--primary-200)',
             borderRadius: 'var(--border-radius)',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            textDecoration: 'none',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
@@ -83,7 +84,7 @@ export default function NuevoClientePage() {
         >
           <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
           Volver
-        </button>
+        </Link>
         <div>
           <h1 style={{
             fontSize: '2rem',

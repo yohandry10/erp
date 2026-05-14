@@ -15,6 +15,7 @@ import { TenantContextService } from '../../shared/tenant/tenant-context.service
 import * as crypto from 'crypto';
 import Decimal from 'decimal.js';
 import { PosAuditService, TipoEventoPOS } from './services/pos-audit.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PosService {
@@ -32,10 +33,11 @@ export class PosService {
     private readonly taxCalculator: TaxCalculatorService,
     private readonly cajasService: CajasService,
     private readonly posAuditService: PosAuditService,
+    private readonly configService: ConfigService,
   ) { }
 
   private getCertKey(): Buffer {
-    const key = process.env.CERT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
+    const key = this.configService.get<string>('CERT_ENCRYPTION_KEY') ?? this.configService.get<string>('ENCRYPTION_KEY');
     if (!key || key.length < 32) {
       throw new Error('CERT_ENCRYPTION_KEY no configurada o demasiado corta (min 32 chars)');
     }
@@ -87,6 +89,10 @@ export class PosService {
     return '0'; // Otros
   }
 
+  private isUuid(value: string | null | undefined): boolean {
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
   /**
    * Normaliza el método de pago a su metadata para evitar depender de strings "efectivo"/"tarjeta"
    */
@@ -95,30 +101,34 @@ export class PosService {
 
     // Atajos para literales comunes
     if (!normalized) {
-      return { tipo: 'EFECTIVO', codigo: 'efectivo' };
+      return { id: null, tipo: 'EFECTIVO', codigo: 'efectivo' };
     }
     if (['efectivo', 'cash', 'cash_id', 'efectivo_id'].includes(normalized)) {
-      return { tipo: 'EFECTIVO', codigo: normalized };
+      return { id: null, tipo: 'EFECTIVO', codigo: 'efectivo' };
     }
     if (['tarjeta', 'card', 'card_id', 'tarjeta_id'].includes(normalized)) {
-      return { tipo: 'TARJETA', codigo: normalized };
+      return { id: null, tipo: 'TARJETA', codigo: 'tarjeta' };
     }
 
     // Buscar en catálogo de métodos de pago por id o código
-    const { data: metodoPago, error } = await this.supabase.getClient()
+    const query = this.supabase.getClient()
       .from('metodos_pago')
       .select('id, codigo, tipo')
-      .or(`id.eq.${normalized},codigo.eq.${normalized}`)
       .eq('tenant_id', tenantId)
-      .maybeSingle();
+      .limit(1);
+
+    const { data: metodoPagoRows, error } = this.isUuid(normalized)
+      ? await query.or(`id.eq.${normalized},codigo.eq.${normalized}`)
+      : await query.eq('codigo', normalized);
 
     if (error) {
       this.logger.warn(`⚠️ No se pudo resolver método de pago ${metodo}: ${error.message}`);
     }
 
+    const metodoPago = Array.isArray(metodoPagoRows) ? metodoPagoRows[0] : metodoPagoRows;
     const codigo = metodoPago?.codigo?.toLowerCase() || normalized;
     const tipo = metodoPago?.tipo?.toUpperCase() || 'EFECTIVO';
-    return { tipo, codigo };
+    return { id: metodoPago?.id ?? null, tipo, codigo };
   }
 
   private async runWithTenantContext<T>(user: any, operation: () => Promise<T>): Promise<T> {
@@ -145,6 +155,373 @@ export class PosService {
         return operation();
       },
     );
+  }
+
+  private buildVentaLockKey(ventaData: any, user: any): string {
+    return [
+      user.tenant_id,
+      ventaData?.sesion_caja_id || null,
+      ventaData?.idempotency_key || 'venta',
+    ].filter(Boolean).join(':');
+  }
+
+  private parseCorrelativo(value: any): number {
+    const raw = String(value ?? '').trim();
+    const numeric = raw.includes('-') ? raw.split('-').pop() : raw;
+    const parsed = Number(numeric);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  }
+
+  private async resolveCajaIdForSesion(tenantId: string, sesionCajaId: string | null): Promise<string | null> {
+    if (!sesionCajaId) return null;
+    const { data, error } = await this.supabase.getClient()
+      .from('sesiones_caja')
+      .select('caja_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', sesionCajaId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data?.caja_id ?? null;
+  }
+
+  private async getMaxCorrelativoFiscalOcupado(tenantId: string, serie: string): Promise<number> {
+    const client = this.supabase.getClient();
+    const normalizedSerie = String(serie || '').trim().toUpperCase();
+    let max = 0;
+
+    const [ventas, cpes, documentos] = await Promise.all([
+      client
+        .from('ventas_pos')
+        .select('numero_ticket, correlativo')
+        .eq('tenant_id', tenantId)
+        .eq('serie', normalizedSerie)
+        .limit(1000),
+      client
+        .from('cpe')
+        .select('numero')
+        .eq('tenant_id', tenantId)
+        .eq('serie', normalizedSerie)
+        .limit(1000),
+      client
+        .from('documentos')
+        .select('numero')
+        .eq('tenant_id', tenantId)
+        .eq('serie', normalizedSerie)
+        .limit(1000),
+    ]);
+
+    for (const result of [ventas, cpes, documentos]) {
+      if (result.error) {
+        throw result.error;
+      }
+    }
+
+    for (const venta of ventas.data || []) {
+      max = Math.max(max, this.parseCorrelativo(venta.correlativo), this.parseCorrelativo(venta.numero_ticket));
+    }
+    for (const cpe of cpes.data || []) {
+      max = Math.max(max, this.parseCorrelativo(cpe.numero));
+    }
+    for (const documento of documentos.data || []) {
+      max = Math.max(max, this.parseCorrelativo(documento.numero));
+    }
+
+    return max;
+  }
+
+  private async syncPosNumeracionConDocumentos(tenantId: string, serie: string, cajaId: string | null): Promise<void> {
+    const client = this.supabase.getClient();
+    const normalizedSerie = String(serie || 'B001').trim().toUpperCase();
+    const maxOcupado = await this.getMaxCorrelativoFiscalOcupado(tenantId, normalizedSerie);
+
+    const query = client
+      .from('pos_numeracion')
+      .select('id, correlativo_actual')
+      .eq('tenant_id', tenantId)
+      .eq('tipo_documento', 'TICKET')
+      .eq('serie', normalizedSerie)
+      .eq('activo', true);
+
+    const { data: existente, error } = cajaId
+      ? await query.eq('caja_id', cajaId).maybeSingle()
+      : await query.is('caja_id', null).maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (existente?.id) {
+      const actual = Number(existente.correlativo_actual ?? 0);
+      if (actual < maxOcupado) {
+        const { error: updateError } = await client
+          .from('pos_numeracion')
+          .update({ correlativo_actual: maxOcupado, updated_at: new Date().toISOString() })
+          .eq('id', existente.id);
+        if (updateError) throw updateError;
+      }
+      return;
+    }
+
+    const { error: insertError } = await client.from('pos_numeracion').insert({
+      tenant_id: tenantId,
+      tipo_documento: 'TICKET',
+      serie: normalizedSerie,
+      caja_id: cajaId,
+      correlativo_actual: maxOcupado,
+      correlativo_maximo: 99999999,
+      activo: true,
+      estado: 'ACTIVO',
+    });
+
+    if (insertError && (insertError as any).code !== '23505') {
+      throw insertError;
+    }
+  }
+
+  private async validarProductosVentaPOS(
+    items: any[],
+    tenantId: string,
+    permiteVentaSinStock: boolean,
+  ): Promise<Map<string, any>> {
+    const productIds = Array.from(new Set(items.map((item: any) => item.producto_id).filter(Boolean)));
+    if (productIds.length === 0) {
+      throw new Error('La venta POS requiere productos válidos');
+    }
+
+    const { data: productos, error } = await this.supabase.getClient()
+      .from('productos')
+      .select('id, codigo, nombre, precio_venta, stock, stock_actual, stock_reservado, activo, estado, es_servicio, controla_stock, unidad_medida')
+      .eq('tenant_id', tenantId)
+      .in('id', productIds);
+
+    if (error) {
+      throw error;
+    }
+
+    const productosMap = new Map<string, any>((productos || []).map((producto: any) => [producto.id, producto]));
+    for (const item of items) {
+      const producto = productosMap.get(item.producto_id);
+      if (!producto) {
+        throw new Error(`Producto POS no encontrado: ${item.producto_id}`);
+      }
+
+      const activo = producto.activo !== false && String(producto.estado || 'ACTIVO').toUpperCase() !== 'INACTIVO';
+      if (!activo) {
+        throw new Error(`Producto inactivo no vendible en POS: ${producto.nombre || producto.codigo || item.producto_id}`);
+      }
+
+      const cantidad = Number(item.cantidad ?? 0);
+      if (!Number.isFinite(cantidad) || cantidad <= 0) {
+        throw new Error(`Cantidad inválida para ${producto.nombre || producto.codigo || item.producto_id}`);
+      }
+
+      const controlaStock = producto.es_servicio === true ? false : producto.controla_stock !== false;
+      if (controlaStock && !permiteVentaSinStock) {
+        const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
+        const stockReservado = Number(producto.stock_reservado ?? 0);
+        const stockDisponible = stockActual - stockReservado;
+        if (stockDisponible < cantidad) {
+          throw new Error(
+            `Stock insuficiente para ${producto.nombre || producto.codigo || item.producto_id}. Disponible=${stockDisponible}, solicitado=${cantidad}`,
+          );
+        }
+      }
+    }
+
+    return productosMap;
+  }
+
+  private async persistirImpactosVentaPOS(params: {
+    ventaId: string;
+    tenantId: string;
+    userId: string;
+    items: any[];
+    productos: Map<string, any>;
+    pagos: Array<{
+      codigo: string;
+      tipo: string;
+      monto: number;
+      referencia?: string | null;
+      metodo_pago_id?: string | null;
+    }> | null;
+    ventaData: any;
+  }): Promise<void> {
+    const client = this.supabase.getClient();
+    const { ventaId, tenantId, userId, items, productos, pagos, ventaData } = params;
+
+    const { data: detallesExistentes, error: detalleLookupError } = await client
+      .from('detalle_ventas_pos')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('venta_pos_id', ventaId)
+      .limit(1);
+
+    if (detalleLookupError) {
+      throw detalleLookupError;
+    }
+
+    if (!detallesExistentes || detallesExistentes.length === 0) {
+      const detalleRows = items.map((item: any, index: number) => {
+        const producto = productos.get(item.producto_id) || {};
+        const subtotal = Number(item.subtotal ?? 0);
+        const impuesto = new Decimal(subtotal).times(0.18).toDecimalPlaces(2).toNumber();
+        return {
+          tenant_id: tenantId,
+          venta_id: ventaId,
+          venta_pos_id: ventaId,
+          producto_id: item.producto_id,
+          item_index: index + 1,
+          cantidad: Number(item.cantidad ?? 0),
+          precio_unitario: Number(item.precio_unitario ?? 0),
+          descuento: Number(item.descuento_monto ?? 0),
+          impuesto,
+          subtotal,
+          total: new Decimal(subtotal).plus(impuesto).toDecimalPlaces(2).toNumber(),
+          nombre_producto: item.producto?.nombre || producto.nombre || item.nombre || item.descripcion || 'Producto',
+          codigo_producto: item.producto?.codigo || producto.codigo || item.codigo || 'PROD',
+          unidad_medida: item.producto?.unidad_medida_sunat || item.producto?.unidad_medida || producto.unidad_medida || 'NIU',
+          estado: 'CONFIRMADO',
+          metadata: {
+            source: 'pos',
+            idempotency_key: ventaData.idempotency_key,
+          },
+        };
+      });
+
+      const { error: detalleError } = await client.from('detalle_ventas_pos').insert(detalleRows);
+      if (detalleError) {
+        throw detalleError;
+      }
+    }
+
+    const metodoPagoDefault = await this.getMetodoPagoInfo(ventaData.metodo_pago_id || 'efectivo', tenantId);
+    const pagosRows = pagos && pagos.length > 0
+      ? pagos
+      : [{
+        codigo: metodoPagoDefault.codigo,
+        tipo: metodoPagoDefault.tipo,
+        monto: Number(ventaData.total ?? 0),
+        referencia: ventaData.referencia_pago || null,
+        metodo_pago_id: metodoPagoDefault.id,
+      }];
+
+    const { data: pagosExistentes, error: pagosLookupError } = await client
+      .from('ventas_pos_pagos')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('venta_pos_id', ventaId)
+      .limit(1);
+
+    if (pagosLookupError) {
+      throw pagosLookupError;
+    }
+
+    if (!pagosExistentes || pagosExistentes.length === 0) {
+      const { error: pagosError } = await client.from('ventas_pos_pagos').insert(
+        pagosRows.map((pago: any) => ({
+          tenant_id: tenantId,
+          venta_pos_id: ventaId,
+          metodo_pago_id: pago.metodo_pago_id || null,
+          metodo_pago_codigo: pago.codigo,
+          metodo_pago_tipo: pago.tipo,
+          monto: pago.monto,
+          moneda: ventaData.moneda || 'PEN',
+          referencia: pago.referencia || null,
+          estado: 'ACTIVO',
+          metadata: {
+            source: 'pos',
+            idempotency_key: ventaData.idempotency_key,
+          },
+        })),
+      );
+      if (pagosError) {
+        throw pagosError;
+      }
+    }
+
+    for (const item of items) {
+      const producto = productos.get(item.producto_id);
+      if (!producto) continue;
+      const controlaStock = producto.es_servicio === true ? false : producto.controla_stock !== false;
+      if (!controlaStock) continue;
+
+      const cantidad = Number(item.cantidad ?? 0);
+      const { data: movimientoExistente, error: movimientoLookupError } = await client
+        .from('movimientos_inventario')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('producto_id', item.producto_id)
+        .eq('referencia_id', ventaId)
+        .eq('referencia_tipo', 'VENTA_POS')
+        .eq('tipo', 'SALIDA')
+        .maybeSingle();
+
+      if (movimientoLookupError && movimientoLookupError.code !== 'PGRST116') {
+        throw movimientoLookupError;
+      }
+      if (movimientoExistente) {
+        continue;
+      }
+
+      const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
+      const stockReservado = Number(producto.stock_reservado ?? 0);
+      const nuevoStock = new Decimal(stockActual).minus(cantidad).toDecimalPlaces(2).toNumber();
+      if (nuevoStock < 0 && ventaData.permite_venta_sin_stock !== true) {
+        throw new Error(`Stock insuficiente para ${producto.nombre || producto.codigo || item.producto_id}`);
+      }
+
+      const { error: updateStockError } = await client
+        .from('productos')
+        .update({
+          stock_actual: nuevoStock,
+          stock: String(nuevoStock),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', item.producto_id);
+      if (updateStockError) {
+        throw updateStockError;
+      }
+      producto.stock_actual = nuevoStock;
+      producto.stock = String(nuevoStock);
+
+      const { error: movimientoError } = await client.from('movimientos_inventario').insert({
+        tenant_id: tenantId,
+        producto_id: item.producto_id,
+        tipo: 'SALIDA',
+        cantidad,
+        referencia_tipo: 'VENTA_POS',
+        referencia_id: ventaId,
+        created_by: userId,
+        motivo: `Venta POS ${ventaId}`,
+        notas: `Salida POS por venta ${ventaId}`,
+        stock_actual: String(nuevoStock),
+        stock_reservado: String(stockReservado),
+        activo: true,
+        estado: 'ACTIVO',
+        metadata: {
+          source: 'pos',
+          idempotency_key: ventaData.idempotency_key,
+          numero_ticket: ventaData.numero_ticket,
+        },
+      });
+      if (movimientoError) {
+        await client
+          .from('productos')
+          .update({
+            stock_actual: stockActual,
+            stock: String(stockActual),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('tenant_id', tenantId)
+          .eq('id', item.producto_id);
+        throw movimientoError;
+      }
+    }
   }
 
   async getProductos(user: any) {
@@ -375,7 +752,9 @@ export class PosService {
     const productLocks: string[] = [];
     const items = Array.isArray(ventaData?.items) ? ventaData.items : [];
     try {
-      this.logger.log('Procesando venta:', JSON.stringify(ventaData, null, 2));
+      this.logger.log(
+        `Procesando venta POS tenant=${user.tenant_id} items=${items.length} tiene_cpe=${Boolean(ventaData?.emitir_cpe)}`
+      );
 
       // ===== PRE-SALE VALIDATIONS =====
       this.logger.log(`Starting pre-sale validations for tenant: ${user.tenant_id}`);
@@ -393,11 +772,7 @@ export class PosService {
       const ventaIdempotencyKey = ventaData.idempotency_key;
 
       // Lock por tenant + idempotency y, si existe, sesión de caja para evitar colisiones concurrentes
-      const lockKey = [
-        user.tenant_id,
-        ventaData.sesion_caja_id || null,
-        ventaIdempotencyKey || 'venta'
-      ].filter(Boolean).join(':');
+      const lockKey = this.buildVentaLockKey(ventaData, user);
 
       // Acquire advisory lock principal (tenant + sesion + idempotency)
       await this.supabase.getClient().rpc('acquire_pos_lock', {
@@ -553,7 +928,7 @@ export class PosService {
             tipo: metodoInfo.tipo,
             monto: montoPago,
             referencia: pago?.referencia ?? null,
-            metodo_pago_id: pago?.metodo_pago_id ?? null,
+            metodo_pago_id: metodoInfo.id,
           });
         }
 
@@ -665,6 +1040,12 @@ export class PosService {
         this.logger.warn(`Document warnings: ${documentValidation.warnings.map(w => w.message).join(', ')}`);
       }
 
+      const productosMap = await this.validarProductosVentaPOS(
+        recomputed,
+        user.tenant_id,
+        ventaData?.permite_venta_sin_stock === true,
+      );
+
       this.logger.log('✅ All pre-sale validations passed');
       // ===== END PRE-SALE VALIDATIONS =====
 
@@ -703,6 +1084,13 @@ export class PosService {
           },
         };
       }
+
+      const cajaIdActual = await this.resolveCajaIdForSesion(user.tenant_id, sesionCajaId);
+      await this.syncPosNumeracionConDocumentos(
+        user.tenant_id,
+        ventaData.comprobante?.serie || 'B001',
+        cajaIdActual,
+      );
 
       await this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
         tipo_evento: TipoEventoPOS.INICIO_VENTA,
@@ -829,6 +1217,26 @@ export class PosService {
 
       this.logger.log('✅ Venta procesada exitosamente:', ventaResult.id);
 
+      try {
+        await this.persistirImpactosVentaPOS({
+          ventaId: ventaResult.id,
+          tenantId: user.tenant_id,
+          userId: user.id,
+          items: recomputed,
+          productos: productosMap,
+          pagos: pagosNormalizados,
+          ventaData: {
+            ...ventaData,
+            total: totalCalculado,
+            numero_ticket: ventaResult.numero_ticket,
+          },
+        });
+      } catch (impactoError) {
+        this.logger.error('❌ Error persistiendo impactos POS; revirtiendo venta:', impactoError);
+        await this.rollbackVenta(ventaResult.id, user.tenant_id);
+        throw impactoError;
+      }
+
       // Registrar movimiento de caja (solo efectivo) para calcular saldo esperado correctamente
       try {
         let montoEfectivo = 0;
@@ -908,7 +1316,7 @@ export class PosService {
         if (ventaData.cliente_id) {
           const { data: clienteData } = await this.supabase.getClient()
             .from('clientes')
-            .select('numero_documento, tipo_documento, razon_social, nombres, apellidos, direccion')
+            .select('numero_documento, documento_numero, ruc, codigo, tipo_documento, razon_social, nombres, apellidos, direccion')
             .eq('id', ventaData.cliente_id)
             .eq('tenant_id', user.tenant_id)
             .maybeSingle();
@@ -924,7 +1332,14 @@ export class PosService {
         const monedaCpe = (ventaData?.moneda || empresaData.moneda_defecto || 'PEN').toString();
 
         // Sanitizar documento del receptor y validar contra tipo de comprobante
-        const docReceptor = (ventaData.cliente_documento || clienteInfo?.numero_documento || '').toString().trim();
+        const docReceptor = (
+          ventaData.cliente_documento ||
+          clienteInfo?.numero_documento ||
+          clienteInfo?.documento_numero ||
+          clienteInfo?.ruc ||
+          clienteInfo?.codigo ||
+          ''
+        ).toString().trim();
         const tipoDocReceptor = this.inferirTipoDocumento(docReceptor, ventaData.cliente_tipo_documento || clienteInfo?.tipo_documento);
         if (tipoComprobante === '01' && tipoDocReceptor !== '6') {
           return {
@@ -993,7 +1408,9 @@ export class PosService {
           })
         };
 
-        this.logger.log('📋 Datos CPE preparados:', JSON.stringify(cpeData, null, 2));
+        this.logger.log(
+          `Datos CPE POS preparados tenant=${user.tenant_id} tipo=${cpeData.tipo_documento} serie=${cpeData.serie} total=${cpeData.total}`
+        );
 
         // Retry/backoff simple para CPE
         let ultimoError: any = null;
@@ -1169,6 +1586,31 @@ export class PosService {
         }
       }
 
+      if (this.eventBus) {
+        await this.eventBus.emitVentaProcessed({
+          eventId: uuidv4(),
+          tenantId: user.tenant_id,
+          idempotencyKey: `pos.venta:${user.tenant_id}:${ventaIdempotencyKey}`,
+          source: 'pos.venta.registrada',
+          ventaId: ventaResult.id,
+          numeroTicket: String(ventaResult.numero_ticket),
+          clienteId: ventaData.cliente_id || undefined,
+          clienteNombre: ventaData.cliente_nombre || 'Cliente POS',
+          metodoPago: metodoPagoPrincipal,
+          subtotal: subtotalCalculado,
+          impuestos: impuestosCalculados,
+          total: totalCalculado,
+          items: recomputed.map((item: any) => ({
+            productoId: item.producto_id,
+            cantidad: Number(item.cantidad ?? 0),
+            precio: Number(item.precio_unitario ?? 0),
+            total: Number(item.subtotal ?? 0),
+          })),
+          cpeId: cpeId || undefined,
+          inventarioAplicado: true,
+        });
+      }
+
       return {
         success: true,
         venta_id: ventaResult.id,
@@ -1177,6 +1619,16 @@ export class PosService {
         factura_electronica: cpeEmitido,
         cpe_id: cpeId,
         cuenta_por_cobrar_id: cuentaPorCobrarId,
+        items_actualizados: recomputed.map((item: any) => {
+          const producto = productosMap.get(item.producto_id);
+          const stockActual = producto ? Number(producto.stock_actual ?? producto.stock ?? 0) : null;
+          const stockReservado = producto ? Number(producto.stock_reservado ?? 0) : 0;
+          return {
+            producto_id: item.producto_id,
+            stock_actual: stockActual,
+            stock_disponible: stockActual == null ? null : Math.max(stockActual - stockReservado, 0),
+          };
+        }),
         message: cpeEmitido
           ? esVentaCredito
             ? 'Venta procesada, CPE emitido y cuenta por cobrar creada'
@@ -1197,7 +1649,7 @@ export class PosService {
       };
     } finally {
       try {
-        const lockKey = ventaData.idempotency_key || `${user.tenant_id}:venta`;
+        const lockKey = this.buildVentaLockKey(ventaData, user);
         await this.supabase.getClient().rpc('release_pos_lock', {
           p_tenant_id: user.tenant_id,
           p_lock_key: lockKey,
@@ -1335,16 +1787,8 @@ export class PosService {
         throw new Error('No hay sesión de caja abierta');
       }
 
-      let cajaId = typeof data === 'number' ? undefined : data?.caja_id;
-      let sesionId = typeof data === 'number' ? undefined : (data?.sesion_id || data?.sesionId);
-
-      if (!sesionId) {
-        sesionId = sesion?.id ?? undefined;
-      }
-
-      if (!cajaId) {
-        cajaId = sesion?.caja_id ?? undefined;
-      }
+      let cajaId = sesion?.caja_id ?? undefined;
+      let sesionId = sesion?.id ?? undefined;
 
       if (!cajaId && sesionId) {
         const { data: sesionDb } = await this.supabase.getClient()
@@ -1756,6 +2200,12 @@ export class PosService {
   private async rollbackVenta(ventaId: string, tenantId: string): Promise<void> {
     try {
       await this.supabase.getClient()
+        .from('ventas_pos_pagos')
+        .delete()
+        .eq('venta_pos_id', ventaId)
+        .eq('tenant_id', tenantId);
+
+      await this.supabase.getClient()
         .from('detalle_ventas_pos')
         .delete()
         .eq('venta_id', ventaId)
@@ -1766,6 +2216,13 @@ export class PosService {
         .delete()
         .eq('id', ventaId)
         .eq('tenant_id', tenantId);
+
+      await this.supabase.getClient()
+        .from('outbox_events')
+        .delete()
+        .eq('tenant_id', tenantId)
+        .eq('aggregate_type', 'venta_pos')
+        .eq('aggregate_id', ventaId);
 
       this.logger.warn(`♻️ Venta ${ventaId} revertida por inconsistencia`);
     } catch (err) {

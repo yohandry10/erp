@@ -48,8 +48,8 @@ describe('CpeService', () => {
                 precio_unitario: 100,
                 unidad: 'NIU',
                 valor_venta: 100,
-                impuesto_igv: 18,
-                total_item: 118
+                igv: 18,
+                precio_venta: 118
             }
         ],
         ruc_emisor: '20100100100',
@@ -63,7 +63,7 @@ describe('CpeService', () => {
         total_igv: 18,
         total_venta: 118,
         condicion_pago: 'CONTADO'
-    };
+    } as any;
 
     beforeEach(async () => {
         mockSupabaseClient = {
@@ -88,8 +88,12 @@ describe('CpeService', () => {
                     },
                 },
                 {
-                    provide: ConfigService,
-                    useValue: { get: jest.fn((key) => key === 'PFX_PASS' ? 'pass' : null) },
+                provide: ConfigService,
+                    useValue: { get: jest.fn((key) => {
+                      if (key === 'PFX_PASS') return 'pass1234';
+                      if (key === 'PFX_PATH') return '/tmp/demo.pfx';
+                      return null;
+                    }) },
                 },
                 {
                     provide: EventBusService,
@@ -175,29 +179,42 @@ describe('CpeService', () => {
                 ...mockCreateFacturaDto,
                 created_at: new Date().toISOString(),
             };
+            const mockDocumentoOperativo = { id: 'doc-123' };
             mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCreatedCpe, error: null });
 
-            // 5. Ensure Document (RPC check)
-            mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'doc-123', error: null });
+            // 5. Ensure Document: no existe documento previo, se crea documento operativo real
+            mockSupabaseClient.maybeSingle
+                .mockResolvedValueOnce({ data: null, error: null } as any)
+                .mockResolvedValueOnce({
+                    data: {
+                        ruc: '20100100100',
+                        razon_social: 'Empresa Demo',
+                        direccion_fiscal: 'Av. Demo 123',
+                    },
+                    error: null,
+                } as any);
 
-            // 6. Refresh CPE (optional step in service)
-            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCreatedCpe, error: null });
+            mockSupabaseClient.single.mockResolvedValueOnce({ data: mockDocumentoOperativo, error: null });
 
-            // 7. Get certificate (2nd call in prepareXmlForSunat) -> Fallback to demo
+            // 6. Get certificate (2nd call in prepareXmlForSunat) -> Fallback to demo
             mockSupabaseClient.single.mockResolvedValueOnce({
                 data: null, // No tenant cert -> fallback to demo
                 error: { message: 'Not found' }
             });
 
-            // 8. Update in prepareXmlForSunat
-            supabaseService.update.mockResolvedValue({ data: null, error: null });
+            // 7. Update in prepareXmlForSunat
+            supabaseService.update.mockResolvedValue({ data: null, error: null } as any);
 
             const result = await service.create(mockCreateFacturaDto, mockTenantId);
 
             expect(result).toBeDefined();
             expect(result.id).toBe('cpe-123');
             expect(mockSupabaseClient.insert).toHaveBeenCalled();
+            expect(mockSupabaseClient.update).toHaveBeenCalledWith({ documento_id: 'doc-123' });
             expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalled();
+            expect(eventBusService.emitFacturaEmitidaEvent).toHaveBeenCalledWith(
+                expect.objectContaining({ facturaId: 'doc-123' }),
+            );
             expect(supabaseService.update).toHaveBeenCalled();
         });
 
@@ -264,6 +281,32 @@ describe('CpeService', () => {
             mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any); // Idempotencia
 
             await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/Cada ítem debe tener cantidad > 0/);
+            errorSpy.mockRestore();
+        });
+
+        it('debe rechazar totales declarados que no coinciden con items', async () => {
+            const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+            const invalidDto = {
+                ...mockCreateFacturaDto,
+                total_venta: 999,
+            };
+            mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any);
+
+            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/Totales inconsistentes/);
+            errorSpy.mockRestore();
+        });
+
+        it('debe rechazar factura con receptor sin RUC válido', async () => {
+            const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+            const invalidDto = {
+                ...mockCreateFacturaDto,
+                tipo_documento: '01' as any,
+                tipo_documento_receptor: '1',
+                documento_receptor: '12345678',
+            };
+            mockSupabaseClient.maybeSingle.mockResolvedValue({ data: null } as any);
+
+            await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/factura requiere receptor con RUC/i);
             errorSpy.mockRestore();
         });
     });
@@ -361,7 +404,7 @@ describe('CpeService', () => {
             });
 
             // 3. Update CPE
-            supabaseService.update.mockResolvedValue({ data: null, error: null });
+            supabaseService.update.mockResolvedValue({ data: null, error: null } as any);
 
             const result = await service.checkOseStatus('cpe-1', mockTenantId);
 

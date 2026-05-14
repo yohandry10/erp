@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import React from 'react';
 
 export interface ProductoPOS {
@@ -57,9 +58,16 @@ export const ProductGrid: React.FC<Props> = ({ productos, onAgregar, productoSel
               transform: estaSeleccionado ? 'scale(1.02)' : undefined,
             }}
           >
-            <div className="product-image">
+            <div className="product-image" style={{ position: 'relative' }}>
               {producto.imagen_url ? (
-                <img src={producto.imagen_url} alt={producto.nombre} />
+                <Image
+                  src={producto.imagen_url}
+                  alt={producto.nombre}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 160px"
+                  style={{ objectFit: 'cover' }}
+                  unoptimized
+                />
               ) : (
                 <div className="placeholder-img" />
               )}

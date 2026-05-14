@@ -57,12 +57,12 @@ const BANCO_TEMPLATES: Record<BancoTemplate, { name: string; description: string
 
 export function ImportarExtractoCSV({
   conciliacionId,
-  cuentaBancariaId,
   banco,
   onImportSuccess,
   onCancel,
 }: ImportarExtractoCSVProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [csvContent, setCsvContent] = useState('');
   const [bancoTemplate, setBancoTemplate] = useState<BancoTemplate>('GENERICO');
   const [previewData, setPreviewData] = useState<MovimientoCSV[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -71,7 +71,7 @@ export function ImportarExtractoCSV({
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const API_BASE_URL = '/backend';
 
   // Detectar banco automáticamente
   React.useEffect(() => {
@@ -98,6 +98,7 @@ export function ImportarExtractoCSV({
     }
 
     setSelectedFile(file);
+    setCsvContent('');
     setError(null);
     setParseErrors([]);
     processCSVPreview(file);
@@ -110,6 +111,7 @@ export function ImportarExtractoCSV({
 
     try {
       const text = await file.text();
+      setCsvContent(text);
       const lines = text.split('\n').filter((line) => line.trim());
 
       if (lines.length === 0) {
@@ -330,9 +332,8 @@ export function ImportarExtractoCSV({
           },
           credentials: 'include',
           body: JSON.stringify({
-            cuenta_bancaria_id: cuentaBancariaId,
-            movimientos: previewData,
-            banco_template: bancoTemplate,
+            contenidoCsv: csvContent,
+            banco: bancoTemplate,
           }),
         }
       );

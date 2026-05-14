@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -65,12 +65,7 @@ export function CotizacionCompraWizard({
 
   const formData = watch()
 
-  useEffect(() => {
-    loadProveedores()
-    loadProductos()
-  }, [])
-
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     try {
       setLoadingProveedores(true)
       const response = await get('/api/compras/proveedores?activo=true')
@@ -82,9 +77,9 @@ export function CotizacionCompraWizard({
     } finally {
       setLoadingProveedores(false)
     }
-  }
+  }, [get])
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
       setLoadingProductos(true)
       const response = await get('/api/inventario/productos')
@@ -96,7 +91,12 @@ export function CotizacionCompraWizard({
     } finally {
       setLoadingProductos(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadProveedores()
+    loadProductos()
+  }, [loadProductos, loadProveedores])
 
   const handleNext = () => {
     if (currentStep === 1) {
@@ -139,7 +139,7 @@ export function CotizacionCompraWizard({
 
   const handleFinalSubmit = async () => {
     const { subtotal, igv, total } = calculateTotals()
-    
+
     const cotizacionData = {
       numero: formData.numero,
       proveedor_id: formData.proveedor_id,
@@ -172,7 +172,7 @@ export function CotizacionCompraWizard({
         <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem' }}>
           Nueva Cotización de Compra
         </h2>
-        
+
         {/* Step Indicator */}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           {[
@@ -212,9 +212,9 @@ export function CotizacionCompraWizard({
                 </span>
               </div>
               {idx < 2 && (
-                <div style={{ 
-                  flex: 0.5, 
-                  height: '2px', 
+                <div style={{
+                  flex: 0.5,
+                  height: '2px',
                   background: currentStep > step.num ? '#3b82f6' : '#e5e7eb',
                   marginTop: '-1.5rem'
                 }} />
@@ -230,7 +230,7 @@ export function CotizacionCompraWizard({
           <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>
             Información Básica
           </h3>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
@@ -374,9 +374,9 @@ export function CotizacionCompraWizard({
       )}
 
       {/* Navigation Buttons */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         gap: '1rem',
         paddingTop: '2rem',
         marginTop: '2rem',
@@ -445,12 +445,12 @@ export function CotizacionCompraWizard({
 }
 
 // Step 2 Component: Add Products
-function Step2AddProducts({ 
-  productos, 
-  detalles, 
-  onAddProducto, 
+function Step2AddProducts({
+  productos,
+  detalles,
+  onAddProducto,
   onRemoveProducto,
-  loadingProductos 
+  loadingProductos
 }: any) {
   const [selectedProducto, setSelectedProducto] = useState('')
   const [cantidad, setCantidad] = useState(1)

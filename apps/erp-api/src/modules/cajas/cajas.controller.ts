@@ -9,6 +9,8 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { Denominaciones } from './services/cash-reconciliation.service';
 
 
 @Controller('cajas')
@@ -17,12 +19,14 @@ export class CajasController {
   constructor(private readonly service: CajasService) { }
 
   @Get()
+  @RequirePermission('cajas.ver')
   async listar(@CurrentTenant() tenantId: string) {
     const data = await this.service.listarCajas(tenantId);
     return { success: true, data };
   }
 
   @Post()
+  @RequirePermission('cajas.crear')
   async crear(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -33,6 +37,7 @@ export class CajasController {
   }
 
   @Put(':id')
+  @RequirePermission('cajas.editar')
   async actualizar(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -43,6 +48,7 @@ export class CajasController {
   }
 
   @Post(':id/apertura')
+  @RequirePermission('cajas.apertura')
   async abrir(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -54,6 +60,7 @@ export class CajasController {
   }
 
   @Post(':id/cierre')
+  @RequirePermission('cajas.cierre')
   async cerrar(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -70,6 +77,7 @@ export class CajasController {
   }
 
   @Get('sesiones')
+  @RequirePermission('cajas.sesiones.ver')
   async listarSesiones(
     @CurrentTenant() tenantId: string,
     @Query('estado') estado?: string,
@@ -82,6 +90,7 @@ export class CajasController {
   }
 
   @Get('cortes')
+  @RequirePermission('cajas.cortes.ver')
   async listarCortes(
     @CurrentTenant() tenantId: string,
     @Query('fecha_desde') fecha_desde?: string,
@@ -93,6 +102,7 @@ export class CajasController {
   }
 
   @Get('cortes/:corteId')
+  @RequirePermission('cajas.cortes.ver')
   async obtenerCorte(
     @CurrentTenant() tenantId: string,
     @Param('corteId') corteId: string,
@@ -102,6 +112,7 @@ export class CajasController {
   }
 
   @Get('cortes/:corteId/pdf')
+  @RequirePermission('cajas.cortes.exportar_pdf')
   async descargarCortePdf(
     @CurrentTenant() tenantId: string,
     @Param('corteId') corteId: string,
@@ -114,6 +125,7 @@ export class CajasController {
   }
 
   @Get('cortes/:corteId/csv')
+  @RequirePermission('cajas.cortes.exportar_csv')
   async descargarCorteCsv(
     @CurrentTenant() tenantId: string,
     @Param('corteId') corteId: string,
@@ -126,6 +138,7 @@ export class CajasController {
   }
 
   @Get('validar-precierre/:sesionId')
+  @RequirePermission('cajas.precierre.ver')
   async validarPrecierre(
     @CurrentTenant() tenantId: string,
     @Param('sesionId') sesionId: string,
@@ -135,6 +148,7 @@ export class CajasController {
   }
 
   @Get('saldo-esperado/:sesionId')
+  @RequirePermission('cajas.saldo_esperado.ver')
   async obtenerSaldoEsperado(
     @CurrentTenant() tenantId: string,
     @Param('sesionId') sesionId: string,
@@ -144,13 +158,14 @@ export class CajasController {
   }
 
   @Post('cerrar/:sesionId')
+  @RequirePermission('cajas.cierre_administrativo')
   async cerrarCajaAvanzado(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
     @Body() dto: {
       monto_contado: number;
-      denominaciones: Record<string, any>;
+      denominaciones: Denominaciones;
       notas?: string;
       supervisor_id?: string;
       codigo_autorizacion?: string;
@@ -172,6 +187,7 @@ export class CajasController {
   }
 
   @Post('retiros/:sesionId')
+  @RequirePermission('cajas.retiros.crear')
   async solicitarRetiro(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -206,6 +222,7 @@ export class CajasController {
   }
 
   @Post('retiros/:retiroId/conciliar')
+  @RequirePermission('cajas.retiros.conciliar')
   async conciliarRetiro(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -222,6 +239,7 @@ export class CajasController {
   }
 
   @Post('cambio-turno/iniciar/:sesionId')
+  @RequirePermission('cajas.cambios_turno.iniciar')
   async iniciarCambioTurno(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -238,6 +256,7 @@ export class CajasController {
   }
 
   @Post('cambio-turno/completar/:cambioId')
+  @RequirePermission('cajas.cambios_turno.completar')
   async completarCambioTurno(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -265,6 +284,7 @@ export class CajasController {
   }
 
   @Post('cambio-turno/cancelar/:cambioId')
+  @RequirePermission('cajas.cambios_turno.cancelar')
   async cancelarCambioTurno(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -281,6 +301,7 @@ export class CajasController {
   }
 
   @Get('sesiones/:sesionId/cambios-turno')
+  @RequirePermission('cajas.cambios_turno.ver')
   async listarCambiosTurno(
     @CurrentTenant() tenantId: string,
     @Param('sesionId') sesionId: string,
@@ -290,6 +311,7 @@ export class CajasController {
   }
 
   @Post('movimientos/manual/:sesionId')
+  @RequirePermission('cajas.movimientos.manual')
   async registrarMovimientoManual(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -316,6 +338,7 @@ export class CajasController {
    * Requiere permisos de supervisor/admin
    */
   @Post('sesiones/:sesionId/cierre-administrativo')
+  @RequirePermission('cajas.cierre_administrativo')
   async cerrarSesionAdministrativa(
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
@@ -341,6 +364,7 @@ export class CajasController {
   }
 
   @Get(':id/corte-z')
+  @RequirePermission('cajas.corte_z.ver')
   async obtenerCorteZ(
     @CurrentTenant() tenantId: string,
     @Param('id') cajaId: string,

@@ -1,6 +1,33 @@
-version: '3.8'
-
 services:
+  # ============================================
+  # ERP Web (Next.js Frontend)
+  # ============================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - NEXT_PUBLIC_API_URL=http://localhost:3002
+      - SERVER_API_URL=http://erp-api:3002
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED}
+      - NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED}
+      - NEXT_PUBLIC_FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED}
+    depends_on:
+      erp-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http'); const req=http.get('http://localhost:3001/dashboard/', (res)=>process.exit(res.statusCode < 500 ? 0 : 1)); req.on('error', ()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # ============================================
   # ERP API (NestJS Backend)
   # ============================================
@@ -9,15 +36,36 @@ services:
       context: .
       dockerfile: apps/erp-api/Dockerfile
     ports:
-      - "3001:3001"
+      - "3002:3002"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
+      - NODE_ENV=production
+      - PORT=3002
       - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - PFX_PATH=/app/certs/demo.pfx
       - PFX_PASS=${PFX_PASS}
+      - AUTH_SIGNATURE_SECRET=${AUTH_SIGNATURE_SECRET}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY=${CERT_ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY_OLD=${CERT_ENCRYPTION_KEY_OLD:-}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - HEALTH_TOKEN=${HEALTH_TOKEN}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3001}
+      - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
+      - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
+      - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
+      - CERTIFICATE_PATH=/app/certs/demo.pfx
+      - CERTIFICATE_PASSWORD=${PFX_PASS}
       - OSE_URL=${OSE_URL}
       - OSE_USERNAME=${OSE_USERNAME}
       - OSE_PASSWORD=${OSE_PASSWORD}
@@ -28,7 +76,7 @@ services:
       - redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,10 +105,25 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - REDIS_URL=redis://redis:6379
+      - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
+      - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
+      - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
+      - ERP_API_URL=http://erp-api:3002/api
+      - WORKER_PORT=3050
+      - POS_WORKER_JWT_SECRET=${POS_WORKER_JWT_SECRET}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY=${CERT_ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY_OLD=${CERT_ENCRYPTION_KEY_OLD:-}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - HEALTH_TOKEN=${HEALTH_TOKEN}
       - OSE_URL=${OSE_URL}
       - OSE_USERNAME=${OSE_USERNAME}
       - OSE_PASSWORD=${OSE_PASSWORD}
@@ -70,6 +133,11 @@ services:
       - redis
       - erp-api
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port:3050,path:'/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # ============================================
   # Prometheus (Métricas)
@@ -154,4 +222,4 @@ volumes:
 
 networks:
   default:
-    name: erp-network 
+    name: erp-network

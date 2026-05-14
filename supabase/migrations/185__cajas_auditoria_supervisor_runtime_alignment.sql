@@ -7,6 +7,9 @@
 
 BEGIN;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.caja_audit_log;
+DROP POLICY IF EXISTS tenant_isolation ON public.supervisor_pins;
+
 CREATE OR REPLACE FUNCTION app.normalize_caja_audit_estado(
   p_input text,
   p_default text DEFAULT 'ACTIVO'
@@ -267,5 +270,8 @@ ON public.supervisor_pins (tenant_id, usuario_id, estado, activo);
 CREATE INDEX IF NOT EXISTS idx_supervisor_pins_bloqueado_hasta_runtime
 ON public.supervisor_pins (tenant_id, bloqueado_hasta)
 WHERE bloqueado_hasta IS NOT NULL;
+
+SELECT app.apply_tenant_policy('public', 'caja_audit_log');
+SELECT app.apply_tenant_policy('public', 'supervisor_pins');
 
 COMMIT;

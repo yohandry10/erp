@@ -1,11 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const API_BASE_URL = '/backend'
 
 interface EmpresaConfig {
   ruc?: string
@@ -65,15 +66,9 @@ export function ConfigurationSummaryStep() {
     const loadConfig = async () => {
       try {
         setLoading(true)
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
-        if (!token) {
-          setLoading(false)
-          return
-        }
-
         const response = await fetch(`${API_BASE_URL}/api/configuration/empresa`, {
+          credentials: 'include',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         })
@@ -101,15 +96,12 @@ export function ConfigurationSummaryStep() {
   const handleSaveLogoUrl = async () => {
     setSaving(true)
     setMessage(null)
-    
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
-      if (!token) throw new Error('No hay sesión activa')
 
+    try {
       const response = await fetch(`${API_BASE_URL}/api/configuration/empresa`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ logoUrl })
@@ -188,8 +180,8 @@ export function ConfigurationSummaryStep() {
     <div style={{ padding: '1rem', maxWidth: '800px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-        <div style={{ 
-          width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#10b981', 
+        <div style={{
+          width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#10b981',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem'
         }}>
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
@@ -422,7 +414,7 @@ export function ConfigurationSummaryStep() {
       {/* Logo de la Empresa */}
       <div style={{ ...sectionStyle, backgroundColor: '#fff', border: '1px solid #e5e7eb' }}>
         <h2 style={sectionTitleStyle}>🖼️ Logo de la Empresa (para tickets y facturas)</h2>
-        
+
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'block', marginBottom: '0.375rem', color: '#374151', fontSize: '0.8rem' }}>
             URL del Logo:
@@ -448,9 +440,12 @@ export function ConfigurationSummaryStep() {
         {logoUrl && (
           <div style={{ marginBottom: '0.75rem' }}>
             <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: '0.375rem' }}>Vista previa:</p>
-            <img 
-              src={logoUrl} 
-              alt="Logo preview" 
+            <Image
+              src={logoUrl}
+              alt="Logo preview"
+              width={180}
+              height={60}
+              unoptimized
               style={{ maxHeight: '60px', maxWidth: '180px', objectFit: 'contain' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   CheckCircle, 
@@ -74,11 +74,7 @@ export default function ConciliacionWizard({
     }
   ]
 
-  useEffect(() => {
-    loadEstadisticas()
-  }, [conciliacionId])
-
-  const loadEstadisticas = async () => {
+  const loadEstadisticas = useCallback(async () => {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}/diferencias`,
@@ -94,7 +90,11 @@ export default function ConciliacionWizard({
     } catch (error) {
       console.error('Error loading estadisticas:', error)
     }
-  }
+  }, [API_BASE_URL, conciliacionId])
+
+  useEffect(() => {
+    loadEstadisticas()
+  }, [loadEstadisticas])
 
   const handleMatchAutomatico = async () => {
     setLoading(true)

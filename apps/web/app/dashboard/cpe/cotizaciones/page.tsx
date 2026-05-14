@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 import CotizacionModal from '@/components/modals/CotizacionModal'
@@ -77,36 +77,7 @@ export default function CotizacionesPage() {
     console.log('🔄 Estado del modal cambió a:', showCotizacionModal)
   }, [showCotizacionModal])
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      
-      // Cargar datos en paralelo
-      const [statsResponse, cotizacionesResponse, clientesResponse] = await Promise.all([
-        loadStats(),
-        loadCotizaciones(),
-        loadClientesTop()
-      ])
-      
-      console.log('📊 Datos cargados exitosamente')
-    } catch (error) {
-      console.error('❌ Error cargando datos:', error)
-      toast({
-        title: "Error",
-        description: "Error al cargar los datos de cotizaciones",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const response = await get('/api/cotizaciones/stats')
       if (response && response.success) {
@@ -120,9 +91,9 @@ export default function CotizacionesPage() {
       console.error('❌ Error cargando estadísticas:', error)
       return null
     }
-  }
+  }, [get])
 
-  const loadCotizaciones = async () => {
+  const loadCotizaciones = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (filters.estado) params.append('estado', filters.estado)
@@ -144,9 +115,9 @@ export default function CotizacionesPage() {
       setCotizaciones([])
       return null
     }
-  }
+  }, [filters, get])
 
-  const loadClientesTop = async () => {
+  const loadClientesTop = useCallback(async () => {
     try {
       const response = await get('/api/cotizaciones/clientes-top')
       if (response.success && Array.isArray(response.data)) {
@@ -162,7 +133,36 @@ export default function CotizacionesPage() {
       setClientesTop([])
       return null
     }
-  }
+  }, [get])
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      // Cargar datos en paralelo
+      const [statsResponse, cotizacionesResponse, clientesResponse] = await Promise.all([
+        loadStats(),
+        loadCotizaciones(),
+        loadClientesTop()
+      ])
+
+      console.log('📊 Datos cargados exitosamente')
+    } catch (error) {
+      console.error('❌ Error cargando datos:', error)
+      toast({
+        title: "Error",
+        description: "Error al cargar los datos de cotizaciones",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [loadClientesTop, loadCotizaciones, loadStats])
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Aplicar filtros
   const handleFilterChange = (field: string, value: string) => {
@@ -206,7 +206,7 @@ export default function CotizacionesPage() {
   const getStatusColor = (estado: string) => {
     // Normalizar el estado para manejo consistente
     const estadoNormalizado = estado?.toUpperCase().trim() || 'BORRADOR';
-    
+
     switch (estadoNormalizado) {
       case 'BORRADOR':
       case 'PENDIENTE': // Legacy - convertir a BORRADOR
@@ -273,8 +273,8 @@ export default function CotizacionesPage() {
       <div className="dashboard-header">
         <h1 className="dashboard-title">Gestión de Cotizaciones</h1>
         <p className="dashboard-subtitle">Administra tus cotizaciones y seguimiento comercial</p>
-        <button 
-          className="refresh-btn" 
+        <button
+          className="refresh-btn"
           onClick={loadData}
           style={{
             background: 'rgba(34, 197, 94, 0.2)',
@@ -285,7 +285,7 @@ export default function CotizacionesPage() {
         >
           🔄 Actualizar
         </button>
-        <button 
+        <button
           className="refresh-btn"
           onClick={(e) => {
             e.preventDefault()
@@ -348,21 +348,21 @@ export default function CotizacionesPage() {
       <div className="activity-section">
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 className="activity-title" style={{ marginBottom: '1rem' }}>Filtros de Búsqueda</h2>
-          
+
           {/* Filtros en grid responsive */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '1rem',
             marginBottom: '1rem'
           }}>
-            <select 
+            <select
               value={filters.estado}
               onChange={(e) => handleFilterChange('estado', e.target.value)}
-              style={{ 
-                padding: '0.75rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid #d1d5db', 
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
                 background: 'white',
                 color: '#374151',
                 fontSize: '0.875rem',
@@ -375,16 +375,16 @@ export default function CotizacionesPage() {
               <option value="VENCIDA">⏰ Vencida</option>
               <option value="CONVERTIDA">🎯 Convertida en venta</option>
             </select>
-            
+
             <input
               type="text"
               placeholder="Buscar por vendedor"
               value={filters.vendedor}
               onChange={(e) => handleFilterChange('vendedor', e.target.value)}
-              style={{ 
-                padding: '0.75rem 1rem', 
-                borderRadius: '8px', 
-                border: '1px solid #d1d5db', 
+              style={{
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
                 background: 'white',
                 color: '#374151',
                 fontSize: '0.875rem',
@@ -398,10 +398,10 @@ export default function CotizacionesPage() {
                 type="date"
                 value={filters.fecha_desde}
                 onChange={(e) => handleFilterChange('fecha_desde', e.target.value)}
-                style={{ 
-                  padding: '0.75rem 1rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid #d1d5db', 
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
                   background: 'white',
                   color: '#374151',
                   fontSize: '0.875rem',
@@ -416,10 +416,10 @@ export default function CotizacionesPage() {
                 type="date"
                 value={filters.fecha_hasta}
                 onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)}
-                style={{ 
-                  padding: '0.75rem 1rem', 
-                  borderRadius: '8px', 
-                  border: '1px solid #d1d5db', 
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #d1d5db',
                   background: 'white',
                   color: '#374151',
                   fontSize: '0.875rem',
@@ -431,8 +431,8 @@ export default function CotizacionesPage() {
 
           {/* Botones de acción */}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <button 
-              onClick={applyFilters} 
+            <button
+              onClick={applyFilters}
               className="refresh-btn"
               style={{
                 background: 'rgba(168, 85, 247, 0.2)',
@@ -444,8 +444,8 @@ export default function CotizacionesPage() {
             >
               🔍 Aplicar Filtros
             </button>
-            <button 
-              onClick={clearFilters} 
+            <button
+              onClick={clearFilters}
               className="refresh-btn"
               style={{
                 background: 'rgba(239, 68, 68, 0.2)',
@@ -465,7 +465,7 @@ export default function CotizacionesPage() {
       <div className="activity-section">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 className="activity-title">Cotizaciones Recientes</h2>
-          <button 
+          <button
             className="refresh-btn"
             onClick={loadData}
             style={{
@@ -482,9 +482,9 @@ export default function CotizacionesPage() {
         {/* Quotations Table */}
         <div className="activity-card">
           {cotizaciones.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '3rem', 
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
               color: '#e2e8f0',
               background: 'rgba(0,0,0,0.3)',
               borderRadius: '12px',
@@ -497,10 +497,10 @@ export default function CotizacionesPage() {
               <div style={{ color: '#94a3b8', marginBottom: '2rem' }}>
                 Comienza creando tu primera cotización para gestionar tus ventas
               </div>
-                             <button 
+                             <button
                  className="refresh-btn"
                  onClick={handleCrearCotizacion}
-                 style={{ 
+                 style={{
                    marginTop: '1rem',
                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                    color: 'white',
@@ -542,7 +542,7 @@ export default function CotizacionesPage() {
               </thead>
               <tbody>
                   {cotizaciones.map((cotizacion) => (
-                    <tr key={cotizacion.id} style={{ 
+                    <tr key={cotizacion.id} style={{
                       borderBottom: '1px solid rgba(255,255,255,0.1)',
                       backgroundColor: 'rgba(255,255,255,0.05)'
                     }}>
@@ -569,10 +569,10 @@ export default function CotizacionesPage() {
                         {formatCurrency(cotizacion.total)}
                       </td>
                       <td style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <div style={{ 
-                          width: '60px', 
-                          height: '20px', 
-                          borderRadius: '10px', 
+                        <div style={{
+                          width: '60px',
+                          height: '20px',
+                          borderRadius: '10px',
                           background: getProbabilityColor(cotizacion.probabilidad),
                           display: 'flex',
                           alignItems: 'center',
@@ -585,27 +585,27 @@ export default function CotizacionesPage() {
                         </div>
                       </td>
                       <td style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <span style={{ 
+                        <span style={{
                           ...getStatusColor(cotizacion.estado),
-                          padding: '0.25rem 0.75rem', 
+                          padding: '0.25rem 0.75rem',
                           borderRadius: '12px',
                           fontSize: '0.75rem',
                           fontWeight: '600'
                         }}>
                           {cotizacion.estado?.toUpperCase() === 'EN PROCESO' || cotizacion.estado?.toUpperCase() === 'PROCESO' || cotizacion.estado?.toUpperCase() === 'PENDIENTE'
-                            ? 'BORRADOR' 
+                            ? 'BORRADOR'
                             : (cotizacion.estado?.toUpperCase() || 'BORRADOR')}
                         </span>
                       </td>
                       <td style={{ padding: '1rem', backgroundColor: 'white' }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button 
+                          <button
                             onClick={() => handleVerCotizacion(cotizacion)}
-                            style={{ 
-                              background: '#3b82f6', 
-                              color: 'white', 
-                              border: 'none', 
-                              padding: '0.5rem 0.75rem', 
+                            style={{
+                              background: '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              padding: '0.5rem 0.75rem',
                               borderRadius: '6px',
                               fontSize: '0.75rem',
                               cursor: 'pointer',
@@ -617,7 +617,7 @@ export default function CotizacionesPage() {
                           >
                             👁️ Ver
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               // Generar y descargar PDF de la cotización
                               alert(`📄 DESCARGANDO PDF: ${cotizacion.numero}
@@ -629,15 +629,15 @@ export default function CotizacionesPage() {
 • Términos y condiciones incluidos
 
 ✨ Se abrirá automáticamente el PDF generado...`);
-                              
+
                               // Aquí iría la lógica para generar y descargar el PDF
                               console.log('📄 Generando PDF para cotización:', cotizacion.numero);
                             }}
-                                                        style={{ 
-                            background: '#dc2626', 
-                            color: 'white', 
-                            border: 'none', 
-                            padding: '0.5rem 0.75rem', 
+                                                        style={{
+                            background: '#dc2626',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.5rem 0.75rem',
                             borderRadius: '6px',
                             fontSize: '0.75rem',
                             cursor: 'pointer',
@@ -676,9 +676,9 @@ export default function CotizacionesPage() {
                       RUC: {cliente.ruc}
                     </div>
                 </div>
-                <div style={{ 
-                    width: '60px', 
-                    height: '60px', 
+                <div style={{
+                    width: '60px',
+                    height: '60px',
                   borderRadius: '50%',
                     background: `conic-gradient(${getConversionColor(cliente.conversion)} ${cliente.conversion}%, rgba(255,255,255,0.1) 0)`,
                   display: 'flex',
@@ -691,7 +691,7 @@ export default function CotizacionesPage() {
                     {cliente.conversion}%
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.875rem' }}>
                   <div>
                     <div style={{ color: '#64748b' }}>Cotizaciones</div>
@@ -702,7 +702,7 @@ export default function CotizacionesPage() {
                     <div style={{ color: '#22c55e', fontWeight: '600' }}>{formatCurrency(cliente.totalCotizado)}</div>
                   </div>
                 </div>
-                
+
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.875rem' }}>
                   <div style={{ color: '#64748b' }}>Última cotización</div>
                   <div style={{ color: '#f8fafc' }}>{formatDate(cliente.ultimaCotizacion)}</div>
@@ -714,10 +714,10 @@ export default function CotizacionesPage() {
       )}
 
     </div>
-    
+
     {/* Modal de Cotización - Fuera del contenedor */}
     {console.log('🚀 Rendering CotizacionModal with isOpen:', showCotizacionModal)}
-    <CotizacionModal 
+    <CotizacionModal
       isOpen={showCotizacionModal}
       onClose={() => {
         console.log('🚪 [MODAL CLOSE] Cerrando modal de cotización')
@@ -726,7 +726,7 @@ export default function CotizacionesPage() {
       onSuccess={handleCotizacionCreated}
     />
 
-    <CotizacionViewModal 
+    <CotizacionViewModal
       isOpen={showViewModal}
       onClose={() => {
         setShowViewModal(false)
@@ -738,4 +738,4 @@ export default function CotizacionesPage() {
     </>
   )
 }
- 
+

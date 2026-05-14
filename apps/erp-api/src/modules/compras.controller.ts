@@ -33,6 +33,7 @@ export class ComprasController {
   }
   
   @Get('stats')
+  @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de compras' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@Query() filtros: any) {
@@ -128,6 +129,7 @@ export class ComprasController {
   }
 
   @Get()
+  @RequirePermission('compras.ordenes.ver')
   async getOrdenes(@Query() filtros: any) {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: usar tenant del contexto.
@@ -171,6 +173,7 @@ export class ComprasController {
   }
 
   @Get('next-number')
+  @RequirePermission('compras.ordenes.crear')
   @ApiOperation({ summary: 'Obtener siguiente número de orden' })
   @ApiResponse({ status: 200, description: 'Número generado exitosamente' })
   async getNextNumber(@Query() filtros: any) {
@@ -216,6 +219,7 @@ export class ComprasController {
   }
 
   @Post()
+  @RequirePermission('compras.ordenes.crear')
   async crearOrden(@Body() ordenData: any) {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: tenant siempre proviene del contexto.
@@ -288,6 +292,7 @@ export class ComprasController {
   }
 
   @Put(':id/recibir')
+  @RequirePermission('compras.ordenes.actualizar')
   async recibirMercancia(@Param('id') ordenId: string, @Body() recepcionData: any) {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: tenant proviene del contexto.
@@ -299,7 +304,7 @@ export class ComprasController {
         .from('ordenes_compra')
         .select(`
           *,
-          orden_compra_detalles(*),
+          orden_compra_detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(*),
           proveedor:proveedores(*)
         `)
         .eq('tenant_id', tenantId) // ✅ Filtro de tenant
@@ -432,6 +437,7 @@ export class ComprasController {
   }
 
   @Put(':id/cancelar')
+  @RequirePermission('compras.ordenes.cancelar')
   async cancelarOrden(@Param('id') ordenId: string, @Body() motivoData: any) {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: tenant del contexto.
@@ -460,6 +466,7 @@ export class ComprasController {
   }
 
   @Get('proveedores')
+  @RequirePermission('compras.proveedores.ver')
   @ApiOperation({ summary: 'Obtener lista de proveedores' })
   @ApiResponse({ status: 200, description: 'Proveedores obtenidos exitosamente' })
   async getProveedores(@CurrentTenant() tenantId: string) {
@@ -523,6 +530,7 @@ export class ComprasController {
   }
 
   @Post('proveedores')
+  @RequirePermission('compras.proveedores.crear')
   @ApiOperation({ summary: 'Crear nuevo proveedor' })
   @ApiResponse({ status: 201, description: 'Proveedor creado exitosamente' })
   async crearProveedor(@Body() proveedorData: any) {
@@ -610,6 +618,7 @@ export class ComprasController {
   }
 
   @Put('proveedores/:id')
+  @RequirePermission('compras.proveedores.editar')
   @ApiOperation({ summary: 'Actualizar proveedor existente' })
   @ApiResponse({ status: 200, description: 'Proveedor actualizado exitosamente' })
   async actualizarProveedor(@Param('id') proveedorId: string, @Body() proveedorData: any) {
@@ -683,6 +692,7 @@ export class ComprasController {
   }
 
   @Delete('proveedores/:id')
+  @RequirePermission('compras.proveedores.eliminar')
   @ApiOperation({ summary: 'Desactivar proveedor (soft delete)' })
   @ApiResponse({ status: 200, description: 'Proveedor desactivado exitosamente' })
   async desactivarProveedor(@Param('id') proveedorId: string, @Body() data: any = {}) {
@@ -723,6 +733,7 @@ export class ComprasController {
   }
 
   @Get('reporte-compras')
+  @RequirePermission('compras.ordenes.ver')
   async getReporteCompras(@Query() filtros: any) {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: reporte limitado al tenant actual.
@@ -731,7 +742,7 @@ export class ComprasController {
         .select(`
           *,
           proveedor:proveedores(*),
-          orden_compra_detalles(*)
+          orden_compra_detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(*)
         `)
         .eq('tenant_id', tenantId)
         .order('fecha_orden', { ascending: false });
@@ -800,6 +811,7 @@ export class ComprasController {
   }
 
   @Get('productos')
+  @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ summary: 'Obtener lista de productos para compras' })
   @ApiResponse({ status: 200, description: 'Productos obtenidos exitosamente' })
   async getProductos() {
@@ -844,6 +856,7 @@ export class ComprasController {
 
   // IMPORTANTE: Este endpoint debe ir AL FINAL porque captura cualquier ID
   @Get(':id')
+  @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ summary: 'Obtener orden específica por ID' })
   @ApiResponse({ status: 200, description: 'Orden obtenida exitosamente' })
   async getOrden(@Param('id') ordenId: string) {
@@ -853,7 +866,7 @@ export class ComprasController {
         .select(`
           *,
           proveedor:proveedores(*),
-          orden_compra_detalles(*)
+          orden_compra_detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(*)
         `)
         .eq('id', ordenId)
         .single();

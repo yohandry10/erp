@@ -238,6 +238,12 @@ EXECUTE FUNCTION app.normalize_pii_encryption_log_row();
 -- ----------------------------------------------------------------------------
 -- Migracion de estado a citext + defaults canonicos.
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v_secrets_rotation_status;
+
+DROP TRIGGER IF EXISTS trg_normalize_secret_rotation_state_row ON public.secret_rotation_state;
+DROP TRIGGER IF EXISTS trg_normalize_system_alerts_row ON public.system_alerts;
+DROP TRIGGER IF EXISTS trg_normalize_pii_encryption_log_row ON public.pii_encryption_log;
+
 ALTER TABLE public.secret_rotation_state
   ALTER COLUMN estado TYPE citext
   USING app.normalize_security_secrets_estado_287('secret_rotation_state', estado::text, true, NULL),
@@ -289,5 +295,37 @@ ON public.system_alerts (tenant_id, estado, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_pii_encryption_log_tenant_estado_ci_runtime_287
 ON public.pii_encryption_log (tenant_id, estado, created_at DESC);
+
+CREATE TRIGGER trg_normalize_secret_rotation_state_row
+BEFORE INSERT OR UPDATE ON public.secret_rotation_state
+FOR EACH ROW
+EXECUTE FUNCTION app.normalize_secret_rotation_state_row();
+
+CREATE TRIGGER trg_normalize_system_alerts_row
+BEFORE INSERT OR UPDATE ON public.system_alerts
+FOR EACH ROW
+EXECUTE FUNCTION app.normalize_system_alerts_row();
+
+CREATE TRIGGER trg_normalize_pii_encryption_log_row
+BEFORE INSERT OR UPDATE ON public.pii_encryption_log
+FOR EACH ROW
+EXECUTE FUNCTION app.normalize_pii_encryption_log_row();
+
+CREATE OR REPLACE VIEW public.v_secrets_rotation_status AS
+SELECT
+  s.id,
+  s.tenant_id,
+  s.secret_key,
+  s.current_secret_hash,
+  s.previous_secret_hash,
+  s.rotated_at,
+  s.grace_period_hours,
+  s.next_rotation_due_at,
+  s.source_module,
+  s.rotation_reason,
+  s.estado::text AS estado,
+  s.created_at,
+  s.updated_at
+FROM public.secret_rotation_state s;
 
 COMMIT;

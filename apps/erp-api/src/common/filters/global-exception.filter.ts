@@ -51,6 +51,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       message = exception.message;
       error = exception.name;
+
+      const normalizedMessage = message.toLowerCase();
+      if (normalizedMessage.includes('duplicate key value') || normalizedMessage.includes('unique constraint')) {
+        statusCode = HttpStatus.CONFLICT;
+        error = 'CONFLICT';
+      } else if (
+        normalizedMessage.includes('foreign key constraint') ||
+        normalizedMessage.includes('violates check constraint') ||
+        normalizedMessage.includes('invalid input syntax')
+      ) {
+        statusCode = HttpStatus.BAD_REQUEST;
+        error = 'BAD_REQUEST';
+      }
     }
 
     // Build error response

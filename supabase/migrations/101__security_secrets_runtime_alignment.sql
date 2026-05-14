@@ -207,6 +207,8 @@ ON public.pii_encryption_log (tenant_id, success, created_at DESC);
 -- ----------------------------------------------------------------------------
 -- Vista operativa de rotación de secretos.
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v_secrets_rotation_status;
+
 CREATE OR REPLACE VIEW public.v_secrets_rotation_status AS
 SELECT
   s.id,

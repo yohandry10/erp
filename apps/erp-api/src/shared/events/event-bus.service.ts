@@ -29,6 +29,7 @@ export interface VentaProcessedEvent {
     total: number;
   }>;
   cpeId?: string;
+  inventarioAplicado?: boolean;
 }
 
 export interface ComprobanteCreadoEvent {
@@ -80,6 +81,7 @@ export interface CompraEntregadaEvent {
   condicionesPago?: string | null;
   almacenId?: string | null;
   observaciones?: string | null;
+  inventarioAplicado?: boolean;
   items: Array<{
     productoId: string;
     descripcion?: string;

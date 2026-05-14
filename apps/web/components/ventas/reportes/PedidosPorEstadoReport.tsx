@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart3 } from 'lucide-react'
@@ -57,17 +57,13 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
   const [data, setData] = useState<PedidoPorEstado[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/pedidos-por-estado', {
         params: filters
       })
-      
+
       if (response?.success) {
         setData(response.data || [])
       }
@@ -81,7 +77,11 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const totalPedidos = data.reduce((sum, item) => sum + item.cantidad, 0)
   const totalMonto = data.reduce((sum, item) => sum + item.total, 0)

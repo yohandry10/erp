@@ -261,6 +261,40 @@ describe('PresupuestosService', () => {
     });
   });
 
+  describe('obtenerComparacionPresupuestoVsReal', () => {
+    const tenantId = '55555555-5555-5555-5555-555555555555';
+    const periodoId = 'periodo-123';
+
+    it('debe consultar presupuestos sin order embebido invalido y retornar shape completo sin datos', async () => {
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: { id: periodoId, anio: 2026, mes: 5, estado: 'ABIERTO' },
+        error: null,
+      });
+      mockSupabaseClient.order.mockResolvedValueOnce({ data: [], error: null });
+
+      const comparacion = await service.obtenerComparacionPresupuestoVsReal(tenantId, periodoId);
+
+      expect(mockSupabaseClient.order).toHaveBeenCalledWith('centro_costo_id', { ascending: true });
+      expect(mockSupabaseClient.order).not.toHaveBeenCalledWith('plan_cuentas.codigo', expect.anything());
+      expect(comparacion.resumen_global).toEqual({
+        total_presupuestado: 0,
+        total_ejecutado: 0,
+        total_comprometido: 0,
+        total_disponible: 0,
+        total_variacion: 0,
+        porcentaje_ejecucion: 0,
+        variacion_porcentaje: 0,
+        total_centros: 0,
+        total_cuentas: 0,
+        alertas: {
+          sobregiros: 0,
+          advertencias: 0,
+          normales: 0,
+        },
+      });
+    });
+  });
+
   describe('obtenerResumenAlertas', () => {
     const tenantId = '55555555-5555-5555-5555-555555555555';
     const periodoId = 'periodo-123';

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
@@ -104,32 +104,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     modalidad_trabajo_preferida: 'presencial'
   })
 
-  useEffect(() => {
-    console.log('🚀 CandidatoModal - isOpen:', isOpen, 'candidato:', candidato)
-    
-    if (isOpen) {
-      if (vacantesProps) {
-        setVacantes(vacantesProps)
-      } else {
-        loadVacantes()
-      }
-      
-      if (candidato) {
-        setFormData(candidato)
-      } else {
-        resetForm()
-      }
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, candidato, vacantesProps])
-
-  const loadVacantes = async () => {
+  const loadVacantes = useCallback(async () => {
     try {
       const response = await get('/api/rrhh/vacantes')
       if (response?.success) {
@@ -139,7 +114,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     } catch (error) {
       console.error('Error cargando vacantes:', error)
     }
-  }
+  }, [get])
 
 
 
@@ -173,6 +148,31 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
     })
     setCurrentStep(1)
   }
+
+  useEffect(() => {
+    console.log('🚀 CandidatoModal - isOpen:', isOpen, 'candidato:', candidato)
+
+    if (isOpen) {
+      if (vacantesProps) {
+        setVacantes(vacantesProps)
+      } else {
+        loadVacantes()
+      }
+
+      if (candidato) {
+        setFormData(candidato)
+      } else {
+        resetForm()
+      }
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [candidato, isOpen, loadVacantes, vacantesProps])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))

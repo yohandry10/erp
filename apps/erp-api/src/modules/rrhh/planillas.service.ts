@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -36,9 +36,38 @@ export class PlanillasService {
   // Crear nueva planilla
   // ✅ FIX: Agregar soporte multi-tenant
   async crearPlanilla(planillaData: any, tenantId?: string) {
+    const periodo = String(planillaData?.periodo || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(periodo)) {
+      throw new BadRequestException('Debe enviar periodo de planilla en formato YYYY-MM');
+    }
+
+    const camposPermitidos = [
+      'id',
+      'periodo',
+      'estado',
+      'estado_pago',
+      'total_ingresos',
+      'total_descuentos',
+      'total_aportes',
+      'total_neto',
+      'total_pagado',
+      'fecha_pago',
+      'metodo_pago',
+      'asientos_generados',
+      'fecha_asientos',
+      'centro_costo_id',
+      'observaciones',
+      'metadata',
+    ];
+    const datosLimpios = Object.fromEntries(
+      Object.entries({ ...planillaData, periodo })
+        .filter(([key]) => camposPermitidos.includes(key))
+        .filter(([, value]) => value !== '' && value !== undefined && value !== null)
+    );
+
     const dataToInsert = tenantId 
-      ? { ...planillaData, tenant_id: tenantId }
-      : planillaData;
+      ? { ...datosLimpios, tenant_id: tenantId }
+      : datosLimpios;
       
     const { data, error } = await this.supabaseService.getClient()
       .from('planillas')
@@ -968,7 +997,7 @@ export class PlanillasService {
   /**
    * Pagar empleados seleccionados de una planilla
    */
-  async pagarEmpleadosSeleccionados(planillaId: string, pagoData: any) {
+  async pagarEmpleadosSeleccionados(planillaId: string, pagoData: any, tenantId?: string) {
     try {
       console.log(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId}`);
 
@@ -978,20 +1007,49 @@ export class PlanillasService {
         throw new Error('Debe seleccionar al menos un empleado');
       }
 
-      // Obtener detalles de empleados planilla
-      const { data: empleadosPlanilla, error } = await this.supabaseService.getClient()
+      let planillaInfoQuery = this.supabaseService.getClient()
+        .from('planillas')
+        .select('periodo, tenant_id')
+        .eq('id', planillaId);
+
+      if (tenantId) {
+        planillaInfoQuery = planillaInfoQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: planillaInfo, error: planillaInfoError } = await planillaInfoQuery.single();
+      if (planillaInfoError || !planillaInfo) {
+        throw new Error('Planilla no encontrada para el tenant');
+      }
+
+      const tenantIdPlanilla = tenantId || planillaInfo.tenant_id;
+
+      let empleadosPlanillaQuery = this.supabaseService.getClient()
         .from('empleado_planilla')
-        .select(`
-          *,
-          empleados!empleado_planilla_id_empleado_fkey(nombres, apellidos, numero_documento)
-        `)
+        .select('*')
         .in('id', empleados_ids)
         .eq('id_planilla', planillaId);
 
+      if (tenantIdPlanilla) {
+        empleadosPlanillaQuery = empleadosPlanillaQuery.eq('tenant_id', tenantIdPlanilla);
+      }
+
+      const { data: empleadosPlanilla, error } = await empleadosPlanillaQuery;
+
       if (error) throw error;
+      if (!empleadosPlanilla || empleadosPlanilla.length === 0) {
+        throw new Error('No se encontraron empleados de planilla para pagar');
+      }
 
       let totalPagado = 0;
       const empleadosPagados = [];
+      const numeroOperacionNormalizado =
+        numero_operacion && /^\d+$/.test(String(numero_operacion))
+          ? Number(numero_operacion)
+          : null;
+      const observacionesPago = [
+        observaciones || null,
+        numero_operacion && !numeroOperacionNormalizado ? `Operacion: ${numero_operacion}` : null,
+      ].filter(Boolean).join(' | ') || null;
 
       // Procesar cada empleado
       for (const empleadoPlanilla of empleadosPlanilla) {
@@ -1001,10 +1059,11 @@ export class PlanillasService {
             estado_pago: 'pagado',
             fecha_pago: new Date().toISOString(),
             metodo_pago: metodo_pago,
-            numero_operacion: numero_operacion || null,
-            observaciones_pago: observaciones || null
+            numero_operacion: numeroOperacionNormalizado,
+            observaciones_pago: observacionesPago
           })
-          .eq('id', empleadoPlanilla.id);
+          .eq('id', empleadoPlanilla.id)
+          .eq('id_planilla', planillaId);
 
         if (updateError) {
           console.error('Error actualizando empleado planilla:', updateError);
@@ -1035,20 +1094,14 @@ export class PlanillasService {
       // 🎯 SINCRONIZAR CON TABLA RRHH_PAGOS para que aparezca en "Pagos & Comprobantes"
       const fechaPago = new Date().toISOString();
 
-      // Obtener el período de la planilla para usar como referencia
-      const { data: planillaInfo } = await this.supabaseService.getClient()
-        .from('planillas')
-        .select('periodo')
-        .eq('id', planillaId)
-        .single();
-
       const periodoDisplay = planillaInfo?.periodo || new Date().toISOString().substring(0, 7);
 
       console.log(`🔄 [RRHH] Sincronizando ${empleadosPagados.length} pagos con tabla rrhh_pagos...`);
 
       for (const empleadoPlanilla of empleadosPagados) {
-        console.log(`📝 [RRHH] Insertando pago para empleado ${empleadoPlanilla.id_empleado}:`, {
-          empleado_id: empleadoPlanilla.id_empleado,
+        const empleadoId = empleadoPlanilla.id_empleado || empleadoPlanilla.empleado_id;
+        console.log(`📝 [RRHH] Insertando pago para empleado ${empleadoId}:`, {
+          empleado_id: empleadoId,
           planilla_id: planillaId,
           periodo: periodoDisplay,
           monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
@@ -1060,23 +1113,24 @@ export class PlanillasService {
         const { error: rrhhPagoError } = await this.supabaseService.getClient()
           .from('rrhh_pagos')
           .insert({
-            empleado_id: empleadoPlanilla.id_empleado,
+            tenant_id: tenantIdPlanilla,
+            empleado_id: empleadoId,
             planilla_id: planillaId,
             periodo: periodoDisplay, // Usar el período real de la planilla
             monto_bruto: parseFloat(empleadoPlanilla.total_ingresos) || 0,
             descuentos: parseFloat(empleadoPlanilla.total_descuentos) || 0,
             monto_neto: parseFloat(empleadoPlanilla.neto_pagar) || 0,
-            metodo_pago: metodo_pago,
-            estado: 'PROCESADO',
-            fecha_pago: fechaPago,
-            usuario_id: 'sistema'
-          });
+          metodo_pago: metodo_pago,
+          estado: 'PROCESADO',
+          fecha_pago: fechaPago,
+          usuario_id: 'sistema'
+        });
 
         if (rrhhPagoError) {
-          console.warn('⚠️ Error sincronizando con rrhh_pagos:', rrhhPagoError);
-          console.warn('⚠️ Detalles del error:', JSON.stringify(rrhhPagoError, null, 2));
+          console.error('❌ Error sincronizando con rrhh_pagos:', rrhhPagoError);
+          throw new Error(`No se pudo registrar pago RRHH: ${rrhhPagoError.message}`);
         } else {
-          console.log(`✅ Pago sincronizado para empleado ${empleadoPlanilla.id_empleado}`);
+          console.log(`✅ Pago sincronizado para empleado ${empleadoId}`);
         }
       }
 
@@ -1085,7 +1139,7 @@ export class PlanillasService {
       // 🎯 GENERAR ASIENTOS CONTABLES AUTOMÁTICAMENTE
       try {
         console.log('📊 [RRHH] Generando asientos contables automáticamente...');
-        await this.generarAsientosContables(planillaId);
+        await this.generarAsientosContables(planillaId, planillaInfo?.tenant_id);
         console.log('✅ [RRHH] Asientos contables generados automáticamente');
       } catch (asientosError) {
         console.warn('⚠️ [RRHH] Error generando asientos automáticos (no crítico):', asientosError);
@@ -1111,45 +1165,116 @@ export class PlanillasService {
   /**
    * Obtener UUID de cuenta por código
    */
-  private async getCuentaIdPorCodigo(codigo: string): Promise<string | null> {
+  private async getCuentaIdPorCodigo(codigo: string, tenantId: string): Promise<string> {
     try {
       const { data, error } = await this.supabaseService.getClient()
         .from('plan_cuentas')
         .select('id')
+        .eq('tenant_id', tenantId)
         .eq('codigo', codigo)
-        .single();
+        .eq('activo', true)
+        .maybeSingle();
 
       if (error || !data) {
-        console.warn(`⚠️ No se encontró cuenta con código ${codigo}, usando código como ID`);
-        return codigo; // Fallback al código si no existe la cuenta
+        throw new Error(`Cuenta contable ${codigo} no encontrada para el tenant`);
       }
 
       return data.id;
     } catch (error) {
-      console.warn(`⚠️ Error buscando cuenta ${codigo}:`, error);
-      return codigo; // Fallback al código si hay error
+      console.error(`❌ Error buscando cuenta ${codigo}:`, error);
+      throw error;
     }
+  }
+
+  private async getSiguienteNumeroAsiento(tenantId: string): Promise<number> {
+    const { data, error } = await this.supabaseService.getClient()
+      .from('asientos_contables')
+      .select('numero_asiento')
+      .eq('tenant_id', tenantId)
+      .order('numero_asiento', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`No se pudo obtener el correlativo contable: ${error.message}`);
+    }
+
+    const ultimoNumero = Number(data?.numero_asiento ?? 0);
+    return Number.isFinite(ultimoNumero) ? ultimoNumero + 1 : 1;
   }
 
   /**
    * Generar asientos contables para planilla
    */
-  async generarAsientosContables(planillaId: string) {
+  async generarAsientosContables(planillaId: string, tenantId?: string) {
     try {
       console.log(`📊 [RRHH] Generando asientos contables para planilla ${planillaId}`);
 
       // Obtener planilla con empleados
-      const { data: planilla, error } = await this.supabaseService.getClient()
+      let planillaQuery = this.supabaseService.getClient()
         .from('planillas')
         .select(`
           *,
           empleado_planilla(*)
         `)
-        .eq('id', planillaId)
-        .single();
+        .eq('id', planillaId);
+
+      if (tenantId) {
+        planillaQuery = planillaQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: planilla, error } = await planillaQuery.single();
 
       if (error || !planilla) {
         throw new Error('Planilla no encontrada');
+      }
+
+      const tenantIdPlanilla = tenantId || planilla.tenant_id;
+      if (!tenantIdPlanilla) {
+        throw new Error('La planilla no tiene tenant_id; no se puede generar asiento contable');
+      }
+
+      const referenciaPlanilla = `PLANILLA-${planillaId}`;
+      const sourceEventId = planillaId;
+      const fechaAsiento = this.getFechaAsientoPlanilla(planilla.periodo);
+      await this.validarPeriodoContableAbierto(tenantIdPlanilla, fechaAsiento);
+
+      const { data: asientoExistente, error: asientoExistenteError } = await this.supabaseService.getClient()
+        .from('asientos_contables')
+        .select('id, numero_asiento, codigo, referencia, total_debe, total_haber')
+        .eq('tenant_id', tenantIdPlanilla)
+        .or(`referencia.eq.${referenciaPlanilla},source_event_id.eq.${sourceEventId}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (asientoExistenteError) {
+        throw new Error(`Error validando asiento existente de planilla: ${asientoExistenteError.message}`);
+      }
+
+      if (asientoExistente?.id) {
+        await this.supabaseService.getClient()
+          .from('planillas')
+          .update({
+            asientos_generados: true,
+            fecha_asientos: new Date().toISOString(),
+          })
+          .eq('id', planillaId)
+          .eq('tenant_id', tenantIdPlanilla);
+
+        return {
+          success: true,
+          message: 'La planilla ya tenía asiento contable generado; se retorna el asiento existente',
+          data: {
+            numero_asiento: asientoExistente.numero_asiento,
+            codigo_asiento: asientoExistente.codigo,
+            asiento_id: asientoExistente.id,
+            registros: 0,
+            monto_total: Number(asientoExistente.total_debe ?? 0),
+            planilla_periodo: planilla.periodo,
+            existente: true,
+            tablas_utilizadas: ['asientos_contables', 'detalle_asientos']
+          }
+        };
       }
 
       // ✅ FIX: Normalizar comparación de estados (case-insensitive)
@@ -1196,7 +1321,14 @@ export class PlanillasService {
           },
         });
 
-        await this.supabaseService.getClient().from('outbox_events').insert(outboxEvent);
+        const { error: outboxError } = await this.supabaseService.getClient()
+          .from('outbox_events')
+          .insert(outboxEvent);
+
+        if (outboxError) {
+          throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
+        }
+
         await this.supabaseService.getClient()
           .from('planillas')
           .update({
@@ -1220,9 +1352,9 @@ export class PlanillasService {
       console.log('📝 [RRHH] Creando asientos contables en sistema principal...');
 
       // 1. Obtener IDs reales de las cuentas del plan contable
-      const cuentaGastos = await this.getCuentaIdPorCodigo('621');
-      const cuentaRemuneraciones = await this.getCuentaIdPorCodigo('411');
-      const cuentaInstituciones = await this.getCuentaIdPorCodigo('403');
+      const cuentaGastos = await this.getCuentaIdPorCodigo('621', tenantIdPlanilla);
+      const cuentaRemuneraciones = await this.getCuentaIdPorCodigo('411', tenantIdPlanilla);
+      const cuentaInstituciones = await this.getCuentaIdPorCodigo('403', tenantIdPlanilla);
 
       console.log(`🔍 [RRHH] IDs de cuentas obtenidos:`);
       console.log(`   - Gastos (621): ${cuentaGastos}`);
@@ -1230,21 +1362,26 @@ export class PlanillasService {
       console.log(`   - Instituciones (403): ${cuentaInstituciones}`);
 
       // 2. Crear cabecera del asiento en tabla principal
-      const numeroAsiento = `RRHH-${planilla.periodo}-${Date.now()}`;
-      const fechaAsiento = new Date().toISOString().split('T')[0]; // Solo fecha, no timestamp
+      const numeroAsiento = await this.getSiguienteNumeroAsiento(tenantIdPlanilla);
+      const codigoAsiento = `RRHH-${planilla.periodo}-${numeroAsiento.toString().padStart(6, '0')}`;
 
-      console.log(`📊 [RRHH] Creando cabecera del asiento: ${numeroAsiento}`);
+      console.log(`📊 [RRHH] Creando cabecera del asiento: ${codigoAsiento}`);
 
       const { data: asientoCreado, error: asientoError } = await this.supabaseService.getClient()
         .from('asientos_contables')
         .insert({
+          tenant_id: tenantIdPlanilla,
+          codigo: codigoAsiento,
           numero_asiento: numeroAsiento,
           fecha: fechaAsiento,
+          tipo_asiento: 'PLANILLA',
+          origen: 'RRHH',
           concepto: `Planilla de sueldos ${planilla.periodo}`,
-          referencia: `PLANILLA-${planillaId}`,
+          referencia: referenciaPlanilla,
           total_debe: totalIngresos,
           total_haber: totalIngresos,
           estado: 'CONFIRMADO',
+          source_event_id: sourceEventId,
           usuario_id: null
         })
         .select()
@@ -1260,25 +1397,31 @@ export class PlanillasService {
       // 3. Crear detalles del asiento
       const detallesAsiento = [
         {
+          tenant_id: tenantIdPlanilla,
           asiento_id: asientoCreado.id,
           cuenta_id: cuentaGastos,
           debe: totalIngresos,
           haber: 0,
-          concepto: `Gasto planilla ${planilla.periodo}`
+          fecha: fechaAsiento,
+          nombre: `Gasto planilla ${planilla.periodo}`
         },
         {
+          tenant_id: tenantIdPlanilla,
           asiento_id: asientoCreado.id,
           cuenta_id: cuentaRemuneraciones,
           debe: 0,
           haber: totalNeto,
-          concepto: `Remuneraciones por pagar ${planilla.periodo}`
+          fecha: fechaAsiento,
+          nombre: `Remuneraciones por pagar ${planilla.periodo}`
         },
         {
+          tenant_id: tenantIdPlanilla,
           asiento_id: asientoCreado.id,
           cuenta_id: cuentaInstituciones,
           debe: 0,
           haber: totalDescuentos,
-          concepto: `Aportes planilla ${planilla.periodo}`
+          fecha: fechaAsiento,
+          nombre: `Aportes planilla ${planilla.periodo}`
         }
       ];
 
@@ -1309,7 +1452,8 @@ export class PlanillasService {
             asientos_generados: true,
             fecha_asientos: new Date().toISOString()
           })
-          .eq('id', planillaId);
+          .eq('id', planillaId)
+          .eq('tenant_id', tenantIdPlanilla);
         console.log('✅ Planilla marcada con asientos generados');
       } catch (updateError) {
         console.warn('⚠️ Error actualizando flag de asientos:', updateError);
@@ -1320,6 +1464,7 @@ export class PlanillasService {
         message: 'Asientos contables generados correctamente en sistema principal',
         data: {
           numero_asiento: numeroAsiento,
+          codigo_asiento: codigoAsiento,
           asiento_id: asientoCreado.id,
           registros: detallesAsiento.length,
           monto_total: totalIngresos,
@@ -1360,4 +1505,38 @@ export class PlanillasService {
       return { success: true, data: [] };
     }
   }
-} 
+
+  private getFechaAsientoPlanilla(periodo: string): string {
+    if (/^\d{4}-\d{2}$/.test(periodo || '')) {
+      return `${periodo}-01`;
+    }
+
+    return new Date().toISOString().split('T')[0];
+  }
+
+  private async validarPeriodoContableAbierto(tenantId: string, fechaAsiento: string): Promise<void> {
+    const fecha = new Date(`${fechaAsiento}T00:00:00.000Z`);
+    const anio = fecha.getUTCFullYear();
+    const mes = fecha.getUTCMonth() + 1;
+
+    const { data: periodo, error } = await this.supabaseService.getClient()
+      .from('periodos_contables')
+      .select('estado')
+      .eq('tenant_id', tenantId)
+      .eq('anio', anio)
+      .eq('mes', mes)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Error validando período contable de planilla: ${error.message}`);
+    }
+
+    const estado = String(periodo?.estado || 'ABIERTO').toUpperCase();
+    if (estado === 'CERRADO' || estado === 'BLOQUEADO') {
+      throw new Error(
+        `El período contable ${anio}-${String(mes).padStart(2, '0')} está ${estado}. ` +
+        'No se pueden generar asientos de planilla en períodos cerrados o bloqueados.'
+      );
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService } from '../../shared/events/event-bus.service';
 
@@ -24,11 +24,11 @@ export class RrhhService {
       .from('empleados')
       .select(`
         *,
-        departamentos(nombre),
-        contratos(*),
-        empleado_horarios(
+        departamentos!empleados_id_departamento_fkey_runtime(nombre),
+        contratos!contratos_id_empleado_fkey_runtime(*),
+        empleado_horarios!empleado_horarios_id_empleado_fkey(
           id,
-          horarios_trabajo(*)
+          horarios_trabajo!empleado_horarios_id_horario_fkey(*)
         )
       `)
       .eq('tenant_id', currentTenantId); // ✅ Filtro de tenant
@@ -68,6 +68,69 @@ export class RrhhService {
     'contacto_emergencia', 'telefono_emergencia', 'foto_url',
   ];
 
+  private limpiarEmpleadoData(empleadoData: any) {
+    return Object.fromEntries(
+      Object.entries(empleadoData || {})
+        .filter(([key]) => this.CAMPOS_EMPLEADO_PERMITIDOS.includes(key))
+        .map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])
+        .filter(([, value]) => value !== '' && value !== undefined && value !== null)
+    );
+  }
+
+  private validarEmpleadoData(datos: Record<string, any>, partial = false) {
+    const requeridos = ['nombres', 'apellidos', 'numero_documento'];
+    if (!partial) {
+      const faltantes = requeridos.filter((campo) => !datos[campo]);
+      if (faltantes.length > 0) {
+        throw new BadRequestException(`Campos requeridos faltantes: ${faltantes.join(', ')}`);
+      }
+    }
+
+    if (datos.tipo_documento && !['DNI', 'CE', 'Pasaporte'].includes(datos.tipo_documento)) {
+      throw new BadRequestException('Tipo de documento inválido');
+    }
+
+    if (datos.tipo_documento === 'DNI' && datos.numero_documento && !/^\d{8}$/.test(String(datos.numero_documento))) {
+      throw new BadRequestException('El DNI debe tener 8 dígitos');
+    }
+
+    if (datos.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(datos.email))) {
+      throw new BadRequestException('Email inválido');
+    }
+
+    if (datos.cantidad_hijos !== undefined && Number(datos.cantidad_hijos) < 0) {
+      throw new BadRequestException('La cantidad de hijos no puede ser negativa');
+    }
+  }
+
+  private async validarDocumentoUnico(tenantId: string, numeroDocumento: string, empleadoId?: string) {
+    let query = this.supabaseService
+      .getClient()
+      .from('empleados')
+      .select('id, estado')
+      .eq('tenant_id', tenantId)
+      .eq('numero_documento', numeroDocumento)
+      .limit(1);
+
+    if (empleadoId) {
+      query = query.neq('id', empleadoId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    if ((data || []).length > 0) {
+      throw new ConflictException('Ya existe un empleado con el mismo documento de identidad');
+    }
+  }
+
+  private estadoActivoPatch(estado: unknown) {
+    if (typeof estado !== 'string') return {};
+    const normalizado = estado.trim().toLowerCase();
+    if (normalizado === 'activo') return { estado: 'activo', activo: true };
+    if (normalizado === 'inactivo') return { estado: 'inactivo', activo: false };
+    throw new BadRequestException('Estado de empleado inválido');
+  }
+
   async createEmpleado(empleadoData: any, tenantId?: string) {
     // ✅ MULTI-TENANT: Agregar tenant_id al crear
     if (!tenantId) {
@@ -75,23 +138,17 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    // ✅ FIX: Filtrar solo campos permitidos para prevenir inyección
-    const datosLimpios = Object.fromEntries(
-      Object.entries(empleadoData).filter(([key]) => 
-        this.CAMPOS_EMPLEADO_PERMITIDOS.includes(key)
-      )
-    );
-
-    // Validar campos requeridos
-    if (!datosLimpios.nombres || !datosLimpios.apellidos) {
-      throw new Error('Nombres y apellidos son requeridos');
-    }
+    const datosLimpios = this.limpiarEmpleadoData(empleadoData);
+    this.validarEmpleadoData(datosLimpios);
+    await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento));
 
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empleados')
       .insert({
         ...datosLimpios,
+        tipo_documento: datosLimpios.tipo_documento || 'DNI',
+        ...this.estadoActivoPatch(datosLimpios.estado || 'activo'),
         tenant_id: currentTenantId, // ✅ Incluir tenant
       })
       .select();
@@ -107,23 +164,28 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    // ✅ FIX: Filtrar solo campos permitidos para prevenir inyección
-    const datosLimpios = Object.fromEntries(
-      Object.entries(empleadoData).filter(([key]) => 
-        this.CAMPOS_EMPLEADO_PERMITIDOS.includes(key)
-      )
-    );
+    const datosLimpios = this.limpiarEmpleadoData(empleadoData);
+    this.validarEmpleadoData(datosLimpios, true);
+    if (datosLimpios.numero_documento) {
+      await this.validarDocumentoUnico(currentTenantId, String(datosLimpios.numero_documento), id);
+    }
 
     const { data, error } = await this.supabaseService
       .getClient()
       .from('empleados')
-      .update(datosLimpios)
+      .update({
+        ...datosLimpios,
+        ...this.estadoActivoPatch(datosLimpios.estado),
+      })
       .eq('id', id)
       .eq('tenant_id', currentTenantId) // ✅ Validar tenant
       .select();
 
     if (error) throw error;
-    return data?.[0];
+    if (!data?.[0]) {
+      throw new NotFoundException('Empleado no encontrado');
+    }
+    return data[0];
   }
 
   async deleteEmpleado(id: string, tenantId?: string) {
@@ -133,15 +195,20 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
-    const { error } = await this.supabaseService
+    const { data, error } = await this.supabaseService
       .getClient()
       .from('empleados')
-      .delete()
+      .update({ estado: 'inactivo', activo: false })
       .eq('id', id)
-      .eq('tenant_id', currentTenantId); // ✅ Validar tenant
+      .eq('tenant_id', currentTenantId)
+      .select('id, estado')
+      .single();
 
     if (error) throw error;
-    return { success: true, message: 'Empleado eliminado exitosamente' };
+    if (!data?.id) {
+      throw new NotFoundException('Empleado no encontrado');
+    }
+    return { success: true, message: 'Empleado inactivado exitosamente', data };
   }
 
   async createDepartamento(departamentoData: any, tenantId?: string) {
@@ -173,7 +240,7 @@ export class RrhhService {
       .select(`
         *,
         departamentos(nombre),
-        candidatos(count)
+        candidatos!candidatos_id_vacante_fkey(count)
       `)
       .eq('tenant_id', currentTenantId)
       .order('created_at', { ascending: false });
@@ -209,7 +276,7 @@ export class RrhhService {
       .from('candidatos')
       .select(`
         *,
-        vacantes(titulo, puesto_solicitado)
+        vacantes!candidatos_id_vacante_fkey(titulo, puesto_solicitado)
       `)
       .eq('tenant_id', currentTenantId)
       .order('fecha_postulacion', { ascending: false });

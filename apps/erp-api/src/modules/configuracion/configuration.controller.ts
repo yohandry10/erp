@@ -11,10 +11,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ConfigurationService, TOTAL_WIZARD_STEPS } from './configuration.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { User } from '../auth/user.interface';
+import { AuditService } from '../audit/audit.service';
 import {
   SaveWizardStepDto,
   UpdateGREThresholdsDto,
@@ -24,7 +27,8 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 @ApiTags('configuration')
 @Controller('configuration')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('configuracion.read')
 @ApiBearerAuth()
 export class ConfigurationController {
   private readonly logger = new Logger(ConfigurationController.name);
@@ -32,6 +36,7 @@ export class ConfigurationController {
   constructor(
     private readonly configurationService: ConfigurationService,
     private readonly supabaseService: SupabaseService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -86,6 +91,7 @@ export class ConfigurationController {
    * Validate certificate payload before saving wizard progress
    */
   @Post('wizard/validate-certificate')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Validate wizard certificate payload' })
   @ApiResponse({ status: 200, description: 'Certificate validated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid certificate payload' })
@@ -199,6 +205,7 @@ export class ConfigurationController {
    * Save wizard step progress
    */
   @Post('wizard/step')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Save wizard step progress' })
   @ApiResponse({ status: 200, description: 'Wizard step saved successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
@@ -267,6 +274,7 @@ export class ConfigurationController {
    * Reset wizard configuration to start over
    */
   @Post('wizard/reset')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Reset wizard configuration' })
   @ApiResponse({ status: 200, description: 'Wizard reset successfully' })
   async resetWizard(
@@ -313,6 +321,7 @@ export class ConfigurationController {
    * Mark configuration wizard as completed
    */
   @Post('complete')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Complete configuration wizard' })
   @ApiResponse({ status: 200, description: 'Configuration completed successfully' })
   @ApiResponse({ status: 400, description: 'Configuration is incomplete' })
@@ -376,6 +385,7 @@ export class ConfigurationController {
    * Update GRE automatic creation thresholds
    */
   @Put('gre-thresholds')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Update GRE thresholds' })
   @ApiResponse({ status: 200, description: 'GRE thresholds updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid threshold values' })
@@ -605,11 +615,13 @@ export class ConfigurationController {
    * Update company data for the current tenant
    */
   @Put('empresa')
+  @RequirePermission('configuracion.write')
   @ApiOperation({ summary: 'Update company data' })
   @ApiResponse({ status: 200, description: 'Company data updated successfully' })
   async updateEmpresaData(
     @Body() datosEmpresa: any,
     @CurrentTenant() tenantId?: string,
+    @CurrentUser() user?: User,
   ) {
     try {
       if (!tenantId) {
@@ -620,6 +632,12 @@ export class ConfigurationController {
       }
 
       this.logger.log(`Updating empresa data for tenant: ${tenantId}`);
+      const { data: existingEmpresa } = await this.supabaseService
+        .getClient()
+        .from('empresa_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
       const updateData: any = {};
       let resolvedPaisId: number | null = null;
@@ -761,6 +779,19 @@ export class ConfigurationController {
         throw error;
       }
 
+      await this.auditService.registrarCambio(
+        'empresa_config',
+        'UPDATE',
+        user?.id || 'SYSTEM',
+        {
+          old: existingEmpresa || undefined,
+          new: data,
+        },
+        tenantId,
+        data?.id,
+        { accion: 'ACTUALIZAR_CONFIGURACION_EMPRESA' },
+      );
+
       return {
         success: true,
         message: 'Datos de empresa actualizados exitosamente',
@@ -768,6 +799,9 @@ export class ConfigurationController {
       };
     } catch (error) {
       this.logger.error('Error updating empresa data:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         { success: false, message: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR,

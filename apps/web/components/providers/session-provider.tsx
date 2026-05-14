@@ -28,18 +28,14 @@ export function SessionProvider({
 
   useEffect(() => {
     try {
-      console.log('🔐 [SessionProvider] Inicializando...')
-      
       // Cargar sesión inicial
       customAuth.getSession().then(({ data }) => {
-        console.log('🔐 [SessionProvider] Sesión inicial:', data.session ? 'Autenticado' : 'No autenticado')
         setSession(data.session)
         setLoading(false)
       })
-      
+
       // Escuchar cambios en la autenticación
       const { data: { subscription } } = customAuth.onAuthStateChange((event, session) => {
-        console.log('🔐 [SessionProvider] Cambio de autenticación:', event, session ? 'Autenticado' : 'No autenticado')
         setSession(session)
         setLoading(false)
         setError(null)
@@ -47,7 +43,6 @@ export function SessionProvider({
 
       return () => subscription.unsubscribe()
     } catch (err) {
-      console.error('❌ [SessionProvider] Error initializing auth:', err)
       setError('Error de conexión con el sistema de autenticación')
       setLoading(false)
     }
@@ -66,4 +61,4 @@ export const useSession = () => {
     throw new Error('useSession must be used within a SessionProvider')
   }
   return context
-} 
+}

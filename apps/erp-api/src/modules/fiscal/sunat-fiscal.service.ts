@@ -33,9 +33,14 @@ export class SunatFiscalService extends FiscalServiceAbstract {
   }
 
   private initializeXmlSigner(): void {
+    const requireRealCertificate = this.config.environment === 'produccion'
+      || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === true
+      || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === 'true';
+
     this.xmlSigner = new XmlSigner({
       pfxPath: this.config.certificatePath,
-      pfxPassword: this.config.certificatePassword
+      pfxPassword: this.config.certificatePassword,
+      allowDemoFallback: !requireRealCertificate,
     });
   }
 

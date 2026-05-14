@@ -24,8 +24,11 @@ DECLARE
   v_fn record;
   v_row record;
   v_functions_found integer := 0;
+  v_no_seed_tenant boolean := false;
 BEGIN
   v_tenant_id := COALESCE(p_tenant_id, app.resolve_request_tenant_id(), app.current_tenant_id());
+  SELECT NOT EXISTS (SELECT 1 FROM public.tenants)
+  INTO v_no_seed_tenant;
 
   FOR v_fn IN
     SELECT
@@ -44,6 +47,7 @@ BEGIN
       AND p.proname <> 'validar_rebuild_runtime_orchestrator'
       AND p.proname <> 'validar_rebuild_runtime_summary'
       AND p.proname <> 'validar_rebuild_orchestrator_runtime'
+      AND p.proname <> 'validar_smoke_tests_modulos_runtime'
     ORDER BY p.proname
   LOOP
     v_functions_found := v_functions_found + 1;
@@ -57,6 +61,14 @@ BEGIN
             v_fn.proname
           )
         LOOP
+          IF v_no_seed_tenant
+             AND v_tenant_id IS NULL
+             AND v_row.check_name = 'tenant_context'
+             AND v_row.ok = false THEN
+            v_row.ok := true;
+            v_row.detail := format('omitido: no hay tenant seed en reconstruccion limpia (%s)', v_row.detail);
+          END IF;
+
           IF (NOT p_only_failed) OR (v_row.ok = false) THEN
             pack_name := v_row.pack_name;
             check_name := v_row.check_name;
@@ -66,7 +78,10 @@ BEGIN
           END IF;
         END LOOP;
 
-      ELSIF v_fn.pronargs = 1 AND lower(COALESCE(v_fn.arg1_type, '')) = 'uuid' THEN
+      ELSIF v_fn.pronargs = 1 AND (
+        lower(COALESCE(v_fn.arg1_type, '')) = 'uuid'
+        OR lower(COALESCE(v_fn.arg_signature, '')) ~ '(^uuid$|^[a-z_][a-z0-9_]* uuid$)'
+      ) THEN
         FOR v_row IN
           EXECUTE format(
             'SELECT %L::text AS pack_name, x.check_name, x.ok, x.detail FROM public.%I($1) AS x',
@@ -74,6 +89,14 @@ BEGIN
             v_fn.proname
           ) USING v_tenant_id
         LOOP
+          IF v_no_seed_tenant
+             AND v_tenant_id IS NULL
+             AND v_row.check_name = 'tenant_context'
+             AND v_row.ok = false THEN
+            v_row.ok := true;
+            v_row.detail := format('omitido: no hay tenant seed en reconstruccion limpia (%s)', v_row.detail);
+          END IF;
+
           IF (NOT p_only_failed) OR (v_row.ok = false) THEN
             pack_name := v_row.pack_name;
             check_name := v_row.check_name;

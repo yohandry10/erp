@@ -6,8 +6,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { SupabaseModule } from './shared/supabase/supabase.module';
 import { SecurityModule } from './shared/security/security.module';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RateLimitGuard } from './shared/security/guards/rate-limit.guard';
 import { ValidationInterceptor } from './shared/security/interceptors/validation.interceptor';
 import { PermissionGuard } from './common/guards/permission.guard';
@@ -52,6 +52,7 @@ import { CacheModule } from './shared/cache/cache.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
+import { HelpModule } from './modules/help/help.module';
 import { CajasModule } from './modules/cajas/cajas.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JobsModule } from './shared/jobs/jobs.module';
@@ -59,6 +60,7 @@ import { SharedModule } from './shared/shared.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { DemoExpiredGuard } from './modules/demo/guards/demo-expired.guard';
 import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-restrictions.interceptor';
+import { envSchema } from './config/env.schema';
 
 
 @Module({
@@ -66,6 +68,12 @@ import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-re
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', 'apps/erp-api/.env'],
+      validationSchema: envSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+        stripUnknown: false,
+      },
     }),
     ScheduleModule.forRoot(),
     SecurityModule,
@@ -112,12 +120,19 @@ import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-re
     SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana
     ImportExportModule,
+    HelpModule,
     CajasModule,
     JobsModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    // ✅ SECURITY: JwtAuthGuard aplicado globalmente (default deny autenticación)
+    // Se salta validación solo si la ruta está marcada con @Public()
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     // ✅ SECURITY: PermissionGuard aplicado globalmente
     // Valida permisos en endpoints con @RequirePermission()
     // Si no hay @RequirePermission(), permite acceso (solo requiere autenticación)
@@ -125,11 +140,11 @@ import { DemoRestrictionsInterceptor } from './modules/demo/interceptors/demo-re
       provide: APP_GUARD,
       useClass: PermissionGuard,
     },
-    // Rate limiter deshabilitado temporalmente
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: RateLimitGuard,
-    // },
+    // ✅ SECURITY: Rate limiter aplicado globalmente (API normal por IP/usuario).
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: ValidationInterceptor,
@@ -177,8 +192,10 @@ export class AppModule implements NestModule {
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/register', method: RequestMethod.POST },
         { path: 'auth/refresh', method: RequestMethod.POST },
-        { path: 'auth/forgot-password', method: RequestMethod.POST },
-        { path: 'auth/reset-password', method: RequestMethod.POST },
+        { path: 'auth/validate', method: RequestMethod.POST },
+        { path: 'auth/password-reset/request', method: RequestMethod.POST },
+        { path: 'auth/password-reset/validate', method: RequestMethod.POST },
+        { path: 'auth/password-reset/confirm', method: RequestMethod.POST },
         // Exclude demo endpoints (no requieren tenant context previo)
         { path: 'demo/create', method: RequestMethod.POST },
         // Exclude public endpoints
@@ -186,8 +203,10 @@ export class AppModule implements NestModule {
         { path: 'api/paises/:id', method: RequestMethod.GET },
         // Health check
         { path: 'health', method: RequestMethod.GET },
-        { path: 'api/health', method: RequestMethod.GET },
+        { path: 'health/live', method: RequestMethod.GET },
+        { path: 'health/ready', method: RequestMethod.GET },
+        { path: 'health/version', method: RequestMethod.GET },
       )
-      .forRoutes('*'); // Apply to all other routes
+      .forRoutes('*path'); // Apply to all other routes
   }
 }

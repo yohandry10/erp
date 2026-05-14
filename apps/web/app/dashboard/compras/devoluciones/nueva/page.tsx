@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Search, Plus, Trash2, AlertCircle, PackageX } from 'lucide-react'
@@ -27,9 +27,15 @@ interface RecepcionItem {
   producto_id: string
   cantidad_recibida: number
   calidad: string
+  almacen_id?: string
   lote?: string
   serie?: string
   observaciones?: string
+  precio_unitario?: number
+  detalle?: {
+    descripcion?: string
+    precio_unitario?: number
+  }
   producto?: {
     codigo: string
     nombre: string
@@ -37,8 +43,14 @@ interface RecepcionItem {
 }
 
 interface DevolucionItem {
+  recepcion_item_id?: string
   producto_id: string
+  descripcion: string
   cantidad: number
+  precio_unitario: number
+  almacen_id?: string
+  lote?: string
+  serie?: string
   motivo: string
   observaciones?: string
   producto?: {
@@ -50,7 +62,7 @@ interface DevolucionItem {
 export default function NuevaDevolucionPage() {
   const router = useRouter()
   const { get, post } = useApi()
-  
+
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [recepciones, setRecepciones] = useState<Recepcion[]>([])
@@ -60,18 +72,13 @@ export default function NuevaDevolucionPage() {
   const [motivoGeneral, setMotivoGeneral] = useState('')
   const [observacionesGenerales, setObservacionesGenerales] = useState('')
 
-  useEffect(() => {
-    if (step === 1) {
-      loadRecepciones()
-    }
-  }, [step])
-
-  const loadRecepciones = async () => {
+  const loadRecepciones = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/api/compras/recepciones?estado=CERRADA')
-      if (response?.success) {
-        setRecepciones(response.data || [])
+      const recepcionesData = Array.isArray(response) ? response : response?.data
+      if (Array.isArray(recepcionesData)) {
+        setRecepciones(recepcionesData)
       }
     } catch (error) {
       console.error('Error loading recepciones:', error)
@@ -79,28 +86,40 @@ export default function NuevaDevolucionPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    if (step === 1) {
+      loadRecepciones()
+    }
+  }, [loadRecepciones, step])
 
   const loadRecepcionDetalle = async (recepcionId: string) => {
     try {
       setLoading(true)
       const response = await get(`/api/compras/recepciones/${recepcionId}`)
-      if (response?.success) {
-        const recepcion = response.data
+      const recepcion = response?.data ?? response
+      if (recepcion?.id) {
         setSelectedRecepcion(recepcion)
-        
-        // Pre-cargar items rechazados u observados
-        const itemsRechazados = (recepcion.items || [])
-          .filter((item: RecepcionItem) => item.calidad === 'RECHAZADO' || item.calidad === 'OBSERVADO')
+
+        // Una devolución debe poder iniciarse desde cualquier item recibido en una recepción cerrada.
+        const itemsRecibidos = (recepcion.items || [])
+          .filter((item: RecepcionItem) => Number(item.cantidad_recibida || 0) > 0)
           .map((item: RecepcionItem) => ({
+            recepcion_item_id: item.id,
             producto_id: item.producto_id,
+            descripcion: item.producto?.nombre || item.detalle?.descripcion || 'Producto recibido',
             cantidad: item.cantidad_recibida,
+            precio_unitario: Number(item.detalle?.precio_unitario ?? item.precio_unitario ?? 0),
+            almacen_id: item.almacen_id,
+            lote: item.lote,
+            serie: item.serie,
             motivo: item.calidad === 'RECHAZADO' ? 'DEFECTUOSO' : 'OBSERVADO',
             observaciones: item.observaciones || '',
             producto: item.producto
           }))
-        
-        setItems(itemsRechazados)
+
+        setItems(itemsRecibidos)
         setStep(2)
       }
     } catch (error) {
@@ -114,7 +133,9 @@ export default function NuevaDevolucionPage() {
   const addItem = () => {
     setItems([...items, {
       producto_id: '',
+      descripcion: '',
       cantidad: 0,
+      precio_unitario: 0,
       motivo: 'DEFECTUOSO',
       observaciones: ''
     }])
@@ -132,7 +153,7 @@ export default function NuevaDevolucionPage() {
 
   const handleSubmit = async () => {
     if (!selectedRecepcion) return
-    
+
     if (items.length === 0) {
       alert('Debe agregar al menos un item')
       return
@@ -151,7 +172,7 @@ export default function NuevaDevolucionPage() {
 
     try {
       setLoading(true)
-      
+
       const payload = {
         recepcion_id: selectedRecepcion.id,
         orden_id: selectedRecepcion.orden_id,
@@ -159,18 +180,24 @@ export default function NuevaDevolucionPage() {
         motivo: motivoGeneral,
         observaciones: observacionesGenerales,
         items: items.map(item => ({
+          recepcion_item_id: item.recepcion_item_id,
           producto_id: item.producto_id,
+          descripcion: item.descripcion || item.producto?.nombre || 'Producto devuelto',
           cantidad: item.cantidad,
-          motivo: item.motivo,
-          observaciones: item.observaciones
+          precio_unitario: Number(item.precio_unitario || 0),
+          almacen_id: item.almacen_id,
+          lote: item.lote,
+          serie: item.serie,
+          motivo_detalle: item.observaciones || item.motivo
         }))
       }
 
       const response = await post('/api/compras/devoluciones', payload)
-      
-      if (response?.success) {
+      const devolucion = response?.data ?? response
+
+      if (devolucion?.id || response?.success) {
         alert('Devolución creada exitosamente')
-        router.push(`/dashboard/compras/devoluciones/${response.data.id}`)
+        router.push(`/dashboard/compras/devoluciones/${devolucion.id}`)
       } else {
         alert(response?.message || 'Error al crear devolución')
       }
@@ -182,7 +209,7 @@ export default function NuevaDevolucionPage() {
     }
   }
 
-  const filteredRecepciones = recepciones.filter(r => 
+  const filteredRecepciones = recepciones.filter(r =>
     r.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.orden?.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.orden?.proveedor?.razon_social.toLowerCase().includes(searchTerm.toLowerCase())
@@ -229,9 +256,9 @@ export default function NuevaDevolucionPage() {
       </div>
 
       {/* Progress */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '16px', 
+      <div style={{
+        display: 'flex',
+        gap: '16px',
         marginBottom: '32px',
         alignItems: 'center'
       }}>
@@ -241,9 +268,9 @@ export default function NuevaDevolucionPage() {
             backgroundColor: 'var(--primary-600)',
             borderRadius: '2px'
           }} />
-          <p style={{ 
-            marginTop: '8px', 
-            fontSize: '13px', 
+          <p style={{
+            marginTop: '8px',
+            fontSize: '13px',
             fontWeight: '600',
             color: 'var(--primary-600)'
           }}>
@@ -256,9 +283,9 @@ export default function NuevaDevolucionPage() {
             backgroundColor: step >= 2 ? 'var(--primary-600)' : 'var(--gray-200)',
             borderRadius: '2px'
           }} />
-          <p style={{ 
-            marginTop: '8px', 
-            fontSize: '13px', 
+          <p style={{
+            marginTop: '8px',
+            fontSize: '13px',
             fontWeight: '600',
             color: step >= 2 ? 'var(--primary-600)' : 'var(--text-tertiary)'
           }}>
@@ -273,15 +300,15 @@ export default function NuevaDevolucionPage() {
           {/* Search */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ position: 'relative' }}>
-              <Search 
-                size={18} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '12px', 
-                  top: '50%', 
+              <Search
+                size={18}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--text-tertiary)'
-                }} 
+                }}
               />
               <input
                 type="text"
@@ -408,7 +435,7 @@ export default function NuevaDevolucionPage() {
             <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
               Información General
             </h3>
-            
+
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
                 Motivo General *
@@ -488,7 +515,7 @@ export default function NuevaDevolucionPage() {
 
             {items.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                No hay items agregados. Haga clic en "Agregar Item" para comenzar.
+                No hay items agregados. Haga clic en &quot;Agregar Item&quot; para comenzar.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -621,9 +648,9 @@ export default function NuevaDevolucionPage() {
           </div>
 
           {/* Actions */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
+          <div style={{
+            display: 'flex',
+            gap: '12px',
             justifyContent: 'flex-end',
             marginTop: '24px'
           }}>

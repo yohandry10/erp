@@ -127,7 +127,7 @@ const createInitialState = (): WizardState => ({
     dian_test_set_id: '',
     dian_environment: 'HOMOLOGACION',
     dian_regimen_fiscal: '',
-    dian_tipo_contribuyente: '',
+    dian_tipo_contribuyente: undefined,
     dian_resolucion_numero: '',
     dian_resolucion_prefijo: '',
     dian_resolucion_desde: undefined,
@@ -149,40 +149,40 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case 'GO_TO_STEP':
       return { ...state, currentStep: action.payload, error: null }
-    
+
     case 'NEXT_STEP':
       if (state.currentStep < state.steps.length - 1) {
         // Mark current step as complete before moving to next
         const updatedSteps = state.steps.map((step, index) =>
           index === state.currentStep ? { ...step, isComplete: true } : step
         )
-        return { 
-          ...state, 
-          currentStep: state.currentStep + 1, 
+        return {
+          ...state,
+          currentStep: state.currentStep + 1,
           steps: updatedSteps,
-          error: null 
+          error: null
         }
       }
       return state
-    
+
     case 'PREVIOUS_STEP':
       if (state.currentStep > 0) {
         return { ...state, currentStep: state.currentStep - 1, error: null }
       }
       return state
-    
+
     case 'UPDATE_CONFIGURATION':
       return {
         ...state,
         configuration: { ...state.configuration, ...action.payload },
       }
-    
+
     case 'UPDATE_VALIDATION_RESULTS':
       return {
         ...state,
         validationResults: { ...state.validationResults, ...action.payload },
       }
-    
+
     case 'MARK_STEP_COMPLETE':
       return {
         ...state,
@@ -190,7 +190,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
           index === action.payload ? { ...step, isComplete: true } : step
         ),
       }
-    
+
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload }
 

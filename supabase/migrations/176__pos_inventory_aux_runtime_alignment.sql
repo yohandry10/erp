@@ -16,6 +16,13 @@ ALTER TABLE IF EXISTS public.configuracion_caja
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true,
   ADD COLUMN IF NOT EXISTS updated_by uuid;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.configuracion_caja;
+DROP POLICY IF EXISTS tenant_isolation ON public.detalle_ventas_pos;
+DROP POLICY IF EXISTS tenant_isolation ON public.producto_existencias;
+DROP POLICY IF EXISTS tenant_isolation ON public.eventos_pos;
+
+DROP VIEW IF EXISTS public.vw_eventos_pos_sospechosos;
+
 ALTER TABLE IF EXISTS public.configuracion_caja
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN caja_id TYPE uuid USING app.to_uuid_or_null(COALESCE(caja_id::text, '')),
@@ -450,5 +457,24 @@ ON public.eventos_pos (tenant_id, sesion_caja_id, "timestamp" DESC);
 
 CREATE INDEX IF NOT EXISTS idx_eventos_pos_tenant_supervisor_runtime
 ON public.eventos_pos (tenant_id, requiere_supervisor, supervisor_id, "timestamp" DESC);
+
+SELECT app.apply_tenant_policy('public', 'configuracion_caja');
+SELECT app.apply_tenant_policy('public', 'detalle_ventas_pos');
+SELECT app.apply_tenant_policy('public', 'producto_existencias');
+SELECT app.apply_tenant_policy('public', 'eventos_pos');
+
+CREATE OR REPLACE VIEW public.vw_eventos_pos_sospechosos AS
+SELECT
+  e.tenant_id,
+  e.sesion_caja_id,
+  e.tipo_evento,
+  COALESCE(e.riesgo_nivel, 'BAJO') AS riesgo_nivel,
+  e.requiere_supervisor,
+  e.supervisor_id,
+  e."timestamp",
+  e.created_at
+FROM public.eventos_pos e
+WHERE e.requiere_supervisor IS TRUE
+   OR COALESCE(e.riesgo_nivel, 'BAJO') IN ('MEDIO', 'ALTO', 'CRITICO');
 
 COMMIT;

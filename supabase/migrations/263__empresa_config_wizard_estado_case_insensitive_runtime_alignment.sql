@@ -12,6 +12,8 @@ SET LOCAL search_path = public, extensions, app, pg_temp;
 
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
+DROP TRIGGER IF EXISTS trg_sync_tenants_from_empresa_config ON public.empresa_config;
+
 -- ----------------------------------------------------------------------------
 -- Helper de normalizacion de estado para empresa_config.
 -- ----------------------------------------------------------------------------
@@ -61,5 +63,11 @@ WHERE tenant_id IS NOT NULL;
 -- ----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_empresa_config_tenant_estado_ci_runtime_263
 ON public.empresa_config (tenant_id, estado, updated_at DESC);
+
+CREATE TRIGGER trg_sync_tenants_from_empresa_config
+AFTER INSERT OR UPDATE OF tenant_id, razon_social, nombre_comercial, ruc, pais, plan, estado
+ON public.empresa_config
+FOR EACH ROW
+EXECUTE FUNCTION app.sync_tenants_from_empresa_config();
 
 COMMIT;

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { AuditService, AuditLog } from './audit.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { AuditOperation } from './dto';
 
 describe('AuditService', () => {
     let service: AuditService;
@@ -43,7 +44,7 @@ describe('AuditService', () => {
 
             const auditLog: AuditLog = {
                 table_name: 'pedidos',
-                operation: 'INSERT',
+                operation: AuditOperation.INSERT,
                 record_id: 'record-123',
                 tenant_id: 'tenant-123',
                 user_id: 'user-123',
@@ -67,7 +68,7 @@ describe('AuditService', () => {
 
             const auditLog: AuditLog = {
                 table_name: 'pedidos',
-                operation: 'INSERT',
+                operation: AuditOperation.INSERT,
                 tenant_id: 'tenant-123',
             };
 
@@ -131,7 +132,7 @@ describe('AuditService', () => {
 
             await service.getAuditLogs('tenant-123', {
                 table_name: 'pedidos',
-                operation: 'INSERT',
+                operation: AuditOperation.INSERT,
                 user_id: 'user-123',
                 start_date: '2024-01-01',
                 end_date: '2024-12-31',

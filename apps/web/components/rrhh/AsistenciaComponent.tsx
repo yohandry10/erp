@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import Image from 'next/image'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
 
@@ -33,12 +34,7 @@ export default function AsistenciaComponent() {
   const [fechaConsulta, setFechaConsulta] = useState(new Date().toISOString().split('T')[0])
   const [modoMarcado, setModoMarcado] = useState<'individual' | 'masivo'>('individual')
 
-  useEffect(() => {
-    loadEmpleados()
-    loadAsistenciaDelDia()
-  }, [fechaConsulta])
-
-  const loadEmpleados = async () => {
+  const loadEmpleados = useCallback(async () => {
     try {
       const response = await get('/api/rrhh/empleados')
       if (response?.success) {
@@ -48,9 +44,9 @@ export default function AsistenciaComponent() {
     } catch (error) {
       console.error('Error cargando empleados:', error)
     }
-  }
+  }, [get])
 
-  const loadAsistenciaDelDia = async () => {
+  const loadAsistenciaDelDia = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/rrhh/asistencia?fecha_desde=${fechaConsulta}&fecha_hasta=${fechaConsulta}`)
@@ -62,7 +58,12 @@ export default function AsistenciaComponent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [fechaConsulta, get])
+
+  useEffect(() => {
+    loadEmpleados()
+    loadAsistenciaDelDia()
+  }, [loadAsistenciaDelDia, loadEmpleados])
 
   const marcarAsistencia = async (empleadoId: string, tipo: 'entrada' | 'salida') => {
     try {
@@ -280,9 +281,12 @@ export default function AsistenciaComponent() {
                     {/* Avatar */}
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                       {empleado.foto_url ? (
-                        <img 
-                          src={empleado.foto_url} 
+                        <Image
+                          src={empleado.foto_url}
                           alt={empleado.nombres}
+                          width={48}
+                          height={48}
+                          unoptimized
                           className="w-12 h-12 rounded-full object-cover"
                         />
                       ) : (

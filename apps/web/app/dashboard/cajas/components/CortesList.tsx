@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -32,43 +32,40 @@ interface Props {
 }
 
 export function CortesList({ className = '', id }: Props) {
-  const api = useApi();
+  const { get } = useApi();
   const { session } = useAuth();
   const [cortes, setCortes] = useState<Corte[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    cargarCortes();
-  }, []);
-
-  const cargarCortes = async () => {
+  const cargarCortes = useCallback(async () => {
     try {
       setLoading(true);
-      const resp = await api.get('/cajas/cortes');
+      const resp = await get('/cajas/cortes');
       if ((resp as any)?.success) {
         setCortes((resp as any).data || []);
       } else {
         throw new Error((resp as any)?.message || 'No se pudieron cargar los cortes');
       }
     } catch (err: any) {
-      console.error('Error cargando cortes:', err);
+      console.warn('Error cargando cortes:', err);
       setError(err.message || 'Error desconocido');
     } finally {
       setLoading(false);
     }
-  };
+  }, [get]);
+
+  useEffect(() => {
+    cargarCortes();
+  }, [cargarCortes]);
 
   const descargarArchivo = async (corteId: string, formato: 'pdf' | 'csv') => {
     try {
-      const token = session?.access_token;
-      if (!token) throw new Error('No hay sesión activa para descargar.');
+      if (!session?.user) throw new Error('No hay sesión activa para descargar.');
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
       const url = `${baseUrl}/api/cajas/cortes/${corteId}/${formato}`;
       const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
       if (!res.ok) throw new Error(`Error al descargar ${formato.toUpperCase()}`);
       const blob = await res.blob();

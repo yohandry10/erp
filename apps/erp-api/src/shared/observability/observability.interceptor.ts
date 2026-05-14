@@ -10,6 +10,7 @@ import { Request, Response } from 'express';
 import { LoggerService } from './logger.service';
 import { MetricsService } from './metrics.service';
 import { TracingService } from '../tracing/tracing.service';
+import { redactSensitiveHeaders, redactSensitiveData } from '../utils/redact-sensitive';
 
 @Injectable()
 export class ObservabilityInterceptor implements NestInterceptor {
@@ -35,7 +36,7 @@ export class ObservabilityInterceptor implements NestInterceptor {
       url,
       userAgent,
       ip,
-      headers: this.sanitizeHeaders(request.headers),
+      headers: redactSensitiveHeaders(request.headers as Record<string, any>),
     }, {
       module: 'http',
       operation: `${method} ${url}`,
@@ -54,11 +55,11 @@ export class ObservabilityInterceptor implements NestInterceptor {
         const statusCode = response.statusCode;
         
         // Log de request completado
-        this.logger.logHttpRequest(method, url, statusCode, duration, {
+        this.logger.logHttpRequest(method, url, statusCode, duration, redactSensitiveData({
           responseSize: JSON.stringify(data || {}).length,
           userAgent,
           ip,
-        });
+        }));
 
         // Métricas de performance
         this.metrics.recordPerformance({
@@ -100,14 +101,14 @@ export class ObservabilityInterceptor implements NestInterceptor {
         this.logger.error(
           `HTTP Request falló: ${method} ${url}`,
           error,
-          {
+          redactSensitiveData({
             method,
             url,
             statusCode,
             duration,
             userAgent,
             ip,
-          },
+          }),
           {
             module: 'http',
             operation: `${method} ${url}`,
@@ -163,21 +164,5 @@ export class ObservabilityInterceptor implements NestInterceptor {
     if (statusCode < 400) return '3xx';
     if (statusCode < 500) return '4xx';
     return '5xx';
-  }
-
-  /**
-   * Sanitiza headers sensibles
-   */
-  private sanitizeHeaders(headers: Record<string, any>): Record<string, any> {
-    const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
-    const sanitized = { ...headers };
-    
-    sensitiveHeaders.forEach(header => {
-      if (sanitized[header]) {
-        sanitized[header] = '[REDACTED]';
-      }
-    });
-    
-    return sanitized;
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -32,7 +32,7 @@ export default function ConciliacionesPendientesReport() {
   const [conciliaciones, setConciliaciones] = useState<ConciliacionPendiente[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadConciliaciones = async () => {
+  const loadConciliaciones = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/api/finanzas/conciliacion/pendientes')
@@ -45,11 +45,11 @@ export default function ConciliacionesPendientesReport() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
   useEffect(() => {
     loadConciliaciones()
-  }, [])
+  }, [loadConciliaciones])
 
   const formatCurrency = (amount: number, currency: string = 'PEN') => {
     return new Intl.NumberFormat('es-PE', {

@@ -144,9 +144,9 @@ export class CotizacionesService {
     const detalleData = createCotizacionDto.detalle.map((item, index) => {
       const producto = productosMap.get(item.producto_id);
       return {
+        tenant_id: tenantId,
         cotizacion_id: cotizacion.id,
         producto_id: item.producto_id,
-        producto_codigo: producto?.codigo || '',
         producto_nombre: producto?.nombre || item.descripcion,
         descripcion: item.descripcion,
         cantidad: item.cantidad,
@@ -221,7 +221,7 @@ export class CotizacionesService {
       .from('cotizaciones')
       .select(`
         *,
-        cliente:cliente_id (
+        cliente:clientes!cotizaciones_cliente_id_fkey (
           id,
           razon_social,
           numero_documento,
@@ -285,7 +285,7 @@ export class CotizacionesService {
       .from('cotizaciones')
       .select(`
         *,
-        cliente:cliente_id (
+        cliente:clientes!cotizaciones_cliente_id_fkey (
           id,
           razon_social,
           numero_documento,
@@ -492,12 +492,22 @@ export class CotizacionesService {
       );
     }
 
+    if (cotizacion.fecha_vencimiento) {
+      const hoy = new Date().toISOString().split('T')[0];
+      const fechaVencimiento = String(cotizacion.fecha_vencimiento).split('T')[0];
+
+      if (fechaVencimiento < hoy) {
+        throw new BadRequestException('No se puede convertir una cotización vencida');
+      }
+    }
+
     if (!cotizacion.detalle || cotizacion.detalle.length === 0) {
       throw new BadRequestException('La cotización no tiene productos para convertir en pedido');
     }
 
     // ✅ CORRECCIÓN BRECHA 2: Usar función RPC transaccional
-    const { data: resultado, error: rpcError } = await client
+    let resultado: any;
+    const { data: resultadoRpc, error: rpcError } = await client
       .rpc('convertir_cotizacion_a_pedido', {
         p_cotizacion_id: id,
         p_tenant_id: tenantId,
@@ -507,9 +517,25 @@ export class CotizacionesService {
 
     if (rpcError) {
       console.error('❌ [CotizacionesService] Error en conversión transaccional:', rpcError);
-      throw new BadRequestException(
-        rpcError.message || 'Error al convertir cotización a pedido',
+      const esDuplicado =
+        rpcError.code === '23505' ||
+        String(rpcError.message ?? '').toLowerCase().includes('duplicate key value') ||
+        String(rpcError.message ?? '').toLowerCase().includes('unique constraint');
+
+      if (!esDuplicado) {
+        throw new BadRequestException(
+          rpcError.message || 'Error al convertir cotización a pedido',
+        );
+      }
+
+      resultado = await this.convertirAPedidoConCorrelativoSeguro(
+        cotizacion,
+        convertirPedidoDto,
+        tenantId,
+        userId,
       );
+    } else {
+      resultado = resultadoRpc;
     }
 
     if (!resultado?.success) {
@@ -545,6 +571,132 @@ export class CotizacionesService {
         cotizacion: updatedCotizacion,
       },
     };
+  }
+
+  private async convertirAPedidoConCorrelativoSeguro(
+    cotizacion: any,
+    convertirPedidoDto: ConvertirPedidoDto,
+    tenantId: string,
+    userId?: string,
+  ): Promise<any> {
+    const client = this.supabase.getClient();
+    let pedidoCreado: any = null;
+    let ultimoError: any = null;
+
+    for (let intento = 1; intento <= 2; intento += 1) {
+      const numero = await this.generarNumeroPedidoSeguro(tenantId);
+
+      const { data: pedido, error: pedidoError } = await client
+        .from('pedidos_venta')
+        .insert({
+          tenant_id: tenantId,
+          numero,
+          cotizacion_id: cotizacion.id,
+          cliente_id: cotizacion.cliente_id,
+          fecha_pedido: new Date().toISOString().split('T')[0],
+          fecha: new Date().toISOString().split('T')[0],
+          estado: 'PENDIENTE',
+          subtotal: cotizacion.subtotal ?? 0,
+          igv: cotizacion.igv ?? 0,
+          total: cotizacion.total ?? 0,
+          moneda: cotizacion.moneda ?? 'PEN',
+          observaciones: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
+          notas: convertirPedidoDto.notas ?? cotizacion.observaciones ?? null,
+          created_by: userId ?? null,
+        })
+        .select('id, numero')
+        .single();
+
+      if (!pedidoError) {
+        pedidoCreado = pedido;
+        break;
+      }
+
+      ultimoError = pedidoError;
+      const esDuplicado =
+        pedidoError.code === '23505' ||
+        String(pedidoError.message ?? '').toLowerCase().includes('duplicate key value') ||
+        String(pedidoError.message ?? '').toLowerCase().includes('unique constraint');
+
+      if (!esDuplicado || intento === 2) {
+        throw new BadRequestException(pedidoError.message || 'Error al crear pedido desde cotización');
+      }
+    }
+
+    if (!pedidoCreado) {
+      throw new BadRequestException(ultimoError?.message || 'Error al crear pedido desde cotización');
+    }
+
+    const detalles = (cotizacion.detalle ?? []).map((item: any) => ({
+      tenant_id: tenantId,
+      pedido_id: pedidoCreado.id,
+      producto_id: item.producto_id,
+      descripcion: item.descripcion ?? item.producto_nombre ?? 'Producto',
+      cantidad: item.cantidad ?? 0,
+      precio_unitario: item.precio_unitario ?? 0,
+      subtotal: item.subtotal ?? Number(item.cantidad ?? 0) * Number(item.precio_unitario ?? 0),
+      estado_item: 'PENDIENTE',
+    }));
+
+    const { error: detalleError } = await client
+      .from('pedidos_venta_detalle')
+      .insert(detalles);
+
+    if (detalleError) {
+      await client.from('pedidos_venta').delete().eq('id', pedidoCreado.id).eq('tenant_id', tenantId);
+      throw new BadRequestException(detalleError.message || 'Error al crear detalle del pedido');
+    }
+
+    const { error: cotizacionError } = await client
+      .from('cotizaciones')
+      .update({
+        estado: EstadoCotizacion.CONVERTIDA,
+        fecha_conversion: new Date().toISOString(),
+        convertido_por: userId ?? null,
+        pedido_id: pedidoCreado.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', cotizacion.id)
+      .eq('tenant_id', tenantId);
+
+    if (cotizacionError) {
+      await client.from('pedidos_venta_detalle').delete().eq('pedido_id', pedidoCreado.id);
+      await client.from('pedidos_venta').delete().eq('id', pedidoCreado.id).eq('tenant_id', tenantId);
+      throw new BadRequestException(cotizacionError.message || 'Error al actualizar cotización convertida');
+    }
+
+    return {
+      success: true,
+      pedido_id: pedidoCreado.id,
+      pedido_numero: pedidoCreado.numero,
+      cotizacion_id: cotizacion.id,
+    };
+  }
+
+  private async generarNumeroPedidoSeguro(tenantId: string): Promise<string> {
+    const client = this.supabase.getClient();
+    const year = new Date().getFullYear();
+    const prefix = `PED-${year}-`;
+
+    const { data, error } = await client
+      .from('pedidos_venta')
+      .select('numero')
+      .eq('tenant_id', tenantId)
+      .like('numero', `${prefix}%`)
+      .order('numero', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      throw new BadRequestException('Error al generar número de pedido');
+    }
+
+    const maxSuffix = (data ?? []).reduce((max: number, row: any) => {
+      const match = String(row.numero ?? '').match(/^PED-\d{4}-(\d+)$/);
+      const suffix = match ? Number.parseInt(match[1], 10) : 0;
+      return Number.isFinite(suffix) && suffix > max ? suffix : max;
+    }, 0);
+
+    return `${prefix}${String(maxSuffix + 1).padStart(4, '0')}`;
   }
 
   /**

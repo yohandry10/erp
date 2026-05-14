@@ -4,6 +4,7 @@ import { AsientosGeneratorService } from './asientos-generator.service';
 import { PeriodosService, EstadoPeriodo } from './periodos.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { PlanCuentasService, PlanCuenta } from './plan-cuentas.service';
+import { DocumentoFiscalGeneradoEvent } from '../../../shared/events/event-bus.service';
 
 describe('AsientosGeneratorService', () => {
   let service: AsientosGeneratorService;

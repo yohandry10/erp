@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Cotizacion, EstadoCotizacion } from '@/types/ventas'
@@ -25,22 +25,18 @@ export default function CotizacionDetailPage() {
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
-  
+
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
   const cotizacionId = params.id as string
 
-  useEffect(() => {
-    loadCotizacion()
-  }, [cotizacionId])
-
-  const loadCotizacion = async () => {
+  const loadCotizacion = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/ventas/cotizaciones/${cotizacionId}`)
-      
+
       if (response?.success && response.data) {
         setCotizacion(response.data)
       } else {
@@ -62,12 +58,16 @@ export default function CotizacionDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [cotizacionId, get, router])
+
+  useEffect(() => {
+    loadCotizacion()
+  }, [loadCotizacion])
 
   const handleUpdate = async (data: CotizacionFormData) => {
     try {
       const response = await put(`/api/ventas/cotizaciones/${cotizacionId}`, data)
-      
+
       if (response?.success) {
         toast({
           title: 'Éxito',
@@ -137,7 +137,7 @@ export default function CotizacionDetailPage() {
   }
 
   const canEdit = cotizacion.estado === EstadoCotizacion.BORRADOR
-  const canConvert = cotizacion.estado === EstadoCotizacion.BORRADOR || 
+  const canConvert = cotizacion.estado === EstadoCotizacion.BORRADOR ||
                      cotizacion.estado === EstadoCotizacion.ENVIADA
   const isConverted = cotizacion.estado === EstadoCotizacion.CONVERTIDA
 
@@ -226,7 +226,7 @@ export default function CotizacionDetailPage() {
               Editar
             </button>
           )}
-          
+
           {!isEditing && canConvert && !isConverted && (
             <ConvertirPedidoButton
               cotizacionId={cotizacion.id}

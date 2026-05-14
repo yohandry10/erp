@@ -314,39 +314,40 @@ export class DianFiscalService extends FiscalServiceAbstract {
       this.logger.warn(`No se pudo cargar config DIAN para tenant ${tenantId}: ${error.message}`);
     }
 
-    if (!data) {
+    const typedData = data as any;
+    if (!typedData) {
       this.config = { ...this.defaultConfig };
       this.dianConfig = { ...this.defaultDianConfig };
       this.currentCertificateBuffer = undefined;
       return;
     }
 
-    const envRaw = (data.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
+    const envRaw = (typedData.dian_environment || 'HOMOLOGACION').toString().toUpperCase();
     const fiscalEnvironment = envRaw === 'PRODUCCION' ? 'produccion' : 'homologacion';
     const apiEnvironment = envRaw === 'PRODUCCION' ? 'produccion' : 'habilitacion';
 
     this.config = {
       ...this.defaultConfig,
-      url: data.dian_url || this.defaultConfig.url,
-      usuario: data.dian_usuario || this.defaultConfig.usuario,
-      password: data.dian_password || this.defaultConfig.password,
-      empresaId: data.ruc || this.defaultConfig.empresaId,
-      certificatePassword: data.certificado_password || this.defaultConfig.certificatePassword,
+      url: typedData.dian_url || this.defaultConfig.url,
+      usuario: typedData.dian_usuario || this.defaultConfig.usuario,
+      password: typedData.dian_password || this.defaultConfig.password,
+      empresaId: typedData.ruc || this.defaultConfig.empresaId,
+      certificatePassword: typedData.certificado_password || this.defaultConfig.certificatePassword,
       environment: fiscalEnvironment,
       pais: 'CO',
     };
 
     this.dianConfig = {
       ...this.defaultDianConfig,
-      url: data.dian_url || this.defaultDianConfig.url,
+      url: typedData.dian_url || this.defaultDianConfig.url,
       environment: apiEnvironment,
-      nit: data.ruc || this.defaultDianConfig.nit,
-      softwareId: data.dian_software_id || this.defaultDianConfig.softwareId,
-      softwarePin: data.dian_software_pin || this.defaultDianConfig.softwarePin,
-      testSetId: data.dian_test_set_id || this.defaultDianConfig.testSetId,
+      nit: typedData.ruc || this.defaultDianConfig.nit,
+      softwareId: typedData.dian_software_id || this.defaultDianConfig.softwareId,
+      softwarePin: typedData.dian_software_pin || this.defaultDianConfig.softwarePin,
+      testSetId: typedData.dian_test_set_id || this.defaultDianConfig.testSetId,
     };
 
     this.apiClient.configurar(this.dianConfig);
-    this.currentCertificateBuffer = normalizeCertificateInput(data.certificado_pfx);
+    this.currentCertificateBuffer = normalizeCertificateInput(typedData.certificado_pfx);
   }
 }

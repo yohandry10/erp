@@ -29,6 +29,11 @@ ALTER TABLE IF EXISTS public.vacantes
   ADD COLUMN IF NOT EXISTS fecha_cierre date,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.vacantes;
+DROP POLICY IF EXISTS tenant_isolation ON public.candidatos;
+DROP POLICY IF EXISTS tenant_isolation ON public.solicitudes;
+DROP POLICY IF EXISTS tenant_isolation ON public.evaluaciones;
+
 ALTER TABLE IF EXISTS public.vacantes
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN departamento_id TYPE uuid USING app.to_uuid_or_null(COALESCE(departamento_id::text, '')),
@@ -687,5 +692,10 @@ WHERE id_empleado IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_evaluaciones_tenant_estado_fecha_runtime
 ON public.evaluaciones (tenant_id, estado, fecha_evaluacion DESC, created_at DESC);
+
+SELECT app.apply_tenant_policy('public', 'vacantes');
+SELECT app.apply_tenant_policy('public', 'candidatos');
+SELECT app.apply_tenant_policy('public', 'solicitudes');
+SELECT app.apply_tenant_policy('public', 'evaluaciones');
 
 COMMIT;

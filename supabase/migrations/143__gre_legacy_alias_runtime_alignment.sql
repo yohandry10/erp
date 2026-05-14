@@ -19,6 +19,8 @@ ALTER TABLE IF EXISTS public.gre
   ADD COLUMN IF NOT EXISTS cpe_relacionado uuid,
   ADD COLUMN IF NOT EXISTS error_message text;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.gre;
+
 ALTER TABLE IF EXISTS public.gre
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN numero TYPE text USING NULLIF(btrim(COALESCE(numero::text, '')), ''),
@@ -576,5 +578,6 @@ WHERE tenant_id IS NOT NULL
   AND numero IS NOT NULL
   AND btrim(numero) <> '';
 
-COMMIT;
+SELECT app.apply_tenant_policy('public', 'gre');
 
+COMMIT;

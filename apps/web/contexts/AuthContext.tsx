@@ -20,36 +20,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    console.log('🔄 [AuthContext] Inicializando...')
-    loadSession()
-  }, [])
-
   const loadSession = async () => {
     try {
-      console.log('🔄 [AuthContext] Cargando sesión...')
       const { data, error } = await customAuth.getSession()
-      
+
       if (error) {
-        console.error('❌ [AuthContext] Error cargando sesión:', error)
         setSession(null)
         setUser(null)
       } else if (data?.session) {
-        console.log('✅ [AuthContext] Sesión cargada:', {
-          userId: data.session.user.id,
-          email: data.session.user.email,
-          hasToken: !!data.session.access_token
-        })
         setSession(data.session)
         setUser(data.session.user)
         clearPermissionCache(data.session.user.id)
       } else {
-        console.log('ℹ️ [AuthContext] No hay sesión activa')
         setSession(null)
         setUser(null)
       }
     } catch (error) {
-      console.error('❌ [AuthContext] Error inesperado:', error)
+      console.error('[AuthContext] Error cargando sesión:', error)
       setSession(null)
       setUser(null)
     } finally {
@@ -57,41 +44,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  useEffect(() => {
+    loadSession()
+  }, [])
+
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 [AuthContext] Iniciando login...')
     const { data, error } = await customAuth.signInWithPassword({ email, password })
-    
+
     if (error) {
-      console.error('❌ [AuthContext] Error en login:', error)
       throw error
     }
-    
-    if (data?.session) {
-      console.log('✅ [AuthContext] Login exitoso')
-      setSession(data.session)
-      setUser(data.user)
-      clearPermissionCache(data.user.id)
-    } else {
+
+    if (!data?.session) {
       throw new Error('No se recibió sesión del servidor')
     }
+
+    setSession(data.session)
+    setUser(data.user)
+    clearPermissionCache(data.user.id)
   }
 
   const signOut = async () => {
-    console.log('🚪 [AuthContext] Cerrando sesión...')
     const previousUserId = user?.id
     await customAuth.signOut()
     setSession(null)
     setUser(null)
-    if (previousUserId) {
-      clearPermissionCache(previousUserId)
-    } else {
-      clearPermissionCache()
-    }
-    console.log('✅ [AuthContext] Sesión cerrada')
+    clearPermissionCache(previousUserId)
   }
 
   const refreshSession = async () => {
-    console.log('🔄 [AuthContext] Refrescando sesión...')
     await loadSession()
   }
 
@@ -101,14 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn,
     signOut,
-    refreshSession
+    refreshSession,
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

@@ -227,6 +227,8 @@ $$;
 -- ----------------------------------------------------------------------------
 -- Vista de estado tenant/RLS en finanzas (enriquecida)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v_tenant_id_status_finanzas;
+
 CREATE OR REPLACE VIEW public.v_tenant_id_status_finanzas AS
 WITH finance_tables AS (
   SELECT unnest(ARRAY[

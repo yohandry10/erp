@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Calendar, Lock, Unlock, AlertCircle, ArrowLeft, CheckCircle } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
@@ -22,7 +22,7 @@ interface Periodo {
 export default function PeriodoDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const periodoId = params.id as string
+  const periodoId = params.id as string | undefined
 
   const [periodo, setPeriodo] = useState<Periodo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -46,13 +46,9 @@ export default function PeriodoDetailPage() {
     variant: 'default'
   })
 
-  useEffect(() => {
-    if (periodoId) {
-      fetchPeriodo()
-    }
-  }, [periodoId])
+  const fetchPeriodo = useCallback(async () => {
+    if (!periodoId) return
 
-  const fetchPeriodo = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -65,7 +61,7 @@ export default function PeriodoDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall, periodoId])
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -118,6 +114,10 @@ export default function PeriodoDetailPage() {
       setReopening(false)
     }
   }
+
+  useEffect(() => {
+    fetchPeriodo()
+  }, [fetchPeriodo])
 
   if (loading) {
     return (

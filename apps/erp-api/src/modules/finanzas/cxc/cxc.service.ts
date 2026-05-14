@@ -80,7 +80,7 @@ export class CxcService {
       .select(
         `
           *,
-          clientes!inner(
+          clientes!cuentas_por_cobrar_cliente_id_fkey(
             id,
             razon_social,
             documento_numero
@@ -160,13 +160,13 @@ export class CxcService {
       return;
     }
 
-    const facturaId = documentoReferenciaId ?? cpeReferenciaId;
-
-    if (!documentoReferenciaId && cpeReferenciaId) {
-      this.logger.warn(
-        `⚠️ [CXC] No se pudo resolver documento_id para CPE ${cpeReferenciaId}, se usará el ID del CPE como referencia`,
+    if (!documentoReferenciaId) {
+      throw new BadRequestException(
+        `No se pudo resolver documento operativo para CPE ${cpeReferenciaId}`,
       );
     }
+
+    const facturaId = documentoReferenciaId;
 
     const client = this.supabase.getClient();
     const startedAt = Date.now();
@@ -587,7 +587,7 @@ export class CxcService {
       .select(
         `
           *,
-          clientes(*),
+          clientes:clientes!cuentas_por_cobrar_cliente_id_fkey(*),
           documentos:documentos(*),
           pedido:pedidos_venta(id, numero, estado),
           pagos:cxc_pagos(*)
@@ -1396,7 +1396,7 @@ export class CxcService {
         }
 
         this.logger.error(
-          `❌ [CXC] Error creando documento fallback para CPE ${cpeId}:`,
+          `❌ [CXC] Error creando documento operativo para CPE ${cpeId}:`,
           insertError,
         );
         return null;
@@ -1409,9 +1409,9 @@ export class CxcService {
       }
 
       return documentoId;
-    } catch (fallbackError: any) {
+    } catch (documentError: any) {
       this.logger.error(
-        `❌ [CXC] Error general creando documento para CPE ${cpeId}: ${fallbackError?.message ?? fallbackError}`,
+        `❌ [CXC] Error general creando documento para CPE ${cpeId}: ${documentError?.message ?? documentError}`,
       );
       return null;
     }
@@ -1708,7 +1708,7 @@ export class CxcService {
         .from('clientes')
         .select('id, numero_documento')
         .eq('tenant_id', tenantId)
-        .eq('numero_documento', documento)
+        .or(`ruc.eq.${documento},codigo.eq.${documento}`)
         .maybeSingle();
 
       if (error) {
@@ -1833,21 +1833,30 @@ export class CxcService {
     const tipoDocumento = this.mapSunatDocumentoTipo(tipoDocumentoSunat);
     const tipoCliente = tipoDocumento === 'RUC' ? 'EMPRESA' : 'PERSONA';
     const tipoDocumentoCorto = this.mapDocumentoTipoCorto(tipoDocumento);
+    const documentoEnteroSeguro = this.toSafeIntegerDocument(documento);
 
-    const insertData = {
+    const insertData: Record<string, any> = {
       tenant_id: tenantId,
       tipo: tipoCliente,
       tipo_documento: tipoDocumentoCorto,
       documento_tipo: tipoDocumento,
-      numero_documento: documento,
       razon_social: razonSocial ?? 'CLIENTE',
-      nombre_comercial: razonSocial ?? null,
+      nombre: razonSocial ?? 'CLIENTE',
+      codigo: documento,
       direccion: direccion ?? null,
       email: null,
-      telefono: null,
-      contacto: null,
       activo: true,
+      estado: 'ACTIVO',
     };
+
+    if (tipoDocumento === 'RUC') {
+      insertData.ruc = documento;
+    }
+
+    if (documentoEnteroSeguro !== null) {
+      insertData.numero_documento = documentoEnteroSeguro;
+      insertData.documento_numero = documentoEnteroSeguro;
+    }
 
     try {
       const { data, error } = await client
@@ -1870,6 +1879,19 @@ export class CxcService {
       this.logger.error('❌ [CXC] Error inesperado creando cliente desde CPE:', error);
       return null;
     }
+  }
+
+  private toSafeIntegerDocument(documento: string): number | null {
+    if (!/^\d+$/.test(documento)) {
+      return null;
+    }
+
+    const value = Number(documento);
+    if (!Number.isSafeInteger(value) || value > 2147483647) {
+      return null;
+    }
+
+    return value;
   }
 }
 

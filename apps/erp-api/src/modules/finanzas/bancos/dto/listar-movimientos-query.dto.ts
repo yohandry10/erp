@@ -1,6 +1,18 @@
-import { IsOptional, IsDateString, IsString, IsBoolean, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsDateString, IsString, IsBoolean, IsInt, Min, Max, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+const toOptionalBoolean = ({ obj, key, value }: { obj?: Record<string, unknown>; key?: string; value: unknown }) => {
+  const rawValue = key && obj ? obj[key] : value;
+  if (rawValue === undefined || rawValue === null || rawValue === '') return undefined;
+  if (typeof rawValue === 'boolean') return rawValue;
+  if (typeof rawValue === 'string') {
+    const normalized = rawValue.trim().toLowerCase();
+    if (['true', '1', 'yes', 'si', 'sí'].includes(normalized)) return true;
+    if (['false', '0', 'no'].includes(normalized)) return false;
+  }
+  return rawValue;
+};
 
 export class ListarMovimientosQueryDto {
   @ApiPropertyOptional({
@@ -33,9 +45,26 @@ export class ListarMovimientosQueryDto {
     example: false,
   })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(toOptionalBoolean)
   @IsBoolean({ message: 'El estado de conciliación debe ser un booleano' })
   conciliado?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar movimientos importados desde extracto bancario',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(toOptionalBoolean)
+  @IsBoolean({ message: 'El origen de extracto debe ser un booleano' })
+  es_extracto?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filtrar movimientos asociados a una conciliación bancaria',
+    example: '0f2d1186-6d09-4fdb-9eb5-5d6b5d15db41',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'La conciliación debe ser un UUID válido' })
+  conciliacion_id?: string;
 
   @ApiPropertyOptional({
     description: 'Número de página',

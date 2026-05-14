@@ -28,6 +28,10 @@ ALTER TABLE IF EXISTS public.ventas
   ADD COLUMN IF NOT EXISTS idempotency_key text,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.ventas;
+DROP POLICY IF EXISTS tenant_isolation ON public.venta_detalles;
+DROP POLICY IF EXISTS tenant_isolation ON public.pagos_ventas;
+
 ALTER TABLE IF EXISTS public.ventas
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN cliente_id TYPE uuid USING app.to_uuid_or_null(COALESCE(cliente_id::text, '')),
@@ -484,5 +488,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_pagos_ventas_tenant_event_id
 ON public.pagos_ventas (tenant_id, event_id)
 WHERE tenant_id IS NOT NULL
   AND event_id IS NOT NULL;
+
+SELECT app.apply_tenant_policy('public', 'ventas');
+SELECT app.apply_tenant_policy('public', 'venta_detalles');
+SELECT app.apply_tenant_policy('public', 'pagos_ventas');
 
 COMMIT;

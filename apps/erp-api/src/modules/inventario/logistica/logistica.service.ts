@@ -54,7 +54,7 @@ export class LogisticaService {
         numero,
         fecha_pedido,
         cliente_id,
-        clientes(id, razon_social, numero_documento),
+        clientes:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, numero_documento),
         estado,
         total,
         created_at
@@ -126,7 +126,7 @@ export class LogisticaService {
         numero,
         fecha_pedido,
         cliente_id,
-        clientes(id, razon_social, numero_documento),
+        clientes:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, numero_documento),
         estado,
         total,
         created_at

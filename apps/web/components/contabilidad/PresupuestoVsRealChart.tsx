@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -12,6 +12,7 @@ import {
 import { exportToExcel, formatCurrencyForExcel, formatPercentageForExcel } from '@/lib/excel-export'
 import PresupuestoEjecucionIndicator, { getEjecucionColor } from './PresupuestoEjecucionIndicator'
 import PresupuestoEjecucionPorCentroChart from './PresupuestoEjecucionPorCentroChart'
+import { useApi } from '@/hooks/use-api'
 
 interface PresupuestoVsRealChartProps {
   periodoId: string
@@ -86,40 +87,31 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedCentros, setExpandedCentros] = useState<Set<string>>(new Set())
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
 
-  useEffect(() => {
-    fetchComparacion()
-    
-    // Auto-expand the specified centro if provided
-    if (centroId && data) {
-      setExpandedCentros(new Set([centroId]))
-    }
-  }, [periodoId, centroId])
-
-  const fetchComparacion = async () => {
+  const fetchComparacion = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/contabilidad/presupuestos/comparacion/${periodoId}`, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Error al obtener la comparación')
-      }
-
-      const result = await response.json()
+      const result = await apiCall(`/contabilidad/presupuestos/comparacion/${periodoId}`)
       setData(result.data)
     } catch (err) {
-      console.error('Error fetching comparación:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall, periodoId])
+
+  useEffect(() => {
+    fetchComparacion()
+  }, [fetchComparacion])
+
+  useEffect(() => {
+    if (centroId && data) {
+      setExpandedCentros(new Set([centroId]))
+    }
+  }, [centroId, data])
 
   const toggleCentro = (centroId: string) => {
     const newExpanded = new Set(expandedCentros)

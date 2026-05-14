@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+import { useState, useCallback, useEffect } from 'react'
+import { useApiCall } from '@/hooks/use-api'
+import { unwrapApiObject } from '@/lib/api-contract'
 
 interface GreViewModalProps {
   isOpen: boolean
@@ -30,41 +30,33 @@ interface GreData {
 export default function GreViewModal({ isOpen, onClose, documentId }: GreViewModalProps) {
   const [greData, setGreData] = useState<GreData | null>(null)
   const [loading, setLoading] = useState(false)
+  const { get } = useApiCall<GreData>()
+
+  const loadGreData = useCallback(async () => {
+    if (!documentId) return
+
+    setLoading(true)
+    try {
+      const result = await get(`/api/gre/guias/${documentId}`)
+      setGreData(unwrapApiObject<GreData>(result, null as any))
+    } catch (error) {
+      console.error('Error cargando GRE:', error)
+      setGreData(null)
+    }
+    setLoading(false)
+  }, [get, documentId])
 
   useEffect(() => {
     if (isOpen && documentId) {
       loadGreData()
     }
-  }, [isOpen, documentId])
-
-  const loadGreData = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/gre/guias/${documentId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'demo-token'}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        setGreData(result.data)
-      }
-    } catch (error) {
-      console.error('Error cargando GRE:', error)
-    }
-    setLoading(false)
-  }
+  }, [documentId, isOpen, loadGreData])
 
   const handleDownloadPdf = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/gre/guias/${documentId}/pdf`, {
+      const response = await fetch(`/backend/api/gre/guias/${documentId}/pdf/`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || 'demo-token'}`,
-        }
+        credentials: 'include',
       })
 
       if (response.ok) {

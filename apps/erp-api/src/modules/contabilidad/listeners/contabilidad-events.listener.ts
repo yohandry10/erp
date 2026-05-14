@@ -675,6 +675,13 @@ export class ContabilidadEventsListener implements OnModuleInit {
     try {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'venta.facturada');
+      if (eventData.source === 'ventas.pedidos.confirmacion') {
+        this.logger.log(
+          `ℹ️ [ContabilidadEventsListener] Pedido confirmado ${eventData.ventaId ?? eventData.pedidoId ?? evento.event_id}; ` +
+          'se espera evento fiscal/CxC para generar asiento de venta.',
+        );
+        return;
+      }
       
       // Preparar datos para el generador de asientos
       const ventaData = {
@@ -874,13 +881,17 @@ export class ContabilidadEventsListener implements OnModuleInit {
     try {
       const eventData = evento.event_data;
       const tenantId = this.ensureEventTenant(eventData, 'recepcion.registrada');
+      const totalRecepcion = eventData.totalParcial ?? eventData.total;
+      const costoRecepcion =
+        eventData.subtotalParcial ?? eventData.subtotal ?? eventData.costo;
+      const igvRecepcion = eventData.igvParcial ?? eventData.igv;
       
       const compraData = {
         tenant_id: tenantId,
         fecha: eventData.fechaRecepcion || eventData.fecha || new Date().toISOString(),
-        total: eventData.total,
-        costo: eventData.subtotal || eventData.costo,
-        igv: eventData.igv,
+        total: totalRecepcion,
+        costo: costoRecepcion,
+        igv: igvRecepcion,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroRecepcion || eventData.numeroOrden,
         event_id: eventData.eventId || evento.event_id
@@ -1227,7 +1238,5 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
 }
-
-
 
 

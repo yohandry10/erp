@@ -106,15 +106,16 @@ export function useCountryContext(): CountryContext {
   const loadCountryContext = async () => {
     try {
       // Obtener configuración de la empresa que incluye país
-      const response = await api.get('/api/configuration/empresa');
+      const response = await api.get('/api/configuration/context/country');
+      const empresaConfig = response?.data ?? response;
       
-      if (response?.data) {
-        const paisId = response.data.pais_id ? Number(response.data.pais_id) : 0;
-        const paisCodigo = typeof response.data.pais === 'string'
-          ? response.data.pais.toUpperCase()
+      if (empresaConfig) {
+        const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : 0;
+        const paisCodigo = typeof empresaConfig.pais === 'string'
+          ? empresaConfig.pais.toUpperCase()
           : '';
-        const monedaDefecto = typeof response.data.monedaDefecto === 'string'
-          ? response.data.monedaDefecto.toUpperCase()
+        const monedaDefecto = typeof empresaConfig.monedaDefecto === 'string'
+          ? empresaConfig.monedaDefecto.toUpperCase()
           : '';
 
         if (!paisId || !paisCodigo) {

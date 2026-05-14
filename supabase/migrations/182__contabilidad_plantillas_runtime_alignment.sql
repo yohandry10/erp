@@ -54,6 +54,13 @@ ALTER TABLE IF EXISTS public.plantillas_asientos
   ADD COLUMN IF NOT EXISTS aplica_por_defecto boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.plantillas_asientos;
+DROP POLICY IF EXISTS tenant_isolation ON public.plantillas_asientos_detalle;
+DROP POLICY IF EXISTS tenant_isolation ON public.plantillas_asientos_historial;
+DROP POLICY IF EXISTS tenant_isolation ON public.plantillas_asientos_ventas;
+DROP POLICY IF EXISTS tenant_or_global_select ON public.plantillas_asientos_ventas;
+DROP POLICY IF EXISTS tenant_or_global_write ON public.plantillas_asientos_ventas;
+
 ALTER TABLE IF EXISTS public.plantillas_asientos
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN nombre TYPE text USING NULLIF(btrim(COALESCE(nombre, '')), ''),
@@ -570,5 +577,10 @@ ON public.plantillas_asientos_historial (tenant_id, fecha_generacion DESC, estad
 
 CREATE INDEX IF NOT EXISTS idx_plantillas_asientos_ventas_runtime_lookup
 ON public.plantillas_asientos_ventas (pais_id, tipo_documento, activo, tenant_id);
+
+SELECT app.apply_tenant_policy('public', 'plantillas_asientos');
+SELECT app.apply_tenant_policy('public', 'plantillas_asientos_detalle');
+SELECT app.apply_tenant_policy('public', 'plantillas_asientos_historial');
+SELECT app.apply_global_or_tenant_policy('public', 'plantillas_asientos_ventas');
 
 COMMIT;

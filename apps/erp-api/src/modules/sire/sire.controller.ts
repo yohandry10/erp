@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SireService } from './sire.service';
@@ -23,22 +23,8 @@ export class SireController {
   @ApiResponse({ status: 200, description: 'SIRE statistics retrieved successfully' })
   @RequirePermission('sire.read')
   async getStats(@CurrentTenant() tenantId: string) {
-    try {
-      console.log('📊 Endpoint SIRE stats llamado');
-      return await this.sireService.getStats(tenantId);
-    } catch (error) {
-      console.error('❌ Error en endpoint SIRE stats:', error);
-      return {
-        success: false,
-        data: {
-          reportesDelMes: 0,
-          registrosTotales: 0,
-          enviadosASunat: 0,
-          pendientes: 0,
-        },
-        error: error.message
-      };
-    }
+    console.log('📊 Endpoint SIRE stats llamado');
+    return await this.sireService.getStats(tenantId);
   }
 
   @Get('reportes')
@@ -46,17 +32,8 @@ export class SireController {
   @ApiResponse({ status: 200, description: 'SIRE reports retrieved successfully' })
   @RequirePermission('sire.read')
   async getReportes(@Query() filters: any, @CurrentTenant() tenantId: string) {
-    try {
-      console.log('📄 Endpoint SIRE reportes llamado con filtros:', filters);
-      return await this.sireService.getReportes(filters, tenantId);
-    } catch (error) {
-      console.error('❌ Error en endpoint SIRE reportes:', error);
-      return {
-        success: false,
-        data: [],
-        error: error.message
-      };
-    }
+    console.log('📄 Endpoint SIRE reportes llamado con filtros:', filters);
+    return await this.sireService.getReportes(filters, tenantId);
   }
 
   @Post('generar-reporte')
@@ -69,11 +46,7 @@ export class SireController {
       return await this.sireService.generarReporte(reportData, tenantId);
     } catch (error) {
       console.error('❌ Error en endpoint SIRE generar-reporte:', error);
-      return {
-        success: false,
-        message: 'Error al generar el reporte SIRE',
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -82,17 +55,8 @@ export class SireController {
   @ApiResponse({ status: 200, description: 'SIRE report downloaded successfully' })
   @RequirePermission('sire.read')
   async downloadReporte(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    try {
-      console.log('📥 Endpoint SIRE download llamado para ID:', id);
-      return await this.sireService.downloadReporte(id, tenantId);
-    } catch (error) {
-      console.error('❌ Error en endpoint SIRE download:', error);
-      return {
-        success: false,
-        message: 'Error al descargar el reporte',
-        error: error.message
-      };
-    }
+    console.log('📥 Endpoint SIRE download llamado para ID:', id);
+    return await this.sireService.downloadReporte(id, tenantId);
   }
 
   @Post('reportes/:id/enviar-sunat')
@@ -100,17 +64,8 @@ export class SireController {
   @ApiResponse({ status: 200, description: 'SIRE report sent to SUNAT successfully' })
   @RequirePermission('sire.emitir')
   async enviarSunat(@Param('id') id: string, @CurrentTenant() tenantId: string) {
-    try {
-      console.log('📡 Endpoint SIRE enviar-sunat llamado para ID:', id);
-      return await this.sireService.enviarSunat(id, tenantId);
-    } catch (error) {
-      console.error('❌ Error en endpoint SIRE enviar-sunat:', error);
-      return {
-        success: false,
-        message: 'Error al enviar reporte a SUNAT',
-        error: error.message
-      };
-    }
+    console.log('📡 Endpoint SIRE enviar-sunat llamado para ID:', id);
+    return await this.sireService.enviarSunat(id, tenantId);
   }
 
   @Post('test-evento')
@@ -171,7 +126,7 @@ export class SireController {
   @Post('test-integracion-pos')
   @ApiOperation({ summary: 'Test POS → CPE → SIRE integration' })
   @RequirePermission('system.debug')
-  async testIntegracionPOS(@Body() testData: any) {
+  async testIntegracionPOS() {
     try {
       if (isProduction()) {
         throw new ForbiddenException('Endpoint restringido en producción');
@@ -213,6 +168,7 @@ export class SireController {
 
   @Get()
   @ApiOperation({ summary: 'Get SIRE exports (placeholder)' })
+  @RequirePermission('sire.read')
   findAll() {
     return this.sireService.findAll();
   }

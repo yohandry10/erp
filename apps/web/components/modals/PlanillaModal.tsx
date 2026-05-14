@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 import { toast } from '@/components/ui/use-toast'
@@ -60,23 +60,6 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     estado: 'borrador'
   })
 
-  useEffect(() => {
-    console.log('🔥 useEffect triggered - isOpen:', isOpen)
-    if (isOpen) {
-      console.log('🔥 Modal OPENING - configurando período y cargando empleados')
-      configurarPeriodoActual()
-      loadEmpleados()
-      document.body.style.overflow = 'hidden'
-    } else {
-      console.log('🔥 Modal CLOSING')
-      document.body.style.overflow = 'unset'
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen])
-
   const configurarPeriodoActual = () => {
     const ahora = new Date()
     const periodo = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`
@@ -95,7 +78,7 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     })
   }
 
-  const loadEmpleados = async () => {
+  const loadEmpleados = useCallback(async () => {
     console.log('🔥 loadEmpleados INICIADO')
     try {
       setLoading(true)
@@ -145,7 +128,24 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    console.log('🔥 useEffect triggered - isOpen:', isOpen)
+    if (isOpen) {
+      console.log('🔥 Modal OPENING - configurando período y cargando empleados')
+      configurarPeriodoActual()
+      loadEmpleados()
+      document.body.style.overflow = 'hidden'
+    } else {
+      console.log('🔥 Modal CLOSING')
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen, loadEmpleados])
 
   const calcularValoresEmpleado = (empleado: EmpleadoPlanilla) => {
     const sueldoDiario = empleado.sueldo_base / DIAS_LABORABLES_MES

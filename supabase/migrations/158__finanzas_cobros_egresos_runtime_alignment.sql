@@ -44,6 +44,15 @@ ALTER TABLE IF EXISTS public.gastos
   ADD COLUMN IF NOT EXISTS numero_comprobante text,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP VIEW IF EXISTS public.v_costos_fijos_mensuales;
+DROP VIEW IF EXISTS public.v_gastos_resumen;
+
+DROP POLICY IF EXISTS tenant_isolation ON public.gastos;
+DROP POLICY IF EXISTS tenant_isolation ON public.egresos;
+DROP POLICY IF EXISTS tenant_isolation ON public.cobranzas;
+DROP POLICY IF EXISTS tenant_isolation ON public.gestiones_cobranza;
+DROP POLICY IF EXISTS tenant_isolation ON public.pagos_facturas;
+
 ALTER TABLE IF EXISTS public.gastos
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN centro_costo_id TYPE uuid USING app.to_uuid_or_null(COALESCE(centro_costo_id::text, '')),
@@ -892,5 +901,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_pagos_facturas_tenant_event_id
 ON public.pagos_facturas (tenant_id, event_id)
 WHERE tenant_id IS NOT NULL
   AND event_id IS NOT NULL;
+
+SELECT app.apply_tenant_policy('public', 'gastos');
+SELECT app.apply_tenant_policy('public', 'egresos');
+SELECT app.apply_tenant_policy('public', 'cobranzas');
+SELECT app.apply_tenant_policy('public', 'gestiones_cobranza');
+SELECT app.apply_tenant_policy('public', 'pagos_facturas');
+
+CREATE OR REPLACE VIEW public.v_costos_fijos_mensuales AS
+SELECT
+  tenant_id,
+  date_trunc('month', created_at) AS periodo,
+  SUM(COALESCE(monto, app.to_numeric_or_zero(metadata->>'total'), 0)) AS total_mes
+FROM public.gastos
+GROUP BY tenant_id, date_trunc('month', created_at);
+
+CREATE OR REPLACE VIEW public.v_gastos_resumen AS
+SELECT
+  tenant_id,
+  estado,
+  COUNT(*) AS total_registros,
+  SUM(COALESCE(monto, app.to_numeric_or_zero(metadata->>'total'), 0)) AS total_gastos
+FROM public.gastos
+GROUP BY tenant_id, estado;
 
 COMMIT;

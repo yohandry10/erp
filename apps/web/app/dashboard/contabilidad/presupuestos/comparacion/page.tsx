@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Calendar, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import PresupuestoVsRealChart from '@/components/contabilidad/PresupuestoVsRealChart'
@@ -21,23 +21,7 @@ export default function ComparacionPresupuestoPage() {
   const [loading, setLoading] = useState(true)
   const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
-  useEffect(() => {
-    fetchPeriodos()
-    
-    // Check for URL parameters
-    const params = new URLSearchParams(window.location.search)
-    const periodoIdParam = params.get('periodoId')
-    const centroIdParam = params.get('centroId')
-    
-    if (periodoIdParam) {
-      setSelectedPeriodoId(periodoIdParam)
-    }
-    if (centroIdParam) {
-      setCentroIdFilter(centroIdParam)
-    }
-  }, [])
-
-  const fetchPeriodos = async () => {
+  const fetchPeriodos = useCallback(async () => {
     try {
       setLoading(true)
       const result = await apiCall('/contabilidad/periodos')
@@ -58,7 +42,22 @@ export default function ComparacionPresupuestoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall])
+
+  useEffect(() => {
+    fetchPeriodos()
+
+    const params = new URLSearchParams(window.location.search)
+    const periodoIdParam = params.get('periodoId')
+    const centroIdParam = params.get('centroId')
+
+    if (periodoIdParam) {
+      setSelectedPeriodoId(periodoIdParam)
+    }
+    if (centroIdParam) {
+      setCentroIdFilter(centroIdParam)
+    }
+  }, [fetchPeriodos])
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -74,6 +73,7 @@ export default function ComparacionPresupuestoPage() {
       <div className="dashboard-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
+            aria-label="Volver a presupuestos"
             onClick={() => router.back()}
             style={{
               padding: '0.5rem',

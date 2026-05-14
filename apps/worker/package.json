@@ -11,19 +11,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@erp-suite/crypto": "workspace:*",
-    "@erp-suite/dtos": "workspace:*",
     "@supabase/supabase-js": "^2.39.0",
-    "@types/ioredis": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "axios": "^1.6.0",
-    "bull": "^4.12.2",
+    "axios": "^1.16.0",
     "bullmq": "^4.15.4",
     "dotenv": "^16.3.1",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
-    "redis": "^4.6.10",
     "winston": "^3.11.0"
   },
   "devDependencies": {

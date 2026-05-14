@@ -79,6 +79,10 @@ export class CreateFacturaDto {
   @IsString()
   razon_social_receptor: string;
 
+  @IsOptional()
+  @IsString()
+  cliente_id?: string;
+
   @IsString()
   @IsOptional()
   direccion_receptor?: string;

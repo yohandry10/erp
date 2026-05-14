@@ -52,6 +52,12 @@ ALTER TABLE IF EXISTS public.gre_guias
   ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now(),
   ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
+DROP POLICY IF EXISTS tenant_isolation ON public.gre_guias;
+DROP POLICY IF EXISTS tenant_isolation ON public.gre_detalles;
+DROP POLICY IF EXISTS tenant_isolation ON public.sire_files;
+DROP POLICY IF EXISTS tenant_isolation ON public.sire_registros_detalle;
+DROP VIEW IF EXISTS public.gre_documentos;
+
 ALTER TABLE IF EXISTS public.gre_guias
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN numero TYPE text USING NULLIF(btrim(COALESCE(numero::text, '')), ''),
@@ -784,5 +790,23 @@ ON public.sire_registros_detalle (tenant_id, reporte_id, fecha_registro DESC);
 
 CREATE INDEX IF NOT EXISTS idx_sire_registros_detalle_tenant_cpe_runtime
 ON public.sire_registros_detalle (tenant_id, cpe_id, fecha_registro DESC);
+
+CREATE OR REPLACE VIEW public.gre_documentos AS
+SELECT
+  g.id,
+  g.tenant_id,
+  g.serie,
+  g.numero,
+  COALESCE(NULLIF(btrim(g.estado::text), ''), 'BORRADOR') AS estado,
+  g.fecha_emision,
+  COALESCE(g.total, 0)::numeric(14,2) AS total,
+  g.created_at,
+  g.updated_at
+FROM public.gre_guias g;
+
+SELECT app.apply_tenant_policy('public', 'gre_guias');
+SELECT app.apply_tenant_policy('public', 'gre_detalles');
+SELECT app.apply_tenant_policy('public', 'sire_files');
+SELECT app.apply_tenant_policy('public', 'sire_registros_detalle');
 
 COMMIT;

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -75,11 +75,7 @@ export default function AsientosPage() {
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
 
-  useEffect(() => {
-    loadAsientos()
-  }, [])
-
-  const loadAsientos = async () => {
+  const loadAsientos = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -97,7 +93,11 @@ export default function AsientosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadAsientos()
+  }, [loadAsientos])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {

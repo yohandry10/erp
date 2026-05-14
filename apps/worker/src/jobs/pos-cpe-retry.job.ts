@@ -74,6 +74,8 @@ export async function runPosCpeRetryJob(): Promise<{
       try {
         const token = jwt.sign(
           {
+            iss: 'pos.worker',
+            sub: 'worker-service',
             scope: 'pos.worker',
             tenant_id: tenant.id,
             tenant_ids: [tenant.id],

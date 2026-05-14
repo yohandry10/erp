@@ -20,11 +20,13 @@ import { TaxCalculatorService } from '../shared/utils/tax-calculator';
 import { Request } from 'express';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
 @ApiTags('cotizaciones')
 @ApiBearerAuth()
 @Controller('cotizaciones')
 @UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('ventas.cotizaciones.read')
 export class CotizacionesController {
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -276,6 +278,7 @@ export class CotizacionesController {
   }
 
   @Post('crear')
+  @RequirePermission('ventas.cotizaciones.write')
   @ApiOperation({ summary: 'Crear nueva cotización' })
   @ApiResponse({ status: 201, description: 'Cotización creada exitosamente' })
   async createCotizacion(@Body() cotizacionData: any, @Req() req: Request) {
@@ -361,6 +364,7 @@ export class CotizacionesController {
   }
 
   @Put(':id')
+  @RequirePermission('ventas.cotizaciones.write')
   @ApiOperation({ summary: 'Actualizar cotización' })
   @ApiResponse({ status: 200, description: 'Cotización actualizada exitosamente' })
   async actualizarCotizacion(@Param('id') id: string, @Body() cotizacionData: any, @Req() req: Request) {
@@ -449,6 +453,7 @@ export class CotizacionesController {
   // ========== NUEVOS ENDPOINTS PARA CONVERSIÓN ==========
 
   @Put(':id/aprobar')
+  @RequirePermission('ventas.cotizaciones.approve')
   @ApiOperation({ summary: 'Aprobar cotización' })
   @ApiResponse({ status: 200, description: 'Cotización aprobada exitosamente' })
   async aprobarCotizacion(@Param('id') id: string, @Body() data: { probabilidad?: number, observaciones?: string }, @Req() req: Request) {
@@ -496,6 +501,7 @@ export class CotizacionesController {
   }
 
   @Post(':id/convertir-en-venta')
+  @RequirePermission('ventas.cotizaciones.convert')
   @ApiOperation({ summary: 'Convertir cotización aprobada en venta/factura' })
   @ApiResponse({ status: 201, description: 'Cotización convertida en venta exitosamente' })
   async convertirEnVenta(@Param('id') id: string, @Body() opcionesConversion: {
@@ -704,6 +710,7 @@ export class CotizacionesController {
   }
 
   @Put(':id/rechazar')
+  @RequirePermission('ventas.cotizaciones.approve')
   @ApiOperation({ summary: 'Rechazar cotización' })
   @ApiResponse({ status: 200, description: 'Cotización rechazada exitosamente' })
   async rechazarCotizacion(@Param('id') id: string, @Body() data: { motivo: string }, @Req() req: Request) {
