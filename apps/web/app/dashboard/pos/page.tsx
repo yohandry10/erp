@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { ConfigStatusBanner } from '@/components/pos/config-status-banner'
 import { usePosConfig } from '@/hooks/use-pos-config'
@@ -49,7 +50,10 @@ interface MetodoPago {
 interface Cliente {
   id: string
   tipo_documento: string
-  numero_documento: string
+  numero_documento?: string | number | null
+  documento_numero?: string | number | null
+  ruc?: string | null
+  codigo?: string | null
   nombres?: string
   apellidos?: string
   razon_social?: string
@@ -67,19 +71,9 @@ interface EstadoCaja {
 
 export default function POSPage() {
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
-  if (!posEnabled) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold">POS no disponible</h1>
-        {/* // HARDENING: POS deshabilitado por feature flag. */}
-        <p className="text-slate-600 mt-2">
-          El módulo POS está deshabilitado en este entorno.
-        </p>
-      </div>
-    )
-  }
 
   const api = useApi()
+  const posSaleApi = useApi({ retries: 1, timeoutMs: 30000 })
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
@@ -92,6 +86,15 @@ export default function POSPage() {
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const taxRate = country.impuestoRate ?? 0.18
+  const getClienteDocumento = useCallback((cliente?: Cliente | null) => {
+    return String(
+      cliente?.numero_documento ??
+      cliente?.documento_numero ??
+      cliente?.ruc ??
+      cliente?.codigo ??
+      '',
+    ).trim()
+  }, [])
 
   // Estados principales
   const [productos, setProductos] = useState<ProductoPOS[]>([])
@@ -180,35 +183,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     }
   }, [estadoCaja?.estado, sesionCajaId]);
 
-  useEffect(() => {
-    // Solo cargar datos una vez al montar el componente
-    // Usar ref para evitar doble carga en StrictMode
-    if (!datosInicializados && !cargandoRef.current) {
-      cargandoRef.current = true;
-
-      // Rehidratar sesión almacenada (si la hay) para mostrar estado mientras valida con API
-      if (typeof window !== 'undefined') {
-        const sesionGuardada = localStorage.getItem('pos_sesion_caja_id');
-        if (sesionGuardada) {
-          sesionGuardadaRef.current = sesionGuardada;
-          setSesionCajaId(sesionGuardada);
-          setEstadoCaja((prev) => ({
-            estado: 'ABIERTA',
-            montoInicial: prev?.montoInicial || 0,
-            ventasEfectivo: prev?.ventasEfectivo || 0,
-            ventasTarjeta: prev?.ventasTarjeta || 0,
-            montoFinal: prev?.montoFinal || 0,
-            cajaId: prev?.cajaId,
-            sesionId: sesionGuardada,
-          }));
-        }
-      }
-
-      cargarDatos();
-    }
-  }, []);
-
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     console.log('🔄 Cargando datos POS empresarial...')
     setIsLoading(true)
     try {
@@ -239,7 +214,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         } catch (sesionError) {
           console.error('❌ Error cargando sesión de caja:', sesionError);
         }
-        
+
         if (cajas.length === 0) {
           console.warn('⚠️ No hay cajas configuradas para este tenant');
           setHayCajasDisponibles(false);
@@ -425,7 +400,35 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       setDatosInicializados(true)
       setIsLoading(false)
     }
-  }
+  }, [api, toast])
+
+  useEffect(() => {
+    // Solo cargar datos una vez al montar el componente
+    // Usar ref para evitar doble carga en StrictMode
+    if (!datosInicializados && !cargandoRef.current) {
+      cargandoRef.current = true;
+
+      // Rehidratar sesión almacenada (si la hay) para mostrar estado mientras valida con API
+      if (typeof window !== 'undefined') {
+        const sesionGuardada = localStorage.getItem('pos_sesion_caja_id');
+        if (sesionGuardada) {
+          sesionGuardadaRef.current = sesionGuardada;
+          setSesionCajaId(sesionGuardada);
+          setEstadoCaja((prev) => ({
+            estado: 'ABIERTA',
+            montoInicial: prev?.montoInicial || 0,
+            ventasEfectivo: prev?.ventasEfectivo || 0,
+            ventasTarjeta: prev?.ventasTarjeta || 0,
+            montoFinal: prev?.montoFinal || 0,
+            cajaId: prev?.cajaId,
+            sesionId: sesionGuardada,
+          }));
+        }
+      }
+
+      cargarDatos();
+    }
+  }, [cargarDatos, datosInicializados]);
 
   const recargarHistorialVentas = async () => {
     try {
@@ -724,7 +727,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
     // Validar documento de cliente seleccionado
     const clienteActual = clientes.find(c => c.id === clienteSeleccionado)
-    const documento = (clienteActual?.numero_documento || '').trim()
+    const documento = getClienteDocumento(clienteActual)
     if (!documento || documento.length < 8) {
       toast({
         variant: 'destructive',
@@ -866,7 +869,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         sesion_caja_id: sesionCajaId,
         cliente_id: clienteSeleccionado,
         cliente_nombre: clienteActual?.razon_social || `${clienteActual?.nombres || ''} ${clienteActual?.apellidos || ''}`.trim() || 'Cliente General',
-        cliente_documento: clienteActual?.numero_documento || '00000000',
+        cliente_documento: getClienteDocumento(clienteActual) || '00000000',
         metodo_pago_id: pagosMixtos ? null : metodoPagoSeleccionado,
         referencia_pago: pagosMixtos ? null : referenciaPago,
         numero_comprobante: comprobante.numero,
@@ -903,7 +906,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       const enviarVenta = async () => {
         console.log('🔄 Iniciando llamada API...')
-        const resp = await api.post('/api/pos/venta', ventaData)
+        const resp = await posSaleApi.post('/api/pos/venta', ventaData)
         console.log('📨 Respuesta completa del backend:', resp)
         console.log('📨 Tipo de respuesta:', typeof resp, 'Es null?', resp === null, 'Es undefined?', resp === undefined)
         return resp
@@ -949,14 +952,28 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         setDescuentoGlobal({ tipo: 'PORCENTAJE', valor: 0, descripcion: '' })
         setCurrentIdempotencyKey(null)
 
-        // 8. SOLO recargar historial de ventas (NO cargar todos los datos para mantener caja abierta)
+        const itemsActualizados = Array.isArray(ventaInfo?.items_actualizados) ? ventaInfo.items_actualizados : []
+        if (itemsActualizados.length > 0) {
+          setProductos((prev) => prev.map((producto) => {
+            const actualizado = itemsActualizados.find((item: any) => item.producto_id === producto.id)
+            if (!actualizado) return producto
+            return {
+              ...producto,
+              stock_actual: actualizado.stock_actual ?? producto.stock_actual,
+              stock_disponible: actualizado.stock_disponible ?? producto.stock_disponible,
+            }
+          }))
+        }
+
+        // 8. Recargar historial y productos para reflejar stock real sin cerrar la caja.
         console.log('🔄 Recargando historial de ventas...')
         await recargarHistorialVentas().catch(err => console.warn('⚠️ Error recargando historial:', err))
+        await recargarProductos().catch(err => console.warn('⚠️ Error recargando productos:', err))
 
         // 9. Mostrar modal de venta exitosa con opción de imprimir
         console.log('✅ Venta procesada exitosamente:', resultado)
         const totalVenta = totalServidor ?? calcularTotal()
-        
+
         // Preparar datos para el modal de éxito
         setVentaExitosaData({
           venta_id: ventaInfo.venta_id,
@@ -1318,6 +1335,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
     )
   }
 
+  if (!posEnabled) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-bold">POS no disponible</h1>
+        <p className="text-slate-600 mt-2">
+          El módulo POS está deshabilitado en este entorno.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       {!estadoCaja || estadoCaja.estado === 'CERRADA' ? (
@@ -1344,7 +1372,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   {hayCajasDisponibles ? 'CAJA CERRADA' : 'SIN CAJA CONFIGURADA'}
                 </h2>
                 <p className="dashboard-subtitle" style={{ marginBottom: '2rem' }}>
-                  {hayCajasDisponibles 
+                  {hayCajasDisponibles
                     ? 'Para usar el sistema POS, primero debe abrir la caja registradora con el monto inicial'
                     : 'No hay cajas registradoras configuradas. Vaya a Configuración para crear una caja primero.'}
                 </p>
@@ -1731,8 +1759,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   boxShadow: 'var(--shadow-xl)',
                 }}
               >
-                <ProductGrid 
-                  productos={productosFiltrados} 
+                <ProductGrid
+                  productos={productosFiltrados}
                   onAgregar={agregarAlCarrito}
                   productoSeleccionado={productoSeleccionado}
                   onSeleccionar={setProductoSeleccionado}
@@ -1800,9 +1828,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     >
                       <div style={{ flexShrink: 0 }}>
                         {item.producto.imagen_url ? (
-                          <img
+                          <Image
                             src={item.producto.imagen_url}
                             alt={item.producto.nombre}
+                            width={60}
+                            height={60}
+                            unoptimized
                             style={{
                               width: '60px',
                               height: '60px',
@@ -1846,23 +1877,23 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           Stock: {item.producto.stock_disponible ?? item.producto.stock_actual ?? 0}
                         </p>
                         <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 5)}
                           >
                             -5%
                           </button>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 10)}
                           >
                             -10%
                           </button>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }} 
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 0)}
                           >
                             ↺
@@ -2034,7 +2065,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     <option value="">-- Seleccionar cliente --</option>
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {(c.razon_social || `${c.nombres || ''} ${c.apellidos || ''}`.trim() || 'Cliente')} - {c.numero_documento}
+                        {(c.razon_social || `${c.nombres || ''} ${c.apellidos || ''}`.trim() || 'Cliente')} - {getClienteDocumento(c)}
                       </option>
                     ))}
                   </select>
@@ -2045,7 +2076,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       ✅ {clienteActual.razon_social || `${clienteActual.nombres || ''} ${clienteActual.apellidos || ''}`.trim()}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--emerald-600)' }}>
-                      {clienteActual.tipo_documento}: {clienteActual.numero_documento}
+                      {clienteActual.tipo_documento}: {getClienteDocumento(clienteActual)}
                     </div>
                   </div>
                 )}
@@ -2058,7 +2089,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     ➕ Crear nuevo cliente
                   </button>
                 )}
-                
+
                 {/* Tipo de Comprobante */}
                 <div style={{ marginTop: '0.75rem' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--primary-600)', marginBottom: '0.5rem', display: 'block' }}>
@@ -2396,7 +2427,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '1.5rem' }}>
                     <div>
                       {empresaInfo?.logo_url ? (
-                        <img src={empresaInfo.logo_url} alt="Logo de la empresa" style={{ maxHeight: '60px', marginBottom: '1rem' }} />
+                        <Image
+                          src={empresaInfo.logo_url}
+                          alt="Logo de la empresa"
+                          width={160}
+                          height={60}
+                          unoptimized
+                          style={{ maxHeight: '60px', width: 'auto', marginBottom: '1rem', objectFit: 'contain' }}
+                        />
                       ) : (
                         <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
                           {empresaInfo?.nombre_comercial || 'Mi Empresa'}

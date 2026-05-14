@@ -7,10 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface OutboxEventInsert {
   /** UUID único del evento - obligatorio para trazabilidad */
   event_id: string;
-  
-  /** UUID de correlación para agrupar eventos relacionados */
-  correlation_id: string;
-  
+
   /** ID del tenant - obligatorio para multi-tenancy */
   tenant_id: string;
   
@@ -24,20 +21,14 @@ export interface OutboxEventInsert {
   event_type: string;
   
   /** Payload del evento con todos los datos necesarios */
-  event_data: Record<string, any>;
-  
-  /** Versión del schema del evento - default 1 */
-  event_version: number;
-  
-  /** Estado inicial del evento - siempre 'PENDING' al crear */
-  status: 'PENDING';
+  payload: Record<string, any>;
+
+  /** Estado inicial del evento - siempre 'pending' al crear */
+  status: 'pending';
   
   /** Contador de reintentos - siempre 0 al crear */
   retry_count: number;
   
-  /** Máximo de reintentos permitidos - default 5 */
-  max_retries?: number;
-
   /** Llave de idempotencia por tenant (dedupe de reintentos upstream) */
   idempotency_key?: string;
   
@@ -76,12 +67,7 @@ export class OutboxEventBuilder {
       aggregateId,
       eventData,
       eventId = uuidv4(),
-      correlationId,
-      eventVersion = 1,
-      maxRetries = 5,
     } = options;
-
-    const resolvedCorrelationId = correlationId || options.idempotencyKey || uuidv4();
 
     // Validaciones
     if (!tenantId) {
@@ -97,8 +83,8 @@ export class OutboxEventBuilder {
       throw new Error('aggregateId es requerido para crear un evento de outbox');
     }
 
-    // Asegurar que tenantId esté en event_data para compatibilidad
-    const enrichedEventData = {
+    // Asegurar que tenantId esté en payload para compatibilidad con listeners.
+    const enrichedPayload = {
       ...eventData,
       tenantId,
       tenant_id: tenantId,
@@ -106,16 +92,13 @@ export class OutboxEventBuilder {
 
     return {
       event_id: eventId,
-      correlation_id: resolvedCorrelationId,
       tenant_id: tenantId,
       aggregate_type: aggregateType,
       aggregate_id: aggregateId,
       event_type: eventType,
-      event_data: enrichedEventData,
-      event_version: eventVersion,
-      status: 'PENDING',
+      payload: enrichedPayload,
+      status: 'pending',
       retry_count: 0,
-      max_retries: maxRetries,
       idempotency_key: options.idempotencyKey,
       created_at: new Date().toISOString(),
     };

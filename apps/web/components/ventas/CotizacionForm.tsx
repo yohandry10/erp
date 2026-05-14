@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { Cotizacion, CotizacionDetalle } from '@/types/ventas'
@@ -57,7 +57,7 @@ export default function CotizacionForm({
 }: CotizacionFormProps) {
   const { get } = useApi()
   const { tasaIgv } = useTaxConfig()
-  
+
   const [clienteId, setClienteId] = useState(cotizacion?.cliente_id || '')
   const [fechaVencimiento, setFechaVencimiento] = useState(cotizacion?.fecha_vencimiento || '')
   const [notas, setNotas] = useState(cotizacion?.notas || '')
@@ -81,11 +81,6 @@ export default function CotizacionForm({
     })
     .filter((info) => info.solicitado > info.disponible)
 
-  // Load productos on mount
-  useEffect(() => {
-    loadProductos()
-  }, [])
-
   // Initialize detalle from cotizacion if editing
   useEffect(() => {
     if (cotizacion?.detalle && cotizacion.detalle.length > 0) {
@@ -101,7 +96,7 @@ export default function CotizacionForm({
     }
   }, [cotizacion])
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
       setLoadingProductos(true)
       const response = await get('/inventario/productos')
@@ -126,7 +121,12 @@ export default function CotizacionForm({
     } finally {
       setLoadingProductos(false)
     }
-  }
+  }, [get])
+
+  // Load productos on mount
+  useEffect(() => {
+    loadProductos()
+  }, [loadProductos])
 
   const handleAddItem = () => {
     setDetalle([
@@ -234,7 +234,7 @@ export default function CotizacionForm({
 
     try {
       setSubmitting(true)
-      
+
       const formData: CotizacionFormData = {
         cliente_id: clienteId,
         fecha_vencimiento: fechaVencimiento || undefined,
@@ -365,7 +365,7 @@ export default function CotizacionForm({
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--primary-500)' }}>
             <Package style={{ width: '3rem', height: '3rem', margin: '0 auto 0.5rem', color: 'var(--primary-400)' }} />
             <p style={{ margin: '0.5rem 0' }}>No hay productos agregados</p>
-            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en "Agregar Producto" para comenzar</p>
+            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en &quot;Agregar Producto&quot; para comenzar</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

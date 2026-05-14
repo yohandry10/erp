@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 
 interface MovimientoCaja {
@@ -29,13 +29,7 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (sesionId) {
-            cargarMovimientos();
-        }
-    }, [sesionId]);
-
-    const cargarMovimientos = async () => {
+    const cargarMovimientos = useCallback(async () => {
         try {
             setLoading(true);
             const response = await api.get(`/cajas/movimientos/${sesionId}`);
@@ -50,7 +44,13 @@ export function CashMovementsTable({ sesionId, className = '' }: CashMovementsTa
         } finally {
             setLoading(false);
         }
-    };
+    }, [api, sesionId]);
+
+    useEffect(() => {
+        if (sesionId) {
+            cargarMovimientos();
+        }
+    }, [cargarMovimientos, sesionId]);
 
     const formatearHora = (fecha: string) => {
         return new Date(fecha).toLocaleTimeString('es-PE', {

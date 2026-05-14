@@ -2,12 +2,14 @@ import { ValidationService } from './validation.service';
 import { ColombiaValidationService } from './colombia-validation.service';
 import { ApiPeruService } from './apiperu.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('ValidationService', () => {
   let service: ValidationService;
   let supabaseService: jest.Mocked<SupabaseService>;
   let colombiaService: jest.Mocked<ColombiaValidationService>;
   let apiPeruService: jest.Mocked<ApiPeruService>;
+  let configService: jest.Mocked<ConfigService>;
 
   const mockSupabaseClient = {
     from: jest.fn().mockReturnThis(),
@@ -29,7 +31,11 @@ describe('ValidationService', () => {
       lookupDni: jest.fn(),
     } as any;
 
-    service = new ValidationService(supabaseService, colombiaService, apiPeruService);
+    configService = {
+      get: jest.fn(),
+    } as any;
+
+    service = new ValidationService(supabaseService, colombiaService, apiPeruService, configService);
   });
 
   afterEach(() => {
@@ -165,7 +171,7 @@ describe('ValidationService', () => {
     it('debe validar documento con datos correctos', async () => {
       const document = {
         serie: 'F001',
-        correlativo: 12345,
+        correlativo: '12345',
         total: 1000,
         items: [{ descripcion: 'Item 1', cantidad: 1, precio: 1000 }],
       };
@@ -179,7 +185,7 @@ describe('ValidationService', () => {
     it('debe rechazar serie con formato incorrecto', async () => {
       const document = {
         serie: 'F00', // Solo 3 caracteres
-        correlativo: 12345,
+        correlativo: '12345',
         total: 1000,
         items: [],
       };
@@ -193,7 +199,7 @@ describe('ValidationService', () => {
     it('debe rechazar correlativo con más de 8 dígitos', async () => {
       const document = {
         serie: 'F001',
-        correlativo: 123456789, // 9 dígitos
+        correlativo: '123456789', // 9 dígitos
         total: 1000,
         items: [],
       };
@@ -207,7 +213,7 @@ describe('ValidationService', () => {
     it('debe rechazar monto total negativo', async () => {
       const document = {
         serie: 'F001',
-        correlativo: 12345,
+        correlativo: '12345',
         total: -100,
         items: [],
       };
@@ -222,7 +228,7 @@ describe('ValidationService', () => {
       const items = Array(501).fill({ descripcion: 'Item', cantidad: 1, precio: 10 });
       const document = {
         serie: 'F001',
-        correlativo: 12345,
+        correlativo: '12345',
         total: 5010,
         items,
       };
@@ -237,7 +243,7 @@ describe('ValidationService', () => {
       const items = Array(1000).fill({ descripcion: 'Item', cantidad: 1, precio: 10 });
       const document = {
         serie: 'F001',
-        correlativo: 12345,
+        correlativo: '12345',
         total: 10000,
         items,
       };

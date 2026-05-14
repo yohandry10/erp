@@ -90,15 +90,23 @@ export class OseService implements OnModuleInit {
   }
 
   private initializeXmlSigner() {
+    const requireRealCertificate = this.oseConfig.environment === 'produccion'
+      || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === true
+      || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === 'true';
+
     try {
       // Verificar si existe el certificado real
       if (fs.existsSync(this.oseConfig.certificatePath)) {
         this.xmlSigner = new XmlSigner({
           pfxPath: this.oseConfig.certificatePath,
           pfxPassword: this.oseConfig.certificatePassword,
+          allowDemoFallback: !requireRealCertificate,
         });
         this.logger.log('✅ Certificado digital real cargado exitosamente');
       } else {
+        if (requireRealCertificate) {
+          throw new Error(`Certificado fiscal requerido no encontrado: ${this.oseConfig.certificatePath}`);
+        }
         this.logger.warn('⚠️ Certificado no encontrado, usando modo DEMO para testing');
         // Usar modo demo con la flag correcta
         this.xmlSigner = new XmlSigner({
@@ -108,6 +116,9 @@ export class OseService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error('❌ Error inicializando certificado:', error);
+      if (requireRealCertificate) {
+        throw error;
+      }
       // Fallback a modo demo si hay cualquier error
       this.logger.warn('🔧 Iniciando en modo DEMO como fallback...');
       this.xmlSigner = new XmlSigner({

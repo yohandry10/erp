@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { toast } from '@/components/ui/use-toast'
@@ -65,14 +65,7 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
     }
   ])
 
-  useEffect(() => {
-    console.log('🔥 [COTIZACION MODAL] useEffect triggered - isOpen:', isOpen)
-    if (isOpen) {
-      loadClientes()
-    }
-  }, [isOpen])
-
-  const loadClientes = async () => {
+  const loadClientes = useCallback(async () => {
     try {
       const response = await get('/api/pos/clientes')
       if (response && response.success && Array.isArray(response.data)) {
@@ -108,7 +101,14 @@ export default function CotizacionModal({ isOpen, onClose, onSuccess }: Cotizaci
         }
       ])
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    console.log('🔥 [COTIZACION MODAL] useEffect triggered - isOpen:', isOpen)
+    if (isOpen) {
+      loadClientes()
+    }
+  }, [isOpen, loadClientes])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))

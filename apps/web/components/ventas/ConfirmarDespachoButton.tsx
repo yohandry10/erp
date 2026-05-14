@@ -90,7 +90,7 @@ export function ConfirmarDespachoButton({
                 <ul className="text-sm text-blue-800 mt-2 space-y-1 list-disc list-inside">
                   <li>Descontará el stock real de los productos</li>
                   <li>Liberará las reservas de inventario</li>
-                  <li>Cambiará el estado a "Listo para Facturar"</li>
+                  <li>Cambiará el estado a &quot;Listo para Facturar&quot;</li>
                   <li>Notificará al equipo de ventas</li>
                 </ul>
               </div>

@@ -5,10 +5,12 @@ import { EventBusService } from '../shared/events/event-bus.service';
 import { FinancialIntegrationService } from '../shared/integration/financial-integration.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../common/guards/permission.guard';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 
 @ApiTags('finanzas')
 @Controller('finanzas')
 @UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('finanzas.read')
 export class FinanzasController {
   constructor(
     private readonly supabase: SupabaseService,
@@ -54,6 +56,7 @@ export class FinanzasController {
   }
 
   @Post('analisis-credito')
+  @RequirePermission('finanzas.write')
   @ApiOperation({ summary: 'Análisis de crédito basado en datos reales' })
   @ApiResponse({ status: 200, description: 'Análisis crediticio completo' })
   async getAnalisisCredito(@Body() solicitudData: {

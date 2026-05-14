@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 
@@ -25,17 +25,7 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (isOpen) {
-            cargarCajas();
-            setStep('SELECT_CAJA');
-            setMontoInicio(0);
-            setDenominaciones({ billetes: {}, monedas: {} });
-            setError(null);
-        }
-    }, [isOpen]);
-
-    const cargarCajas = async () => {
+    const cargarCajas = useCallback(async () => {
         try {
             setLoading(true);
             const response = await api.get('/cajas');
@@ -53,7 +43,17 @@ export function CashOpenDialog({ isOpen, onClose, onSuccess }: CashOpenDialogPro
         } finally {
             setLoading(false);
         }
-    };
+    }, [api]);
+
+    useEffect(() => {
+        if (isOpen) {
+            cargarCajas();
+            setStep('SELECT_CAJA');
+            setMontoInicio(0);
+            setDenominaciones({ billetes: {}, monedas: {} });
+            setError(null);
+        }
+    }, [cargarCajas, isOpen]);
 
     const handleDenominationSubmit = (denom: Denominaciones, total: number) => {
         setDenominaciones(denom);

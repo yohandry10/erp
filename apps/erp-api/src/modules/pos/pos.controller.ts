@@ -1,17 +1,17 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param, UnauthorizedException, ForbiddenException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { Controller, Get, Post, Body, UseGuards, Req, Param, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { FeatureFlagGuard } from '../../common/guards/feature-flag.guard';
 import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorator';
 import { PosService } from './pos.service';
+import { Public } from '../../common/decorators/public.decorator';
+import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
 
 @Controller('pos')
 export class PosController {
   constructor(
     private readonly posService: PosService,
-    private readonly jwtService: JwtService,
   ) {}
 
   @Get('productos')
@@ -87,7 +87,10 @@ export class PosController {
     foto_apertura?: string;
     user_agent?: string;
   }, @Req() req: any) {
-    return this.posService.abrirCaja(data, req.user);
+    if (data?.supervisor_id || data?.razon_autorizacion) {
+      throw new ForbiddenException('La autorización de supervisor debe validarse en un flujo dedicado');
+    }
+    return this.posService.abrirCaja(data as any, req.user);
   }
 
   @Post('caja/cerrar')
@@ -102,8 +105,8 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consultar detalle de venta.
-  async getDetallesVenta(@Body() data: { venta_id: string }, @Req() req: any) {
-    return this.posService.getDetallesVenta(data.venta_id, req.user);
+  async getDetallesVenta(@Param('id') id: string, @Req() req: any) {
+    return this.posService.getDetallesVenta(id, req.user);
   }
 
   @Post('configurar-certificado')
@@ -146,45 +149,12 @@ export class PosController {
   }
 
   @Post('worker/procesar-pendientes')
+  @Public()
+  @UseGuards(WorkerAuthGuard)
   async procesarVentasPendientesWorker(@Req() req: any) {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-    const secret = process.env.POS_WORKER_JWT_SECRET;
-
-    if (!token) {
-      throw new UnauthorizedException('Falta Authorization Bearer token');
-    }
-    if (!secret || secret.length < 24) {
-      throw new ForbiddenException('POS_WORKER_JWT_SECRET no configurado o demasiado corto');
-    }
-
-    let payload: any;
-    try {
-      payload = this.jwtService.verify(token, { secret });
-    } catch (err) {
-      throw new UnauthorizedException('Token de worker inválido o expirado');
-    }
-
-    if (payload?.scope !== 'pos.worker') {
-      throw new ForbiddenException('Scope inválido para worker POS');
-    }
-
-    const requestedTenant = req.query.tenant_id || req.headers['x-tenant-id'];
+    const requestedTenant = req.tenantId;
     if (!requestedTenant) {
       throw new ForbiddenException('Debe indicar tenant_id a procesar');
-    }
-
-    const allowedTenants: string[] = Array.isArray(payload?.tenant_ids) ? payload.tenant_ids : [];
-    const singleTenant = payload?.tenant_id;
-    const allTenants = payload?.all_tenants === true;
-
-    const isAllowed =
-      allTenants ||
-      (singleTenant && String(singleTenant) === String(requestedTenant)) ||
-      allowedTenants.some(t => String(t) === String(requestedTenant));
-
-    if (!isAllowed) {
-      throw new ForbiddenException('El token de worker no tiene acceso al tenant solicitado');
     }
 
     return this.posService.procesarVentasPendientesFacturacion(String(requestedTenant), 50);

@@ -15,7 +15,7 @@ export default function DemoPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/demo/create`, {
+      const response = await fetch(`${apiUrl}/api/demo/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dias_duracion: 14 }),

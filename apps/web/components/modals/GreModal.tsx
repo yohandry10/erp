@@ -5,6 +5,7 @@ import { useApiCall } from '@/hooks/use-api'
 
 interface CpeData {
   id: string
+  tipoDocumento?: string
   tipoComprobante: string
   serie: string
   numero: number
@@ -72,7 +73,7 @@ export default function GreModal({
         destinatario: cpeData.cliente,
         fechaTraslado: fechaTraslado,
         motivo: 'VENTA',
-        observaciones: `Relacionado con ${cpeData.tipoComprobante === '01' ? 'Factura' : 'Boleta'} ${cpeData.serie}-${cpeData.numero.toString().padStart(8, '0')} - ${cpeData.cliente}`
+        observaciones: `Relacionado con ${(cpeData.tipoDocumento || cpeData.tipoComprobante) === '01' ? 'Factura' : 'Boleta'} ${cpeData.serie}-${cpeData.numero.toString().padStart(8, '0')} - ${cpeData.cliente}`
       }))
     }
   }, [cpeData, isOpen])
@@ -204,7 +205,7 @@ export default function GreModal({
             <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>Nueva Guía de Remisión Electrónica</h2>
             {cpeData && (
               <p style={{ fontSize: '0.9rem', color: '#22c55e', marginTop: '0.25rem', fontWeight: '500' }}>
-                🔗 Datos pre-llenados desde {cpeData.tipoComprobante === '01' ? 'Factura' : 'Boleta'} {cpeData.serie}-{cpeData.numero.toString().padStart(8, '0')}
+                🔗 Datos pre-llenados desde {(cpeData.tipoDocumento || cpeData.tipoComprobante) === '01' ? 'Factura' : 'Boleta'} {cpeData.serie}-{cpeData.numero.toString().padStart(8, '0')}
               </p>
             )}
           </div>
@@ -491,4 +492,3 @@ export default function GreModal({
     </div>
   )
 }
-

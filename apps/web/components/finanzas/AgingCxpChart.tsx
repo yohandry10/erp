@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { BarChart3, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react'
 
@@ -46,7 +46,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   const [agingData, setAgingData] = useState<AgingData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadAgingData = async () => {
+  const loadAgingData = useCallback(async () => {
     try {
       setLoading(true)
       const params = proveedorId ? `?proveedor_id=${proveedorId}` : ''
@@ -60,11 +60,11 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, proveedorId])
 
   useEffect(() => {
     loadAgingData()
-  }, [proveedorId])
+  }, [loadAgingData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
   User,
   MessageSquare,
   Calendar,
@@ -56,16 +56,12 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadAprobaciones()
-  }, [ordenId])
-
-  const loadAprobaciones = async () => {
+  const loadAprobaciones = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const response = await get(`/api/compras/ordenes/${ordenId}/aprobaciones`)
-      
+
       if (response?.success && response.data) {
         setAprobaciones(response.data)
       } else {
@@ -77,7 +73,11 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, ordenId])
+
+  useEffect(() => {
+    loadAprobaciones()
+  }, [loadAprobaciones])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE', {
@@ -92,7 +92,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   const getEstadoBadge = (estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA') => {
     const config = ESTADO_CONFIG[estado]
     const Icon = config.icon
-    
+
     return (
       <span style={{
         display: 'inline-flex',
@@ -120,9 +120,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   if (loading) {
     return (
       <div className="activity-card">
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '0.75rem',
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
@@ -155,9 +155,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   if (error) {
     return (
       <div className="activity-card">
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '0.75rem',
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
@@ -193,9 +193,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
   return (
     <div className="activity-card">
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '0.75rem',
         marginBottom: '1.5rem',
         paddingBottom: '1rem',
@@ -224,9 +224,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       </div>
 
       {/* Summary Stats */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(3, 1fr)', 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '0.75rem',
         marginBottom: '1.5rem'
       }}>
@@ -276,9 +276,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       {/* Progress Bar */}
       {aprobaciones.length > 0 && (
         <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '0.5rem'
           }}>
@@ -299,8 +299,8 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
             <div style={{
               width: `${(aprobadas / aprobaciones.length) * 100}%`,
               height: '100%',
-              background: rechazadas > 0 
-                ? 'linear-gradient(90deg, var(--red-500), var(--red-600))' 
+              background: rechazadas > 0
+                ? 'linear-gradient(90deg, var(--red-500), var(--red-600))'
                 : 'linear-gradient(90deg, var(--emerald-500), var(--emerald-600))',
               transition: 'width 0.3s ease'
             }} />
@@ -311,7 +311,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       {/* Approvals List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {aprobaciones.map((aprobacion) => (
-          <div 
+          <div
             key={aprobacion.id}
             style={{
               padding: '1rem',
@@ -321,9 +321,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
               transition: 'all 0.2s ease'
             }}
           >
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'flex-start',
               marginBottom: '0.75rem'
             }}>
@@ -355,9 +355,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
             </div>
 
             {aprobacion.fecha_aprobacion && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.375rem',
                 marginBottom: '0.5rem',
                 fontSize: '0.75rem',
@@ -376,9 +376,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
                 background: 'white',
                 border: '1px solid var(--primary-200)'
               }}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '0.375rem',
                   marginBottom: '0.375rem',
                   fontSize: '0.75rem',
@@ -388,9 +388,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
                   <MessageSquare size={12} />
                   Comentarios
                 </div>
-                <p style={{ 
-                  fontSize: '0.75rem', 
-                  color: 'var(--primary-700)', 
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--primary-700)',
                   margin: 0,
                   lineHeight: '1.5'
                 }}>
@@ -403,9 +403,9 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       </div>
 
       {aprobaciones.length === 0 && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '2rem', 
+        <div style={{
+          textAlign: 'center',
+          padding: '2rem',
           color: 'var(--primary-400)',
           fontSize: '0.875rem'
         }}>

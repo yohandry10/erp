@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi } from '@/hooks/use-api'
 
@@ -43,20 +43,7 @@ export default function PlanillaCalcularModal({ isOpen, onClose, onSuccess, plan
   const [empleados, setEmpleados] = useState<EmpleadoPlanilla[]>([])
   const [calculando, setCalculando] = useState(false)
 
-  useEffect(() => {
-    if (isOpen && planilla) {
-      loadEmpleados()
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'unset'
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, planilla])
-
-  const loadEmpleados = async () => {
+  const loadEmpleados = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/api/rrhh/empleados')
@@ -99,7 +86,20 @@ export default function PlanillaCalcularModal({ isOpen, onClose, onSuccess, plan
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    if (isOpen && planilla) {
+      loadEmpleados()
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen, loadEmpleados, planilla])
 
   const calcularEmpleado = (empleado: EmpleadoPlanilla): EmpleadoPlanilla => {
     const sueldoDiario = empleado.sueldo_base / 30

@@ -12,9 +12,78 @@ import { runPosFacturaPendienteJob } from './jobs/pos-facturacion-pendiente.job'
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 
+type WorkerRuntimeConfig = {
+  apiBase: string;
+  healthPort: number;
+  healthToken?: string;
+  supabaseUrl: string;
+  supabaseServiceRoleKey: string;
+  redisHost: string;
+  redisPort: number;
+  redisPassword?: string;
+  workerJwtSecret: string;
+};
+
+const DEFAULT_ERP_API_URL = 'http://localhost:3002/api';
+
+function requireEnv(env: NodeJS.ProcessEnv, name: string, minLength = 1): string {
+  const value = env[name]?.trim();
+  if (!value || value.length < minLength) {
+    throw new Error(`${name} must be configured with at least ${minLength} characters`);
+  }
+  return value;
+}
+
+function parsePort(value: string | undefined, fallback: number, name: string): number {
+  const raw = value?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+    throw new Error(`${name} must be a valid TCP port`);
+  }
+  return parsed;
+}
+
+function parseUrl(value: string, name: string): string {
+  try {
+    return new URL(value).toString().replace(/\/$/, '');
+  } catch {
+    throw new Error(`${name} must be a valid URL`);
+  }
+}
+
+function loadWorkerRuntimeConfig(env: NodeJS.ProcessEnv): WorkerRuntimeConfig {
+  const isProduction = env.NODE_ENV === 'production';
+  const apiUrl = env.ERP_API_URL?.trim() || (isProduction ? '' : DEFAULT_ERP_API_URL);
+
+  if (!apiUrl) {
+    throw new Error('ERP_API_URL must be configured in production');
+  }
+
+  const healthToken = env.HEALTH_TOKEN?.trim();
+  const redisPassword = env.REDIS_PASSWORD?.trim();
+
+  return {
+    apiBase: parseUrl(apiUrl, 'ERP_API_URL'),
+    healthPort: parsePort(env.WORKER_PORT, 3050, 'WORKER_PORT'),
+    healthToken: healthToken || undefined,
+    supabaseUrl: parseUrl(requireEnv(env, 'SUPABASE_URL'), 'SUPABASE_URL'),
+    supabaseServiceRoleKey: requireEnv(env, 'SUPABASE_SERVICE_ROLE_KEY'),
+    redisHost: env.REDIS_HOST?.trim() || 'localhost',
+    redisPort: parsePort(env.REDIS_PORT, 6379, 'REDIS_PORT'),
+    redisPassword: redisPassword || undefined,
+    workerJwtSecret: requireEnv(env, 'POS_WORKER_JWT_SECRET', 24),
+  };
+}
+
+const runtimeConfig = loadWorkerRuntimeConfig(process.env);
+
 // ERP API base (para endpoints protegidos con service role)
-const apiBase = process.env.ERP_API_URL || 'http://localhost:3002/api';
-const healthPort = parseInt(process.env.WORKER_PORT || '3050', 10);
+const apiBase = runtimeConfig.apiBase;
+const healthPort = runtimeConfig.healthPort;
 
 // Métricas básicas en memoria
 const metrics = {
@@ -65,15 +134,15 @@ const logger = winston.createLogger({
 
 // Supabase client
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  runtimeConfig.supabaseUrl,
+  runtimeConfig.supabaseServiceRoleKey
 );
 
 // Redis connection
 const redisConnection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
+  host: runtimeConfig.redisHost,
+  port: runtimeConfig.redisPort,
+  password: runtimeConfig.redisPassword,
 };
 
 // Job queues
@@ -169,20 +238,15 @@ const sireWorker = new Worker('sire-processing', async (job) => {
 // Helpers SUNAT/OSE: usar API ERP con token de servicio
 // Helpers SUNAT/OSE: usar API ERP con token de servicio
 function signWorkerToken(tenantId: string) {
-  const secret = process.env.POS_WORKER_JWT_SECRET;
-  if (!secret) {
-    logger.error('❌ POS_WORKER_JWT_SECRET no configurado');
-    throw new Error('POS_WORKER_JWT_SECRET missing');
-  }
-
   return jwt.sign(
     {
       iss: 'pos.worker',
       sub: 'worker-service',
       tenant_id: tenantId,
+      scope: 'pos.worker',
       role: 'service_role' // O un rol específico si se configura en el API
     },
-    secret,
+    runtimeConfig.workerJwtSecret,
     { expiresIn: '5m' }
   );
 }
@@ -565,7 +629,6 @@ class BackgroundWorker {
         return true;
       }
 
-      const apiBase = process.env.ERP_API_URL || 'http://localhost:3002/api';
       const idempotencyKey =
         String((cpe as any)?.idempotency_key ?? '').trim() || `worker.cpe.send:${cpe?.tenant_id}:${data.cpeId}`;
 
@@ -608,7 +671,6 @@ class BackgroundWorker {
         return true;
       }
 
-      const apiBase = process.env.ERP_API_URL || 'http://localhost:3002/api';
       const idempotencyKey =
         String((gre as any)?.idempotency_key ?? '').trim() || `worker.gre.send:${gre?.tenant_id}:${data.greId}`;
 
@@ -921,10 +983,10 @@ import http from 'http';
 const server = http.createServer((req, res) => {
   if (req.url === '/health' || req.url === '/healthz') {
     // Protección opcional con HEALTH_TOKEN
-    if (process.env.HEALTH_TOKEN) {
+    if (runtimeConfig.healthToken) {
       const token = req.headers['x-health-token'] || req.headers['authorization'];
       const cleaned = Array.isArray(token) ? token[0] : (token || '').toString().replace(/^Bearer\s+/i, '');
-      if (cleaned !== process.env.HEALTH_TOKEN) {
+      if (cleaned !== runtimeConfig.healthToken) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'unauthorized' }));
         return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,23 +10,23 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useTauri, AppConfig } from '@/hooks/useTauri';
 import { toast } from 'sonner';
-import { 
-  Settings, 
-  Shield, 
-  FileKey, 
-  Cloud, 
-  HardDrive, 
+import {
+  Settings,
+  Shield,
+  FileKey,
+  Cloud,
+  HardDrive,
   Printer,
   Download,
   Upload
 } from 'lucide-react';
 
 export default function DesktopConfig() {
-  const { 
-    isDesktop, 
-    config, 
+  const {
+    isDesktop,
+    config,
     loading,
-    saveConfig, 
+    saveConfig,
     selectCertificate,
     getPrinters,
     backupDatabase,
@@ -51,16 +51,16 @@ export default function DesktopConfig() {
     }
   }, [config]);
 
+  const loadPrinters = useCallback(async () => {
+    const printerList = await getPrinters();
+    setPrinters(printerList);
+  }, [getPrinters]);
+
   useEffect(() => {
     if (isDesktop) {
       loadPrinters();
     }
-  }, [isDesktop]);
-
-  const loadPrinters = async () => {
-    const printerList = await getPrinters();
-    setPrinters(printerList);
-  };
+  }, [isDesktop, loadPrinters]);
 
   const handleSave = async () => {
     const success = await saveConfig(formData);
@@ -96,7 +96,7 @@ export default function DesktopConfig() {
       toast.error('Selecciona un período');
       return;
     }
-    
+
     const filePath = await exportSIRE(selectedPeriod);
     if (filePath) {
       toast.success('Datos SIRE exportados correctamente');
@@ -119,7 +119,7 @@ export default function DesktopConfig() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Para acceder a las funciones avanzadas como firma digital, 
+            Para acceder a las funciones avanzadas como firma digital,
             impresión directa y modo offline, descarga la aplicación desktop.
           </p>
         </CardContent>
@@ -161,7 +161,7 @@ export default function DesktopConfig() {
               />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="sunat_endpoint">Endpoint SUNAT</Label>
             <Input
@@ -198,7 +198,7 @@ export default function DesktopConfig() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <Button 
+            <Button
               onClick={handleSelectCertificate}
               variant="outline"
               className="flex items-center gap-2"
@@ -212,7 +212,7 @@ export default function DesktopConfig() {
               </Badge>
             )}
           </div>
-          
+
           {formData.certificado_path && (
             <div className="space-y-2">
               <Label htmlFor="cert_password">Contraseña del Certificado</Label>
@@ -220,9 +220,9 @@ export default function DesktopConfig() {
                 id="cert_password"
                 type="password"
                 value={formData.certificado_password || ''}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  certificado_password: e.target.value 
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  certificado_password: e.target.value
                 }))}
                 placeholder="Contraseña del archivo .pfx"
               />
@@ -254,10 +254,10 @@ export default function DesktopConfig() {
           ) : (
             <p className="text-muted-foreground">No se encontraron impresoras</p>
           )}
-          <Button 
-            onClick={loadPrinters} 
-            variant="outline" 
-            size="sm" 
+          <Button
+            onClick={loadPrinters}
+            variant="outline"
+            size="sm"
             className="mt-4"
           >
             Actualizar Lista
@@ -278,7 +278,7 @@ export default function DesktopConfig() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-4">
-            <Button 
+            <Button
               onClick={handleBackup}
               variant="outline"
               className="flex items-center gap-2"
@@ -304,7 +304,7 @@ export default function DesktopConfig() {
                   className="w-32"
                 />
               </div>
-              <Button 
+              <Button
                 onClick={handleExportSIRE}
                 variant="outline"
                 className="flex items-center gap-2"
@@ -320,7 +320,7 @@ export default function DesktopConfig() {
 
       {/* Guardar Configuración */}
       <div className="flex justify-end">
-        <Button 
+        <Button
           onClick={handleSave}
           disabled={loading}
           className="flex items-center gap-2"

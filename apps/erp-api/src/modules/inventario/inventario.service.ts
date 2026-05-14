@@ -38,6 +38,7 @@ export interface MovimientoInventario {
   notas?: string;
   created_by?: string;
   centro_costo_id?: string;
+  emitirEvento?: boolean;
 }
 
 interface ListarRecepcionesFiltros {
@@ -159,9 +160,11 @@ export class InventarioService {
       // por lo que el cálculo del stock anterior puede ser aproximado.
       // Los métodos principales (descontarStock, registrarEntradaStockAtomico) emiten el evento directamente
       // con valores precisos. Este método solo emite para casos donde se llama directamente.
-      if (movimiento.tipo === TipoMovimiento.ENTRADA || 
+      if (movimiento.emitirEvento !== false && (
+          movimiento.tipo === TipoMovimiento.ENTRADA || 
           movimiento.tipo === TipoMovimiento.SALIDA || 
-          movimiento.tipo === TipoMovimiento.AJUSTE) {
+          movimiento.tipo === TipoMovimiento.AJUSTE
+        )) {
         try {
           // Obtener producto para calcular valores
           const { data: producto } = await this.supabase.getClient()
@@ -516,7 +519,8 @@ export class InventarioService {
         cantidad,
         referencia_tipo,
         referencia_id,
-        notas: `Salida de ${cantidad} unidades`
+        notas: `Salida de ${cantidad} unidades${referencia_tipo ? ` (${referencia_tipo})` : ''}`,
+        emitirEvento: false,
       });
 
       console.log(`✅ Stock descontado exitosamente. Nuevo stock: ${nuevoStockActual}, stock_reservado: ${nuevoStockReservado}`);
@@ -974,13 +978,76 @@ export class InventarioService {
         };
       });
 
+      let salidasQuery = client
+        .from('movimientos_inventario')
+        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas')
+        .eq('tenant_id', tenantId)
+        .in('tipo', ['SALIDA', 'AJUSTE', 'DEVOLUCION']);
+
+      if (filtros.productoId) {
+        salidasQuery = salidasQuery.eq('producto_id', filtros.productoId);
+      }
+
+      if (fechaDesde) {
+        salidasQuery = salidasQuery.gte('created_at', fechaDesde);
+      }
+
+      if (fechaHasta) {
+        salidasQuery = salidasQuery.lte('created_at', fechaHasta);
+      }
+
+      const { data: salidasData, error: salidasError } = await salidasQuery
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (salidasError) {
+        throw salidasError;
+      }
+
+      const movimientosSalida = (salidasData ?? []).map((movimiento: any) => {
+        const cantidad = Number(movimiento.cantidad ?? 0);
+        return {
+          id: movimiento.id,
+          tipo: movimiento.tipo ?? 'SALIDA',
+          fecha: this.sanitizeDateOutput(movimiento.created_at) ?? null,
+          documento: movimiento.referencia_tipo ?? null,
+          estado: null,
+          cantidad,
+          costoUnitario: 0,
+          valorTotal: 0,
+          moneda: 'PEN',
+          producto: {
+            id: movimiento.producto_id,
+            nombre: 'Producto',
+            codigo: null,
+            sku: null,
+          },
+          almacen: null,
+          ubicacion: null,
+          lote: null,
+          serie: null,
+          fechaExpiracion: null,
+          recepcionId: null,
+          referenciaTipo: movimiento.referencia_tipo ?? null,
+          referenciaId: movimiento.referencia_id ?? null,
+          motivo: movimiento.notas ?? movimiento.referencia_tipo ?? null,
+        };
+      });
+
+      movimientos.push(...movimientosSalida);
+
       movimientos.sort((a, b) => {
         const fechaA = a.fecha ? new Date(a.fecha).getTime() : 0;
         const fechaB = b.fecha ? new Date(b.fecha).getTime() : 0;
         return fechaB - fechaA;
       });
 
-      const totalEntradas = movimientos.reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
+      const totalEntradas = movimientos
+        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'ENTRADA')
+        .reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
+      const totalSalidas = movimientos
+        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'SALIDA')
+        .reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
       const valorEntradas = movimientos.reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
       const valorPorMoneda = movimientos.reduce<Record<string, number>>((acc, mov) => {
         const moneda = mov.moneda ?? 'PEN';
@@ -991,8 +1058,9 @@ export class InventarioService {
       const resumen = {
         totalMovimientos: movimientos.length,
         totalEntradas: this.round2(totalEntradas),
+        totalSalidas: this.round2(totalSalidas),
         valorEntradas: this.round2(valorEntradas),
-        saldoCantidad: this.round2(totalEntradas),
+        saldoCantidad: this.round2(totalEntradas - totalSalidas),
         saldoValorizado: this.round2(valorEntradas),
         valorPorMoneda: Object.entries(valorPorMoneda).reduce<Record<string, number>>((acc, [moneda, valor]) => {
           acc[moneda] = this.round2(valor);

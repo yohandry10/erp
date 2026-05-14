@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 
 // Componente simple para gráfico de barras
@@ -14,7 +14,7 @@ const BarChart = ({ data, title, color = '#3b82f6' }: { data: any, title: string
   }
 
   const maxValue = Math.max(...data.data)
-  
+
   return (
     <div>
       <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>{title}</h3>
@@ -51,10 +51,10 @@ const BarChart = ({ data, title, color = '#3b82f6' }: { data: any, title: string
               >
                 {height > 30 ? data.data[index].toLocaleString() : ''}
               </div>
-              <div style={{ 
-                fontSize: '0.7rem', 
-                color: '#6b7280', 
-                marginTop: '8px', 
+              <div style={{
+                fontSize: '0.7rem',
+                color: '#6b7280',
+                marginTop: '8px',
                 textAlign: 'center',
                 transform: 'rotate(-45deg)',
                 transformOrigin: 'center',
@@ -82,7 +82,7 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
 
   const total = data.data.reduce((sum: number, value: number) => sum + value, 0)
   let currentAngle = 0
-  
+
   return (
     <div>
       <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>{title}</h3>
@@ -95,25 +95,25 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
               const radius = 80
               const centerX = 100
               const centerY = 100
-              
+
               const x1 = centerX + radius * Math.cos((currentAngle * Math.PI) / 180)
               const y1 = centerY + radius * Math.sin((currentAngle * Math.PI) / 180)
               const x2 = centerX + radius * Math.cos(((currentAngle + angle) * Math.PI) / 180)
               const y2 = centerY + radius * Math.sin(((currentAngle + angle) * Math.PI) / 180)
-              
+
               const largeArcFlag = angle > 180 ? 1 : 0
-              
+
               const pathData = [
                 `M ${centerX} ${centerY}`,
                 `L ${x1} ${y1}`,
                 `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
                 'Z'
               ].join(' ')
-              
+
               const color = data.backgroundColor[index] || `hsl(${(index * 137.5) % 360}, 70%, 60%)`
-              
+
               currentAngle += angle
-              
+
               return (
                 <path
                   key={index}
@@ -129,22 +129,22 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
             })}
           </svg>
         </div>
-        
+
         <div style={{ flex: 1 }}>
           {data.labels.map((label: string, index: number) => {
             const percentage = ((data.data[index] / total) * 100).toFixed(1)
             const color = data.backgroundColor[index] || `hsl(${(index * 137.5) % 360}, 70%, 60%)`
-            
+
             return (
               <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <div 
-                  style={{ 
-                    width: '16px', 
-                    height: '16px', 
-                    backgroundColor: color, 
+                <div
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: color,
                     marginRight: '0.75rem',
                     borderRadius: '2px'
-                  }} 
+                  }}
                 />
                 <span style={{ fontSize: '0.9rem', color: '#374151' }}>
                   {label}: {percentage}%
@@ -163,8 +163,8 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
   // Verificación de seguridad para datos
   if (!data || typeof data.valor === 'undefined' || typeof data.objetivo === 'undefined') {
     return (
-      <div style={{ 
-        textAlign: 'center', 
+      <div style={{
+        textAlign: 'center',
         padding: '1.5rem',
         backgroundColor: '#f8fafc',
         borderRadius: '8px',
@@ -180,10 +180,10 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
 
   const percentage = Math.min((data.valor / data.objetivo) * 100, 100)
   const color = percentage >= 80 ? '#10b981' : percentage >= 60 ? '#f59e0b' : '#ef4444'
-  
+
   return (
-    <div style={{ 
-      textAlign: 'center', 
+    <div style={{
+      textAlign: 'center',
       padding: '1.5rem',
       backgroundColor: '#f8fafc',
       borderRadius: '8px',
@@ -209,10 +209,10 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
             style={{ transition: 'stroke-dasharray 1s ease' }}
           />
         </svg>
-        <div style={{ 
-          position: 'absolute', 
-          bottom: '10px', 
-          left: '50%', 
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          left: '50%',
           transform: 'translateX(-50%)',
           fontSize: '1.2rem',
           fontWeight: '700',
@@ -236,16 +236,12 @@ export default function AnalyticsPage() {
   const [kpisVisuales, setKpisVisuales] = useState<any>(null)
   const [periodo, setPeriodo] = useState('mensual')
 
-  const api = useApiCall()
+  const { get } = useApiCall()
 
-  useEffect(() => {
-    cargarDatos()
-  }, [periodo])
-
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     try {
       console.log('📊 Cargando datos de analytics...')
-      
+
       const [
         ventasResponse,
         deudasClientesResponse,
@@ -253,11 +249,11 @@ export default function AnalyticsPage() {
         ventasCategoriaResponse,
         kpisResponse
       ] = await Promise.all([
-        api.get(`/api/analytics/ventas-tiempo?periodo=${periodo}`),
-        api.get('/api/analytics/deudas-clientes'),
-        api.get('/api/analytics/deudas-proveedores'),
-        api.get('/api/analytics/ventas-categoria'),
-        api.get('/api/analytics/kpis-visuales')
+        get(`/api/analytics/ventas-tiempo?periodo=${periodo}`),
+        get('/api/analytics/deudas-clientes'),
+        get('/api/analytics/deudas-proveedores'),
+        get('/api/analytics/ventas-categoria'),
+        get('/api/analytics/kpis-visuales')
       ])
 
       // Procesar respuestas con verificación de éxito
@@ -304,15 +300,19 @@ export default function AnalyticsPage() {
     } catch (error) {
       console.error('💥 Error cargando datos de analytics:', error)
     }
-  }
+  }, [get, periodo])
+
+  useEffect(() => {
+    cargarDatos()
+  }, [cargarDatos])
 
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1 className="dashboard-title">📈 Analytics Financiero</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <select 
-            value={periodo} 
+          <select
+            value={periodo}
             onChange={(e) => setPeriodo(e.target.value)}
             style={{
               padding: '0.5rem',
@@ -336,9 +336,9 @@ export default function AnalyticsPage() {
             <KPIGauge data={kpisVisuales?.liquidez} title="💧 Liquidez" />
             <KPIGauge data={kpisVisuales?.rentabilidad} title="📈 Rentabilidad" />
             <KPIGauge data={kpisVisuales?.crecimiento} title="🚀 Crecimiento" />
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '1.5rem', 
+            <div style={{
+              textAlign: 'center',
+              padding: '1.5rem',
               backgroundColor: '#f8fafc',
               borderRadius: '8px',
               border: '1px solid #e2e8f0'
@@ -358,7 +358,7 @@ export default function AnalyticsPage() {
                   Sin datos de rotación
                 </div>
               )}
-              
+
               {kpisVisuales?.eficiencia?.cicloEfectivo !== undefined ? (
                 <>
                   <div style={{ fontSize: '1rem', fontWeight: '600', color: '#10b981', marginTop: '0.5rem' }}>
@@ -381,12 +381,12 @@ export default function AnalyticsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         {/* Ventas en el Tiempo */}
         <div className="activity-card">
-          <BarChart 
+          <BarChart
             data={ventasTiempo ? {
               labels: ventasTiempo.labels,
               data: ventasTiempo.datasets?.[0]?.data || []
-            } : null} 
-            title="📊 Evolución de Ventas" 
+            } : null}
+            title="📊 Evolución de Ventas"
             color="#3b82f6"
           />
           {ventasTiempo?.totales && (
@@ -399,9 +399,9 @@ export default function AnalyticsPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                 <span>Crecimiento:</span>
-                <span style={{ 
-                  fontWeight: '600', 
-                  color: ventasTiempo.totales.crecimiento.includes('-') ? '#ef4444' : '#10b981' 
+                <span style={{
+                  fontWeight: '600',
+                  color: ventasTiempo.totales.crecimiento.includes('-') ? '#ef4444' : '#10b981'
                 }}>
                   {ventasTiempo.totales.crecimiento}
                 </span>
@@ -412,9 +412,9 @@ export default function AnalyticsPage() {
 
         {/* Ventas por Categoría */}
         <div className="activity-card">
-          <PieChart 
-            data={ventasCategoria?.graficoPie} 
-            title="🏷️ Ventas por Categoría" 
+          <PieChart
+            data={ventasCategoria?.graficoPie}
+            title="🏷️ Ventas por Categoría"
           />
         </div>
 
@@ -424,12 +424,12 @@ export default function AnalyticsPage() {
             👥 Análisis de Cuentas por Cobrar
           </h3>
           {deudasClientes?.graficoEdadSaldos && (
-            <BarChart 
+            <BarChart
               data={{
                 labels: deudasClientes.graficoEdadSaldos.labels || [],
                 data: deudasClientes.graficoEdadSaldos.data || []
               }}
-              title="" 
+              title=""
               color="#10b981"
             />
           )}
@@ -444,7 +444,7 @@ export default function AnalyticsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                 <span>Vencido:</span>
                 <span style={{ fontWeight: '600', color: '#ef4444' }}>
-                  S/ {deudasClientes.totales.vencido.toLocaleString()} 
+                  S/ {deudasClientes.totales.vencido.toLocaleString()}
                   ({deudasClientes.totales.porcentajeVencido.toFixed(1)}%)
                 </span>
               </div>
@@ -458,12 +458,12 @@ export default function AnalyticsPage() {
             🏪 Análisis de Cuentas por Pagar
           </h3>
           {deudasProveedores?.graficoEdadSaldos && (
-            <BarChart 
+            <BarChart
               data={{
                 labels: deudasProveedores.graficoEdadSaldos.labels || [],
                 data: deudasProveedores.graficoEdadSaldos.data || []
               }}
-              title="" 
+              title=""
               color="#ef4444"
             />
           )}
@@ -478,7 +478,7 @@ export default function AnalyticsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
                 <span>Vencido:</span>
                 <span style={{ fontWeight: '600', color: '#7f1d1d' }}>
-                  S/ {deudasProveedores.totales.vencido.toLocaleString()} 
+                  S/ {deudasProveedores.totales.vencido.toLocaleString()}
                   ({deudasProveedores.totales.porcentajeVencido.toFixed(1)}%)
                 </span>
               </div>
@@ -490,7 +490,7 @@ export default function AnalyticsPage() {
       {/* Análisis Explicativo */}
       <div className="activity-card" style={{ marginTop: '2rem' }}>
         <h2 style={{ marginBottom: '2rem' }}>🧠 Análisis Inteligente para Empresarios</h2>
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
           <div style={{ padding: '1.5rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #0ea5e9' }}>
             <h3 style={{ color: '#0c4a6e', marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>

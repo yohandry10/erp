@@ -692,8 +692,7 @@ export class PresupuestosService {
       `)
       .eq('tenant_id', tenantId)
       .eq('periodo_contable_id', periodoContableId)
-      .order('centro_costo_id', { ascending: true })
-      .order('plan_cuentas.codigo', { ascending: true });
+      .order('centro_costo_id', { ascending: true });
 
     if (errorPresupuestos) {
       console.error('❌ [Presupuestos] Error obteniendo presupuestos:', errorPresupuestos);
@@ -710,12 +709,25 @@ export class PresupuestosService {
           total_ejecutado: 0,
           total_comprometido: 0,
           total_disponible: 0,
+          total_variacion: 0,
           porcentaje_ejecucion: 0,
+          variacion_porcentaje: 0,
           total_centros: 0,
-          total_cuentas: 0
+          total_cuentas: 0,
+          alertas: {
+            sobregiros: 0,
+            advertencias: 0,
+            normales: 0
+          }
         }
       };
     }
+
+    presupuestos.sort((a, b) => {
+      const centroCompare = String(a.centro_costo_id || '').localeCompare(String(b.centro_costo_id || ''));
+      if (centroCompare !== 0) return centroCompare;
+      return String(a.plan_cuentas?.codigo || '').localeCompare(String(b.plan_cuentas?.codigo || ''));
+    });
 
     // Calcular monto ejecutado para cada presupuesto
     const presupuestosConCalculos = await Promise.all(

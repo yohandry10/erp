@@ -1,8 +1,8 @@
 # Multi-stage build for production
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install the lockfile-compatible pnpm version.
+RUN npm install -g pnpm@9.15.4
 
 WORKDIR /app
 
@@ -28,8 +28,8 @@ RUN pnpm run build --filter=@erp-suite/erp-api
 # Production stage
 FROM node:20-alpine AS production
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install the lockfile-compatible pnpm version.
+RUN npm install -g pnpm@9.15.4
 
 WORKDIR /app
 
@@ -53,8 +53,6 @@ RUN pnpm install --prod --frozen-lockfile
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nestjs -u 1001
 
-# Change ownership
-RUN chown -R nestjs:nodejs /app
 USER nestjs
 
 # Expose port
@@ -62,7 +60,7 @@ EXPOSE 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3002/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
 
 # Start the application
 CMD ["node", "apps/erp-api/dist/main.js"] 

@@ -23,11 +23,14 @@ export class AccountingEntriesService {
   private readonly cuentaFallbacks: Record<string, string[]> = {
     '101': ['10'],
     '104': ['10'],
-    '121': ['12'],
+    '121': ['12', '10'],
     '201': ['20'],
     '401': ['40'],
+    '421': ['42'],
+    '601': ['6011-DEMO'],
     '691': ['69'],
-    '701': ['70'],
+    '701': ['7011-DEMO', '70'],
+    '791': ['79'],
   };
 
   constructor(

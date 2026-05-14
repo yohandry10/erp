@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Cliente } from '@/types/ventas'
 import { Input } from '@/components/ui/input'
@@ -32,53 +32,7 @@ export default function ClienteSelector({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // Load selected cliente on mount if value is provided
-  useEffect(() => {
-    if (value && !selectedCliente) {
-      loadClienteById(value)
-    }
-  }, [value])
-
-  // Load all clientes on mount
-  useEffect(() => {
-    loadAllClientes()
-  }, [])
-
-  // Search clientes with debounce
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    if (searchTerm.length >= 2) {
-      searchTimeoutRef.current = setTimeout(() => {
-        searchClientes(searchTerm)
-      }, 300)
-    } else if (searchTerm.length === 0 && clientes.length === 0) {
-      // Reload all clientes if search is cleared and list is empty
-      loadAllClientes()
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [searchTerm])
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const loadClienteById = async (clienteId: string) => {
+  const loadClienteById = useCallback(async (clienteId: string) => {
     try {
       const response = await get(`/api/ventas/clientes/${clienteId}`)
       if (response?.success && response.data) {
@@ -87,23 +41,23 @@ export default function ClienteSelector({
     } catch (error) {
       console.error('Error loading cliente:', error)
     }
-  }
+  }, [get])
 
-  const loadAllClientes = async () => {
+  const loadAllClientes = useCallback(async () => {
     try {
       setLoading(true)
       console.log('🔍 [ClienteSelector] Cargando todos los clientes...')
       const response = await get('/api/ventas/clientes?limit=100')
-      
+
       console.log('📦 [ClienteSelector] Respuesta recibida:', response)
-      
+
       // Si response es null, probablemente no hay token
       if (response === null) {
         console.error('❌ [ClienteSelector] No se recibió respuesta - probablemente no hay token de autenticación')
         setClientes([])
         return
       }
-      
+
       if (response?.success && response?.data) {
         console.log('✅ [ClienteSelector] Clientes cargados:', response.data.length || 0)
         setClientes(response.data || [])
@@ -125,13 +79,13 @@ export default function ClienteSelector({
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
-  const searchClientes = async (search: string) => {
+  const searchClientes = useCallback(async (search: string) => {
     try {
       setLoading(true)
       const response = await get(`/api/ventas/clientes?search=${encodeURIComponent(search)}&limit=10`)
-      
+
       if (response?.success) {
         setClientes(response.data || [])
         setIsOpen(true)
@@ -142,7 +96,53 @@ export default function ClienteSelector({
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  // Load selected cliente on mount if value is provided
+  useEffect(() => {
+    if (value && (!selectedCliente || selectedCliente.id !== value)) {
+      loadClienteById(value)
+    }
+  }, [loadClienteById, selectedCliente, value])
+
+  // Load all clientes on mount
+  useEffect(() => {
+    loadAllClientes()
+  }, [loadAllClientes])
+
+  // Search clientes with debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (searchTerm.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchClientes(searchTerm)
+      }, 300)
+    } else if (searchTerm.length === 0 && clientes.length === 0) {
+      // Reload all clientes if search is cleared and list is empty
+      loadAllClientes()
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [clientes.length, loadAllClientes, searchClientes, searchTerm])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleSelectCliente = (cliente: Cliente) => {
     setSelectedCliente(cliente)

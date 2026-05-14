@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { customAuth } from '@/lib/auth-service'
+import { apiSucceeded, getApiErrorMessage, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
 
 interface ApiResponse<T> {
   data?: T
@@ -35,7 +36,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   const [loading, setLoading] = useState(false)
   
   const { toast } = useToast()
-  const { session, loading: authLoading } = useAuth()
+  const { loading: authLoading } = useAuth()
   const {
     showErrorToast = true,
     showSuccessToast = false,
@@ -59,53 +60,30 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      // ✅ SOLUCIÓN: Obtener token del contexto de autenticación (siempre sincronizado)
-      const token = session?.access_token
-      const tokenSource = 'context'
-      
-      // Debug solo en desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 [useApi] Token status:', {
-          authLoading,
-          hasSession: !!session,
-          hasToken: !!token,
-          tokenLength: token?.length || 0,
-          tokenSource,
-          endpoint,
-          hasTokenInContext: !!session?.access_token
-        })
+      if (authLoading) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
       
-      if (!token) {
-        if (authLoading) {
-          console.warn('⚠️ [useApi] AuthContext aún cargando, se pospone la llamada')
-          return null
-        }
-        console.error('❌ [useApi] No hay sesión activa')
-        console.error('❌ [useApi] Endpoint solicitado:', endpoint)
-        console.error('❌ [useApi] AuthContext loading:', authLoading)
-        
-        // Redirigir al login si no estamos ya ahí
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          console.log('🔄 [useApi] Redirigiendo al login...')
-          window.location.href = '/login'
-        }
-        return null
-      }
-      
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+      const API_BASE_URL = '/backend'
       // Agregar prefijo /api si el endpoint no lo tiene
       const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`
 
+      const withTrailingSlash = (base: string) => {
+        const [path, query] = base.split('?')
+        const normalizedPath = path.endsWith('/') ? path : `${path}/`
+        return query === undefined ? normalizedPath : `${normalizedPath}?${query}`
+      }
+
       const buildUrl = (base: string, params?: QueryParams) => {
-        if (!params || Object.keys(params).length === 0) return base
+        const normalizedBase = withTrailingSlash(base)
+        if (!params || Object.keys(params).length === 0) return normalizedBase
         const qs = new URLSearchParams()
         for (const [k, v] of Object.entries(params)) {
           if (v === undefined || v === null) continue
           qs.set(k, String(v))
         }
         const suffix = qs.toString()
-        return suffix ? `${base}?${suffix}` : base
+        return suffix ? `${normalizedBase}?${suffix}` : normalizedBase
       }
 
       const baseUrl = `${API_BASE_URL}${normalizedEndpoint}`
@@ -126,11 +104,6 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...optionsHeaders,
-      }
-
-      // Añadir token si existe (tiene prioridad sobre headers proporcionados)
-      if (token) {
-        headers.Authorization = `Bearer ${token}`
       }
 
       // Inyección automática del país (si existe en localStorage)
@@ -166,6 +139,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
               'Cache-Control': 'no-cache',
               ...headers,
             },
+            credentials: 'include',
             mode: 'cors',
             signal: controller.signal,
           })
@@ -173,14 +147,10 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
           // Handle 401 Unauthorized - redirect to login
           if (response.status === 401) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('❌ [useApi] 401 Unauthorized - Endpoint:', url);
-            }
-            
-            // Limpiar sesión y redirigir al login
-            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-              await customAuth.signOut()
-              window.location.href = '/login'
+        // Limpiar sesión y redirigir al login
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          await customAuth.signOut()
+          window.location.href = '/login'
             }
             throw new Error('Unauthorized - Session expired')
           }
@@ -227,15 +197,17 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
           const result: any = await response.json()
           
-          // Heurística de éxito
-          const hasData = result?.id || result?.data || Array.isArray(result)
-          const success = result?.success === true || result?.success === 'true' || hasData
+          // Contrato de lectura:
+          // - endpoints nuevos: { success, data, message }
+          // - endpoints legacy: array/objeto crudo
+          // `success: "false"` nunca se trata como truthy.
+          const success = apiSucceeded(result)
           
           if (!success && result?.error) {
-            throw new Error(result.message || result.error || 'API call failed')
+            throw new Error(getApiErrorMessage(result, 'API call failed'))
           }
 
-          const responseData = result?.data !== undefined ? result.data : result
+          const responseData = unwrapApiData<T>(result)
           setState({ success: true, data: responseData })
           
           if (showSuccessToast) {
@@ -279,7 +251,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [toast, session, authLoading, showErrorToast, showSuccessToast])
+  }, [toast, authLoading, showErrorToast, showSuccessToast])
 
   // Métodos helper
   const get = useCallback((endpoint: string, reqOptions?: ApiRequestOptions) => {
@@ -316,12 +288,15 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     delete: del,
     apiCall,
     request: apiCall,
+    unwrap: unwrapApiData,
+    unwrapArray: unwrapApiArray,
+    unwrapObject: unwrapApiObject,
   }
 }
 
 // Hooks específicos
-export function useApiCall<T = any>() {
-  return useApi<T>()
+export function useApiCall<T = any>(options: UseApiOptions = {}) {
+  return useApi<T>(options)
 }
 
 export function useCpeApi() {

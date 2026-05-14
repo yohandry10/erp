@@ -18,6 +18,12 @@ ALTER TABLE IF EXISTS public.comunicaciones_baja
   ADD COLUMN IF NOT EXISTS enviado_en timestamptz,
   ADD COLUMN IF NOT EXISTS respondido_en timestamptz;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.comunicaciones_baja;
+DROP POLICY IF EXISTS tenant_isolation ON public.resumenes_diarios;
+DROP POLICY IF EXISTS tenant_isolation ON public.detalle_comunicacion_baja;
+DROP POLICY IF EXISTS tenant_isolation ON public.detalle_resumen_diario;
+DROP POLICY IF EXISTS tenant_isolation ON public.validaciones_sunat;
+
 ALTER TABLE IF EXISTS public.comunicaciones_baja
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN numero_comunicacion TYPE text USING NULLIF(upper(btrim(COALESCE(numero_comunicacion, ''))), ''),
@@ -544,5 +550,11 @@ ON public.validaciones_sunat (tenant_id, estado, validado_en DESC);
 
 CREATE INDEX IF NOT EXISTS idx_validaciones_sunat_tenant_cpe_runtime
 ON public.validaciones_sunat (tenant_id, cpe_id);
+
+SELECT app.apply_tenant_policy('public', 'comunicaciones_baja');
+SELECT app.apply_tenant_policy('public', 'resumenes_diarios');
+SELECT app.apply_tenant_policy('public', 'detalle_comunicacion_baja');
+SELECT app.apply_tenant_policy('public', 'detalle_resumen_diario');
+SELECT app.apply_tenant_policy('public', 'validaciones_sunat');
 
 COMMIT;

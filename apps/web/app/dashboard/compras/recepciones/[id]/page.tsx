@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  ArrowLeft, 
-  Package, 
+import {
+  ArrowLeft,
+  Package,
   Calendar,
   User,
   FileText,
@@ -78,17 +78,14 @@ export default function RecepcionDetallePage() {
   const [recepcion, setRecepcion] = useState<RecepcionDetalle | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadRecepcion()
-  }, [recepcionId])
-
-  const loadRecepcion = async () => {
+  const loadRecepcion = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/compras/recepciones/${recepcionId}`)
-      
-      if (response?.success && response.data) {
-        setRecepcion(response.data)
+      const recepcionData = response?.data ?? response
+
+      if (recepcionData?.id) {
+        setRecepcion(recepcionData)
       } else {
         alert('Error al cargar la recepción')
         router.push('/dashboard/compras/recepciones')
@@ -100,7 +97,11 @@ export default function RecepcionDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, recepcionId, router])
+
+  useEffect(() => {
+    loadRecepcion()
+  }, [loadRecepcion])
 
   if (loading) {
     return (
@@ -389,7 +390,7 @@ export default function RecepcionDetallePage() {
               {recepcion.items?.map((item) => {
                 const calidadConfig = CALIDAD_CONFIG[item.calidad]
                 const CalidadIcon = calidadConfig.icon
-                
+
                 return (
                   <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                     <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
@@ -426,7 +427,7 @@ export default function RecepcionDetallePage() {
                       {item.serie || '-'}
                     </td>
                     <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                      {item.fecha_expiracion 
+                      {item.fecha_expiracion
                         ? new Date(item.fecha_expiracion).toLocaleDateString('es-PE')
                         : '-'
                       }

@@ -34,6 +34,24 @@ apps/**/.next/cache/
 *.env.*
 !*.env.example
 
+# Local certificates and private keys
+certs/
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Playwright auth state
+apps/web/tests/e2e/.auth/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/tests/e2e/artifacts/
+
+# Local validation databases and tool caches
+.codex_pg_rebuild/
+.deepsec/data/
+.deepsec/node_modules/
+
 # Tauri / Rust
 apps/**/src-tauri/target/
 apps/**/src-tauri/gen/

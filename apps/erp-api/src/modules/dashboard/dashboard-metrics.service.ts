@@ -193,11 +193,13 @@ export class DashboardMetricsService {
       sireResult
     ] = await Promise.allSettled([
       client.from('cpe')
-        .select('total_venta, created_at, tenant_id')
+        .select('total_venta, total, created_at, tenant_id')
         .eq('tenant_id', tenantId)
+        .gte('created_at', inicioMes.toISOString())
+        .lte('created_at', finMes.toISOString())
         .order('created_at', { ascending: false }),
       client.from('cpe')
-        .select('total_venta')
+        .select('total_venta, total')
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioHoy.toISOString()),
       client.from('gre_guias')
@@ -205,11 +207,13 @@ export class DashboardMetricsService {
         .eq('tenant_id', tenantId)
         .gte('created_at', inicioMes.toISOString()),
       client.from('productos')
-        .select('id, precio, stock_actual, stock_minimo')
+        .select('id, precio, precio_venta, stock_actual, stock, stock_minimo')
         .eq('tenant_id', tenantId),
       client.from('ordenes_compra')
         .select('total, estado, fecha_orden, created_at')
         .eq('tenant_id', tenantId)
+        .gte('created_at', inicioMes.toISOString())
+        .lte('created_at', finMes.toISOString())
         .order('created_at', { ascending: false }),
       client.from('usuarios_sistema')
         .select('id')
@@ -246,11 +250,11 @@ export class DashboardMetricsService {
     const totalProductos = productosData?.length || 0;
     const valorInventario = this.calcularValorInventario(productosData);
     const productosStockBajo = this.contarProductosStockBajo(productosData);
-    const comprasPendientes = comprasData?.filter(c => c.estado === 'PENDIENTE').length || 0;
+    const comprasPendientes = comprasData?.filter(c => this.estadoNormalizado(c.estado) === 'pendiente').length || 0;
 
     // Calcular tasa de conversión de cotizaciones
     const totalCotizaciones = cotizacionesData?.length || 0;
-    const cotizacionesAceptadas = cotizacionesData?.filter(c => c.estado === 'ACEPTADA').length || 0;
+    const cotizacionesAceptadas = cotizacionesData?.filter(c => this.estadoNormalizado(c.estado) === 'aceptada').length || 0;
     const tasaConversion = totalCotizaciones > 0 ?
       ((cotizacionesAceptadas / totalCotizaciones) * 100) : 0;
 
@@ -357,7 +361,7 @@ export class DashboardMetricsService {
           type: 'GRE',
           description: `Guía de Remisión ${gre.numero || gre.id}`,
           amount: 0,
-          date: gre.fecha_traslado || gre.created_at,
+          date: gre.created_at || gre.fecha_traslado,
           status: this.mapearEstado(gre.estado)
         });
       });
@@ -371,7 +375,7 @@ export class DashboardMetricsService {
           type: 'COMPRA',
           description: `Orden de Compra ${compra.numero || compra.id}`,
           amount: parseFloat(compra.total) || 0,
-          date: compra.fecha_orden || compra.created_at,
+          date: compra.created_at || compra.fecha_orden,
           status: this.mapearEstado(compra.estado)
         });
       });
@@ -385,7 +389,7 @@ export class DashboardMetricsService {
           type: 'COTIZACION',
           description: `Cotización ${cotizacion.numero || cotizacion.id}`,
           amount: parseFloat(cotizacion.total) || 0,
-          date: cotizacion.fecha_cotizacion || cotizacion.created_at,
+          date: cotizacion.created_at || cotizacion.fecha_cotizacion,
           status: this.mapearEstado(cotizacion.estado)
         });
       });
@@ -415,7 +419,7 @@ export class DashboardMetricsService {
   private sumarTotalesCpe(data: any[]): number {
     if (!Array.isArray(data)) return 0;
     return data.reduce(
-      (sum, item) => sum.plus(item.total_venta || 0),
+      (sum, item) => sum.plus(item.total_venta ?? item.total ?? 0),
       new Decimal(0)
     ).toDecimalPlaces(2).toNumber();
   }
@@ -424,7 +428,7 @@ export class DashboardMetricsService {
     if (!Array.isArray(productos)) return 0;
     return productos.reduce(
       (sum, p) => sum.plus(
-        new Decimal(p.precio || 0).times(p.stock || 0)
+        new Decimal(p.precio ?? p.precio_venta ?? 0).times(p.stock_actual ?? p.stock ?? 0)
       ),
       new Decimal(0)
     ).toDecimalPlaces(2).toNumber();
@@ -433,8 +437,12 @@ export class DashboardMetricsService {
   private contarProductosStockBajo(productos: any[]): number {
     if (!Array.isArray(productos)) return 0;
     return productos.filter(p =>
-      parseFloat((p as any).stock_actual || 0) <= parseFloat(p.stock_minimo || 0)
+      parseFloat((p as any).stock_actual ?? (p as any).stock ?? 0) <= parseFloat(p.stock_minimo || 0)
     ).length;
+  }
+
+  private estadoNormalizado(estado: unknown): string {
+    return String(estado ?? '').trim().toLowerCase();
   }
 
   private mapearEstado(estado: string): 'success' | 'warning' | 'error' | 'pending' {

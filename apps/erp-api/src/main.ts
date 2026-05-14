@@ -13,6 +13,7 @@ import { LoggingInterceptor } from './shared/interceptors/logging.interceptor';
 import { StructuredLogger } from './shared/logging/structured-logger.service';
 import helmet from 'helmet';
 import compression from 'compression';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Notifica a PostgREST para que recargue el esquema de la base de datos.
@@ -32,52 +33,12 @@ async function notifySchemaReload(supabase: SupabaseService) {
   }
 }
 
-/**
- * A4: Validar JWT_SECRET en arranque
- * 
- * Valida que:
- * 1. JWT_SECRET exista
- * 2. Tenga mínimo 32 caracteres
- * 3. Tenga entropía suficiente (mayúsculas, minúsculas, números, símbolos)
- */
-async function validateCriticalSecrets(): Promise<void> {
-  const jwtSecret = process.env.JWT_SECRET;
-
-  if (!jwtSecret) {
-    throw new Error(
-      '❌ [A4] JWT_SECRET no está configurado. Configure esta variable de entorno antes de iniciar la aplicación.'
-    );
-  }
-
-  // Validar longitud mínima
-  if (jwtSecret.length < 32) {
-    throw new Error(
-      `❌ [A4] JWT_SECRET debe tener mínimo 32 caracteres. Actual: ${jwtSecret.length} caracteres.`
-    );
-  }
-
-  // Validar entropía (debe contener caracteres aleatorios, no palabras simples)
-  const hasUpperLower = /[A-Z]/.test(jwtSecret) && /[a-z]/.test(jwtSecret);
-  const hasNumber = /\d/.test(jwtSecret);
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>\[\]\\\/_+\-=\[\]`~]/.test(jwtSecret);
-
-  if (!hasUpperLower || !hasNumber || !hasSpecial) {
-    throw new Error(
-      '❌ [A4] JWT_SECRET debe contener mayúsculas, minúsculas, números y caracteres especiales para mayor seguridad.'
-    );
-  }
-
-  console.log('✅ [A4] JWT_SECRET validado correctamente');
-}
-
 async function bootstrap() {
-  // ✅ A4: Validar antes de crear app
-  await validateCriticalSecrets();
-
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
   // Definir puerto al inicio
-  const port = process.env.PORT || 3002;
+  const port = configService.get<number>('PORT', 3002);
 
   // Obtener servicio de seguridad
   const securityService = app.get(SecurityService);
@@ -100,7 +61,7 @@ async function bootstrap() {
     transform: true,                    // Auto-transform payloads to DTO instances
     whitelist: true,                    // Strip properties that don't have decorators
     forbidNonWhitelisted: true,         // Throw error if non-whitelisted properties are present
-    disableErrorMessages: process.env.NODE_ENV === 'production',
+      disableErrorMessages: configService.get<string>('NODE_ENV') === 'production',
     validateCustomDecorators: true,
     transformOptions: {
       enableImplicitConversion: true,   // Enable implicit type conversion for primitives
@@ -124,7 +85,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Swagger documentation (solo en desarrollo)
-  if (process.env.NODE_ENV !== 'production') {
+  if (configService.get<string>('NODE_ENV') !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('ERP Suite API - Multi-Level Admin System')
       .setDescription(`
@@ -334,8 +295,8 @@ Para más información, consulte la documentación técnica en el repositorio.
   await app.listen(port);
 
   // Log startup con structured logger
-  logger.log(`Servidor corriendo en puerto ${port}`, {
-    environment: process.env.NODE_ENV || 'development',
+    logger.log(`Servidor corriendo en puerto ${port}`, {
+    environment: configService.get<string>('NODE_ENV') || 'development',
     port,
     features: ['Helmet', 'Rate Limiting', 'Compression', 'Correlation IDs', 'Structured Logging'],
   });
@@ -344,7 +305,7 @@ Para más información, consulte la documentación técnica en el repositorio.
   console.log(`🔒 Seguridad habilitada: Helmet, Rate Limiting, Compression`);
   console.log(`📊 Logging estructurado activado con Correlation IDs`);
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (configService.get<string>('NODE_ENV') !== 'production') {
     console.log(`📚 Documentación disponible en http://localhost:${port}/api/docs`);
   }
 

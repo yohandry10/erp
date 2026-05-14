@@ -78,7 +78,7 @@ const URGENCIA_CONFIG = {
 
 export default function TesoreriaPage() {
   const router = useRouter()
-  const { get } = useApi()
+  const { get } = useApi({ retries: 1, timeoutMs: 8000 })
   
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([])
   const [proximosPagos, setProximosPagos] = useState<PagoProximo[]>([])

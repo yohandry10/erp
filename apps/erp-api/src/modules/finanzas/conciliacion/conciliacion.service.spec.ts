@@ -590,7 +590,11 @@ describe('ConciliacionService - Validación de Cierre', () => {
       });
 
       // Mock: Updates (2 veces, uno por cada movimiento)
-      mockSupabaseClient.from.mockReturnValue(createMockQueryBuilder(null));
+      const updateSistemaBuilder = createMockQueryBuilder(null);
+      const updateExtractoBuilder = createMockQueryBuilder(null);
+      mockSupabaseClient.from
+        .mockReturnValueOnce(updateSistemaBuilder)
+        .mockReturnValueOnce(updateExtractoBuilder);
 
       const resultado = await service.matchAutomatico(tenantId, conciliacionId, {
         tolerancia_dias: 2,
@@ -599,6 +603,20 @@ describe('ConciliacionService - Validación de Cierre', () => {
       expect(resultado.success).toBe(true);
       expect(resultado.data.matches_realizados).toBe(1);
       expect(resultado.data.matches_por_referencia).toBe(1);
+      expect(updateSistemaBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
+        conciliado: true,
+        conciliacion_id: conciliacionId,
+        match_automatico: true,
+        match_id: 'mov-extracto-1',
+        movimiento_relacionado_id: 'mov-extracto-1',
+      }));
+      expect(updateExtractoBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
+        conciliado: true,
+        conciliacion_id: conciliacionId,
+        match_automatico: true,
+        match_id: 'mov-sistema-1',
+        movimiento_relacionado_id: 'mov-sistema-1',
+      }));
     });
 
     it('debe hacer match automático por monto y fecha con tolerancia', async () => {

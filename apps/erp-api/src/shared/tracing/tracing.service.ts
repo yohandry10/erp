@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { AsyncLocalStorage } from 'async_hooks';
+import { redactSensitiveData } from '../utils/redact-sensitive';
 
 export interface TraceContext {
   correlationId: string;
@@ -194,9 +195,9 @@ export class TracingService {
       userId: context?.userId,
       sessionId: context?.sessionId,
       source: context?.source,
-      data,
+      data: redactSensitiveData(data),
     };
 
-    console.log(`[${level.toUpperCase()}]`, JSON.stringify(logEntry, null, 2));
+    console.log(`[${level.toUpperCase()}]`, JSON.stringify(redactSensitiveData(logEntry), null, 2));
   }
 }

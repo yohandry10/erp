@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { ProveedorForm } from '@/components/compras/ProveedorForm'
@@ -30,16 +30,16 @@ export default function EditProveedorPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadProveedor()
-  }, [params.id])
+  const proveedorId = params.id as string | undefined
 
-  const loadProveedor = async () => {
+  const loadProveedor = useCallback(async () => {
+    if (!proveedorId) return
+
     try {
       setLoading(true)
       setError(null)
-      const response = await get(`/compras/proveedores/${params.id}`)
-      
+      const response = await get(`/compras/proveedores/${proveedorId}`)
+
       if (response.success && response.data) {
         setProveedor(response.data)
       } else {
@@ -50,13 +50,17 @@ export default function EditProveedorPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, proveedorId])
+
+  useEffect(() => {
+    loadProveedor()
+  }, [loadProveedor])
 
   const handleSubmit = async (data: CreateProveedorDto) => {
     try {
       setSubmitting(true)
       const response = await put(`/compras/proveedores/${params.id}`, data)
-      
+
       if (response.success || response.data) {
         alert('Proveedor actualizado exitosamente')
         router.push(`/dashboard/compras/proveedores/${params.id}`)
@@ -135,9 +139,9 @@ export default function EditProveedorPage() {
       </div>
 
       {/* Info Banner */}
-      <div 
-        className="activity-card" 
-        style={{ 
+      <div
+        className="activity-card"
+        style={{
           marginBottom: '2rem',
           background: '#eff6ff',
           borderColor: '#bfdbfe'

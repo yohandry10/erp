@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { useApi } from '@/hooks/use-api'
 
@@ -28,7 +28,7 @@ export default function OrdenCompraModal({
   orden 
 }: OrdenCompraModalProps) {
   const { tasaIgv } = useTaxConfig()
-  const api = useApi()
+  const { get } = useApi()
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
   
   // DEBUG: Log de props recibidas
@@ -64,31 +64,10 @@ export default function OrdenCompraModal({
     total: 0
   })
 
-  // Cargar datos iniciales
-  useEffect(() => {
-    console.log('🔥 [MODAL] useEffect triggered - isOpen:', isOpen)
-    if (isOpen) {
-      console.log('🔥 [MODAL] Modal está abierto, cargando datos...')
-      loadProveedores()
-      loadProductos()
-      generateNumeroOrden()
-      if (orden) {
-        loadOrdenData()
-      } else {
-        addItem() // Agregar un item por defecto
-      }
-    }
-  }, [isOpen, orden])
-
-  // Calcular totales cuando cambien los items
-  useEffect(() => {
-    calculateTotales()
-  }, [items])
-
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     try {
       console.log('🔥 [MODAL] CARGANDO PROVEEDORES...')
-      const resp = await api.get('/api/compras/proveedores')
+      const resp = await get('/api/compras/proveedores')
       if ((resp as any)?.success) {
         const proveedoresData = (resp as any).data || []
         setProveedores(proveedoresData)
@@ -99,22 +78,22 @@ export default function OrdenCompraModal({
     } catch (error) {
       console.error('🔥 [MODAL] Error loading proveedores:', error)
     }
-  }
+  }, [get])
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
-      const resp = await api.get('/api/compras/productos')
+      const resp = await get('/api/compras/productos')
       if ((resp as any)?.success) {
         setProductos((resp as any).data || [])
       }
     } catch (error) {
       console.error('Error loading productos:', error)
     }
-  }
+  }, [get])
 
-  const generateNumeroOrden = async () => {
+  const generateNumeroOrden = useCallback(async () => {
     try {
-      const resp = await api.get('/api/compras/next-number')
+      const resp = await get('/api/compras/next-number')
       if ((resp as any)?.success) {
         const numero = (resp as any)?.data?.numero
         if (numero) {
@@ -124,9 +103,9 @@ export default function OrdenCompraModal({
     } catch (error) {
       console.error('Error generating order number:', error)
     }
-  }
+  }, [get])
 
-  const loadOrdenData = () => {
+  const loadOrdenData = useCallback(() => {
     if (orden) {
       console.log('🔍 Cargando datos de orden:', JSON.stringify(orden, null, 2))
       
@@ -163,9 +142,9 @@ export default function OrdenCompraModal({
       console.log('📋 Items procesados para cargar:', JSON.stringify(itemsToLoad, null, 2))
       setItems(itemsToLoad)
     }
-  }
+  }, [orden])
 
-  const calculateTotales = () => {
+  const calculateTotales = useCallback(() => {
     const subtotal = items.reduce((sum, item) => {
       const itemSubtotal = Number(item.subtotal) || 0
       return sum + itemSubtotal
@@ -175,9 +154,9 @@ export default function OrdenCompraModal({
 
     setTotales({ subtotal, igv, total })
     setFormData(prev => ({ ...prev, subtotal, igv, total }))
-  }
+  }, [items, tasaIgv])
 
-  const addItem = () => {
+  const addItem = useCallback(() => {
     const newItem: OrdenItem = {
       id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       producto_id: '',
@@ -188,7 +167,28 @@ export default function OrdenCompraModal({
       esNuevoProducto: false,
     }
     setItems(prev => [...prev, newItem])
-  }
+  }, [])
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    console.log('🔥 [MODAL] useEffect triggered - isOpen:', isOpen)
+    if (isOpen) {
+      console.log('🔥 [MODAL] Modal está abierto, cargando datos...')
+      loadProveedores()
+      loadProductos()
+      generateNumeroOrden()
+      if (orden) {
+        loadOrdenData()
+      } else {
+        addItem() // Agregar un item por defecto
+      }
+    }
+  }, [addItem, generateNumeroOrden, isOpen, loadOrdenData, loadProductos, loadProveedores, orden])
+
+  // Calcular totales cuando cambien los items
+  useEffect(() => {
+    calculateTotales()
+  }, [calculateTotales])
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items]

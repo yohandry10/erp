@@ -154,7 +154,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           </Label>
           <Input
             id="nombre"
-            {...register('nombre', { 
+            {...register('nombre', {
               required: 'First name is required',
               minLength: { value: 2, message: 'First name must be at least 2 characters' }
             })}
@@ -185,7 +185,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
         <Input
           id="email"
           type="email"
-          {...register('email', { 
+          {...register('email', {
             required: 'Email is required',
             pattern: {
               value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -330,7 +330,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
       {/* Info Message */}
       {!user && (
         <p className="text-sm text-muted-foreground">
-          A temporary password will be generated and sent to the user's email address.
+          A temporary password will be generated and sent to the user&apos;s email address.
         </p>
       )}
     </form>

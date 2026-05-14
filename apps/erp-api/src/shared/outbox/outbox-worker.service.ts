@@ -78,7 +78,7 @@ export class OutboxWorker implements OnModuleInit {
                 const erpEvent: ERPEvent = {
                   type: event.event_type,
                   data: {
-                    ...event.event_data,
+                    ...(event.event_data ?? event.payload ?? {}),
                     eventId: event.id, // Incluir eventId para que los listeners puedan rastrearlo
                   },
                   timestamp: new Date(event.created_at),
@@ -137,11 +137,11 @@ export class OutboxWorker implements OnModuleInit {
       const { error, count } = await client
         .from('outbox_events')
         .update({
-          status: 'PENDING',
+          status: 'pending',
           next_retry_at: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('status', 'PROCESSING')
+        .eq('status', 'processing')
         .lt('updated_at', cutoff);
 
       if (error) {
@@ -174,7 +174,7 @@ export class OutboxWorker implements OnModuleInit {
 
             const erpEvent: ERPEvent = {
               type: event.event_type,
-              data: event.event_data,
+              data: event.event_data ?? event.payload ?? {},
               timestamp: new Date(event.created_at),
               module: 'outbox-worker',
             };

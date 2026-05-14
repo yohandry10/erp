@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { TrendingDown, RefreshCw, AlertTriangle } from 'lucide-react'
 
@@ -28,7 +28,7 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
   const [proveedores, setProveedores] = useState<ProveedorDeuda[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadProveedores = async () => {
+  const loadProveedores = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/finanzas/cxp/proveedores-mayor-deuda?limite=${limite}`)
@@ -41,11 +41,11 @@ export default function ProveedoresMayorDeudaReport({ limite = 20 }: Proveedores
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, limite])
 
   useEffect(() => {
     loadProveedores()
-  }, [limite])
+  }, [loadProveedores])
 
   const formatCurrency = (amount: number, currency: string = 'PEN') => {
     return new Intl.NumberFormat('es-PE', {

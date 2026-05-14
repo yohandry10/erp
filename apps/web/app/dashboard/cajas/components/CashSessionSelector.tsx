@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 
 interface SesionCaja {
@@ -25,32 +25,32 @@ interface CashSessionSelectorProps {
 }
 
 export function CashSessionSelector({ onSelect, className = '' }: CashSessionSelectorProps) {
-    const api = useApi();
+    const { get } = useApi();
     const [sesiones, setSesiones] = useState<SesionCaja[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        cargarSesiones();
-    }, []);
-
-    const cargarSesiones = async () => {
+    const cargarSesiones = useCallback(async () => {
         try {
             setLoading(true);
             // Fetch open sessions first, then closed ones
-            const response = await api.get('/cajas/sesiones');
+            const response = await get('/cajas/sesiones');
             if (response?.success) {
                 setSesiones(response.data || []);
             } else {
                 throw new Error(response?.message || 'Error cargando sesiones');
             }
         } catch (err: any) {
-            console.error('Error cargando sesiones:', err);
+            console.warn('Error cargando sesiones:', err);
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    };
+    }, [get]);
+
+    useEffect(() => {
+        cargarSesiones();
+    }, [cargarSesiones]);
 
     const formatearFecha = (fecha: string) => {
         return new Date(fecha).toLocaleString('es-PE', {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
@@ -30,22 +30,18 @@ export default function PedidoDetailPage() {
   const params = useParams()
   const { get, post } = useApi()
   const { config: empresaConfig, loading: empresaConfigLoading } = useEmpresaConfig()
-  
+
   const [pedido, setPedido] = useState<PedidoVenta | null>(null)
   const [loading, setLoading] = useState(true)
 
   const pedidoId = params.id as string
 
-  useEffect(() => {
-    loadPedido()
-  }, [pedidoId])
-
-  const loadPedido = async () => {
+  const loadPedido = useCallback(async () => {
     try {
       setLoading(true)
       console.debug('[PedidoDetailPage] Cargando pedido...', { pedidoId })
       const response = await get(`/ventas/pedidos/${pedidoId}`)
-      
+
       console.debug('[PedidoDetailPage] Respuesta detalle pedido', response)
       if (response?.success && response.data) {
         setPedido(response.data)
@@ -72,7 +68,11 @@ export default function PedidoDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, pedidoId, router])
+
+  useEffect(() => {
+    loadPedido()
+  }, [loadPedido])
 
   const handleFacturaGenerada = (result: { facturaId: string | null; sugerioGre: boolean }) => {
     setPedido((prev) => {

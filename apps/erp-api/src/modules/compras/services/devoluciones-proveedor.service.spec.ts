@@ -3,7 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DevolucionesProveedorService } from './devoluciones-proveedor.service';
 import { DevolucionesProveedorRepository } from '../repositories/devoluciones-proveedor.repository';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { InventarioService, TipoMovimiento } from '../../inventario/inventario.service';
+import { InventarioService } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { EventEmitterService } from '../../../shared/events/event-emitter.service';
@@ -16,6 +16,7 @@ describe('DevolucionesProveedorService', () => {
   let inventarioService: jest.Mocked<InventarioService>;
   let eventBusService: jest.Mocked<EventBusService>;
   let eventEmitter: jest.Mocked<EventEmitterService>;
+  let awaitedQueryResults: Array<{ data: any; error: any }>;
 
   const mockDevolucion = {
     id: 'devolucion-123',
@@ -60,10 +61,12 @@ describe('DevolucionesProveedorService', () => {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
     single: jest.fn(),
     maybeSingle: jest.fn(),
     insert: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis()
+    update: jest.fn().mockReturnThis(),
+    then: jest.fn((resolve) => resolve(awaitedQueryResults.shift() ?? { data: [], error: null })),
   };
 
   beforeEach(async () => {
@@ -135,6 +138,7 @@ describe('DevolucionesProveedorService', () => {
     inventarioService = module.get(InventarioService);
     eventBusService = module.get(EventBusService);
     eventEmitter = module.get(EventEmitterService) as jest.Mocked<EventEmitterService>;
+    awaitedQueryResults = [];
 
     // Default resolve to avoid undefined in tests that don't override
     mockSupabaseClient.single.mockResolvedValue({ data: null, error: null });
@@ -183,6 +187,21 @@ describe('DevolucionesProveedorService', () => {
         },
         error: null
       });
+
+      awaitedQueryResults.push(
+        {
+          data: [
+            {
+              id: 'recepcion-item-1',
+              recepcion_id: 'recepcion-123',
+              producto_id: 'producto-1',
+              cantidad_recibida: 10,
+            },
+          ],
+          error: null,
+        },
+        { data: [], error: null },
+      );
 
       repository.generarNumeroDevolucion.mockResolvedValue('DEV-2024-0001');
       repository.crear.mockResolvedValue(mockDevolucion);
@@ -303,6 +322,21 @@ describe('DevolucionesProveedorService', () => {
         error: null
       });
 
+      awaitedQueryResults.push(
+        {
+          data: [
+            {
+              id: 'recepcion-item-1',
+              recepcion_id: 'recepcion-123',
+              producto_id: 'producto-1',
+              cantidad_recibida: 10,
+            },
+          ],
+          error: null,
+        },
+        { data: [], error: null },
+      );
+
       repository.generarNumeroDevolucion.mockResolvedValue('DEV-2024-0001');
       repository.crear.mockResolvedValue(mockDevolucion);
       repository.crearItems.mockResolvedValue(mockDevolucion.items);
@@ -318,6 +352,98 @@ describe('DevolucionesProveedorService', () => {
         }),
         'user-123'
       );
+    });
+
+    it('should reject devolucion quantity greater than received quantity', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'orden-123',
+          numero: 'OC-2024-001',
+          proveedor_id: 'proveedor-123',
+          estado: 'RECIBIDA',
+        },
+        error: null,
+      });
+
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'recepcion-123',
+          orden_id: 'orden-123',
+        },
+        error: null,
+      });
+
+      awaitedQueryResults.push(
+        {
+          data: [
+            {
+              id: 'recepcion-item-1',
+              recepcion_id: 'recepcion-123',
+              producto_id: 'producto-1',
+              cantidad_recibida: 4,
+            },
+          ],
+          error: null,
+        },
+        { data: [], error: null },
+      );
+
+      await expect(service.crearDevolucion('tenant-123', validDto, 'user-123'))
+        .rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
+
+    it('should reject duplicate devolucion quantities beyond remaining received quantity', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'orden-123',
+          numero: 'OC-2024-001',
+          proveedor_id: 'proveedor-123',
+          estado: 'RECIBIDA',
+        },
+        error: null,
+      });
+
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'recepcion-123',
+          orden_id: 'orden-123',
+        },
+        error: null,
+      });
+
+      awaitedQueryResults.push(
+        {
+          data: [
+            {
+              id: 'recepcion-item-1',
+              recepcion_id: 'recepcion-123',
+              producto_id: 'producto-1',
+              cantidad_recibida: 10,
+            },
+          ],
+          error: null,
+        },
+        {
+          data: [
+            {
+              recepcion_item_id: 'recepcion-item-1',
+              cantidad: 6,
+              devolucion: {
+                id: 'devolucion-previa',
+                estado: 'EMITIDA',
+                tenant_id: 'tenant-123',
+                recepcion_id: 'recepcion-123',
+              },
+            },
+          ],
+          error: null,
+        },
+      );
+
+      await expect(service.crearDevolucion('tenant-123', validDto, 'user-123'))
+        .rejects.toThrow(BadRequestException);
+      expect(repository.crear).not.toHaveBeenCalled();
     });
 
     it('should create devolucion without recepcion_id', async () => {
@@ -409,16 +535,7 @@ describe('DevolucionesProveedorService', () => {
       const result = await service.emitirDevolucion('devolucion-123', 'tenant-123', 'user-123');
 
       expect(result.estado).toBe('EMITIDA');
-      expect(inventarioService.crearMovimiento).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-123',
-          producto_id: 'producto-1',
-          tipo: TipoMovimiento.SALIDA,
-          cantidad: 10,
-          referencia_tipo: 'DEVOLUCION_PROVEEDOR',
-          referencia_id: 'devolucion-123'
-        })
-      );
+      expect(inventarioService.crearMovimiento).not.toHaveBeenCalled();
       expect(inventarioService.descontarStock).toHaveBeenCalledWith(
         'producto-1',
         10,
@@ -510,7 +627,7 @@ describe('DevolucionesProveedorService', () => {
 
     it('should throw BadRequestException when inventory operation fails', async () => {
       repository.obtenerPorId.mockResolvedValue(mockDevolucion);
-      inventarioService.crearMovimiento.mockRejectedValue(
+      inventarioService.descontarStock.mockRejectedValue(
         new BadRequestException('Stock insuficiente')
       );
 
@@ -547,7 +664,7 @@ describe('DevolucionesProveedorService', () => {
 
       await service.emitirDevolucion('devolucion-123', 'tenant-123', 'user-123');
 
-      expect(inventarioService.crearMovimiento).toHaveBeenCalledTimes(2);
+      expect(inventarioService.crearMovimiento).not.toHaveBeenCalled();
       expect(inventarioService.descontarStock).toHaveBeenCalledTimes(2);
     });
 

@@ -45,7 +45,7 @@ describe('BancosService - Validación de Sobregiro', () => {
     it('debe rechazar saldo inicial negativo si no permite sobregiro', async () => {
       // Arrange
       const tenantId = 'test-tenant-id';
-      const dto = {
+      const dto: any = {
         nombre: 'Cuenta Test',
         banco: 'BCP',
         numero_cuenta: '123456789',
@@ -74,7 +74,7 @@ describe('BancosService - Validación de Sobregiro', () => {
     it('debe permitir saldo inicial negativo si permite sobregiro', async () => {
       // Arrange
       const tenantId = 'test-tenant-id';
-      const dto = {
+      const dto: any = {
         nombre: 'Cuenta Test',
         banco: 'BCP',
         numero_cuenta: '123456789',

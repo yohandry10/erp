@@ -47,8 +47,8 @@ export function SeleccionarCxpLote({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [montosParciales, setMontosParciales] = useState<Record<string, number>>({});
   const [filtroProveedor, setFiltroProveedor] = useState<string>('');
-  const [filtroEstado, setFiltroEstado] = useState<string>('');
-  const [filtroUrgencia, setFiltroUrgencia] = useState<string>('');
+  const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
+  const [filtroUrgencia, setFiltroUrgencia] = useState<string>('TODAS');
 
   // Filtrar CxPs
   const cxpsFiltradas = cxps.filter((cxp) => {
@@ -63,12 +63,12 @@ export function SeleccionarCxpLote({
     }
 
     // Filtro por estado
-    if (filtroEstado && cxp.estado !== filtroEstado) {
+    if (filtroEstado !== 'TODOS' && cxp.estado !== filtroEstado) {
       return false;
     }
 
     // Filtro por urgencia
-    if (filtroUrgencia && cxp.urgencia !== filtroUrgencia) {
+    if (filtroUrgencia !== 'TODAS' && cxp.urgencia !== filtroUrgencia) {
       return false;
     }
 
@@ -136,7 +136,7 @@ export function SeleccionarCxpLote({
   // Notificar cambios al componente padre
   useEffect(() => {
     onSelectionChange(Array.from(selectedIds), montosParciales);
-  }, [selectedIds, montosParciales]);
+  }, [montosParciales, onSelectionChange, selectedIds]);
 
   // Obtener badge de urgencia
   const getUrgenciaBadge = (urgencia?: string) => {
@@ -192,7 +192,7 @@ export function SeleccionarCxpLote({
                 <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="TODOS">Todos</SelectItem>
                 <SelectItem value="PENDIENTE">Pendiente</SelectItem>
                 <SelectItem value="PARCIAL">Parcial</SelectItem>
                 <SelectItem value="VENCIDA">Vencida</SelectItem>
@@ -207,7 +207,7 @@ export function SeleccionarCxpLote({
                 <SelectValue placeholder="Todas las urgencias" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="TODAS">Todas</SelectItem>
                 <SelectItem value="VENCIDA">Vencida</SelectItem>
                 <SelectItem value="HOY">Vence Hoy</SelectItem>
                 <SelectItem value="URGENTE">Urgente (1-7 días)</SelectItem>

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import EmpleadoModal from '@/components/modals/EmpleadoModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,8 +10,9 @@ const RrhhPage = () => {
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [departamentos, setDepartamentos] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const { get, post, delete: del } = useApi();
+  const { get, post, put, delete: del } = useApi();
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -30,17 +31,13 @@ const RrhhPage = () => {
 
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
       setLoading(false);
       setEmpleados([]);
       setDepartamentos([]);
       return;
     }
-    loadData();
-  }, [rrhhEnabled]);
-
-  const loadData = async () => {
     try {
       setLoading(true);
       
@@ -71,18 +68,29 @@ const RrhhPage = () => {
     } finally {
       setLoading(false);
     }
+  }, [get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openCreateEmpleado = () => {
+    setEmpleadoEditando(null);
+    setIsModalOpen(true);
   };
 
-  const handleCreateEmpleado = async (empleadoData: any) => {
+  const handleSubmitEmpleado = async (empleadoData: any) => {
     try {
-      // ✅ Usar useApi en lugar de fetch
-      const response = await post('/rrhh/empleados', empleadoData);
+      const response = empleadoEditando?.id
+        ? await put(`/rrhh/empleados/${empleadoEditando.id}`, empleadoData)
+        : await post('/rrhh/empleados', empleadoData);
 
       if (response) {
         setIsModalOpen(false);
+        setEmpleadoEditando(null);
         loadData(); // Recargar la lista
       } else {
-        throw new Error('Error al crear empleado');
+        throw new Error(empleadoEditando ? 'Error al actualizar empleado' : 'Error al crear empleado');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -124,7 +132,7 @@ const RrhhPage = () => {
           <h1 className="dashboard-title">Recursos Humanos</h1>
           <p className="dashboard-subtitle">Gestión de empleados, contratos y planillas</p>
         </div>
-        <button className="refresh-btn" onClick={() => setIsModalOpen(true)}>
+        <button className="refresh-btn" onClick={openCreateEmpleado}>
           <span>👤</span>
           Agregar Empleado
         </button>
@@ -460,7 +468,6 @@ Teléfono: ${empleado.telefono || 'No registrado'}
 Puesto: ${empleado.puesto || 'Sin asignar'}
 Departamento: ${empleado.departamentos?.nombre || 'Sin departamento'}
 Fecha Ingreso: ${formatDate(empleado.fecha_ingreso)}
-Salario: S/ ${empleado.salario?.toLocaleString() || '0'}
 Estado: ${empleado.estado}
 Dirección: ${empleado.direccion || 'No registrada'}
                               `;
@@ -473,42 +480,40 @@ Dirección: ${empleado.direccion || 'No registrada'}
                             className="btn-icon" 
                             title="Editar empleado"
                             onClick={() => {
-                              // Aquí abrirías el modal de edición
-                              console.log('Editando empleado:', empleado.id);
-                              alert('Función de edición en desarrollo. Use el modal principal por ahora.');
+                              setEmpleadoEditando(empleado);
+                              setIsModalOpen(true);
                             }}
                           >
                             ✏️
                           </button>
                           <button 
                             className="btn-icon-danger" 
-                            title="Eliminar empleado"
+                            title="Inactivar empleado"
                             onClick={() => {
                               setConfirmDialog({
                                 isOpen: true,
-                                title: 'Eliminar Empleado',
-                                message: `¿Está seguro de eliminar a ${empleado.nombres} ${empleado.apellidos}?\n\nEsta acción no se puede deshacer.`,
-                                variant: 'danger',
+                                title: 'Inactivar Empleado',
+                                message: `¿Está seguro de inactivar a ${empleado.nombres} ${empleado.apellidos}?\n\nEl historial se conserva para planillas, pagos y contabilidad.`,
+                                variant: 'warning',
                                 onConfirm: async () => {
                                   try {
-                                    // ✅ Usar useApi en lugar de fetch
                                     const response = await del(`/rrhh/empleados/${empleado.id}`);
                                     
                                     if (response) {
-                                      loadData(); // Recargar la lista
-                                      alert('Empleado eliminado exitosamente');
+                                      loadData();
+                                      alert('Empleado inactivado exitosamente');
                                     } else {
-                                      throw new Error('Error al eliminar empleado');
+                                      throw new Error('Error al inactivar empleado');
                                     }
                                   } catch (error) {
                                     console.error('Error:', error);
-                                    alert('Error al eliminar empleado');
+                                    alert('Error al inactivar empleado');
                                   }
                                 }
                               });
                             }}
                           >
-                            🗑️
+                            🚫
                           </button>
                         </div>
                       </td>
@@ -521,21 +526,27 @@ Dirección: ${empleado.direccion || 'No registrada'}
         </div>
       </div>
 
-      {/* Modal para agregar empleado */}
       <EmpleadoModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateEmpleado}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEmpleadoEditando(null);
+        }}
+        onSubmit={handleSubmitEmpleado}
         departamentos={departamentos}
+        initialData={empleadoEditando}
       />
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        onConfirm={confirmDialog.onConfirm}
         title={confirmDialog.title}
         message={confirmDialog.message}
         variant={confirmDialog.variant}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={async () => {
+          await confirmDialog.onConfirm();
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        }}
       />
     </div>
   );

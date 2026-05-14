@@ -86,7 +86,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       facturaId: 'documento-456',
       serie: 'F001',
       numero: '12',
-      clienteId: 'cliente-789',
+      clienteId: '11111111-1111-4111-8111-111111111111',
       subtotal: 1000,
       impuestos: 180,
       total: 1180,
@@ -195,7 +195,7 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       facturaId: 'documento-456',
       serie: 'F001',
       numero: '12',
-      clienteId: 'cliente-789',
+      clienteId: '11111111-1111-4111-8111-111111111111',
       subtotal: 1000,
       impuestos: 180,
       total: 1180,
@@ -239,6 +239,46 @@ describe('CxcService - FacturaEmitidaEvent', () => {
       tenant_id: tenantId,
       status: 'SUCCESS',
       response_summary: expect.objectContaining({ skipped: true }),
+    }));
+  });
+
+  it('crea cliente fallback desde CPE sin columnas inexistentes y sin desbordar documento entero', async () => {
+    const insertClienteQuery = {
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({
+        data: { id: 'cliente-ruc', numero_documento: null },
+        error: null,
+      }),
+    };
+
+    mockSupabaseClient.from.mockImplementationOnce(() => insertClienteQuery);
+
+    const result = await (service as any).crearClienteDesdeCpe(
+      'tenant-001',
+      '20668394163',
+      '6',
+      'Cliente Fiscal SAC',
+      'Av. Fiscal 100',
+    );
+
+    expect(result).toEqual({ id: 'cliente-ruc', numeroDocumento: null });
+    expect(insertClienteQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
+      tenant_id: 'tenant-001',
+      tipo: 'EMPRESA',
+      tipo_documento: 'R',
+      documento_tipo: 'RUC',
+      razon_social: 'Cliente Fiscal SAC',
+      nombre: 'Cliente Fiscal SAC',
+      codigo: '20668394163',
+      ruc: '20668394163',
+      estado: 'ACTIVO',
+    }));
+    expect(insertClienteQuery.insert).toHaveBeenCalledWith(expect.not.objectContaining({
+      contacto: expect.anything(),
+      telefono: expect.anything(),
+      numero_documento: expect.anything(),
+      documento_numero: expect.anything(),
     }));
   });
 });

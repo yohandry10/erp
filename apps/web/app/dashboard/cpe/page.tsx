@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import CpeModal from '@/components/modals/CpeModal'
 import CpeViewModal from '@/components/modals/CpeViewModal'
@@ -9,9 +9,11 @@ import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 
 interface CpeDocument {
   id: string
+  tipoDocumento?: string
   tipoComprobante: string
   serie: string
   numero: number
@@ -58,21 +60,10 @@ export default function CPEPage() {
     moneda: ''
   })
 
-  const api = useApiCall<CpeDocument[]>()
-  const statsApi = useApiCall<CpeStats>()
+  const { get, post, loading } = useApiCall<CpeDocument[]>()
+  const { get: getStats } = useApiCall<CpeStats>()
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
-    await Promise.all([
-      loadDocuments(),
-      loadStats()
-    ])
-  }
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     const queryParams = new URLSearchParams()
     if (filters.tipoComprobante) queryParams.append('tipoComprobante', filters.tipoComprobante)
     if (filters.estado) queryParams.append('estado', filters.estado)
@@ -83,31 +74,49 @@ export default function CPEPage() {
     if (filters.cliente) queryParams.append('cliente', filters.cliente)
 
     console.log('📄 CPE: Cargando comprobantes...', { filters, queryParams: queryParams.toString() })
-    const response = await api.get(`/api/cpe/comprobantes?${queryParams}`)
+    const response = await get(`/api/cpe/comprobantes?${queryParams}`)
     console.log('📄 CPE: Respuesta completa de comprobantes:', response)
-    
-    if (response && response.success && response.data) {
-      console.log('📄 CPE: Datos de comprobantes recibidos:', response.data.length)
-      setDocuments(response.data)
+
+    const documents = unwrapApiArray<CpeDocument>(response)
+    if (apiSucceeded(response)) {
+      console.log('📄 CPE: Datos de comprobantes recibidos:', documents.length)
+      setDocuments(documents)
     } else {
       console.warn('⚠️ CPE: No se recibieron datos de comprobantes o hay error:', response?.message)
       setDocuments([])
     }
-  }
+  }, [get, filters])
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     console.log('📊 CPE: Cargando estadísticas...')
-    const response = await statsApi.get('/api/cpe/stats')
+    const response = await getStats('/api/cpe/stats')
     console.log('📊 CPE: Respuesta completa de estadísticas:', response)
-    
-    if (response && response.success && response.data) {
-      console.log('📊 CPE: Estadísticas recibidas:', response.data)
-      setStats(response.data)
+
+    if (apiSucceeded(response)) {
+      const stats = unwrapApiObject<CpeStats>(response, {
+        cpeEmitidosHoy: 0,
+        cpeDelMes: 0,
+        montoFacturado: 0,
+        rechazados: 0,
+      })
+      console.log('📊 CPE: Estadísticas recibidas:', stats)
+      setStats(stats)
     } else {
       console.warn('⚠️ CPE: No se recibieron estadísticas o hay error:', response?.message)
       setStats(null)
     }
-  }
+  }, [getStats])
+
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      loadDocuments(),
+      loadStats()
+    ])
+  }, [loadDocuments, loadStats])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const viewDocument = (documentId: string, documentType: string) => {
     console.log(`📄 Abriendo vista del documento: ${documentId} tipo: ${documentType}`);
@@ -122,8 +131,8 @@ export default function CPEPage() {
       return
     }
 
-    const response = await api.post(`/api/cpe/comprobantes/${documentId}/enviar-sunat`)
-    if (response && response.success) {
+    const response = await post(`/api/cpe/comprobantes/${documentId}/enviar-sunat`)
+    if (apiSucceeded(response)) {
       loadDocuments() // Reload documents to update status
       alert(`✅ Comprobante enviado a ${fiscalLabel} exitosamente`)
     } else {
@@ -192,17 +201,17 @@ export default function CPEPage() {
     loadData() // Reload all data when a new CPE is created
   }
 
-  if (api.loading && documents.length === 0) {
+  if (loading && documents.length === 0) {
     return (
       <div className="dashboard-container">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              border: '4px solid #f3f4f6', 
-              borderTop: '4px solid #3b82f6', 
-              borderRadius: '50%', 
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
               animation: 'spin 1s linear infinite',
               margin: '0 auto 1rem'
             }}></div>
@@ -219,7 +228,7 @@ export default function CPEPage() {
       <div className="dashboard-header">
         <h1 className="dashboard-title">Comprobantes de Pago Electrónicos (CPE)</h1>
         <p className="dashboard-subtitle">Gestiona facturas, boletas y notas de crédito/débito</p>
-        <button 
+        <button
           className="refresh-btn"
           onClick={() => setIsModalOpen(true)}
         >

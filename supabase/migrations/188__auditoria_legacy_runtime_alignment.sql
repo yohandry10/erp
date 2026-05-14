@@ -8,6 +8,10 @@
 
 BEGIN;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.audit_log_archive;
+DROP POLICY IF EXISTS tenant_isolation ON public.auditoria;
+DROP POLICY IF EXISTS tenant_isolation ON public.auditoria_cotizaciones;
+
 CREATE OR REPLACE FUNCTION app.normalize_criticidad_auditoria(
   p_input text,
   p_default text DEFAULT 'BAJA'
@@ -296,5 +300,9 @@ WHERE cotizacion_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_auditoria_cotizaciones_tenant_accion_timestamp_runtime
 ON public.auditoria_cotizaciones (tenant_id, accion, "timestamp" DESC);
+
+SELECT app.apply_tenant_policy('public', 'audit_log_archive');
+SELECT app.apply_tenant_policy('public', 'auditoria');
+SELECT app.apply_tenant_policy('public', 'auditoria_cotizaciones');
 
 COMMIT;

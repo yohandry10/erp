@@ -5,6 +5,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
@@ -19,6 +20,7 @@ import { ReportesService } from './reportes.service';
 @ApiTags('Ventas - Reportes')
 @ApiBearerAuth()
 @Controller('ventas/reportes')
+  @Throttle({ default: { limit: 25, ttl: 60000 } })
 @UseGuards(JwtAuthGuard, PermissionGuard) // HARDENING: reportes exige permisos granulares.
 export class ReportesController {
   constructor(private readonly reportesService: ReportesService) {}

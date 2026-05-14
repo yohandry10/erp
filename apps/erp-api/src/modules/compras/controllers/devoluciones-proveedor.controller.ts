@@ -35,6 +35,7 @@ export class DevolucionesProveedorController {
    * Crea una nueva devolución a proveedor
    */
   @Post()
+  @RequirePermission('compras.devoluciones.crear')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Crear devolución a proveedor',
@@ -56,6 +57,7 @@ export class DevolucionesProveedorController {
    * Lista todas las devoluciones con filtros opcionales
    */
   @Get()
+  @RequirePermission('compras.devoluciones.ver')
   @ApiOperation({
     summary: 'Listar devoluciones',
     description: 'Obtiene la lista de devoluciones a proveedores con filtros opcionales',
@@ -75,6 +77,7 @@ export class DevolucionesProveedorController {
    * Obtiene una devolución específica por ID
    */
   @Get(':id')
+  @RequirePermission('compras.devoluciones.ver')
   @ApiOperation({
     summary: 'Obtener devolución por ID',
     description: 'Obtiene los detalles completos de una devolución incluyendo sus items',
@@ -95,6 +98,7 @@ export class DevolucionesProveedorController {
    * Emite una devolución a proveedor (procesa la devolución)
    */
   @Post(':id/emitir')
+  @RequirePermission('compras.devoluciones.emitir')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Emitir devolución a proveedor',

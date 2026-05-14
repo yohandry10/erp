@@ -6,6 +6,10 @@
 
 BEGIN;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.departamentos;
+DROP POLICY IF EXISTS tenant_isolation ON public.empleados;
+DROP POLICY IF EXISTS tenant_isolation ON public.contratos;
+
 -- ----------------------------------------------------------------------------
 -- departamentos
 -- ----------------------------------------------------------------------------
@@ -568,5 +572,9 @@ ON public.contratos (tenant_id, tipo_contrato, estado, fecha_fin DESC, created_a
 
 CREATE INDEX IF NOT EXISTS idx_contratos_tenant_fecha_inicio_runtime
 ON public.contratos (tenant_id, fecha_inicio DESC, created_at DESC);
+
+SELECT app.apply_tenant_policy('public', 'departamentos');
+SELECT app.apply_tenant_policy('public', 'empleados');
+SELECT app.apply_tenant_policy('public', 'contratos');
 
 COMMIT;

@@ -5,6 +5,34 @@
 
 BEGIN;
 
+DO $$
+DECLARE
+  v_fn record;
+BEGIN
+  FOR v_fn IN
+    SELECT p.oid::regprocedure AS fn_ref
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prosecdef
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', v_fn.fn_ref);
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+      EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon', v_fn.fn_ref);
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+      EXECUTE format('REVOKE ALL ON FUNCTION %s FROM authenticated', v_fn.fn_ref);
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', v_fn.fn_ref);
+    END IF;
+  END LOOP;
+END
+$$;
+
 CREATE OR REPLACE FUNCTION public.validar_smoke_tests_modulos_runtime(
   p_tenant_id uuid DEFAULT NULL
 )

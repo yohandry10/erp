@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,17 +37,13 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
   const [sortField, setSortField] = useState<SortField>('unidades')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/productos-mas-vendidos', {
         params: filters
       })
-      
+
       if (response?.success) {
         setData(response.data || [])
       }
@@ -61,7 +57,11 @@ export default function ProductosMasVendidosReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

@@ -15,6 +15,33 @@ export interface PlanCuenta {
   updated_at?: string;
 }
 
+const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>> = {
+  '12': {
+    codigo: '12',
+    nombre: 'Cuentas por cobrar comerciales',
+    tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '69': {
+    codigo: '69',
+    nombre: 'Costo de ventas',
+    tipo: 'GASTO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '70': {
+    codigo: '70',
+    nombre: 'Ventas',
+    tipo: 'INGRESO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+};
+
 @Injectable()
 export class PlanCuentasService {
   constructor(private readonly supabaseService: SupabaseService) {}
@@ -66,12 +93,13 @@ export class PlanCuentasService {
     tenantId: string,
     codigos: string[]
   ): Promise<Map<string, PlanCuenta>> {
+    const codigosUnicos = [...new Set(codigos.map((codigo) => codigo.trim()).filter(Boolean))];
     const { data, error } = await this.supabaseService
       .getClient()
       .from('plan_cuentas')
       .select('*')
       .eq('tenant_id', tenantId)
-      .in('codigo', codigos);
+      .in('codigo', codigosUnicos);
 
     if (error) {
       console.error(
@@ -85,10 +113,22 @@ export class PlanCuentasService {
       throw new Error('No se encontraron cuentas en el plan de cuentas');
     }
 
-    // Validar que todas las cuentas solicitadas existan
-    const cuentasEncontradas = data.map((c) => c.codigo);
-    const cuentasFaltantes = codigos.filter(
+    const cuentas = [...data];
+    const cuentasEncontradas = cuentas.map((c) => c.codigo);
+    let cuentasFaltantes = codigosUnicos.filter(
       (codigo) => !cuentasEncontradas.includes(codigo)
+    );
+
+    for (const codigo of cuentasFaltantes) {
+      const cuentaCreada = await this.crearCuentaOperativaSiEsEstandar(tenantId, codigo);
+      if (cuentaCreada) {
+        cuentas.push(cuentaCreada);
+      }
+    }
+
+    const cuentasEncontradasFinal = cuentas.map((c) => c.codigo);
+    cuentasFaltantes = codigosUnicos.filter(
+      (codigo) => !cuentasEncontradasFinal.includes(codigo)
     );
 
     if (cuentasFaltantes.length > 0) {
@@ -98,7 +138,7 @@ export class PlanCuentasService {
     }
 
     // Validar que todas acepten movimientos
-    const cuentasNoMovimiento = data.filter((c) => !c.acepta_movimiento);
+    const cuentasNoMovimiento = cuentas.filter((c) => !c.acepta_movimiento);
     if (cuentasNoMovimiento.length > 0) {
       const nombres = cuentasNoMovimiento
         .map((c) => `${c.codigo} - ${c.nombre}`)
@@ -110,11 +150,64 @@ export class PlanCuentasService {
 
     // Crear map de código -> cuenta
     const cuentasMap = new Map<string, PlanCuenta>();
-    data.forEach((cuenta) => {
+    cuentas.forEach((cuenta) => {
       cuentasMap.set(cuenta.codigo, cuenta as PlanCuenta);
     });
 
     return cuentasMap;
+  }
+
+  private async crearCuentaOperativaSiEsEstandar(
+    tenantId: string,
+    codigo: string
+  ): Promise<PlanCuenta | null> {
+    const cuentaBase = CUENTAS_OPERATIVAS_RUNTIME[codigo];
+    if (!cuentaBase) {
+      return null;
+    }
+
+    const payload = {
+      tenant_id: tenantId,
+      codigo: cuentaBase.codigo,
+      nombre: cuentaBase.nombre,
+      tipo: cuentaBase.tipo,
+      tipo_cuenta: cuentaBase.tipo,
+      nivel: cuentaBase.nivel,
+      acepta_movimiento: cuentaBase.acepta_movimiento,
+      activo: true,
+      estado: cuentaBase.estado,
+      metadata: {
+        source: 'runtime_accounting_standard_account',
+      },
+    };
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('plan_cuentas')
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (!error && data) {
+      return data as PlanCuenta;
+    }
+
+    if (error?.code === '23505') {
+      const { data: existente, error: findError } = await this.supabaseService
+        .getClient()
+        .from('plan_cuentas')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('codigo', codigo)
+        .single();
+
+      if (!findError && existente) {
+        return existente as PlanCuenta;
+      }
+    }
+
+    console.error(`❌ [PlanCuentas] Error creando cuenta estándar ${codigo}:`, error);
+    return null;
   }
 
   async buscarCuentaPorCodigoONombre(

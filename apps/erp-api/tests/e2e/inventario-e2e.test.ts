@@ -301,10 +301,9 @@ test('E2E Inventario – Reservas concurrentes no sobre-reservan (RPC reservar_s
   // Si el RPC no existe en DB local, no podemos validar (migraciones no aplicadas)
   const errorNoExiste = resultados.find((r) => r.error?.message?.includes('does not exist'));
   if (errorNoExiste) {
-    console.warn('⚠️ RPC reservar_stock_atomico no existe (migraciones no aplicadas).');
     await supabase.from('productos').delete().eq('id', productoId);
     await supabase.from('tenants').delete().eq('id', tenantId);
-    return;
+    assert.fail(`RPC reservar_stock_atomico debe existir para validar concurrencia de inventario: ${errorNoExiste.error?.message}`);
   }
 
   const successCount = resultados.filter((r) => !r.error && r.data).length;

@@ -11,6 +11,28 @@ export class BancosService {
     private readonly eventBus: EventBusService,
   ) {}
 
+  private toRuntimeBoolean(value: unknown): boolean | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'si', 'sí'].includes(normalized)) return true;
+      if (['false', '0', 'no'].includes(normalized)) return false;
+    }
+    return Boolean(value);
+  }
+
+  private applyConciliadoFilter<T extends { eq: (column: string, value: boolean) => T; or: (filters: string) => T }>(
+    queryBuilder: T,
+    conciliado: unknown,
+  ): T {
+    const normalized = this.toRuntimeBoolean(conciliado);
+
+    return normalized
+      ? queryBuilder.eq('conciliado', true)
+      : queryBuilder.or('conciliado.is.false,conciliado.is.null');
+  }
+
   async crearCuentaBancaria(
     tenantId: string,
     dto: CrearCuentaBancariaDto,
@@ -249,7 +271,16 @@ export class BancosService {
     }
 
     if (query.conciliado !== undefined) {
-      queryBuilder = queryBuilder.eq('conciliado', query.conciliado);
+      queryBuilder = this.applyConciliadoFilter(queryBuilder, query.conciliado);
+    }
+
+    const esExtracto = this.toRuntimeBoolean(query.es_extracto);
+    if (esExtracto !== undefined) {
+      queryBuilder = queryBuilder.eq('es_extracto', esExtracto);
+    }
+
+    if (query.conciliacion_id) {
+      queryBuilder = queryBuilder.eq('conciliacion_id', query.conciliacion_id);
     }
 
     // Paginación
@@ -627,7 +658,16 @@ export class BancosService {
     }
 
     if (query.conciliado !== undefined) {
-      queryBuilder = queryBuilder.eq('conciliado', query.conciliado);
+      queryBuilder = this.applyConciliadoFilter(queryBuilder, query.conciliado);
+    }
+
+    const esExtracto = this.toRuntimeBoolean(query.es_extracto);
+    if (esExtracto !== undefined) {
+      queryBuilder = queryBuilder.eq('es_extracto', esExtracto);
+    }
+
+    if (query.conciliacion_id) {
+      queryBuilder = queryBuilder.eq('conciliacion_id', query.conciliacion_id);
     }
 
     // Ordenar por fecha
@@ -738,7 +778,16 @@ export class BancosService {
     }
 
     if (query.conciliado !== undefined) {
-      queryBuilder = queryBuilder.eq('conciliado', query.conciliado);
+      queryBuilder = this.applyConciliadoFilter(queryBuilder, query.conciliado);
+    }
+
+    const esExtracto = this.toRuntimeBoolean(query.es_extracto);
+    if (esExtracto !== undefined) {
+      queryBuilder = queryBuilder.eq('es_extracto', esExtracto);
+    }
+
+    if (query.conciliacion_id) {
+      queryBuilder = queryBuilder.eq('conciliacion_id', query.conciliacion_id);
     }
 
     // Paginación
@@ -777,7 +826,16 @@ export class BancosService {
     }
 
     if (query.conciliado !== undefined) {
-      resumenQueryBuilder = resumenQueryBuilder.eq('conciliado', query.conciliado);
+      resumenQueryBuilder = this.applyConciliadoFilter(resumenQueryBuilder, query.conciliado);
+    }
+
+    const esExtractoResumen = this.toRuntimeBoolean(query.es_extracto);
+    if (esExtractoResumen !== undefined) {
+      resumenQueryBuilder = resumenQueryBuilder.eq('es_extracto', esExtractoResumen);
+    }
+
+    if (query.conciliacion_id) {
+      resumenQueryBuilder = resumenQueryBuilder.eq('conciliacion_id', query.conciliacion_id);
     }
 
     const { data: todosMovimientos, error: errorResumen } = await resumenQueryBuilder;

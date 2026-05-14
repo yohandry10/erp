@@ -54,6 +54,21 @@ ALTER TABLE IF EXISTS public.cajas
   ADD COLUMN IF NOT EXISTS tipo text DEFAULT 'TIENDA',
   ADD COLUMN IF NOT EXISTS creado_por uuid;
 
+DROP VIEW IF EXISTS public.vista_autorizaciones_caja;
+DROP VIEW IF EXISTS public.vw_eventos_pos_sospechosos;
+DROP VIEW IF EXISTS public.vw_ranking_cajeros;
+DROP VIEW IF EXISTS public.vw_sesiones_activas;
+DROP VIEW IF EXISTS public.vw_sesiones_caja_resumen;
+DROP VIEW IF EXISTS public.vw_turnos_metrics;
+
+DROP POLICY IF EXISTS tenant_isolation ON public.cajas;
+DROP POLICY IF EXISTS tenant_isolation ON public.sesiones_caja;
+DROP POLICY IF EXISTS tenant_isolation ON public.movimientos_caja;
+DROP POLICY IF EXISTS tenant_isolation ON public.retiros_caja;
+DROP POLICY IF EXISTS tenant_isolation ON public.cambios_turno;
+DROP POLICY IF EXISTS tenant_isolation ON public.cortes_caja;
+DROP POLICY IF EXISTS tenant_isolation ON public.autorizaciones_caja;
+
 ALTER TABLE IF EXISTS public.cajas
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN sucursal_id TYPE uuid USING app.to_uuid_or_null(COALESCE(sucursal_id::text, '')),
@@ -854,5 +869,61 @@ WHERE tenant_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_autorizaciones_caja_tenant_supervisor_created_runtime
 ON public.autorizaciones_caja (tenant_id, supervisor_id, created_at DESC)
 WHERE tenant_id IS NOT NULL AND supervisor_id IS NOT NULL;
+
+SELECT app.apply_tenant_policy('public', 'cajas');
+SELECT app.apply_tenant_policy('public', 'sesiones_caja');
+SELECT app.apply_tenant_policy('public', 'movimientos_caja');
+SELECT app.apply_tenant_policy('public', 'retiros_caja');
+SELECT app.apply_tenant_policy('public', 'cambios_turno');
+SELECT app.apply_tenant_policy('public', 'cortes_caja');
+SELECT app.apply_tenant_policy('public', 'autorizaciones_caja');
+
+CREATE OR REPLACE VIEW public.vista_autorizaciones_caja AS
+SELECT a.*
+FROM public.autorizaciones_caja a;
+
+CREATE OR REPLACE VIEW public.vw_eventos_pos_sospechosos AS
+SELECT
+  e.id,
+  e.tenant_id,
+  e.estado,
+  e.created_at,
+  e.metadata
+FROM public.eventos_pos e
+WHERE COALESCE(e.estado, '') IN ('ALERTA', 'SOSPECHOSO', 'CRITICO');
+
+CREATE OR REPLACE VIEW public.vw_ranking_cajeros AS
+SELECT
+  s.tenant_id,
+  s.cajero_id,
+  COUNT(*) AS total_sesiones,
+  COALESCE(SUM(s.total_efectivo), 0) AS total_efectivo,
+  COALESCE(SUM(s.total_tarjeta), 0) AS total_tarjeta
+FROM public.sesiones_caja s
+GROUP BY s.tenant_id, s.cajero_id;
+
+CREATE OR REPLACE VIEW public.vw_sesiones_activas AS
+SELECT s.*
+FROM public.sesiones_caja s
+WHERE s.estado = 'ABIERTA';
+
+CREATE OR REPLACE VIEW public.vw_sesiones_caja_resumen AS
+SELECT
+  s.tenant_id,
+  s.id AS sesion_id,
+  s.estado,
+  COALESCE(s.total_efectivo, 0) AS total_efectivo,
+  COALESCE(s.total_tarjeta, 0) AS total_tarjeta,
+  COALESCE(s.total_efectivo, 0) + COALESCE(s.total_tarjeta, 0) AS total_sesion
+FROM public.sesiones_caja s;
+
+CREATE OR REPLACE VIEW public.vw_turnos_metrics AS
+SELECT
+  s.tenant_id,
+  s.cajero_id,
+  COUNT(*) AS total_turnos,
+  SUM(COALESCE(s.total_efectivo, 0) + COALESCE(s.total_tarjeta, 0)) AS total_vendido
+FROM public.sesiones_caja s
+GROUP BY s.tenant_id, s.cajero_id;
 
 COMMIT;

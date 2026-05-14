@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Trash2, Building2, Mail, Phone, MapPin, User, CreditCard, Calendar } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -31,16 +31,16 @@ export default function ProveedorDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadProveedor()
-  }, [params.id])
+  const proveedorId = params.id as string | undefined
 
-  const loadProveedor = async () => {
+  const loadProveedor = useCallback(async () => {
+    if (!proveedorId) return
+
     try {
       setLoading(true)
       setError(null)
-      const response = await get(`/compras/proveedores/${params.id}`)
-      
+      const response = await get(`/compras/proveedores/${proveedorId}`)
+
       if (response.success && response.data) {
         setProveedor(response.data)
       } else {
@@ -51,7 +51,11 @@ export default function ProveedorDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, proveedorId])
+
+  useEffect(() => {
+    loadProveedor()
+  }, [loadProveedor])
 
   const handleDelete = async () => {
     if (!confirm('¿Está seguro de desactivar este proveedor?')) {
@@ -60,7 +64,7 @@ export default function ProveedorDetailPage() {
 
     try {
       const response = await del(`/compras/proveedores/${params.id}`)
-      
+
       if (response.success) {
         alert('Proveedor desactivado exitosamente')
         router.push('/dashboard/compras/proveedores')
@@ -195,9 +199,9 @@ export default function ProveedorDetailPage() {
 
       {/* Información Básica */}
       <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',
@@ -235,9 +239,9 @@ export default function ProveedorDetailPage() {
 
       {/* Información de Contacto */}
       <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',
@@ -273,9 +277,9 @@ export default function ProveedorDetailPage() {
 
       {/* Condiciones Comerciales */}
       <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',
@@ -309,9 +313,9 @@ export default function ProveedorDetailPage() {
 
       {/* Metadata */}
       <div className="activity-card">
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
           marginBottom: '1.5rem',
           display: 'flex',
           alignItems: 'center',

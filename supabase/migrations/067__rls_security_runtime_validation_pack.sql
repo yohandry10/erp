@@ -121,6 +121,7 @@ BEGIN
       AND (
         position('tenant_idisnull' IN v_policy_expr_norm) = 0
         OR position('app.current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
+        OR position('current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
       ),
       COALESCE(v_policy_expr, '<missing_policy>');
   END IF;
@@ -142,6 +143,7 @@ BEGIN
       AND (
         position('tenant_idisnull' IN v_policy_expr_norm) = 0
         OR position('app.current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
+        OR position('current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
       ),
       COALESCE(v_policy_expr, '<missing_policy>');
   END IF;
@@ -163,6 +165,7 @@ BEGIN
       AND (
         position('tenant_idisnull' IN v_policy_expr_norm) = 0
         OR position('app.current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
+        OR position('current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
       ),
       COALESCE(v_policy_expr, '<missing_policy>');
   END IF;
@@ -184,6 +187,7 @@ BEGIN
       AND (
         position('tenant_idisnull' IN v_policy_expr_norm) = 0
         OR position('app.current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
+        OR position('current_tenant_id()isnotnull' IN v_policy_expr_norm) > 0
       ),
       COALESCE(v_policy_expr, '<missing_policy>');
   END IF;

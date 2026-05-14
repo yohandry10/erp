@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { customAuth } from '@/lib/auth-service'
 import { useTenant } from '@/contexts/TenantContext'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const API_BASE_URL = '/backend'
 
 export interface ConfigurationStatus {
   isComplete: boolean
@@ -27,7 +26,7 @@ export function useConfigurationStatus() {
   const [error, setError] = useState<string | null>(null)
   const { isSuperAdmin, loading: tenantLoading } = useTenant()
 
-  const checkStatus = useCallback(async () => {
+  const checkStatus = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -52,26 +51,15 @@ export function useConfigurationStatus() {
         return
       }
 
-      // ✅ Verificar que haya token antes de hacer la request
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
-      
-      if (!token) {
-        console.warn('[useConfigurationStatus] No token available, skipping check')
-        setIsLoading(false)
-        return
-      }
-
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/configuration/status`, { 
-        headers,
+      const response = await fetch(`${API_BASE_URL}/api/configuration/context/status/`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
         mode: 'cors',
-        credentials: 'include'
+        credentials: 'include',
+        signal,
       })
-      
+
       if (!response.ok) {
         // Si es 404 o 500, asumir que no hay configuración
         console.warn('[useConfigurationStatus] Configuration status not available, assuming incomplete')
@@ -92,7 +80,7 @@ export function useConfigurationStatus() {
       }
 
       const data = await response.json()
-      
+
       if (data.success) {
         setStatus(data.data)
       } else {
@@ -112,7 +100,10 @@ export function useConfigurationStatus() {
         })
       }
     } catch (err) {
-      console.error('[useConfigurationStatus] Error checking configuration status:', err)
+      if (signal?.aborted) {
+        return
+      }
+      console.warn('[useConfigurationStatus] Error checking configuration status:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
       // En caso de error, asumir configuración incompleta en lugar de fallar
       setStatus({
@@ -129,7 +120,9 @@ export function useConfigurationStatus() {
         }
       })
     } finally {
-      setIsLoading(false)
+      if (!signal?.aborted) {
+        setIsLoading(false)
+      }
     }
   }, [isSuperAdmin])
 
@@ -138,7 +131,9 @@ export function useConfigurationStatus() {
     if (tenantLoading) {
       return
     }
-    checkStatus()
+    const controller = new AbortController()
+    checkStatus(controller.signal)
+    return () => controller.abort()
   }, [checkStatus, tenantLoading, isSuperAdmin])
 
   return {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -75,11 +75,7 @@ export default function PresupuestosListaPage() {
   const [estadoFilter, setEstadoFilter] = useState<string>('TODOS')
   const [alertaFilter, setAlertaFilter] = useState<string>('TODOS')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -108,7 +104,11 @@ export default function PresupuestosListaPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Está seguro de eliminar este presupuesto?')) return

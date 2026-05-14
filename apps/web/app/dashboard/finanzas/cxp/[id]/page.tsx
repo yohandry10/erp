@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -21,14 +21,9 @@ export default function CxpDetallePage() {
   const [loadingPagos, setLoadingPagos] = useState(true)
   const [showPagoModal, setShowPagoModal] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      loadCxp()
-      loadPagos()
-    }
-  }, [id])
+  const loadCxp = useCallback(async () => {
+    if (!id) return
 
-  const loadCxp = async () => {
     try {
       setLoading(true)
       const response = await get(`/api/finanzas/cxp/${id}`)
@@ -39,9 +34,11 @@ export default function CxpDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, id])
 
-  const loadPagos = async () => {
+  const loadPagos = useCallback(async () => {
+    if (!id) return
+
     try {
       setLoadingPagos(true)
       const response = await get(`/api/finanzas/cxp/${id}/pagos`)
@@ -51,7 +48,12 @@ export default function CxpDetallePage() {
     } finally {
       setLoadingPagos(false)
     }
-  }
+  }, [get, id])
+
+  useEffect(() => {
+    loadCxp()
+    loadPagos()
+  }, [loadCxp, loadPagos])
 
   const formatCurrency = (amount: number, moneda: string = 'PEN') => {
     if (!amount) return '-'

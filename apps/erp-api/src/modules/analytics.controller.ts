@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { InventoryIntegrationService } from '../shared/integration/inventory-integration.service';
@@ -26,15 +26,14 @@ export class AnalyticsController {
     try {
       console.log(`📊 [Analytics] [Tenant: ${tenantId}] Analizando ventas por tiempo`);
 
-      // Obtener ventas de los últimos 30 días directamente
-      const fechaInicio = new Date();
-      fechaInicio.setDate(fechaInicio.getDate() - 30);
+      const { fechaInicio, fechaFin } = this.resolveDateRange(filtros);
 
       const { data: ventas, error: ventasError } = await this.supabase.getClient()
         .from('ventas')
         .select('fecha, total')
         .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .gte('fecha', fechaInicio.toISOString())
+        .lte('fecha', fechaFin.toISOString())
         .order('fecha');
 
       if (ventasError) {
@@ -51,7 +50,7 @@ export class AnalyticsController {
 
       // Calcular totales
       const ventasActuales = ventas?.reduce((sum, v) => sum + parseFloat(v.total || 0), 0) || 0;
-      const ventasAnterior = await this.calcularVentasMesAnterior(tenantId);
+      const ventasAnterior = await this.calcularVentasPeriodoAnterior(tenantId, fechaInicio, fechaFin);
       const crecimiento = ventasAnterior > 0 ? 
         ((ventasActuales - ventasAnterior) / ventasAnterior * 100).toFixed(1) + '%' : 
         'SIN DATOS';
@@ -77,6 +76,9 @@ export class AnalyticsController {
         }
       };
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       console.error('❌ Error analizando ventas por tiempo:', error);
       return {
         success: false,
@@ -109,20 +111,66 @@ export class AnalyticsController {
     }));
   }
 
-  private async calcularVentasMesAnterior(tenantId: string): Promise<number> {
+  private resolveDateRange(filtros: any): { fechaInicio: Date; fechaFin: Date } {
+    const fechaDesde = filtros?.fecha_desde ?? filtros?.fechaDesde;
+    const fechaHasta = filtros?.fecha_hasta ?? filtros?.fechaHasta;
+    const periodo = filtros?.periodo ?? 'mensual';
+    const allowedPeriodos = new Set(['semanal', 'mensual', 'trimestral', 'anual']);
+
+    if ((fechaDesde && !fechaHasta) || (!fechaDesde && fechaHasta)) {
+      throw new BadRequestException('Debe enviar fecha_desde y fecha_hasta juntas');
+    }
+
+    if (fechaDesde && fechaHasta) {
+      const inicio = this.parseDateParam(fechaDesde, 'fecha_desde');
+      const fin = this.parseDateParam(fechaHasta, 'fecha_hasta');
+      fin.setUTCHours(23, 59, 59, 999);
+      if (inicio.getTime() > fin.getTime()) {
+        throw new BadRequestException('fecha_desde no puede ser mayor que fecha_hasta');
+      }
+      return { fechaInicio: inicio, fechaFin: fin };
+    }
+
+    if (!allowedPeriodos.has(periodo)) {
+      throw new BadRequestException('Periodo invalido. Use semanal, mensual, trimestral o anual');
+    }
+
+    const fechaFin = new Date();
+    const fechaInicio = new Date(fechaFin);
+    const daysByPeriodo: Record<string, number> = {
+      semanal: 7,
+      mensual: 30,
+      trimestral: 90,
+      anual: 365,
+    };
+    fechaInicio.setDate(fechaInicio.getDate() - daysByPeriodo[periodo]);
+    return { fechaInicio, fechaFin };
+  }
+
+  private parseDateParam(value: string, fieldName: string): Date {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException(`${fieldName} debe tener formato YYYY-MM-DD`);
+    }
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`${fieldName} debe ser una fecha valida`);
+    }
+    return parsed;
+  }
+
+  private async calcularVentasPeriodoAnterior(tenantId: string, fechaInicio: Date, fechaFin: Date): Promise<number> {
     // ✅ MULTI-TENANT: Filtrar por tenant
     try {
-      const fechaInicio = new Date();
-      fechaInicio.setDate(fechaInicio.getDate() - 60);
-      const fechaFin = new Date();
-      fechaFin.setDate(fechaFin.getDate() - 30);
+      const durationMs = fechaFin.getTime() - fechaInicio.getTime();
+      const inicioAnterior = new Date(fechaInicio.getTime() - durationMs - 1);
+      const finAnterior = new Date(fechaInicio.getTime() - 1);
 
       const { data: ventas } = await this.supabase.getClient()
         .from('ventas')
         .select('total')
         .eq('tenant_id', tenantId) // ✅ Filtro de tenant
-        .gte('fecha', fechaInicio.toISOString())
-        .lte('fecha', fechaFin.toISOString());
+        .gte('fecha', inicioAnterior.toISOString())
+        .lte('fecha', finAnterior.toISOString());
 
       return ventas?.reduce((sum, venta) => sum + parseFloat(venta.total || 0), 0) || 0;
     } catch (error) {
@@ -140,7 +188,7 @@ export class AnalyticsController {
       console.log(`📊 [Analytics] [Tenant: ${tenantId}] Analizando deudas de clientes`);
       const { data: cuentasPorCobrar, error } = await this.supabase.getClient()
         .from('cuentas_por_cobrar')
-        .select('*, clientes(nombre, ruc)')
+        .select('id, cliente_id, saldo, monto_pendiente, monto_total, fecha_vencimiento, numero')
         .eq('tenant_id', tenantId) // ✅ Filtro de tenant
         .order('fecha_vencimiento', { ascending: true });
 
@@ -160,7 +208,7 @@ export class AnalyticsController {
 
       cuentasPorCobrar?.forEach(cuenta => {
         const diasVencido = Math.floor((ahora.getTime() - new Date(cuenta.fecha_vencimiento).getTime()) / (1000 * 60 * 60 * 24));
-        const monto = parseFloat(cuenta.monto || 0);
+        const monto = parseFloat(cuenta.saldo ?? cuenta.monto_pendiente ?? cuenta.monto_total ?? 0);
         
         totalPorCobrar += monto;
         
@@ -174,8 +222,8 @@ export class AnalyticsController {
         }
 
         topDeudores.push({
-          cliente: cuenta.clientes?.nombre || 'Cliente sin nombre',
-          ruc: cuenta.clientes?.ruc || 'Sin RUC',
+          cliente: cuenta.numero || cuenta.cliente_id || 'Cliente sin nombre',
+          ruc: 'Sin RUC',
           monto: monto,
           diasVencido: Math.max(0, diasVencido)
         });
@@ -194,13 +242,184 @@ export class AnalyticsController {
           totales: {
             totalPorCobrar,
             vencido: totalVencido,
-            porcentajeVencido: totalPorCobrar > 0 ? (totalVencido / totalPorCobrar * 100).toFixed(1) : 0
+            porcentajeVencido: totalPorCobrar > 0 ? Number((totalVencido / totalPorCobrar * 100).toFixed(1)) : 0
           }
         }
       };
     } catch (error) {
       return { success: false, message: error.message };
     }
+  }
+
+  @Get('deudas-proveedores')
+  @RequirePermission('analytics.cobranza.read')
+  @ApiOperation({ summary: 'Gráfico de deudas a proveedores' })
+  @ApiResponse({ status: 200, description: 'Datos de deudas a proveedores obtenidos exitosamente' })
+  async getDeudasProveedores(@CurrentTenant() tenantId: string, @Query() filtros: any) {
+    try {
+      const { data: cuentasPorPagar, error } = await this.supabase.getClient()
+        .from('cuentas_por_pagar')
+        .select('saldo, total, fecha_vencimiento, proveedor_id')
+        .eq('tenant_id', tenantId)
+        .order('fecha_vencimiento', { ascending: true });
+
+      if (error) throw error;
+
+      const ahora = new Date();
+      const edadSaldos = {
+        '0-30 días': 0,
+        '31-60 días': 0,
+        '61-90 días': 0,
+        '90+ días': 0,
+      };
+
+      let totalPorPagar = 0;
+      let totalVencido = 0;
+
+      cuentasPorPagar?.forEach((cuenta) => {
+        const monto = Number.parseFloat(cuenta.saldo ?? cuenta.total ?? 0);
+        const diasVencido = Math.floor(
+          (ahora.getTime() - new Date(cuenta.fecha_vencimiento).getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        totalPorPagar += monto;
+        if (diasVencido <= 0) return;
+
+        totalVencido += monto;
+        if (diasVencido <= 30) edadSaldos['0-30 días'] += monto;
+        else if (diasVencido <= 60) edadSaldos['31-60 días'] += monto;
+        else if (diasVencido <= 90) edadSaldos['61-90 días'] += monto;
+        else edadSaldos['90+ días'] += monto;
+      });
+
+      return {
+        success: true,
+        data: {
+          graficoEdadSaldos: {
+            labels: Object.keys(edadSaldos),
+            data: Object.values(edadSaldos),
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7c2d12'],
+          },
+          totales: {
+            totalPorPagar,
+            vencido: totalVencido,
+            porcentajeVencido: totalPorPagar > 0 ? totalVencido / totalPorPagar * 100 : 0,
+          },
+        },
+      };
+    } catch (error) {
+      console.error('❌ Error analizando deudas a proveedores:', error);
+      return {
+        success: true,
+        data: this.getEmptyDebtAnalytics('totalPorPagar'),
+      };
+    }
+  }
+
+  @Get('ventas-categoria')
+  @RequirePermission('analytics.ventas.read')
+  @ApiOperation({ summary: 'Gráfico de ventas por categoría' })
+  @ApiResponse({ status: 200, description: 'Datos de ventas por categoría obtenidos exitosamente' })
+  async getVentasCategoria(@CurrentTenant() tenantId: string) {
+    try {
+      const { data: productos, error } = await this.supabase.getClient()
+        .from('productos')
+        .select('categoria')
+        .eq('tenant_id', tenantId);
+
+      if (error) throw error;
+
+      const categorias = new Map<string, number>();
+      productos?.forEach((producto) => {
+        const categoria = producto.categoria || 'Sin categoría';
+        categorias.set(categoria, (categorias.get(categoria) || 0) + 1);
+      });
+
+      return {
+        success: true,
+        data: {
+          graficoPie: {
+            labels: Array.from(categorias.keys()),
+            data: Array.from(categorias.values()),
+            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'],
+          },
+        },
+      };
+    } catch (error) {
+      console.error('❌ Error analizando ventas por categoría:', error);
+      return {
+        success: true,
+        data: {
+          graficoPie: {
+            labels: [],
+            data: [],
+            backgroundColor: [],
+          },
+        },
+      };
+    }
+  }
+
+  @Get('kpis-visuales')
+  @RequirePermission('analytics.finanzas.read')
+  @ApiOperation({ summary: 'KPIs visuales de analytics financiero' })
+  @ApiResponse({ status: 200, description: 'KPIs visuales obtenidos exitosamente' })
+  async getKpisVisuales(@CurrentTenant() tenantId: string) {
+    try {
+      const desde = new Date();
+      desde.setMonth(desde.getMonth() - 1);
+
+      const [ventasResult, gastosResult, cxcResult, cxpResult] = await Promise.all([
+        this.supabase.getClient().from('ventas').select('total').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
+        this.supabase.getClient().from('gastos').select('monto').eq('tenant_id', tenantId).gte('fecha', desde.toISOString()),
+        this.supabase.getClient().from('cuentas_por_cobrar').select('saldo, monto').eq('tenant_id', tenantId),
+        this.supabase.getClient().from('cuentas_por_pagar').select('saldo, total').eq('tenant_id', tenantId),
+      ]);
+
+      const ventas = ventasResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.total || 0), 0) || 0;
+      const gastos = gastosResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.monto || 0), 0) || 0;
+      const porCobrar = cxcResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.monto ?? 0), 0) || 0;
+      const porPagar = cxpResult.data?.reduce((sum, row) => sum + Number.parseFloat(row.saldo ?? row.total ?? 0), 0) || 0;
+
+      const liquidez = porPagar > 0 ? (ventas + porCobrar) / porPagar : ventas > 0 ? 2 : 0;
+      const rentabilidad = ventas > 0 ? ((ventas - gastos) / ventas) * 100 : 0;
+
+      return {
+        success: true,
+        data: {
+          liquidez: { valor: Number(liquidez.toFixed(1)), objetivo: 1.5, estado: liquidez >= 1.5 ? 'OK' : 'REVISAR' },
+          rentabilidad: { valor: Number(rentabilidad.toFixed(1)), objetivo: 15, estado: rentabilidad >= 15 ? 'OK' : 'REVISAR' },
+          crecimiento: { valor: 0, objetivo: 10, estado: 'SIN DATOS' },
+          eficiencia: { rotacionInventario: 0, cicloEfectivo: 0 },
+        },
+      };
+    } catch (error) {
+      console.error('❌ Error calculando KPIs visuales:', error);
+      return {
+        success: true,
+        data: {
+          liquidez: { valor: 0, objetivo: 1.5, estado: 'SIN DATOS' },
+          rentabilidad: { valor: 0, objetivo: 15, estado: 'SIN DATOS' },
+          crecimiento: { valor: 0, objetivo: 10, estado: 'SIN DATOS' },
+          eficiencia: { rotacionInventario: 0, cicloEfectivo: 0 },
+        },
+      };
+    }
+  }
+
+  private getEmptyDebtAnalytics(totalKey: 'totalPorPagar' | 'totalPorCobrar') {
+    return {
+      graficoEdadSaldos: {
+        labels: ['0-30 días', '31-60 días', '61-90 días', '90+ días'],
+        data: [0, 0, 0, 0],
+        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7c2d12'],
+      },
+      totales: {
+        [totalKey]: 0,
+        vencido: 0,
+        porcentajeVencido: 0,
+      },
+    };
   }
 
   @Get('rentabilidad-productos')
@@ -473,8 +692,8 @@ export class AnalyticsController {
       return diasVencido > 30;
     }).map(cuenta => ({
       tipo: 'VENCIDO',
-      mensaje: `Cliente ${cuenta.clientes?.nombre} tiene ${Math.floor((ahora.getTime() - new Date(cuenta.fecha_vencimiento).getTime()) / (1000 * 60 * 60 * 24))} días de atraso`,
-      monto: parseFloat(cuenta.monto || 0),
+      mensaje: `Cliente ${cuenta.numero || cuenta.cliente_id || 'sin nombre'} tiene ${Math.floor((ahora.getTime() - new Date(cuenta.fecha_vencimiento).getTime()) / (1000 * 60 * 60 * 24))} días de atraso`,
+      monto: parseFloat(cuenta.saldo ?? cuenta.monto_pendiente ?? cuenta.monto_total ?? 0),
       fechaVencimiento: cuenta.fecha_vencimiento
     })) || [];
   }

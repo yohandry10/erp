@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { FileText, RefreshCw, Download, Filter } from 'lucide-react'
 
@@ -31,7 +31,7 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ABONO' | 'CARGO'>('TODOS')
   const [filtroConciliado, setFiltroConciliado] = useState<'TODOS' | 'SI' | 'NO'>('TODOS')
 
-  const loadMovimientos = async () => {
+  const loadMovimientos = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -48,11 +48,11 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
     } finally {
       setLoading(false)
     }
-  }
+  }, [fechaDesde, fechaHasta, get])
 
   useEffect(() => {
     loadMovimientos()
-  }, [fechaDesde, fechaHasta])
+  }, [loadMovimientos])
 
   const formatCurrency = (amount: number, currency: string = 'PEN') => {
     return new Intl.NumberFormat('es-PE', {

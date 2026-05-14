@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import UsuarioModal from '@/components/modals/UsuarioModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useToast } from "@/components/ui/use-toast"
 import { useApi } from '@/hooks/use-api'
 import { useTenant } from '@/contexts/TenantContext'
+import { usePermission } from '@/hooks/use-permission'
 import { UsersStats, UsersFilters, UsersTable, RolesSection } from '@/components/usuarios'
 
 export default function UsuariosPage() {
@@ -25,6 +26,8 @@ export default function UsuariosPage() {
   const { toast } = useToast()
   const { get, put, delete: del } = useApi()
   const { user: currentUser } = useTenant()
+  const { hasPermission: canViewUsers, loading: permissionLoading } = usePermission('configuracion', 'ver', 'usuarios')
+  const { hasPermission: canCreateUsers } = usePermission('configuracion', 'crear', 'usuarios')
 
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
@@ -40,10 +43,15 @@ export default function UsuariosPage() {
     variant: 'default'
   })
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (permissionLoading || !canViewUsers) {
+      if (!permissionLoading) setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
-      
+
       const [usuariosData, rolesData, statsData] = await Promise.all([
         get(`/usuarios-sistema?rol=${filtroRol}&estado=${filtroEstado}`),
         get('/usuarios-sistema/roles'),
@@ -72,11 +80,11 @@ export default function UsuariosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [canViewUsers, filtroEstado, filtroRol, get, permissionLoading, toast])
 
   useEffect(() => {
     fetchData()
-  }, [filtroRol, filtroEstado])
+  }, [fetchData])
 
   const handleNuevoUsuario = () => {
     setUsuarioEditando(null)
@@ -112,7 +120,7 @@ export default function UsuariosPage() {
     }
   }
 
-  if (loading) {
+  if (loading || permissionLoading) {
     return (
       <div className="dashboard-container">
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
@@ -127,15 +135,28 @@ export default function UsuariosPage() {
     )
   }
 
+  if (!canViewUsers) {
+    return (
+      <div className="dashboard-container">
+        <div className="activity-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <h1 className="dashboard-title">Acceso denegado</h1>
+          <p className="dashboard-subtitle">No tienes permisos para gestionar usuarios.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
         <h1 className="dashboard-title">Gestión de Usuarios</h1>
         <p className="dashboard-subtitle">Administra usuarios, roles y permisos del sistema</p>
-        <button className="refresh-btn" onClick={handleNuevoUsuario}>
-          + Nuevo Usuario
-        </button>
+        {canCreateUsers && (
+          <button className="refresh-btn" onClick={handleNuevoUsuario}>
+            + Nuevo Usuario
+          </button>
+        )}
       </div>
 
       {/* Stats */}

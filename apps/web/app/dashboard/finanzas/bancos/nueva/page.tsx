@@ -24,6 +24,7 @@ export default function NuevaCuentaBancariaPage() {
   
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   // Form fields
   const [nombre, setNombre] = useState('')
@@ -35,35 +36,44 @@ export default function NuevaCuentaBancariaPage() {
   const [permiteSobregiro, setPermiteSobregiro] = useState(false)
   const [activa, setActiva] = useState(true)
 
+  const clearFieldError = (field: string) => {
+    if (!fieldErrors[field]) return
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {}
+
+    if (!nombre.trim()) nextErrors.nombre = 'El nombre de la cuenta es requerido'
+    if (!banco.trim()) nextErrors.banco = 'El nombre del banco es requerido'
+    if (!numeroCuenta.trim()) nextErrors.numeroCuenta = 'El número de cuenta es requerido'
+
+    const saldoNum = parseFloat(saldo)
+    if (isNaN(saldoNum) || saldoNum < 0) {
+      nextErrors.saldo = 'El saldo debe ser un número mayor o igual a 0'
+    }
+
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    // Validations
-    if (!nombre.trim()) {
-      setError('El nombre de la cuenta es requerido')
-      return
-    }
-
-    if (!banco.trim()) {
-      setError('El nombre del banco es requerido')
-      return
-    }
-
-    if (!numeroCuenta.trim()) {
-      setError('El número de cuenta es requerido')
-      return
-    }
-
-    const saldoNum = parseFloat(saldo)
-    if (isNaN(saldoNum) || saldoNum < 0) {
-      setError('El saldo debe ser un número mayor o igual a 0')
+    if (!validateForm()) {
+      setError('Revise los campos marcados antes de crear la cuenta bancaria')
       return
     }
 
     setSubmitting(true)
 
     try {
+      const saldoNum = parseFloat(saldo)
       const payload = {
         nombre: nombre.trim(),
         banco: banco.trim(),
@@ -95,6 +105,7 @@ export default function NuevaCuentaBancariaPage() {
     const regex = /^\d*\.?\d{0,2}$/
     if (regex.test(value) || value === '') {
       setSaldo(value)
+      clearFieldError('saldo')
     }
   }
 
@@ -104,7 +115,7 @@ export default function NuevaCuentaBancariaPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/dashboard/finanzas/bancos')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2"
           >
             <ArrowLeft size={20} />
@@ -124,7 +135,7 @@ export default function NuevaCuentaBancariaPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {/* Información Básica */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -142,11 +153,20 @@ export default function NuevaCuentaBancariaPage() {
                   <input
                     type="text"
                     value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
+                    onChange={(e) => {
+                      setNombre(e.target.value)
+                      clearFieldError('nombre')
+                    }}
                     placeholder="Ej: Cuenta Operaciones BCP"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    aria-invalid={Boolean(fieldErrors.nombre)}
+                    aria-describedby={fieldErrors.nombre ? 'cuenta-nombre-error' : undefined}
                   />
+                  {fieldErrors.nombre && (
+                    <p id="cuenta-nombre-error" className="text-xs text-red-600 mt-1">
+                      {fieldErrors.nombre}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">
                     Nombre descriptivo para identificar la cuenta
                   </p>
@@ -161,11 +181,20 @@ export default function NuevaCuentaBancariaPage() {
                   <input
                     type="text"
                     value={banco}
-                    onChange={(e) => setBanco(e.target.value)}
+                    onChange={(e) => {
+                      setBanco(e.target.value)
+                      clearFieldError('banco')
+                    }}
                     placeholder="Ej: Banco de Crédito del Perú"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    aria-invalid={Boolean(fieldErrors.banco)}
+                    aria-describedby={fieldErrors.banco ? 'cuenta-banco-error' : undefined}
                   />
+                  {fieldErrors.banco && (
+                    <p id="cuenta-banco-error" className="text-xs text-red-600 mt-1">
+                      {fieldErrors.banco}
+                    </p>
+                  )}
                 </div>
 
                 {/* Número de Cuenta */}
@@ -177,11 +206,20 @@ export default function NuevaCuentaBancariaPage() {
                   <input
                     type="text"
                     value={numeroCuenta}
-                    onChange={(e) => setNumeroCuenta(e.target.value)}
+                    onChange={(e) => {
+                      setNumeroCuenta(e.target.value)
+                      clearFieldError('numeroCuenta')
+                    }}
                     placeholder="Ej: 191-1234567-0-89"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
+                    aria-invalid={Boolean(fieldErrors.numeroCuenta)}
+                    aria-describedby={fieldErrors.numeroCuenta ? 'cuenta-numero-error' : undefined}
                   />
+                  {fieldErrors.numeroCuenta && (
+                    <p id="cuenta-numero-error" className="text-xs text-red-600 mt-1">
+                      {fieldErrors.numeroCuenta}
+                    </p>
+                  )}
                 </div>
 
                 {/* Tipo de Cuenta */}
@@ -246,7 +284,14 @@ export default function NuevaCuentaBancariaPage() {
                     onChange={(e) => handleSaldoChange(e.target.value)}
                     placeholder="0.00"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    aria-invalid={Boolean(fieldErrors.saldo)}
+                    aria-describedby={fieldErrors.saldo ? 'cuenta-saldo-error' : undefined}
                   />
+                  {fieldErrors.saldo && (
+                    <p id="cuenta-saldo-error" className="text-xs text-red-600 mt-1">
+                      {fieldErrors.saldo}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">
                     Saldo actual de la cuenta bancaria
                   </p>
@@ -303,7 +348,7 @@ export default function NuevaCuentaBancariaPage() {
             <div className="flex justify-end gap-3 pt-6 border-t">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={() => router.push('/dashboard/finanzas/bancos')}
                 disabled={submitting}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >

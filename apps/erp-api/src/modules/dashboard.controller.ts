@@ -165,7 +165,6 @@ export class DashboardController {
   }
   
   @Get('stats')
-  @RequirePermission('dashboard.stats.read') // HARDENING: métrica protegida por permiso granular.
   @ApiOperation({ summary: 'Obtener estadísticas generales del dashboard' })
   @ApiResponse({ status: 200, description: 'Estadísticas obtenidas exitosamente' })
   async getStats(@CurrentTenant() tenantId: string) {
@@ -210,7 +209,6 @@ export class DashboardController {
   }
 
   @Get('activities')
-  @RequirePermission('dashboard.view') // Permiso más amplio para evitar 403 en panel principal.
   @ApiOperation({ summary: 'Obtener actividades recientes' })
   @ApiResponse({ status: 200, description: 'Actividades obtenidas exitosamente' })
   async getActivities(@CurrentTenant() tenantId: string) {

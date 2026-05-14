@@ -15,10 +15,12 @@ import { ValidationInterceptor } from './interceptors/validation.interceptor';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        ttl: parseInt(configService.get('THROTTLE_TTL', '60000')),
-        limit: parseInt(configService.get('THROTTLE_LIMIT', '100')),
-      }),
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: parseInt(configService.get('THROTTLE_TTL', '60000')),
+          limit: parseInt(configService.get('THROTTLE_LIMIT', '100')),
+        },
+      ],
     }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

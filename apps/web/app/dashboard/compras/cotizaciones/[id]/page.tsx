@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  ArrowLeft, 
-  Edit, 
-  Send, 
-  CheckCircle, 
-  XCircle, 
+import {
+  ArrowLeft,
+  Edit,
+  Send,
+  CheckCircle,
+  XCircle,
   FileText,
   Calendar,
   User,
@@ -76,15 +76,11 @@ export default function CotizacionDetallePage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
-  useEffect(() => {
-    loadCotizacion()
-  }, [cotizacionId])
-
-  const loadCotizacion = async () => {
+  const loadCotizacion = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/compras/cotizaciones/${cotizacionId}`)
-      
+
       if (response?.success && response.data) {
         setCotizacion(response.data)
       } else {
@@ -98,7 +94,11 @@ export default function CotizacionDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [cotizacionId, get, router])
+
+  useEffect(() => {
+    loadCotizacion()
+  }, [loadCotizacion])
 
   const handleEnviar = async () => {
     if (!confirm('¿Está seguro de enviar esta cotización al proveedor?')) return
@@ -106,7 +106,7 @@ export default function CotizacionDetallePage() {
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/enviar`, {})
-      
+
       if (response?.success) {
         alert('✅ Cotización enviada exitosamente')
         loadCotizacion()
@@ -127,7 +127,7 @@ export default function CotizacionDetallePage() {
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/aprobar`, {})
-      
+
       if (response?.success) {
         alert('✅ Cotización aprobada exitosamente')
         loadCotizacion()
@@ -149,7 +149,7 @@ export default function CotizacionDetallePage() {
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/rechazar`, { motivo })
-      
+
       if (response?.success) {
         alert('✅ Cotización rechazada')
         loadCotizacion()
@@ -170,7 +170,7 @@ export default function CotizacionDetallePage() {
     try {
       setActionLoading(true)
       const response = await post(`/api/compras/cotizaciones/${cotizacionId}/convertir-oc`, {})
-      
+
       if (response?.success && response.data?.orden_id) {
         alert('✅ Orden de Compra creada exitosamente')
         router.push(`/dashboard/compras/ordenes/${response.data.orden_id}`)

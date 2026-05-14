@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import React, { useState, useRef, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, Building2 } from 'lucide-react'
 
@@ -29,7 +30,7 @@ export function LogoUploader({
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     if (!acceptedFormats.includes(file.type)) {
       return `Formato no válido. Usa: ${acceptedFormats.map(f => f.split('/')[1].toUpperCase()).join(', ')}`
     }
@@ -37,7 +38,7 @@ export function LogoUploader({
       return `El archivo es muy grande. Máximo ${maxSizeMB}MB`
     }
     return null
-  }
+  }, [acceptedFormats, maxSizeBytes, maxSizeMB])
 
   const processFile = useCallback((file: File) => {
     const validationError = validateFile(file)
@@ -54,7 +55,7 @@ export function LogoUploader({
       onLogoChange(file, url)
     }
     reader.readAsDataURL(file)
-  }, [onLogoChange, maxSizeBytes, acceptedFormats])
+  }, [onLogoChange, validateFile])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -138,9 +139,12 @@ export function LogoUploader({
               justifyContent: 'center',
             }}
           >
-            <img
+            <Image
               src={previewUrl}
               alt="Logo de la empresa"
+              width={80}
+              height={80}
+              unoptimized
               style={{
                 maxWidth: '100%',
                 maxHeight: '100%',

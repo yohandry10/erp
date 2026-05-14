@@ -37,6 +37,44 @@ export class ConciliacionController {
     return this.conciliacionService.listarConciliaciones(tenantId, query);
   }
 
+  @Get('pendientes')
+  @RequirePermission('finanzas.conciliacion.ver')
+  @ApiOperation({
+    summary: 'Obtener conciliaciones pendientes',
+    description: 'Obtiene la lista de conciliaciones bancarias que están pendientes de completar (estado ABIERTA o EN_PROCESO). Incluye información de la cuenta bancaria, período, saldos y porcentaje de avance de conciliación. Útil para monitorear el estado de las conciliaciones en curso.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de conciliaciones pendientes obtenida exitosamente' })
+  async obtenerConciliacionesPendientes(
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.conciliacionService.obtenerConciliacionesPendientes(tenantId);
+  }
+
+  @Get('plantillas-csv')
+  @RequirePermission('finanzas.conciliacion.ver')
+  @ApiOperation({
+    summary: 'Listar plantillas CSV disponibles',
+    description: 'Obtiene la lista de todas las plantillas CSV configuradas para importar extractos bancarios. Incluye plantillas predefinidas para bancos peruanos (BCP, BBVA, Interbank, Scotiabank) y plantillas personalizadas registradas.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de plantillas obtenida exitosamente' })
+  async listarPlantillasCsv() {
+    return this.conciliacionService.listarPlantillasCsv();
+  }
+
+  @Post('plantillas-csv')
+  @RequirePermission('finanzas.conciliacion.gestionar')
+  @ApiOperation({
+    summary: 'Registrar plantilla CSV personalizada',
+    description: 'Registra una nueva plantilla CSV personalizada para importar extractos bancarios de bancos no soportados por defecto. Permite definir el formato de columnas, separadores, formato de fecha y otras configuraciones específicas del banco.',
+  })
+  @ApiResponse({ status: 201, description: 'Plantilla registrada exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos de plantilla inválidos' })
+  async registrarPlantillaCsv(
+    @Body() registrarPlantillaDto: RegistrarPlantillaCsvDto,
+  ) {
+    return this.conciliacionService.registrarPlantillaCsv(registrarPlantillaDto);
+  }
+
   @Get(':id')
   @RequirePermission('finanzas.conciliacion.ver')
   @ApiOperation({
@@ -156,43 +194,5 @@ export class ConciliacionController {
       user?.id,
       cerrarConciliacionDto.forzar_cierre || false
     );
-  }
-
-  @Get('pendientes')
-  @RequirePermission('finanzas.conciliacion.ver')
-  @ApiOperation({
-    summary: 'Obtener conciliaciones pendientes',
-    description: 'Obtiene la lista de conciliaciones bancarias que están pendientes de completar (estado ABIERTA o EN_PROCESO). Incluye información de la cuenta bancaria, período, saldos y porcentaje de avance de conciliación. Útil para monitorear el estado de las conciliaciones en curso.',
-  })
-  @ApiResponse({ status: 200, description: 'Lista de conciliaciones pendientes obtenida exitosamente' })
-  async obtenerConciliacionesPendientes(
-    @CurrentTenant() tenantId: string,
-  ) {
-    return this.conciliacionService.obtenerConciliacionesPendientes(tenantId);
-  }
-
-  @Get('plantillas-csv')
-  @RequirePermission('finanzas.conciliacion.ver')
-  @ApiOperation({
-    summary: 'Listar plantillas CSV disponibles',
-    description: 'Obtiene la lista de todas las plantillas CSV configuradas para importar extractos bancarios. Incluye plantillas predefinidas para bancos peruanos (BCP, BBVA, Interbank, Scotiabank) y plantillas personalizadas registradas.',
-  })
-  @ApiResponse({ status: 200, description: 'Lista de plantillas obtenida exitosamente' })
-  async listarPlantillasCsv() {
-    return this.conciliacionService.listarPlantillasCsv();
-  }
-
-  @Post('plantillas-csv')
-  @RequirePermission('finanzas.conciliacion.gestionar')
-  @ApiOperation({
-    summary: 'Registrar plantilla CSV personalizada',
-    description: 'Registra una nueva plantilla CSV personalizada para importar extractos bancarios de bancos no soportados por defecto. Permite definir el formato de columnas, separadores, formato de fecha y otras configuraciones específicas del banco.',
-  })
-  @ApiResponse({ status: 201, description: 'Plantilla registrada exitosamente' })
-  @ApiResponse({ status: 400, description: 'Datos de plantilla inválidos' })
-  async registrarPlantillaCsv(
-    @Body() registrarPlantillaDto: RegistrarPlantillaCsvDto,
-  ) {
-    return this.conciliacionService.registrarPlantillaCsv(registrarPlantillaDto);
   }
 }

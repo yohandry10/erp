@@ -17,7 +17,7 @@
  */
 
 import assert from 'assert';
-import { skipIfNoSupabase } from './helpers/supabase-test-client';
+import { requireSupabaseAvailable } from './helpers/supabase-test-client';
 import { TenantContextService } from '../../src/shared/tenant/tenant-context.service';
 import { SupabaseService } from '../../src/shared/supabase/supabase.service';
 import { OutboxService } from '../../src/shared/outbox/outbox.service';
@@ -51,7 +51,7 @@ function requireEnv(name: string): string {
 }
 
 test('E2E Outbox – worker procesa y marca COMPLETED', async () => {
-  if (await skipIfNoSupabase()) return;
+  await requireSupabaseAvailable();
   requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   const tenantContext = new TenantContextService();
@@ -110,7 +110,7 @@ test('E2E Outbox – worker procesa y marca COMPLETED', async () => {
 });
 
 test('E2E Outbox – error marca PENDING + retry_count + next_retry_at', async () => {
-  if (await skipIfNoSupabase()) return;
+  await requireSupabaseAvailable();
   requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   const tenantContext = new TenantContextService();
@@ -165,7 +165,7 @@ test('E2E Outbox – error marca PENDING + retry_count + next_retry_at', async (
 });
 
 async function run() {
-  if (await skipIfNoSupabase()) return;
+  await requireSupabaseAvailable();
 
   for (const t of tests) {
     try {
@@ -181,4 +181,3 @@ async function run() {
 }
 
 void run();
-

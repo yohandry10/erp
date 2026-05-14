@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NotificationItem, Notification } from './NotificationItem'
 import { useApi } from '@/hooks/use-api'
 import { Loader2, Bell } from 'lucide-react'
@@ -16,7 +16,7 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
   const [error, setError] = useState<string | null>(null)
   const { get, put, delete: del } = useApi({ showErrorToast: false })
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -39,11 +39,11 @@ export function NotificationPanel({ onNotificationRead, onClose }: NotificationP
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
   useEffect(() => {
     fetchNotifications()
-  }, [])
+  }, [fetchNotifications])
 
   const handleMarkAsRead = async (id: string) => {
     try {

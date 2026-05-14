@@ -1,6 +1,7 @@
 import { Injectable, LoggerService, Scope } from '@nestjs/common';
 import { Request } from 'express';
 import { CORRELATION_ID_KEY } from '../middleware/correlation-id.middleware';
+import { redactSensitiveData } from '../utils/redact-sensitive';
 
 /**
  * Niveles de log estandarizados
@@ -86,15 +87,19 @@ export class StructuredLogger implements LoggerService {
         additionalContext?: any,
         stack?: string,
     ): LogEntry {
+        const context = redactSensitiveData({
+            ...this.context,
+            ...additionalContext,
+        }) as LogContext;
+
+        const redactedStack = stack ? (redactSensitiveData(stack) as unknown as string) : undefined;
+
         return {
             timestamp: new Date().toISOString(),
             level,
             message,
-            context: {
-                ...this.context,
-                ...additionalContext,
-            },
-            ...(stack && { stack }),
+            context,
+            ...(redactedStack ? { stack: redactedStack } : {}),
         };
     }
 

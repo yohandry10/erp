@@ -6,6 +6,7 @@ import ProveedorModal from '../../../components/modals/ProveedorModal'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useApi } from '@/hooks/use-api'
+import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 
 type AnyRecord = Record<string, any>
 
@@ -92,10 +93,11 @@ export default function ComprasPage() {
 
       console.log('📊 [Frontend] Stats recibidas:', data)
 
-      if (data?.success && data?.data) {
-        setStats(data.data)
-        console.log('📊 [Frontend] Stats actualizadas en estado:', data.data)
-        console.log('💰 [Frontend] Monto total que debería mostrarse:', data.data.montoTotalMes)
+      const nextStats = unwrapApiObject(data, stats)
+      if (apiSucceeded(data)) {
+        setStats(nextStats)
+        console.log('📊 [Frontend] Stats actualizadas en estado:', nextStats)
+        console.log('💰 [Frontend] Monto total que debería mostrarse:', nextStats.montoTotalMes)
       } else {
         console.error('📊 [Frontend] Error en respuesta:', data)
         toast({
@@ -123,8 +125,8 @@ export default function ComprasPage() {
       // ✅ Usar useApi en lugar de fetch directo
       const data = await get(`/compras/ordenes?${queryParams.toString()}`)
       
-      if (data?.success) {
-        setOrdenes(data.data)
+      if (apiSucceeded(data)) {
+        setOrdenes(unwrapApiArray(data))
       }
     } catch (error) {
       console.error('Error loading ordenes:', error)
@@ -140,9 +142,10 @@ export default function ComprasPage() {
       
       console.log('🔥 [COMPRAS PAGE] Response data:', JSON.stringify(data, null, 2))
 
-      if (data?.success) {
-        console.log('🔥 [COMPRAS PAGE] Proveedores recibidos:', data.data.length)
-        setProveedores(data.data)
+      if (apiSucceeded(data)) {
+        const proveedores = unwrapApiArray(data)
+        console.log('🔥 [COMPRAS PAGE] Proveedores recibidos:', proveedores.length)
+        setProveedores(proveedores)
         console.log('🔥 [COMPRAS PAGE] Estado proveedores actualizado')
       } else {
         console.error('🔥 [COMPRAS PAGE] Error en respuesta:', data?.error)

@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-green.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)
-![NestJS](https://img.shields.io/badge/NestJS-10.x-red.svg)
+![NestJS](https://img.shields.io/badge/NestJS-11.x-red.svg)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-darkgreen.svg)
 ![License](https://img.shields.io/badge/license-Private-red.svg)
 
@@ -113,7 +113,7 @@ ERP Suite es un sistema de planificación de recursos empresariales (ERP) comple
 ### Backend
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  NestJS 10.x          │  Framework principal               │
+│  NestJS 11.x          │  Framework principal               │
 │  TypeScript 5.4       │  Tipado estático                   │
 │  Supabase             │  Base de datos (PostgreSQL 15)     │
 │  Redis 7              │  Cache y colas de trabajo          │
@@ -147,7 +147,7 @@ ERP Suite es un sistema de planificación de recursos empresariales (ERP) comple
 | `@supabase/supabase-js` | 2.50.0 | Cliente de base de datos |
 | `decimal.js` | 10.6.0 | Precisión monetaria |
 | `xmlbuilder2` | 3.0.2 | Generación XML UBL |
-| `node-forge` | 1.3.1 | Firma digital de documentos |
+| `node-forge` | 1.4.0 | Firma digital de documentos |
 | `pdfkit` | 0.15.2 | Generación de PDFs |
 | `ioredis` | 5.7.0 | Cliente Redis |
 | `helmet` | 8.1.0 | Seguridad HTTP |
@@ -263,7 +263,7 @@ erp/
 │   └── 📂 infra/                # Infraestructura
 │
 ├── 📂 supabase/
-│   ├── 📂 migrations/           # 171 migraciones SQL
+│   ├── 📂 migrations/           # Migraciones activas 000..302
 │   ├── 📂 seeds/                # Datos iniciales
 │   └── 📂 verify/               # Scripts de verificación
 │
@@ -465,7 +465,7 @@ BORRADOR → PENDIENTE → APROBACION → APROBADA → PARCIAL → RECIBIDA
 node >= 18.0.0
 pnpm >= 8.0.0
 docker >= 20.0.0
-docker-compose >= 2.0.0
+Docker Compose plugin >= 2.0.0
 ```
 
 ### 1. Clonar y Configurar
@@ -482,29 +482,34 @@ pnpm install
 ### 2. Configurar Variables de Entorno
 
 ```bash
-# Copiar template de variables
-cp apps/erp-api/.env.staging.example apps/erp-api/.env
+# Copiar template raiz para Compose
+cp .env.example .env
+
+# Para ejecucion directa del API, usar tambien la plantilla del API
+cp apps/erp-api/.env.example apps/erp-api/.env.local
 
 # Editar con tus credenciales
-# Ver sección "Configuración de Entorno" para detalles
+# Ver docs/configuration.md y docs/ops/docker.md para detalles
 ```
 
 ### 3. Iniciar Servicios con Docker
 
 ```bash
 # Levantar todos los servicios
-docker-compose up -d
+docker compose --env-file .env up --build
 
 # Verificar estado
-docker-compose ps
+docker compose ps
 ```
 
 ### 4. Ejecutar Migraciones
 
 ```bash
-# Aplicar migraciones de base de datos
-cd supabase
-supabase db push
+# Validar primero el estado vigente
+cat docs/db_rebuild_status.md
+
+# Con Supabase CLI y entorno local disponible, aplicar 000..302 en orden
+supabase db reset
 ```
 
 ### 5. Iniciar en Desarrollo
@@ -525,8 +530,8 @@ pnpm dev
 | Servicio | URL |
 |----------|-----|
 | Frontend | http://localhost:3000 |
-| API | http://localhost:3001 |
-| Swagger Docs | http://localhost:3001/api/docs |
+| API | http://localhost:3002 |
+| Swagger Docs | http://localhost:3002/api/docs |
 | Grafana | http://localhost:3300 (admin/admin) |
 | Prometheus | http://localhost:9091 |
 
@@ -534,26 +539,30 @@ pnpm dev
 
 ## ⚙️ Configuración de Entorno
 
-### Variables Requeridas (`apps/erp-api/.env`)
+### Variables Requeridas
 
 ```env
 # ============================================
 # SUPABASE
 # ============================================
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIs...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 
 # ============================================
 # JWT & AUTH
 # ============================================
 JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRATION=24h
+JWT_REFRESH_SECRET=your-refresh-secret
+SESSION_SECRET=your-session-secret
+CSRF_SECRET=your-csrf-secret
+AUTH_SIGNATURE_SECRET=your-auth-signature-secret
 
 # ============================================
 # CERTIFICADO DIGITAL (SUNAT)
 # ============================================
 CERT_ENCRYPTION_KEY=32-char-encryption-key-here
+DB_ENCRYPTION_KEY=32-char-db-encryption-key-here
 CERT_ENCRYPTION_KEY_OLD=  # Para rotación de claves
 PFX_PATH=/path/to/certificate.pfx
 PFX_PASS=certificate-password
@@ -568,14 +577,23 @@ OSE_PASSWORD=your-ose-password
 # ============================================
 # REDIS
 # ============================================
-REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+POS_WORKER_JWT_SECRET=replace_with_worker_jwt_secret_min_24_chars
 
 # ============================================
 # SERVER
 # ============================================
-PORT=3001
+PORT=3002
 NODE_ENV=development
 ```
+
+Plantillas vigentes:
+
+- `.env.example` para `docker compose`.
+- `apps/erp-api/.env.example` para ejecucion directa del API.
+- `docs/configuration.md` para reglas de validacion del backend.
+- `docs/ops/docker.md` para variables del stack API/worker.
 
 ---
 
@@ -583,7 +601,7 @@ NODE_ENV=development
 
 ### Esquema Principal
 
-El sistema utiliza **PostgreSQL 15** via Supabase con 171 migraciones que definen:
+El sistema utiliza **PostgreSQL 15** via Supabase. La fuente vigente de reconstruccion indica migraciones activas `000..302` y 299 archivos SQL; ver `docs/db_rebuild_status.md` antes de aplicar o reconstruir BD.
 
 | Categoría | Tablas Principales |
 |-----------|-------------------|
@@ -618,12 +636,14 @@ crear_pedido_completo(...)
 ### Ejecutar Migraciones
 
 ```bash
-# Usando Supabase CLI
-supabase db push
+# Usando Supabase CLI sobre una BD local/limpia
+supabase db reset
 
 # Verificar estado
 supabase db status
 ```
+
+No ejecutar SQL sueltos de raiz sin convertirlos antes en migraciones/seeds idempotentes. Algunos archivos estan marcados como forenses en `docs/DOCUMENTATION_QUARANTINE.md`.
 
 ---
 
@@ -673,7 +693,7 @@ X-Tenant-Id: <tenant-uuid>
 
 Acceder a documentación interactiva en:
 ```
-http://localhost:3001/api/docs
+http://localhost:3002/api/docs
 ```
 
 ---
@@ -824,11 +844,14 @@ docker tag erp-api:latest ghcr.io/org/erp-api:latest
 docker push ghcr.io/org/erp-api:latest
 ```
 
-### Docker Compose (Producción)
+### Docker Compose
 
 ```bash
-# Con variables de producción
-docker-compose -f docker-compose.prod.yml up -d
+# Validar configuracion sin secretos reales
+docker compose --env-file .env.example config --quiet
+
+# Con variables reales locales/produccion
+docker compose --env-file .env up --build
 ```
 
 ### Kubernetes (Helm)
@@ -849,20 +872,26 @@ pnpm k8s:deploy
 
 | Documento | Descripción |
 |-----------|-------------|
+| [PROJECT_STATUS.md](PROJECT_STATUS.md) | Estado operativo vigente, gates ejecutados, riesgos y bloqueantes |
+| [PROJECT_REVIEW_INDEX.md](PROJECT_REVIEW_INDEX.md) | Índice maestro de revisión exhaustiva por rondas |
+| [docs/db_rebuild_status.md](docs/db_rebuild_status.md) | Fuente vigente de reconstrucción BD `000..302` |
+| [docs/DOCUMENTATION_QUARANTINE.md](docs/DOCUMENTATION_QUARANTINE.md) | Clasificación de docs/artefactos obsoletos antes de borrar |
 | [VENTAS_POS_FISCAL.md](docs/manuals/modules/VENTAS_POS_FISCAL.md) | Módulos comerciales y fiscales (~600 líneas) |
 | [COMPRAS_INVENTARIO.md](docs/manuals/modules/COMPRAS_INVENTARIO.md) | Compras, inventario y logística (~500 líneas) |
 | [FINANZAS_CONTABILIDAD.md](docs/manuals/modules/FINANZAS_CONTABILIDAD.md) | Finanzas y contabilidad (~500 líneas) |
-| [SYSTEM_ARCHITECTURE.md](docs/manuals/SYSTEM_ARCHITECTURE.md) | Arquitectura general |
-| [DATABASE_REFERENCE.md](docs/manuals/DATABASE_REFERENCE.md) | Esquema de base de datos |
-| [DEVELOPER_GUIDE.md](docs/manuals/DEVELOPER_GUIDE.md) | Guía para desarrolladores |
+| [SYSTEM_ARCHITECTURE.md](docs/manuals/SYSTEM_ARCHITECTURE.md) | Arquitectura general histórica; validar contra el índice vigente |
+| [DATABASE_REFERENCE.md](docs/manuals/DATABASE_REFERENCE.md) | Referencia histórica; usar `docs/db_rebuild_status.md` como fuente BD |
+| [DEVELOPER_GUIDE.md](docs/manuals/DEVELOPER_GUIDE.md) | Guía histórica; validar comandos contra este README y docs ops |
 
 ### Documentación de Seguridad
 
 | Documento | Descripción |
 |-----------|-------------|
-| [IMPLEMENTACION-AUDITORIA-RLS.md](docs/security/IMPLEMENTACION-AUDITORIA-RLS.md) | Auditoría y RLS |
-| [rls-alerts-guide.md](docs/security/rls-alerts-guide.md) | Alertas de seguridad |
-| [security-dashboard.md](docs/security/security-dashboard.md) | Dashboard de monitoreo |
+| [route-access-matrix.md](docs/security/route-access-matrix.md) | Matriz vigente de autorización por endpoint |
+| [session-auth.md](docs/security/session-auth.md) | Sesión por cookie HttpOnly y auth actual |
+| [rate-limiting.md](docs/security/rate-limiting.md) | Rate limiting global y configuración |
+| [supabase-access-audit.md](docs/security/supabase-access-audit.md) | Auditoría de acceso Supabase/service role |
+| [security-dashboard.md](docs/security/security-dashboard.md) | Dashboard de monitoreo; revisar junto con cuarentena |
 
 ---
 

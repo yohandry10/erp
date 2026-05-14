@@ -94,6 +94,8 @@ export default function ClienteForm({
 
   const documentoTipo = watch('documento_tipo')
   const documentoNumero = watch('documento_numero')
+  const documentoTipoField = register('documento_tipo')
+  const documentoNumeroField = register('documento_numero')
   const loading = isSubmitting || externalLoading
 
   const handleValidarRuc = async () => {
@@ -152,7 +154,15 @@ export default function ClienteForm({
 
   const onFormSubmit = async (data: ClienteFormData) => {
     try {
-      await onSubmit(data)
+      const normalizedData = {
+        ...data,
+        nombre_comercial: data.nombre_comercial?.trim() || undefined,
+        direccion: data.direccion?.trim() || undefined,
+        email: data.email?.trim() || undefined,
+        telefono: data.telefono?.trim() || undefined,
+      }
+
+      await onSubmit(normalizedData)
     } catch (error) {
       // Error handling is done in parent component
       console.error('Form submission error:', error)
@@ -160,7 +170,7 @@ export default function ClienteForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <form onSubmit={handleSubmit(onFormSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Tipo de Cliente y Documento */}
       <div style={{
         background: 'var(--primary-50)',
@@ -215,7 +225,9 @@ export default function ClienteForm({
             <Label htmlFor="documento_tipo">Tipo de Documento *</Label>
             <select
               id="documento_tipo"
-              {...register('documento_tipo')}
+              name={documentoTipoField.name}
+              ref={documentoTipoField.ref}
+              onBlur={documentoTipoField.onBlur}
               style={{
                 width: '100%',
                 padding: '0.875rem 1rem',
@@ -227,7 +239,10 @@ export default function ClienteForm({
                 cursor: 'pointer'
               }}
               disabled={loading}
-              onChange={() => setRucValidated(false)}
+              onChange={(event) => {
+                documentoTipoField.onChange(event)
+                setRucValidated(false)
+              }}
             >
               <option value={TipoDocumento.DNI}>DNI</option>
               <option value={TipoDocumento.RUC}>RUC</option>
@@ -253,14 +268,19 @@ export default function ClienteForm({
             <div style={{ flex: 1 }}>
               <Input
                 id="documento_numero"
-                {...register('documento_numero')}
+                name={documentoNumeroField.name}
+                ref={documentoNumeroField.ref}
+                onBlur={documentoNumeroField.onBlur}
                 placeholder={
                   documentoTipo === TipoDocumento.RUC ? '20123456789' :
                   documentoTipo === TipoDocumento.DNI ? '12345678' :
                   'Número de documento'
                 }
                 disabled={loading}
-                onChange={() => setRucValidated(false)}
+                onChange={(event) => {
+                  documentoNumeroField.onChange(event)
+                  setRucValidated(false)
+                }}
               />
             </div>
             {documentoTipo === TipoDocumento.RUC && (

@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import PlanillaModal from '@/components/modals/PlanillaModal';
 import PlanillaCalcularModal from '@/components/modals/PlanillaCalcularModal';
 import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
+import { apiSucceeded, unwrapApiArray } from '@/lib/api-contract';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
@@ -38,17 +39,7 @@ const PlanillasPage = () => {
   
   console.log('🔥 COMPONENTE RENDERIZADO - showPlanillaModal:', showPlanillaModal);
 
-  useEffect(() => {
-    if (!rrhhEnabled) {
-      // HARDENING: evitar montar planillas cuando RRHH está deshabilitado.
-      setPlanillas([]);
-      setLoading(false);
-      return;
-    }
-    loadPlanillas();
-  }, [rrhhEnabled]);
-
-  const loadPlanillas = async () => {
+  const loadPlanillas = useCallback(async () => {
     if (!rrhhEnabled) {
       setPlanillas([]);
       setLoading(false);
@@ -57,8 +48,8 @@ const PlanillasPage = () => {
     try {
       setLoading(true);
       const response = await get('/api/rrhh/planillas');
-      if (response && response.success && Array.isArray(response.data)) {
-        setPlanillas(response.data);
+      if (apiSucceeded(response)) {
+        setPlanillas(unwrapApiArray(response));
       } else {
         setPlanillas([]);
       }
@@ -68,7 +59,11 @@ const PlanillasPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadPlanillas();
+  }, [loadPlanillas]);
 
   const abrirModalPlanilla = () => {
     console.log('🔥 ABRIENDO MODAL PLANILLA - llamando setShowPlanillaModal(true)');
@@ -572,7 +567,7 @@ const PlanillasPage = () => {
             <div className="activity-empty">
               <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚀</div>
               <h3>¡Comienza con tu Primera Planilla!</h3>
-              <p>Usa el botón "Crear Nueva Planilla" para configurar y generar tu primera planilla</p>
+              <p>Usa el botón &quot;Crear Nueva Planilla&quot; para configurar y generar tu primera planilla</p>
               <button 
                 className="btn btn-primary" 
                 onClick={abrirModalPlanilla}

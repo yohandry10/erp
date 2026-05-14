@@ -15,6 +15,7 @@ import { ColombiaValidationService } from './colombia-validation.service';
 import { normalizeCertificateInput, parseCertificateBuffer } from '../../shared/utils/certificate.utils';
 import * as crypto from 'crypto';
 import { ApiPeruService } from './apiperu.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ValidationService {
@@ -24,6 +25,7 @@ export class ValidationService {
     private readonly supabaseService: SupabaseService,
     private readonly colombiaValidationService: ColombiaValidationService,
     private readonly apiPeruService: ApiPeruService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -116,8 +118,10 @@ export class ValidationService {
 
   private getCertKeys(): Buffer[] {
     const keys: Buffer[] = [];
-    const main = process.env.CERT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
-    const old = process.env.CERT_ENCRYPTION_KEY_OLD;
+    const main =
+      this.configService.get<string>('CERT_ENCRYPTION_KEY') ??
+      this.configService.get<string>('ENCRYPTION_KEY');
+    const old = this.configService.get<string>('CERT_ENCRYPTION_KEY_OLD');
 
     if (main && main.length >= 32) {
       keys.push(crypto.createHash('sha256').update(main).digest());

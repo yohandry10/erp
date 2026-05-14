@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { RetencionesValidationService } from './retenciones-validation.service';
-import { SupabaseService } from '../../../../shared/supabase/supabase.service';
+import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 /**
  * Tests unitarios para validación de cálculos de retenciones

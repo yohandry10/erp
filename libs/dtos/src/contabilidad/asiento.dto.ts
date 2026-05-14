@@ -1,4 +1,5 @@
-import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsString, IsNumber, IsOptional, IsDateString, IsEnum, IsUUID, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum EstadoAsiento {
@@ -158,6 +159,9 @@ export class CreateAsientoManualDto {
   referencia?: string;
 
   @ApiProperty({ description: 'Detalles del asiento (debe/haber)', type: [CreateDetalleAsientoDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateDetalleAsientoDto)
   detalles: CreateDetalleAsientoDto[];
 }
 

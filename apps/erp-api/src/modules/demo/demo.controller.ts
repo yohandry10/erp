@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { DemoService } from './demo.service';
 import { CreateDemoTenantDto, ConvertDemoToRealDto } from './dto/create-demo-tenant.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Demo')
 @Controller('demo')
@@ -30,7 +31,8 @@ export class DemoController {
   }
 
   @Post('create')
-  @Throttle(5, 3600) // 5 requests por hora
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 3600000 } }) // 5 requests por hora
   @ApiOperation({ summary: 'Crear tenant demo con datos seed (14 días)' })
   @ApiResponse({ status: 201, description: 'Tenant demo creado exitosamente' })
   @ApiResponse({ status: 429, description: 'Límite de demos alcanzado (5/hora)' })
@@ -51,9 +53,11 @@ export class DemoController {
   }
 
   @Get('planes')
+  @Public()
   @ApiOperation({ summary: 'Obtener planes disponibles para conversión' })
   @ApiResponse({ status: 200, description: 'Lista de planes con precios' })
   async getPlanes() {
+    this.ensureDemoApiEnabled();
     return this.demoService.getPlanes();
   }
 

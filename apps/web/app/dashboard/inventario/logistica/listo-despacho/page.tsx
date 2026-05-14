@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
@@ -16,18 +16,14 @@ import { ConfirmarDespachoButton } from '@/components/ventas/ConfirmarDespachoBu
 export default function ListoDespachoPage() {
   const router = useRouter()
   const { get } = useApi()
-  const { config, loading: configLoading, isFlujologistica } = useEmpresaConfig()
-  
+  const { loading: configLoading, isFlujologistica } = useEmpresaConfig()
+
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (isFlujologistica) {
-      loadOrdenes()
-    }
-  }, [isFlujologistica])
+  const loadOrdenes = useCallback(async () => {
+    if (!isFlujologistica) return
 
-  const loadOrdenes = async () => {
     try {
       setLoading(true)
       const response = await get('/inventario/logistica/listo-despacho')
@@ -46,7 +42,11 @@ export default function ListoDespachoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, isFlujologistica])
+
+  useEffect(() => {
+    loadOrdenes()
+  }, [loadOrdenes])
 
   const handleVerDetalle = (pedidoId: string) => {
     router.push(`/dashboard/ventas/pedidos/${pedidoId}`)
@@ -64,16 +64,24 @@ export default function ListoDespachoPage() {
     return `S/ ${monto.toFixed(2)}`
   }
 
-  if (!isFlujologistica) {
-    return null
-  }
-
   if (configLoading) {
     return (
       <div className="dashboard-container">
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando configuración...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isFlujologistica) {
+    return (
+      <div className="dashboard-container">
+        <div className="activity-empty">
+          <Truck />
+          <h3>Flujo de logística desactivado</h3>
+          <p>Activa el flujo de logística en configuración para gestionar despachos.</p>
         </div>
       </div>
     )

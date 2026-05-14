@@ -128,6 +128,7 @@ export class UserManagementController {
    * Requirements: 2.4, 9.3
    */
   @Post(':id/activate')
+  @RequirePermission('users.manage') // HARDENING: activar usuarios.
   @ApiOperation({ summary: 'Activar usuario', description: 'Activa un usuario desactivado' })
   @ApiResponse({ status: 200, description: 'Usuario activado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -144,6 +145,7 @@ export class UserManagementController {
    * Requirements: 2.6, 9.3
    */
   @Post(':id/deactivate')
+  @RequirePermission('users.manage') // HARDENING: desactivar usuarios.
   @ApiOperation({ summary: 'Desactivar usuario', description: 'Desactiva un usuario y revoca sus sesiones activas' })
   @ApiResponse({ status: 200, description: 'Usuario desactivado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -179,6 +181,7 @@ export class UserManagementController {
    * Requirements: 2.5, 9.2
    */
   @Get(':id/roles')
+  @RequirePermission('users.manage') // HARDENING: lectura de roles de usuario.
   @ApiOperation({ summary: 'Obtener roles del usuario', description: 'Obtiene todos los roles asignados a un usuario' })
   @ApiResponse({ status: 200, description: 'Roles obtenidos exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -218,6 +221,7 @@ export class UserManagementController {
    */
   @Delete(':id/roles/:roleId')
   @HttpCode(HttpStatus.OK)
+  @RequirePermission('users.manage') // HARDENING: administrar roles de usuario.
   @ApiOperation({ summary: 'Remover rol del usuario', description: 'Remueve un rol específico de un usuario' })
   @ApiResponse({ status: 200, description: 'Rol removido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -236,6 +240,7 @@ export class UserManagementController {
    * Requirements: 9.2
    */
   @Get(':id/permissions')
+  @RequirePermission('users.manage') // HARDENING: lectura de permisos de usuario.
   @ApiOperation({ summary: 'Obtener permisos del usuario', description: 'Obtiene todos los permisos agregados del usuario desde sus roles' })
   @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -252,6 +257,7 @@ export class UserManagementController {
    * Requirements: 9.2
    */
   @Get(':id/audit-logs')
+  @RequirePermission('users.manage') // HARDENING: auditoría de usuario.
   @ApiOperation({ summary: 'Obtener historial de auditoría del usuario', description: 'Obtiene el historial de acciones del usuario' })
   @ApiResponse({ status: 200, description: 'Historial obtenido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })

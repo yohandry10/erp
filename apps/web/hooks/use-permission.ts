@@ -166,6 +166,13 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
       return
     }
 
+    // Empty permission strings mean no specific permission required
+    if (!modulo && !accion && !recurso) {
+      setHasPermission(true)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -189,7 +196,7 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
           // Create new request and track it
           const fetchPromise = (async () => {
             console.log(`[usePermission] Fetching permissions for user ${user.id}`)
-            const response = await get(`/usuarios-sistema/${user.id}/permissions`)
+            const response = await get('/usuarios-sistema/me/permissions')
             
             if (!response) {
               console.error(`[usePermission] No response from permissions API for user ${user.id}`)
@@ -305,7 +312,7 @@ export function useUserPermissions() {
       } else {
         // Create new request
         const fetchPromise = (async () => {
-          const response = await get(`/usuarios-sistema/${user.id}/permissions`)
+          const response = await get('/usuarios-sistema/me/permissions')
           if (!response) return []
           const perms = Array.isArray(response) ? response : (response.data || [])
           permissionCache.set(cacheKey, { permissions: perms, timestamp: Date.now() })

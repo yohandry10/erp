@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CotizacionesCompraService } from '../services/cotizaciones-compra.service';
@@ -29,6 +30,7 @@ export class CotizacionesCompraController {
   ) {}
 
   @Post()
+  @RequirePermission('compras.cotizaciones.crear')
   @ApiOperation({ summary: 'Crear nueva cotización de compra' })
   @ApiResponse({ status: 201, description: 'Cotización creada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -48,14 +50,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Get()
+  @RequirePermission('compras.cotizaciones.ver')
   @ApiOperation({ summary: 'Obtener lista de cotizaciones con filtros' })
   @ApiResponse({ status: 200, description: 'Cotizaciones obtenidas exitosamente' })
   @ApiQuery({ name: 'tenant_id', required: false, description: 'ID del tenant' })
@@ -109,16 +109,12 @@ export class CotizacionesCompraController {
         count: result.count
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: [],
-        count: 0
-      };
+      throw error;
     }
   }
 
   @Get(':id')
+  @RequirePermission('compras.cotizaciones.ver')
   @ApiOperation({ summary: 'Obtener cotización por ID' })
   @ApiResponse({ status: 200, description: 'Cotización encontrada' })
   @ApiResponse({ status: 404, description: 'Cotización no encontrada' })
@@ -135,15 +131,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      };
+      throw error;
     }
   }
 
   @Put(':id')
+  @RequirePermission('compras.cotizaciones.editar')
   @ApiOperation({ summary: 'Actualizar cotización de compra' })
   @ApiResponse({ status: 200, description: 'Cotización actualizada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o cotización no editable' })
@@ -165,14 +158,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Post(':id/enviar')
+  @RequirePermission('compras.cotizaciones.enviar')
   @ApiOperation({ summary: 'Enviar cotización (cambiar estado de BORRADOR a ENVIADA)' })
   @ApiResponse({ status: 200, description: 'Cotización enviada exitosamente' })
   @ApiResponse({ status: 400, description: 'Cotización no puede ser enviada (estado inválido o vencida)' })
@@ -193,14 +184,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Post(':id/aprobar')
+  @RequirePermission('compras.cotizaciones.aprobar')
   @ApiOperation({ summary: 'Aprobar cotización (cambiar estado de ENVIADA a APROBADA)' })
   @ApiResponse({ status: 200, description: 'Cotización aprobada exitosamente' })
   @ApiResponse({ status: 400, description: 'Cotización no puede ser aprobada (estado inválido o vencida)' })
@@ -221,14 +210,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Post(':id/rechazar')
+  @RequirePermission('compras.cotizaciones.rechazar')
   @ApiOperation({ summary: 'Rechazar cotización (cambiar estado de ENVIADA a RECHAZADA)' })
   @ApiResponse({ status: 200, description: 'Cotización rechazada exitosamente' })
   @ApiResponse({ status: 400, description: 'Cotización no puede ser rechazada (estado inválido)' })
@@ -252,14 +239,12 @@ export class CotizacionesCompraController {
         data: cotizacion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Post(':id/convertir-oc')
+  @RequirePermission('compras.cotizaciones.convertir_orden')
   @ApiOperation({ summary: 'Convertir cotización aprobada a orden de compra' })
   @ApiResponse({ status: 201, description: 'Orden de compra creada exitosamente desde cotización' })
   @ApiResponse({ status: 400, description: 'Cotización no puede ser convertida (estado inválido, vencida, o ya convertida)' })
@@ -274,10 +259,7 @@ export class CotizacionesCompraController {
     try {
       // Validar que se proporcionó el número de OC
       if (!body.numero_oc) {
-        return {
-          success: false,
-          error: 'Debe proporcionar el número de orden de compra (numero_oc)'
-        };
+        throw new BadRequestException('Debe proporcionar el número de orden de compra (numero_oc)');
       }
 
       const ordenCompra = await this.cotizacionesService.convertirAOrdenCompra(
@@ -292,10 +274,7 @@ export class CotizacionesCompraController {
         data: ordenCompra
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 }

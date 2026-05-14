@@ -18,6 +18,20 @@ export interface JwtPayload {
   roles?: string[];
   tenant_id: string; // ✅ MULTI-TENANT: Identificador del tenant
   is_super_admin: boolean; // Super-admin flag
+  session_token?: string;
+}
+
+export interface AuthenticatedUserView {
+  id: string;
+  email: string;
+  nombre?: string;
+  apellido?: string;
+  nombre_usuario?: string;
+  roles: string[];
+  tenant_id: string;
+  is_super_admin: boolean;
+  activo: boolean;
+  estado?: string;
 }
 
 @Injectable()
@@ -186,6 +200,7 @@ export class AuthService {
 
       // Create session
       const sessionToken = await this.createSession(user.id, user.tenant_id);
+      payload.session_token = sessionToken;
 
       // ✅ A5: Registrar intento exitoso
       await this.logLoginAttempt({
@@ -247,10 +262,53 @@ export class AuthService {
       if (!user || !user.activo) {
         throw new UnauthorizedException('Token inválido');
       }
-      return user;
+      return this.toAuthenticatedUserView(user);
     } catch (error) {
       throw new UnauthorizedException('Token inválido');
     }
+  }
+
+  private extractRoleNames(user: any): string[] {
+    if (Array.isArray(user?.roles)) {
+      return user.roles
+        .map((role: any) => typeof role === 'string' ? role : role?.nombre)
+        .filter(Boolean);
+    }
+
+    if (Array.isArray(user?.user_roles)) {
+      return user.user_roles
+        .map((ur: any) => ur?.roles?.nombre || ur?.role_name || ur?.role_id)
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
+  private toAuthenticatedUserView(user: any): AuthenticatedUserView {
+    return {
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      apellido: user.apellido,
+      nombre_usuario: user.nombre_usuario,
+      roles: this.extractRoleNames(user),
+      tenant_id: user.tenant_id,
+      is_super_admin: user.is_super_admin || false,
+      activo: user.activo !== false,
+      estado: user.estado,
+    };
+  }
+
+  private buildJwtPayloadFromUser(user: any, sessionToken?: string): JwtPayload {
+    return {
+      sub: user.id,
+      email: user.email,
+      username: user.nombre_usuario || user.nombre,
+      roles: this.extractRoleNames(user),
+      tenant_id: user.tenant_id,
+      is_super_admin: user.is_super_admin || false,
+      session_token: sessionToken
+    };
   }
 
   private async findUserByEmail(email: string): Promise<any> {
@@ -310,16 +368,25 @@ export class AuthService {
   }
 
   async refreshToken(user: any) {
-    // ✅ MULTI-TENANT: Incluir tenant_id en refresh
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      username: user.nombre_usuario,
-      roles: user.roles || [],
-      tenant_id: user.tenant_id,
+    const userId = user?.id || user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    if (!user?.session_token) {
+      throw new UnauthorizedException('Token sin sesión activa');
+    }
 
-      is_super_admin: user.is_super_admin || false
-    };
+    const sessionIsActive = await this.validateSession(user.session_token);
+    if (!sessionIsActive) {
+      throw new UnauthorizedException('Sesión expirada o revocada');
+    }
+
+    const freshUser = await this.findUserById(userId);
+    if (!freshUser || !freshUser.activo || freshUser.estado === 'INACTIVO') {
+      throw new UnauthorizedException('Usuario inactivo o inexistente');
+    }
+
+    const payload = this.buildJwtPayloadFromUser(freshUser, user.session_token);
 
     return {
       access_token: this.jwtService.sign(payload)
@@ -329,30 +396,22 @@ export class AuthService {
   // Failed login attempt tracking
   private async incrementFailedLoginAttempts(userId: string): Promise<void> {
     try {
-      // Usar cliente público porque el login NO tiene tenant context
-      const client = this.supabaseService.getPublicClient();
-      const user = await this.findUserById(userId);
-      
-      if (!user) return;
+      const client = this.supabaseService.getAdminClient();
+      const { data, error } = await client.rpc('increment_failed_login_attempts', {
+        p_user_id: userId,
+        p_max_attempts: 5,
+        p_lock_minutes: 15,
+      });
 
-      const failedAttempts = (user.failed_login_attempts || 0) + 1;
-      const updateData: any = {
-        failed_login_attempts: failedAttempts,
-        updated_at: new Date().toISOString()
-      };
-
-      // Lock account after 5 failed attempts
-      if (failedAttempts >= 5) {
-        const lockUntil = new Date();
-        lockUntil.setMinutes(lockUntil.getMinutes() + 15); // Lock for 15 minutes
-        updateData.locked_until = lockUntil.toISOString();
-        console.log('🔒 [AUTH] Cuenta bloqueada por intentos fallidos - Usuario:', userId);
+      if (error) {
+        this.logger.error('Error incrementing failed login attempts atomically:', error);
+        return;
       }
 
-      await client
-        .from('usuarios_sistema')
-        .update(updateData)
-        .eq('id', userId);
+      const failedAttempts = Array.isArray(data) ? data[0]?.failed_login_attempts : data?.failed_login_attempts;
+      if (failedAttempts >= 5) {
+        console.log('🔒 [AUTH] Cuenta bloqueada por intentos fallidos - Usuario:', userId);
+      }
     } catch (error) {
       console.error('Error incrementing failed login attempts:', error);
     }
@@ -638,9 +697,8 @@ export class AuthService {
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 8); // 8 hours session
 
-      // Usar cliente público porque el login NO tiene tenant context aún
-      const client = this.supabaseService.getPublicClient();
-      await client
+      const client = this.supabaseService.getAdminClient();
+      const { error } = await client
         .from('user_sessions')
         .insert({
           usuario_sistema_id: userId,
@@ -651,6 +709,10 @@ export class AuthService {
           created_at: new Date().toISOString()
         });
 
+      if (error) {
+        throw error;
+      }
+
       return sessionToken;
     } catch (error) {
       console.error('Error creating session:', error);
@@ -660,8 +722,7 @@ export class AuthService {
 
   async validateSession(sessionToken: string): Promise<boolean> {
     try {
-      // Usar cliente público para validación de sesiones
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       const { data: session, error } = await client
         .from('user_sessions')
         .select('*')
@@ -693,8 +754,7 @@ export class AuthService {
 
   async revokeSession(sessionToken: string): Promise<void> {
     try {
-      // Usar cliente público para revocar sesiones
-      const client = this.supabaseService.getPublicClient();
+      const client = this.supabaseService.getAdminClient();
       await client
         .from('user_sessions')
         .delete()

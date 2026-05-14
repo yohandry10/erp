@@ -70,10 +70,7 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -118,12 +115,7 @@ export class OrdenesCompraController {
         count: result.count
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: [],
-        count: 0
-      };
+      throw error;
     }
   }
 
@@ -153,11 +145,7 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: null
-      };
+      throw error;
     }
   }
 
@@ -198,10 +186,7 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -237,10 +222,7 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -277,10 +259,7 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -320,14 +299,12 @@ export class OrdenesCompraController {
         data: orden
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Post(':id/recepciones')
+  @RequirePermission('compras.ordenes.actualizar')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ 
     summary: 'Crear recepción para una orden de compra',
@@ -366,14 +343,12 @@ export class OrdenesCompraController {
         data: recepcion
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      throw error;
     }
   }
 
   @Get(':id/recepciones')
+  @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ 
     summary: 'Obtener recepciones de una orden de compra',
     description: 'Obtiene todas las recepciones de mercancía asociadas a una orden de compra específica'
@@ -398,16 +373,12 @@ export class OrdenesCompraController {
         count: recepciones.length
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: [],
-        count: 0
-      };
+      throw error;
     }
   }
 
   @Get(':id/aprobaciones')
+  @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ 
     summary: 'Obtener aprobaciones de una orden de compra',
     description: 'Obtiene todos los registros de aprobación asociados a una orden de compra específica'
@@ -432,12 +403,7 @@ export class OrdenesCompraController {
         count: aprobaciones.length
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        data: [],
-        count: 0
-      };
+      throw error;
     }
   }
 }

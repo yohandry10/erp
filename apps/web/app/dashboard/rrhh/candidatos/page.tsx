@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 
 import VacanteModal from '@/components/modals/VacanteModal';
@@ -20,43 +20,35 @@ const CandidatosPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [candidatoEdit, setCandidatoEdit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const api = useApi();
+  const { get, post } = useApi();
   const { toast } = useToast();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
-      // HARDENING: evitar llamadas RRHH cuando el feature está deshabilitado.
       setCandidatos([]);
       setVacantes([]);
       setDepartamentos([]);
       setLoading(false);
       return;
     }
-    loadData();
-  }, [rrhhEnabled]);
-
-  const loadData = async () => {
-    if (!rrhhEnabled) {
-      return;
-    }
     try {
       setLoading(true);
       
       // Cargar candidatos
-      const candidatosData = await api.get('/api/rrhh/candidatos');
+      const candidatosData = await get('/api/rrhh/candidatos');
       if (candidatosData && Array.isArray(candidatosData)) {
         setCandidatos(candidatosData);
       }
 
       // Cargar vacantes
-      const vacantesData = await api.get('/api/rrhh/vacantes');
+      const vacantesData = await get('/api/rrhh/vacantes');
       if (vacantesData && Array.isArray(vacantesData)) {
         setVacantes(vacantesData);
       }
 
       // Cargar departamentos
-      const departamentosData = await api.get('/api/rrhh/departamentos');
+      const departamentosData = await get('/api/rrhh/departamentos');
       if (departamentosData && Array.isArray(departamentosData)) {
         setDepartamentos(departamentosData);
       }
@@ -65,7 +57,11 @@ const CandidatosPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const [showVacanteModal, setShowVacanteModal] = useState(false);
   const [vacanteData, setVacanteData] = useState({
@@ -80,7 +76,7 @@ const CandidatosPage = () => {
   const handleCreateVacante = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/api/rrhh/vacantes', {
+      await post('/api/rrhh/vacantes', {
         ...vacanteData,
         salario_min: parseFloat(vacanteData.salario_min),
         salario_max: parseFloat(vacanteData.salario_max),

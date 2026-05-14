@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateUserDto, UpdateUserDto, UserFiltersDto } from './dto';
 import * as bcrypt from 'bcrypt';
@@ -15,6 +15,42 @@ export class UserManagementService {
     private readonly emailService: EmailService,
     private readonly permissionService: PermissionService
   ) {}
+
+  private async assertNotLastSuperAdmin(tenantId: string, userId: string): Promise<any> {
+    const client = this.supabase.getClient();
+    const { data: user, error } = await client
+      .from('usuarios_sistema')
+      .select('id, email, is_super_admin, estado, activo')
+      .eq('id', userId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error || !user) {
+      throw new NotFoundException('Usuario no encontrado en este tenant');
+    }
+
+    if (!user.is_super_admin) {
+      return user;
+    }
+
+    const { count, error: countError } = await client
+      .from('usuarios_sistema')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('is_super_admin', true)
+      .eq('activo', true)
+      .neq('id', userId);
+
+    if (countError) {
+      throw new BadRequestException(`No se pudo validar superadmins activos: ${countError.message}`);
+    }
+
+    if ((count || 0) === 0) {
+      throw new ForbiddenException('No se puede inactivar o eliminar el último super admin activo');
+    }
+
+    return user;
+  }
 
   /**
    * Create a new user with tenant isolation
@@ -180,43 +216,34 @@ export class UserManagementService {
   async deleteUser(tenantId: string, userId: string): Promise<void> {
     const client = this.supabase.getClient();
 
-    // Validate user belongs to tenant
-    const { data: existingUser } = await client
-      .from('usuarios_sistema')
-      .select('id, email')
-      .eq('id', userId)
-      .eq('tenant_id', tenantId)
-      .single();
+    const existingUser = await this.assertNotLastSuperAdmin(tenantId, userId);
 
-    if (!existingUser) {
-      throw new NotFoundException('Usuario no encontrado en este tenant');
-    }
-
-    // Delete user record (cascade will handle user_roles)
     const { error } = await client
       .from('usuarios_sistema')
-      .delete()
+      .update({
+        estado: 'INACTIVO',
+        activo: false,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', userId)
       .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('Error deleting user:', error);
-      throw new BadRequestException('Error al eliminar usuario');
+      throw new BadRequestException('Error al inactivar usuario');
     }
 
-    // Log deletion to audit_log
-    await client
-      .from('audit_log')
-      .insert({
-        table_name: 'usuarios_sistema',
-        operation: 'DELETE',
-        old_values: { id: userId, email: existingUser.email },
-        user_id: userId,
-        tenant_id: tenantId,
-        timestamp: new Date().toISOString()
-      });
+    await this.auditService.registrarCambio(
+      'usuarios_sistema',
+      'DELETE',
+      userId,
+      { old: existingUser, new: { ...existingUser, estado: 'INACTIVO', activo: false } },
+      tenantId,
+      userId,
+      { accion: 'INACTIVAR_USUARIO_POR_DELETE_LOGICO' },
+    );
 
-    console.log('🗑️ [USER-MGMT] Usuario eliminado - ID:', userId, 'Email:', existingUser.email);
+    console.log('🗑️ [USER-MGMT] Usuario inactivado - ID:', userId, 'Email:', existingUser.email);
   }
 
   /**
@@ -422,6 +449,7 @@ export class UserManagementService {
       .from('usuarios_sistema')
       .update({
         estado: 'ACTIVO',
+        activo: true,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)
@@ -445,11 +473,13 @@ export class UserManagementService {
   async deactivateUser(tenantId: string, userId: string) {
     const client = this.supabase.getClient();
 
-    // Update estado to INACTIVO
+    await this.assertNotLastSuperAdmin(tenantId, userId);
+
     const { data: user, error } = await client
       .from('usuarios_sistema')
       .update({
         estado: 'INACTIVO',
+        activo: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)

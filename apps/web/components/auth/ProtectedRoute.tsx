@@ -21,43 +21,29 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     const checkAuth = async () => {
       try {
-        if (authLoading) {
-          return
-        }
+        if (authLoading) return
 
         setIsChecking(true)
 
-        // Verificar sesión con el servicio de auth
         const { data } = await customAuth.getSession()
-        const token = data?.session?.access_token
-        
-        if (!token) {
-          console.warn('⚠️ [ProtectedRoute] No hay token, redirigiendo a login')
+        if (!data?.session?.user) {
           if (isMounted && pathname !== '/login') {
             router.replace('/login')
           }
           return
         }
 
-        if (!data.session || !data.session.access_token) {
-          console.warn('⚠️ [ProtectedRoute] Sesión inválida, redirigiendo a login')
+        if (!data.session || !data.session.user) {
           if (isMounted && pathname !== '/login') {
             router.replace('/login')
           }
           return
         }
 
-        console.log('✅ [ProtectedRoute] Usuario autenticado:', {
-          userId: data.session.user.id,
-          email: data.session.user.email,
-          hasToken: !!data.session.access_token
-        })
-        
         if (isMounted) {
           setIsAuthenticated(true)
         }
       } catch (error) {
-        console.error('❌ [ProtectedRoute] Error verificando autenticación:', error)
         if (isMounted && pathname !== '/login') {
           router.replace('/login')
         }

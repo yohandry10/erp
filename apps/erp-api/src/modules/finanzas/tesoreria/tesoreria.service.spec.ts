@@ -703,15 +703,23 @@ describe('TesoreriaService', () => {
       expect(result.data).toHaveProperty('proyeccion');
     });
 
-    it('should throw NotFoundException if no active cuentas bancarias', async () => {
+    it('should return an empty flujo caja when there are no active cuentas bancarias', async () => {
       mockQueryBuilder.maybeSingle.mockResolvedValueOnce({
         data: [],
         error: null,
       });
 
-      await expect(service.obtenerFlujoCaja(tenantId, {})).rejects.toThrow(
-        'No se encontraron cuentas bancarias activas',
-      );
+      const result = await service.obtenerFlujoCaja(tenantId, {});
+
+      expect(result.success).toBe(true);
+      expect(result.data.cuentas_bancarias).toEqual([]);
+      expect(result.data.resumen).toEqual([]);
+      expect(result.data.proyeccion).toEqual([]);
+      expect(result.data.estadisticas).toEqual({
+        total_movimientos: 0,
+        total_cxp_pendientes: 0,
+        total_cxc_pendientes: 0,
+      });
     });
 
     it('should calculate resumen correctly', async () => {

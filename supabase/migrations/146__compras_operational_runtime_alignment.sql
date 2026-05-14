@@ -27,6 +27,11 @@ ALTER TABLE IF EXISTS public.ordenes_compra
   ADD COLUMN IF NOT EXISTS cancelado_by uuid,
   ADD COLUMN IF NOT EXISTS motivo_cancelacion text;
 
+DROP VIEW IF EXISTS public.vw_inventario_recepciones;
+DROP VIEW IF EXISTS public.vw_kardex_valorizado;
+DROP VIEW IF EXISTS public.orden_compra;
+DROP VIEW IF EXISTS public.vista_registro_compras;
+
 ALTER TABLE IF EXISTS public.ordenes_compra
   ALTER COLUMN numero TYPE text USING NULLIF(btrim(COALESCE(numero::text, '')), ''),
   ALTER COLUMN numero_orden TYPE text USING NULLIF(btrim(COALESCE(numero_orden::text, '')), ''),
@@ -413,5 +418,135 @@ WHERE tenant_id IS NOT NULL AND numero IS NOT NULL AND btrim(numero) <> '';
 CREATE INDEX IF NOT EXISTS idx_compras_tenant_numero_documento_runtime
 ON public.compras (tenant_id, upper(numero_documento))
 WHERE tenant_id IS NOT NULL AND numero_documento IS NOT NULL AND btrim(numero_documento) <> '';
+
+CREATE OR REPLACE VIEW public.vw_inventario_recepciones AS
+WITH item_totals AS (
+  SELECT
+    ri.recepcion_id,
+    COUNT(ri.id)::bigint AS total_items,
+    COALESCE(SUM(app.to_numeric_or_zero(COALESCE(ri.cantidad_recibida, 0)::text)), 0)::numeric(14,2) AS cantidad_total,
+    COALESCE(
+      SUM(
+        app.to_numeric_or_zero(COALESCE(ri.cantidad_recibida, 0)::text)
+        * COALESCE(
+            app.to_numeric_or_zero(ocd.precio_unitario::text),
+            app.to_numeric_or_zero(prod.precio_compra::text),
+            0
+          )
+      ),
+      0
+    )::numeric(14,2) AS valor_total,
+    MAX(COALESCE(NULLIF(btrim(ocd.moneda), ''), NULLIF(btrim(ri.moneda), ''), 'PEN')) AS moneda
+  FROM public.recepcion_items ri
+  LEFT JOIN public.orden_compra_detalles ocd ON ocd.id = ri.detalle_id
+  LEFT JOIN public.productos prod ON prod.id = ri.producto_id
+  GROUP BY ri.recepcion_id
+)
+SELECT
+  r.id AS recepcion_id,
+  COALESCE(r.tenant_id, oc.tenant_id) AS tenant_id,
+  COALESCE(NULLIF(btrim(r.numero::text), ''), NULLIF(btrim(r.codigo), ''), r.id::text) AS numero,
+  COALESCE(r.fecha_recepcion, r.created_at) AS fecha_recepcion,
+  COALESCE(r.estado, 'PENDIENTE') AS estado,
+  r.observaciones,
+  COALESCE(r.gre_proveedor, r.metadata->>'gre_proveedor', oc.metadata->>'gre_proveedor') AS gre_proveedor,
+  oc.id AS orden_id,
+  COALESCE(
+    NULLIF(btrim(oc.numero::text), ''),
+    NULLIF(btrim(oc.numero_orden::text), ''),
+    NULLIF(btrim(oc.codigo), '')
+  ) AS numero_orden,
+  p.id AS proveedor_id,
+  COALESCE(NULLIF(btrim(p.razon_social), ''), NULLIF(btrim(p.nombre_comercial), ''), NULLIF(btrim(p.nombre), '')) AS proveedor_nombre,
+  COALESCE(
+    NULLIF(btrim(p.documento_numero), ''),
+    NULLIF(btrim(p.ruc), ''),
+    CASE WHEN p.numero_documento IS NOT NULL THEN p.numero_documento::text ELSE NULL END
+  ) AS proveedor_ruc,
+  COALESCE(it.total_items, 0)::bigint AS total_items,
+  COALESCE(it.cantidad_total, 0)::numeric(14,2) AS cantidad_total,
+  COALESCE(it.valor_total, 0)::numeric(14,2) AS valor_total,
+  COALESCE(NULLIF(btrim(it.moneda), ''), NULLIF(btrim(oc.moneda), ''), 'PEN') AS moneda,
+  r.created_at,
+  r.updated_at
+FROM public.recepciones r
+LEFT JOIN public.ordenes_compra oc ON oc.id = r.orden_id
+LEFT JOIN public.proveedores p ON p.id = oc.proveedor_id
+LEFT JOIN item_totals it ON it.recepcion_id = r.id;
+
+CREATE OR REPLACE VIEW public.vw_kardex_valorizado AS
+WITH items AS (
+  SELECT
+    ri.*,
+    app.to_numeric_or_zero(COALESCE(ri.cantidad_recibida, 0)::text)::numeric(14,2) AS cantidad_recibida_num
+  FROM public.recepcion_items ri
+)
+SELECT
+  it.id AS recepcion_item_id,
+  it.recepcion_id,
+  COALESCE(r.tenant_id, it.tenant_id, oc.tenant_id) AS tenant_id,
+  COALESCE(NULLIF(btrim(r.numero::text), ''), NULLIF(btrim(r.codigo), ''), r.id::text) AS recepcion_numero,
+  COALESCE(r.fecha_recepcion, it.created_at) AS fecha_recepcion,
+  COALESCE(r.estado, 'PENDIENTE') AS recepcion_estado,
+  it.producto_id,
+  COALESCE(NULLIF(btrim(prod.codigo), ''), NULLIF(btrim(prod.sku), ''), it.producto_id::text) AS producto_codigo,
+  COALESCE(NULLIF(btrim(prod.nombre), ''), 'Producto') AS producto_nombre,
+  NULLIF(btrim(prod.sku), '') AS producto_sku,
+  it.cantidad_recibida_num AS cantidad_recibida,
+  costo.costo_unitario,
+  (it.cantidad_recibida_num * costo.costo_unitario)::numeric(14,2) AS valor_total,
+  it.almacen_id,
+  al.nombre AS almacen_nombre,
+  it.ubicacion_id,
+  au.codigo AS ubicacion_codigo,
+  it.lote,
+  it.serie,
+  it.fecha_expiracion,
+  COALESCE(
+    NULLIF(btrim(ocd.moneda), ''),
+    NULLIF(btrim(it.moneda), ''),
+    NULLIF(btrim(oc.moneda), ''),
+    'PEN'
+  ) AS moneda_detalle
+FROM items it
+LEFT JOIN public.recepciones r ON r.id = it.recepcion_id
+LEFT JOIN public.orden_compra_detalles ocd ON ocd.id = it.detalle_id
+LEFT JOIN public.ordenes_compra oc ON oc.id = COALESCE(r.orden_id, ocd.orden_id)
+LEFT JOIN public.productos prod ON prod.id = it.producto_id
+LEFT JOIN public.almacenes al ON al.id = it.almacen_id
+LEFT JOIN public.almacen_ubicaciones au ON au.id = it.ubicacion_id
+LEFT JOIN LATERAL (
+  SELECT COALESCE(
+    app.to_numeric_or_zero(ocd.precio_unitario::text),
+    app.to_numeric_or_zero(prod.precio_compra::text),
+    0
+  )::numeric(14,2) AS costo_unitario
+) costo ON true;
+
+CREATE OR REPLACE VIEW public.orden_compra AS
+SELECT
+  oc.id,
+  oc.tenant_id,
+  oc.proveedor_id,
+  oc.fecha,
+  oc.fecha_orden,
+  oc.estado,
+  COALESCE(oc.subtotal, 0)::numeric(14,2) AS subtotal,
+  COALESCE(oc.igv, 0)::numeric(14,2) AS igv,
+  COALESCE(oc.total, 0)::numeric(14,2) AS total,
+  COALESCE(NULLIF(btrim(oc.moneda), ''), 'PEN') AS moneda,
+  oc.created_at,
+  oc.updated_at
+FROM public.ordenes_compra oc;
+
+CREATE OR REPLACE VIEW public.vista_registro_compras AS
+SELECT
+  oc.id AS orden_compra_id,
+  oc.tenant_id,
+  oc.estado,
+  oc.total,
+  p.nombre AS proveedor_nombre
+FROM public.ordenes_compra oc
+LEFT JOIN public.proveedores p ON p.id = oc.proveedor_id;
 
 COMMIT;

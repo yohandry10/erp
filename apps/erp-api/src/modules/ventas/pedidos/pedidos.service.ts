@@ -202,7 +202,7 @@ export class PedidosService {
 
     let query = client
       .from('pedidos_venta')
-      .select('*, clientes!inner(id, razon_social, numero_documento)', { count: 'exact' })
+      .select('*, clientes:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, numero_documento)', { count: 'exact' })
       .eq('tenant_id', tenantId);
 
     // Filtro por estado
@@ -235,9 +235,23 @@ export class PedidosService {
       
       if (cleanSearch.length > 0) {
         const searchTerm = `%${cleanSearch}%`;
-        query = query.or(
-          `numero.ilike.${searchTerm},clientes.razon_social.ilike.${searchTerm}`,
-        );
+        const { data: clientesCoincidentes } = await client
+          .from('clientes')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .ilike('razon_social', searchTerm)
+          .limit(25);
+
+        const clienteIds = (clientesCoincidentes || [])
+          .map((cliente: { id?: string }) => cliente.id)
+          .filter(Boolean);
+
+        const searchFilters = [`numero.ilike.${searchTerm}`];
+        if (clienteIds.length > 0) {
+          searchFilters.push(`cliente_id.in.(${clienteIds.join(',')})`);
+        }
+
+        query = query.or(searchFilters.join(','));
       }
     }
 
@@ -277,7 +291,7 @@ export class PedidosService {
       .select(
         `
           *,
-          clientes!inner(id, razon_social, numero_documento, limite_credito, permite_morosidad)
+          clientes:clientes!pedidos_venta_cliente_id_fkey(id, razon_social, numero_documento, limite_credito, permite_morosidad)
         `,
       )
       .eq('tenant_id', tenantId)
@@ -504,7 +518,7 @@ export class PedidosService {
 
     const { data: pedido, error: pedidoError } = await client
       .from('pedidos_venta')
-      .select('*, clientes(*)')
+      .select('*, clientes:clientes!pedidos_venta_cliente_id_fkey(*)')
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .single();
@@ -960,6 +974,7 @@ export class PedidosService {
           precio: Number(item.precio_unitario ?? 0),
           total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
         })),
+        inventarioAplicado: true,
       });
 
       console.log(`✅ [PedidosService] Evento VentaProcessedEvent emitido al confirmar pedido ${pedido.numero}`);
@@ -1022,6 +1037,7 @@ export class PedidosService {
           total: Number(item.subtotal ?? (item.cantidad ?? 0) * (item.precio_unitario ?? 0)),
         })),
         cpeId: factura.factura_id,
+        inventarioAplicado: true,
       });
     } catch (error) {
       console.error('Error emitiendo evento de venta procesada para asientos contables:', error);
@@ -2045,6 +2061,63 @@ export class PedidosService {
         );
       }
 
+      for (const item of pedido.detalle) {
+        const { data: salidaExistente, error: salidaExistenteError } = await client
+          .from('movimientos_inventario')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('referencia_tipo', 'PEDIDO')
+          .eq('referencia_id', pedidoId)
+          .eq('tipo', 'SALIDA')
+          .eq('producto_id', item.producto_id)
+          .limit(1);
+
+        if (salidaExistenteError) {
+          throw new BadRequestException('No se pudo verificar si ya se registró la salida de inventario');
+        }
+
+        const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
+
+        if (!yaTieneSalidaRegistrada) {
+          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
+            tenant_id: tenantId,
+            producto_id: item.producto_id,
+            tipo: 'SALIDA',
+            cantidad: item.cantidad,
+            referencia_tipo: 'PEDIDO',
+            referencia_id: pedidoId,
+            notas: `Salida por documento fiscal de pedido ${pedido.numero}`,
+          });
+
+          if (movimientoError) {
+            throw new BadRequestException('No se pudo registrar el movimiento de salida de inventario');
+          }
+
+          const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
+            p_producto_id: item.producto_id,
+            p_cantidad: item.cantidad,
+          });
+
+          if (salidaError) {
+            this.logger.error('Error descontando stock al generar documento:', salidaError);
+            throw new BadRequestException('No se pudo descontar el stock al generar documento');
+          }
+        }
+
+        const { error: detalleDespachoError } = await client
+          .from('pedidos_venta_detalle')
+          .update({
+            cantidad_despachada: item.cantidad,
+            estado_item: 'DESPACHADO',
+          })
+          .eq('id', item.id)
+          .eq('tenant_id', tenantId);
+
+        if (detalleDespachoError) {
+          this.logger.warn('No se pudo actualizar el detalle con la cantidad despachada al generar documento:', detalleDespachoError);
+        }
+      }
+
       // 3. Obtener configuración del tenant (país, moneda, etc.)
       const { data: empresaConfig, error: configError } = await client
         .from('empresa_config')
@@ -2057,13 +2130,14 @@ export class PedidosService {
       }
 
       // 4. Obtener serie activa para el tipo de documento
+      const tipoDocumentoCanonico = tipoDoc === '01' ? 'FACTURA' : 'BOLETA';
       const serieDefault = tipoDoc === '01' ? 'F001' : 'B001';
 
       const { data: serie, error: serieError } = await client
         .from('documento_series')
         .select('*')
         .eq('tenant_id', tenantId)
-        .eq('tipo_documento', tipoDoc)
+        .in('tipo_documento', [tipoDoc, tipoDocumentoCanonico])
         .eq('activo', true)
         .order('created_at', { ascending: true })
         .limit(1)
@@ -2077,19 +2151,12 @@ export class PedidosService {
       const serieAUsar = serie?.serie || serieDefault;
 
       // 5. Obtener siguiente número de serie (con lock)
-      const { data: numeroData, error: numeroError } = await client
-        .rpc('obtener_siguiente_numero_documento', {
-          p_tenant_id: tenantId,
-          p_tipo_documento: tipoDoc,
-          p_serie: serieAUsar,
-        });
-
-      if (numeroError) {
-        this.logger.error('Error obteniendo número de serie:', numeroError);
-        throw new BadRequestException('Error al obtener el número de serie');
-      }
-
-      const numero = numeroData || '00000001';
+      let numero = await this.obtenerSiguienteNumeroDocumentoSeguro(
+        client,
+        tenantId,
+        tipoDocumentoCanonico,
+        serieAUsar,
+      );
 
       this.logger.log(`📋 [PedidosService] Serie: ${serieAUsar}, Número: ${numero}`);
 
@@ -2124,7 +2191,7 @@ export class PedidosService {
       const documentoData = {
         tenant_id: tenantId,
         pedido_id: pedidoId,
-        tipo_documento: tipoDoc,
+        tipo_documento: tipoDocumentoCanonico,
         serie: serieAUsar,
         numero: numero,
         fecha_emision: fechaEmision.toISOString(),
@@ -2161,15 +2228,39 @@ export class PedidosService {
         created_by: userId,
       };
 
-      const { data: documento, error: documentoError } = await client
-        .from('documentos')
-        .insert(documentoData)
-        .select()
-        .single();
+      let documento: any = null;
+      for (let intento = 1; intento <= 5; intento += 1) {
+        const { data: documentoCreado, error: documentoError } = await client
+          .from('documentos')
+          .insert(documentoData)
+          .select()
+          .single();
 
-      if (documentoError) {
-        this.logger.error('Error creando documento:', documentoError);
-        throw new BadRequestException(`Error al crear el documento: ${documentoError.message}`);
+        if (!documentoError) {
+          documento = documentoCreado;
+          break;
+        }
+
+        const esDuplicado =
+          documentoError.code === '23505' ||
+          String(documentoError.message ?? '').toLowerCase().includes('duplicate key value') ||
+          String(documentoError.message ?? '').toLowerCase().includes('unique constraint');
+
+        if (!esDuplicado || intento === 5) {
+          this.logger.error('Error creando documento:', documentoError);
+          throw new BadRequestException(`Error al crear el documento: ${documentoError.message}`);
+        }
+
+        this.logger.warn(
+          `Correlativo ${serieAUsar}-${numero} ya existe; recalculando número antes de reintentar documento`,
+        );
+        numero = await this.obtenerSiguienteNumeroDocumentoSeguro(
+          client,
+          tenantId,
+          tipoDocumentoCanonico,
+          serieAUsar,
+        );
+        documentoData.numero = numero;
       }
 
       this.logger.log(`✅ [PedidosService] Documento creado: ${documento.id}`);
@@ -2217,9 +2308,9 @@ export class PedidosService {
           fecha_emision: fechaEmision.toISOString(),
 
           // Datos del cliente
-          cliente_tipo_doc: cliente.documento_tipo || 'RUC',
-          cliente_numero_doc: cliente.numero_documento,
-          cliente_razon_social: cliente.razon_social || cliente.nombre_comercial,
+          tipo_documento_receptor: cliente.documento_tipo || cliente.tipo_documento || 'RUC',
+          documento_receptor: String(cliente.numero_documento || cliente.documento_numero || ''),
+          razon_social_receptor: cliente.razon_social || cliente.nombre_comercial || cliente.nombre,
 
           // Montos
           moneda: monedaPedido,
@@ -2241,13 +2332,18 @@ export class PedidosService {
           .single();
 
         if (cpeError) {
-          this.logger.warn('⚠️ [PedidosService] Error creando CPE (no crítico):', cpeError);
+          this.logger.error('❌ [PedidosService] Error creando CPE:', cpeError);
+          throw new BadRequestException(`Error al crear el CPE: ${cpeError.message}`);
         } else {
           cpe = cpeCreado;
           this.logger.log(`✅ [PedidosService] CPE creado: ${cpe.id}`);
         }
       } catch (cpeException) {
-        this.logger.warn('⚠️ [PedidosService] Excepción creando CPE:', cpeException);
+        this.logger.error('❌ [PedidosService] Excepción creando CPE:', cpeException);
+        if (cpeException instanceof BadRequestException) {
+          throw cpeException;
+        }
+        throw new BadRequestException('Error al crear el CPE');
       }
 
       // 12. Crear Cuenta por Cobrar (CxC)
@@ -2317,6 +2413,10 @@ export class PedidosService {
           clienteId: pedido.cliente_id,
           saldoInicial: taxResult.total,
           saldoPendiente: taxResult.total,
+          montoTotal: taxResult.total,
+          montoPendiente: taxResult.total,
+          subtotal: taxResult.subtotal,
+          impuestos: taxResult.igv,
           moneda: monedaPedido,
           fechaEmision: fechaEmision.toISOString(),
           fechaVencimiento: fechaVencimiento.toISOString(),
@@ -2367,6 +2467,72 @@ export class PedidosService {
    */
   private round2(value: number): number {
     return Math.round(value * 100) / 100;
+  }
+
+  private async obtenerSiguienteNumeroDocumentoSeguro(
+    client: any,
+    tenantId: string,
+    tipoDocumentoCanonico: string,
+    serie: string,
+  ): Promise<string> {
+    const normalizarNumero = (value: unknown) => {
+      const raw = String(value ?? '').trim();
+      const parsed = Number.parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed > 0
+        ? String(parsed).padStart(8, '0')
+        : '00000001';
+    };
+
+    const { data: numeroData, error: numeroError } = await client
+      .rpc('obtener_siguiente_numero_documento', {
+        p_tenant_id: tenantId,
+        p_tipo_documento: tipoDocumentoCanonico,
+        p_serie: serie,
+      });
+
+    if (numeroError) {
+      this.logger.error('Error obteniendo número de serie:', numeroError);
+      throw new BadRequestException('Error al obtener el número de serie');
+    }
+
+    const numeroRpc = normalizarNumero(numeroData);
+
+    const { data: documentosExistentes, error: documentosError } = await client
+      .from('documentos')
+      .select('tipo_documento, numero')
+      .eq('tenant_id', tenantId)
+      .eq('serie', serie)
+      .order('numero', { ascending: false })
+      .limit(100);
+
+    if (documentosError) {
+      this.logger.error('Error verificando correlativos existentes:', documentosError);
+      throw new BadRequestException('Error al verificar correlativos existentes');
+    }
+
+    const normalizarTipo = (value: unknown) => {
+      const raw = String(value ?? '').trim().toUpperCase();
+      if (raw === '01' || raw === 'FACTURA') return 'FACTURA';
+      if (raw === '03' || raw === 'BOLETA') return 'BOLETA';
+      if (raw === '07' || raw === 'NC' || raw === 'NOTA_CREDITO') return 'NOTA_CREDITO';
+      if (raw === '08' || raw === 'ND' || raw === 'NOTA_DEBITO') return 'NOTA_DEBITO';
+      return raw || 'FACTURA';
+    };
+
+    const ultimoNumero = (documentosExistentes ?? []).reduce((max: number, row: any) => {
+      if (normalizarTipo(row.tipo_documento) !== tipoDocumentoCanonico) {
+        return max;
+      }
+      const numero = Number.parseInt(String(row.numero ?? '0'), 10);
+      return Number.isFinite(numero) && numero > max ? numero : max;
+    }, 0);
+    const siguienteRpc = Number.parseInt(numeroRpc, 10);
+
+    if (Number.isFinite(ultimoNumero) && ultimoNumero >= siguienteRpc) {
+      return String(ultimoNumero + 1).padStart(8, '0');
+    }
+
+    return numeroRpc;
   }
 
   /**

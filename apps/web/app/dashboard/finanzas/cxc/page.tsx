@@ -94,7 +94,7 @@ const initialFilters = {
 
 export default function CuentasPorCobrarPage() {
   const router = useRouter()
-  const api = useApi()
+  const { get } = useApi()
 
   const [cuentas, setCuentas] = useState<CuentaPorCobrar[]>([])
   const [clientes, setClientes] = useState<ClienteLigero[]>([])
@@ -119,7 +119,7 @@ export default function CuentasPorCobrarPage() {
       if (filters.search) params.append('search', filters.search.trim())
 
       const endpoint = params.toString() ? `/finanzas/cxc?${params.toString()}` : '/finanzas/cxc'
-      const response = await api.get(endpoint)
+      const response = await get(endpoint)
       if (response?.success && Array.isArray(response.data)) {
         setCuentas(response.data as CuentaPorCobrar[])
       } else {
@@ -131,24 +131,24 @@ export default function CuentasPorCobrarPage() {
     } finally {
       setLoading(false)
     }
-  }, [api.get, filters])
+  }, [filters, get])
 
   const fetchClientes = useCallback(async () => {
     try {
-      const response = await api.get('/ventas/clientes?limit=1000')
+      const response = await get('/ventas/clientes?limit=1000')
       const data = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : []
       setClientes(data as ClienteLigero[])
     } catch (error) {
       console.error('Error cargando clientes', error)
       setClientes([])
     }
-  }, [api.get])
+  }, [get])
 
   const fetchHistorial = useCallback(
     async (cxcId: string) => {
       try {
         setLoadingHistorial(true)
-        const response = await api.get(`/finanzas/cxc/${cxcId}`)
+        const response = await get(`/finanzas/cxc/${cxcId}`)
         if (response?.success) {
           setDetalleHistorial(response.data ?? response)
         } else {
@@ -161,13 +161,12 @@ export default function CuentasPorCobrarPage() {
         setLoadingHistorial(false)
       }
     },
-    [api.get],
+    [get],
   )
 
   useEffect(() => {
     fetchClientes()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [fetchClientes])
 
   useEffect(() => {
     fetchCuentas()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useApiCall } from '@/hooks/use-api'
 import GestionTenants from './components/GestionTenants'
@@ -35,7 +35,7 @@ export default function CrearTenants() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
 
-  const fetchTenants = async () => {
+  const fetchTenants = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -50,11 +50,11 @@ export default function CrearTenants() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   useEffect(() => {
     fetchTenants()
-  }, [])
+  }, [fetchTenants])
 
   const filteredTenants = useMemo(() => {
     const q = search.trim().toLowerCase()

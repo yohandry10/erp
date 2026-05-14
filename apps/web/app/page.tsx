@@ -9,21 +9,15 @@ export default function HomePage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('🏠 [HomePage] Verificando autenticación...')
-      
       try {
-        // Usar customAuth en lugar de Supabase
         const { data } = await customAuth.getSession()
 
-        if (data.session && data.session.access_token) {
-          console.log('✅ [HomePage] Usuario autenticado, redirigiendo a dashboard')
+        if (data.session?.user) {
           router.push('/dashboard')
         } else {
-          console.log('ℹ️ [HomePage] No hay sesión, redirigiendo a login')
           router.push('/login')
         }
       } catch (error) {
-        console.error('❌ [HomePage] Error verificando autenticación:', error)
         router.push('/login')
       }
     }

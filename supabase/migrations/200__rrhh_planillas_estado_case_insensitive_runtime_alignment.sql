@@ -10,6 +10,8 @@ SET LOCAL search_path = public, extensions, app, pg_temp;
 
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
+DROP VIEW IF EXISTS public.v_planillas_integridad;
+
 -- ----------------------------------------------------------------------------
 -- Helpers de normalizacion de estado para planillas.
 -- ----------------------------------------------------------------------------
@@ -360,5 +362,41 @@ ON public.planillas (tenant_id, estado_pago, periodo, updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_detalle_planillas_tenant_estado_ci_runtime_200
 ON public.detalle_planillas (tenant_id, estado, updated_at DESC);
+
+CREATE OR REPLACE VIEW public.v_planillas_integridad AS
+SELECT
+  p.tenant_id,
+  p.id AS planilla_id,
+  p.periodo,
+  p.estado::text AS estado,
+  COUNT(DISTINCT ep.id) AS total_empleados_detalle,
+  COUNT(ep.id) FILTER (WHERE ep.planilla_id IS NULL OR ep.empleado_id IS NULL) AS empleados_detalle_con_fk_incompleta,
+  COUNT(epc.id) AS total_conceptos_detalle,
+  COALESCE(SUM(ep.total_ingresos), 0) AS suma_detalle_ingresos,
+  COALESCE(SUM(ep.total_descuentos), 0) AS suma_detalle_descuentos,
+  COALESCE(SUM(ep.total_aportes), 0) AS suma_detalle_aportes,
+  COALESCE(SUM(ep.neto_pagar), 0) AS suma_detalle_neto,
+  COALESCE(p.total_ingresos, 0) AS cabecera_total_ingresos,
+  COALESCE(p.total_descuentos, 0) AS cabecera_total_descuentos,
+  COALESCE(p.total_aportes, 0) AS cabecera_total_aportes,
+  COALESCE(p.total_neto, 0) AS cabecera_total_neto,
+  COALESCE(SUM(ep.total_ingresos), 0) - COALESCE(p.total_ingresos, 0) AS diff_ingresos,
+  COALESCE(SUM(ep.total_descuentos), 0) - COALESCE(p.total_descuentos, 0) AS diff_descuentos,
+  COALESCE(SUM(ep.total_aportes), 0) - COALESCE(p.total_aportes, 0) AS diff_aportes,
+  COALESCE(SUM(ep.neto_pagar), 0) - COALESCE(p.total_neto, 0) AS diff_neto
+FROM public.planillas p
+LEFT JOIN public.empleado_planilla ep
+  ON ep.planilla_id = p.id
+LEFT JOIN public.empleado_planilla_conceptos epc
+  ON epc.empleado_planilla_id = ep.id
+GROUP BY
+  p.tenant_id,
+  p.id,
+  p.periodo,
+  p.estado,
+  p.total_ingresos,
+  p.total_descuentos,
+  p.total_aportes,
+  p.total_neto;
 
 COMMIT;

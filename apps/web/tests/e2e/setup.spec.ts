@@ -15,10 +15,10 @@ test.describe('Setup Verification', () => {
 
   test('should navigate to login page', async ({ page }) => {
     await page.goto('/login');
-    
+
     // Verify login page elements exist
-    await expect(page.locator('input[name="email"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
+    await expect(page.getByLabel('Correo Electrónico')).toBeVisible();
+    await expect(page.getByLabel('Contraseña')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Iniciar Sesión' })).toBeVisible();
   });
 });

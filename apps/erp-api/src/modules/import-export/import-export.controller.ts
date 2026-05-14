@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * Controlador de Import/Export
@@ -18,6 +19,7 @@ import { CurrentTenant } from '../../common/decorators/current-tenant.decorator'
 @ApiTags('Import/Export')
 @ApiBearerAuth()
 @Controller('import-export')
+  @Throttle({ default: { limit: 25, ttl: 60000 } })
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ImportExportController {
   constructor(private readonly service: ImportExportService) {}
@@ -33,6 +35,7 @@ export class ImportExportController {
 
   @Post('comprobantes/preview')
   @RequirePermission('import-export.comprobantes.preview')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async previewComprobantes(@Body() body: PreviewComprobantesDto) {
     const csv = Buffer.from(body.fileBase64, 'base64').toString('utf8');
     return this.service.validateComprobantesCsv(csv);
@@ -49,6 +52,7 @@ export class ImportExportController {
 
   @Post('catalogo/preview')
   @RequirePermission('import-export.catalogo.preview')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async previewCatalogo(@Body() body: PreviewComprobantesDto) {
     const csv = Buffer.from(body.fileBase64, 'base64').toString('utf8');
     return this.service.validateCatalogoCsv(csv);
@@ -62,6 +66,7 @@ export class ImportExportController {
    */
   @Post('catalogo/import')
   @RequirePermission('import-export.catalogo.import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async importCatalogo(
     @Body() body: ImportCatalogoDto,
     @CurrentTenant() tenantId: string,  // ✅ Del token, no del body

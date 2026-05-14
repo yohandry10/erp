@@ -492,32 +492,73 @@ export class InventarioController {
       const client = this.supabase.getClient();
 
       const { data, error } = await client
-        .from('stock_movimientos')
-        .select('*')
+        .from('movimientos_inventario')
+        .select(`
+          id,
+          tenant_id,
+          producto_id,
+          tipo,
+          cantidad,
+          referencia_tipo,
+          referencia_id,
+          notas,
+          created_by,
+          created_at
+        `)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (error) {
         this.logger.warn(`⚠️ Error consultando movimientos: ${(error as Error).message}`);
-        return { 
-          success: true, 
-          data: []
-        };
+        throw error;
       }
 
-      this.logger.log(`✅ ${data?.length || 0} movimientos obtenidos`); // HARDENING: confirma resultado.
+      const productoIds = Array.from(new Set((data || []).map((mov: any) => mov.producto_id).filter(Boolean)));
+      let productosPorId = new Map<string, any>();
+      if (productoIds.length > 0) {
+        const { data: productos, error: productosError } = await client
+          .from('productos')
+          .select('id, codigo, nombre')
+          .eq('tenant_id', tenantId)
+          .in('id', productoIds);
+
+        if (productosError) {
+          this.logger.warn(`⚠️ Error consultando productos de movimientos: ${(productosError as Error).message}`);
+        } else {
+          productosPorId = new Map((productos || []).map((producto: any) => [producto.id, producto]));
+        }
+      }
+
+      const movimientos = (data || []).map((mov: any) => {
+        const producto = productosPorId.get(mov.producto_id);
+        return {
+          id: mov.id,
+          tenant_id: mov.tenant_id,
+          producto_id: mov.producto_id,
+          tipo_movimiento: mov.tipo,
+          tipo: mov.tipo,
+          cantidad: mov.cantidad,
+          referencia_tipo: mov.referencia_tipo,
+          referencia_id: mov.referencia_id,
+          referencia: mov.referencia_id ?? mov.referencia_tipo ?? null,
+          motivo: mov.notas ?? mov.referencia_tipo ?? null,
+          usuario_id: mov.created_by,
+          created_at: mov.created_at,
+          codigo: producto?.codigo ?? null,
+          nombre: producto?.nombre ?? null,
+        };
+      });
+
+      this.logger.log(`✅ ${movimientos.length} movimientos obtenidos`); // HARDENING: confirma resultado.
       
       return { 
         success: true, 
-        data: data || [] 
+        data: movimientos 
       };
     } catch (error) {
       this.logger.error('❌ Error obteniendo movimientos', error as Error);
-      return { 
-        success: true,
-        data: [] 
-      };
+      throw error;
     }
   }
 

@@ -64,7 +64,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
   const [monto, setMonto] = useState('')
   const [fechaPago, setFechaPago] = useState(() => new Date().toISOString().split('T')[0])
   const [metodoPago, setMetodoPago] = useState('EFECTIVO')
-  const [cuentaBancariaId, setCuentaBancariaId] = useState('')
+  const [cuentaBancariaId, setCuentaBancariaId] = useState('SIN_CUENTA')
   const [referencia, setReferencia] = useState('')
   const [notas, setNotas] = useState('')
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancariaResumen[]>([])
@@ -82,7 +82,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
     }
 
     setMonto(saldoDisponible > 0 ? String(saldoDisponible) : '')
-    setCuentaBancariaId('')
+    setCuentaBancariaId('SIN_CUENTA')
     setReferencia('')
     setNotas('')
     setError(null)
@@ -166,7 +166,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
         monto: montoNumber,
         fecha_pago: fechaPago,
         metodo_pago: metodoPago,
-        cuenta_bancaria_id: cuentaBancariaId || undefined,
+        cuenta_bancaria_id: cuentaBancariaId === 'SIN_CUENTA' ? undefined : cuentaBancariaId,
         referencia: referencia || undefined,
         notas: notas || undefined,
         idempotency_key: generateIdempotencyKey(),
@@ -270,7 +270,7 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
                   <SelectValue placeholder={loadingBancos ? 'Cargando cuentas...' : 'Selecciona una cuenta'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin cuenta bancaria</SelectItem>
+                  <SelectItem value="SIN_CUENTA">Sin cuenta bancaria</SelectItem>
                   {cuentasBancarias.map((cuentaBanco) => (
                     <SelectItem key={cuentaBanco.id} value={cuentaBanco.id}>
                       {`${cuentaBanco.nombre || cuentaBanco.banco || 'Cuenta'}${

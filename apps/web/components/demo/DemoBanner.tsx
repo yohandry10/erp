@@ -29,7 +29,7 @@ export function DemoBanner() {
       }
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/demo/status`, {
+      const response = await fetch(`${apiUrl}/api/demo/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -48,7 +48,7 @@ export function DemoBanner() {
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/demo/extend`, {
+      const response = await fetch(`${apiUrl}/api/demo/extend`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

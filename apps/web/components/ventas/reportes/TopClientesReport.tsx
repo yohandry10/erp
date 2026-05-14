@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,17 +35,13 @@ export default function TopClientesReport({ filters }: Props) {
   const [loading, setLoading] = useState(true)
   const [topN, setTopN] = useState(10)
 
-  useEffect(() => {
-    loadData()
-  }, [filters, topN])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/top-clientes', {
         params: { ...filters, limit: topN }
       })
-      
+
       if (response?.success) {
         setData(response.data || [])
       }
@@ -59,7 +55,11 @@ export default function TopClientesReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get, topN])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleVerCliente = (clienteId: string) => {
     router.push(`/dashboard/ventas/clientes/${clienteId}`)

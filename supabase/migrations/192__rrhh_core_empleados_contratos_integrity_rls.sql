@@ -128,8 +128,8 @@ WITH ranked AS (
 )
 UPDATE public.contratos c
 SET
-  fecha_inicio = c.fecha_inicio + (r.rn - 1),
-  fecha_firma = COALESCE(c.fecha_firma, c.fecha_inicio + (r.rn - 1)),
+  fecha_inicio = c.fecha_inicio + (r.rn - 1)::integer,
+  fecha_firma = COALESCE(c.fecha_firma, c.fecha_inicio + (r.rn - 1)::integer),
   updated_at = now()
 FROM ranked r
 WHERE c.id = r.id

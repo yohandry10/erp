@@ -34,7 +34,7 @@ SET
   tenant_id = x.tenant_id,
   updated_at = now()
 FROM (
-  SELECT d.asiento_id, max(d.tenant_id) AS tenant_id
+  SELECT d.asiento_id, min(d.tenant_id::text)::uuid AS tenant_id
   FROM public.detalle_asientos d
   WHERE d.asiento_id IS NOT NULL
     AND d.tenant_id IS NOT NULL

@@ -1,8 +1,7 @@
-import { SignedXml } from 'xml-crypto';
 import * as forge from 'node-forge';
-import { DOMParser } from 'xmldom';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as path from 'path';
 
 export interface SigningOptions {
   pfxPath?: string;
@@ -10,6 +9,7 @@ export interface SigningOptions {
   pfxPassword?: string;
   referenceUri?: string;
   useDemoMode?: boolean; // Para testing sin certificado real
+  allowDemoFallback?: boolean;
 }
 
 export class XmlSigner {
@@ -32,6 +32,9 @@ export class XmlSigner {
         this.loadRealCertificate();
       }
     } catch (error) {
+      if (this.options.allowDemoFallback === false) {
+        throw error;
+      }
       console.error('❌ Error cargando certificado, usando modo demo:', error);
       this.demoMode = true;
       this.generateDemoCertificate();
@@ -46,11 +49,13 @@ export class XmlSigner {
       console.log('📜 Cargando certificado desde buffer (base de datos)');
       pfxData = this.options.pfxBuffer;
     } else if (this.options.pfxPath) {
-      if (!fs.existsSync(this.options.pfxPath)) {
-        throw new Error('Archivo de certificado no encontrado');
+      const resolvedPath = this.resolveCertificatePath(this.options.pfxPath);
+
+      if (!resolvedPath) {
+        throw new Error(`Archivo de certificado no encontrado: ${this.options.pfxPath}`);
       }
-      console.log('📜 Cargando certificado desde archivo:', this.options.pfxPath);
-      pfxData = fs.readFileSync(this.options.pfxPath);
+      console.log('📜 Cargando certificado desde archivo:', resolvedPath);
+      pfxData = fs.readFileSync(resolvedPath);
     } else {
       throw new Error('No se proporcionó pfxPath ni pfxBuffer');
     }
@@ -69,6 +74,20 @@ export class XmlSigner {
     } else {
       throw new Error('No se pudo extraer certificado o clave privada del archivo .pfx');
     }
+  }
+
+  private resolveCertificatePath(configuredPath: string): string | null {
+    if (path.isAbsolute(configuredPath) && fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
+
+    const candidates = [
+      path.resolve(process.cwd(), configuredPath),
+      path.resolve(process.cwd(), '..', '..', configuredPath),
+      path.resolve(__dirname, '..', '..', '..', configuredPath),
+    ];
+
+    return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
   }
 
   private generateDemoCertificate(): void {

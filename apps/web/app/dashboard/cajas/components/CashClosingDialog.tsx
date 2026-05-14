@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useApi } from '@/hooks/use-api';
 import { DenominationForm, Denominaciones } from './DenominationForm';
 
@@ -30,13 +30,7 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
     // Configuración (idealmente vendría del backend)
     const TOLERANCIA = 10;
 
-    useEffect(() => {
-        if (isOpen && sesionId) {
-            iniciarCierre();
-        }
-    }, [isOpen, sesionId]);
-
-    const iniciarCierre = async () => {
+    const iniciarCierre = useCallback(async () => {
         setStep('VALIDATING');
         setError(null);
         setValidation(null);
@@ -65,7 +59,13 @@ export function CashClosingDialog({ isOpen, onClose, onSuccess, sesionId }: Cash
         } finally {
             setLoading(false);
         }
-    };
+    }, [api, sesionId]);
+
+    useEffect(() => {
+        if (isOpen && sesionId) {
+            iniciarCierre();
+        }
+    }, [iniciarCierre, isOpen, sesionId]);
 
     const handleCountSubmit = (denom: Denominaciones, total: number) => {
         setDenominaciones(denom);

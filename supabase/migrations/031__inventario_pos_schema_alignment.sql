@@ -93,6 +93,8 @@ WHERE
 -- ----------------------------------------------------------------------------
 -- Recepciones / ítems: columnas esperadas por inventario
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_inventario_recepciones;
+
 ALTER TABLE IF EXISTS public.recepciones
   ADD COLUMN IF NOT EXISTS gre_proveedor text;
 
@@ -113,6 +115,18 @@ ALTER TABLE IF EXISTS public.almacen_ubicaciones
 SELECT app.add_fk_if_possible('recepcion_items', 'almacen_id', 'almacenes', 'id', 'fk_recepcion_items_almacen_id_v2');
 SELECT app.add_fk_if_possible('recepcion_items', 'ubicacion_id', 'almacen_ubicaciones', 'id', 'fk_recepcion_items_ubicacion_id_v2');
 SELECT app.add_fk_if_possible('recepcion_items', 'detalle_id', 'orden_compra_detalles', 'id', 'fk_recepcion_items_detalle_id_v2');
+
+CREATE OR REPLACE VIEW public.vw_inventario_recepciones AS
+SELECT
+  r.id AS recepcion_id,
+  r.tenant_id,
+  r.estado,
+  r.fecha_recepcion,
+  ri.id AS item_id,
+  ri.producto_id,
+  ri.cantidad_recibida
+FROM public.recepciones r
+LEFT JOIN public.recepcion_items ri ON ri.recepcion_id = r.id;
 
 -- ----------------------------------------------------------------------------
 -- Índices de soporte para consultas runtime

@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { PUBLIC_METADATA_KEY } from '../decorators/public.decorator';
 import { PERMISSION_KEY, ParsedPermission } from '../decorators/require-permission.decorator';
 import { PermissionService } from '../../modules/permissions/permission.service';
+import { ConfigService } from '@nestjs/config';
+import { TenantContextService } from '../../shared/tenant/tenant-context.service';
 
 /**
  * HARDENING: Guard centralizado que valida permisos granulares contra la tabla
@@ -15,7 +17,28 @@ export class PermissionGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly permissionService: PermissionService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly tenantContext: TenantContextService,
   ) {}
+
+  private async runWithTenantContext<T>(
+    user: Record<string, any>,
+    tenantId: string,
+    callback: () => Promise<T>,
+  ): Promise<T> {
+    const snapshot = {
+      tenantId,
+      userId: user.id || user.sub || null,
+      isSuperAdmin: user.is_super_admin === true,
+    };
+
+    if (this.tenantContext.getContext()) {
+      this.tenantContext.setContext(snapshot);
+      return callback();
+    }
+
+    return this.tenantContext.run(snapshot, callback);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -28,20 +51,19 @@ export class PermissionGuard implements CanActivate {
       return true;
     }
 
+    if (request.method === 'GET' && request.path === '/api/metrics') {
+      return true;
+    }
+
     const requiredPermission = this.reflector.getAllAndOverride<ParsedPermission>(
       PERMISSION_KEY,
       [context.getHandler(), context.getClass()],
     );
 
     if (!requiredPermission) {
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
-        throw new UnauthorizedException('Usuario no autenticado');
-      }
-
       let user = request.user;
 
-      if (!request.user) {
+      if (!user) {
         const authHeader = request.headers?.authorization;
         if (typeof authHeader !== 'string') {
           throw new UnauthorizedException('Usuario no autenticado');
@@ -52,8 +74,13 @@ export class PermissionGuard implements CanActivate {
           throw new UnauthorizedException('Usuario no autenticado');
         }
 
+        const secret = this.configService.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new UnauthorizedException('JWT_SECRET no configurado');
+        }
+
         try {
-          const payload = this.jwtService.verify(token) as Record<string, any>;
+          const payload = this.jwtService.verify(token, { secret }) as Record<string, any>;
           user = {
             id: payload.sub,
             email: payload.email,
@@ -99,13 +126,13 @@ export class PermissionGuard implements CanActivate {
         throw new UnauthorizedException('Usuario no autenticado');
       }
 
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
-        throw new UnauthorizedException('Usuario no autenticado');
-      }
-
       try {
-        const payload = this.jwtService.verify(token) as Record<string, any>;
+        const secret = this.configService.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new UnauthorizedException('JWT_SECRET no configurado');
+        }
+
+        const payload = this.jwtService.verify(token, { secret }) as Record<string, any>;
         user = {
           id: payload.sub,
           email: payload.email,
@@ -147,22 +174,26 @@ export class PermissionGuard implements CanActivate {
 
     const { module, resource, action } = requiredPermission;
 
-    let hasPermission = await this.permissionService.checkUserPermission(
-      user.id,
-      tenantId,
-      module,
-      action,
-      resource,
-    );
-
-    if (!hasPermission && resource !== '__global__') {
-      // HARDENING: permite fallback a permisos globales si existen.
-      hasPermission = await this.permissionService.checkUserPermission(
+    let hasPermission = await this.runWithTenantContext(user, tenantId, () =>
+      this.permissionService.checkUserPermission(
         user.id,
         tenantId,
         module,
         action,
-        '__global__',
+        resource,
+      ),
+    );
+
+    if (!hasPermission && resource !== '__global__') {
+      // HARDENING: permite fallback a permisos globales si existen.
+      hasPermission = await this.runWithTenantContext(user, tenantId, () =>
+        this.permissionService.checkUserPermission(
+          user.id,
+          tenantId,
+          module,
+          action,
+          '__global__',
+        ),
       );
     }
 

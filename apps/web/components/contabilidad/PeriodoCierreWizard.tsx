@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CheckCircle, XCircle, AlertTriangle, Lock, Loader2 } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
 
 interface PeriodoCierreWizardProps {
   periodoId: string
@@ -33,6 +34,7 @@ export default function PeriodoCierreWizard({
   const [validationResults, setValidationResults] = useState<ValidationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const { apiCall } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false, throwOnError: true })
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
@@ -42,34 +44,21 @@ export default function PeriodoCierreWizard({
     return `${meses[mes - 1]} ${anio}`
   }
 
-  const validatePeriodo = async () => {
+  const validatePeriodo = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`/api/contabilidad/periodos/${periodoId}/validar-cierre`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Error al validar el período')
-      }
-
-      const data = await response.json()
+      const data = await apiCall(`/contabilidad/periodos/${periodoId}/validar-cierre`)
       setValidationResults(data)
       setStep('results')
     } catch (err: any) {
-      console.error('Error validating period:', err)
       setError(err.message || 'Error al validar el período')
       setStep('results')
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall, periodoId])
 
   const cerrarPeriodo = async () => {
     setStep('processing')
@@ -77,21 +66,9 @@ export default function PeriodoCierreWizard({
     setError(null)
 
     try {
-      const response = await fetch(`/api/contabilidad/periodos/${periodoId}/cerrar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Error al cerrar el período')
-      }
-
+      await apiCall(`/contabilidad/periodos/${periodoId}/cerrar`, { method: 'POST' })
       onSuccess()
     } catch (err: any) {
-      console.error('Error closing period:', err)
       setError(err.message || 'Error al cerrar el período')
       setStep('results')
     } finally {
@@ -100,9 +77,9 @@ export default function PeriodoCierreWizard({
   }
 
   // Auto-validate on mount
-  useState(() => {
+  useEffect(() => {
     validatePeriodo()
-  })
+  }, [validatePeriodo])
 
   const canClose = validationResults?.asientos.valido && validationResults?.eventos.valido
 

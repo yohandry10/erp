@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Check, Package, Scan, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
@@ -81,62 +81,15 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { get, post } = useApi()
 
-  useEffect(() => {
-    loadOrden()
-    loadAlmacenes()
-  }, [ordenId])
-
-  // Scanner detection: rapid keystrokes indicate scanner input
-  useEffect(() => {
-    if (!scannerMode) return
-
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Clear previous timeout
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current)
-      }
-
-      // Enter key indicates end of scan
-      if (e.key === 'Enter') {
-        if (scanBuffer.length > 0) {
-          handleScanComplete(scanBuffer)
-          setScanBuffer('')
-        }
-        return
-      }
-
-      // Accumulate characters
-      if (e.key.length === 1) {
-        setScanBuffer(prev => prev + e.key)
-        
-        // Auto-complete after 100ms of no input (scanner is fast)
-        scanTimeoutRef.current = setTimeout(() => {
-          if (scanBuffer.length > 0) {
-            handleScanComplete(scanBuffer + e.key)
-            setScanBuffer('')
-          }
-        }, 100)
-      }
-    }
-
-    window.addEventListener('keypress', handleKeyPress)
-    return () => {
-      window.removeEventListener('keypress', handleKeyPress)
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current)
-      }
-    }
-  }, [scannerMode, scanBuffer])
-
-  const loadOrden = async () => {
+  const loadOrden = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get(`/api/compras/ordenes/${ordenId}`)
-      
+
       if (response?.success && response.data) {
         const ordenData = response.data
         setOrden(ordenData)
-        
+
         // Initialize items with pending quantities
         if (ordenData.detalles && ordenData.detalles.length > 0) {
           const recepcionItems: RecepcionItem[] = ordenData.detalles
@@ -161,9 +114,9 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, ordenId])
 
-  const loadAlmacenes = async () => {
+  const loadAlmacenes = useCallback(async () => {
     try {
       const response = await get('/api/inventario/almacenes')
       if (response?.success && response.data) {
@@ -172,7 +125,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     } catch (error) {
       console.error('Error loading almacenes:', error)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadOrden()
+    loadAlmacenes()
+  }, [loadAlmacenes, loadOrden])
 
   const loadUbicaciones = async (almacenId: string) => {
     if (ubicacionesPorAlmacen[almacenId]) {
@@ -192,25 +150,25 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
     }
   }
 
-  const handleScanComplete = (scannedCode: string) => {
+  const handleScanComplete = useCallback((scannedCode: string) => {
     // Find item by product code
-    const itemIndex = items.findIndex(item => 
+    const itemIndex = items.findIndex(item =>
       item.producto_codigo.toLowerCase() === scannedCode.toLowerCase()
     )
-    
+
     if (itemIndex !== -1) {
       // Increment quantity by 1
       const updatedItems = [...items]
       const item = updatedItems[itemIndex]
       const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
-      
+
       if (item.cantidad_recibir < maxCantidad) {
         updatedItems[itemIndex] = {
           ...item,
           cantidad_recibir: item.cantidad_recibir + 1
         }
         setItems(updatedItems)
-        
+
         // Visual feedback
         const element = document.getElementById(`item-${itemIndex}`)
         if (element) {
@@ -226,16 +184,58 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       // Product not found
       alert(`Producto no encontrado: ${scannedCode}`)
     }
-  }
+  }, [items])
+
+  // Scanner detection: rapid keystrokes indicate scanner input
+  useEffect(() => {
+    if (!scannerMode) return
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Clear previous timeout
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current)
+      }
+
+      // Enter key indicates end of scan
+      if (e.key === 'Enter') {
+        if (scanBuffer.length > 0) {
+          handleScanComplete(scanBuffer)
+          setScanBuffer('')
+        }
+        return
+      }
+
+      // Accumulate characters
+      if (e.key.length === 1) {
+        setScanBuffer(prev => prev + e.key)
+
+        // Auto-complete after 100ms of no input (scanner is fast)
+        scanTimeoutRef.current = setTimeout(() => {
+          if (scanBuffer.length > 0) {
+            handleScanComplete(scanBuffer + e.key)
+            setScanBuffer('')
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('keypress', handleKeyPress)
+    return () => {
+      window.removeEventListener('keypress', handleKeyPress)
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current)
+      }
+    }
+  }, [handleScanComplete, scanBuffer, scannerMode])
 
   const updateItemQuantity = (index: number, cantidad: number) => {
     const updatedItems = [...items]
     const item = updatedItems[index]
     const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
-    
+
     // Validate quantity
     const validCantidad = Math.max(0, Math.min(cantidad, maxCantidad))
-    
+
     updatedItems[index] = {
       ...item,
       cantidad_recibir: validCantidad
@@ -327,7 +327,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       // Validate all items with quantity have almacen selected
       const itemsToReceive = items.filter(item => item.cantidad_recibir > 0)
       const itemsWithoutAlmacen = itemsToReceive.filter(item => !item.almacen_id)
-      
+
       if (itemsWithoutAlmacen.length > 0) {
         alert('Debe seleccionar un almacén para todos los productos a recepcionar')
         return
@@ -343,10 +343,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const handleSubmit = async () => {
     try {
       setSubmitting(true)
-      
+
       // Filter items with quantity > 0
       const itemsToReceive = items.filter(item => item.cantidad_recibir > 0)
-      
+
       if (itemsToReceive.length === 0) {
         alert('Debe ingresar al menos una cantidad para recepcionar')
         return
@@ -370,19 +370,23 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       }
 
       const createResponse = await post(`/api/compras/recepciones/ordenes/${ordenId}`, createDto)
-      
-      if (!createResponse?.success) {
+
+      const createSucceeded = createResponse?.success === true || Boolean(createResponse?.id)
+
+      if (!createSucceeded) {
         throw new Error(createResponse?.message || 'Error al crear la recepción')
       }
 
-      const recepcionId = createResponse.data?.id
-      
+      const recepcionId = createResponse.data?.id || createResponse.id
+
       // Close reception immediately
       const closeResponse = await post(`/api/compras/recepciones/${recepcionId}/cerrar`, {
         observaciones: 'Recepción cerrada automáticamente'
       })
-      
-      if (!closeResponse?.success) {
+
+      const closeSucceeded = closeResponse?.success === true || Boolean(closeResponse?.id)
+
+      if (!closeSucceeded) {
         throw new Error(closeResponse?.message || 'Error al cerrar la recepción')
       }
 
@@ -397,7 +401,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   }
 
   const getTotalItems = () => items.reduce((sum, item) => sum + item.cantidad_recibir, 0)
-  
+
   const getCalidadColor = (calidad: string) => {
     switch (calidad) {
       case 'OK': return '#10b981'
@@ -590,7 +594,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
               {items.map((item, index) => {
                 const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
                 const pendiente = maxCantidad - item.cantidad_recibir
-                
+
                 return (
                   <div
                     key={item.detalle_id}
@@ -788,7 +792,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {items.filter(item => item.cantidad_recibir > 0).map((item, index) => {
                 const originalIndex = items.findIndex(i => i.detalle_id === item.detalle_id)
-                
+
                 return (
                   <div
                     key={item.detalle_id}
@@ -945,7 +949,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {items.filter(item => item.cantidad_recibir > 0).map((item, index) => {
                 const originalIndex = items.findIndex(i => i.detalle_id === item.detalle_id)
-                
+
                 return (
                   <div
                     key={item.detalle_id}

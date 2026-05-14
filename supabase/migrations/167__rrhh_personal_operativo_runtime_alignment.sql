@@ -41,6 +41,16 @@ ALTER TABLE IF EXISTS public.beneficios
   ADD COLUMN IF NOT EXISTS fecha_fin date,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP POLICY IF EXISTS tenant_isolation ON public.beneficios;
+DROP POLICY IF EXISTS tenant_isolation ON public.capacitaciones;
+DROP POLICY IF EXISTS tenant_isolation ON public.horarios_trabajo;
+DROP POLICY IF EXISTS tenant_isolation ON public.empleado_beneficios;
+DROP POLICY IF EXISTS tenant_isolation ON public.empleado_capacitaciones;
+DROP POLICY IF EXISTS tenant_isolation ON public.empleado_horarios;
+DROP POLICY IF EXISTS tenant_isolation ON public.expediente_documentos;
+DROP POLICY IF EXISTS tenant_isolation ON public.liquidaciones;
+DROP POLICY IF EXISTS tenant_isolation ON public.historial_pagos_planilla;
+
 ALTER TABLE IF EXISTS public.beneficios
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN descripcion TYPE text USING NULLIF(btrim(COALESCE(descripcion, '')), ''),
@@ -902,6 +912,8 @@ ALTER TABLE IF EXISTS public.historial_pagos_planilla
   ADD COLUMN IF NOT EXISTS fecha_registro timestamptz,
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP TRIGGER IF EXISTS trg_enforce_tenant_historial_pagos_planilla ON public.historial_pagos_planilla;
+
 ALTER TABLE IF EXISTS public.historial_pagos_planilla
   ALTER COLUMN tenant_id TYPE uuid USING app.to_uuid_or_null(COALESCE(tenant_id::text, '')),
   ALTER COLUMN planilla_id TYPE uuid USING app.to_uuid_or_null(COALESCE(planilla_id::text, '')),
@@ -1124,5 +1136,15 @@ WHERE planilla_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_historial_pagos_planilla_tenant_metodo_fecha_runtime
 ON public.historial_pagos_planilla (tenant_id, metodo, fecha DESC, created_at DESC);
+
+SELECT app.apply_tenant_policy('public', 'beneficios');
+SELECT app.apply_tenant_policy('public', 'capacitaciones');
+SELECT app.apply_tenant_policy('public', 'horarios_trabajo');
+SELECT app.apply_tenant_policy('public', 'empleado_beneficios');
+SELECT app.apply_tenant_policy('public', 'empleado_capacitaciones');
+SELECT app.apply_tenant_policy('public', 'empleado_horarios');
+SELECT app.apply_tenant_policy('public', 'expediente_documentos');
+SELECT app.apply_tenant_policy('public', 'liquidaciones');
+SELECT app.apply_tenant_policy('public', 'historial_pagos_planilla');
 
 COMMIT;

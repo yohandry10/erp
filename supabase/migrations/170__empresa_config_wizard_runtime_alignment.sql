@@ -28,6 +28,8 @@ ALTER TABLE IF EXISTS public.empresa_config
   ADD COLUMN IF NOT EXISTS nombre text,
   ADD COLUMN IF NOT EXISTS moneda text;
 
+DROP TRIGGER IF EXISTS trg_sync_tenants_from_empresa_config ON public.empresa_config;
+
 ALTER TABLE IF EXISTS public.empresa_config
   ALTER COLUMN pais TYPE text USING NULLIF(upper(btrim(COALESCE(pais, ''))), ''),
   ALTER COLUMN moneda_defecto TYPE text USING NULLIF(upper(btrim(COALESCE(moneda_defecto, ''))), ''),
@@ -336,5 +338,11 @@ ON public.wizard_progress (tenant_id, completado, updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_wizard_progress_paso_actual_updated_runtime
 ON public.wizard_progress (paso_actual, updated_at DESC);
+
+CREATE TRIGGER trg_sync_tenants_from_empresa_config
+AFTER INSERT OR UPDATE OF tenant_id, razon_social, nombre_comercial, ruc, pais, plan, estado
+ON public.empresa_config
+FOR EACH ROW
+EXECUTE FUNCTION app.sync_tenants_from_empresa_config();
 
 COMMIT;

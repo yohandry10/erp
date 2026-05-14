@@ -110,6 +110,14 @@ ALTER TABLE IF EXISTS public.users
 ALTER TABLE IF EXISTS public.usuarios_sistemas
   ADD COLUMN IF NOT EXISTS activo boolean DEFAULT true;
 
+DROP TRIGGER IF EXISTS trg_normalize_tenants_estado_activo ON public.tenants;
+DROP TRIGGER IF EXISTS trg_normalize_usuarios_estado_activo ON public.usuarios;
+DROP TRIGGER IF EXISTS trg_normalize_usuarios_sistema_estado_activo ON public.usuarios_sistema;
+DROP TRIGGER IF EXISTS trg_normalize_usuarios_sistemas_estado_activo_275 ON public.usuarios_sistemas;
+DROP TRIGGER IF EXISTS trg_normalize_users_estado_activo_275 ON public.users;
+
+DROP VIEW IF EXISTS public.v_tenants_estado_activo;
+
 -- ----------------------------------------------------------------------------
 -- Migracion de estado a citext para las tablas foco.
 -- ----------------------------------------------------------------------------
@@ -244,5 +252,18 @@ ON public.usuarios_sistemas (tenant_id, estado, updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_users_tenant_estado_ci_runtime_275
 ON public.users (tenant_id, estado, updated_at DESC);
+
+CREATE OR REPLACE VIEW public.v_tenants_estado_activo AS
+SELECT
+  t.id,
+  t.codigo,
+  t.nombre,
+  t.estado::text AS estado,
+  t.activo,
+  (lower(t.estado::text) = 'activo') AS should_be_active,
+  (t.activo = (lower(t.estado::text) = 'activo')) AS is_consistent,
+  t.created_at,
+  t.updated_at
+FROM public.tenants t;
 
 COMMIT;

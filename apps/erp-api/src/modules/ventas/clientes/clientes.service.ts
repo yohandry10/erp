@@ -20,13 +20,19 @@ export class ClientesService {
    */
   async create(createClienteDto: CreateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
     const client = this.supabase.getClient();
+    const documentoTexto = String(createClienteDto.documento_numero || '').trim();
+    const documentoNumero = this.toSafeIntegerDocument(documentoTexto);
 
-    // Validar duplicados por numero_documento
+    if (!/^\d+$/.test(documentoTexto)) {
+      throw new BadRequestException('El número de documento debe ser numérico');
+    }
+
+    // Validar duplicados por documento textual. RUC de 11 dígitos excede integer, por eso no se filtra solo por numero_documento.
     const { data: existingCliente } = await client
       .from('clientes')
-      .select('id, numero_documento')
+      .select('id, numero_documento, codigo, ruc')
       .eq('tenant_id', tenantId)
-      .eq('numero_documento', createClienteDto.documento_numero)
+      .or(`codigo.eq.${documentoTexto},ruc.eq.${documentoTexto}`)
       .maybeSingle();
 
     if (existingCliente) {
@@ -35,35 +41,22 @@ export class ClientesService {
       );
     }
 
-    // Crear cliente
-    // Mapear tipo_documento a 1 carácter para la columna tipo_documento (varchar 1)
-    const tipoDocumentoMap: Record<string, string> = {
-      'DNI': 'D',
-      'RUC': 'R',
-      'CE': 'C',
-      'PASAPORTE': 'P'
-    };
-    const tipoDocumentoCorto = tipoDocumentoMap[createClienteDto.documento_tipo] || 'D';
-    
-    console.log('🔍 [DEBUG] createClienteDto.tipo:', createClienteDto.tipo);
-    console.log('🔍 [DEBUG] documento_tipo:', createClienteDto.documento_tipo, '→ tipo_documento:', tipoDocumentoCorto);
-    
+    // Crear cliente usando solo columnas reales del esquema runtime.
     const insertData = {
       tenant_id: tenantId,
       tipo: createClienteDto.tipo, // PERSONA o EMPRESA
-      tipo_documento: tipoDocumentoCorto, // D, R, C, P (columna varchar 1 - NOT NULL)
-      documento_tipo: createClienteDto.documento_tipo, // DNI, RUC, CE, PASAPORTE (columna varchar 11)
-      numero_documento: createClienteDto.documento_numero,
+      tipo_documento: createClienteDto.documento_tipo,
+      documento_tipo: createClienteDto.documento_tipo,
+      documento_numero: documentoNumero,
+      numero_documento: documentoNumero,
       razon_social: createClienteDto.razon_social,
-      nombre_comercial: createClienteDto.nombre_comercial || null,
+      nombre: createClienteDto.razon_social,
+      codigo: documentoTexto,
       direccion: createClienteDto.direccion || null,
       email: createClienteDto.email || null,
-      telefono: createClienteDto.telefono || null,
-      contacto: createClienteDto.nombre_comercial || null,
+      ruc: createClienteDto.documento_tipo === 'RUC' ? documentoTexto : null,
       activo: true,
     };
-    
-    console.log('🔍 [DEBUG] Datos a insertar:', JSON.stringify(insertData, null, 2));
     
     const { data, error} = await client
       .from('clientes')
@@ -78,6 +71,12 @@ export class ClientesService {
 
     console.log('✅ [ClientesService] Cliente creado:', data.id);
     return data;
+  }
+
+  private toSafeIntegerDocument(documento: string): number | null {
+    if (!/^\d+$/.test(documento)) return null;
+    const parsed = Number(documento);
+    return Number.isSafeInteger(parsed) && parsed <= 2147483647 ? parsed : null;
   }
 
   /**
@@ -111,10 +110,24 @@ export class ClientesService {
 
     // Búsqueda por RUC, DNI, razón social o nombre comercial
     if (filters?.search) {
-      const searchTerm = `%${filters.search}%`;
-      query = query.or(
-        `numero_documento.ilike.${searchTerm},razon_social.ilike.${searchTerm},nombre_comercial.ilike.${searchTerm}`
-      );
+      const rawSearch = filters.search.trim();
+      const searchTerm = `%${rawSearch.replace(/[%_,]/g, '')}%`;
+      const numericSearch = Number(rawSearch);
+      const textFilters = [
+        `razon_social.ilike.${searchTerm}`,
+        `nombre.ilike.${searchTerm}`,
+        `codigo.ilike.${searchTerm}`,
+      ];
+
+      if (Number.isFinite(numericSearch)) {
+        query = query.or([
+          `numero_documento.eq.${numericSearch}`,
+          `documento_numero.eq.${numericSearch}`,
+          ...textFilters,
+        ].join(','));
+      } else {
+        query = query.or(textFilters.join(','));
+      }
     }
 
     // Ordenar y paginar

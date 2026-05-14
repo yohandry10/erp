@@ -538,9 +538,18 @@ export class ComunicacionBajaService {
       });
     }
 
+    const pfxPath = this.configService.get<string>('PFX_PATH');
+    const pfxPassword = this.configService.get<string>('PFX_PASS');
+
+    if (!pfxPath || !pfxPassword) {
+      throw new BadRequestException(
+        `No hay configuración de certificado fiscal para el tenant ${tenantId}. Configure PFX_PATH y PFX_PASS para fallback global o cargue el certificado del tenant.`,
+      );
+    }
+
     return new XmlSigner({
-      pfxPath: this.configService.get('PFX_PATH') || '/tmp/demo.pfx',
-      pfxPassword: this.configService.get('PFX_PASS') || 'demo123',
+      pfxPath,
+      pfxPassword,
     });
   }
 

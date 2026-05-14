@@ -213,6 +213,9 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
           
           {/* Botón X de cerrar */}
           <button
+            type="button"
+            aria-label="Cerrar modal de usuario"
+            title="Cerrar modal de usuario"
             onClick={onClose}
             style={{
               position: 'absolute',

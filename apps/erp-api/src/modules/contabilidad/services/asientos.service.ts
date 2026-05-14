@@ -339,34 +339,40 @@ export class AsientosService {
    * @param fecha - Fecha del asiento
    * @returns Número de asiento generado
    */
-  private async generarNumeroAsiento(tenantId: string, fecha: Date): Promise<string> {
+  private async generarNumeroAsiento(tenantId: string, fecha: Date): Promise<number> {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1;
+    const inicioMes = new Date(Date.UTC(anio, mes - 1, 1)).toISOString().slice(0, 10);
+    const inicioMesSiguiente = new Date(Date.UTC(anio, mes, 1)).toISOString().slice(0, 10);
 
-    // Obtener el último número de asiento del período
-    const { data: ultimoAsiento } = await this.supabaseService
+    const { data: asientosPeriodo, error } = await this.supabaseService
       .getClient()
       .from('asientos_contables')
       .select('numero_asiento')
       .eq('tenant_id', tenantId)
-      .gte('fecha', `${anio}-${String(mes).padStart(2, '0')}-01`)
-      .lt('fecha', `${anio}-${String(mes + 1).padStart(2, '0')}-01`)
-      .order('numero_asiento', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .gte('fecha', inicioMes)
+      .lt('fecha', inicioMesSiguiente)
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
-    let numeroSecuencial = 1;
+    if (error) {
+      throw new Error(`Error generando número de asiento: ${error.message}`);
+    }
 
-    if (ultimoAsiento && ultimoAsiento.numero_asiento) {
-      // Extraer el número secuencial del último asiento
-      const match = ultimoAsiento.numero_asiento.match(/(\d+)$/);
+    let maxSecuencial = 0;
+
+    for (const asiento of asientosPeriodo || []) {
+      if (asiento.numero_asiento === null || asiento.numero_asiento === undefined) {
+        continue;
+      }
+      const numeroAsiento = String(asiento.numero_asiento);
+      const match = numeroAsiento.match(/(\d+)$/);
       if (match) {
-        numeroSecuencial = parseInt(match[1], 10) + 1;
+        maxSecuencial = Math.max(maxSecuencial, parseInt(match[1], 10));
       }
     }
 
-    // Formato: A-YYYYMM-NNNN (ej: A-202410-0001)
-    return `A-${anio}${String(mes).padStart(2, '0')}-${String(numeroSecuencial).padStart(4, '0')}`;
+    return maxSecuencial + 1;
   }
 
   /**
@@ -494,11 +500,8 @@ export class AsientosService {
           haber,
           concepto,
           centro_costo_id,
-          plan_cuentas:cuenta_id (
+          plan_cuentas!fk_detalle_asientos_cuenta_id (
             codigo,
-            nombre
-          ),
-          centros_costo:centro_costo_id (
             nombre
           )
         `
@@ -508,6 +511,28 @@ export class AsientosService {
       if (error) {
         this.logger.error(`❌ Error obteniendo detalles del asiento: ${error.message}`);
         throw error;
+      }
+
+      const centroCostoIds = [
+        ...new Set((detalles || []).map((detalle: any) => detalle.centro_costo_id).filter(Boolean)),
+      ];
+      const centrosCostoPorId = new Map<string, string>();
+
+      if (centroCostoIds.length > 0) {
+        const { data: centrosCosto, error: centrosCostoError } = await this.supabaseService
+          .getClient()
+          .from('centros_costo')
+          .select('id, nombre')
+          .eq('tenant_id', tenantId)
+          .in('id', centroCostoIds);
+
+        if (centrosCostoError) {
+          this.logger.warn(`⚠️ Error obteniendo centros de costo de detalles: ${centrosCostoError.message}`);
+        }
+
+        (centrosCosto || []).forEach((centro: any) => {
+          centrosCostoPorId.set(centro.id, centro.nombre);
+        });
       }
 
       // Mapear los detalles con la información de cuentas y centros de costo
@@ -520,7 +545,9 @@ export class AsientosService {
         haber: detalle.haber,
         concepto: detalle.concepto,
         centro_costo_id: detalle.centro_costo_id,
-        centro_costo_nombre: detalle.centros_costo?.nombre || undefined
+        centro_costo_nombre: detalle.centro_costo_id
+          ? centrosCostoPorId.get(detalle.centro_costo_id)
+          : undefined
       }));
     } catch (error) {
       this.logger.error(`❌ Error obteniendo detalles del asiento: ${error.message}`);

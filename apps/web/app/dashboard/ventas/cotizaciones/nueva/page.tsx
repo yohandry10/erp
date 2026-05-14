@@ -46,6 +46,7 @@ export default function NuevaCotizacionPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <button
           onClick={() => router.back()}
+          aria-label="Volver a cotizaciones"
           style={{
             display: 'inline-flex',
             alignItems: 'center',

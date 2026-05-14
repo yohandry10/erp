@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Building2, Calendar, TrendingUp, AlertCircle, FileText, DollarSign } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
@@ -78,30 +78,9 @@ export default function CentroCostoDetailPage({
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'presupuestos' | 'gastos'>('presupuestos')
 
-  useEffect(() => {
-    void Promise.resolve(params as any).then((resolved) => {
-      if (resolved?.id) setCentroId(resolved.id)
-    })
-  }, [params])
-
-  useEffect(() => {
+  const loadCentro = useCallback(async () => {
     if (!centroId) return
-    loadCentro()
-    loadPeriodos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centroId])
 
-  useEffect(() => {
-    if (selectedPeriodoId && centro) {
-      if (activeTab === 'presupuestos') {
-        loadPresupuestos()
-      } else {
-        loadReporteGastos()
-      }
-    }
-  }, [selectedPeriodoId, centro, activeTab])
-
-  const loadCentro = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -119,9 +98,9 @@ export default function CentroCostoDetailPage({
     } finally {
       setLoading(false)
     }
-  }
+  }, [centroId, get])
 
-  const loadPeriodos = async () => {
+  const loadPeriodos = useCallback(async () => {
     try {
       const response = await get('/api/contabilidad/periodos')
 
@@ -136,9 +115,9 @@ export default function CentroCostoDetailPage({
     } catch (err) {
       console.error('Error loading periodos:', err)
     }
-  }
+  }, [get])
 
-  const loadPresupuestos = async () => {
+  const loadPresupuestos = useCallback(async () => {
     if (!selectedPeriodoId || !centro) return
 
     try {
@@ -160,9 +139,9 @@ export default function CentroCostoDetailPage({
     } finally {
       setLoadingPresupuestos(false)
     }
-  }
+  }, [centro, get, selectedPeriodoId])
 
-  const loadReporteGastos = async () => {
+  const loadReporteGastos = useCallback(async () => {
     if (!selectedPeriodoId || !centro) return
 
     try {
@@ -191,7 +170,29 @@ export default function CentroCostoDetailPage({
     } finally {
       setLoadingReporte(false)
     }
-  }
+  }, [centro, get, periodos, selectedPeriodoId])
+
+  useEffect(() => {
+    void Promise.resolve(params as any).then((resolved) => {
+      if (resolved?.id) setCentroId(resolved.id)
+    })
+  }, [params])
+
+  useEffect(() => {
+    if (!centroId) return
+    loadCentro()
+    loadPeriodos()
+  }, [centroId, loadCentro, loadPeriodos])
+
+  useEffect(() => {
+    if (selectedPeriodoId && centro) {
+      if (activeTab === 'presupuestos') {
+        loadPresupuestos()
+      } else {
+        loadReporteGastos()
+      }
+    }
+  }, [activeTab, centro, loadPresupuestos, loadReporteGastos, selectedPeriodoId])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-PE', {

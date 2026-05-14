@@ -501,7 +501,7 @@ export class OrdenesCompraRepository {
       .from('recepciones')
       .select(`
         *,
-        recepcion_items(
+        recepcion_items!recepcion_items_recepcion_id_fkey_runtime(
           id,
           producto_id,
           cantidad_recibida,
@@ -509,8 +509,7 @@ export class OrdenesCompraRepository {
           lote,
           serie,
           almacen_id,
-          fecha_expiracion,
-          observaciones
+          fecha_expiracion
         )
       `)
       .eq('orden_id', ordenId)

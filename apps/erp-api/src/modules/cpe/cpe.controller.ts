@@ -10,6 +10,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CpeService } from './cpe.service';
 import { CpeHelperService } from './cpe-helper.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto } from '@erp-suite/dtos';
@@ -157,6 +158,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')
   @ApiOperation({ summary: 'Exportar comprobantes CPE a CSV' })
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   async exportComprobantes(
     @Query() filters: any,
     @CurrentTenant() tenantId: string,
@@ -203,6 +205,7 @@ export class CpeController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.descargar_pdf')
   @ApiOperation({ summary: 'Descargar PDF del CPE' })
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async downloadPdf(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,

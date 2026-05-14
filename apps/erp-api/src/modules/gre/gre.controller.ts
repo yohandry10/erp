@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Headers, Param, Query, UseGuards, Req, Res } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Post, Body, Headers, Param, Query, UseGuards, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GreService } from './gre.service';
@@ -32,11 +32,7 @@ export class GreController {
       };
     } catch (error) {
       console.error('❌ Error en controlador al listar GREs:', error);
-      return {
-        success: false,
-        data: [],
-        message: error.message || 'Error al consultar las guías de remisión'
-      };
+      throw new BadRequestException(error.message || 'Error al consultar las guías de remisión');
     }
   }
 
@@ -59,11 +55,7 @@ export class GreController {
       };
     } catch (error) {
       console.error('❌ Error al obtener guía:', error);
-      return {
-        success: false,
-        message: error.message || 'Error al obtener la guía de remisión',
-        error: error.message
-      };
+      throw new BadRequestException(error.message || 'Error al obtener la guía de remisión');
     }
   }
 
@@ -89,11 +81,7 @@ export class GreController {
       };
     } catch (error) {
       console.error('❌ Error al crear GRE:', error);
-      return {
-        success: false,
-        message: error.message || 'Error al crear la guía de remisión',
-        error: error.message
-      };
+      throw error;
     }
   }
 
@@ -221,6 +209,37 @@ export class GreController {
     }
   }
 
+  @Get('guias/:id/pdf')
+  @RequirePermission('gre.guias.ver')
+  @ApiOperation({ summary: 'Obtener representación impresa de la GRE' })
+  @ApiResponse({ status: 200, description: 'Representación impresa obtenida exitosamente' })
+  async obtenerRepresentacionImpresa(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Res() res: any,
+  ) {
+    const gre = await this.greService.findGuiaById(id, tenantId);
+    const contenido = [
+      'GUIA DE REMISION ELECTRONICA',
+      `Numero: ${gre.numero}`,
+      `Destinatario: ${gre.destinatario}`,
+      `Direccion destino: ${gre.direccionDestino}`,
+      `Fecha traslado: ${new Date(gre.fechaTraslado).toISOString().split('T')[0]}`,
+      `Modalidad: ${gre.modalidad}`,
+      `Motivo: ${gre.motivo}`,
+      `Peso total: ${gre.pesoTotal} Kg`,
+      `Estado: ${gre.estado}`,
+      gre.transportista ? `Transportista: ${gre.transportista}` : null,
+      gre.placaVehiculo ? `Placa: ${gre.placaVehiculo}` : null,
+      gre.licenciaConducir ? `Licencia: ${gre.licenciaConducir}` : null,
+      gre.hashGre ? `Hash: ${gre.hashGre}` : null,
+    ].filter(Boolean).join('\n');
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="GRE-${gre.numero}.txt"`);
+    return res.send(contenido);
+  }
+
   @Post('guias/:id/enviar-sunat')
   @RequirePermission('gre.guias.enviar')
   @ApiOperation({ summary: 'Enviar GRE firmada a SUNAT manualmente' })
@@ -237,10 +256,7 @@ export class GreController {
       const gre = await this.greService.findGuiaById(id, tenantId);
       
       if (gre.estado !== 'FIRMADO') {
-        return {
-          success: false,
-          message: `GRE debe estar en estado FIRMADO para enviar a SUNAT. Estado actual: ${gre.estado}`
-        };
+        throw new BadRequestException(`GRE debe estar en estado FIRMADO para enviar a SUNAT. Estado actual: ${gre.estado}`);
       }
 
       // Enviar a SUNAT usando el método existente
@@ -254,10 +270,7 @@ export class GreController {
 
     } catch (error) {
       console.error(`❌ Error enviando GRE ${id} a SUNAT:`, error);
-      return {
-        success: false,
-        message: `Error enviando GRE a SUNAT: ${error.message}`
-      };
+      throw error;
     }
   }
 
@@ -296,10 +309,7 @@ export class GreController {
       };
     } catch (error) {
       console.error(`❌ Error evaluating auto GRE creation:`, error);
-      return {
-        success: false,
-        message: `Error evaluando creación automática: ${error.message}`,
-      };
+      throw new BadRequestException(`Error evaluando creación automática: ${error.message}`);
     }
   }
 
@@ -320,10 +330,7 @@ export class GreController {
       };
     } catch (error) {
       console.error(`❌ Error getting auto config:`, error);
-      return {
-        success: false,
-        message: `Error obteniendo configuración: ${error.message}`,
-      };
+      throw new BadRequestException(`Error obteniendo configuración: ${error.message}`);
     }
   }
 
@@ -373,10 +380,7 @@ export class GreController {
       };
     } catch (error) {
       console.error(`❌ Error updating auto config:`, error);
-      return {
-        success: false,
-        message: `Error actualizando configuración: ${error.message}`,
-      };
+      throw new BadRequestException(`Error actualizando configuración: ${error.message}`);
     }
   }
 }

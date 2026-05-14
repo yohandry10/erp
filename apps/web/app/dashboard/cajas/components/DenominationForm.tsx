@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 
 export interface Denominaciones {
     billetes: { [denominacion: number]: number };
@@ -27,13 +27,7 @@ export function DenominationForm({
     const [monedas, setMonedas] = useState<{ [key: number]: number }>(
         initialValues?.monedas || {}
     );
-    const [total, setTotal] = useState(0);
-
-    useEffect(() => {
-        calcularTotal();
-    }, [billetes, monedas]);
-
-    const calcularTotal = () => {
+    const total = useMemo(() => {
         let sum = 0;
         Object.entries(billetes).forEach(([denom, qty]) => {
             sum += parseFloat(denom) * (qty || 0);
@@ -41,8 +35,8 @@ export function DenominationForm({
         Object.entries(monedas).forEach(([denom, qty]) => {
             sum += parseFloat(denom) * (qty || 0);
         });
-        setTotal(Math.round(sum * 100) / 100);
-    };
+        return Math.round(sum * 100) / 100;
+    }, [billetes, monedas]);
 
     const handleBilleteChange = (denom: number, value: string) => {
         if (readOnly) return;

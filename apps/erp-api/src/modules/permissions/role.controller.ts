@@ -1,11 +1,13 @@
 import { Controller, Get, Post, Put, Delete, UseGuards, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RoleService } from './role.service';
 import { PermissionService } from './permission.service';
 import { Role, Permission } from './types';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { CreateRoleDto, UpdateRoleDto, AssignPermissionDto } from './dto';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 
 /**
  * Role Management Controller
@@ -15,7 +17,7 @@ import { CreateRoleDto, UpdateRoleDto, AssignPermissionDto } from './dto';
 @ApiTags('Gestión de Roles')
 @ApiBearerAuth()
 @Controller('roles')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class RoleController {
   constructor(
     private readonly roleService: RoleService,
@@ -30,6 +32,8 @@ export class RoleController {
   @ApiOperation({ summary: 'Obtener todos los roles', description: 'Obtiene todos los roles del tenant actual' })
   @ApiResponse({ status: 200, description: 'Lista de roles obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async getRoles(@CurrentTenant() tenantId: string): Promise<Role[]> {
     return this.roleService.getRoles(tenantId);
   }
@@ -43,6 +47,8 @@ export class RoleController {
   @ApiResponse({ status: 200, description: 'Rol obtenido exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async getRoleById(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -60,6 +66,8 @@ export class RoleController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 409, description: 'El nombre del rol ya existe en el tenant' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async createRole(
     @CurrentTenant() tenantId: string,
     @Body() createRoleDto: CreateRoleDto,
@@ -77,6 +85,8 @@ export class RoleController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async updateRole(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -96,6 +106,8 @@ export class RoleController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol no encontrado' })
   @ApiResponse({ status: 409, description: 'No se puede eliminar un rol del sistema' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async deleteRole(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -113,6 +125,8 @@ export class RoleController {
   @ApiResponse({ status: 200, description: 'Permisos obtenidos exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async getRolePermissions(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -131,6 +145,8 @@ export class RoleController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol o permiso no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async assignPermissionToRole(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -154,6 +170,8 @@ export class RoleController {
   @ApiResponse({ status: 200, description: 'Permiso revocado exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol o permiso no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async revokePermissionFromRole(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,
@@ -172,6 +190,8 @@ export class RoleController {
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
   @ApiResponse({ status: 404, description: 'Rol no encontrado' })
+  @ApiResponse({ status: 403, description: 'Permiso insuficiente' })
+  @RequirePermission('users.manage')
   async getRoleUsers(
     @CurrentTenant() tenantId: string,
     @Param('id') roleId: string,

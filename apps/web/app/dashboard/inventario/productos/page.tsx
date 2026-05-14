@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
@@ -44,11 +44,7 @@ export default function ProductosPage() {
     soloCriticos: false
   })
 
-  useEffect(() => {
-    loadProductos()
-  }, [])
-
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     setLoading(true)
     try {
       const response = await get('/inventario/productos')
@@ -61,7 +57,11 @@ export default function ProductosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadProductos()
+  }, [loadProductos])
 
   const handleDelete = async (id: string, nombre: string) => {
     if (!confirm(`¿Está seguro de eliminar el producto "${nombre}"?`)) return
@@ -81,14 +81,14 @@ export default function ProductosPage() {
   }
 
   const categorias = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)))
-  
+
   const productosFiltrados = productos.filter(p => {
     if (filters.estado !== 'TODOS' && p.activo !== (filters.estado === 'ACTIVO')) return false
     if (filters.categoria && p.categoria !== filters.categoria) return false
     if (filters.soloCriticos && (p.stock_actual || p.stock || 0) > p.stock_minimo) return false
     if (filters.search) {
       const term = filters.search.toLowerCase()
-      return p.nombre.toLowerCase().includes(term) || 
+      return p.nombre.toLowerCase().includes(term) ||
              p.codigo?.toLowerCase().includes(term) ||
              p.codigo_barras?.toLowerCase().includes(term)
     }

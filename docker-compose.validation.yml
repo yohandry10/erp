@@ -1,0 +1,127 @@
+services:
+  web:
+    image: erp-web:latest
+    ports:
+      - "13001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - NEXT_PUBLIC_API_URL=http://localhost:13002
+      - SERVER_API_URL=http://erp-api:3002
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED}
+      - NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED}
+      - NEXT_PUBLIC_FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED}
+    depends_on:
+      erp-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http'); const req=http.get('http://localhost:3001/dashboard/', (res)=>process.exit(res.statusCode < 500 ? 0 : 1)); req.on('error', ()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  erp-api:
+    image: erp-erp-api:latest
+    ports:
+      - "13002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - PFX_PATH=/app/certs/demo.pfx
+      - PFX_PASS=${PFX_PASS}
+      - AUTH_SIGNATURE_SECRET=${AUTH_SIGNATURE_SECRET}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY=${CERT_ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY_OLD=${CERT_ENCRYPTION_KEY_OLD:-}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - HEALTH_TOKEN=${HEALTH_TOKEN}
+      - POS_WORKER_JWT_SECRET=${POS_WORKER_JWT_SECRET}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:13001}
+      - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
+      - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
+      - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
+      - CERTIFICATE_PATH=/app/certs/demo.pfx
+      - CERTIFICATE_PASSWORD=${PFX_PASS}
+      - OSE_URL=${OSE_URL}
+      - OSE_USERNAME=${OSE_USERNAME}
+      - OSE_PASSWORD=${OSE_PASSWORD}
+    volumes:
+      - ./certs:/app/certs:ro
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_validation_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: erp-worker:latest
+    environment:
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+      - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
+      - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
+      - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
+      - ERP_API_URL=http://erp-api:3002/api
+      - WORKER_PORT=3050
+      - POS_WORKER_JWT_SECRET=${POS_WORKER_JWT_SECRET}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY=${CERT_ENCRYPTION_KEY}
+      - CERT_ENCRYPTION_KEY_OLD=${CERT_ENCRYPTION_KEY_OLD:-}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - HEALTH_TOKEN=${HEALTH_TOKEN}
+      - OSE_URL=${OSE_URL}
+      - OSE_USERNAME=${OSE_USERNAME}
+      - OSE_PASSWORD=${OSE_PASSWORD}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      erp-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port:3050,path:'/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_validation_data:

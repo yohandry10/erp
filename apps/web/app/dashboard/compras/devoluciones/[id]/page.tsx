@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  ArrowLeft, 
-  PackageX, 
-  Clock, 
-  CheckCircle, 
+import {
+  ArrowLeft,
+  PackageX,
+  Clock,
+  CheckCircle,
   XCircle,
   FileText,
   User,
@@ -21,7 +21,8 @@ interface DevolucionItem {
   cantidad: number
   precio_unitario: number
   subtotal: number
-  motivo: string
+  motivo?: string
+  motivo_detalle?: string
   observaciones?: string
   producto?: {
     codigo: string
@@ -71,23 +72,22 @@ export default function DevolucionDetallePage() {
   const router = useRouter()
   const params = useParams()
   const { get, post } = useApi()
-  
+
   const [devolucion, setDevolucion] = useState<Devolucion | null>(null)
   const [loading, setLoading] = useState(true)
   const [emitiendo, setEmitiendo] = useState(false)
 
-  useEffect(() => {
-    if (params.id) {
-      loadDevolucion()
-    }
-  }, [params.id])
+  const devolucionId = params.id as string | undefined
 
-  const loadDevolucion = async () => {
+  const loadDevolucion = useCallback(async () => {
+    if (!devolucionId) return
+
     try {
       setLoading(true)
-      const response = await get(`/api/compras/devoluciones/${params.id}`)
-      if (response?.success) {
-        setDevolucion(response.data)
+      const response = await get(`/api/compras/devoluciones/${devolucionId}`)
+      const devolucionData = response?.data ?? response
+      if (devolucionData?.id) {
+        setDevolucion(devolucionData)
       }
     } catch (error) {
       console.error('Error loading devolucion:', error)
@@ -95,11 +95,15 @@ export default function DevolucionDetallePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [devolucionId, get])
+
+  useEffect(() => {
+    loadDevolucion()
+  }, [loadDevolucion])
 
   const handleEmitir = async () => {
     if (!devolucion || devolucion.estado !== 'PENDIENTE') return
-    
+
     if (!confirm('¿Está seguro de emitir esta devolución? Esta acción actualizará el inventario y creará una nota de crédito.')) {
       return
     }
@@ -107,8 +111,9 @@ export default function DevolucionDetallePage() {
     try {
       setEmitiendo(true)
       const response = await post(`/api/compras/devoluciones/${devolucion.id}/emitir`, {})
-      
-      if (response?.success) {
+      const devolucionEmitida = response?.data ?? response
+
+      if (devolucionEmitida?.id || response?.success) {
         alert('Devolución emitida exitosamente')
         loadDevolucion()
       } else {
@@ -154,10 +159,10 @@ export default function DevolucionDetallePage() {
       EMITIDA: { bg: 'var(--emerald-100)', color: 'var(--emerald-800)', icon: CheckCircle },
       ANULADA: { bg: 'var(--red-100)', color: 'var(--red-800)', icon: XCircle }
     }
-    
+
     const style = styles[estado as keyof typeof styles] || styles.PENDIENTE
     const Icon = style.icon
-    
+
     return (
       <span style={{
         display: 'inline-flex',
@@ -424,7 +429,7 @@ export default function DevolucionDetallePage() {
                             backgroundColor: 'var(--red-100)',
                             color: 'var(--red-800)'
                           }}>
-                            {item.motivo}
+                            {item.motivo_detalle || item.motivo || '-'}
                           </span>
                           {item.observaciones && (
                             <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -450,11 +455,11 @@ export default function DevolucionDetallePage() {
                   <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>IGV (18%):</span>
                   <span style={{ fontSize: '14px', fontWeight: '500' }}>{formatCurrency(devolucion.igv)}</span>
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  paddingTop: '12px', 
-                  borderTop: '2px solid var(--border-color)' 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  paddingTop: '12px',
+                  borderTop: '2px solid var(--border-color)'
                 }}>
                   <span style={{ fontSize: '16px', fontWeight: '600' }}>Total:</span>
                   <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary-600)' }}>

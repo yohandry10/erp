@@ -1,18 +1,19 @@
-import { 
-  Injectable, 
-  ExecutionContext, 
+import {
+  Injectable,
+  ExecutionContext,
   UnauthorizedException,
-  ForbiddenException,
   Logger,
   Inject,
   forwardRef
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from '../auth.service';
+import { Reflector } from '@nestjs/core';
+import { PUBLIC_METADATA_KEY } from '../../../common/decorators/public.decorator';
 
 /**
  * A3: Guard mejorado que valida sesión en cada request
- * 
+ *
  * Validaciones realizadas:
  * 1. JWT válido y firmado correctamente (base de AuthGuard)
  * 2. Verifica que el token no esté revocado (validación de sesión)
@@ -25,16 +26,30 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
-    @Inject(forwardRef(() => AuthService)) private readonly authService?: AuthService
+    @Inject(forwardRef(() => AuthService)) private readonly authService?: AuthService,
+    private readonly reflector?: Reflector,
   ) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    
+
+    const isPublic = this.reflector?.getAllAndOverride<boolean>(PUBLIC_METADATA_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
+    if (request.method === 'GET' && request.path === '/api/metrics') {
+      return true;
+    }
+
     this.logger.debug(`[JWT] canActivate START - Path: ${request.path}, Has Auth Header: ${!!request.headers?.authorization}`);
-    
+
     // Primero ejecutar validación base (JWT válido, firma correcta)
     try {
       const canActivate = await super.canActivate(context);
@@ -50,7 +65,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     const user = request.user;
-    
+
     this.logger.debug(`[JWT] User after super.canActivate: ${user ? 'EXISTS' : 'NULL'}`);
 
     if (!user) {
@@ -92,4 +107,4 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
     return user;
   }
-} 
+}

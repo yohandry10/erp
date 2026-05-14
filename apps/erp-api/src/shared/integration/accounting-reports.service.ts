@@ -195,12 +195,12 @@ export class AccountingReportsService {
         .select(
           `
           *,
-          asientos_contables(
+          asientos_contables!fk_detalle_asientos_asiento_id(
             fecha,
             concepto,
             referencia
           ),
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
@@ -348,7 +348,7 @@ export class AccountingReportsService {
         *,
         detalle_asientos(
           *,
-          plan_cuentas(
+          plan_cuentas!fk_detalle_asientos_cuenta_id(
             codigo,
             nombre
           )
@@ -376,12 +376,12 @@ export class AccountingReportsService {
       .select(
         `
         *,
-        asientos_contables(
+        asientos_contables!fk_detalle_asientos_asiento_id(
           fecha,
           numero_asiento,
           concepto
         ),
-        plan_cuentas(
+        plan_cuentas!fk_detalle_asientos_cuenta_id(
           codigo,
           nombre
         )

@@ -1,5 +1,6 @@
 import { Controller, Post, Req, Res, Headers, RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiExcludeEndpoint } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { DemoService } from './demo.service';
 import { StripeService } from './stripe.service';
@@ -17,6 +18,7 @@ export class WebhookController {
   @Public()
   @ApiExcludeEndpoint()
   @ApiOperation({ summary: 'Webhook de Stripe para procesar pagos' })
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   async handleStripeWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Res() res: Response,

@@ -7,6 +7,7 @@ import { RetencionesValidationService } from '../shared/retenciones-validation.s
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 import Decimal from 'decimal.js';
 import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bus.service';
+import { TesoreriaService } from '../tesoreria/tesoreria.service';
 
 @Injectable()
 export class CxpService {
@@ -14,6 +15,7 @@ export class CxpService {
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
     private readonly retencionesValidation: RetencionesValidationService,
+    private readonly tesoreriaService?: TesoreriaService,
   ) { }
 
   private async registrarIntegrationLog(entry: {
@@ -481,7 +483,7 @@ export class CxpService {
         ),
         recepcion:recepciones!cuentas_por_pagar_recepcion_id_fkey(
           id,
-          numero_recepcion,
+          numero,
           fecha_recepcion,
           estado
         )
@@ -528,7 +530,7 @@ export class CxpService {
         ),
         recepcion:recepciones!cuentas_por_pagar_recepcion_id_fkey(
           id,
-          numero_recepcion
+          numero
         )
       `)
       .eq('tenant_id', tenantId)
@@ -700,6 +702,23 @@ export class CxpService {
     dto: AplicarPagoCxpDto,
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
+    if (this.tesoreriaService) {
+      return this.tesoreriaService.registrarPago(
+        tenantId,
+        {
+          cxp_id: cxpId,
+          monto: dto.monto,
+          fecha_pago: dto.fecha_pago,
+          metodo_pago: dto.metodo_pago,
+          cuenta_bancaria_id: dto.cuenta_bancaria_id,
+          referencia: dto.referencia,
+          observaciones: dto.observaciones,
+          idempotency_key: dto.idempotency_key,
+        },
+        userId,
+      );
+    }
+
     const client = this.supabase.getClient();
 
     // Validar que el monto sea positivo

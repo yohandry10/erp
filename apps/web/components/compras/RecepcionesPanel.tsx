@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Package, Calendar, User, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react'
 
@@ -84,16 +84,12 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [expandedRecepcion, setExpandedRecepcion] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadRecepciones()
-  }, [ordenId])
-
-  const loadRecepciones = async () => {
+  const loadRecepciones = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
       const response = await get(`/api/compras/ordenes/${ordenId}/recepciones`)
-      
+
       if (response?.success && response.data) {
         setRecepciones(response.data)
       } else {
@@ -105,7 +101,11 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, ordenId])
+
+  useEffect(() => {
+    loadRecepciones()
+  }, [loadRecepciones])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE', {
@@ -118,9 +118,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   const getEstadoBadge = (estado: string) => {
     const config = ESTADOS_CONFIG[estado]
     if (!config) return null
-    
+
     const Icon = config.icon
-    
+
     return (
       <span style={{
         display: 'inline-flex',
@@ -142,7 +142,7 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   const getCalidadBadge = (calidad: string) => {
     const config = CALIDAD_CONFIG[calidad]
     if (!config) return null
-    
+
     return (
       <span style={{
         display: 'inline-block',
@@ -165,9 +165,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   if (loading) {
     return (
       <div className="activity-card">
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '0.75rem',
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
@@ -200,9 +200,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
   if (error) {
     return (
       <div className="activity-card">
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '0.75rem',
           marginBottom: '1.5rem',
           paddingBottom: '1rem',
@@ -234,9 +234,9 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
 
   return (
     <div className="activity-card">
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: '1.5rem',
         paddingBottom: '1rem',
@@ -345,13 +345,13 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
                     </div>
                   </div>
                 </div>
-                <Eye 
-                  size={18} 
-                  style={{ 
+                <Eye
+                  size={18}
+                  style={{
                     color: 'var(--primary-400)',
                     transform: expandedRecepcion === recepcion.id ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: 'transform 0.2s ease'
-                  }} 
+                  }}
                 />
               </div>
 
@@ -403,10 +403,10 @@ export default function RecepcionesPanel({ ordenId }: RecepcionesPanelProps) {
                               {getCalidadBadge(item.calidad)}
                             </div>
                             {(item.lote || item.serie || item.observaciones) && (
-                              <div style={{ 
-                                display: 'flex', 
-                                gap: '1rem', 
-                                fontSize: '0.75rem', 
+                              <div style={{
+                                display: 'flex',
+                                gap: '1rem',
+                                fontSize: '0.75rem',
                                 color: 'var(--primary-500)',
                                 paddingTop: '0.5rem',
                                 borderTop: '1px solid var(--primary-100)'

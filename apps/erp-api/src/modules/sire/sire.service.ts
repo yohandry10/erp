@@ -38,7 +38,7 @@ export class SireService {
       console.log(`📊 [SIRE] ¡NUEVO COMPROBANTE DETECTADO! Registrando ${comprobante.serie}-${comprobante.numero} en SIRE para tenant: ${tenantId}`);
       console.log(`📊 [SIRE] Datos del comprobante:`, JSON.stringify(comprobante, null, 2));
       
-      const periodo = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const periodo = this.getPeriodoFromComprobante(comprobante);
       
       // 1. Buscar si ya existe un reporte SIRE para este período
       let reporteSire = await this.buscarOCrearReportePeriodo(periodo, comprobante.tipoDocumento, tenantId);
@@ -67,6 +67,7 @@ export class SireService {
     try {
       // ✅ MULTI-TENANT: Usar tenant_id
       const currentTenantId = this.ensureTenant(tenantId);
+      const tipoSire = this.getTipoSirePorDocumento(tipoDocumento);
       
       // Buscar reporte existente para el período
       const { data: reporteExistente } = await this.supabaseService.getClient()
@@ -74,7 +75,7 @@ export class SireService {
         .select('*')
         .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('periodo', periodo)
-        .eq('tipo', 'REG_VEN')
+        .eq('tipo', tipoSire)
         .single();
 
       if (reporteExistente) {
@@ -89,9 +90,9 @@ export class SireService {
         .insert({
           tenant_id: currentTenantId, // ✅ Usar tenant actual
           periodo: periodo,
-          tipo: 'REG_VEN',
-          filename: `SIRE_REG_VEN_${periodo}.txt`,
-          file_path: `/sire/${periodo}/REG_VEN.txt`,
+          tipo: tipoSire,
+          filename: `SIRE_${tipoSire}_${periodo}.txt`,
+          file_path: `/sire/${periodo}/${tipoSire}.txt`,
           file_size: 0,
           total_registros: 0,
           estado: 'GENERANDO',
@@ -233,7 +234,10 @@ export class SireService {
 
       queryMes = queryMes.eq('tenant_id', currentTenantId);
 
-      const { count: reportesDelMes } = await queryMes;
+      const { count: reportesDelMes, error: reportesMesError } = await queryMes;
+      if (reportesMesError) {
+        throw new BadRequestException('Error consultando reportes SIRE del mes: ' + reportesMesError.message);
+      }
 
       // Count total records processed
       let queryRegistros = this.supabaseService
@@ -242,17 +246,23 @@ export class SireService {
         .select('total_registros')
         .eq('tenant_id', currentTenantId);
 
-      const { data: reportes } = await queryRegistros;
+      const { data: reportes, error: registrosError } = await queryRegistros;
+      if (registrosError) {
+        throw new BadRequestException('Error consultando registros SIRE: ' + registrosError.message);
+      }
       const registrosTotales = reportes?.reduce((sum, reporte) => sum + (reporte.total_registros || 0), 0) || 0;
 
       // Count detail records if table exists
       let totalDetalles = 0;
       try {
-        const { count: countDetalle } = await this.supabaseService
+        const { count: countDetalle, error: detalleError } = await this.supabaseService
           .getClient()
           .from('sire_registros_detalle')
           .select('*', { count: 'exact', head: true })
           .eq('tenant_id', currentTenantId);
+        if (detalleError) {
+          throw detalleError;
+        }
         totalDetalles = countDetalle || 0;
       } catch (err: any) {
         console.warn('⚠️ [SIRE] No se pudo contar sire_registros_detalle (puede no existir):', err?.message || err);
@@ -267,7 +277,10 @@ export class SireService {
 
       queryEnviados = queryEnviados.eq('tenant_id', currentTenantId);
 
-      const { count: enviadosASunat } = await queryEnviados;
+      const { count: enviadosASunat, error: enviadosError } = await queryEnviados;
+      if (enviadosError) {
+        throw new BadRequestException('Error consultando reportes SIRE enviados: ' + enviadosError.message);
+      }
 
       // Count pending reports
       let queryPendientes = this.supabaseService
@@ -278,7 +291,10 @@ export class SireService {
 
       queryPendientes = queryPendientes.eq('tenant_id', currentTenantId);
 
-      const { count: pendientes } = await queryPendientes;
+      const { count: pendientes, error: pendientesError } = await queryPendientes;
+      if (pendientesError) {
+        throw new BadRequestException('Error consultando reportes SIRE pendientes: ' + pendientesError.message);
+      }
 
       const stats = {
         reportesDelMes: reportesDelMes || 0,
@@ -296,16 +312,10 @@ export class SireService {
       };
     } catch (error) {
       console.error('❌ Error getting SIRE stats:', error);
-      return {
-        success: false,
-        data: {
-          reportesDelMes: 0,
-          registrosTotales: 0,
-          enviadosASunat: 0,
-          pendientes: 0,
-        },
-        error: error.message
-      };
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Error obteniendo estadísticas SIRE');
     }
   }
 
@@ -321,9 +331,7 @@ export class SireService {
         .order('created_at', { ascending: false });
 
       // Filter by tenant
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+      query = query.eq('tenant_id', currentTenantId);
 
       // Apply filters
       if (filters.periodo) {
@@ -342,6 +350,9 @@ export class SireService {
         };
         const tipoCorto = tipoReporteMap[filters.tipoReporte] || filters.tipoReporte.substring(0, 10);
         query = query.eq('tipo', tipoCorto);
+      }
+      if (filters.estado) {
+        query = query.eq('estado', String(filters.estado).toUpperCase());
       }
 
       const { data, error } = await query;
@@ -366,11 +377,10 @@ export class SireService {
       };
     } catch (error) {
       console.error('❌ Error getting SIRE reports:', error);
-      return {
-        success: false,
-        data: [],
-        error: error.message
-      };
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Error obteniendo reportes SIRE');
     }
   }
 
@@ -396,18 +406,8 @@ export class SireService {
         throw new BadRequestException('Tipo de reporte y período son requeridos');
       }
 
-      // Map long values to shorter ones that fit the database constraints (varchar 10)
-      const tipoReporteMap = {
-        'REGISTRO_VENTAS': 'REG_VEN',
-        'REGISTRO_COMPRAS': 'REG_COM', 
-        'LIBRO_DIARIO': 'LIB_DIA',
-        'LIBRO_MAYOR': 'LIB_MAY',
-        'RETENCIONES': 'RETENC',
-        'PERCEPCIONES': 'PERCEP'
-      };
-
-      const tipoCorto = tipoReporteMap[reportData.tipoReporte] || reportData.tipoReporte.substring(0, 10);
-      const periodoCorto = reportData.periodo.substring(0, 10); // Asegurar que periodo no exceda 10 chars
+      const tipoCorto = this.mapTipoReporte(reportData.tipoReporte);
+      const periodoCorto = this.normalizePeriodo(reportData.periodo);
       
       const nuevoReporte = {
         tenant_id: currentTenantId,
@@ -418,6 +418,10 @@ export class SireService {
         file_size: 0,
         estado: 'GENERANDO',
         total_registros: 0,
+        metadata: {
+          incluirAnulados: Boolean(reportData.incluirAnulados),
+          formato: reportData.formato || 'TXT',
+        },
       };
 
       console.log('💾 Insertando nuevo reporte SIRE (valores ajustados):', nuevoReporte);
@@ -425,6 +429,27 @@ export class SireService {
       const { data, error } = await this.supabaseService.insert('sire_files', nuevoReporte);
 
       if (error) {
+        if ((error as any).code === '23505') {
+          const { data: reporteExistente, error: existenteError } = await this.supabaseService
+            .getClient()
+            .from('sire_files')
+            .select('*')
+            .eq('tenant_id', currentTenantId)
+            .eq('tipo', tipoCorto)
+            .eq('periodo', periodoCorto)
+            .single();
+
+          if (!existenteError && reporteExistente) {
+            if (reporteExistente.estado !== 'ENVIADO') {
+              await this.simularGeneracionReporte(reporteExistente.id, currentTenantId);
+            }
+            return {
+              success: true,
+              data: reporteExistente,
+              message: 'Reporte SIRE existente reutilizado',
+            };
+          }
+        }
         console.error('❌ Error creating SIRE report:', error);
         throw new BadRequestException('Error creating SIRE report: ' + error.message);
       }
@@ -441,7 +466,7 @@ export class SireService {
           .getClient()
           .from('sire_files')
           .select('*')
-          .eq('tenant_id', tenantId)
+          .eq('tenant_id', currentTenantId)
           .eq('tipo', tipoCorto)
           .eq('periodo', periodoCorto)
           .order('created_at', { ascending: false })
@@ -460,14 +485,7 @@ export class SireService {
 
       // Validate that we have a valid report with ID before setting timeout
       if (reporteCreado && reporteCreado.id) {
-        // Execute report generation immediately in background
-        setImmediate(async () => {
-          try {
-            await this.simularGeneracionReporte(reporteCreado.id, currentTenantId);
-          } catch (error) {
-            console.error('❌ Error en simulación de generación:', error);
-          }
-        });
+        await this.simularGeneracionReporte(reporteCreado.id, currentTenantId);
       } else {
         console.error('❌ No se pudo obtener ID del reporte creado');
       }
@@ -497,9 +515,7 @@ export class SireService {
         .select('*')
         .eq('id', id);
 
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+      query = query.eq('tenant_id', currentTenantId);
 
       const { data: reporte, error } = await query.single();
 
@@ -512,7 +528,7 @@ export class SireService {
       }
 
       // Build real content from CPE/compras por tenant
-      const contenidoReporte = await this.generarContenidoSire(reporte, tenantId);
+      const contenidoReporte = await this.generarContenidoSire(reporte, currentTenantId);
 
       return {
         success: true,
@@ -529,8 +545,9 @@ export class SireService {
   }
 
   async enviarSunat(id: string, tenantId?: string) {
+    const currentTenantId = this.ensureTenant(tenantId);
     try {
-      console.log('📡 Enviando reporte SIRE a SUNAT:', id, 'para tenant:', tenantId);
+      console.log('📡 Enviando reporte SIRE a SUNAT:', id, 'para tenant:', currentTenantId);
       
       let query = this.supabaseService
         .getClient()
@@ -538,9 +555,7 @@ export class SireService {
         .select('*')
         .eq('id', id);
 
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+      query = query.eq('tenant_id', currentTenantId);
 
       const { data: reporte, error } = await query.single();
 
@@ -559,7 +574,7 @@ export class SireService {
           estado: 'ENVIADO',
           updated_at: new Date().toISOString(),
         },
-        { id }
+        { id, tenant_id: currentTenantId }
       );
 
       if (updateError) {
@@ -610,8 +625,9 @@ export class SireService {
       }
 
       const contenido = await this.generarContenidoSire(reporte, tenantId || reporte.tenant_id);
-      const totalRegistros = Math.max((contenido.split('\n').length - 1), 0); // resta header
-      const nombreArchivo = `sire_${new Date().toISOString().slice(0, 10)}.txt`;
+      const totalRegistros = contenido.split('\n').slice(1).filter((line) => line.trim().length > 0).length;
+      const nombreArchivo = `SIRE_${reporte.tipo}_${reporte.periodo}.txt`;
+      const fileSize = Buffer.byteLength(contenido, 'utf8');
 
       console.log('📊 Actualizando reporte a GENERADO:', { reporteId, totalRegistros, nombreArchivo });
 
@@ -622,6 +638,7 @@ export class SireService {
           estado: 'GENERADO',
           total_registros: totalRegistros,
           filename: nombreArchivo,
+          file_size: fileSize,
           updated_at: new Date().toISOString(),
         })
         .eq('id', reporteId)
@@ -658,16 +675,29 @@ export class SireService {
     // Layout simplificado: REG_VEN y REG_COM con columnas SUNAT
     const periodo = reporte.periodo;
     const tipo = reporte.tipo;
+    const { start, end } = this.getPeriodoDateRange(periodo);
+    const incluirAnulados = Boolean(reporte.metadata?.incluirAnulados);
 
     const client = this.supabaseService.getClient();
 
     if (tipo === 'REG_VEN') {
-      const { data: ventas } = await client
+      let query = client
         .from('cpe')
-        .select('fecha_emision, tipo_documento, serie, numero, documento_receptor, razon_social_receptor, total_venta, total_igv, moneda')
-        .eq('tenant_id', tenantId);
+        .select('fecha_emision, tipo_documento, serie, numero, documento_receptor, razon_social_receptor, total_venta, total_igv, moneda, estado')
+        .eq('tenant_id', tenantId)
+        .gte('fecha_emision', start)
+        .lt('fecha_emision', end);
 
-      const header = 'PERIODO|FECHA_EMISION|TIPO_DOCUMENTO|SERIE|NUMERO|DOC_CLIENTE|CLIENTE|VALOR_FACTURADO|IGV|TOTAL|MONEDA\n';
+      if (!incluirAnulados) {
+        query = query.not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
+      }
+
+      const { data: ventas, error } = await query;
+      if (error) {
+        throw new BadRequestException('Error generando registro de ventas SIRE: ' + error.message);
+      }
+
+      const header = 'PERIODO|FECHA_EMISION|TIPO_DOCUMENTO|SERIE|NUMERO|DOC_CLIENTE|CLIENTE|VALOR_FACTURADO|IGV|TOTAL|MONEDA';
       const rows = (ventas || []).map(v =>
         [
           periodo,
@@ -683,16 +713,27 @@ export class SireService {
           v.moneda || 'PEN',
         ].join('|')
       );
-      return header + rows.join('\n');
+      return [header, ...rows].join('\n');
     }
 
     if (tipo === 'REG_COM') {
-      const { data: compras } = await client
+      let query = client
         .from('cuentas_por_pagar')
-        .select('fecha_emision, numero_documento, proveedor_id, subtotal, igv, total, moneda')
-        .eq('tenant_id', tenantId);
+        .select('fecha_emision, numero_documento, proveedor_id, subtotal, igv, total, moneda, estado')
+        .eq('tenant_id', tenantId)
+        .gte('fecha_emision', start)
+        .lt('fecha_emision', end);
 
-      const header = 'PERIODO|FECHA_EMISION|NUMERO|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA\n';
+      if (!incluirAnulados) {
+        query = query.not('estado', 'in', '("ANULADO","ANULADA","CANCELADO","CANCELADA")');
+      }
+
+      const { data: compras, error } = await query;
+      if (error) {
+        throw new BadRequestException('Error generando registro de compras SIRE: ' + error.message);
+      }
+
+      const header = 'PERIODO|FECHA_EMISION|NUMERO|PROVEEDOR|VALOR_ADQUISICIONES|IGV|TOTAL|MONEDA';
       const rows = (compras || []).map(c =>
         [
           periodo,
@@ -705,7 +746,7 @@ export class SireService {
           c.moneda || 'PEN',
         ].join('|')
       );
-      return header + rows.join('\n');
+      return [header, ...rows].join('\n');
     }
 
     throw new BadRequestException(`Tipo de reporte SIRE no soportado para generación: ${tipo}`);
@@ -715,6 +756,55 @@ export class SireService {
     const [year, month] = currentMonth.split('-').map(Number);
     const nextDate = new Date(year, month, 1); // month is 0-indexed in Date constructor
     return nextDate.toISOString().slice(0, 7);
+  }
+
+  private getPeriodoFromComprobante(comprobante: any): string {
+    const fecha = comprobante.fechaEmision || comprobante.fecha_emision || comprobante.fecha || comprobante.created_at;
+    if (!fecha) {
+      return new Date().toISOString().slice(0, 7);
+    }
+    const parsed = new Date(fecha);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toISOString().slice(0, 7);
+    }
+    return parsed.toISOString().slice(0, 7);
+  }
+
+  private mapTipoReporte(tipoReporte: string): string {
+    const tipoReporteMap = {
+      REGISTRO_VENTAS: 'REG_VEN',
+      REGISTRO_COMPRAS: 'REG_COM',
+      LIBRO_DIARIO: 'LIB_DIA',
+      LIBRO_MAYOR: 'LIB_MAY',
+      RETENCIONES: 'RETENC',
+      PERCEPCIONES: 'PERCEP',
+    };
+
+    return tipoReporteMap[tipoReporte] || String(tipoReporte).substring(0, 10);
+  }
+
+  private getTipoSirePorDocumento(tipoDocumento?: string): string {
+    const tipo = String(tipoDocumento || '').toUpperCase();
+    return ['REG_COM', 'COMPRA', 'COMPRAS'].includes(tipo) ? 'REG_COM' : 'REG_VEN';
+  }
+
+  private normalizePeriodo(periodo: string): string {
+    const value = String(periodo || '').substring(0, 10);
+    if (!/^\d{4}-\d{2}(-\d{2})?$/.test(value)) {
+      throw new BadRequestException('Período SIRE inválido. Use YYYY-MM.');
+    }
+    return value.slice(0, 7);
+  }
+
+  private getPeriodoDateRange(periodo: string): { start: string; end: string } {
+    const periodoNormalizado = this.normalizePeriodo(periodo);
+    const [year, month] = periodoNormalizado.split('-').map(Number);
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    return {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
   }
 
   private generateUuid(): string {

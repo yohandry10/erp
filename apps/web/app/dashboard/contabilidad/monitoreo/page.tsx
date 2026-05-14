@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Activity, CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 
@@ -44,14 +44,7 @@ export default function MonitoreoPage() {
   const [refreshing, setRefreshing] = useState(false)
   const { apiCall: apiGet } = useApi<any>({ retries: 2, timeoutMs: 12000, showErrorToast: false })
 
-  useEffect(() => {
-    fetchData()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setError(null)
       const statsResult = await apiGet('/contabilidad/eventos/estadisticas')
@@ -69,7 +62,7 @@ export default function MonitoreoPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [apiGet])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -87,6 +80,12 @@ export default function MonitoreoPage() {
       console.error('Error retrying event:', err)
     }
   }
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

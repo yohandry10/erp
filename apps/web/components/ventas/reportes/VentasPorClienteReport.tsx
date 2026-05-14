@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,17 +39,13 @@ export default function VentasPorClienteReport({ filters }: Props) {
   const [sortBy, setSortBy] = useState<'total' | 'cantidad'>('total')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  useEffect(() => {
-    loadData()
-  }, [filters])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const response = await get('/ventas/reportes/ventas-por-cliente', {
         params: filters
       })
-      
+
       if (response?.success) {
         setData(response.data || [])
       }
@@ -63,7 +59,11 @@ export default function VentasPorClienteReport({ filters }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters, get])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleExport = () => {
     try {
@@ -200,13 +200,13 @@ export default function VentasPorClienteReport({ filters }: Props) {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
                       onClick={() => handleSort('total')}
                     >
                       Total {sortBy === 'total' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th 
+                    <th
                       className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700"
                       onClick={() => handleSort('cantidad')}
                     >

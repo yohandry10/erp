@@ -37,7 +37,7 @@ interface CuentaPorPagar {
 
 export default function PagoLotePage() {
   const router = useRouter();
-  const { get, post } = useApi();
+  const { get, post } = useApi({ retries: 1, timeoutMs: 8000 });
 
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
   const [cxpsDisponibles, setCxpsDisponibles] = useState<CuentaPorPagar[]>([]);
@@ -56,11 +56,13 @@ export default function PagoLotePage() {
         setCuentasBancarias(cuentasResponse.data || []);
       }
 
-      // Cargar CxPs pendientes y parciales
-      const cxpResponse = await get('/api/finanzas/cxp?estado=PENDIENTE,PARCIAL&limit=1000');
-      if (cxpResponse?.success) {
-        setCxpsDisponibles(cxpResponse.data || []);
-      }
+      const cxpResponses = await Promise.all([
+        get('/api/finanzas/tesoreria/programacion?estado=PENDIENTE&page=1&limit=100'),
+        get('/api/finanzas/tesoreria/programacion?estado=PARCIAL&page=1&limit=100'),
+      ]);
+      setCxpsDisponibles(
+        cxpResponses.flatMap((response) => (response?.success ? response.data || [] : [])),
+      );
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Error al cargar los datos. Por favor, intente nuevamente.');
@@ -252,6 +254,7 @@ export default function PagoLotePage() {
           <div className="flex items-center gap-2 mb-2">
             <button
               onClick={handleCancel}
+              aria-label="Volver a tesorería"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft size={20} />

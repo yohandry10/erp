@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, FileText } from 'lucide-react'
@@ -40,11 +40,7 @@ export default function NuevoAsientoPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadInitialData()
-  }, [])
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       setLoadingData(true)
       setError(null)
@@ -66,7 +62,11 @@ export default function NuevoAsientoPage() {
     } finally {
       setLoadingData(false)
     }
-  }
+  }, [get])
+
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   const handleSubmit = async (data: AsientoFormData) => {
     try {

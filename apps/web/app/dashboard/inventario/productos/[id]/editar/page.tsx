@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { ArrowLeft, Package, Save } from 'lucide-react'
@@ -9,6 +9,7 @@ export default function EditarProductoPage() {
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
+  const productoId = params.id as string | undefined
   const [isLoading, setIsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
@@ -24,16 +25,12 @@ export default function EditarProductoPage() {
     activo: true
   })
 
-  useEffect(() => {
-    if (params.id) {
-      loadProducto()
-    }
-  }, [params.id])
+  const loadProducto = useCallback(async () => {
+    if (!productoId) return
 
-  const loadProducto = async () => {
     setLoading(true)
     try {
-      const response = await get(`/inventario/productos/${params.id}`)
+      const response = await get(`/inventario/productos/${productoId}`)
       if (response?.success && response.data) {
         const p = response.data
         setFormData({
@@ -55,11 +52,15 @@ export default function EditarProductoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get, productoId])
+
+  useEffect(() => {
+    loadProducto()
+  }, [loadProducto])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.codigo || !formData.nombre || !formData.categoria) {
       alert('Por favor complete los campos obligatorios')
       return
@@ -68,7 +69,7 @@ export default function EditarProductoPage() {
     setIsLoading(true)
     try {
       const response = await put(`/inventario/productos/${params.id}`, formData)
-      
+
       if (response?.success) {
         alert('✅ Producto actualizado exitosamente')
         router.push('/dashboard/inventario/productos')

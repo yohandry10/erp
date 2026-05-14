@@ -43,6 +43,13 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
       this.logger.log(`📦 Procesando RecepcionRegistrada: ${data.numeroRecepcion} (${data.recepcionId})`);
       this.logger.debug(`Datos del evento:`, JSON.stringify(data, null, 2));
 
+      if (process.env.CXP_LEGACY_COMPRAS_INTEGRATION !== 'true') {
+        this.logger.log(
+          `⏭️ CxP para recepción ${data.numeroRecepcion} delegada al listener canónico CxpEventsListener`,
+        );
+        return;
+      }
+
       // Verificar configuración de la empresa para saber si debe generar CxP en recepción
       const config = await this.obtenerConfiguracionEmpresa(data.tenantId);
       const generarEn = (config?.generar_cxp_en || 'RECEPCION').toUpperCase();
@@ -261,7 +268,7 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
       .select(
         `
         id,
-        detalles:orden_compra_detalles(
+        detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(
           producto_id,
           cantidad,
           precio_unitario

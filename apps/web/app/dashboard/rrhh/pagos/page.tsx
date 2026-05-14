@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
@@ -11,7 +11,7 @@ const PagosPage = () => {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroPeriodo, setFiltroPeriodo] = useState('todos');
   const [loading, setLoading] = useState(true);
-  const api = useApi();
+  const { get, put } = useApi();
 
   // Estado para diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -32,20 +32,12 @@ const PagosPage = () => {
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
-      // HARDENING: evitar solicitudes de RRHH cuando la función está deshabilitada.
       setPagos([]);
       setEmpleados([]);
       setPlanillas([]);
       setLoading(false);
-      return;
-    }
-    loadData();
-  }, [rrhhEnabled]);
-
-  const loadData = async () => {
-    if (!rrhhEnabled) {
       return;
     }
     try {
@@ -53,7 +45,7 @@ const PagosPage = () => {
       
       // Cargar pagos
       console.log('🔍 [Frontend] Cargando pagos desde /api/rrhh/pagos...');
-      const pagosResponse = await api.get('/api/rrhh/pagos');
+      const pagosResponse = await get('/api/rrhh/pagos');
       console.log('📦 [Frontend] Respuesta pagos:', pagosResponse);
       
       // Verificar si la respuesta tiene la estructura correcta
@@ -72,13 +64,13 @@ const PagosPage = () => {
       console.log(`🎯 [Frontend] Estado actualizado con ${pagosData.length} pagos`);
 
       // Cargar empleados
-      const empleadosData = await api.get('/api/rrhh/empleados');
+      const empleadosData = await get('/api/rrhh/empleados');
       if (empleadosData && Array.isArray(empleadosData)) {
         setEmpleados(empleadosData);
       }
 
       // Cargar planillas
-      const planillasData = await api.get('/api/rrhh/planillas');
+      const planillasData = await get('/api/rrhh/planillas');
       if (planillasData && Array.isArray(planillasData)) {
         setPlanillas(planillasData);
       }
@@ -87,7 +79,11 @@ const PagosPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [get, rrhhEnabled]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const procesarPago = async (pagoId: string) => {
     setConfirmDialog({
@@ -97,7 +93,7 @@ const PagosPage = () => {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          await api.put(`/api/rrhh/pagos/${pagoId}/procesar`);
+          await put(`/api/rrhh/pagos/${pagoId}/procesar`);
           loadData();
         } catch (error) {
           console.error('Error procesando pago:', error);

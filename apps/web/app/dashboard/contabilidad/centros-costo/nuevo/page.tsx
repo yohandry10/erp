@@ -72,6 +72,7 @@ export default function NuevoCentroCostoPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
             <button
+              aria-label="Volver a centros de costo"
               onClick={() => router.push('/dashboard/contabilidad/centros-costo')}
               style={{
                 width: '48px',

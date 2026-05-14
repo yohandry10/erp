@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Building2, ArrowLeft, Save, AlertCircle } from 'lucide-react'
@@ -20,6 +20,7 @@ export default function EditarCentroCostoPage() {
   const router = useRouter()
   const params = useParams()
   const { get, put } = useApi()
+  const centroId = params.id as string | undefined
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -35,16 +36,14 @@ export default function EditarCentroCostoPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    loadCentroCosto()
-  }, [params.id])
+  const loadCentroCosto = useCallback(async () => {
+    if (!centroId) return
 
-  const loadCentroCosto = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const response = await get(`/api/contabilidad/centros-costo/${params.id}`)
+      const response = await get(`/api/contabilidad/centros-costo/${centroId}`)
 
       if (response?.success && response.data) {
         setCentro(response.data)
@@ -63,7 +62,11 @@ export default function EditarCentroCostoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [centroId, get])
+
+  useEffect(() => {
+    loadCentroCosto()
+  }, [loadCentroCosto])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -91,7 +94,7 @@ export default function EditarCentroCostoPage() {
       setSaving(true)
       setError(null)
 
-      const response = await put(`/api/contabilidad/centros-costo/${params.id}`, {
+      const response = await put(`/api/contabilidad/centros-costo/${centroId}`, {
         codigo: formData.codigo.trim(),
         nombre: formData.nombre.trim(),
         descripcion: formData.descripcion.trim() || undefined,

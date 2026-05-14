@@ -22,6 +22,14 @@ FROM pg_catalog.pg_matviews;
 -- ----------------------------------------------------------------------------
 -- Vistas de seguridad RLS (nombres de columnas esperados por API)
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.v_rls_alerts_summary;
+DROP VIEW IF EXISTS public.v_rls_alerts_unacknowledged;
+DROP VIEW IF EXISTS public.v_rls_alerts_recent;
+DROP VIEW IF EXISTS public.v_rls_violations_recent;
+DROP VIEW IF EXISTS public.v_rls_violations_hourly;
+DROP VIEW IF EXISTS public.v_rls_violations_by_user;
+DROP VIEW IF EXISTS public.v_rls_violations_by_table;
+
 CREATE OR REPLACE VIEW public.v_rls_violations_by_table AS
 SELECT
   COALESCE(table_name, 'unknown') AS table_name,
@@ -118,6 +126,11 @@ ORDER BY total_alerts DESC;
 -- ----------------------------------------------------------------------------
 -- Vistas POS/cajas usadas por dashboards
 -- ----------------------------------------------------------------------------
+DROP VIEW IF EXISTS public.vw_turnos_metrics;
+DROP VIEW IF EXISTS public.vw_ranking_cajeros;
+DROP VIEW IF EXISTS public.vw_sesiones_activas;
+DROP VIEW IF EXISTS public.vw_eventos_pos_sospechosos;
+
 CREATE OR REPLACE VIEW public.vw_eventos_pos_sospechosos AS
 SELECT
   ep.id,
@@ -209,4 +222,3 @@ GROUP BY
   date(COALESCE(sc.hora_apertura, sc.fecha_apertura));
 
 COMMIT;
-

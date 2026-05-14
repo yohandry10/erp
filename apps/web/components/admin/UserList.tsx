@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,12 +32,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { 
-  Plus, 
-  Search, 
-  Eye, 
-  Edit, 
-  CheckCircle, 
+import {
+  Plus,
+  Search,
+  Eye,
+  Edit,
+  CheckCircle,
   XCircle,
   User,
   Mail,
@@ -85,7 +85,7 @@ export function UserList() {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
 
   // Fetch users
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
       const response = await get('/users')
@@ -99,11 +99,11 @@ export function UserList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [get])
 
   useEffect(() => {
     fetchUsers()
-  }, [])
+  }, [fetchUsers])
 
   // Filter users based on search and status
   useEffect(() => {
@@ -153,7 +153,7 @@ export function UserList() {
   // Handle password reset
   const handleResetPassword = async () => {
     if (!selectedUser) return
-    
+
     try {
       await post(`/users/${selectedUser.id}/reset-password`)
       setShowResetPasswordDialog(false)
@@ -358,7 +358,7 @@ export function UserList() {
                               <KeyRound className="h-4 w-4 mr-2" />
                               View Permissions
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => {
                                 setSelectedUser(user)
                                 setShowResetPasswordDialog(true)
@@ -369,7 +369,7 @@ export function UserList() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {user.estado === 'ACTIVO' ? (
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleDeactivate(user.id)}
                                 className="text-destructive"
                               >
@@ -377,7 +377,7 @@ export function UserList() {
                                 Deactivate
                               </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleActivate(user.id)}
                                 className="text-green-600"
                               >
@@ -545,7 +545,7 @@ export function UserList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Reset Password</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to reset the password for {selectedUser?.nombre}? 
+              Are you sure you want to reset the password for {selectedUser?.nombre}?
               A password reset email will be sent to {selectedUser?.email}.
             </AlertDialogDescription>
           </AlertDialogHeader>

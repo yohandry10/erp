@@ -16,6 +16,8 @@ SET LOCAL search_path = public, extensions, app, pg_temp;
 
 CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;
 
+DROP VIEW IF EXISTS public.vista_pos_productos;
+
 -- ----------------------------------------------------------------------------
 -- Helpers de normalizacion por tabla.
 -- ----------------------------------------------------------------------------
@@ -373,5 +375,46 @@ ON public.stock_movimientos (tenant_id, estado, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_producto_stock_sucursal_tenant_estado_ci_runtime_269
 ON public.producto_stock_sucursal (tenant_id, estado, updated_at DESC);
+
+CREATE OR REPLACE VIEW public.vista_pos_productos AS
+WITH base AS (
+  SELECT
+    p.*,
+    COALESCE(p.es_servicio, lower(COALESCE(p.tipo, '')) = 'servicio') AS es_servicio_calc,
+    app.to_numeric_or_zero(COALESCE(p.stock_actual, 0)::text)::numeric(14,2) AS stock_actual_num,
+    app.to_numeric_or_zero(COALESCE(p.stock_reservado, 0)::text)::numeric(14,2) AS stock_reservado_num,
+    app.to_numeric_or_zero(COALESCE(p.stock_minimo, 0)::text)::numeric(14,2) AS stock_minimo_num
+  FROM public.productos p
+)
+SELECT
+  b.id,
+  b.tenant_id,
+  COALESCE(NULLIF(btrim(b.codigo), ''), NULLIF(btrim(b.sku), ''), left(b.id::text, 8)) AS codigo,
+  NULLIF(btrim(b.codigo_barras), '') AS codigo_barras,
+  COALESCE(NULLIF(btrim(b.nombre), ''), 'Producto') AS nombre,
+  NULLIF(btrim(b.descripcion), '') AS descripcion,
+  COALESCE(NULLIF(btrim(b.categoria), ''), 'GENERAL') AS categoria,
+  NULLIF(btrim(b.subcategoria), '') AS subcategoria,
+  NULLIF(btrim(b.marca), '') AS marca,
+  ROUND(COALESCE(b.precio_venta, b.precio, b.precio_unitario, 0)::numeric, 2) AS precio_venta,
+  ROUND(COALESCE(b.precio_mayorista, b.precio_venta, b.precio, b.precio_unitario, 0)::numeric, 2) AS precio_mayorista,
+  ROUND(COALESCE(b.precio_especial, b.precio_venta, b.precio, b.precio_unitario, 0)::numeric, 2) AS precio_especial,
+  b.stock_actual_num AS stock_actual,
+  b.stock_minimo_num AS stock_minimo,
+  b.stock_reservado_num AS stock_reservado,
+  CASE
+    WHEN b.es_servicio_calc THEN NULL::numeric(14,2)
+    ELSE GREATEST(b.stock_actual_num - b.stock_reservado_num, 0)
+  END AS stock_disponible,
+  ROUND(COALESCE(b.impuesto, 0.18)::numeric, 4) AS impuesto,
+  b.imagen_url,
+  b.es_servicio_calc AS es_servicio,
+  COALESCE(b.controla_stock, NOT b.es_servicio_calc) AS controla_stock,
+  COALESCE(NULLIF(btrim(b.afectacion_igv), ''), '10') AS afectacion_igv,
+  NULLIF(btrim(b.tipo_operacion), '') AS tipo_operacion,
+  NULLIF(btrim(b.clasificador_sunat), '') AS clasificador_sunat,
+  COALESCE(b.favorito, false) AS favorito,
+  COALESCE(b.activo, true) AS activo
+FROM base b;
 
 COMMIT;

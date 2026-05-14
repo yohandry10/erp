@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { PedidoVenta } from '@/types/ventas'
@@ -56,7 +56,7 @@ export default function PedidoForm({
 }: PedidoFormProps) {
   const { get } = useApi()
   const { tasaIgv } = useTaxConfig()
-  
+
   const [clienteId, setClienteId] = useState(pedido?.cliente_id || '')
   const [observaciones, setObservaciones] = useState(pedido?.observaciones || '')
   const [detalle, setDetalle] = useState<DetalleItem[]>([])
@@ -81,11 +81,6 @@ export default function PedidoForm({
   .filter((info) => info.solicitado > info.disponible)
 const hasStockShortage = stockAlerts.length > 0
 
-  // Load productos on mount
-  useEffect(() => {
-    loadProductos()
-  }, [])
-
   // Initialize detalle from pedido if editing
   useEffect(() => {
     if (pedido?.detalle && pedido.detalle.length > 0) {
@@ -101,7 +96,7 @@ const hasStockShortage = stockAlerts.length > 0
     }
   }, [pedido])
 
-  const loadProductos = async () => {
+  const loadProductos = useCallback(async () => {
     try {
       setLoadingProductos(true)
       const response = await get('/inventario/productos')
@@ -126,7 +121,12 @@ const hasStockShortage = stockAlerts.length > 0
     } finally {
       setLoadingProductos(false)
     }
-  }
+  }, [get])
+
+  // Load productos on mount
+  useEffect(() => {
+    loadProductos()
+  }, [loadProductos])
 
   const handleAddItem = () => {
     setDetalle([
@@ -244,7 +244,7 @@ const hasStockShortage = stockAlerts.length > 0
 
     try {
       setSubmitting(true)
-      
+
       const formData: PedidoFormData = {
         cliente_id: clienteId,
         observaciones: observaciones || undefined,
@@ -393,7 +393,7 @@ const hasStockShortage = stockAlerts.length > 0
           <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--primary-500)' }}>
             <Package style={{ width: '3rem', height: '3rem', margin: '0 auto 0.5rem', color: 'var(--primary-400)' }} />
             <p style={{ margin: '0.5rem 0' }}>No hay productos agregados</p>
-            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en "Agregar Producto" para comenzar</p>
+            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en &quot;Agregar Producto&quot; para comenzar</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { Proveedor } from '@/types/compras'
@@ -29,9 +29,11 @@ export default function ProveedoresPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalProveedores, setTotalProveedores] = useState(0)
+  const loadRequestIdRef = useRef(0)
   const itemsPerPage = 10
 
   const loadProveedores = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -46,6 +48,10 @@ export default function ProveedoresPage() {
       params.append('offset', offset.toString())
 
       const response = await get(`/api/compras/proveedores?${params.toString()}`)
+
+      if (requestId !== loadRequestIdRef.current) {
+        return
+      }
       
       if (response?.success) {
         const data = response.data || []
@@ -54,10 +60,15 @@ export default function ProveedoresPage() {
         setTotalPages(Math.ceil((response.count || data.length) / itemsPerPage))
       }
     } catch (error) {
+      if (requestId !== loadRequestIdRef.current) {
+        return
+      }
       console.error('Error loading proveedores:', error)
       alert('Error: No se pudieron cargar los proveedores')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestIdRef.current) {
+        setLoading(false)
+      }
     }
   }, [searchTerm, activoFilter, condicionesPagoFilter, currentPage, get])
 

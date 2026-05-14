@@ -4,11 +4,11 @@ Bienvenido a la documentación central del sistema ERP. Aquí encontrará toda l
 
 ## 📚 Arquitectura y Referencia Técnica
 
-Documentos fundamentales para entender la estructura del sistema.
+Documentos fundamentales para entender la estructura del sistema. Los manuales creados en enero 2026 se mantienen como referencia historica hasta consolidarlos contra `PROJECT_REVIEW_INDEX.md` y `db_rebuild_status.md`.
 
-*   **[Arquitectura del Sistema](manuals/SYSTEM_ARCHITECTURE.md)**: Visión general del stack tecnológico (NestJS + Supabase), patrones de diseño (Hexagonal, Event-Driven) y estructura del monorepo.
-*   **[Referencia de Base de Datos](manuals/DATABASE_REFERENCE.md)**: Esquema de datos, funciones RPC, Row Level Security (RLS) y triggers.
-*   **[Guía del Desarrollador](manuals/DEVELOPER_GUIDE.md)**: Guía para configurar el entorno local, estándares de código y flujo de trabajo.
+*   **[Arquitectura del Sistema](manuals/SYSTEM_ARCHITECTURE.md)**: Referencia historica de arquitectura; validar contra `../PROJECT_REVIEW_INDEX.md`.
+*   **[Referencia de Base de Datos](manuals/DATABASE_REFERENCE.md)**: Referencia historica; la fuente vigente de BD es `db_rebuild_status.md`.
+*   **[Guía del Desarrollador](manuals/DEVELOPER_GUIDE.md)**: Guia historica; validar setup actual contra `../README.md`, `configuration.md` y `ops/docker.md`.
 
 ## 📦 Módulos Funcionales (Manuales Detallados)
 
@@ -37,11 +37,17 @@ Documentación profunda de la lógica de negocio, flujos de trabajo e implementa
 
 Documentación específica sobre el sistema de seguridad y cumplimiento.
 
-*   **[Auditoría y RLS](security/IMPLEMENTACION-AUDITORIA-RLS.md)**: Implementación técnica del sistema de auditoría y políticas de seguridad a nivel de fila.
-*   **[Guía de Alertas RLS](security/rls-alerts-guide.md)**: Configuración y respuesta ante incidentes de seguridad.
-*   **[Dashboard de Seguridad](security/security-dashboard.md)**: Arquitectura del panel de monitoreo de seguridad.
+*   **[Matriz de rutas API](security/route-access-matrix.md)**: Fuente vigente de autorizacion por endpoint.
+*   **[Sesión y autenticación](security/session-auth.md)**: Contrato actual de cookies HttpOnly y sesion.
+*   **[Rate limiting](security/rate-limiting.md)**: Configuracion vigente de throttling.
+*   **[Auditoría de acceso Supabase](security/supabase-access-audit.md)**: Uso de service role y controles de acceso.
+*   **[Dashboard de Seguridad](security/security-dashboard.md)**: Referencia del panel; revisar junto con la cuarentena documental.
 
 ## 📈 Estado del Proyecto
 
-*   **[Estado Actual y Análisis](manuals/PROJECT_STATUS.md)**: Resumen del avance, deuda técnica identificada y próximos pasos.
+*   **[Estado operativo vigente](../PROJECT_STATUS.md)**: Estado actualizado de build, type-check, riesgos y proximas rondas de revision.
+*   **[Indice maestro de revision](../PROJECT_REVIEW_INDEX.md)**: Matriz de cobertura para revisar exhaustivamente todo el proyecto.
+*   **[Cuarentena documental](DOCUMENTATION_QUARANTINE.md)**: Candidatos a consolidacion o borrado, sin eliminaciones automaticas.
+*   **[Estado de reconstruccion de BD](db_rebuild_status.md)**: Fuente vigente de migraciones `000..302`, validadores y riesgos pendientes.
+*   **[Estado historico 2026-01](manuals/PROJECT_STATUS.md)**: Documento anterior a la reconstruccion `000..301`; usar solo como referencia historica.
 *   **[Análisis Inicial](analisis.md)**: Auditoría completa inicial del código legado.

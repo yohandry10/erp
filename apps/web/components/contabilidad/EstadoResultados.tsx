@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react'
 import { IngresosVsGastosChart } from './IngresosVsGastosChart'
@@ -39,18 +39,14 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   const [data, setData] = useState<EstadoResultadosData | null>(null)
   const [previousData, setPreviousData] = useState<EstadoResultadosData | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [anio, mes, showComparison])
-
-  const getPreviousPeriod = () => {
+  const getPreviousPeriod = useCallback(() => {
     if (mes === 1) {
       return { anio: anio - 1, mes: 12 }
     }
     return { anio, mes: mes - 1 }
-  }
+  }, [anio, mes])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -82,7 +78,11 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
     } finally {
       setLoading(false)
     }
-  }
+  }, [anio, get, getPreviousPeriod, mes, showComparison])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-PE', {

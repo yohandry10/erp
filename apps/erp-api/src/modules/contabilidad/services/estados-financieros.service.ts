@@ -158,6 +158,74 @@ export class EstadosFinancierosService {
     });
   }
 
+  private isMaterializedViewUnavailable(error: any): boolean {
+    return error?.code === '55000' || error?.code === 'PGRST116';
+  }
+
+  private getEmptyEstadoResultados(): EstadoResultados {
+    return {
+      ingresos: {
+        ventas: 0,
+        otros_ingresos: 0,
+        total_ingresos: 0,
+      },
+      costos: {
+        costo_ventas: 0,
+        utilidad_bruta: 0,
+      },
+      gastos: {
+        gastos_administrativos: 0,
+        gastos_ventas: 0,
+        gastos_financieros: 0,
+        total_gastos: 0,
+      },
+      utilidad_neta: 0,
+    };
+  }
+
+  private getEmptyBalanceGeneral(resultadoEjercicio = 0): BalanceGeneral {
+    return {
+      activos: {
+        corrientes: {
+          efectivo: 0,
+          cuentas_por_cobrar: 0,
+          inventarios: 0,
+          otros_activos: 0,
+          total_corrientes: 0,
+        },
+        no_corrientes: {
+          activos_fijos: 0,
+          depreciacion_acumulada: 0,
+          activos_fijos_neto: 0,
+          otros_activos: 0,
+          total_no_corrientes: 0,
+        },
+        total_activos: 0,
+      },
+      pasivos: {
+        corrientes: {
+          cuentas_por_pagar: 0,
+          tributos_por_pagar: 0,
+          remuneraciones_por_pagar: 0,
+          otros_pasivos: 0,
+          total_corrientes: 0,
+        },
+        no_corrientes: {
+          deudas_largo_plazo: 0,
+          otros_pasivos: 0,
+          total_no_corrientes: 0,
+        },
+        total_pasivos: 0,
+      },
+      patrimonio: {
+        capital: 0,
+        resultados_acumulados: 0,
+        resultado_ejercicio: resultadoEjercicio,
+        total_patrimonio: resultadoEjercicio,
+      },
+    };
+  }
+
   /**
    * Limpia entradas de cache expiradas
    */
@@ -248,6 +316,11 @@ export class EstadosFinancierosService {
         .order('cuenta', { ascending: true });
 
       if (error) {
+        if (this.isMaterializedViewUnavailable(error)) {
+          console.warn('⚠️ Balance de comprobación sin MV poblada o sin filas, retornando lista vacía');
+          this.setCache(cacheKey, []);
+          return [];
+        }
         console.error('❌ Error consultando vista materializada:', error);
         throw error;
       }
@@ -325,30 +398,19 @@ export class EstadosFinancierosService {
         .single();
 
       if (error) {
+        if (this.isMaterializedViewUnavailable(error)) {
+          console.warn('⚠️ Estado de resultados sin MV poblada o sin filas, retornando valores en cero');
+          const emptyResult = this.getEmptyEstadoResultados();
+          this.setCache(cacheKey, emptyResult);
+          return emptyResult;
+        }
         console.error('❌ Error consultando vista materializada:', error);
         throw error;
       }
 
       if (!resultado) {
         console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
-        const emptyResult = {
-          ingresos: {
-            ventas: 0,
-            otros_ingresos: 0,
-            total_ingresos: 0,
-          },
-          costos: {
-            costo_ventas: 0,
-            utilidad_bruta: 0,
-          },
-          gastos: {
-            gastos_administrativos: 0,
-            gastos_ventas: 0,
-            gastos_financieros: 0,
-            total_gastos: 0,
-          },
-          utilidad_neta: 0,
-        };
+        const emptyResult = this.getEmptyEstadoResultados();
         // Guardar en cache incluso si está vacío
         this.setCache(cacheKey, emptyResult);
         return emptyResult;
@@ -450,6 +512,13 @@ export class EstadosFinancierosService {
         .single();
 
       if (error) {
+        if (this.isMaterializedViewUnavailable(error)) {
+          console.warn('⚠️ Balance general sin MV poblada o sin filas, retornando valores en cero');
+          const estadoResultados = await this.getEstadoResultados(tenantId, anio, mes);
+          const emptyBalance = this.getEmptyBalanceGeneral(estadoResultados.utilidad_neta);
+          this.setCache(cacheKey, emptyBalance);
+          return emptyBalance;
+        }
         console.error('❌ Error consultando vista materializada:', error);
         throw error;
       }
@@ -460,46 +529,7 @@ export class EstadosFinancierosService {
 
       if (!balance) {
         console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
-        const emptyBalance = {
-          activos: {
-            corrientes: {
-              efectivo: 0,
-              cuentas_por_cobrar: 0,
-              inventarios: 0,
-              otros_activos: 0,
-              total_corrientes: 0,
-            },
-            no_corrientes: {
-              activos_fijos: 0,
-              depreciacion_acumulada: 0,
-              activos_fijos_neto: 0,
-              otros_activos: 0,
-              total_no_corrientes: 0,
-            },
-            total_activos: 0,
-          },
-          pasivos: {
-            corrientes: {
-              cuentas_por_pagar: 0,
-              tributos_por_pagar: 0,
-              remuneraciones_por_pagar: 0,
-              otros_pasivos: 0,
-              total_corrientes: 0,
-            },
-            no_corrientes: {
-              deudas_largo_plazo: 0,
-              otros_pasivos: 0,
-              total_no_corrientes: 0,
-            },
-            total_pasivos: 0,
-          },
-          patrimonio: {
-            capital: 0,
-            resultados_acumulados: 0,
-            resultado_ejercicio: resultadoEjercicio,
-            total_patrimonio: resultadoEjercicio,
-          },
-        };
+        const emptyBalance = this.getEmptyBalanceGeneral(resultadoEjercicio);
         // Guardar en cache incluso si está vacío
         this.setCache(cacheKey, emptyBalance);
         return emptyBalance;

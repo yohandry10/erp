@@ -93,7 +93,7 @@ export function ProveedorForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6" noValidate>
       {/* Información Básica */}
       <div className="activity-card">
         <h3 style={{ 

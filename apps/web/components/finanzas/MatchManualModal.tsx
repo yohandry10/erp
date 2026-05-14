@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -45,13 +45,9 @@ export default function MatchManualModal({
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
 
-  useEffect(() => {
-    if (isOpen && conciliacionId) {
-      loadMovimientos();
-    }
-  }, [isOpen, conciliacionId]);
+  const loadMovimientos = useCallback(async () => {
+    if (!conciliacionId) return;
 
-  const loadMovimientos = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -114,7 +110,13 @@ export default function MatchManualModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL, conciliacionId]);
+
+  useEffect(() => {
+    if (isOpen && conciliacionId) {
+      loadMovimientos();
+    }
+  }, [conciliacionId, isOpen, loadMovimientos]);
 
   const handleMatch = async () => {
     if (!selectedSistema || !selectedExtracto) {
@@ -237,10 +239,14 @@ export default function MatchManualModal({
                   </p>
                 ) : (
                   movimientosSistema.map((mov) => (
-                    <div
+                    <button
+                      type="button"
                       key={mov.id}
+                      data-testid="match-sistema-item"
+                      aria-pressed={selectedSistema === mov.id}
+                      aria-label={`Seleccionar movimiento del sistema ${mov.tipo} ${formatCurrency(mov.monto)} ${mov.descripcion}`}
                       onClick={() => setSelectedSistema(mov.id)}
-                      className={`p-3 border rounded cursor-pointer transition-all ${
+                      className={`w-full text-left p-3 border rounded cursor-pointer transition-all ${
                         selectedSistema === mov.id
                           ? 'border-blue-500 bg-blue-50 shadow-md'
                           : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
@@ -265,7 +271,7 @@ export default function MatchManualModal({
                       {mov.referencia && (
                         <p className="text-xs text-gray-500 mt-1">Ref: {mov.referencia}</p>
                       )}
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -283,10 +289,14 @@ export default function MatchManualModal({
                   </p>
                 ) : (
                   movimientosExtracto.map((mov) => (
-                    <div
+                    <button
+                      type="button"
                       key={mov.id}
+                      data-testid="match-extracto-item"
+                      aria-pressed={selectedExtracto === mov.id}
+                      aria-label={`Seleccionar movimiento del extracto ${mov.tipo} ${formatCurrency(mov.monto)} ${mov.descripcion}`}
                       onClick={() => setSelectedExtracto(mov.id)}
-                      className={`p-3 border rounded cursor-pointer transition-all ${
+                      className={`w-full text-left p-3 border rounded cursor-pointer transition-all ${
                         selectedExtracto === mov.id
                           ? 'border-green-500 bg-green-50 shadow-md'
                           : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
@@ -311,7 +321,7 @@ export default function MatchManualModal({
                       {mov.referencia && (
                         <p className="text-xs text-gray-500 mt-1">Ref: {mov.referencia}</p>
                       )}
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
