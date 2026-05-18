@@ -38,7 +38,7 @@
     "@supabase/postgrest-js": "^1.19.4",
     "@supabase/supabase-js": "^2.50.0",
     "@willsoto/nestjs-prometheus": "^6.0.2",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.5.17",
     "axios": "^1.16.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
