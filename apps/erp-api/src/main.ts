@@ -118,7 +118,7 @@ POST /api/auth/login
 **Respuesta:**
 \`\`\`json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access_token": "REPLACE_WITH_TEST_JWT",
   "user": {
     "id": "uuid",
     "email": "usuario@empresa.com",

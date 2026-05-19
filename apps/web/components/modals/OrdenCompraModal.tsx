@@ -294,47 +294,14 @@ export default function OrdenCompraModal({
   if (!isOpen) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        width: '95%',
-        maxWidth: '1200px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
+      <div className="bg-white rounded-3 p-8 w-[95%] max-w-[1200px] overflow-auto shadow">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-6 font-semibold text-gray-800">
             {orden ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
           </h2>
           <button 
-            onClick={onClose} 
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              fontSize: '1.5rem', 
-              cursor: 'pointer', 
-              color: '#6b7280', 
-              width: '30px', 
-              height: '30px', 
-              borderRadius: '50%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center'
-            }}
+            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500 w-[30px] h-[30px] rounded-full flex items-center justify-center"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#f3f4f6'
             }}
@@ -348,42 +315,27 @@ export default function OrdenCompraModal({
 
         <form onSubmit={handleSubmit}>
           {/* Información básica */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Número de Orden
               </label>
               <input
                 type="text"
                 value={formData.numero}
-                disabled
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  backgroundColor: '#f9fafb',
-                  color: '#6b7280'
-                }}
+                disabled className="w-[100%] p-2 border rounded-1.5 bg-[#f9fafb] text-gray-500"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Proveedor *
               </label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="flex gap-2">
                 <select
                   value={formData.proveedor_id}
                   onChange={(e) => setFormData({...formData, proveedor_id: e.target.value})}
-                  required
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white'
-                  }}
+                  required className="flex-[1] p-2 border rounded-1.5 bg-white"
                 >
                   <option value="">Seleccionar proveedor</option>
                   {proveedores.map((proveedor: any) => (
@@ -397,16 +349,7 @@ export default function OrdenCompraModal({
                   onClick={() => {
                     alert('Función de agregar proveedor - Se abrirá en nueva ventana');
                     // Aquí abrirías el modal de proveedores o irías a su página
-                  }}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    border: '1px solid #10b981',
-                    borderRadius: '0.375rem',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
+                  }} className="py-2 px-4 border rounded-1.5 bg-[#10b981] text-white cursor-pointer whitespace-nowrap"
                   title="Agregar nuevo proveedor"
                 >
                   + Nuevo
@@ -415,19 +358,12 @@ export default function OrdenCompraModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Moneda
               </label>
               <select
                 value={formData.moneda}
-                onChange={(e) => setFormData({...formData, moneda: e.target.value})}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  backgroundColor: 'white'
-                }}
+                onChange={(e) => setFormData({...formData, moneda: e.target.value})} className="w-[100%] p-2 border rounded-1.5 bg-white"
               >
                 <option value="PEN">PEN - Soles</option>
                 <option value="USD">USD - Dólares</option>
@@ -435,128 +371,82 @@ export default function OrdenCompraModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha de Orden *
               </label>
               <input
                 type="date"
                 value={formData.fecha_orden}
                 onChange={(e) => setFormData({...formData, fecha_orden: e.target.value})}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem'
-                }}
+                required className="w-[100%] p-2 border rounded-1.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha de Entrega *
               </label>
               <input
                 type="date"
                 value={formData.fecha_entrega}
                 onChange={(e) => setFormData({...formData, fecha_entrega: e.target.value})}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem'
-                }}
+                required className="w-[100%] p-2 border rounded-1.5"
               />
             </div>
           </div>
 
           {/* Items */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#374151' }}>Items de la Orden</h3>
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[1.125rem] font-semibold text-gray-700">Items de la Orden</h3>
               <button
                 type="button"
-                onClick={addItem}
-                style={{
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}
+                onClick={addItem} className="bg-blue-500 text-white py-2 px-4 rounded-1.5 border-0 cursor-pointer text-[0.875rem] font-medium"
               >
                 + Agregar Item
               </button>
             </div>
 
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ backgroundColor: '#f9fafb' }}>
+            <div className="border rounded-2 overflow-hidden">
+              <table className="w-[100%]">
+                <thead className="bg-[#f9fafb]">
                   <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Producto</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Cantidad</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Precio Unit.</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Subtotal</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>Acciones</th>
+                    <th className="p-3 text-left text-[0.875rem] font-medium text-gray-700">Producto</th>
+                    <th className="p-3 text-center text-[0.875rem] font-medium text-gray-700">Cantidad</th>
+                    <th className="p-3 text-right text-[0.875rem] font-medium text-gray-700">Precio Unit.</th>
+                    <th className="p-3 text-right text-[0.875rem] font-medium text-gray-700">Subtotal</th>
+                    <th className="p-3 text-center text-[0.875rem] font-medium text-gray-700">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item, index) => (
-                    <tr key={item.id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '0.75rem' }}>
+                    <tr key={item.id} className="border-t">
+                      <td className="p-3">
                         {item.esNuevoProducto ? (
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div className="flex gap-2 items-center">
                             <input
                               type="text"
                               placeholder="Nombre del nuevo producto"
                               value={item.producto_nombre || ''}
                               onChange={(e) => updateItem(index, 'producto_nombre', e.target.value)}
-                              required
-                              style={{
-                                flex: 1,
-                                padding: '0.25rem 0.5rem',
-                                border: '1px solid #3b82f6',
-                                borderRadius: '0.25rem',
-                                fontSize: '0.875rem',
-                                backgroundColor: '#eff6ff'
-                              }}
+                              required className="flex-[1] py-1 px-2 border rounded-1 text-[0.875rem] bg-[#eff6ff]"
                             />
                             <button
                               type="button"
-                              onClick={() => updateItem(index, 'esNuevoProducto', false)}
-                              style={{
-                                backgroundColor: '#6b7280',
-                                color: 'white',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.25rem',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem'
-                              }}
+                              onClick={() => updateItem(index, 'esNuevoProducto', false)} className="bg-gray-500 text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
                               title="Cancelar producto nuevo"
                             >
                               ✕
                             </button>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <div className="flex gap-2 items-center">
                             <select
                               value={item.producto_id}
                               onChange={(e) => updateItem(index, 'producto_id', e.target.value)}
-                              required
-                              style={{
-                                flex: 1,
-                                padding: '0.25rem 0.5rem',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '0.25rem',
-                                fontSize: '0.875rem'
-                              }}
+                              required className="flex-[1] py-1 px-2 border rounded-1 text-[0.875rem]"
                             >
                               <option value="">Seleccionar producto</option>
                               {productos.map((producto: any) => (
@@ -567,16 +457,7 @@ export default function OrdenCompraModal({
                             </select>
                             <button
                               type="button"
-                              onClick={() => updateItem(index, 'esNuevoProducto', true)}
-                              style={{
-                                backgroundColor: '#10b981',
-                                color: 'white',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.25rem',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem'
-                              }}
+                              onClick={() => updateItem(index, 'esNuevoProducto', true)} className="bg-[#10b981] text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
                               title="Crear producto nuevo"
                             >
                               + Nuevo
@@ -584,55 +465,30 @@ export default function OrdenCompraModal({
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      <td className="p-3 text-center">
                         <input
                           type="number"
                           min="1"
                           value={item.cantidad || ''}
-                          onChange={(e) => updateItem(index, 'cantidad', e.target.value)}
-                          style={{
-                            width: '80px',
-                            padding: '0.25rem',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '0.25rem',
-                            textAlign: 'center',
-                            fontSize: '0.875rem'
-                          }}
+                          onChange={(e) => updateItem(index, 'cantidad', e.target.value)} className="w-[80px] p-1 border rounded-1 text-center text-[0.875rem]"
                         />
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                      <td className="p-3 text-right">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.precio_unitario || ''}
-                          onChange={(e) => updateItem(index, 'precio_unitario', e.target.value)}
-                          style={{
-                            width: '100px',
-                            padding: '0.25rem',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '0.25rem',
-                            textAlign: 'right',
-                            fontSize: '0.875rem'
-                          }}
+                          onChange={(e) => updateItem(index, 'precio_unitario', e.target.value)} className="w-[100px] p-1 border rounded-1 text-right text-[0.875rem]"
                         />
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 500 }}>
+                      <td className="p-3 text-right font-medium">
                         S/ {Number(item.subtotal || 0).toFixed(2)}
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      <td className="p-3 text-center">
                         <button
                           type="button"
-                          onClick={() => removeItem(index)}
-                          style={{
-                            backgroundColor: '#dc2626',
-                            color: 'white',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem'
-                          }}
+                          onClick={() => removeItem(index)} className="bg-red-600 text-white py-1 px-2 rounded-1 border-0 cursor-pointer text-3"
                         >
                           Eliminar
                         </button>
@@ -644,18 +500,18 @@ export default function OrdenCompraModal({
             </div>
 
             {/* Totales */}
-            <div style={{ marginTop: '1rem', backgroundColor: '#f9fafb', padding: '1rem', borderRadius: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: 500 }}>Subtotal: </span>
+            <div className="mt-4 bg-[#f9fafb] p-4 rounded-2">
+              <div className="flex justify-end">
+                <div className="text-right">
+                  <div className="mb-2 text-[0.875rem]">
+                    <span className="font-medium">Subtotal: </span>
                     <span>S/ {Number(totales.subtotal || 0).toFixed(2)}</span>
                   </div>
-                  <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: 500 }}>IGV (18%): </span>
+                  <div className="mb-2 text-[0.875rem]">
+                    <span className="font-medium">IGV (18%): </span>
                     <span>S/ {Number(totales.igv || 0).toFixed(2)}</span>
                   </div>
-                  <div style={{ fontSize: '1.125rem', fontWeight: 600, borderTop: '1px solid #d1d5db', paddingTop: '0.5rem' }}>
+                  <div className="text-[1.125rem] font-semibold border-t pt-2">
                     <span>Total: S/ {Number(totales.total || 0).toFixed(2)}</span>
                   </div>
                 </div>
@@ -664,56 +520,29 @@ export default function OrdenCompraModal({
           </div>
 
           {/* Observaciones */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
+          <div className="mb-6">
+            <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
               Observaciones
             </label>
             <textarea
               value={formData.observaciones}
               onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
               rows={3}
-              placeholder="Observaciones adicionales..."
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                resize: 'vertical'
-              }}
+              placeholder="Observaciones adicionales..." className="w-[100%] p-2 border rounded-1.5"
             />
           </div>
 
           {/* Botones */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+          <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                backgroundColor: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: 500
-              }}
+              onClick={onClose} className="py-2 px-4 border rounded-1.5 bg-white text-gray-700 cursor-pointer text-[0.875rem] font-medium"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: isLoading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: 500
-              }}
+              disabled={isLoading} className="py-2 px-4 text-white border-0 rounded-1.5 text-[0.875rem] font-medium"
             >
               {isLoading ? 'Procesando...' : (orden ? 'Actualizar' : 'Crear')} Orden
             </button>

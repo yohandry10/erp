@@ -78,72 +78,46 @@ export default function ConvertDemoPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem'
-    }}>
-      <div style={{ maxWidth: '600px', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 800,
-            color: '#1e293b',
-            marginBottom: '0.5rem'
-          }}>
+    <div className="flex items-center justify-center p-8">
+      <div className="max-w-[600px] w-[100%]">
+        <div className="text-center mb-8">
+          <h1 className="text-8 font-extrabold text-slate-800 mb-2">
             Convierte tu Demo a Cuenta Real
           </h1>
-          <p style={{ color: '#64748b' }}>
+          <p className="text-slate-500">
             Mantén todos tus datos y obtén acceso completo al sistema
           </p>
         </div>
 
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '2.5rem',
-          boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)'
-        }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
+        <div className="rounded-6 p-10 shadow">
+          <h2 className="text-5 font-bold text-slate-800 mb-2">
             Información de tu Empresa
           </h2>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+          <p className="text-slate-500 mb-6 text-[0.875rem]">
             Completa los datos para activar tu cuenta permanente
           </p>
 
           <form onSubmit={handleSubmit}>
             {error && (
-              <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#dc2626',
-                padding: '1rem',
-                borderRadius: '12px',
-                marginBottom: '1.5rem'
-              }}>
+              <div className="bg-[#fef2f2] border text-red-600 p-4 rounded-3 mb-6">
                 {error}
               </div>
             )}
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={labelStyle}>Razón Social *</label>
+            <div className="mb-5">
+              <label className="block font-semibold text-slate-600 mb-2 text-[0.875rem]">Razón Social *</label>
               <input
                 type="text"
                 name="razon_social"
                 value={formData.razon_social}
                 onChange={handleChange}
                 placeholder="Ej: MI EMPRESA SAC"
-                required
-                style={inputStyle}
+                required className="w-[100%] py-[0.875rem] px-4 rounded-3 text-4 bg-white text-slate-800 transition"
               />
             </div>
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={labelStyle}>RUC *</label>
+            <div className="mb-5">
+              <label className="block font-semibold text-slate-600 mb-2 text-[0.875rem]">RUC *</label>
               <input
                 type="text"
                 name="ruc"
@@ -151,32 +125,30 @@ export default function ConvertDemoPage() {
                 onChange={handleChange}
                 placeholder="20123456789"
                 maxLength={11}
-                required
-                style={inputStyle}
+                required className="w-[100%] py-[0.875rem] px-4 rounded-3 text-4 bg-white text-slate-800 transition"
               />
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+              <p className="text-3 text-slate-500 mt-1">
                 Ingresa el RUC real de tu empresa
               </p>
             </div>
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={labelStyle}>Email *</label>
+            <div className="mb-5">
+              <label className="block font-semibold text-slate-600 mb-2 text-[0.875rem]">Email *</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="tu@email.com"
-                required
-                style={inputStyle}
+                required className="w-[100%] py-[0.875rem] px-4 rounded-3 text-4 bg-white text-slate-800 transition"
               />
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+              <p className="text-3 text-slate-500 mt-1">
                 Este será tu email de acceso al sistema
               </p>
             </div>
 
-            <div style={{ marginBottom: '1.25rem' }}>
-              <label style={labelStyle}>Contraseña *</label>
+            <div className="mb-5">
+              <label className="block font-semibold text-slate-600 mb-2 text-[0.875rem]">Contraseña *</label>
               <input
                 type="password"
                 name="password"
@@ -184,72 +156,41 @@ export default function ConvertDemoPage() {
                 onChange={handleChange}
                 placeholder="Mínimo 8 caracteres"
                 minLength={8}
-                required
-                style={inputStyle}
+                required className="w-[100%] py-[0.875rem] px-4 rounded-3 text-4 bg-white text-slate-800 transition"
               />
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={labelStyle}>Teléfono</label>
+            <div className="mb-6">
+              <label className="block font-semibold text-slate-600 mb-2 text-[0.875rem]">Teléfono</label>
               <input
                 type="text"
                 name="telefono"
                 value={formData.telefono}
                 onChange={handleChange}
-                placeholder="+51 999 999 999"
-                style={inputStyle}
+                placeholder="+51 999 999 999" className="w-[100%] py-[0.875rem] px-4 rounded-3 text-4 bg-white text-slate-800 transition"
               />
             </div>
 
-            <div style={{
-              background: '#eff6ff',
-              border: '1px solid #dbeafe',
-              padding: '1.25rem',
-              borderRadius: '12px',
-              marginBottom: '1.5rem'
-            }}>
-              <h4 style={{ fontWeight: 600, color: '#1e40af', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="bg-[#eff6ff] border p-5 rounded-3 mb-6">
+              <h4 className="font-semibold text-[#1e40af] mb-3 flex items-center gap-2">
                 ✓ ¿Qué incluye la cuenta real?
               </h4>
-              <ul style={{ fontSize: '0.875rem', color: '#1e40af', listStyle: 'none', padding: 0, margin: 0 }}>
-                <li style={{ marginBottom: '0.25rem' }}>✓ Acceso ilimitado sin expiración</li>
-                <li style={{ marginBottom: '0.25rem' }}>✓ Facturación electrónica real a SUNAT</li>
-                <li style={{ marginBottom: '0.25rem' }}>✓ Soporte técnico prioritario</li>
-                <li style={{ marginBottom: '0.25rem' }}>✓ Todos tus datos demo se mantienen</li>
+              <ul className="text-[0.875rem] text-[#1e40af] list-none p-0 m-0">
+                <li className="mb-1">✓ Acceso ilimitado sin expiración</li>
+                <li className="mb-1">✓ Facturación electrónica real a SUNAT</li>
+                <li className="mb-1">✓ Soporte técnico prioritario</li>
+                <li className="mb-1">✓ Todos tus datos demo se mantienen</li>
                 <li>✓ Certificado digital propio</li>
               </ul>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '1rem 2rem',
-                background: loading ? '#94a3b8' : 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem'
-              }}
+              disabled={loading} className="w-[100%] py-4 px-8 text-white border-0 rounded-3 text-4 font-semibold shadow flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
-                  <span style={{
-                    width: '20px',
-                    height: '20px',
-                    border: '2px solid white',
-                    borderTopColor: 'transparent',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }} />
+                  <span className="w-5 h-5 rounded-full" />
                   Convirtiendo cuenta...
                 </>
               ) : (
@@ -257,39 +198,20 @@ export default function ConvertDemoPage() {
               )}
             </button>
 
-            <p style={{ fontSize: '0.75rem', textAlign: 'center', color: '#64748b', marginTop: '1rem' }}>
+            <p className="text-3 text-center text-slate-500 mt-4">
               Al activar tu cuenta, aceptas nuestros términos y condiciones
             </p>
           </form>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+        <div className="text-center mt-6">
           <button
-            onClick={() => router.push('/dashboard')}
-            style={{
-              background: 'transparent',
-              color: '#64748b',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
+            onClick={() => router.push('/dashboard')} className="bg-transparent text-slate-500 border-0 py-3 px-6 cursor-pointer text-[0.875rem]"
           >
             ← Volver al dashboard
           </button>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        input:focus {
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-      `}</style>
     </div>
   );
 }

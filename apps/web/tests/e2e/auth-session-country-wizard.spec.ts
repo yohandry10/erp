@@ -1,9 +1,29 @@
 import { expect, request, test, type APIRequestContext, type Page } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
+
+for (const envPath of [
+  path.resolve(process.cwd(), '../../.env.local'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '../erp-api/.env'),
+]) {
+  if (!fs.existsSync(envPath)) continue;
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
+    if (!match || process.env[match[1]]) continue;
+    process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+  }
+}
+
+function getOperationalPassword(): string {
+  if (process.env.DATABASE_URL) return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
+  return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+}
 
 const adminAuthFile = path.join(__dirname, '.auth', 'admin.json');
 const adminEmail = process.env.TEST_USER_EMAIL || 'admin@erp.local';
-const adminPassword = process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+const adminPassword = getOperationalPassword();
 const standardPassword = 'StdUserProd2026!';
 
 type BrowserEvidence = {
@@ -86,10 +106,13 @@ async function closeTourIfVisible(page: Page) {
 }
 
 async function loginThroughUi(page: Page, email: string, password: string) {
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  await page.getByLabel(/Correo Electrónico/i).fill(email);
-  await page.getByLabel(/Contraseña/i).fill(password);
-  await page.getByRole('button', { name: /^Iniciar Sesión$/i }).click();
+  await page.goto('/login/', { waitUntil: 'networkidle' });
+  await expect(page.getByText('Cargando países...')).toBeHidden({ timeout: 60000 });
+  await page.locator('#email').fill(email);
+  await page.locator('#password').fill(password);
+  const submitButton = page.getByRole('button', { name: /^Iniciar Sesión$/i });
+  await expect(submitButton).toBeEnabled({ timeout: 30000 });
+  await submitButton.click();
   await expectDashboardReady(page);
   await closeTourIfVisible(page);
 }

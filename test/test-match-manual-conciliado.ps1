@@ -2,7 +2,7 @@
 # Este script prueba el endpoint POST /api/finanzas/conciliacion/:id/marcar-item
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ZTU3ZGU2Yy1hOTBjLTRhMzItYjU5Zi1lMzJiMzE0YzQwNjgiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwidGVuYW50X2lkIjoiNzZhNjU0YTUtZTNiMy00YzU3LWI0YzYtMzk1YzJhMzY5YjU3IiwiaWF0IjoxNzMzMzQ1Mzk3LCJleHAiOjE3MzM0MzE3OTd9.Rl-tMYqvhBqOXqKEqLlZJjvPvXCqLlZJjvPvXCqLlZJjvPvXCqLlZJjvPvXCqLl"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "76a654a5-e3b3-4c57-b4c6-395c2a369b57"
 
 $headers = @{
@@ -102,12 +102,12 @@ $movimientosUrl = "$baseUrl/api/finanzas/bancos/cuentas/$($cuentaBancaria.id)/mo
 try {
     $movimientosResponse = Invoke-RestMethod -Uri $movimientosUrl -Method Get -Headers $headers
     $movimientoExtracto = $movimientosResponse.data | Where-Object { $_.es_extracto -eq $true -and $_.conciliacion_id -eq $conciliacionId } | Select-Object -First 1
-    
+
     if (-not $movimientoExtracto) {
         Write-Host "ERROR: No se encontró el movimiento del extracto" -ForegroundColor Red
         exit 1
     }
-    
+
     $movimientoExtractoId = $movimientoExtracto.id
     Write-Host "✓ Movimiento extracto encontrado: $movimientoExtractoId" -ForegroundColor Green
     Write-Host "  - Tipo: $($movimientoExtracto.tipo)" -ForegroundColor Gray
@@ -161,10 +161,10 @@ Write-Host "PASO 6: Verificando estado de conciliación..." -ForegroundColor Yel
 
 try {
     $movimientosResponse = Invoke-RestMethod -Uri $movimientosUrl -Method Get -Headers $headers
-    
+
     $movSistemaActualizado = $movimientosResponse.data | Where-Object { $_.id -eq $movimientoSistemaId } | Select-Object -First 1
     $movExtractoActualizado = $movimientosResponse.data | Where-Object { $_.id -eq $movimientoExtractoId } | Select-Object -First 1
-    
+
     Write-Host ""
     Write-Host "Estado final de los movimientos:" -ForegroundColor Cyan
     Write-Host ""
@@ -178,7 +178,7 @@ try {
     Write-Host "  - Conciliado: $($movExtractoActualizado.conciliado)" -ForegroundColor $(if ($movExtractoActualizado.conciliado) { "Green" } else { "Red" })
     Write-Host "  - Es Extracto: $($movExtractoActualizado.es_extracto)" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Validar que ambos están conciliados
     if ($movSistemaActualizado.conciliado -and $movExtractoActualizado.conciliado) {
         Write-Host "✓✓✓ ÉXITO: Ambos movimientos están marcados como CONCILIADO ✓✓✓" -ForegroundColor Green

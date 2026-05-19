@@ -2,10 +2,14 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { ProveedoresRepository } from '../repositories/proveedores.repository';
 import { CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class ProveedoresService {
-  constructor(private readonly proveedoresRepository: ProveedoresRepository) {}
+  constructor(
+    private readonly proveedoresRepository: ProveedoresRepository,
+    private readonly auditService: AuditService,
+  ) {}
 
   async findAll(tenantId: string, filters?: { 
     activo?: boolean; 
@@ -51,12 +55,24 @@ export class ProveedoresService {
       throw new BadRequestException('El límite de crédito no puede ser negativo');
     }
 
-    return await this.proveedoresRepository.create(createDto, tenantId, userId);
+    const proveedor = await this.proveedoresRepository.create(createDto, tenantId, userId);
+    if (userId) {
+      await this.auditService.registrarCambio(
+        'proveedores',
+        'INSERT',
+        userId,
+        { new: proveedor },
+        tenantId,
+        proveedor.id,
+        { accion: 'CREAR_PROVEEDOR' },
+      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de creación de proveedor:', error));
+    }
+    return proveedor;
   }
 
-  async update(id: string, updateDto: UpdateProveedorDto, tenantId: string) {
+  async update(id: string, updateDto: UpdateProveedorDto, tenantId: string, userId?: string) {
     // Verificar que el proveedor existe
-    await this.findById(id, tenantId);
+    const previousProveedor = await this.findById(id, tenantId);
 
     // Si se está actualizando el RUC, validarlo
     if (updateDto.ruc) {
@@ -79,7 +95,19 @@ export class ProveedoresService {
       throw new BadRequestException('El límite de crédito no puede ser negativo');
     }
 
-    return await this.proveedoresRepository.update(id, updateDto, tenantId);
+    const proveedor = await this.proveedoresRepository.update(id, updateDto, tenantId);
+    if (userId) {
+      await this.auditService.registrarCambio(
+        'proveedores',
+        'UPDATE',
+        userId,
+        { old: previousProveedor, new: proveedor },
+        tenantId,
+        id,
+        { accion: 'EDITAR_PROVEEDOR' },
+      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de edición de proveedor:', error));
+    }
+    return proveedor;
   }
 
   async softDelete(id: string, tenantId: string) {
@@ -102,6 +130,22 @@ export class ProveedoresService {
     // Perú: 11 dígitos, Colombia: 9 dígitos
     if (cleanRuc.length !== 11 && cleanRuc.length !== 9) {
       throw new BadRequestException('El RUC debe tener 11 dígitos (Perú) o 9 dígitos (Colombia)');
+    }
+
+    // Validar dígito verificador para RUC peruano (módulo 11 SUNAT)
+    if (cleanRuc.length === 11) {
+      const prefijo = cleanRuc.substring(0, 2);
+      if (!['10', '15', '17', '20'].includes(prefijo)) {
+        throw new BadRequestException(`Prefijo de RUC inválido: ${prefijo}. Debe iniciar con 10, 15, 17 o 20`);
+      }
+      const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+      const digitos = cleanRuc.split('').map(Number);
+      const suma = factores.reduce((acc, factor, i) => acc + factor * digitos[i], 0);
+      const resto = 11 - (suma % 11);
+      const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
+      if (digitoVerificador !== digitos[10]) {
+        throw new BadRequestException('RUC inválido: dígito verificador no coincide');
+      }
     }
   }
 

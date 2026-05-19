@@ -1,11 +1,11 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { customAuth } from '@/lib/auth-service'
 import { useToast } from '@/components/ui/use-toast'
+import { cn } from '@/lib/utils'
 import {
   Building2,
   FileText,
@@ -393,26 +393,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   // Show loading state for items being checked
   if (loading && item.permission) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
-          margin: '0.25rem 0',
-          borderRadius: '12px',
-          color: 'var(--primary-400)',
-          fontSize: isTablet ? '0.85rem' : '0.9rem',
-          minHeight: '44px',
-          opacity: 0.5,
-        }}
-      >
-        <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-        <span style={{
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          minWidth: 0
-        }}>
+      <div className={cn('my-1 flex min-h-11 items-center rounded-xl text-slate-400 opacity-50 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm')}>
+        <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
+        <span className="min-w-0 truncate whitespace-nowrap">
           {item.title}
         </span>
       </div>
@@ -422,51 +405,32 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   // If item has submenu, render as expandable
   if (item.submenu) {
     return (
-      <div style={{ margin: '0.25rem 0' }}>
+      <div className="my-1">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            width: '100%',
-            padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
-            borderRadius: '12px',
-            textDecoration: 'none',
-            color: isSubmenuActive ? 'white' : 'var(--primary-600)',
-            fontWeight: isSubmenuActive ? '700' : '600',
-            fontSize: isTablet ? '0.85rem' : '0.9rem',
-            transition: 'all 0.3s ease',
-            background: isSubmenuActive ? 'var(--gradient-primary)' : 'transparent',
-            boxShadow: isSubmenuActive ? 'var(--shadow-lg)' : 'none',
-            border: 'none',
-            cursor: 'pointer',
-            minHeight: '44px'
-          }}
+          className={cn(
+            'flex min-h-11 w-full items-center justify-between rounded-xl border border-transparent transition duration-300',
+            isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
+            isSubmenuActive
+              ? 'bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white shadow-[0_18px_40px_rgba(8,145,178,0.25)]'
+              : 'font-semibold text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
+          )}
         >
-          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-            <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-            <span style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              minWidth: 0
-            }}>
+          <div className="flex min-w-0 flex-1 items-center">
+            <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
+            <span className="min-w-0 truncate whitespace-nowrap">
               {item.title}
             </span>
           </div>
           {isExpanded ? (
-            <ChevronDown size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
           ) : (
-            <ChevronRight size={16} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />
+            <ChevronRight className="ml-2 h-4 w-4 shrink-0" />
           )}
         </button>
 
         {isExpanded && (
-          <div style={{
-            marginLeft: isTablet ? '1rem' : '1.5rem',
-            marginTop: '0.25rem'
-          }}>
+          <div className={cn('mt-1', isTablet ? 'ml-4' : 'ml-6')}>
             {item.submenu.map((subItem) => (
               <MenuItem
                 key={subItem.href}
@@ -510,34 +474,18 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     <Link
       key={item.href}
       href={item.href!}
-      className={`nav-item ${isActive ? 'active' : ''}`}
+      className={cn(
+        'nav-item my-1 flex min-h-11 items-center rounded-xl border transition duration-300',
+        isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
+        isActive
+          ? 'active -translate-y-px border-transparent bg-gradient-to-br from-cyan-500 to-blue-600 font-bold text-white shadow-[0_18px_40px_rgba(8,145,178,0.25)]'
+          : 'border-transparent font-semibold text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
+      )}
       data-tour={getDataTour(item.title)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: isTablet ? '0.75rem 1rem' : '1rem 1.5rem',
-        margin: '0.25rem 0',
-        borderRadius: '12px',
-        textDecoration: 'none',
-        color: isActive ? 'white' : 'var(--primary-600)',
-        fontWeight: isActive ? '700' : '600',
-        fontSize: isTablet ? '0.85rem' : '0.9rem',
-        transition: 'all 0.3s ease',
-        background: isActive ? 'var(--gradient-primary)' : 'transparent',
-        boxShadow: isActive ? 'var(--shadow-lg)' : 'none',
-        transform: isActive ? 'translateY(-1px)' : 'none',
-        border: isActive ? 'none' : '1px solid transparent',
-        minHeight: '44px'
-      }}
       onClick={onClose}
     >
-      <Icon size={isTablet ? 18 : 20} style={{ marginRight: isTablet ? '0.5rem' : '0.75rem', flexShrink: 0 }} />
-      <span style={{
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        minWidth: 0
-      }}>
+      <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
+      <span className="min-w-0 truncate whitespace-nowrap">
         {item.title}
       </span>
     </Link>
@@ -625,87 +573,55 @@ export default function Sidebar() {
     }
   }
 
-  const sidebarWidth = isMobile ? '280px' : isTablet ? '240px' : '280px'
-
   return (
     <>
       {/* Mobile menu button */}
       <button
-        className="mobile-menu-btn"
+        className={cn(
+          'mobile-menu-btn fixed left-4 top-4 z-[1002] hidden cursor-pointer items-center justify-center rounded-xl border border-cyan-300/20 bg-slate-950/95 p-3 text-sky-100 shadow-lg backdrop-blur-xl transition duration-300 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white/95 group-data-[erp-theme=light]/dashboard:text-blue-800',
+          isMobile && 'flex',
+        )}
         aria-label={isOpen ? 'Cerrar menú' : 'Abrir menú'}
         title={isOpen ? 'Cerrar menú' : 'Abrir menú'}
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'fixed',
-          top: '1rem',
-          left: '1rem',
-          zIndex: 1002,
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          borderRadius: 'var(--border-radius)',
-          padding: '0.75rem',
-          cursor: 'pointer',
-          display: isMobile ? 'flex' : 'none',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--shadow-lg)',
-          transition: 'all 0.3s ease'
-        }}
       >
-        {isOpen ? <X size={20} style={{ color: 'var(--primary-600)' }} /> : <Menu size={20} style={{ color: 'var(--primary-600)' }} />}
+        {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       {/* Sidebar */}
       <aside
-        className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}
-        style={{
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          height: '100vh',
-          width: sidebarWidth,
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.3)',
-          padding: isTablet ? '1.5rem 0' : '2rem 0',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          zIndex: 1001,
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
-          boxShadow: 'var(--shadow-2xl)',
-          WebkitOverflowScrolling: 'touch'
-        }}
+        className={cn(
+          'sidebar fixed left-0 top-0 z-[1001] h-screen w-[280px] overflow-x-hidden overflow-y-auto border-r border-cyan-300/15 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 shadow-[24px_0_70px_rgba(2,8,23,0.5)] backdrop-blur-xl transition-transform duration-300 ease-out [-webkit-overflow-scrolling:touch] group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-slate-50 group-data-[erp-theme=light]/dashboard:to-slate-100 group-data-[erp-theme=light]/dashboard:shadow-[24px_0_70px_rgba(15,23,42,0.12)]',
+          isTablet ? 'py-6 md:w-[240px] lg:w-[280px]' : 'py-8',
+          isMobile && !isOpen ? '-translate-x-full' : 'translate-x-0',
+          isOpen && 'sidebar-open',
+        )}
       >
         {/* Logo */}
-        <div style={{
-          padding: isTablet ? '1rem 1.5rem' : '1.5rem 2rem',
-          borderBottom: '1px solid var(--primary-200)',
-          flexShrink: 0
-        }}>
-          <Link href="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Image
-              src="/logo.png"
-              alt="NEON SYSTEM"
-              width={180}
-              height={60}
-              priority
-              style={{
-                width: isTablet ? '140px' : '180px',
-                height: 'auto',
-                objectFit: 'contain'
-              }}
-            />
+        <div className={cn('shrink-0 border-b border-slate-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200', isTablet ? 'px-5 py-4' : 'p-6')}>
+          <Link
+            href="/dashboard"
+            className={cn(
+              'flex items-center gap-3 rounded-[18px] border border-cyan-300/20 bg-gradient-to-br from-sky-950/75 to-slate-900/65 no-underline shadow-[0_18px_45px_rgba(8,145,178,0.12)] group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:to-blue-50',
+              isTablet ? 'p-3' : 'p-3.5',
+            )}
+          >
+            <span className={cn('grid place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 font-black tracking-normal text-cyan-50 shadow-[0_16px_35px_rgba(37,99,235,0.35)]', isTablet ? 'h-11 w-11 text-lg' : 'h-[50px] w-[50px] text-[1.35rem]')}>
+              N
+            </span>
+            <span className="min-w-0">
+              <span className={cn('block font-black leading-none tracking-[0.08em] text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950', isTablet ? 'text-[0.95rem]' : 'text-[1.05rem]')}>
+                NEON
+              </span>
+              <span className={cn('mt-1 block font-bold leading-none tracking-[0.2em] text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600', isTablet ? 'text-[0.62rem]' : 'text-[0.68rem]')}>
+                ERP SUITE
+              </span>
+            </span>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav style={{
-          padding: isTablet ? '1.5rem 0.75rem' : '2rem 1rem',
-          flex: 1,
-          overflowY: 'auto'
-        }}>
+        <nav className={cn('flex-1 overflow-y-auto', isTablet ? 'px-3 py-6' : 'px-4 py-8')}>
           {filteredMenuItems.map((item) => (
             <MenuItem
               key={item.href || item.title}
@@ -719,65 +635,20 @@ export default function Sidebar() {
         </nav>
 
         {/* User Section */}
-        <div style={{
-          padding: isTablet ? '0.75rem' : '1rem',
-          borderTop: '1px solid var(--primary-200)',
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: isTablet ? '0.75rem' : '1rem'
-        }}>
+        <div className={cn('flex shrink-0 flex-col border-t border-slate-400/15', isTablet ? 'gap-3 p-3' : 'gap-4 p-4')}>
           {/* User Info Card */}
-          <div style={{
-            padding: isTablet ? '0.75rem' : '1rem',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(14, 165, 233, 0.05) 100%)',
-            borderRadius: 'var(--border-radius)',
-            border: '1px solid rgba(59, 130, 246, 0.2)'
-          }}>
-            <div style={{
-              fontSize: isTablet ? '0.85rem' : '0.9rem',
-              fontWeight: '700',
-              color: 'var(--primary-800)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>{user?.nombre || 'Usuario'}</div>
-            <div style={{
-              fontSize: isTablet ? '0.75rem' : '0.8rem',
-              color: 'var(--primary-500)',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>{user?.email || ''}</div>
+          <div className={cn('rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-blue-500/10 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:from-blue-50 group-data-[erp-theme=light]/dashboard:to-white', isTablet ? 'p-3' : 'p-4')}>
+            <div className={cn('truncate whitespace-nowrap font-bold text-sky-100 group-data-[erp-theme=light]/dashboard:text-slate-950', isTablet ? 'text-[0.85rem]' : 'text-sm')}>{user?.nombre || 'Usuario'}</div>
+            <div className={cn('truncate whitespace-nowrap font-medium text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'text-xs' : 'text-[0.8rem]')}>{user?.email || ''}</div>
           </div>
 
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              padding: isTablet ? '0.5rem' : '0.75rem 1rem',
-              background: 'transparent',
-              border: '1px solid var(--red-200)',
-              borderRadius: 'var(--border-radius)',
-              color: 'var(--red-600)',
-              fontSize: isTablet ? '0.85rem' : '0.9rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              minHeight: '44px'
-            }}
+            className={cn('flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-slate-500/40 bg-transparent font-semibold text-slate-300 transition duration-300 hover:border-cyan-300/30 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700', isTablet ? 'p-2 text-[0.85rem]' : 'px-4 py-3 text-sm')}
           >
-            <LogOut size={isTablet ? 16 : 18} style={{ marginRight: isTablet ? '0.25rem' : '0.5rem' }} />
-            <span style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>Cerrar Sesión</span>
+            <LogOut className={cn('shrink-0', isTablet ? 'mr-1 h-4 w-4' : 'mr-2 h-[18px] w-[18px]')} />
+            <span className="truncate whitespace-nowrap">Cerrar Sesión</span>
           </button>
         </div>
       </aside>
@@ -785,13 +656,7 @@ export default function Sidebar() {
       {/* Mobile overlay */}
       {isMobile && isOpen && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.8)',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)'
-          }}
+          className="fixed inset-0 z-[1000] bg-slate-900/80 backdrop-blur"
           onClick={() => setIsOpen(false)}
         />
       )}

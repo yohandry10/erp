@@ -70,7 +70,7 @@ try {
     Write-Host "  Número: $ordenNumero" -ForegroundColor Gray
     Write-Host "  Estado: $ordenEstado" -ForegroundColor Gray
     Write-Host "  Total: $($ordenResponse.data.total)" -ForegroundColor Gray
-    
+
     # Verify it's in APROBACION state if it requires approval
     if ($ordenEstado -eq "APROBACION") {
         Write-Host "  ✓ Orden requires approval (estado: APROBACION)" -ForegroundColor Green
@@ -107,11 +107,11 @@ $aprobar1Body = @{
 
 try {
     $aprobar1Response = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/aprobar" -Method Post -Body $aprobar1Body -ContentType "application/json"
-    
+
     if ($aprobar1Response.success) {
         Write-Host "✓ Primera aprobación registrada" -ForegroundColor Green
         Write-Host "  Estado: $($aprobar1Response.data.estado)" -ForegroundColor Gray
-        
+
         # Check if still in APROBACION state (waiting for more approvals)
         if ($aprobar1Response.data.estado -eq "APROBACION") {
             Write-Host "  ✓ Orden still in APROBACION (waiting for more approvals)" -ForegroundColor Green
@@ -134,7 +134,7 @@ Write-Host ""
 Write-Host "Step 5: Testing duplicate approval by same aprobador..." -ForegroundColor Yellow
 try {
     $duplicateResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/aprobar" -Method Post -Body $aprobar1Body -ContentType "application/json"
-    
+
     if (-not $duplicateResponse.success) {
         Write-Host "✓ Duplicate approval correctly rejected" -ForegroundColor Green
         Write-Host "  Error message: $($duplicateResponse.error)" -ForegroundColor Gray
@@ -154,7 +154,7 @@ try {
     $currentResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId`?tenant_id=$tenantId" -Method Get
     $currentEstado = $currentResponse.data.estado
     Write-Host "✓ Current estado: $currentEstado" -ForegroundColor Green
-    
+
     if ($currentEstado -eq "APROBADA") {
         Write-Host "  ✓ All approvals completed - Orden is APROBADA" -ForegroundColor Green
         Write-Host "  Aprobado por: $($currentResponse.data.aprobado_by)" -ForegroundColor Gray
@@ -210,7 +210,7 @@ $rechazarBody = @{
 
 try {
     $rechazarResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$orden2Id/rechazar" -Method Post -Body $rechazarBody -ContentType "application/json"
-    
+
     if ($rechazarResponse.success) {
         Write-Host "✓ Orden rechazada exitosamente" -ForegroundColor Green
         Write-Host "  Estado: $($rechazarResponse.data.estado)" -ForegroundColor Gray
@@ -232,7 +232,7 @@ $aprobarRejectedBody = @{
 
 try {
     $aprobarRejectedResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$orden2Id/aprobar" -Method Post -Body $aprobarRejectedBody -ContentType "application/json"
-    
+
     if (-not $aprobarRejectedResponse.success) {
         Write-Host "✓ Approval of rejected orden correctly blocked" -ForegroundColor Green
         Write-Host "  Error message: $($aprobarRejectedResponse.error)" -ForegroundColor Gray

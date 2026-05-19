@@ -2,7 +2,7 @@
 # Endpoint: POST /api/finanzas/cxp
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzY5YzI5Yy1hNzI5LTRhNzAtYjI5Ny1lNzI5YzI5YzI5YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.fake-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 
 Write-Host "🧪 Test: Crear Cuenta por Pagar Manual" -ForegroundColor Cyan
@@ -78,7 +78,7 @@ try {
     Write-Host "`n❌ Error al crear cuenta por pagar" -ForegroundColor Red
     Write-Host "Status Code: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Red
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "Details:" -ForegroundColor Red
         $_.ErrorDetails.Message | ConvertFrom-Json | ConvertTo-Json -Depth 10 | Write-Host

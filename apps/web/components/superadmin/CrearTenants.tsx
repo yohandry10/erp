@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useApiCall } from '@/hooks/use-api'
 import GestionTenants from './components/GestionTenants'
@@ -22,7 +22,9 @@ export interface Tenant {
 }
 
 export default function CrearTenants() {
-  const api = useApiCall()
+  const { get, delete: deleteRequest } = useApiCall({ showErrorToast: false })
+  const getRef = useRef(get)
+  const deleteRef = useRef(deleteRequest)
 
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(false)
@@ -35,13 +37,27 @@ export default function CrearTenants() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL')
 
+  useEffect(() => {
+    getRef.current = get
+    deleteRef.current = deleteRequest
+  }, [get, deleteRequest])
+
   const fetchTenants = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/tenants')
-      if (res?.success) {
-        setTenants(res.data || [])
+      const res = await getRef.current('/tenants')
+      const rawTenants = res?.data ?? res
+      const nextTenants = Array.isArray(rawTenants)
+        ? rawTenants
+        : Array.isArray(rawTenants?.items)
+          ? rawTenants.items
+          : Array.isArray(rawTenants?.tenants)
+            ? rawTenants.tenants
+            : []
+
+      if (res && res.success !== false) {
+        setTenants(nextTenants)
       } else {
         setError(res?.message || 'No se pudo cargar los tenants')
       }
@@ -50,7 +66,7 @@ export default function CrearTenants() {
     } finally {
       setLoading(false)
     }
-  }, [api])
+  }, [])
 
   useEffect(() => {
     fetchTenants()
@@ -94,7 +110,7 @@ export default function CrearTenants() {
     }
 
     try {
-      const res = await api.delete(`/tenants/${tenant.id}`)
+      const res = await deleteRef.current(`/tenants/${tenant.id}`)
       if (res?.success) {
         alert('✅ Empresa eliminada exitosamente')
         fetchTenants()

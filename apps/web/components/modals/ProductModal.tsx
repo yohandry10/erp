@@ -74,47 +74,21 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
   if (!isOpen) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '600px',
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>Nuevo Producto</h2>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
+      <div className="bg-white rounded-3 p-8 w-[90%] max-w-[600px] overflow-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-6 font-semibold text-gray-800">Nuevo Producto</h2>
           <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#6b7280'
-            }}
+            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
           >
             ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Código *
               </label>
               <input
@@ -122,19 +96,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="codigo"
                 value={formData.codigo}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Nombre *
               </label>
               <input
@@ -142,53 +109,31 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="nombre"
                 value={formData.nombre}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+            <div>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Descripción
               </label>
               <textarea
                 name="descripcion"
                 value={formData.descripcion}
                 onChange={handleChange}
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  resize: 'vertical'
-                }}
+                rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Categoría *
               </label>
               <select
                 name="categoria"
                 value={formData.categoria}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               >
                 <option value="">Seleccionar categoría</option>
                 <option value="Tecnología">Tecnología</option>
@@ -200,20 +145,13 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Unidad de Medida
               </label>
               <select
                 name="unidadMedida"
                 value={formData.unidadMedida}
-                onChange={handleChange}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
               >
                 <option value="UND">Unidad</option>
                 <option value="KG">Kilogramo</option>
@@ -225,7 +163,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Precio Compra *
               </label>
               <input
@@ -235,19 +173,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Precio Venta *
               </label>
               <input
@@ -257,19 +188,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Stock Inicial *
               </label>
               <input
@@ -278,19 +202,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 value={formData.stock}
                 onChange={handleChange}
                 min="0"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Stock Mínimo *
               </label>
               <input
@@ -299,19 +216,12 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 value={formData.stockMinimo}
                 onChange={handleChange}
                 min="0"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Stock Máximo
               </label>
               <input
@@ -319,65 +229,33 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
                 name="stockMaximo"
                 value={formData.stockMaximo}
                 onChange={handleChange}
-                min="0"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                min="0" className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Proveedor
               </label>
               <input
                 type="text"
                 name="proveedor"
                 value={formData.proveedor}
-                onChange={handleChange}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+          <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={api.loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: api.loading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                cursor: api.loading ? 'not-allowed' : 'pointer',
-                fontWeight: '600'
-              }}
+              disabled={api.loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
             >
               {api.loading ? 'Guardando...' : 'Crear Producto'}
             </button>

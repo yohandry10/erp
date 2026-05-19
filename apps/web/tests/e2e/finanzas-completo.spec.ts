@@ -592,6 +592,42 @@ test.describe('T13 Finanzas completo', () => {
       'no debe conciliar movimiento ya conciliado',
     );
 
+    const mismatchMov = await parseOk<any>(
+      await apiContext.post(api('/finanzas/bancos/movimientos'), {
+        data: {
+          cuenta_bancaria_id: cuenta.id,
+          tipo: 'ABONO',
+          monto: 44.44,
+          fecha: today(),
+          descripcion: 'Movimiento mismatch T13',
+          referencia: `MISMATCH-SYS-${runId}`,
+        },
+      }),
+      'crear movimiento mismatch T13',
+    );
+    await parseOk<any>(
+      await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/importar-csv`), {
+        data: {
+          banco: 'GENERICO',
+          contenidoCsv: `Fecha,Descripcion,Referencia,Tipo,Monto\n${today()},Movimiento mismatch T13,MISMATCH-EXT-${runId},ABONO,44.45`,
+        },
+      }),
+      'importar extracto mismatch T13',
+    );
+    const extractosMismatch = await parseOk<any[]>(
+      await apiContext.get(api(`/finanzas/bancos/cuentas/${cuenta.id}/movimientos?conciliado=false&es_extracto=true&conciliacion_id=${conciliacion.id}&limit=100`)),
+      'listar extracto mismatch T13',
+    );
+    const mismatchExtracto = extractosMismatch.find((mov) => mov.referencia === `MISMATCH-EXT-${runId}`);
+    expect(mismatchExtracto?.id, 'debe existir extracto mismatch pendiente').toBeTruthy();
+    await expectStatus(
+      await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/marcar-item`), {
+        data: { movimiento_sistema_id: mismatchMov.id, movimiento_extracto_id: mismatchExtracto.id },
+      }),
+      400,
+      'no debe conciliar montos distintos sin autorizacion explicita',
+    );
+
     const conciliadosDespues = await parseOk<any[]>(
       await apiContext.get(api(`/finanzas/bancos/cuentas/${cuenta.id}/movimientos?conciliado=true&limit=100`)),
       'filtrar movimientos conciliados despues',

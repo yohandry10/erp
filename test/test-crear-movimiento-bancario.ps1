@@ -2,7 +2,7 @@
 # Endpoint: POST /api/finanzas/bancos/movimientos
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZTBiNGU0YS1mODg4LTRkMzMtYjBhOS1lMzNhMWVkMzJlMGIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJpYXQiOjE3Mjk4MDA2MzIsImV4cCI6MTczMjM5MjYzMn0.VJk7fQOoGq-2Rl0Yx_Ry3Yx5Zy8Zy8Zy8Zy8Zy8Zy8"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "c77b8c4e-4d5e-4f6a-8b9c-1a2b3c4d5e6f"
 
 $headers = @{
@@ -19,7 +19,7 @@ Write-Host "========================================`n" -ForegroundColor Cyan
 Write-Host "Paso 1: Obteniendo cuentas bancarias..." -ForegroundColor Yellow
 try {
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas" -Method Get -Headers $headers
-    
+
     if ($cuentasResponse.success -and $cuentasResponse.data.Count -gt 0) {
         $cuenta = $cuentasResponse.data[0]
         Write-Host "✓ Cuenta bancaria encontrada:" -ForegroundColor Green
@@ -28,13 +28,13 @@ try {
         Write-Host "  Banco: $($cuenta.banco)" -ForegroundColor White
         Write-Host "  Saldo actual: $($cuenta.saldo) $($cuenta.moneda)" -ForegroundColor White
         Write-Host "  Permite sobregiro: $($cuenta.permite_sobregiro)" -ForegroundColor White
-        
+
         $cuentaBancariaId = $cuenta.id
         $saldoAnterior = $cuenta.saldo
     } else {
         Write-Host "✗ No se encontraron cuentas bancarias" -ForegroundColor Red
         Write-Host "Creando una cuenta bancaria de prueba..." -ForegroundColor Yellow
-        
+
         $nuevaCuenta = @{
             nombre = "Cuenta Test Movimientos"
             banco = "BCP"
@@ -45,11 +45,11 @@ try {
             permite_sobregiro = $false
             activa = $true
         } | ConvertTo-Json
-        
+
         $cuentaResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas" -Method Post -Headers $headers -Body $nuevaCuenta
         $cuentaBancariaId = $cuentaResponse.data.id
         $saldoAnterior = $cuentaResponse.data.saldo
-        
+
         Write-Host "✓ Cuenta bancaria creada: $cuentaBancariaId" -ForegroundColor Green
     }
 } catch {
@@ -71,7 +71,7 @@ $movimientoAbono = @{
 
 try {
     $abonoResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos" -Method Post -Headers $headers -Body $movimientoAbono
-    
+
     if ($abonoResponse.success) {
         Write-Host "✓ Movimiento ABONO creado exitosamente" -ForegroundColor Green
         Write-Host "  ID: $($abonoResponse.data.id)" -ForegroundColor White
@@ -82,7 +82,7 @@ try {
         Write-Host "  Referencia: $($abonoResponse.data.referencia)" -ForegroundColor White
         Write-Host "  Saldo anterior: $($abonoResponse.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor White
         Write-Host "  Saldo nuevo: $($abonoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor White
-        
+
         $nuevoSaldo = $abonoResponse.data.cuenta_bancaria.saldo_nuevo
     } else {
         Write-Host "✗ Error: $($abonoResponse.message)" -ForegroundColor Red
@@ -110,7 +110,7 @@ $movimientoCargo = @{
 
 try {
     $cargoResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos" -Method Post -Headers $headers -Body $movimientoCargo
-    
+
     if ($cargoResponse.success) {
         Write-Host "✓ Movimiento CARGO creado exitosamente" -ForegroundColor Green
         Write-Host "  ID: $($cargoResponse.data.id)" -ForegroundColor White
@@ -137,16 +137,16 @@ try {
 Write-Host "`nPaso 4: Verificando movimientos creados..." -ForegroundColor Yellow
 try {
     $movimientosResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaBancariaId/movimientos" -Method Get -Headers $headers
-    
+
     if ($movimientosResponse.success) {
         Write-Host "✓ Movimientos obtenidos: $($movimientosResponse.data.Count)" -ForegroundColor Green
         Write-Host "`nÚltimos movimientos:" -ForegroundColor Cyan
-        
+
         $movimientosResponse.data | Select-Object -First 5 | ForEach-Object {
             $color = if ($_.tipo -eq "ABONO") { "Green" } else { "Red" }
             Write-Host "  - [$($_.tipo)] $($_.fecha) | $($_.monto) | $($_.descripcion)" -ForegroundColor $color
         }
-        
+
         Write-Host "`nPaginación:" -ForegroundColor Cyan
         Write-Host "  Página: $($movimientosResponse.pagination.page)" -ForegroundColor White
         Write-Host "  Total: $($movimientosResponse.pagination.total)" -ForegroundColor White
@@ -160,17 +160,17 @@ try {
 Write-Host "`nPaso 5: Verificando saldo actualizado de la cuenta..." -ForegroundColor Yellow
 try {
     $cuentaActualizada = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaBancariaId" -Method Get -Headers $headers
-    
+
     if ($cuentaActualizada.success) {
         Write-Host "✓ Saldo actualizado correctamente" -ForegroundColor Green
         Write-Host "  Saldo inicial: $saldoAnterior" -ForegroundColor White
         Write-Host "  + ABONO: 2500.75" -ForegroundColor Green
         Write-Host "  - CARGO: 1200.50" -ForegroundColor Red
         Write-Host "  = Saldo final: $($cuentaActualizada.data.saldo)" -ForegroundColor Cyan
-        
+
         $saldoEsperado = [math]::Round($saldoAnterior + 2500.75 - 1200.50, 2)
         $saldoReal = $cuentaActualizada.data.saldo
-        
+
         if ([math]::Abs($saldoReal - $saldoEsperado) -lt 0.01) {
             Write-Host "`n✓ VALIDACIÓN: El saldo es correcto" -ForegroundColor Green
         } else {

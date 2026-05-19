@@ -24,7 +24,7 @@ $createBody = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores" -Method Post -Body $createBody -ContentType "application/json"
-    
+
     if ($createResponse.success) {
         $proveedorId = $createResponse.data.id
         Write-Host "✓ Proveedor creado exitosamente" -ForegroundColor Green
@@ -58,7 +58,7 @@ $updateBody = @{
 
 try {
     $updateResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId" -Method Put -Body $updateBody -ContentType "application/json"
-    
+
     if ($updateResponse.success) {
         Write-Host "✓ Proveedor actualizado exitosamente" -ForegroundColor Green
         Write-Host "  Razón Social: $($updateResponse.data.razon_social)" -ForegroundColor Gray
@@ -84,49 +84,49 @@ try {
 Write-Host "Paso 3: Verificando cambios..." -ForegroundColor Yellow
 try {
     $getResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($getResponse.success) {
         $proveedor = $getResponse.data
-        
+
         # Verificar cada campo actualizado
         $errores = @()
-        
+
         if ($proveedor.razon_social -ne "PROVEEDOR TEST ACTUALIZADO S.A.C.") {
             $errores += "Razón social no se actualizó correctamente"
         }
-        
+
         if ($proveedor.nombre_comercial -ne "Test Actualizado") {
             $errores += "Nombre comercial no se actualizó correctamente"
         }
-        
+
         if ($proveedor.email -ne "actualizado@test.com") {
             $errores += "Email no se actualizó correctamente"
         }
-        
+
         if ($proveedor.telefono -ne "+51 111 222 333") {
             $errores += "Teléfono no se actualizó correctamente"
         }
-        
+
         if ($proveedor.direccion -ne "Av. Nueva 456") {
             $errores += "Dirección no se actualizó correctamente"
         }
-        
+
         if ($proveedor.contacto -ne "María García") {
             $errores += "Contacto no se actualizó correctamente"
         }
-        
+
         if ($proveedor.condiciones_pago -ne "CREDITO_30") {
             $errores += "Condiciones de pago no se actualizaron correctamente"
         }
-        
+
         if ($proveedor.limite_credito -ne 50000) {
             $errores += "Límite de crédito no se actualizó correctamente"
         }
-        
+
         if ($proveedor.dias_credito -ne 30) {
             $errores += "Días de crédito no se actualizaron correctamente"
         }
-        
+
         if ($errores.Count -eq 0) {
             Write-Host "✓ Todos los cambios se guardaron correctamente" -ForegroundColor Green
             Write-Host ""
@@ -154,7 +154,7 @@ $partialUpdateBody = @{
 
 try {
     $partialResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId" -Method Put -Body $partialUpdateBody -ContentType "application/json"
-    
+
     if ($partialResponse.success) {
         Write-Host "✓ Actualización parcial exitosa" -ForegroundColor Green
         Write-Host "  Teléfono actualizado: $($partialResponse.data.telefono)" -ForegroundColor Gray
@@ -180,7 +180,7 @@ $invalidEmailBody = @{
 
 try {
     $invalidResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId" -Method Put -Body $invalidEmailBody -ContentType "application/json"
-    
+
     if (-not $invalidResponse.success) {
         Write-Host "  ✓ Validación de email funcionando correctamente" -ForegroundColor Green
         Write-Host "    Error: $($invalidResponse.error)" -ForegroundColor Gray
@@ -200,7 +200,7 @@ $negativeLimitBody = @{
 
 try {
     $negativeResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId" -Method Put -Body $negativeLimitBody -ContentType "application/json"
-    
+
     if (-not $negativeResponse.success) {
         Write-Host "  ✓ Validación de límite de crédito funcionando correctamente" -ForegroundColor Green
         Write-Host "    Error: $($negativeResponse.error)" -ForegroundColor Gray
@@ -223,17 +223,17 @@ $otherProveedorBody = @{
 
 try {
     $otherResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores" -Method Post -Body $otherProveedorBody -ContentType "application/json"
-    
+
     if ($otherResponse.success) {
         # Intentar actualizar el primer proveedor con el RUC del segundo
         $duplicateRucBody = @{
             tenant_id = $tenantId
             ruc = "20888777666"
         } | ConvertTo-Json
-        
+
         try {
             $duplicateResponse = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores/$proveedorId" -Method Put -Body $duplicateRucBody -ContentType "application/json"
-            
+
             if (-not $duplicateResponse.success) {
                 Write-Host "  ✓ Validación de RUC duplicado funcionando correctamente" -ForegroundColor Green
                 Write-Host "    Error: $($duplicateResponse.error)" -ForegroundColor Gray

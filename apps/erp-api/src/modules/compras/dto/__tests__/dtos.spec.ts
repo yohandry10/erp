@@ -134,6 +134,7 @@ describe('Compras DTOs Validation', () => {
   describe('CreateDevolucionProveedorDto', () => {
     it('should validate a valid devolucion', async () => {
       const dto = plainToClass(CreateDevolucionProveedorDto, {
+        recepcion_id: '550e8400-e29b-41d4-a716-446655440004',
         orden_id: '550e8400-e29b-41d4-a716-446655440001',
         proveedor_id: '550e8400-e29b-41d4-a716-446655440002',
         motivo: 'Producto defectuoso',

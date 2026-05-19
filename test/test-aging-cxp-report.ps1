@@ -40,34 +40,34 @@ $headers = @{
 
 try {
     $agingResponse = Invoke-RestMethod -Uri $agingUrl -Method Get -Headers $headers
-    
+
     if ($agingResponse.success) {
         Write-Host "✓ Aging report retrieved successfully" -ForegroundColor Green
         Write-Host ""
-        
+
         # Display summary
         Write-Host "=== RESUMEN ===" -ForegroundColor Cyan
         Write-Host "Fecha Reporte: $($agingResponse.data.fecha_reporte)" -ForegroundColor White
         Write-Host ""
-        
+
         $resumen = $agingResponse.data.resumen
         Write-Host "Total Vencido:" -ForegroundColor White
         Write-Host "  Cantidad: $($resumen.total.cantidad) cuentas" -ForegroundColor Gray
         Write-Host "  Monto: S/ $($resumen.total.monto)" -ForegroundColor Gray
         Write-Host ""
-        
+
         Write-Host "Por Rangos:" -ForegroundColor White
         Write-Host "  0-30 días:   $($resumen.rango_0_30.cantidad) cuentas - S/ $($resumen.rango_0_30.monto)" -ForegroundColor Yellow
         Write-Host "  31-60 días:  $($resumen.rango_31_60.cantidad) cuentas - S/ $($resumen.rango_31_60.monto)" -ForegroundColor Yellow
         Write-Host "  61-90 días:  $($resumen.rango_61_90.cantidad) cuentas - S/ $($resumen.rango_61_90.monto)" -ForegroundColor Yellow
         Write-Host "  +90 días:    $($resumen.rango_mas_90.cantidad) cuentas - S/ $($resumen.rango_mas_90.monto)" -ForegroundColor Red
         Write-Host ""
-        
+
         # Display top 5 providers
         if ($agingResponse.data.por_proveedor.Count -gt 0) {
             Write-Host "=== TOP 5 PROVEEDORES CON MAYOR DEUDA ===" -ForegroundColor Cyan
             $topProveedores = $agingResponse.data.por_proveedor | Select-Object -First 5
-            
+
             foreach ($proveedor in $topProveedores) {
                 Write-Host ""
                 Write-Host "$($proveedor.proveedor_razon_social) (RUC: $($proveedor.proveedor_ruc))" -ForegroundColor White
@@ -78,18 +78,18 @@ try {
                 Write-Host "  +90:   S/ $($proveedor.rango_mas_90)" -ForegroundColor Gray
             }
         }
-        
+
         Write-Host ""
         Write-Host "=== DETALLE (Primeras 10 cuentas) ===" -ForegroundColor Cyan
         $detalleTop = $agingResponse.data.detalle | Select-Object -First 10
-        
+
         foreach ($cuenta in $detalleTop) {
             Write-Host ""
             Write-Host "Doc: $($cuenta.numero_documento) - $($cuenta.proveedor_razon_social)" -ForegroundColor White
             Write-Host "  Vencimiento: $($cuenta.fecha_vencimiento) (Días vencidos: $($cuenta.dias_vencidos))" -ForegroundColor Gray
             Write-Host "  Saldo: $($cuenta.moneda) $($cuenta.saldo) - Rango: $($cuenta.rango)" -ForegroundColor Gray
         }
-        
+
     } else {
         Write-Host "✗ Failed to retrieve aging report" -ForegroundColor Red
         Write-Host "Response: $($agingResponse | ConvertTo-Json -Depth 5)" -ForegroundColor Red

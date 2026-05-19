@@ -41,7 +41,7 @@ $periodoBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Headers $headers -Body $periodoBody
-    
+
     Write-Host "✅ Período creado exitosamente" -ForegroundColor Green
     Write-Host ""
     Write-Host "📅 Detalles del período:" -ForegroundColor Cyan
@@ -83,7 +83,7 @@ $periodoBody2 = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Headers $headers -Body $periodoBody2
-    
+
     Write-Host "✅ Período 2025-11 creado exitosamente" -ForegroundColor Green
     Write-Host "  ID: $($response.data.id)" -ForegroundColor White
     Write-Host "  Estado: $($response.data.estado)" -ForegroundColor White
@@ -99,11 +99,11 @@ Write-Host "5️⃣ Listar todos los períodos..." -ForegroundColor Yellow
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Períodos obtenidos exitosamente" -ForegroundColor Green
     Write-Host ""
     Write-Host "📋 Total de períodos: $($response.data.Count)" -ForegroundColor Cyan
-    
+
     foreach ($periodo in $response.data) {
         Write-Host "  • $($periodo.anio)-$(([string]$periodo.mes).PadLeft(2, '0')) - Estado: $($periodo.estado)" -ForegroundColor White
     }

@@ -140,6 +140,14 @@ export class PosController {
     return this.posService.obtenerVentasPendientesFacturacion(req.user);
   }
 
+  @Get('facturacion/:ventaId')
+  @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
+  @RequireFeatureFlag('pos')
+  @RequirePermission('pos.read') // HARDENING: consultar estado fiscal de una venta POS.
+  async obtenerEstadoFacturacionVenta(@Param('ventaId') ventaId: string, @Req() req: any) {
+    return this.posService.obtenerEstadoFacturacionVenta(ventaId, req.user);
+  }
+
   @Post('reintentar-facturacion/:ventaId')
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')

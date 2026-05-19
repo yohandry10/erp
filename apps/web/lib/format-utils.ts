@@ -52,6 +52,19 @@ export function formatNumber(amount: number | undefined | null, decimals: number
 // FORMATEO DE FECHAS
 // ============================================
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function parseDisplayDate(dateString: string | Date): Date {
+  if (dateString instanceof Date) return dateString
+
+  if (DATE_ONLY_PATTERN.test(dateString)) {
+    const [year, month, day] = dateString.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  return new Date(dateString)
+}
+
 /**
  * Formatea una fecha en formato corto (DD/MM/YYYY)
  * @param dateString - String de fecha ISO
@@ -59,9 +72,9 @@ export function formatNumber(amount: number | undefined | null, decimals: number
  */
 export function formatDate(dateString: string | Date | undefined | null): string {
   if (!dateString) return '-'
-  
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
+  const date = parseDisplayDate(dateString)
+
   return date.toLocaleDateString('es-PE', {
     year: 'numeric',
     month: '2-digit',
@@ -76,9 +89,9 @@ export function formatDate(dateString: string | Date | undefined | null): string
  */
 export function formatDateTime(dateString: string | Date | undefined | null): string {
   if (!dateString) return '-'
-  
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
+  const date = parseDisplayDate(dateString)
+
   return date.toLocaleDateString('es-PE', {
     year: 'numeric',
     month: '2-digit',
@@ -95,9 +108,9 @@ export function formatDateTime(dateString: string | Date | undefined | null): st
  */
 export function formatDateLong(dateString: string | Date | undefined | null): string {
   if (!dateString) return '-'
-  
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
+  const date = parseDisplayDate(dateString)
+
   return date.toLocaleDateString('es-PE', {
     year: 'numeric',
     month: 'long',
@@ -111,8 +124,8 @@ export function formatDateLong(dateString: string | Date | undefined | null): st
  * @returns Período formateado
  */
 export function getPeriodo(dateString: string | Date): string {
-  const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+  const date = parseDisplayDate(dateString)
+
   return date.toLocaleDateString('es-PE', {
     year: 'numeric',
     month: 'long'

@@ -12,14 +12,7 @@ export function FieldHelp({ helpKey, position = 'right', children }: FieldHelpPr
   }
 
   return (
-    <div
-      className="help-icon-wrapper"
-      style={{
-        position: 'relative',
-        display: 'inline-block',
-        width: '100%',
-      }}
-    >
+    <div className="help-icon-wrapper relative inline-block w-full">
       {children}
       <HelpTooltipContent content={helpItem} position={position} />
     </div>

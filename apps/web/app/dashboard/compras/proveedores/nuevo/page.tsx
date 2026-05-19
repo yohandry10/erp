@@ -32,9 +32,7 @@ export default function NuevoProveedorPage() {
   }
 
   const handleCancel = () => {
-    if (confirm('¿Está seguro de cancelar? Los cambios no guardados se perderán.')) {
-      router.push('/dashboard/compras/proveedores')
-    }
+    router.push('/dashboard/compras/proveedores')
   }
 
   return (
@@ -43,24 +41,12 @@ export default function NuevoProveedorPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.push('/dashboard/compras/proveedores')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.25rem 0'
-            }}
+            onClick={() => router.push('/dashboard/compras/proveedores')} className="inline-flex items-center gap-2 text-gray-500 text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
           >
             <ArrowLeft size={16} />
             Volver a Proveedores
           </button>
-          <h1 className="dashboard-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1 className="dashboard-title flex items-center gap-3">
             <Building2 size={28} />
             Nuevo Proveedor
           </h1>
@@ -69,21 +55,12 @@ export default function NuevoProveedorPage() {
       </div>
 
       {/* Info Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        color: 'white',
-        padding: '1rem 1.5rem',
-        borderRadius: '12px',
-        marginBottom: '2rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem'
-      }}>
-        <div style={{ fontSize: '2rem' }}>ℹ️</div>
+      <div className="text-white py-4 px-6 rounded-3 mb-8 flex items-center gap-4">
+        <div className="text-8">ℹ️</div>
         <div>
-          <h3 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Información Importante</h3>
-          <p style={{ fontSize: '0.875rem', opacity: 0.95 }}>
-            Los campos marcados con <span style={{ color: '#fbbf24' }}>*</span> son obligatorios. 
+          <h3 className="font-semibold mb-1">Información Importante</h3>
+          <p className="text-[0.875rem] opacity-[0.95]">
+            Los campos marcados con <span className="text-[#fbbf24]">*</span> son obligatorios. 
             Asegúrese de ingresar un RUC válido (11 dígitos para Perú, 9 para Colombia) y un email válido.
           </p>
         </div>

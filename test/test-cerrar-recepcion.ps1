@@ -19,7 +19,7 @@ $headers = @{
 Write-Host "Step 1: Obteniendo órdenes de compra APROBADAS..." -ForegroundColor Yellow
 try {
     $ordenesResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes?estado=APROBADA" -Method Get -Headers $headers
-    
+
     if ($ordenesResponse.success -and $ordenesResponse.data.Count -gt 0) {
         $orden = $ordenesResponse.data[0]
         Write-Host "✅ Orden encontrada: $($orden.numero)" -ForegroundColor Green
@@ -40,12 +40,12 @@ try {
 Write-Host "Step 2: Obteniendo detalles de la orden..." -ForegroundColor Yellow
 try {
     $ordenDetalleResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$($orden.id)" -Method Get -Headers $headers
-    
+
     if ($ordenDetalleResponse.success) {
         $ordenCompleta = $ordenDetalleResponse.data
         Write-Host "✅ Detalles obtenidos" -ForegroundColor Green
         Write-Host "   Items en la orden: $($ordenCompleta.detalles.Count)" -ForegroundColor Gray
-        
+
         foreach ($detalle in $ordenCompleta.detalles) {
             $cantidadRecibida = if ($detalle.cantidad_recibida) { $detalle.cantidad_recibida } else { 0 }
             $pendiente = $detalle.cantidad - $cantidadRecibida
@@ -65,7 +65,7 @@ try {
 Write-Host "Step 3: Obteniendo almacenes..." -ForegroundColor Yellow
 try {
     $almacenesResponse = Invoke-RestMethod -Uri "$baseUrl/api/inventario/almacenes" -Method Get -Headers $headers
-    
+
     if ($almacenesResponse.success -and $almacenesResponse.data.Count -gt 0) {
         $almacen = $almacenesResponse.data[0]
         Write-Host "✅ Almacén seleccionado: $($almacen.nombre)" -ForegroundColor Green
@@ -86,11 +86,11 @@ $items = @()
 foreach ($detalle in $ordenCompleta.detalles) {
     $cantidadRecibida = if ($detalle.cantidad_recibida) { $detalle.cantidad_recibida } else { 0 }
     $cantidadPendiente = $detalle.cantidad - $cantidadRecibida
-    
+
     if ($cantidadPendiente -gt 0) {
         # Recibir la mitad de lo pendiente para probar recepción parcial
         $cantidadRecibir = [Math]::Ceiling($cantidadPendiente / 2)
-        
+
         $items += @{
             detalle_id = $detalle.id
             cantidad_recibida = $cantidadRecibir
@@ -110,7 +110,7 @@ $createRecepcionBody = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/recepciones/ordenes/$($orden.id)" -Method Post -Headers $headers -Body $createRecepcionBody
-    
+
     if ($createResponse.success) {
         $recepcion = $createResponse.data
         Write-Host "✅ Recepción creada: $($recepcion.numero)" -ForegroundColor Green
@@ -137,7 +137,7 @@ $stockAntes = @{}
 foreach ($item in $recepcion.items) {
     try {
         $productoResponse = Invoke-RestMethod -Uri "$baseUrl/api/inventario/productos/$($item.producto_id)" -Method Get -Headers $headers
-        
+
         if ($productoResponse.success) {
             $producto = $productoResponse.data
             $stockActual = if ($producto.stock_actual) { $producto.stock_actual } else { 0 }
@@ -163,7 +163,7 @@ $cerrarBody = @{
 
 try {
     $cerrarResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/recepciones/$($recepcion.id)/cerrar" -Method Post -Headers $headers -Body $cerrarBody
-    
+
     if ($cerrarResponse.success) {
         $recepcionCerrada = $cerrarResponse.data
         Write-Host "✅ Recepción CERRADA exitosamente" -ForegroundColor Green
@@ -190,21 +190,21 @@ $stockActualizado = $true
 foreach ($productoId in $stockAntes.Keys) {
     try {
         $productoResponse = Invoke-RestMethod -Uri "$baseUrl/api/inventario/productos/$productoId" -Method Get -Headers $headers
-        
+
         if ($productoResponse.success) {
             $producto = $productoResponse.data
             $stockActualProducto = if ($producto.stock_actual) { $producto.stock_actual } else { 0 }
             $stockDespues[$productoId] = $stockActualProducto
-            
+
             $stockEsperado = $stockAntes[$productoId].stock_actual + $stockAntes[$productoId].cantidad_recibir
             $stockReal = $stockDespues[$productoId]
-            
+
             Write-Host "   $($stockAntes[$productoId].nombre):" -ForegroundColor Gray
             Write-Host "     Antes: $($stockAntes[$productoId].stock_actual)" -ForegroundColor Gray
             Write-Host "     Recibido: +$($stockAntes[$productoId].cantidad_recibir)" -ForegroundColor Gray
             Write-Host "     Esperado: $stockEsperado" -ForegroundColor Gray
             Write-Host "     Real: $stockReal" -ForegroundColor Gray
-            
+
             if ($stockReal -eq $stockEsperado) {
                 Write-Host "     ✅ Stock actualizado correctamente" -ForegroundColor Green
             } else {
@@ -223,11 +223,11 @@ Write-Host ""
 Write-Host "Step 8: Verificando estado de la orden de compra..." -ForegroundColor Yellow
 try {
     $ordenActualizadaResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$($orden.id)" -Method Get -Headers $headers
-    
+
     if ($ordenActualizadaResponse.success) {
         $ordenActualizada = $ordenActualizadaResponse.data
         Write-Host "✅ Estado de la orden: $($ordenActualizada.estado)" -ForegroundColor Green
-        
+
         # Verificar cantidades recibidas
         foreach ($detalle in $ordenActualizada.detalles) {
             $cantidadRecibida = if ($detalle.cantidad_recibida) { $detalle.cantidad_recibida } else { 0 }
@@ -248,7 +248,7 @@ Write-Host "Step 9: Verificando movimientos de inventario..." -ForegroundColor Y
 try {
     # Nota: Este endpoint puede no existir, es opcional
     $movimientosResponse = Invoke-RestMethod -Uri "$baseUrl/api/inventario/movimientos?referencia_tipo=RECEPCION&referencia_id=$($recepcion.id)" -Method Get -Headers $headers -ErrorAction SilentlyContinue
-    
+
     if ($movimientosResponse.success) {
         Write-Host "✅ Movimientos de inventario creados: $($movimientosResponse.data.Count)" -ForegroundColor Green
         foreach ($mov in $movimientosResponse.data) {

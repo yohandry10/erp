@@ -4,6 +4,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Check, Package, Scan, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import { cn } from '@/lib/utils'
+
+const fieldLabelClass = 'mb-2 block text-sm font-medium text-slate-700'
+const fieldClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400'
+const panelClass = 'activity-card border border-slate-200 bg-white'
+const qualityClass = {
+  OK: 'border-blue-600 bg-blue-600 text-white',
+  OBSERVADO: 'border-cyan-600 bg-cyan-600 text-white',
+  RECHAZADO: 'border-slate-700 bg-slate-700 text-white',
+} as const
+const qualityBadgeClass = {
+  OK: 'bg-blue-50 text-blue-700',
+  OBSERVADO: 'bg-cyan-50 text-cyan-700',
+  RECHAZADO: 'bg-slate-100 text-slate-700',
+} as const
 
 interface OrdenDetalle {
   id: string
@@ -78,6 +93,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   const [submitting, setSubmitting] = useState(false)
   const [scannerMode, setScannerMode] = useState(false)
   const [scanBuffer, setScanBuffer] = useState('')
+  const [flashItemIndex, setFlashItemIndex] = useState<number | null>(null)
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { get, post } = useApi()
 
@@ -168,17 +184,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
           cantidad_recibir: item.cantidad_recibir + 1
         }
         setItems(updatedItems)
-
-        // Visual feedback
-        const element = document.getElementById(`item-${itemIndex}`)
-        if (element) {
-          element.style.background = 'var(--success)'
-          element.style.color = 'white'
-          setTimeout(() => {
-            element.style.background = ''
-            element.style.color = ''
-          }, 300)
-        }
+        setFlashItemIndex(itemIndex)
+        setTimeout(() => setFlashItemIndex(null), 300)
       }
     } else {
       // Product not found
@@ -402,15 +409,6 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
   const getTotalItems = () => items.reduce((sum, item) => sum + item.cantidad_recibir, 0)
 
-  const getCalidadColor = (calidad: string) => {
-    switch (calidad) {
-      case 'OK': return '#10b981'
-      case 'OBSERVADO': return '#f59e0b'
-      case 'RECHAZADO': return '#ef4444'
-      default: return '#6b7280'
-    }
-  }
-
   const getCalidadIcon = (calidad: string) => {
     switch (calidad) {
       case 'OK': return <CheckCircle size={16} />
@@ -431,12 +429,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
   if (!orden) {
     return (
-      <div className="activity-card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <AlertCircle size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+      <div className="activity-card px-8 py-12 text-center">
+        <AlertCircle size={48} className="mx-auto mb-4 text-slate-500" />
+        <h3 className="mb-2 text-lg font-semibold text-slate-950">
           Orden no encontrada
         </h3>
-        <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+        <p className="mb-6 text-slate-500">
           No se pudo cargar la orden de compra
         </p>
         <button onClick={onCancel} className="refresh-btn">
@@ -449,84 +447,48 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
   return (
     <div>
       {/* Progress Steps */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: '1rem',
-        marginBottom: '2rem',
-        padding: '1.5rem',
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: 'var(--shadow-sm)'
-      }}>
+      <div className="mb-8 flex items-center justify-center gap-4 rounded-xl bg-white p-6 shadow-sm">
         {[
           { num: 1, label: 'Cantidades' },
           { num: 2, label: 'Calidad' },
           { num: 3, label: 'Almacén/Lotes' },
           { num: 4, label: 'Confirmar' }
         ].map((step, idx) => (
-          <div key={step.num} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: currentStep >= step.num ? '#3b82f6' : '#e5e7eb',
-                color: currentStep >= step.num ? 'white' : '#6b7280',
-                fontWeight: '600',
-                fontSize: '1rem',
-                transition: 'all 0.3s ease'
-              }}>
+          <div key={step.num} className="flex items-center gap-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                'flex size-10 items-center justify-center rounded-full text-base font-semibold transition',
+                currentStep >= step.num ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+              )}>
                 {currentStep > step.num ? <Check size={20} /> : step.num}
               </div>
-              <span style={{
-                fontSize: '0.875rem',
-                fontWeight: currentStep === step.num ? '600' : '400',
-                color: currentStep >= step.num ? '#3b82f6' : '#6b7280'
-              }}>
+              <span className={cn(
+                'text-sm',
+                currentStep === step.num ? 'font-semibold' : 'font-normal',
+                currentStep >= step.num ? 'text-blue-600' : 'text-slate-500'
+              )}>
                 {step.label}
               </span>
             </div>
             {idx < 3 && (
-              <div style={{
-                width: '60px',
-                height: '2px',
-                background: currentStep > step.num ? '#3b82f6' : '#e5e7eb',
-                transition: 'all 0.3s ease'
-              }} />
+              <div className={cn('h-0.5 w-16 transition', currentStep > step.num ? 'bg-blue-600' : 'bg-slate-200')} />
             )}
           </div>
         ))}
       </div>
 
       {/* Order Info */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+      <div className="activity-card mb-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <h3 className="mb-2 text-lg font-semibold text-slate-950">
               {orden.numero}
             </h3>
-            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+            <p className="text-sm text-slate-500">
               {orden.proveedores?.razon_social} - RUC: {orden.proveedores?.ruc}
             </p>
           </div>
-          <div style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            background: 'var(--primary-100)',
-            color: 'var(--primary-800)',
-            fontSize: '0.875rem',
-            fontWeight: '600'
-          }}>
+          <div className="rounded-md bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">
             {items.length} productos pendientes
           </div>
         </div>
@@ -536,31 +498,16 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       <div className="activity-card">
         {currentStep === 1 && (
           <div>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <h3 className="text-base font-semibold text-slate-950">
                 Ingrese las cantidades recibidas
               </h3>
               <button
                 onClick={() => setScannerMode(!scannerMode)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: scannerMode ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                  background: scannerMode ? '#eff6ff' : 'white',
-                  color: scannerMode ? '#3b82f6' : '#374151',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  transition: 'all 0.2s ease'
-                }}
+                className={cn(
+                  'flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition',
+                  scannerMode ? 'border-2 border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300 bg-white text-slate-700'
+                )}
               >
                 <Scan size={16} />
                 {scannerMode ? 'Modo Scanner Activo' : 'Activar Scanner'}
@@ -568,29 +515,20 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             </div>
 
             {scannerMode && (
-              <div style={{
-                padding: '1rem',
-                borderRadius: '8px',
-                background: '#eff6ff',
-                border: '2px solid #3b82f6',
-                marginBottom: '1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
-              }}>
-                <Scan size={20} style={{ color: '#3b82f6' }} />
+              <div className="mb-4 flex items-center gap-3 rounded-lg border-2 border-blue-600 bg-blue-50 p-4">
+                <Scan size={20} className="text-blue-600" />
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1e40af' }}>
+                  <div className="text-sm font-semibold text-blue-800">
                     Modo Scanner Activo
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>
+                  <div className="text-xs text-blue-600">
                     Escanee los códigos de barras de los productos. Cada escaneo incrementará la cantidad en 1.
                   </div>
                 </div>
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="flex flex-col gap-4">
               {items.map((item, index) => {
                 const maxCantidad = item.cantidad_pedida - item.cantidad_recibida_anterior
                 const pendiente = maxCantidad - item.cantidad_recibir
@@ -599,68 +537,48 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                   <div
                     key={item.detalle_id}
                     id={`item-${index}`}
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white',
-                      transition: 'all 0.3s ease'
-                    }}
+                    className={cn(
+                      panelClass,
+                      'rounded-lg p-4 transition',
+                      flashItemIndex === index && 'bg-blue-600 text-white'
+                    )}
                   >
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                      gap: '1rem',
-                      alignItems: 'center'
-                    }}>
+                    <div className="grid items-center gap-4 lg:grid-cols-[2fr_1fr_1fr_1fr]">
                       {/* Product Info */}
                       <div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                        <div className="mb-1 text-sm font-semibold">
                           {item.producto_nombre}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                        <div className={cn('font-mono text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
                           Código: {item.producto_codigo}
                         </div>
                         {item.cantidad_recibida_anterior > 0 && (
-                          <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+                          <div className={cn('mt-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-blue-600')}>
                             Ya recibido: {item.cantidad_recibida_anterior} de {item.cantidad_pedida}
                           </div>
                         )}
                       </div>
 
                       {/* Pedido */}
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                      <div className="text-center">
+                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
                           Pedido
                         </div>
-                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#374151' }}>
+                        <div className={cn('text-xl font-bold', flashItemIndex === index ? 'text-white' : 'text-slate-700')}>
                           {item.cantidad_pedida}
                         </div>
                       </div>
 
                       {/* Quantity Input */}
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem', textAlign: 'center' }}>
+                        <div className={cn('mb-2 text-center text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
                           Recibir ahora
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => updateItemQuantity(index, item.cantidad_recibir - 1)}
                             disabled={item.cantidad_recibir === 0}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #d1d5db',
-                              background: item.cantidad_recibir === 0 ? '#f3f4f6' : 'white',
-                              color: item.cantidad_recibir === 0 ? '#9ca3af' : '#374151',
-                              cursor: item.cantidad_recibir === 0 ? 'not-allowed' : 'pointer',
-                              fontSize: '1.25rem',
-                              fontWeight: '600',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
+                            className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             -
                           </button>
@@ -670,34 +588,12 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                             max={maxCantidad}
                             value={item.cantidad_recibir}
                             onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 0)}
-                            style={{
-                              width: '80px',
-                              padding: '0.5rem',
-                              borderRadius: '6px',
-                              border: '2px solid #3b82f6',
-                              textAlign: 'center',
-                              fontSize: '1.125rem',
-                              fontWeight: '700',
-                              color: '#3b82f6'
-                            }}
+                            className="w-20 rounded-md border-2 border-blue-600 px-2 py-2 text-center text-lg font-bold text-blue-700 outline-none focus:ring-4 focus:ring-blue-100"
                           />
                           <button
                             onClick={() => updateItemQuantity(index, item.cantidad_recibir + 1)}
                             disabled={item.cantidad_recibir >= maxCantidad}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              border: '1px solid #d1d5db',
-                              background: item.cantidad_recibir >= maxCantidad ? '#f3f4f6' : 'white',
-                              color: item.cantidad_recibir >= maxCantidad ? '#9ca3af' : '#374151',
-                              cursor: item.cantidad_recibir >= maxCantidad ? 'not-allowed' : 'pointer',
-                              fontSize: '1.25rem',
-                              fontWeight: '600',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
+                            className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-xl font-semibold text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                           >
                             +
                           </button>
@@ -705,55 +601,27 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                       </div>
 
                       {/* Pendiente */}
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                      <div className="text-center">
+                        <div className={cn('mb-1 text-xs', flashItemIndex === index ? 'text-blue-100' : 'text-slate-500')}>
                           Pendiente
                         </div>
-                        <div style={{
-                          fontSize: '1.25rem',
-                          fontWeight: '700',
-                          color: pendiente === 0 ? '#10b981' : '#f59e0b'
-                        }}>
+                        <div className="text-xl font-bold text-blue-700">
                           {pendiente}
                         </div>
                       </div>
                     </div>
 
                     {/* Quick Actions */}
-                    <div style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      marginTop: '0.75rem',
-                      paddingTop: '0.75rem',
-                      borderTop: '1px solid #e5e7eb'
-                    }}>
+                    <div className="mt-3 flex gap-2 border-t border-slate-200 pt-3">
                       <button
                         onClick={() => updateItemQuantity(index, maxCantidad)}
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          borderRadius: '6px',
-                          border: '1px solid #d1d5db',
-                          background: 'white',
-                          color: '#374151',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: '500'
-                        }}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
                       >
                         Recibir todo ({maxCantidad})
                       </button>
                       <button
                         onClick={() => updateItemQuantity(index, 0)}
-                        style={{
-                          padding: '0.375rem 0.75rem',
-                          borderRadius: '6px',
-                          border: '1px solid #d1d5db',
-                          background: 'white',
-                          color: '#374151',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: '500'
-                        }}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700"
                       >
                         Limpiar
                       </button>
@@ -764,19 +632,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             </div>
 
             {/* Summary */}
-            <div style={{
-              marginTop: '1.5rem',
-              padding: '1rem',
-              borderRadius: '8px',
-              background: 'var(--primary-50)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-700)' }}>
+            <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 p-4">
+              <span className="text-sm font-semibold text-blue-700">
                 Total de items a recibir:
               </span>
-              <span style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
+              <span className="text-2xl font-bold text-blue-600">
                 {getTotalItems()}
               </span>
             </div>
@@ -785,120 +645,65 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 2 && (
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+            <h3 className="mb-6 text-base font-semibold text-slate-950">
               Evaluación de Calidad
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="flex flex-col gap-4">
               {items.filter(item => item.cantidad_recibir > 0).map((item, index) => {
                 const originalIndex = items.findIndex(i => i.detalle_id === item.detalle_id)
 
                 return (
                   <div
                     key={item.detalle_id}
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white'
-                    }}
+                    className="rounded-lg border border-slate-200 bg-white p-4"
                   >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'start',
-                      marginBottom: '1rem'
-                    }}>
+                    <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                        <div className="mb-1 text-sm font-semibold text-slate-950">
                           {item.producto_nombre}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        <div className="text-xs text-slate-500">
                           Cantidad a recibir: {item.cantidad_recibir}
                         </div>
                       </div>
-                      <div style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        background: getCalidadColor(item.calidad) + '20',
-                        color: getCalidadColor(item.calidad),
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
+                      <div className={cn(
+                        'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold',
+                        qualityBadgeClass[item.calidad]
+                      )}>
                         {getCalidadIcon(item.calidad)}
                         {item.calidad}
                       </div>
                     </div>
 
                     {/* Quality Buttons */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: '0.5rem',
-                      marginBottom: '1rem'
-                    }}>
+                    <div className="mb-4 grid gap-2 md:grid-cols-3">
                       <button
                         onClick={() => updateItemCalidad(originalIndex, 'OK')}
-                        style={{
-                          padding: '0.75rem',
-                          borderRadius: '6px',
-                          border: item.calidad === 'OK' ? '2px solid #10b981' : '1px solid #d1d5db',
-                          background: item.calidad === 'OK' ? '#10b981' : 'white',
-                          color: item.calidad === 'OK' ? 'white' : '#374151',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          transition: 'all 0.2s ease'
-                        }}
+                        className={cn(
+                          'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
+                          item.calidad === 'OK' ? qualityClass.OK : 'border-slate-300 bg-white text-slate-700'
+                        )}
                       >
                         <CheckCircle size={16} />
                         OK
                       </button>
                       <button
                         onClick={() => updateItemCalidad(originalIndex, 'OBSERVADO')}
-                        style={{
-                          padding: '0.75rem',
-                          borderRadius: '6px',
-                          border: item.calidad === 'OBSERVADO' ? '2px solid #f59e0b' : '1px solid #d1d5db',
-                          background: item.calidad === 'OBSERVADO' ? '#f59e0b' : 'white',
-                          color: item.calidad === 'OBSERVADO' ? 'white' : '#374151',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          transition: 'all 0.2s ease'
-                        }}
+                        className={cn(
+                          'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
+                          item.calidad === 'OBSERVADO' ? qualityClass.OBSERVADO : 'border-slate-300 bg-white text-slate-700'
+                        )}
                       >
                         <AlertCircle size={16} />
                         Observado
                       </button>
                       <button
                         onClick={() => updateItemCalidad(originalIndex, 'RECHAZADO')}
-                        style={{
-                          padding: '0.75rem',
-                          borderRadius: '6px',
-                          border: item.calidad === 'RECHAZADO' ? '2px solid #ef4444' : '1px solid #d1d5db',
-                          background: item.calidad === 'RECHAZADO' ? '#ef4444' : 'white',
-                          color: item.calidad === 'RECHAZADO' ? 'white' : '#374151',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.5rem',
-                          transition: 'all 0.2s ease'
-                        }}
+                        className={cn(
+                          'flex items-center justify-center gap-2 rounded-md border px-3 py-3 text-sm font-semibold transition',
+                          item.calidad === 'RECHAZADO' ? qualityClass.RECHAZADO : 'border-slate-300 bg-white text-slate-700'
+                        )}
                       >
                         <XCircle size={16} />
                         Rechazado
@@ -908,13 +713,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     {/* Observations */}
                     {(item.calidad === 'OBSERVADO' || item.calidad === 'RECHAZADO') && (
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
                           Observaciones {item.calidad === 'RECHAZADO' && '(requerido)'}
                         </label>
                         <textarea
@@ -922,14 +721,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           onChange={(e) => updateItemObservaciones(originalIndex, e.target.value)}
                           placeholder="Describa el problema encontrado..."
                           rows={2}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem',
-                            resize: 'vertical'
-                          }}
+                          className={cn(fieldClass, 'min-h-20 resize-y')}
                         />
                       </div>
                     )}
@@ -942,69 +734,41 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 3 && (
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+            <h3 className="mb-6 text-base font-semibold text-slate-950">
               Asignar Almacén, Ubicación, Lotes y Series
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="flex flex-col gap-4">
               {items.filter(item => item.cantidad_recibir > 0).map((item, index) => {
                 const originalIndex = items.findIndex(i => i.detalle_id === item.detalle_id)
 
                 return (
                   <div
                     key={item.detalle_id}
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      background: 'white'
-                    }}
+                    className="rounded-lg border border-slate-200 bg-white p-4"
                   >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'start',
-                      marginBottom: '1rem'
-                    }}>
+                    <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                        <div className="mb-1 text-sm font-semibold text-slate-950">
                           {item.producto_nombre}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        <div className="text-xs text-slate-500">
                           Cantidad a recibir: {item.cantidad_recibir}
                         </div>
                       </div>
                     </div>
 
                     {/* Almacen y Ubicacion */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '1rem',
-                      marginBottom: '1rem'
-                    }}>
+                    <div className="mb-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Almacén */}
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
-                          Almacén <span style={{ color: '#ef4444' }}>*</span>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
+                          Almacén <span className="text-slate-500">*</span>
                         </label>
                         <select
                           value={item.almacen_id || ''}
                           onChange={(e) => updateItemAlmacen(originalIndex, e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem',
-                            background: 'white'
-                          }}
+                          className={fieldClass}
                         >
                           <option value="">Seleccione almacén</option>
                           {almacenes.map(almacen => (
@@ -1017,28 +781,14 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
                       {/* Ubicación */}
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
                           Ubicación
                         </label>
                         <select
                           value={item.ubicacion_id || ''}
                           onChange={(e) => updateItemUbicacion(originalIndex, e.target.value)}
                           disabled={!item.almacen_id}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem',
-                            background: item.almacen_id ? 'white' : '#f3f4f6',
-                            cursor: item.almacen_id ? 'pointer' : 'not-allowed'
-                          }}
+                          className={fieldClass}
                         >
                           <option value="">Sin ubicación específica</option>
                           {item.almacen_id && ubicacionesPorAlmacen[item.almacen_id]?.map(ubicacion => (
@@ -1051,20 +801,10 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                     </div>
 
                     {/* Lote/Serie/Expiracion Grid */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '1rem'
-                    }}>
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
                       {/* Lote */}
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
                           Número de Lote
                         </label>
                         <input
@@ -1072,25 +812,13 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           value={item.lote || ''}
                           onChange={(e) => updateItemLote(originalIndex, e.target.value)}
                           placeholder="Ej: LOTE-2024-001"
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem'
-                          }}
+                          className={fieldClass}
                         />
                       </div>
 
                       {/* Serie */}
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
                           Número de Serie
                         </label>
                         <input
@@ -1098,52 +826,26 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           value={item.serie || ''}
                           onChange={(e) => updateItemSerie(originalIndex, e.target.value)}
                           placeholder="Ej: SN-123456789"
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem'
-                          }}
+                          className={fieldClass}
                         />
                       </div>
 
                       {/* Fecha Expiración */}
                       <div>
-                        <label style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#374151',
-                          marginBottom: '0.5rem'
-                        }}>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">
                           Fecha de Expiración
                         </label>
                         <input
                           type="date"
                           value={item.fecha_expiracion || ''}
                           onChange={(e) => updateItemFechaExpiracion(originalIndex, e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            fontSize: '0.875rem'
-                          }}
+                          className={fieldClass}
                         />
                       </div>
                     </div>
 
                     {/* Info Note */}
-                    <div style={{
-                      marginTop: '0.75rem',
-                      padding: '0.75rem',
-                      borderRadius: '6px',
-                      background: '#eff6ff',
-                      border: '1px solid #3b82f6',
-                      fontSize: '0.75rem',
-                      color: '#1e40af'
-                    }}>
+                    <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-3 text-xs text-blue-800">
                       <strong>Nota:</strong> El almacén es obligatorio. Los campos de ubicación, lote y serie son opcionales. Complete solo si aplica para este producto.
                     </div>
                   </div>
@@ -1155,169 +857,98 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
 
         {currentStep === 4 && (
           <div>
-            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+            <h3 className="mb-6 text-base font-semibold text-slate-950">
               Confirmar Recepción
             </h3>
 
             {/* Summary Cards */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{
-                padding: '1rem',
-                borderRadius: '8px',
-                background: '#eff6ff',
-                border: '1px solid #3b82f6'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginBottom: '0.5rem' }}>
+            <div className="mb-6 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+              <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+                <div className="mb-2 text-xs text-blue-700">
                   Total Items
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#3b82f6' }}>
+                <div className="text-3xl font-bold text-blue-700">
                   {getTotalItems()}
                 </div>
               </div>
 
-              <div style={{
-                padding: '1rem',
-                borderRadius: '8px',
-                background: '#f0fdf4',
-                border: '1px solid #10b981'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#10b981', marginBottom: '0.5rem' }}>
+              <div className="rounded-lg border border-cyan-300 bg-cyan-50 p-4">
+                <div className="mb-2 text-xs text-cyan-700">
                   OK
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#10b981' }}>
+                <div className="text-3xl font-bold text-cyan-700">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'OK').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
 
-              <div style={{
-                padding: '1rem',
-                borderRadius: '8px',
-                background: '#fffbeb',
-                border: '1px solid #f59e0b'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginBottom: '0.5rem' }}>
+              <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
+                <div className="mb-2 text-xs text-slate-600">
                   Observados
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#f59e0b' }}>
+                <div className="text-3xl font-bold text-slate-700">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'OBSERVADO').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
 
-              <div style={{
-                padding: '1rem',
-                borderRadius: '8px',
-                background: '#fef2f2',
-                border: '1px solid #ef4444'
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#ef4444', marginBottom: '0.5rem' }}>
+              <div className="rounded-lg border border-slate-400 bg-slate-100 p-4">
+                <div className="mb-2 text-xs text-slate-700">
                   Rechazados
                 </div>
-                <div style={{ fontSize: '2rem', fontWeight: '700', color: '#ef4444' }}>
+                <div className="text-3xl font-bold text-slate-800">
                   {items.filter(i => i.cantidad_recibir > 0 && i.calidad === 'RECHAZADO').reduce((sum, i) => sum + i.cantidad_recibir, 0)}
                 </div>
               </div>
             </div>
 
             {/* Items Detail */}
-            <div style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              overflow: 'hidden'
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{
-                      padding: '0.75rem',
-                      textAlign: 'left',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                  <tr className="bg-slate-50">
+                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       Producto
                     </th>
-                    <th style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                    <th className="border-b border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       Cantidad
                     </th>
-                    <th style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                    <th className="border-b border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       Calidad
                     </th>
-                    <th style={{
-                      padding: '0.75rem',
-                      textAlign: 'left',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       Almacén/Ubicación/Lote
                     </th>
-                    <th style={{
-                      padding: '0.75rem',
-                      textAlign: 'left',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}>
+                    <th className="border-b border-slate-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       Observaciones
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.filter(item => item.cantidad_recibir > 0).map((item) => (
-                    <tr key={item.detalle_id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                    <tr key={item.detalle_id} className="border-b border-slate-200 last:border-b-0">
+                      <td className="px-3 py-3">
+                        <div className="text-sm font-semibold text-slate-950">
                           {item.producto_nombre}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                        <div className="font-mono text-xs text-slate-500">
                           {item.producto_codigo}
                         </div>
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <span style={{ fontSize: '1.125rem', fontWeight: '700', color: '#3b82f6' }}>
+                      <td className="px-3 py-3 text-center">
+                        <span className="text-lg font-bold text-blue-700">
                           {item.cantidad_recibir}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: getCalidadColor(item.calidad) + '20',
-                          color: getCalidadColor(item.calidad)
-                        }}>
+                      <td className="px-3 py-3 text-center">
+                        <span className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold',
+                          qualityBadgeClass[item.calidad]
+                        )}>
                           {getCalidadIcon(item.calidad)}
                           {item.calidad}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#374151' }}>
+                      <td className="px-3 py-3">
+                        <div className="text-xs text-slate-700">
                           {item.almacen_id && (
                             <div>
                               <strong>Almacén:</strong> {almacenes.find(a => a.id === item.almacen_id)?.nombre || item.almacen_id}
@@ -1346,8 +977,8 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
                           {!item.almacen_id && !item.lote && !item.serie && !item.fecha_expiracion && '-'}
                         </div>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-slate-500">
                           {item.observaciones || '-'}
                         </span>
                       </td>
@@ -1361,30 +992,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
       </div>
 
       {/* Navigation Buttons */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        marginTop: '2rem',
-        paddingTop: '1.5rem',
-        borderTop: '1px solid #e5e7eb'
-      }}>
+      <div className="mt-8 flex justify-between border-t border-slate-200 pt-6">
         <button
           onClick={currentStep === 1 ? onCancel : handleBack}
           disabled={submitting}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            color: '#374151',
-            cursor: submitting ? 'not-allowed' : 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            opacity: submitting ? 0.5 : 1
-          }}
+          className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft size={16} />
           {currentStep === 1 ? 'Cancelar' : 'Anterior'}
@@ -1394,20 +1006,7 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
           <button
             onClick={handleNext}
             disabled={submitting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#3b82f6',
-              color: 'white',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              opacity: submitting ? 0.5 : 1
-            }}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Siguiente
             <ChevronRight size={16} />
@@ -1422,24 +1021,11 @@ export function RecepcionWizard({ ordenId, onComplete, onCancel }: RecepcionWiza
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#10b981',
-                color: 'white',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                opacity: submitting ? 0.5 : 1
-              }}
+              className="flex items-center gap-2 rounded-lg bg-cyan-700 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (
                 <>
-                  <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                  <div className="loading-spinner size-4"></div>
                   Procesando...
                 </>
               ) : (

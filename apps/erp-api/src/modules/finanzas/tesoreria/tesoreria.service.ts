@@ -16,7 +16,58 @@ export class TesoreriaService {
     dto: RegistrarPagoDto,
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
+    dto = {
+      ...dto,
+      monto: this.normalizarMontoPago(dto.monto),
+      fecha_pago: this.normalizarFechaPago(dto.fecha_pago),
+      idempotency_key: dto.idempotency_key?.trim() || undefined,
+    };
+
     const client = this.supabase.getClient();
+    const submittedIdempotencyKey = dto.idempotency_key ?? null;
+
+    if (submittedIdempotencyKey) {
+      const { data: pagoExistente, error: errorPagoExistente } = await client
+        .from('movimientos_bancarios')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('idempotency_key', submittedIdempotencyKey)
+        .maybeSingle();
+
+      if (errorPagoExistente) {
+        throw new BadRequestException('No se pudo verificar la idempotencia del pago');
+      }
+
+      if (pagoExistente) {
+        const { data: cxpActual, error: errorCxpActual } = await client
+          .from('cuentas_por_pagar')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('id', dto.cxp_id)
+          .maybeSingle();
+
+        if (errorCxpActual || !cxpActual) {
+          throw new NotFoundException('Cuenta por pagar no encontrada');
+        }
+
+        return {
+          success: true,
+          data: {
+            cxp: cxpActual,
+            pago: {
+              monto: this.round2(Number(pagoExistente.monto ?? 0)),
+              fecha_pago: pagoExistente.fecha,
+              metodo_pago: pagoExistente.metodo_pago,
+              referencia: pagoExistente.referencia,
+              cuenta_bancaria_id: pagoExistente.cuenta_bancaria_id,
+              pago_id: pagoExistente.id,
+              idempotent_replay: true,
+            },
+            movimiento_bancario: pagoExistente,
+          },
+        };
+      }
+    }
 
     // Validar que el monto sea positivo
     if (dto.monto <= 0) {
@@ -117,7 +168,8 @@ export class TesoreriaService {
         nuevoEstado = cxp.estado;
       }
 
-      // 3. Actualizar la CxP con el nuevo saldo y estado
+      // 3. HARDENING: Optimistic concurrency — si otro pago ya cambio el saldo, falla
+      const saldoAnterior = cxp.saldo;
       const { data: cxpActualizada, error: errorActualizar } = await client
         .from('cuentas_por_pagar')
         .update({
@@ -128,10 +180,17 @@ export class TesoreriaService {
         })
         .eq('tenant_id', tenantId)
         .eq('id', dto.cxp_id)
+        .eq('saldo', saldoAnterior)
         .select()
         .single();
 
       if (errorActualizar) {
+        // PGRST116 = no rows returned — means another payment already changed the saldo
+        if (errorActualizar.code === 'PGRST116') {
+          throw new BadRequestException(
+            'Conflicto de concurrencia: el saldo de la CxP fue modificado por otro pago simultáneo. Intente de nuevo.'
+          );
+        }
         console.error('Error actualizando cuenta por pagar:', errorActualizar);
         throw new BadRequestException('No se pudo aplicar el pago a la cuenta por pagar');
       }
@@ -159,6 +218,7 @@ export class TesoreriaService {
             metodo_pago: dto.metodo_pago,
             cxp_id: dto.cxp_id,
             proveedor_id: cxp.proveedor_id,
+            idempotency_key: submittedIdempotencyKey,
             conciliado: false,
             saldo_anterior: saldoCuentaAnterior,
             saldo_nuevo: saldoCuentaNuevo,
@@ -982,5 +1042,32 @@ export class TesoreriaService {
 
   private round2(value: number): number {
     return Math.round(value * 100) / 100;
+  }
+
+  private normalizarMontoPago(value: number): number {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+      throw new BadRequestException('El monto del pago debe ser un número válido');
+    }
+
+    const cents = amount * 100;
+    if (Math.abs(cents - Math.round(cents)) > 1e-9) {
+      throw new BadRequestException('El monto del pago debe tener máximo 2 decimales');
+    }
+
+    return this.round2(amount);
+  }
+
+  private normalizarFechaPago(value: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException('La fecha de pago debe tener formato YYYY-MM-DD');
+    }
+
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException('La fecha de pago debe ser una fecha válida');
+    }
+
+    return value;
   }
 }

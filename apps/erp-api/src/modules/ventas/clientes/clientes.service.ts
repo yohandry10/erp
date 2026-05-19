@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto, ValidarRucDto } from './dto';
 import { Cliente } from './entities/cliente.entity';
 import axios from 'axios';
@@ -11,7 +12,10 @@ import axios from 'axios';
  */
 @Injectable()
 export class ClientesService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Crear un nuevo cliente
@@ -70,6 +74,17 @@ export class ClientesService {
     }
 
     console.log('✅ [ClientesService] Cliente creado:', data.id);
+    if (userId) {
+      await this.auditService.registrarCambio(
+        'clientes',
+        'INSERT',
+        userId,
+        { new: data },
+        tenantId,
+        data.id,
+        { accion: 'CREAR_CLIENTE' },
+      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de creación de cliente:', error));
+    }
     return data;
   }
 
@@ -112,14 +127,15 @@ export class ClientesService {
     if (filters?.search) {
       const rawSearch = filters.search.trim();
       const searchTerm = `%${rawSearch.replace(/[%_,]/g, '')}%`;
-      const numericSearch = Number(rawSearch);
+      const numericSearch = this.toSafeIntegerDocument(rawSearch);
       const textFilters = [
         `razon_social.ilike.${searchTerm}`,
         `nombre.ilike.${searchTerm}`,
         `codigo.ilike.${searchTerm}`,
+        `ruc.ilike.${searchTerm}`,
       ];
 
-      if (Number.isFinite(numericSearch)) {
+      if (numericSearch !== null) {
         query = query.or([
           `numero_documento.eq.${numericSearch}`,
           `documento_numero.eq.${numericSearch}`,
@@ -188,21 +204,48 @@ export class ClientesService {
    * Actualizar un cliente
    * Requirements: 1.8
    */
-  async update(id: string, updateClienteDto: UpdateClienteDto, tenantId: string): Promise<Cliente> {
+  async update(id: string, updateClienteDto: UpdateClienteDto, tenantId: string, userId?: string): Promise<Cliente> {
     const client = this.supabase.getClient();
 
     // Verificar que el cliente existe
-    await this.findOne(id, tenantId);
+    const previousCliente = await this.findOne(id, tenantId);
 
-    // Si se está actualizando el documento, validar duplicados
+    const updateData: Record<string, any> = {};
+
+    if (updateClienteDto.tipo !== undefined) updateData.tipo = updateClienteDto.tipo;
+    if (updateClienteDto.documento_tipo !== undefined) {
+      updateData.tipo_documento = updateClienteDto.documento_tipo;
+      updateData.documento_tipo = updateClienteDto.documento_tipo;
+    }
+    if (updateClienteDto.documento_numero !== undefined) {
+      const documentoTexto = String(updateClienteDto.documento_numero || '').trim();
+      if (!/^\d+$/.test(documentoTexto)) {
+        throw new BadRequestException('El número de documento debe ser numérico');
+      }
+      const documentoNumero = this.toSafeIntegerDocument(documentoTexto);
+      updateData.documento_numero = documentoNumero;
+      updateData.numero_documento = documentoNumero;
+      updateData.codigo = documentoTexto;
+      const tipoDocumento = updateClienteDto.documento_tipo || previousCliente.documento_tipo || (previousCliente as any).tipo_documento;
+      updateData.ruc = tipoDocumento === 'RUC' ? documentoTexto : null;
+    }
+    if (updateClienteDto.razon_social !== undefined) {
+      updateData.razon_social = updateClienteDto.razon_social;
+      updateData.nombre = updateClienteDto.razon_social;
+    }
+    if (updateClienteDto.direccion !== undefined) updateData.direccion = updateClienteDto.direccion || null;
+    if (updateClienteDto.email !== undefined) updateData.email = updateClienteDto.email || null;
+
+    // Si se está actualizando el documento, validar duplicados usando el documento textual canónico.
     if (updateClienteDto.documento_numero) {
+      const documentoTexto = String(updateClienteDto.documento_numero).trim();
       const { data: existingCliente } = await client
         .from('clientes')
-        .select('id, numero_documento')
+        .select('id, numero_documento, codigo, ruc')
         .eq('tenant_id', tenantId)
-        .eq('numero_documento', updateClienteDto.documento_numero)
+        .or(`codigo.eq.${documentoTexto},ruc.eq.${documentoTexto}`)
         .neq('id', id)
-        .single();
+        .maybeSingle();
 
       if (existingCliente) {
         throw new ConflictException(
@@ -215,7 +258,7 @@ export class ClientesService {
     const { data, error } = await client
       .from('clientes')
       .update({
-        ...updateClienteDto,
+        ...updateData,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -229,6 +272,17 @@ export class ClientesService {
     }
 
     console.log('✅ [ClientesService] Cliente actualizado:', id);
+    if (userId) {
+      await this.auditService.registrarCambio(
+        'clientes',
+        'UPDATE',
+        userId,
+        { old: previousCliente as any, new: data },
+        tenantId,
+        id,
+        { accion: 'EDITAR_CLIENTE' },
+      ).catch((error) => console.warn('⚠️ No se pudo registrar auditoría de edición de cliente:', error));
+    }
     return data;
   }
 
@@ -296,9 +350,25 @@ export class ClientesService {
       
       const ruc = validarRucDto.ruc;
       
-      // Validación básica del formato
+      // Validación de formato
       if (!/^[0-9]{11}$/.test(ruc)) {
         throw new BadRequestException('El RUC debe tener exactamente 11 dígitos');
+      }
+
+      // Validar prefijo (10=persona natural, 15=no domiciliado, 17=no domiciliado, 20=empresa)
+      const prefijo = ruc.substring(0, 2);
+      if (!['10', '15', '17', '20'].includes(prefijo)) {
+        throw new BadRequestException(`Prefijo de RUC inválido: ${prefijo}. Debe iniciar con 10, 15, 17 o 20`);
+      }
+
+      // Validar dígito verificador (módulo 11 SUNAT)
+      const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+      const digitos = ruc.split('').map(Number);
+      const suma = factores.reduce((acc, factor, i) => acc + factor * digitos[i], 0);
+      const resto = 11 - (suma % 11);
+      const digitoVerificador = resto === 10 ? 0 : resto === 11 ? 1 : resto;
+      if (digitoVerificador !== digitos[10]) {
+        throw new BadRequestException('RUC inválido: dígito verificador no coincide');
       }
 
       // Aquí iría la integración real con SUNAT

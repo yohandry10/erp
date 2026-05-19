@@ -27,7 +27,7 @@ try {
     Write-Host "`n--- Test 1: Listar todos los clientes ---" -ForegroundColor Yellow
     $response = Invoke-RestMethod -Uri "$baseUrl/ventas/clientes?limit=100" -Method Get -Headers $headers
     Write-Host "Clientes encontrados: $($response.data.Count)" -ForegroundColor Green
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "`nPrimeros 3 clientes:" -ForegroundColor Cyan
         $response.data | Select-Object -First 3 | ForEach-Object {

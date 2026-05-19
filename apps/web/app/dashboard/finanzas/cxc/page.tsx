@@ -2,26 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  RefreshCw,
-  FileText,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Eye,
-  Download,
-  DollarSign,
-  History,
-} from 'lucide-react'
+import { AlertCircle, CheckCircle, Clock, DollarSign, Download, Eye, FileText, History, RefreshCw, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
-import {
-  CobroModal,
-  NotaCreditoModal,
-  ReprogramarModal,
-  HistorialDrawer,
-} from '@/components/finanzas'
+import { CobroModal, HistorialDrawer, NotaCreditoModal, ReprogramarModal } from '@/components/finanzas'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type EstadoCxc = 'PENDIENTE' | 'PARCIAL' | 'CANCELADO' | 'VENCIDO'
 
@@ -32,7 +18,7 @@ type CuentaPorCobrar = {
   cliente_id: string
   fecha_emision: string | null
   fecha_vencimiento: string | null
-  estado: EstadoCxc
+  estado: string | null
   total: number
   saldo: number
   moneda: string
@@ -50,38 +36,32 @@ type ClienteLigero = {
   nombre_comercial?: string | null
 }
 
-type EstadoMeta = {
-  label: string
-  color: string
-  background: string
-  icon: typeof Clock
-}
-
-const ESTADO_META: Record<EstadoCxc, EstadoMeta> = {
+const ESTADO_META: Record<EstadoCxc, { label: string; className: string; icon: typeof Clock }> = {
   PENDIENTE: {
     label: 'Pendiente',
-    color: '#f59e0b',
-    background: 'rgba(245, 158, 11, 0.12)',
+    className: 'border-amber-300/25 bg-amber-300/10 text-amber-100',
     icon: Clock,
   },
   PARCIAL: {
     label: 'Parcial',
-    color: '#3b82f6',
-    background: 'rgba(59, 130, 246, 0.12)',
+    className: 'border-blue-300/25 bg-blue-300/10 text-blue-100',
     icon: AlertCircle,
   },
   CANCELADO: {
     label: 'Cancelado',
-    color: '#10b981',
-    background: 'rgba(16, 185, 129, 0.12)',
+    className: 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100',
     icon: CheckCircle,
   },
   VENCIDO: {
     label: 'Vencido',
-    color: '#ef4444',
-    background: 'rgba(239, 68, 68, 0.12)',
+    className: 'border-slate-300/25 bg-slate-300/10 text-slate-100',
     icon: XCircle,
   },
+}
+
+const normalizeEstadoCxc = (estado: string | null | undefined): EstadoCxc | null => {
+  const normalized = String(estado ?? '').trim().toUpperCase()
+  return normalized in ESTADO_META ? (normalized as EstadoCxc) : null
 }
 
 const initialFilters = {
@@ -91,6 +71,11 @@ const initialFilters = {
   vencimientoHasta: '',
   search: '',
 }
+
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
 export default function CuentasPorCobrarPage() {
   const router = useRouter()
@@ -120,11 +105,7 @@ export default function CuentasPorCobrarPage() {
 
       const endpoint = params.toString() ? `/finanzas/cxc?${params.toString()}` : '/finanzas/cxc'
       const response = await get(endpoint)
-      if (response?.success && Array.isArray(response.data)) {
-        setCuentas(response.data as CuentaPorCobrar[])
-      } else {
-        setCuentas([])
-      }
+      setCuentas(response?.success && Array.isArray(response.data) ? (response.data as CuentaPorCobrar[]) : [])
     } catch (error) {
       console.error('Error cargando cuentas por cobrar', error)
       setCuentas([])
@@ -149,11 +130,7 @@ export default function CuentasPorCobrarPage() {
       try {
         setLoadingHistorial(true)
         const response = await get(`/finanzas/cxc/${cxcId}`)
-        if (response?.success) {
-          setDetalleHistorial(response.data ?? response)
-        } else {
-          setDetalleHistorial(response ?? null)
-        }
+        setDetalleHistorial(response?.success ? response.data ?? response : response ?? null)
       } catch (error) {
         console.error('Error cargando historial de CxC', error)
         setDetalleHistorial(null)
@@ -176,33 +153,30 @@ export default function CuentasPorCobrarPage() {
 
   const stats = useMemo(() => {
     const total = cuentas.length
-    const pendientes = cuentas.filter((c) => c.estado === 'PENDIENTE').length
-    const vencidas = cuentas.filter((c) => c.estado === 'VENCIDO').length
+    const pendientes = cuentas.filter((cuenta) => normalizeEstadoCxc(cuenta.estado) === 'PENDIENTE').length
+    const vencidas = cuentas.filter((cuenta) => normalizeEstadoCxc(cuenta.estado) === 'VENCIDO').length
     const saldoPendiente = cuentas
-      .filter((c) => c.estado !== 'CANCELADO')
+      .filter((cuenta) => normalizeEstadoCxc(cuenta.estado) !== 'CANCELADO')
       .reduce((sum, cuenta) => sum + Number(cuenta.saldo ?? 0), 0)
 
     return { total, pendientes, vencidas, saldoPendiente }
   }, [cuentas])
 
   const isFiltersActive = useMemo(
-    () =>
-      Boolean(
-        filters.estado || filters.clienteId || filters.vencimientoDesde || filters.vencimientoHasta || filters.search,
-      ),
+    () => Boolean(filters.estado || filters.clienteId || filters.vencimientoDesde || filters.vencimientoHasta || filters.search),
     [filters],
   )
 
   const formatCurrency = (value: number | null | undefined, currency: string = 'PEN') => {
-    if (value === null || value === undefined) return '—'
+    if (value === null || value === undefined) return '-'
     return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value)
   }
 
   const formatDate = (value: string | null | undefined) => {
-    if (!value) return '—'
+    if (!value) return '-'
     const candidate = value.includes('T') ? value : `${value}T00:00:00Z`
     const parsed = new Date(candidate)
-    return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('es-PE')
+    return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString('es-PE')
   }
 
   const computeDiasAtraso = (value: string | null | undefined) => {
@@ -214,25 +188,19 @@ export default function CuentasPorCobrarPage() {
     return diff < 0 ? Math.abs(diff) : 0
   }
 
-  const renderEstadoBadge = (estado: EstadoCxc) => {
-    const meta = ESTADO_META[estado]
+  const renderEstadoBadge = (estado: string | null | undefined) => {
+    const normalizedEstado = normalizeEstadoCxc(estado)
+    const meta = normalizedEstado
+      ? ESTADO_META[normalizedEstado]
+      : {
+          label: estado ? String(estado) : 'Sin estado',
+          className: 'border-slate-300/25 bg-slate-300/10 text-slate-100',
+          icon: AlertCircle,
+        }
     const Icon = meta.icon
     return (
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          padding: '0.35rem 0.8rem',
-          borderRadius: '999px',
-          background: meta.background,
-          color: meta.color,
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-        }}
-      >
-        <Icon size={14} />
+      <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${meta.className}`}>
+        <Icon className="h-3.5 w-3.5" />
         {meta.label}
       </span>
     )
@@ -266,377 +234,200 @@ export default function CuentasPorCobrarPage() {
     setSelectedCuenta(null)
   }
 
-  const ActionButton = ({
-    children,
-    disabled,
-    onClick,
-    variant = 'primary',
-  }: {
-    children: React.ReactNode
-    disabled?: boolean
-    onClick: () => void
-    variant?: 'primary' | 'outline' | 'danger'
-  }) => {
-    const styles: Record<typeof variant, React.CSSProperties> = {
-      primary: {
-        background: disabled ? '#9ca3af' : '#2563eb',
-        border: 'none',
-        color: '#ffffff',
-      },
-      outline: {
-        background: disabled ? '#f3f4f6' : '#ffffff',
-        border: '1px solid #d1d5db',
-        color: disabled ? '#9ca3af' : '#111827',
-      },
-      danger: {
-        background: disabled ? '#9ca3af' : '#ef4444',
-        border: 'none',
-        color: '#ffffff',
-      },
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        style={{
-          padding: '0.45rem 0.9rem',
-          borderRadius: '8px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          ...styles[variant],
-        }}
-      >
-        {children}
-      </button>
-    )
-  }
+  const actionButtonClass = 'h-9 gap-1 border-cyan-400/20 bg-white/10 px-3 text-xs text-cyan-50 hover:bg-white/15 hover:text-white'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700, color: '#0f172a' }}>Cuentas por Cobrar</h1>
-          <p style={{ margin: '0.35rem 0 0', color: '#475569' }}>
-            Controla CxC generadas desde Ventas y aplica cobros, notas de crédito o reprogramaciones con trazabilidad.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <ActionButton onClick={fetchCuentas}>
-            <RefreshCw size={14} />
-            Actualizar
-          </ActionButton>
-          <ActionButton
-            onClick={() => alert('📥 Exportación en desarrollo')}
-            variant="outline"
-          >
-            <Download size={14} />
-            Exportar
-          </ActionButton>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP Receivables
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Cuentas por Cobrar</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                CxC generadas desde ventas con cobros, notas de credito, reprogramaciones e historial.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={fetchCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => alert('Exportacion en desarrollo')} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </div>
+          </div>
+        </section>
 
-      <section
-        style={{
-          display: 'grid',
-          gap: '1rem',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        }}
-      >
-        <div style={{ borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '1rem', background: 'rgba(59, 130, 246, 0.12)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', textTransform: 'uppercase' }}>Total</span>
-            <FileText size={20} color="#1d4ed8" />
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginTop: '0.5rem' }}>
-            {stats.total.toLocaleString('es-PE')}
-          </div>
-          <span style={{ fontSize: '0.85rem', color: '#475569' }}>Cuentas registradas</span>
-        </div>
-        <div style={{ borderRadius: '14px', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '1rem', background: 'rgba(251, 191, 36, 0.16)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase' }}>Pendientes</span>
-            <Clock size={20} color="#b45309" />
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#7c2d12', marginTop: '0.5rem' }}>
-            {stats.pendientes.toLocaleString('es-PE')}
-          </div>
-          <span style={{ fontSize: '0.85rem', color: '#7c2d12' }}>Por cobrar</span>
-        </div>
-        <div style={{ borderRadius: '14px', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '1rem', background: 'rgba(254, 202, 202, 0.18)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase' }}>Vencidas</span>
-            <XCircle size={20} color="#b91c1c" />
-          </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#7f1d1d', marginTop: '0.5rem' }}>
-            {stats.vencidas.toLocaleString('es-PE')}
-          </div>
-          <span style={{ fontSize: '0.85rem', color: '#7f1d1d' }}>Atrasadas</span>
-        </div>
-        <div style={{ borderRadius: '14px', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '1rem', background: 'rgba(187, 247, 208, 0.18)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase' }}>Saldo total</span>
-            <DollarSign size={20} color="#047857" />
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#065f46', marginTop: '0.5rem' }}>
-            {formatCurrency(stats.saldoPendiente)}
-          </div>
-          <span style={{ fontSize: '0.85rem', color: '#065f46' }}>Pendiente por cobrar</span>
-        </div>
-      </section>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: 'Total', value: stats.total.toLocaleString('es-PE'), description: 'Cuentas registradas', icon: FileText },
+            { label: 'Pendientes', value: stats.pendientes.toLocaleString('es-PE'), description: 'Por cobrar', icon: Clock },
+            { label: 'Vencidas', value: stats.vencidas.toLocaleString('es-PE'), description: 'Atrasadas', icon: XCircle },
+            { label: 'Saldo total', value: formatCurrency(stats.saldoPendiente), description: 'Pendiente por cobrar', icon: DollarSign },
+          ].map(({ label, value, description, icon: Icon }) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>{label}</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <Icon className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
-      <section
-        style={{
-          border: '1px solid rgba(148, 163, 184, 0.35)',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          background: 'rgba(248, 250, 252, 0.85)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'flex-end',
-        }}
-      >
-        <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
-          <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Buscar
-          </label>
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-            placeholder="Serie, número, cliente, moneda…"
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5f5',
-              background: '#ffffff',
-            }}
-          />
-        </div>
-        <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
-          <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Estado
-          </label>
-          <select
-            value={filters.estado}
-            onChange={(event) => setFilters((prev) => ({ ...prev, estado: event.target.value as EstadoCxc | '' }))}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5f5',
-              background: '#ffffff',
-            }}
-          >
-            <option value="">Todos</option>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="PARCIAL">Parcial</option>
-            <option value="VENCIDO">Vencido</option>
-            <option value="CANCELADO">Cancelado</option>
-          </select>
-        </div>
-        <div style={{ flex: '1 1 200px', minWidth: '200px' }}>
-          <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Cliente
-          </label>
-          <select
-            value={filters.clienteId}
-            onChange={(event) => setFilters((prev) => ({ ...prev, clienteId: event.target.value }))}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5f5',
-              background: '#ffffff',
-            }}
-          >
-            <option value="">Todos</option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {cliente.razon_social || cliente.nombre_comercial || 'Sin nombre'}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
-          <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Vencimiento desde
-          </label>
-          <input
-            type="date"
-            value={filters.vencimientoDesde}
-            onChange={(event) => setFilters((prev) => ({ ...prev, vencimientoDesde: event.target.value }))}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5f5',
-              background: '#ffffff',
-            }}
-          />
-        </div>
-        <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
-          <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-            Vencimiento hasta
-          </label>
-          <input
-            type="date"
-            value={filters.vencimientoHasta}
-            onChange={(event) => setFilters((prev) => ({ ...prev, vencimientoHasta: event.target.value }))}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.85rem',
-              borderRadius: '10px',
-              border: '1px solid #cbd5f5',
-              background: '#ffffff',
-            }}
-          />
-        </div>
-        {isFiltersActive && (
-          <ActionButton onClick={resetFilters} variant="danger">
-            <XCircle size={14} />
-            Limpiar
-          </ActionButton>
-        )}
-      </section>
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Filtros operativos</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_180px_minmax(220px,1fr)_170px_170px_auto] xl:items-end">
+            <label className="space-y-2">
+              <span className={labelClass}>Buscar</span>
+              <input className={inputClass} type="text" value={filters.search} onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))} placeholder="Serie, numero, cliente, moneda" />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Estado</span>
+              <select className={inputClass} value={filters.estado} onChange={(event) => setFilters((prev) => ({ ...prev, estado: event.target.value as EstadoCxc | '' }))}>
+                <option value="">Todos</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="PARCIAL">Parcial</option>
+                <option value="VENCIDO">Vencido</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Cliente</span>
+              <select className={inputClass} value={filters.clienteId} onChange={(event) => setFilters((prev) => ({ ...prev, clienteId: event.target.value }))}>
+                <option value="">Todos</option>
+                {clientes.map((cliente) => (
+                  <option key={cliente.id} value={cliente.id}>
+                    {cliente.razon_social || cliente.nombre_comercial || 'Sin nombre'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Desde</span>
+              <input className={inputClass} type="date" value={filters.vencimientoDesde} onChange={(event) => setFilters((prev) => ({ ...prev, vencimientoDesde: event.target.value }))} />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Hasta</span>
+              <input className={inputClass} type="date" value={filters.vencimientoHasta} onChange={(event) => setFilters((prev) => ({ ...prev, vencimientoHasta: event.target.value }))} />
+            </label>
+            {isFiltersActive && (
+              <Button type="button" onClick={resetFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <XCircle className="h-4 w-4" />
+                Limpiar
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
-      <section
-        style={{
-          border: '1px solid rgba(148, 163, 184, 0.35)',
-          borderRadius: '16px',
-          background: '#ffffff',
-          padding: '1.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-        }}
-      >
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', padding: '3rem 0', color: '#475569' }}>
-            <div className="loading-spinner" />
-            Cargando cuentas por cobrar…
-          </div>
-        ) : cuentas.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem 0' }}>
-            <FileText size={48} style={{ marginBottom: '1rem', color: '#cbd5f5' }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem', color: '#0f172a' }}>
-              {isFiltersActive ? 'Sin resultados con los filtros aplicados' : 'No hay cuentas por cobrar'}
-            </h3>
-            <p style={{ maxWidth: '420px', margin: '0 auto', color: '#64748b' }}>
-              Las CxC se generan automáticamente cuando emites un comprobante de ventas. Registra nuevos cobros o notas de crédito desde las acciones.
-            </p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '960px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'left' }}>Documento</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'left' }}>Cliente</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'left' }}>Emisión</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'left' }}>Vencimiento</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'center' }}>Días atraso</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'right' }}>Saldo</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'center' }}>Estado</th>
-                  <th style={{ padding: '0.8rem 0.75rem', textAlign: 'right' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cuentas.map((cuenta) => {
-                  const numeroCompleto = [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || 'N/A'
-                  const diasAtraso = computeDiasAtraso(cuenta.fecha_vencimiento)
-                  const saldo = Number(cuenta.saldo ?? 0)
-                  const puedeGestionar = saldo > 0 && cuenta.estado !== 'CANCELADO'
-                  return (
-                    <tr key={cuenta.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.9rem 0.75rem' }}>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 600, color: '#0f172a' }}>{numeroCompleto}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {cuenta.tipo_documento ?? '—'}
-                        </div>
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem', color: '#0f172a' }}>
-                        <div style={{ fontWeight: 600 }}>
-                          {cuenta.clientes?.razon_social ?? 'Cliente sin nombre'}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {cuenta.clientes?.documento_numero ?? '—'}
-                        </div>
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem', color: '#475569' }}>{formatDate(cuenta.fecha_emision)}</td>
-                      <td style={{ padding: '0.9rem 0.75rem', color: '#475569' }}>{formatDate(cuenta.fecha_vencimiento)}</td>
-                      <td style={{ padding: '0.9rem 0.75rem', textAlign: 'center', color: diasAtraso > 0 ? '#b91c1c' : '#0f172a', fontWeight: 600 }}>
-                        {diasAtraso}
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem', textAlign: 'right', color: '#0f172a', fontWeight: 600 }}>
-                        {formatCurrency(cuenta.total, cuenta.moneda)}
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem', textAlign: 'right', color: saldo > 0 ? '#dc2626' : '#0f172a', fontWeight: 600 }}>
-                        {formatCurrency(saldo, cuenta.moneda)}
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem', textAlign: 'center' }}>
-                        {renderEstadoBadge(cuenta.estado)}
-                      </td>
-                      <td style={{ padding: '0.9rem 0.75rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                            <ActionButton onClick={() => openCobro(cuenta)} disabled={!puedeGestionar}>
-                              <DollarSign size={13} />
-                              Cobro
-                            </ActionButton>
-                          </ProtectedComponent>
-                          <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                            <ActionButton
-                              onClick={() => openNotaCredito(cuenta)}
-                              disabled={!puedeGestionar}
-                              variant="outline"
-                            >
-                              <FileText size={13} />
-                              Nota
-                            </ActionButton>
-                          </ProtectedComponent>
-                          <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
-                            <ActionButton
-                              onClick={() => openReprogramar(cuenta)}
-                              disabled={cuenta.estado === 'CANCELADO'}
-                              variant="outline"
-                            >
-                              <Clock size={13} />
-                              Reprogramar
-                            </ActionButton>
-                          </ProtectedComponent>
-                          <ProtectedComponent modulo="finanzas" recurso="cxc" accion="read" fallback={null}>
-                            <ActionButton onClick={() => openHistorial(cuenta)} variant="outline">
-                              {loadingHistorial && selectedCuenta?.id === cuenta.id ? (
-                                <RefreshCw size={13} className="animate-spin" />
-                              ) : (
-                                <History size={13} />
-                              )}
-                              Historial
-                            </ActionButton>
-                          </ProtectedComponent>
-                          <ActionButton onClick={() => router.push(`/dashboard/finanzas/cxc/${cuenta.id}`)} variant="outline">
-                            <Eye size={13} />
-                            Detalle
-                          </ActionButton>
-                        </div>
-                      </td>
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-slate-300">
+                <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+                <p>Cargando cuentas por cobrar...</p>
+              </div>
+            ) : cuentas.length === 0 ? (
+              <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
+                <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
+                <h3 className="text-lg font-bold text-white">{isFiltersActive ? 'Sin resultados con los filtros aplicados' : 'No hay cuentas por cobrar'}</h3>
+                <p className="mt-2 max-w-xl text-sm text-slate-400">
+                  Las CxC se generan automaticamente cuando emites comprobantes de ventas.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1100px] border-collapse text-sm">
+                  <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Documento</th>
+                      <th className="px-4 py-3 text-left">Cliente</th>
+                      <th className="px-4 py-3 text-left">Emision</th>
+                      <th className="px-4 py-3 text-left">Vencimiento</th>
+                      <th className="px-4 py-3 text-center">Atraso</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3 text-right">Saldo</th>
+                      <th className="px-4 py-3 text-center">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                  </thead>
+                  <tbody className="divide-y divide-cyan-400/10">
+                    {cuentas.map((cuenta) => {
+                      const numeroCompleto = [cuenta.serie, cuenta.numero].filter(Boolean).join('-') || 'N/A'
+                      const diasAtraso = computeDiasAtraso(cuenta.fecha_vencimiento)
+                      const saldo = Number(cuenta.saldo ?? 0)
+                      const estadoNormalizado = normalizeEstadoCxc(cuenta.estado)
+                      const puedeGestionar = saldo > 0 && estadoNormalizado !== 'CANCELADO'
+                      return (
+                        <tr key={cuenta.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
+                          <td className="px-4 py-3">
+                            <div className="font-mono font-semibold text-white">{numeroCompleto}</div>
+                            <div className="text-xs text-cyan-100/55">{cuenta.tipo_documento ?? '-'}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-100">{cuenta.clientes?.razon_social ?? 'Cliente sin nombre'}</div>
+                            <div className="text-xs text-cyan-100/55">{cuenta.clientes?.documento_numero ?? '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">{formatDate(cuenta.fecha_emision)}</td>
+                          <td className="px-4 py-3 text-slate-300">{formatDate(cuenta.fecha_vencimiento)}</td>
+                          <td className="px-4 py-3 text-center font-bold text-slate-100">{diasAtraso}</td>
+                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(cuenta.total, cuenta.moneda)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(saldo, cuenta.moneda)}</td>
+                          <td className="px-4 py-3 text-center">{renderEstadoBadge(cuenta.estado)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
+                                <Button type="button" size="sm" onClick={() => openCobro(cuenta)} disabled={!puedeGestionar} className="h-9 gap-1 bg-blue-600 px-3 text-xs text-white hover:bg-blue-500">
+                                  <DollarSign className="h-3.5 w-3.5" />
+                                  Cobro
+                                </Button>
+                              </ProtectedComponent>
+                              <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
+                                <Button type="button" size="sm" onClick={() => openNotaCredito(cuenta)} disabled={!puedeGestionar} variant="outline" className={actionButtonClass}>
+                                  <FileText className="h-3.5 w-3.5" />
+                                  Nota
+                                </Button>
+                              </ProtectedComponent>
+                              <ProtectedComponent modulo="finanzas" recurso="cxc.cobros" accion="write" fallback={null}>
+                                <Button type="button" size="sm" onClick={() => openReprogramar(cuenta)} disabled={estadoNormalizado === 'CANCELADO'} variant="outline" className={actionButtonClass}>
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Reprogramar
+                                </Button>
+                              </ProtectedComponent>
+                              <ProtectedComponent modulo="finanzas" recurso="cxc" accion="read" fallback={null}>
+                                <Button type="button" size="sm" onClick={() => openHistorial(cuenta)} variant="outline" className={actionButtonClass}>
+                                  {loadingHistorial && selectedCuenta?.id === cuenta.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <History className="h-3.5 w-3.5" />}
+                                  Historial
+                                </Button>
+                              </ProtectedComponent>
+                              <Button type="button" size="sm" onClick={() => router.push(`/dashboard/finanzas/cxc/${cuenta.id}`)} variant="outline" className={actionButtonClass}>
+                                <Eye className="h-3.5 w-3.5" />
+                                Detalle
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <CobroModal
         isOpen={showCobro}
@@ -665,11 +456,7 @@ export default function CuentasPorCobrarPage() {
         }}
         onSuccess={fetchCuentas}
       />
-      <HistorialDrawer
-        isOpen={showHistorial}
-        onClose={closeHistorial}
-        detalle={loadingHistorial ? null : detalleHistorial}
-      />
+      <HistorialDrawer isOpen={showHistorial} onClose={closeHistorial} detalle={loadingHistorial ? null : detalleHistorial} />
     </div>
   )
 }

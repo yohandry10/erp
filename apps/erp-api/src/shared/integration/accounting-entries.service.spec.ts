@@ -103,6 +103,14 @@ describe('AccountingEntriesService - Period Validation', () => {
     jest.clearAllMocks();
   });
 
+  it('does not subscribe to hot EventBus accounting events; outbox listener owns automatic entries', () => {
+    expect(mockEventBusService.onVentaProcessed).not.toHaveBeenCalled();
+    expect(mockEventBusService.onCompraEntregada).not.toHaveBeenCalled();
+    expect(mockEventBusService.onMovimientoStock).not.toHaveBeenCalled();
+    expect(mockEventBusService.onGastoRegistrado).not.toHaveBeenCalled();
+    expect(mockEventBusService.onPagoFactura).not.toHaveBeenCalled();
+  });
+
   describe('guardarAsientoContable with closed period', () => {
     it('should throw error when trying to create asiento in closed period', async () => {
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
@@ -281,15 +289,17 @@ describe('AccountingEntriesService - Period Validation', () => {
 
       const selectMock = jest.fn().mockReturnThis();
       const eqMock = jest.fn().mockReturnThis();
-      const maybeSingleMock = jest.fn().mockResolvedValue({
-        data: { id: existingAsientoId },
+      const orderMock = jest.fn().mockReturnThis();
+      const limitMock = jest.fn().mockResolvedValue({
+        data: [{ id: existingAsientoId }],
         error: null,
       });
 
       const mockFrom = jest.fn().mockReturnValueOnce({
         select: selectMock,
         eq: eqMock,
-        maybeSingle: maybeSingleMock,
+        order: orderMock,
+        limit: limitMock,
       });
 
       mockSupabaseService.getClient = jest.fn(() => ({
@@ -326,7 +336,8 @@ describe('AccountingEntriesService - Period Validation', () => {
 
       expect(result).toBe(existingAsientoId);
       expect(mockFrom).toHaveBeenCalledTimes(1);
-      expect(maybeSingleMock).toHaveBeenCalledTimes(1);
+      expect(orderMock).toHaveBeenCalledWith('created_at', { ascending: true });
+      expect(limitMock).toHaveBeenCalledWith(1);
     });
   });
 });

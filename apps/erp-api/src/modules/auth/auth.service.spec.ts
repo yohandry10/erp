@@ -134,6 +134,64 @@ describe('AuthService', () => {
             expect(service.revokeUserSessions).toBeDefined();
             expect(service.cleanupExpiredSessions).toBeDefined();
         });
+
+        it('logLoginAttempt debe persistir estado coherente con success', async () => {
+            const mockClient = supabaseService.getPublicClient() as any;
+
+            await (service as any).logLoginAttempt({
+                email: 'test@example.com',
+                ipAddress: '127.0.0.1',
+                userAgent: 'jest',
+                success: true,
+                tenantId: 'tenant-123',
+            });
+
+            expect(mockClient.from).toHaveBeenCalledWith('auth_login_attempts');
+            expect(mockClient.insert).toHaveBeenCalledWith(expect.objectContaining({
+                user_email: 'test@example.com',
+                success: true,
+                estado: 'EXITOSO',
+                tenant_id: 'tenant-123',
+            }));
+        });
+
+        it('rate-limit de login debe bloquear por email (no por IP/user-agent para prevenir bypass)', async () => {
+            const mockClient = supabaseService.getPublicClient() as any;
+            mockClient.gte.mockResolvedValueOnce({
+                data: [{ id: 'attempt-1' }, { id: 'attempt-2' }, { id: 'attempt-3' }, { id: 'attempt-4' }, { id: 'attempt-5' }],
+                error: null,
+            });
+
+            const result = await (service as any).checkFailedAttemptsLimit(
+                'test@example.com',
+                '127.0.0.1',
+                'jest-agent',
+            );
+
+            expect(result).toBe(true);
+            expect(mockClient.eq).toHaveBeenCalledWith('user_email', 'test@example.com');
+            expect(mockClient.eq).toHaveBeenCalledWith('success', false);
+        });
+
+        it('login con contraseña correcta no debe quedar bloqueado por intentos fallidos previos del mismo cliente', async () => {
+            jest.spyOn(service as any, 'checkFailedAttemptsLimit').mockResolvedValue(true);
+            jest.spyOn(service, 'validateUser').mockResolvedValue(mockUser);
+            jest.spyOn(service as any, 'updateLastAccess').mockResolvedValue(undefined);
+            jest.spyOn(service as any, 'createSession').mockResolvedValue('session-token');
+            jest.spyOn(service as any, 'logLoginAttempt').mockResolvedValue(undefined);
+
+            const result = await service.login(
+                { email: 'test@example.com', password: 'password123' },
+                '127.0.0.1',
+                'jest-agent',
+            );
+
+            expect(result.access_token).toBe('mock-jwt-token');
+            expect((service as any).logLoginAttempt).toHaveBeenCalledWith(expect.objectContaining({
+                email: 'test@example.com',
+                success: true,
+            }));
+        });
     });
 
     // ==================== VALIDATE USER ====================
@@ -353,12 +411,12 @@ describe('AuthService', () => {
             expect(emailService.sendPasswordResetEmail).toHaveBeenCalled();
         });
 
-        it('should throw UnauthorizedException when user not found', async () => {
+        it('should return generic response when user not found (prevent enumeration)', async () => {
             const mockClient = supabaseService.getPublicClient() as any;
             mockClient.single.mockResolvedValueOnce({ data: null, error: null });
 
-            await expect(service.generatePasswordResetToken('nonexistent@example.com'))
-                .rejects.toThrow(UnauthorizedException);
+            const result = await service.generatePasswordResetToken('nonexistent@example.com');
+            expect(result).toBe('reset-requested');
         });
 
         it('should throw InternalServerErrorException when email not configured', async () => {

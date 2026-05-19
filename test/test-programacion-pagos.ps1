@@ -2,7 +2,7 @@
 # Verifica que el endpoint de programación de pagos funcione correctamente
 
 $baseUrl = "http://localhost:3001"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZmU2YzBjYy1hMzY3LTRhNzAtYjU5Yy1hNzBiNzI5YzI3YjgiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzMwMDcxNjk3LCJleHAiOjE3MzAxNTgwOTd9.qOEtxYVhJN7RLkKxYa-JqJBx_Qs-oPSKJqQvhLqLMhI"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "vierdes"
 
 Write-Host "=== TEST: Programación de Pagos por Vencimiento ===" -ForegroundColor Cyan
@@ -22,7 +22,7 @@ try {
     Write-Host "✅ Programación obtenida exitosamente" -ForegroundColor Green
     Write-Host "Total de pagos: $($response.total)" -ForegroundColor Cyan
     Write-Host "Página: $($response.page) | Límite: $($response.limit)" -ForegroundColor Cyan
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "`nPrimeros 3 pagos:" -ForegroundColor Cyan
         $response.data | Select-Object -First 3 | ForEach-Object {
@@ -43,11 +43,11 @@ Write-Host "Test 2: Filtrar pagos urgentes (próximos 7 días)" -ForegroundColor
 try {
     $hoy = Get-Date -Format "yyyy-MM-dd"
     $en7Dias = (Get-Date).AddDays(7).ToString("yyyy-MM-dd")
-    
+
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/tesoreria/programacion?fecha_desde=$hoy&fecha_hasta=$en7Dias" -Method Get -Headers $headers
     Write-Host "✅ Pagos urgentes obtenidos" -ForegroundColor Green
     Write-Host "Total de pagos urgentes: $($response.total)" -ForegroundColor Cyan
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "`nPagos urgentes:" -ForegroundColor Cyan
         $response.data | ForEach-Object {
@@ -68,7 +68,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/tesoreria/programacion?estado=PENDIENTE&limit=5" -Method Get -Headers $headers
     Write-Host "✅ Pagos pendientes obtenidos" -ForegroundColor Green
     Write-Host "Total de pagos pendientes: $($response.total)" -ForegroundColor Cyan
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "`nPagos pendientes:" -ForegroundColor Cyan
         $response.data | ForEach-Object {
@@ -99,13 +99,13 @@ Write-Host ""
 Write-Host "Test 5: Estadísticas por urgencia" -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/tesoreria/programacion?limit=100" -Method Get -Headers $headers
-    
+
     $vencidas = ($response.data | Where-Object { $_.urgencia -eq "VENCIDA" }).Count
     $hoy = ($response.data | Where-Object { $_.urgencia -eq "HOY" }).Count
     $urgentes = ($response.data | Where-Object { $_.urgencia -eq "URGENTE" }).Count
     $proximas = ($response.data | Where-Object { $_.urgencia -eq "PROXIMA" }).Count
     $normales = ($response.data | Where-Object { $_.urgencia -eq "NORMAL" }).Count
-    
+
     Write-Host "✅ Estadísticas calculadas" -ForegroundColor Green
     Write-Host "  Vencidas: $vencidas" -ForegroundColor Red
     Write-Host "  Vence Hoy: $hoy" -ForegroundColor Yellow

@@ -22,10 +22,10 @@ export default function AuditLogsPage() {
     return (
       <div className="dashboard-container">
         <div className="activity-card">
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <AlertCircle size={48} style={{ margin: '0 auto 1rem', opacity: '0.5', color: '#6b7280' }} />
-            <h3 style={{ marginBottom: '0.5rem', color: '#374151' }}>Acceso denegado</h3>
-            <p style={{ color: '#6b7280' }}>No tienes permisos para ver los logs de auditoría.</p>
+          <div className="p-12 text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-slate-500 opacity-50" />
+            <h3 className="mb-2 text-lg font-semibold text-slate-700">Acceso denegado</h3>
+            <p className="text-slate-500">No tienes permisos para ver los logs de auditoría.</p>
           </div>
         </div>
       </div>
@@ -34,4 +34,3 @@ export default function AuditLogsPage() {
 
   return <AuditLogsViewer />
 }
-

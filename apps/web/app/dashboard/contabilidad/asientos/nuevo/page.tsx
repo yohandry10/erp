@@ -3,8 +3,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, RefreshCw } from 'lucide-react'
 import AsientoForm from '@/components/contabilidad/AsientoForm'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface Cuenta {
   id: string
@@ -45,17 +47,11 @@ export default function NuevoAsientoPage() {
       setLoadingData(true)
       setError(null)
 
-      // Cargar plan de cuentas
       const cuentasResponse = await get('/api/contabilidad/plan-cuentas')
-      if (cuentasResponse?.success && cuentasResponse.data) {
-        setCuentas(cuentasResponse.data)
-      }
+      if (cuentasResponse?.success && cuentasResponse.data) setCuentas(cuentasResponse.data)
 
-      // Cargar centros de costo
       const centrosResponse = await get('/api/contabilidad/centros-costo')
-      if (centrosResponse?.success && centrosResponse.data) {
-        setCentrosCosto(centrosResponse.data)
-      }
+      if (centrosResponse?.success && centrosResponse.data) setCentrosCosto(centrosResponse.data)
     } catch (err: any) {
       console.error('Error loading initial data:', err)
       setError(err.message || 'Error al cargar los datos iniciales')
@@ -76,7 +72,7 @@ export default function NuevoAsientoPage() {
       const response = await post('/api/contabilidad/asiento-contable', data)
 
       if (response?.success) {
-        alert('✅ Asiento contable creado exitosamente')
+        alert('Asiento contable creado exitosamente')
         router.push(`/dashboard/contabilidad/asientos/${response.data.id}`)
       } else {
         throw new Error(response?.message || 'Error al crear el asiento')
@@ -84,103 +80,90 @@ export default function NuevoAsientoPage() {
     } catch (err: any) {
       console.error('Error creating asiento:', err)
       setError(err.message || 'Error al crear el asiento contable')
-      alert(`❌ Error: ${err.message || 'Error al crear el asiento contable'}`)
+      alert(`Error: ${err.message || 'Error al crear el asiento contable'}`)
     } finally {
       setLoading(false)
     }
   }
 
   const handleCancel = () => {
-    if (confirm('¿Está seguro de cancelar? Se perderán los datos ingresados.')) {
+    if (confirm('¿Esta seguro de cancelar? Se perderan los datos ingresados.')) {
       router.push('/dashboard/contabilidad/asientos')
     }
   }
 
   if (loadingData) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando datos...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando datos contables...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error && cuentas.length === 0) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-section">
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              Error al cargar los datos
-            </h3>
-            <p style={{ marginBottom: '1.5rem' }}>{error}</p>
-            <button
-              onClick={loadInitialData}
-              className="refresh-btn"
-            >
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-4 p-6 text-center">
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3">
+              <FileText className="h-8 w-8 text-cyan-100" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Error al cargar los datos</h3>
+              <p className="mt-2 text-sm text-slate-300">{error}</p>
+            </div>
+            <Button onClick={loadInitialData} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <RefreshCw className="h-4 w-4" />
               Reintentar
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <button
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <Button
+            type="button"
             onClick={() => router.push('/dashboard/contabilidad/asientos')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            variant="outline"
+            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
           >
-            <ArrowLeft size={16} />
-            Volver a Asientos Contables
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
-              <FileText size={24} />
+            <ArrowLeft className="h-4 w-4" />
+            Volver a asientos
+          </Button>
+          <div className="flex items-start gap-4">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+              <FileText className="h-6 w-6" />
+            </span>
+            <div>
+              <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                ERP Journal Center
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Nuevo asiento contable manual</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                Complete el asiento y confirme que debe y haber cuadren antes de guardar.
+              </p>
             </div>
-            <h1 className="dashboard-title">Nuevo Asiento Contable Manual</h1>
           </div>
-          <p className="dashboard-subtitle">
-            Complete el formulario para crear un asiento contable manual. El asiento debe estar balanceado (Debe = Haber).
-          </p>
-        </div>
-      </div>
+        </section>
 
-      {/* Form */}
-      <AsientoForm
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-        cuentas={cuentas}
-        centrosCosto={centrosCosto}
-        loading={loading}
-      />
+        <AsientoForm
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          cuentas={cuentas}
+          centrosCosto={centrosCosto}
+          loading={loading}
+        />
+      </div>
     </div>
   )
 }

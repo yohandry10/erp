@@ -1,13 +1,6 @@
-import { 
-  CreditCard, 
-  Eye, 
-  Edit, 
-  Building2,
-  DollarSign,
-  CheckCircle,
-  XCircle,
-  AlertCircle
-} from 'lucide-react'
+import { AlertCircle, Building2, CheckCircle, CreditCard, DollarSign, Edit, Eye, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface CuentaBancaria {
   id: string
@@ -30,15 +23,8 @@ interface CuentaBancariaCardProps {
 const TIPO_CUENTA_LABELS: Record<string, string> = {
   CORRIENTE: 'Corriente',
   AHORROS: 'Ahorros',
-  DETRACCION: 'Detracción',
-  PLAZO_FIJO: 'Plazo Fijo',
-}
-
-const TIPO_CUENTA_COLORS: Record<string, string> = {
-  CORRIENTE: '#3b82f6',
-  AHORROS: '#10b981',
-  DETRACCION: '#f59e0b',
-  PLAZO_FIJO: '#8b5cf6',
+  DETRACCION: 'Detraccion',
+  PLAZO_FIJO: 'Plazo fijo',
 }
 
 export default function CuentaBancariaCard({ cuenta, onView, onEdit }: CuentaBancariaCardProps) {
@@ -46,264 +32,70 @@ export default function CuentaBancariaCard({ cuenta, onView, onEdit }: CuentaBan
     const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: currency,
+      currency,
     }).format(amount)
   }
 
-  const tipoCuentaColor = TIPO_CUENTA_COLORS[cuenta.tipo_cuenta] || '#6b7280'
-  const saldoColor = cuenta.saldo >= 0 ? '#10b981' : '#ef4444'
-
   return (
-    <div style={{
-      background: 'white',
-      borderRadius: '12px',
-      padding: '1.5rem',
-      border: '1px solid #e5e7eb',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      transition: 'all 0.2s ease',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Header con tipo de cuenta */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '4px',
-        background: tipoCuentaColor
-      }} />
-
-      {/* Estado activa/inactiva */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CreditCard size={20} style={{ color: tipoCuentaColor }} />
-          <span style={{
-            fontSize: '0.75rem',
-            fontWeight: '600',
-            color: tipoCuentaColor,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            {TIPO_CUENTA_LABELS[cuenta.tipo_cuenta] || cuenta.tipo_cuenta}
-          </span>
-        </div>
-        
-        {cuenta.activa ? (
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            padding: '0.25rem 0.5rem',
-            borderRadius: '9999px',
-            fontSize: '0.625rem',
-            fontWeight: '600',
-            background: 'rgba(16, 185, 129, 0.1)',
-            color: '#10b981'
-          }}>
-            <CheckCircle size={12} />
-            ACTIVA
-          </span>
-        ) : (
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            padding: '0.25rem 0.5rem',
-            borderRadius: '9999px',
-            fontSize: '0.625rem',
-            fontWeight: '600',
-            background: 'rgba(107, 114, 128, 0.1)',
-            color: '#6b7280'
-          }}>
-            <XCircle size={12} />
-            INACTIVA
-          </span>
-        )}
-      </div>
-
-      {/* Nombre de la cuenta */}
-      <h3 style={{
-        fontSize: '1.125rem',
-        fontWeight: '700',
-        color: '#111827',
-        marginBottom: '0.5rem',
-        lineHeight: '1.4'
-      }}>
-        {cuenta.nombre}
-      </h3>
-
-      {/* Banco */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        marginBottom: '1rem'
-      }}>
-        <Building2 size={16} style={{ color: '#6b7280' }} />
-        <span style={{
-          fontSize: '0.875rem',
-          color: '#6b7280',
-          fontWeight: '500'
-        }}>
-          {cuenta.banco}
-        </span>
-      </div>
-
-      {/* Número de cuenta */}
-      <div style={{
-        background: '#f9fafb',
-        padding: '0.75rem',
-        borderRadius: '8px',
-        marginBottom: '1rem'
-      }}>
-        <div style={{
-          fontSize: '0.75rem',
-          color: '#6b7280',
-          marginBottom: '0.25rem',
-          fontWeight: '500'
-        }}>
-          Número de Cuenta
-        </div>
-        <div style={{
-          fontSize: '0.875rem',
-          fontWeight: '600',
-          color: '#111827',
-          fontFamily: 'monospace',
-          letterSpacing: '0.05em'
-        }}>
-          {cuenta.numero_cuenta}
-        </div>
-      </div>
-
-      {/* Saldo */}
-      <div style={{
-        background: cuenta.saldo >= 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-        padding: '1rem',
-        borderRadius: '8px',
-        marginBottom: '1rem',
-        border: `1px solid ${cuenta.saldo >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <div>
-            <div style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              marginBottom: '0.25rem',
-              fontWeight: '500'
-            }}>
-              Saldo Disponible
-            </div>
-            <div style={{
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              color: saldoColor,
-              lineHeight: '1'
-            }}>
-              {formatCurrency(cuenta.saldo, cuenta.moneda)}
+    <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <div className="h-1 bg-cyan-400/70" />
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+              <CreditCard className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                {TIPO_CUENTA_LABELS[cuenta.tipo_cuenta] || cuenta.tipo_cuenta}
+              </div>
+              <h3 className="mt-1 truncate text-lg font-bold text-white">{cuenta.nombre}</h3>
             </div>
           </div>
-          <DollarSign size={32} style={{ color: saldoColor, opacity: 0.3 }} />
-        </div>
-      </div>
-
-      {/* Permite sobregiro */}
-      {cuenta.permite_sobregiro && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.5rem',
-          background: 'rgba(245, 158, 11, 0.1)',
-          borderRadius: '6px',
-          marginBottom: '1rem'
-        }}>
-          <AlertCircle size={14} style={{ color: '#f59e0b' }} />
-          <span style={{
-            fontSize: '0.75rem',
-            color: '#f59e0b',
-            fontWeight: '500'
-          }}>
-            Permite sobregiro
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${cuenta.activa ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100' : 'border-slate-300/25 bg-slate-300/10 text-slate-100'}`}>
+            {cuenta.activa ? <CheckCircle className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+            {cuenta.activa ? 'Activa' : 'Inactiva'}
           </span>
         </div>
-      )}
 
-      {/* Acciones */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        paddingTop: '1rem',
-        borderTop: '1px solid #e5e7eb'
-      }}>
-        <button
-          onClick={onView}
-          style={{
-            flex: 1,
-            padding: '0.75rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            color: '#374151',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f9fafb'
-            e.currentTarget.style.borderColor = '#9ca3af'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'white'
-            e.currentTarget.style.borderColor = '#d1d5db'
-          }}
-        >
-          <Eye size={16} />
-          Ver Movimientos
-        </button>
-        <button
-          onClick={onEdit}
-          style={{
-            flex: 1,
-            padding: '0.75rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: '#3b82f6',
-            color: 'white',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#2563eb'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#3b82f6'
-          }}
-        >
-          <Edit size={16} />
-          Editar
-        </button>
-      </div>
-    </div>
+        <div className="mt-4 flex items-center gap-2 text-sm text-slate-300">
+          <Building2 className="h-4 w-4 text-cyan-200/70" />
+          <span className="font-medium">{cuenta.banco}</span>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-cyan-400/10 bg-slate-950/70 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Numero de cuenta</div>
+          <div className="mt-2 break-all font-mono text-sm font-bold tracking-wide text-white">{cuenta.numero_cuenta}</div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Saldo disponible</div>
+              <div className="mt-2 text-2xl font-black text-cyan-50">{formatCurrency(cuenta.saldo, cuenta.moneda)}</div>
+            </div>
+            <DollarSign className="h-8 w-8 text-cyan-200/50" />
+          </div>
+        </div>
+
+        {cuenta.permite_sobregiro && (
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm font-semibold text-amber-100">
+            <AlertCircle className="h-4 w-4" />
+            Permite sobregiro
+          </div>
+        )}
+
+        <div className="mt-5 grid gap-2 border-t border-cyan-400/10 pt-4 sm:grid-cols-2">
+          <Button type="button" onClick={onView} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+            <Eye className="h-4 w-4" />
+            Movimientos
+          </Button>
+          <Button type="button" onClick={onEdit} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+            <Edit className="h-4 w-4" />
+            Editar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

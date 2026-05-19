@@ -2,7 +2,7 @@
 # Este script prueba que las órdenes de compra se crean con estado APROBACION cuando el total excede el monto configurado
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6IlNVUEVSX0FETUlOIiwiaWF0IjoxNzI5ODAwMDAwLCJleHAiOjE3Mjk4ODY0MDB9.test-token"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 
 $headers = @{
@@ -66,7 +66,7 @@ try {
     Write-Host "   ✓ OC creada: $($ocBajaResponse.numero)" -ForegroundColor Green
     Write-Host "   ✓ Estado: $($ocBajaResponse.estado)" -ForegroundColor Green
     Write-Host "   ✓ Total: $($ocBajaResponse.total)" -ForegroundColor Green
-    
+
     if ($ocBajaResponse.estado -eq "BORRADOR" -or $ocBajaResponse.estado -eq "PENDIENTE") {
         Write-Host "   ✓ CORRECTO: OC con monto bajo NO requiere aprobación" -ForegroundColor Green
     } else {
@@ -103,7 +103,7 @@ try {
     Write-Host "   ✓ OC creada: $($ocAltaResponse.numero)" -ForegroundColor Green
     Write-Host "   ✓ Estado: $($ocAltaResponse.estado)" -ForegroundColor Green
     Write-Host "   ✓ Total: $($ocAltaResponse.total)" -ForegroundColor Green
-    
+
     if ($ocAltaResponse.estado -eq "APROBACION") {
         Write-Host "   ✓ CORRECTO: OC con monto alto requiere aprobación" -ForegroundColor Green
     } else {

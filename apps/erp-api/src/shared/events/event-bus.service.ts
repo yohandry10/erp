@@ -703,6 +703,31 @@ export class EventBusService {
     console.log(`✅ [EventBus] Evento ${eventType} emitido exitosamente`);
   }
 
+  /**
+   * Emits an event and awaits all registered listeners to complete.
+   * Used by OutboxWorker to ensure handlers finish before marking events completed.
+   */
+  async emitAndAwait(eventType: string, data: any, module: string = 'unknown'): Promise<void> {
+    const event: ERPEvent = {
+      type: eventType,
+      data,
+      timestamp: new Date(),
+      module,
+    };
+
+    const listeners = this.eventEmitter.rawListeners(eventType);
+    const promises = listeners.map((listener) => {
+      try {
+        const result = (listener as any)(event);
+        return result instanceof Promise ? result : Promise.resolve();
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    });
+
+    await Promise.all(promises);
+  }
+
   // Escuchar eventos
   on(eventType: string, listener: (event: ERPEvent) => void) {
     console.log(`👂 [EventBus] Registrando listener para: ${eventType}`);

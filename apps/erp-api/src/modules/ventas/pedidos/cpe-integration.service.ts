@@ -32,6 +32,7 @@ export class CPEIntegrationService {
     pedido: PedidoVenta & { detalle: PedidoDetalle[] },
     tenantId: string,
     idempotencyKey?: string,
+    userId?: string,
   ): Promise<{
     factura_id: string;
     estado: string;
@@ -93,7 +94,7 @@ export class CPEIntegrationService {
 
       // 6. Llamar a CPEService para generar XML/UBL 2.1, QR, hash, PDF (Requirement 10.3, 19.8)
       this.logger.log('Llamando a CPEService para crear factura');
-      const factura = await this.cpeService.create(facturaData, tenantId);
+      const factura = await this.cpeService.create(facturaData, tenantId, userId);
       const documentoId = (factura as any).documento_id ?? (factura as any).documentoId ?? null;
 
       this.logger.log(`✅ Factura generada exitosamente: ${factura.id}`);
@@ -178,14 +179,7 @@ export class CPEIntegrationService {
       };
     });
 
-    const numeroDocumentoCliente = ((
-      cliente.documento_numero ??
-      cliente.numero_documento ??
-      cliente.documento ??
-      ''
-    )
-      ?.toString()
-      .trim()) || null;
+    const numeroDocumentoCliente = this.resolverDocumentoCliente(cliente);
 
     if (!numeroDocumentoCliente) {
       throw new BadRequestException({
@@ -278,11 +272,11 @@ export class CPEIntegrationService {
           tipo,
           documento_tipo,
           documento_numero:numero_documento,
+          ruc,
+          codigo,
           razon_social,
-          nombre_comercial,
           direccion,
           email,
-          telefono,
           limite_credito,
           permite_morosidad
         `,
@@ -296,6 +290,25 @@ export class CPEIntegrationService {
     }
 
     return cliente;
+  }
+
+  private resolverDocumentoCliente(cliente: any): string | null {
+    const candidatos = [
+      cliente?.documento_numero,
+      cliente?.numero_documento,
+      cliente?.ruc,
+      cliente?.codigo,
+      cliente?.documento,
+    ];
+
+    for (const candidato of candidatos) {
+      const documento = candidato?.toString().trim();
+      if (documento) {
+        return documento;
+      }
+    }
+
+    return null;
   }
 
   private mapearTipoDocumentoSunat(tipo?: string | null): string {
@@ -367,13 +380,26 @@ export class CPEIntegrationService {
     }
 
     const serie = config.serie_factura || 'F001';
-    const numero = (config.ultimo_numero_factura || 0) + 1;
+    const ultimoNumero = config.ultimo_numero_factura || 0;
+    const numero = ultimoNumero + 1;
 
-    // Actualizar correlativo
-    await this.supabase.getClient()
+    // Actualizar correlativo con optimistic concurrency control
+    const { data: updateResult, error: updateError } = await this.supabase.getClient()
       .from('empresa_config')
       .update({ ultimo_numero_factura: numero, updated_at: new Date().toISOString() })
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .eq('ultimo_numero_factura', ultimoNumero)
+      .select('ultimo_numero_factura')
+      .single();
+
+    if (updateError) {
+      if (updateError.code === 'PGRST116') {
+        throw new BadRequestException(
+          'Conflicto de concurrencia en numeración de factura. Otro proceso actualizó el correlativo. Reintente la operación.',
+        );
+      }
+      throw new BadRequestException('Error actualizando correlativo de factura');
+    }
 
     return { serie, numero };
   }

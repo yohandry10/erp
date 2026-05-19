@@ -5,11 +5,13 @@ import { useApiCall } from '@/hooks/use-api'
 import CpeModal from '@/components/modals/CpeModal'
 import CpeViewModal from '@/components/modals/CpeViewModal'
 import GreModal from '@/components/modals/GreModal'
-import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
 import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { FileText, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
 
 interface CpeDocument {
   id: string
@@ -22,7 +24,7 @@ interface CpeDocument {
   clienteRuc: string
   total: number
   moneda: string
-  estado: 'BORRADOR' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO'
+  estado: 'BORRADOR' | 'FIRMADO' | 'ENVIADO' | 'ACEPTADO' | 'RECHAZADO' | 'ANULADO'
   estadoSunat?: string
   observaciones?: string
   fechaCreacion: string
@@ -152,29 +154,18 @@ export default function CPEPage() {
     setSelectedCpeForGre(null)
   }
 
-  const getStatusColor = (estado: string) => {
-    switch (estado) {
-      case 'ACEPTADO':
-        return { background: '#10b981', color: 'white' }
-      case 'ENVIADO':
-        return { background: '#f59e0b', color: 'white' }
-      case 'RECHAZADO':
-        return { background: '#ef4444', color: 'white' }
-      case 'BORRADOR':
-        return { background: '#6b7280', color: 'white' }
-      default:
-        return { background: '#6b7280', color: 'white' }
-    }
-  }
-
   const getStatusText = (estado: string) => {
     switch (estado) {
       case 'ACEPTADO':
         return 'Aceptado'
+      case 'FIRMADO':
+        return 'Firmado'
       case 'ENVIADO':
         return 'Pendiente'
       case 'RECHAZADO':
         return 'Rechazado'
+      case 'ANULADO':
+        return 'Anulado'
       case 'BORRADOR':
         return 'Borrador'
       default:
@@ -203,104 +194,89 @@ export default function CPEPage() {
 
   if (loading && documents.length === 0) {
     return (
-      <div className="dashboard-container">
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '4px solid #f3f4f6',
-              borderTop: '4px solid #3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }}></div>
-            <p>Cargando comprobantes...</p>
-          </div>
+      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
+        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
+          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+          <p className="text-sm text-slate-300">Cargando comprobantes...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Comprobantes de Pago Electrónicos (CPE)</h1>
-        <p className="dashboard-subtitle">Gestiona facturas, boletas y notas de crédito/débito</p>
-        <button
-          className="refresh-btn"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Nuevo CPE
-        </button>
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP CPE Center
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Comprobantes de Pago Electronicos</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">Facturas, boletas y notas conectadas a {fiscalLabel}.</p>
+            </div>
+            <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Plus className="h-4 w-4" />
+              Nuevo CPE
+            </Button>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['CPE emitidos hoy', stats?.cpeEmitidosHoy || 0, 'Comprobantes hoy'],
+            ['CPE del mes', stats?.cpeDelMes || 0, 'Total del mes'],
+            ['Monto facturado', `S/ ${stats?.montoFacturado?.toLocaleString() || '0'}`, 'Ingresos del mes'],
+            ['Rechazados', stats?.rechazados || 0, 'Requieren correccion'],
+          ].map(([label, value, description]) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">{label}</div>
+                  <div className="mt-3 text-3xl font-black text-white">{value}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <FileText className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="p-4">
+            <ComprobantesFilters
+              filters={{ ...filters }}
+              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+              onExport={(f) => {
+                const params = new URLSearchParams()
+                if (f.tipoComprobante) params.append('tipoComprobante', f.tipoComprobante)
+                if (f.estado) params.append('estado', f.estado)
+                if (f.serie) params.append('serie', f.serie)
+                if (f.moneda) params.append('moneda', f.moneda)
+                if (f.fechaDesde) params.append('fechaDesde', f.fechaDesde)
+                if (f.fechaHasta) params.append('fechaHasta', f.fechaHasta)
+                if (f.cliente) params.append('cliente', f.cliente)
+                window.open(`/api/cpe/comprobantes/export?${params.toString()}`, '_blank')
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="p-4">
+            <ComprobantesTable
+              documents={documents}
+              onView={viewDocument}
+              onSend={sendToFiscal}
+              onGre={openGreModal}
+              fiscalLabel={fiscalLabel}
+              canSend={canSendToFiscal}
+            />
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Quick Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>CPE EMITIDOS HOY</h3>
-            <span className="stat-icon">📄</span>
-          </div>
-          <div className="stat-value">{stats?.cpeEmitidosHoy || 0}</div>
-          <div className="stat-subtitle">Comprobantes hoy</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>CPE DEL MES</h3>
-            <span className="stat-icon">📈</span>
-          </div>
-          <div className="stat-value">{stats?.cpeDelMes || 0}</div>
-          <div className="stat-subtitle">Total del mes</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>MONTO FACTURADO</h3>
-            <span className="stat-icon">💰</span>
-          </div>
-          <div className="stat-value">S/ {stats?.montoFacturado?.toLocaleString() || '0'}</div>
-          <div className="stat-subtitle">Ingresos del mes</div>
-        </div>
-
-        <div className="stat-card alert">
-          <div className="stat-header">
-            <h3>RECHAZADOS</h3>
-            <span className="stat-icon">❌</span>
-          </div>
-          <div className="stat-value warning">{stats?.rechazados || 0}</div>
-          <div className="stat-subtitle">Requieren corrección</div>
-        </div>
-      </div>
-
-      <ComprobantesFilters
-        filters={{ ...filters }}
-        onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-        onExport={(f) => {
-          const params = new URLSearchParams()
-          if (f.tipoComprobante) params.append('tipoComprobante', f.tipoComprobante)
-          if (f.estado) params.append('estado', f.estado)
-          if (f.serie) params.append('serie', f.serie)
-          if (f.moneda) params.append('moneda', f.moneda)
-          if (f.fechaDesde) params.append('fechaDesde', f.fechaDesde)
-          if (f.fechaHasta) params.append('fechaHasta', f.fechaHasta)
-          if (f.cliente) params.append('cliente', f.cliente)
-          window.open(`/api/cpe/comprobantes/export?${params.toString()}`, '_blank')
-        }}
-      />
-
-        <div className="activity-card">
-          <ComprobantesTable
-            documents={documents}
-            onView={viewDocument}
-            onSend={sendToFiscal}
-            onGre={openGreModal}
-            fiscalLabel={fiscalLabel}
-            canSend={canSendToFiscal}
-          />
-        </div>
 
       {/* CPE Modal */}
       <CpeModal
@@ -325,12 +301,6 @@ export default function CPEPage() {
         cpeData={selectedCpeForGre}
       />
 
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

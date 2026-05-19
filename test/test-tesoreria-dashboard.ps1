@@ -2,7 +2,7 @@
 # Este script verifica que el dashboard de tesorería funcione correctamente
 
 $baseUrl = "http://localhost:3001"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjQyMDJiYy1hMzBjLTRjMzItYjI3Yy1lNzE5YzI3YzI3YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.mZIcfH5ujiRjoF-EyHCVs8KqNPwJLKqZl0x0FqXqqqo"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "vierdes"
 
 $headers = @{

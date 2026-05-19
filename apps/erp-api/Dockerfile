@@ -20,10 +20,11 @@ COPY apps/erp-api/ ./apps/erp-api/
 RUN pnpm install --frozen-lockfile
 
 # Build libraries first
-RUN pnpm run build --filter=@erp-suite/dtos --filter=@erp-suite/crypto
+RUN pnpm --filter=@erp-suite/dtos build
+RUN pnpm --filter=@erp-suite/crypto build
 
 # Build the application
-RUN pnpm run build --filter=@erp-suite/erp-api
+RUN pnpm --filter=@erp-suite/erp-api build
 
 # Production stage
 FROM node:20-alpine AS production
@@ -60,7 +61,7 @@ EXPOSE 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
+  CMD node -e "const port=process.env.PORT||'3002'; const http=require('http'); const req=http.get(`http://localhost:${port}/api/health/ready`, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"
 
 # Start the application
-CMD ["node", "apps/erp-api/dist/main.js"] 
+CMD ["node", "apps/erp-api/dist/main.js"]

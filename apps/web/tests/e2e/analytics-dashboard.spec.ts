@@ -83,7 +83,7 @@ async function insertRow(supabase: SupabaseClient, table: string, row: Record<st
   return data;
 }
 
-test.describe('T16 Analytics y Dashboard', () => {
+test.describe('CASE-18 Analytics y Dashboard', () => {
   test.setTimeout(300000);
 
   test('dashboard y analytics reflejan datos reales por tenant y filtros de fecha', async ({ page }) => {
@@ -100,7 +100,7 @@ test.describe('T16 Analytics y Dashboard', () => {
     await expectStatus(await apiContext.post(api('/dashboard/cache/invalidate'), { data: {} }), 201, 'invalidar cache inicial');
     const baseline = await parseOk<any>(await apiContext.get(api('/dashboard/stats')), 'baseline dashboard stats');
 
-    const unique = `T16-${runId}-${crypto.randomUUID().slice(0, 8)}`;
+    const unique = `QA-PROD-READY-${new Date().toISOString().replace(/\D/g, '').slice(0, 12)}-CASE18-${runId}-${crypto.randomUUID().slice(0, 8)}`;
     const cpeTotal = 432.1;
     const ventaTotal = 321.9;
     const compraTotal = 210.5;
@@ -111,7 +111,7 @@ test.describe('T16 Analytics y Dashboard', () => {
       tenant_id: tenantId,
       codigo: `${unique}-PROD`,
       nombre: `Producto Analytics Dashboard ${unique}`,
-      categoria: 'ANALYTICS_T16',
+      categoria: 'QA-PROD-READY-ANALYTICS-CASE18',
       precio,
       precio_venta: precio,
       stock_actual: stockActual,
@@ -122,11 +122,11 @@ test.describe('T16 Analytics y Dashboard', () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
-    expect(product.id, 'producto T16 debe persistir').toBeTruthy();
+    expect(product.id, 'producto CASE-18 debe persistir').toBeTruthy();
 
     await insertRow(supabase, 'cpe', {
       tenant_id: tenantId,
-      serie: 'F016',
+      serie: 'F018',
       numero: Number(runId.slice(-6)),
       tipo_documento: '01',
       fecha_emision: today(),
@@ -172,7 +172,7 @@ test.describe('T16 Analytics y Dashboard', () => {
     await insertRow(supabase, 'sire_files', {
       tenant_id: tenantId,
       filename: `${unique}-sire.txt`,
-      tipo: `T16${runId.slice(-7)}`,
+      tipo: `QA18${runId.slice(-5)}`,
       servicio: 'SIRE',
       periodo: today().slice(0, 7),
       period: today().slice(0, 7),
@@ -202,7 +202,7 @@ test.describe('T16 Analytics y Dashboard', () => {
       tenant_id: tenantId,
       cliente_id: cliente.id,
       tipo_documento: '03',
-      serie: 'B016',
+      serie: 'B018',
       numero: runId.slice(-8),
       fecha_emision: today(),
       fecha_vencimiento: today(),
@@ -265,20 +265,20 @@ test.describe('T16 Analytics y Dashboard', () => {
       updated_at: new Date().toISOString(),
     });
 
-    await expectStatus(await apiContext.post(api('/dashboard/cache/invalidate'), { data: {} }), 201, 'invalidar cache con datos T16');
-    const stats = await parseOk<any>(await apiContext.get(api('/dashboard/stats')), 'dashboard stats con datos T16');
+    await expectStatus(await apiContext.post(api('/dashboard/cache/invalidate'), { data: {} }), 201, 'invalidar cache con datos CASE-18');
+    const stats = await parseOk<any>(await apiContext.get(api('/dashboard/stats')), 'dashboard stats con datos CASE-18');
     expect(Number(stats.ventasMes), 'Dashboard debe reflejar CPE real del periodo').toBeGreaterThanOrEqual(Number(baseline.ventasMes) + cpeTotal - 0.01);
     expect(Number(stats.comprasMes), 'Dashboard debe reflejar OC real del periodo').toBeGreaterThanOrEqual(Number(baseline.comprasMes) + compraTotal - 0.01);
     expect(Number(stats.totalInventario), 'Dashboard debe contar producto real').toBeGreaterThanOrEqual(Number(baseline.totalInventario) + 1);
     expect(Number(stats.valorInventario), 'Dashboard debe valorizar stock_actual real').toBeGreaterThanOrEqual(Number(baseline.valorInventario) + precio * stockActual - 0.01);
     expect(Number(stats.totalSire), 'Dashboard debe contar SIRE real').toBeGreaterThanOrEqual(Number(baseline.totalSire) + 1);
 
-    const activity = await parseOk<any[]>(await apiContext.get(api('/dashboard/activities')), 'dashboard activities con datos T16');
+    const activity = await parseOk<any[]>(await apiContext.get(api('/dashboard/activities')), 'dashboard activities con datos CASE-18');
     expect(activity.some((item) => String(item.description).includes(`${unique}-OC`)), 'actividad debe incluir OC creada').toBeTruthy();
 
     const ventasTiempo = await parseOk<any>(
       await apiContext.get(api(`/analytics/ventas-tiempo?fecha_desde=${today()}&fecha_hasta=${today()}`)),
-      'analytics ventas-tiempo con rango T16',
+      'analytics ventas-tiempo con rango CASE-18',
     );
     expect(Number(ventasTiempo.totales.ventasActuales), 'Analytics debe incluir venta creada en el rango').toBeGreaterThanOrEqual(ventaTotal);
     expect(ventasTiempo.labels.length, 'Analytics debe generar labels reales').toBeGreaterThan(0);
@@ -315,5 +315,44 @@ test.describe('T16 Analytics y Dashboard', () => {
 
     expect(browserFailures, `sin errores fatales de consola/red: ${browserFailures.join('\n')}`).toEqual([]);
     await apiContext.dispose();
+  });
+
+  test('analytics exporta CSV descargable con metricas reales', async ({ page }) => {
+    await login(page);
+    await gotoAuthenticated(page, '/dashboard/analytics/');
+    await expect(page.getByRole('heading', { name: /Analytics Financiero/i })).toBeVisible({ timeout: 30000 });
+
+    await page.getByLabel('Fecha desde').fill('2026-05-01');
+    await page.getByLabel('Fecha hasta').fill('2026-05-15');
+    await page.getByRole('button', { name: 'Aplicar' }).click();
+    await expect(page.locator('body')).not.toContainText('Fecha inválida');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Exportar CSV' }).click(),
+    ]);
+
+    expect(download.suggestedFilename(), 'nombre de archivo CSV debe incluir rango aplicado').toBe(
+      'analytics_2026-05-01_2026-05-15.csv',
+    );
+
+    const downloadPath = await download.path();
+    expect(downloadPath, 'Playwright debe materializar el archivo descargado').toBeTruthy();
+    const csv = fs.readFileSync(downloadPath!, 'utf8');
+
+    expect(csv, 'CSV debe incluir cabecera').toContain('"metrica","valor"');
+    for (const metric of [
+      'ventas_actuales',
+      'ventas_periodo_anterior',
+      'cxc_total',
+      'cxc_vencido',
+      'cxp_total',
+      'cxp_vencido',
+      'liquidez',
+      'rentabilidad',
+    ]) {
+      expect(csv, `CSV debe incluir metrica ${metric}`).toContain(`"${metric}"`);
+    }
+    expect(csv, 'CSV exportado no debe contener valores undefined/null').not.toMatch(/undefined|null/i);
   });
 });

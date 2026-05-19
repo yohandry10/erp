@@ -2,7 +2,7 @@
 # Este script prueba la anulación de una cuenta por pagar
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkRhRzJPdGhGNGhOdGlYNGEiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzMwMDY5NTU5LCJpYXQiOjE3MzAwNjU5NTksImlzcyI6Imh0dHBzOi8vdGVzdC5zdXBhYmFzZS5jbyIsInN1YiI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMSIsImVtYWlsIjoiYWRtaW5AdGVzdC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7fSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTczMDA2NTk1OX1dLCJzZXNzaW9uX2lkIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxIn0.test"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "00000000-0000-0000-0000-000000000001"
 
 $headers = @{
@@ -127,7 +127,7 @@ try {
     $crearResponse2 = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp" -Method Post -Headers $headers -Body $crearCxpBody2
     $cxpId2 = $crearResponse2.data.id
     Write-Host "✓ CxP creada: $cxpId2" -ForegroundColor Green
-    
+
     # Aplicar un pago parcial
     $pagoBody2 = @{
         monto = 100.00
@@ -135,13 +135,13 @@ try {
         metodo_pago = "EFECTIVO"
         referencia = "PAGO-TEST-001"
     } | ConvertTo-Json
-    
+
     $pagoResponse2 = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/$cxpId2/aplicar-pago" -Method Post -Headers $headers -Body $pagoBody2
     Write-Host "✓ Pago aplicado: $($pagoResponse2.data.pago.monto)" -ForegroundColor Green
     Write-Host "  Saldo anterior: $($pagoResponse2.data.pago.saldo_anterior)" -ForegroundColor Gray
     Write-Host "  Saldo nuevo: $($pagoResponse2.data.pago.saldo_nuevo)" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Intentar anular (debe fallar)
     try {
         $anularResponse3 = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/$cxpId2/anular" -Method Post -Headers $headers -Body $anularBody

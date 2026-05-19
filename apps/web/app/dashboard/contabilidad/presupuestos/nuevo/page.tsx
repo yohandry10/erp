@@ -17,16 +17,10 @@ export default function NuevoPresupuestoPage() {
 
   return (
     <div className="dashboard-container">
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div className="mb-6">
         <button
           onClick={() => router.push('/dashboard/contabilidad/presupuestos/lista')}
-          className="secondary-btn"
-          style={{
-            padding: '0.5rem 1rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+          className="secondary-btn py-2 px-4 inline-flex items-center gap-2"
         >
           <ArrowLeft size={18} />
           Volver a Presupuestos

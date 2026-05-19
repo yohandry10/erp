@@ -68,11 +68,11 @@ try {
 } catch {
     Write-Host "✗ Error applying migration:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
-    
+
     # Try alternative method using psql if available
     Write-Host ""
     Write-Host "Attempting alternative method using direct SQL execution..." -ForegroundColor Yellow
-    
+
     $DB_URL = $env:DATABASE_URL
     if ($DB_URL) {
         try {

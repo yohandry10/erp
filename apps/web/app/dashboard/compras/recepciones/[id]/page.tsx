@@ -64,10 +64,18 @@ interface RecepcionDetalle {
 }
 
 const CALIDAD_CONFIG = {
-  OK: { label: 'OK', color: '#10b981', bgColor: '#d1fae5', icon: CheckCircle },
-  OBSERVADO: { label: 'Observado', color: '#f59e0b', bgColor: '#fef3c7', icon: AlertCircle },
-  RECHAZADO: { label: 'Rechazado', color: '#ef4444', bgColor: '#fee2e2', icon: XCircle }
+  OK: { label: 'OK', icon: CheckCircle, badge: 'bg-blue-100 text-blue-700 ring-blue-200' },
+  OBSERVADO: { label: 'Observado', icon: AlertCircle, badge: 'bg-slate-100 text-slate-700 ring-slate-200' },
+  RECHAZADO: { label: 'Rechazado', icon: XCircle, badge: 'bg-slate-200 text-slate-800 ring-slate-300' }
 }
+
+const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
+const cardClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const mutedTextClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const bodyTextClass = 'text-sm font-semibold text-slate-100'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
 
 export default function RecepcionDetallePage() {
   const router = useRouter()
@@ -105,9 +113,11 @@ export default function RecepcionDetallePage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>Cargando recepción...</div>
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="rounded-2xl border border-blue-400/20 bg-slate-950/70 px-8 py-6 text-lg font-semibold text-slate-300 shadow-xl">
+            Cargando recepción...
+          </div>
         </div>
       </div>
     )
@@ -115,9 +125,11 @@ export default function RecepcionDetallePage() {
 
   if (!recepcion) {
     return (
-      <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '1.125rem', color: '#ef4444' }}>Recepción no encontrada</div>
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="rounded-2xl border border-slate-500/30 bg-slate-950/70 px-8 py-6 text-lg font-semibold text-slate-300 shadow-xl">
+            Recepción no encontrada
+          </div>
         </div>
       </div>
     )
@@ -129,72 +141,38 @@ export default function RecepcionDetallePage() {
   const itemsRechazados = recepcion.items?.filter(i => i.calidad === 'RECHAZADO').length || 0
 
   return (
-    <div className="dashboard-container">
+    <div className={pageClass}>
       {/* Header */}
-      <div className="dashboard-header">
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
         <div>
           <button
             onClick={() => router.push('/dashboard/compras/recepciones')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20"
           >
             <ArrowLeft size={16} />
             Volver a Recepciones
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <h1 className="dashboard-title" style={{ marginBottom: 0 }}>
+          <div className="mb-2 flex flex-wrap items-center gap-4">
+            <h1 className="m-0 text-3xl font-bold text-white">
               Recepción {recepcion.numero}
             </h1>
             <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '9999px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: estadoCerrada ? '#10b981' : '#6b7280',
-                backgroundColor: estadoCerrada ? '#d1fae5' : '#f3f4f6'
-              }}
+              className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-4 py-2 text-sm font-semibold text-blue-100 ring-1 ring-blue-400/30"
             >
               {estadoCerrada ? <CheckCircle size={16} /> : <Clock size={16} />}
               {estadoCerrada ? 'Cerrada' : 'Borrador'}
             </span>
           </div>
-          <p className="dashboard-subtitle">
+          <p className="m-0 text-sm text-slate-300">
             Orden: {recepcion.orden?.numero || 'N/A'} - Proveedor: {recepcion.orden?.proveedores?.razon_social || 'N/A'}
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div className="mt-5 flex gap-3">
           <button
             onClick={() => router.push(`/dashboard/compras/ordenes/${recepcion.orden_id}`)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.625rem 1.25rem',
-              borderRadius: '8px',
-              border: '1px solid var(--primary-600)',
-              background: 'white',
-              color: 'var(--primary-600)',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-400/40 bg-slate-900/80 px-5 py-2.5 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20"
           >
             <FileText size={16} />
             Ver Orden
@@ -203,97 +181,97 @@ export default function RecepcionDetallePage() {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div className="dashboard-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Total Items</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+              <div className={mutedTextClass}>Total Items</div>
+              <div className="mt-1 text-2xl font-bold text-white">
                 {recepcion.items?.length || 0}
               </div>
             </div>
-            <Package size={24} style={{ color: '#6b7280' }} />
+            <Package className="size-6 text-blue-200" />
           </div>
         </div>
 
-        <div className="dashboard-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>OK</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
+              <div className={mutedTextClass}>OK</div>
+              <div className="mt-1 text-2xl font-bold text-blue-100">
                 {itemsOK}
               </div>
             </div>
-            <CheckCircle size={24} style={{ color: '#10b981' }} />
+            <CheckCircle className="size-6 text-blue-200" />
           </div>
         </div>
 
-        <div className="dashboard-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Observados</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
+              <div className={mutedTextClass}>Observados</div>
+              <div className="mt-1 text-2xl font-bold text-blue-100">
                 {itemsObservados}
               </div>
             </div>
-            <AlertCircle size={24} style={{ color: '#f59e0b' }} />
+            <AlertCircle className="size-6 text-blue-200" />
           </div>
         </div>
 
-        <div className="dashboard-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className={cardClass}>
+          <div className="flex items-center justify-between">
             <div>
-              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>Rechazados</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#ef4444' }}>
+              <div className={mutedTextClass}>Rechazados</div>
+              <div className="mt-1 text-2xl font-bold text-blue-100">
                 {itemsRechazados}
               </div>
             </div>
-            <XCircle size={24} style={{ color: '#ef4444' }} />
+            <XCircle className="size-6 text-blue-200" />
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+      <div className="mb-6 grid gap-6 xl:grid-cols-2">
         {/* Información General */}
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
+        <div className={cardClass}>
+          <h3 className="mb-4 text-base font-semibold text-white">
             Información General
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <FileText size={18} style={{ color: '#6b7280' }} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><FileText size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Número</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{recepcion.numero}</div>
+                <div className={mutedTextClass}>Número</div>
+                <div className={bodyTextClass}>{recepcion.numero}</div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Calendar size={18} style={{ color: '#6b7280' }} />
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><Calendar size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Fecha Recepción</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className={mutedTextClass}>Fecha Recepción</div>
+                <div className={bodyTextClass}>
                   {new Date(recepcion.fecha_recepcion).toLocaleDateString('es-PE')}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <MapPin size={18} style={{ color: '#6b7280' }} />
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><MapPin size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Almacén</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className={mutedTextClass}>Almacén</div>
+                <div className={bodyTextClass}>
                   {recepcion.almacenes?.nombre || 'N/A'} ({recepcion.almacenes?.codigo || 'N/A'})
                 </div>
               </div>
             </div>
 
             {recepcion.ubicaciones && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <MapPin size={18} style={{ color: '#6b7280' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><MapPin size={18} /></div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Ubicación</div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className={mutedTextClass}>Ubicación</div>
+                  <div className={bodyTextClass}>
                     {recepcion.ubicaciones.nombre} ({recepcion.ubicaciones.codigo})
                   </div>
                 </div>
@@ -301,11 +279,11 @@ export default function RecepcionDetallePage() {
             )}
 
             {recepcion.recibido_por && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <User size={18} style={{ color: '#6b7280' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><User size={18} /></div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Recibido Por</div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{recepcion.recibido_por}</div>
+                  <div className={mutedTextClass}>Recibido Por</div>
+                  <div className={bodyTextClass}>{recepcion.recibido_por}</div>
                 </div>
               </div>
             )}
@@ -313,36 +291,36 @@ export default function RecepcionDetallePage() {
         </div>
 
         {/* Información de la Orden */}
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
+        <div className={cardClass}>
+          <h3 className="mb-4 text-base font-semibold text-white">
             Orden de Compra
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <FileText size={18} style={{ color: '#6b7280' }} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><FileText size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Número OC</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className={mutedTextClass}>Número OC</div>
+                <div className={bodyTextClass}>
                   {recepcion.orden?.numero || 'N/A'}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <User size={18} style={{ color: '#6b7280' }} />
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><User size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Proveedor</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className={mutedTextClass}>Proveedor</div>
+                <div className={bodyTextClass}>
                   {recepcion.orden?.proveedores?.razon_social || 'N/A'}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Hash size={18} style={{ color: '#6b7280' }} />
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><Hash size={18} /></div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>RUC</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className={mutedTextClass}>RUC</div>
+                <div className={bodyTextClass}>
                   {recepcion.orden?.proveedores?.ruc || 'N/A'}
                 </div>
               </div>
@@ -352,36 +330,36 @@ export default function RecepcionDetallePage() {
       </div>
 
       {/* Items Recibidos */}
-      <div className="dashboard-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
+      <div className={`${cardClass} mb-6`}>
+        <h3 className="mb-4 text-base font-semibold text-white">
           Items Recibidos
         </h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto rounded-xl border border-blue-400/10">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+              <tr className="border-b border-blue-400/20 bg-blue-500/5">
+                <th className={tableHeadClass}>
                   Código
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={tableHeadClass}>
                   Producto
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={`${tableHeadClass} text-center`}>
                   Cantidad
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={`${tableHeadClass} text-center`}>
                   Calidad
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={tableHeadClass}>
                   Lote
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={tableHeadClass}>
                   Serie
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={tableHeadClass}>
                   Expiración
                 </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                <th className={tableHeadClass}>
                   Observaciones
                 </th>
               </tr>
@@ -392,47 +370,37 @@ export default function RecepcionDetallePage() {
                 const CalidadIcon = calidadConfig.icon
 
                 return (
-                  <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                  <tr key={item.id} className="border-b border-blue-400/10 last:border-b-0 hover:bg-blue-500/5">
+                    <td className={tableCellClass}>
                       {item.productos?.codigo || 'N/A'}
                     </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                    <td className={`${tableCellClass} font-semibold text-white`}>
                       {item.productos?.nombre || 'N/A'}
                     </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>
+                    <td className={`${tableCellClass} text-center`}>
                       {item.cantidad} {item.productos?.unidad_medida || ''}
                     </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                    <td className={`${tableCellClass} text-center`}>
                       <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: calidadConfig.color,
-                          backgroundColor: calidadConfig.bgColor
-                        }}
+                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${calidadConfig.badge}`}
                       >
                         <CalidadIcon size={12} />
                         {calidadConfig.label}
                       </span>
                     </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                    <td className={tableCellClass}>
                       {item.lote || '-'}
                     </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                    <td className={tableCellClass}>
                       {item.serie || '-'}
                     </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                    <td className={tableCellClass}>
                       {item.fecha_expiracion
                         ? new Date(item.fecha_expiracion).toLocaleDateString('es-PE')
                         : '-'
                       }
                     </td>
-                    <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                    <td className="px-4 py-3 text-sm text-slate-400">
                       {item.observaciones || '-'}
                     </td>
                   </tr>
@@ -445,11 +413,11 @@ export default function RecepcionDetallePage() {
 
       {/* Observaciones Generales */}
       {recepcion.observaciones && (
-        <div className="dashboard-card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#111827' }}>
+        <div className={`${cardClass} mb-6`}>
+          <h3 className="mb-3 text-base font-semibold text-white">
             Observaciones Generales
           </h3>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', lineHeight: '1.5' }}>
+          <p className="text-sm leading-6 text-slate-300">
             {recepcion.observaciones}
           </p>
         </div>
@@ -457,30 +425,30 @@ export default function RecepcionDetallePage() {
 
       {/* Timeline */}
       {recepcion.cerrado_at && (
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
+        <div className={cardClass}>
+          <h3 className="mb-4 text-base font-semibold text-white">
             Historial
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Package size={16} style={{ color: '#6b7280' }} />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><Package size={16} /></div>
               <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Creada</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                <div className={bodyTextClass}>Creada</div>
+                <div className="text-xs text-slate-400">
                   {new Date(recepcion.created_at).toLocaleString('es-PE')}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <CheckCircle size={16} style={{ color: '#10b981' }} />
+            <div className="flex items-center gap-3">
+              <div className={iconBoxClass}><CheckCircle size={16} /></div>
               <div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Cerrada</div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                <div className={bodyTextClass}>Cerrada</div>
+                <div className="text-xs text-slate-400">
                   {new Date(recepcion.cerrado_at).toLocaleString('es-PE')}
                 </div>
                 {recepcion.recibido_por && (
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  <div className="text-xs text-slate-400">
                     Por: {recepcion.recibido_por}
                   </div>
                 )}

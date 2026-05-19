@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -22,7 +23,7 @@ export class RegistrarPagoCxcDto {
   @Min(0.01, { message: 'El monto debe ser mayor a cero' })
   monto!: number;
 
-  @IsString({ message: 'La fecha de pago es requerida' })
+  @IsDateString({ strict: true }, { message: 'La fecha de pago debe ser una fecha válida' })
   fecha_pago!: string; // ISO date
 
   @IsOptional()

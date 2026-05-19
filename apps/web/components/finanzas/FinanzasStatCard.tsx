@@ -32,11 +32,10 @@ export default function FinanzasStatCard({
     <div className="stat-card">
       <div className="stat-header">
         <h3>{title}</h3>
-        <Icon className="stat-icon" style={{ color: iconColor }} />
+        <Icon className="stat-icon" />
       </div>
       <div 
-        className="stat-value" 
-        style={valueColor ? { color: valueColor, fontSize: typeof value === 'string' && value.length > 15 ? '1.5rem' : '3rem' } : undefined}
+        className="stat-value"
       >
         {value}
       </div>
@@ -46,15 +45,7 @@ export default function FinanzasStatCard({
         </div>
       )}
       {trend && (
-        <div style={{
-          marginTop: '0.5rem',
-          fontSize: '0.875rem',
-          fontWeight: '600',
-          color: trend.isPositive ? '#10b981' : '#ef4444',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.25rem'
-        }}>
+        <div className="mt-2 text-[0.875rem] font-semibold flex items-center gap-1">
           {trend.isPositive ? '↑' : '↓'} {trend.value}
         </div>
       )}

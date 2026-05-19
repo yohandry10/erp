@@ -179,7 +179,6 @@ export default function LeadTimeReport({ filters }: Props) {
                     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
-                        style={{ width: `${rango.porcentaje}%` }}
                       />
                     </div>
                   </div>

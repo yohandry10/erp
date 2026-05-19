@@ -19,17 +19,17 @@ if ($ordenesResponse.success -and $ordenesResponse.data.Count -gt 0) {
     Write-Host "  Numero: $($ordenesResponse.data[0].numero)" -ForegroundColor Gray
     Write-Host "  Estado: $($ordenesResponse.data[0].estado)" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Test the recepciones endpoint
     Write-Host "Step 2: Getting recepciones for orden $ordenId..." -ForegroundColor Yellow
     try {
         $recepcionesResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/recepciones?tenant_id=$tenantId" -Method Get -ContentType "application/json"
-        
+
         if ($recepcionesResponse.success) {
             Write-Host "✓ Recepciones retrieved successfully!" -ForegroundColor Green
             Write-Host "  Count: $($recepcionesResponse.count)" -ForegroundColor Gray
             Write-Host ""
-            
+
             if ($recepcionesResponse.count -gt 0) {
                 Write-Host "Recepciones found:" -ForegroundColor Cyan
                 foreach ($recepcion in $recepcionesResponse.data) {

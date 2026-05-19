@@ -1,27 +1,28 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BalanceComprobacion } from '@/components/contabilidad/BalanceComprobacion'
 import { EstadoResultados } from '@/components/contabilidad/EstadoResultados'
 import { BalanceGeneral } from '@/components/contabilidad/BalanceGeneral'
-import { FileText, Calendar, RefreshCw } from 'lucide-react'
+import { Calendar, FileText, RefreshCw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function EstadosFinancierosPage() {
   const { get } = useApi()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('balance-comprobacion')
-  
-  // Selector de período
+
   const currentDate = new Date()
   const [anio, setAnio] = useState(currentDate.getFullYear())
   const [mes, setMes] = useState(currentDate.getMonth() + 1)
-  
-  // Comparación con período anterior
   const [showComparison, setShowComparison] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const darkMode = true
 
-  // Generar años disponibles (últimos 5 años + próximo año)
   const years = Array.from({ length: 7 }, (_, i) => currentDate.getFullYear() - 5 + i)
   const months = [
     { value: 1, label: 'Enero' },
@@ -35,11 +36,8 @@ export default function EstadosFinancierosPage() {
     { value: 9, label: 'Septiembre' },
     { value: 10, label: 'Octubre' },
     { value: 11, label: 'Noviembre' },
-    { value: 12, label: 'Diciembre' }
+    { value: 12, label: 'Diciembre' },
   ]
-
-  // Trigger para refrescar componentes sin recargar la página
-  const [refreshKey, setRefreshKey] = useState(0)
 
   const handleRefresh = async () => {
     setLoading(true)
@@ -54,169 +52,126 @@ export default function EstadosFinancierosPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
-              <FileText size={24} />
+    <div
+      className={cn(
+        'min-h-screen p-6 transition-colors',
+        darkMode
+          ? 'bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 text-slate-100'
+          : 'erp-light-scope text-slate-950',
+      )}
+    >
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className={cn('rounded-2xl border p-6 shadow-2xl', darkMode ? 'border-cyan-400/20 bg-slate-950/70 shadow-blue-950/20' : 'border-slate-200 bg-white shadow-slate-200/70')}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-4">
+            <div className={cn('rounded-xl border p-3', darkMode ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100' : 'border-blue-100 bg-blue-50 text-blue-700')}>
+              <FileText className="h-6 w-6" />
             </div>
-            <h1 className="dashboard-title">Estados Financieros</h1>
-          </div>
-          <p className="dashboard-subtitle">
-            Balance de Comprobación, Estado de Resultados y Balance General
-          </p>
-        </div>
-      </div>
-
-      {/* Selector de Período */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Calendar size={20} style={{ color: 'var(--primary-600)' }} />
-            <h2 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
-              Seleccionar Período
-            </h2>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.75rem', 
-                fontWeight: '600', 
-                marginBottom: '0.5rem',
-                color: 'var(--primary-700)'
-              }}>
-                Año
-              </label>
-              <select
-                value={anio}
-                onChange={(e) => setAnio(Number(e.target.value))}
-                style={{
-                  padding: '0.75rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  minWidth: '120px'
-                }}
-              >
-                {years.map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
+              <div className={cn('mb-2 inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]', darkMode ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100' : 'border-blue-100 bg-blue-50 text-blue-700')}>
+                ERP Financial Statements
+              </div>
+              <h1 className={cn('text-4xl font-bold tracking-tight', darkMode ? 'text-white' : 'text-slate-950')}>Estados Financieros</h1>
+              <p className={cn('mt-3 max-w-3xl text-sm leading-6', darkMode ? 'text-slate-300' : 'text-slate-500')}>
+                Balance de comprobación, estado de resultados y balance general con periodo controlado.
+              </p>
             </div>
-
-            <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.75rem', 
-                fontWeight: '600', 
-                marginBottom: '0.5rem',
-                color: 'var(--primary-700)'
-              }}>
-                Mes
-              </label>
-              <select
-                value={mes}
-                onChange={(e) => setMes(Number(e.target.value))}
-                style={{
-                  padding: '0.75rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                  minWidth: '150px'
-                }}
-              >
-                {months.map(month => (
-                  <option key={month.value} value={month.value}>{month.label}</option>
-                ))}
-              </select>
             </div>
+          </div>
+        </section>
 
-            <div style={{ paddingTop: '1.5rem' }}>
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: 'var(--primary-700)'
-              }}>
+        <Card className={cn('shadow-xl', darkMode ? 'border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-blue-950/20' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70')}>
+          <CardHeader className={cn('border-b', darkMode ? 'border-cyan-400/10' : 'border-slate-200')}>
+            <CardTitle className={cn('flex items-center gap-2 text-base', darkMode ? 'text-white' : 'text-slate-950')}>
+              <Calendar className={cn('h-5 w-5', darkMode ? 'text-cyan-200' : 'text-blue-700')} />
+              Seleccionar periodo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
+            <div className="grid gap-4 md:grid-cols-[minmax(140px,180px)_minmax(160px,220px)_minmax(220px,1fr)_auto] md:items-end">
+              <label className="space-y-2">
+                <span className={cn('block text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-cyan-200/70' : 'text-slate-500')}>Año</span>
+                <select
+                  value={anio}
+                  onChange={(event) => setAnio(Number(event.target.value))}
+                  className={cn('h-11 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-4', darkMode ? 'border-cyan-400/15 bg-slate-900 text-slate-100 focus:border-cyan-300 focus:ring-cyan-400/10' : 'border-slate-200 bg-white text-slate-950 focus:border-blue-400 focus:ring-blue-100')}
+                >
+                  {years.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className={cn('block text-xs font-semibold uppercase tracking-[0.16em]', darkMode ? 'text-cyan-200/70' : 'text-slate-500')}>Mes</span>
+                <select
+                  value={mes}
+                  onChange={(event) => setMes(Number(event.target.value))}
+                  className={cn('h-11 w-full rounded-lg border px-3 text-sm outline-none transition focus:ring-4', darkMode ? 'border-cyan-400/15 bg-slate-900 text-slate-100 focus:border-cyan-300 focus:ring-cyan-400/10' : 'border-slate-200 bg-white text-slate-950 focus:border-blue-400 focus:ring-blue-100')}
+                >
+                  {months.map((month) => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className={cn('flex min-h-11 items-center gap-3 rounded-lg border px-3 text-sm font-semibold', darkMode ? 'border-cyan-400/15 bg-slate-950/45 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700')}>
                 <input
                   type="checkbox"
                   checked={showComparison}
-                  onChange={(e) => setShowComparison(e.target.checked)}
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    cursor: 'pointer'
-                  }}
+                  onChange={(event) => setShowComparison(event.target.checked)}
+                  className="h-4 w-4 rounded border-cyan-400/30 accent-blue-600"
                 />
-                Comparar con período anterior
+                Comparar con periodo anterior
               </label>
-            </div>
 
-            <div style={{ paddingTop: '1.5rem' }}>
-              <button
+              <Button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="refresh-btn"
-                style={{ padding: '0.75rem 1.5rem' }}
+                className="h-11 gap-2 bg-blue-600 text-white hover:bg-blue-500"
               >
-                <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-                {loading ? 'Refrescando...' : 'Refrescar Vistas'}
-              </button>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Refrescando...' : 'Refrescar vistas'}
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={cn('mb-6 grid w-full grid-cols-1 border p-1 sm:grid-cols-3', darkMode ? 'border-cyan-400/15 bg-slate-950/70' : 'border-slate-200 bg-white')}>
+            <TabsTrigger
+              value="balance-comprobacion"
+              className={cn(darkMode ? 'text-slate-400 data-[state=active]:bg-cyan-400/15 data-[state=active]:text-cyan-50' : 'text-slate-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-800')}
+            >
+              Balance de Comprobación
+            </TabsTrigger>
+            <TabsTrigger
+              value="estado-resultados"
+              className={cn(darkMode ? 'text-slate-400 data-[state=active]:bg-cyan-400/15 data-[state=active]:text-cyan-50' : 'text-slate-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-800')}
+            >
+              Estado de Resultados
+            </TabsTrigger>
+            <TabsTrigger
+              value="balance-general"
+              className={cn(darkMode ? 'text-slate-400 data-[state=active]:bg-cyan-400/15 data-[state=active]:text-cyan-50' : 'text-slate-500 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-800')}
+            >
+              Balance General
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="balance-comprobacion">
+            <BalanceComprobacion key={`bc-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
+          </TabsContent>
+
+          <TabsContent value="estado-resultados">
+            <EstadoResultados key={`er-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
+          </TabsContent>
+
+          <TabsContent value="balance-general">
+            <BalanceGeneral key={`bg-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="balance-comprobacion">
-            Balance de Comprobación
-          </TabsTrigger>
-          <TabsTrigger value="estado-resultados">
-            Estado de Resultados
-          </TabsTrigger>
-          <TabsTrigger value="balance-general">
-            Balance General
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="balance-comprobacion">
-          <BalanceComprobacion key={`bc-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
-        </TabsContent>
-
-        <TabsContent value="estado-resultados">
-          <EstadoResultados key={`er-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
-        </TabsContent>
-
-        <TabsContent value="balance-general">
-          <BalanceGeneral key={`bg-${refreshKey}`} anio={anio} mes={mes} showComparison={showComparison} />
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }

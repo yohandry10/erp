@@ -111,19 +111,7 @@ export default function AprobacionesPage() {
 
     const style = ESTADO_CREDITO_COLOR[estado] || ESTADO_CREDITO_COLOR.SIN_EVALUAR
     return (
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: '0.25rem 0.75rem',
-          borderRadius: '9999px',
-          backgroundColor: style.bg,
-          color: style.text,
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}
+      <span className="inline-flex items-center py-1 px-3 rounded-full text-3 font-semibold"
       >
         {estado}
       </span>
@@ -150,11 +138,10 @@ export default function AprobacionesPage() {
             Gestiona pedidos que requieren autorización por crédito, descuentos o límites configurados
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           <button
             onClick={loadPendientes}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+            className="refresh-btn py-3 px-6"
             disabled={loading}
           >
             <RefreshCw size={16} />
@@ -164,11 +151,11 @@ export default function AprobacionesPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>PENDIENTES</h3>
-            <Clock className="stat-icon" style={{ color: '#f59e0b' }} />
+            <Clock className="stat-icon text-amber-500" />
           </div>
           <div className="stat-value">{data.length}</div>
           <div className="stat-subtitle">Pedidos en espera</div>
@@ -177,9 +164,9 @@ export default function AprobacionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>MONTO COMPROMETIDO</h3>
-            <DollarSign className="stat-icon" style={{ color: '#10b981' }} />
+            <DollarSign className="stat-icon text-[#10b981]" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1.25rem' }}>
+          <div className="stat-value text-5">
             {formatCurrency(totalPendiente)}
           </div>
           <div className="stat-subtitle">Total a aprobar</div>
@@ -188,9 +175,9 @@ export default function AprobacionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>ÚLTIMA ACTUALIZACIÓN</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
+            <FileText className="stat-icon text-blue-500" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1rem' }}>
+          <div className="stat-value text-4">
             {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
           </div>
           <div className="stat-subtitle">{new Date().toLocaleDateString('es-PE')}</div>
@@ -206,9 +193,9 @@ export default function AprobacionesPage() {
           </div>
         ) : data.length === 0 ? (
           <div className="activity-card">
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <CheckCircle2 size={48} style={{ margin: '0 auto 1rem', color: '#10b981' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <div className="text-center p-12 text-gray-500">
+              <CheckCircle2 size={48} className="text-[#10b981]" />
+              <h3 className="text-[1.125rem] font-semibold mb-2">
                 No hay pedidos pendientes de aprobación
               </h3>
               <p>Todos los pedidos han sido procesados o no hay pedidos que requieran aprobación.</p>
@@ -216,26 +203,19 @@ export default function AprobacionesPage() {
           </div>
         ) : (
           <div className="activity-card">
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '0.5rem' }}>
+            <div className="mb-6">
+              <h2 className="text-5 font-semibold text-gray-900 mb-2">
                 Pedidos Pendientes
               </h2>
-              <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              <p className="text-[0.875rem] text-gray-500">
                 {data.length} {data.length === 1 ? 'pedido requiere' : 'pedidos requieren'} aprobación
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="flex flex-col gap-6">
               {data.map((pedido) => (
                 <div
-                  key={pedido.id}
-                  style={{
-                    padding: '1.5rem',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '12px',
-                    transition: 'all 0.3s ease'
-                  }}
+                  key={pedido.id} className="p-6 bg-[rgba(255,_255,_255,_0.8)] border rounded-3 transition"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = '#3b82f6'
                     e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
@@ -247,62 +227,37 @@ export default function AprobacionesPage() {
                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)'
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div className="flex flex-col gap-6">
                     {/* Header del pedido */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                          <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>
+                    <div className="flex justify-between items-start flex-wrap gap-4">
+                      <div className="flex-[1] min-w-0">
+                        <div className="flex items-center gap-4 mb-3 flex-wrap">
+                          <h3 className="text-5 font-bold text-gray-900">
                             {pedido.numero}
                           </h3>
                           {renderEstadoCredito(pedido.estado_credito)}
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            padding: '0.375rem 0.75rem',
-                            borderRadius: '8px',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            background: '#f3f4f6',
-                            color: '#374151',
-                            border: '1px solid #e5e7eb'
-                          }}>
+                          <span className="inline-flex items-center py-1.5 px-3 rounded-2 text-[0.875rem] font-semibold bg-[#f3f4f6] text-gray-700 border">
                             {formatCurrency(pedido.total)}
                           </span>
                         </div>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                        <p className="text-[0.875rem] text-gray-500 mb-2">
                           <strong>{pedido.cliente?.razon_social || 'Cliente no asignado'}</strong>
                           {pedido.cliente?.documento_numero && (
                             <span> · {pedido.cliente.documento_numero}</span>
                           )}
                         </p>
                         {pedido.created_at && (
-                          <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                          <p className="text-3 text-gray-400">
                             Creado: {formatDate(pedido.created_at)}
                           </p>
                         )}
                       </div>
 
                       {/* Botones de acción */}
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleDecision(pedido, 'APROBADO')}
-                          disabled={decidingId === pedido.id}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: decidingId === pedido.id ? '#9ca3af' : '#10b981',
-                            color: 'white',
-                            cursor: decidingId === pedido.id ? 'not-allowed' : 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            transition: 'all 0.2s ease',
-                            opacity: decidingId === pedido.id ? 0.6 : 1
-                          }}
+                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-2 border-0 text-white text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
                               e.currentTarget.style.background = '#059669'
@@ -323,22 +278,7 @@ export default function AprobacionesPage() {
                         </button>
                         <button
                           onClick={() => handleDecision(pedido, 'RECHAZADO')}
-                          disabled={decidingId === pedido.id}
-                          style={{
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: '8px',
-                            border: '1px solid #fecaca',
-                            background: decidingId === pedido.id ? '#f3f4f6' : 'white',
-                            color: decidingId === pedido.id ? '#9ca3af' : '#dc2626',
-                            cursor: decidingId === pedido.id ? 'not-allowed' : 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            transition: 'all 0.2s ease',
-                            opacity: decidingId === pedido.id ? 0.6 : 1
-                          }}
+                          disabled={decidingId === pedido.id} className="py-3 px-6 rounded-2 border text-[0.875rem] font-semibold flex items-center gap-2 transition"
                           onMouseEnter={(e) => {
                             if (decidingId !== pedido.id) {
                               e.currentTarget.style.background = '#fef2f2'
@@ -364,32 +304,13 @@ export default function AprobacionesPage() {
 
                     {/* Motivos */}
                     {pedido.motivos.length > 0 && (
-                      <div style={{
-                        padding: '1rem',
-                        background: '#fef3c7',
-                        border: '1px solid #fde68a',
-                        borderRadius: '8px'
-                      }}>
-                        <span style={{
-                          display: 'block',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          color: '#92400e',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          marginBottom: '0.75rem'
-                        }}>
+                      <div className="p-4 bg-[#fef3c7] border rounded-2">
+                        <span className="block text-3 font-bold text-[#92400e] mb-3">
                           Motivos que requieren aprobación:
                         </span>
-                        <ul style={{
-                          margin: 0,
-                          paddingLeft: '1.25rem',
-                          fontSize: '0.875rem',
-                          color: '#78350f',
-                          listStyleType: 'disc'
-                        }}>
+                        <ul className="m-0 pl-5 text-[0.875rem] text-[#78350f]">
                           {pedido.motivos.map((motivo, idx) => (
-                            <li key={idx} style={{ marginBottom: '0.25rem' }}>
+                            <li key={idx} className="mb-1">
                               {motivo}
                             </li>
                           ))}
@@ -399,64 +320,17 @@ export default function AprobacionesPage() {
 
                     {/* Resumen de crédito */}
                     {pedido.resumen_credito && (
-                      <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '0.75rem',
-                        padding: '1rem',
-                        background: '#f3f4f6',
-                        borderRadius: '8px'
-                      }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: 'white',
-                          color: '#374151',
-                          border: '1px solid #e5e7eb'
-                        }}>
+                      <div className="flex flex-wrap gap-3 p-4 bg-[#f3f4f6] rounded-2">
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
                           Límite: {formatCurrency(pedido.resumen_credito.limite)}
                         </span>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: 'white',
-                          color: '#374151',
-                          border: '1px solid #e5e7eb'
-                        }}>
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
                           Pendiente: {formatCurrency(pedido.resumen_credito.pendiente)}
                         </span>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: pedido.resumen_credito.tieneVencidos ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: pedido.resumen_credito.tieneVencidos ? '#dc2626' : '#059669',
-                          border: `1px solid ${pedido.resumen_credito.tieneVencidos ? '#fecaca' : '#d1fae5'}`
-                        }}>
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold">
                           {pedido.resumen_credito.tieneVencidos ? '⚠️ Con morosidad' : '✓ Sin morosidad'}
                         </span>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          background: 'white',
-                          color: '#374151',
-                          border: '1px solid #e5e7eb'
-                        }}>
+                        <span className="inline-flex items-center py-2 px-3 rounded-[6px] text-3 font-semibold bg-white text-gray-700 border">
                           {pedido.resumen_credito.permiteMorosidad ? 'Permite mora' : 'No permite mora'}
                         </span>
                       </div>

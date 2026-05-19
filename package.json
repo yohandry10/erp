@@ -23,6 +23,7 @@
     "docker:build": "docker build -f apps/erp-api/Dockerfile -t ghcr.io/org/erp-api:latest .",
     "k8s:lint": "helm lint infra/helm/erp-suite",
     "k8s:deploy": "helm upgrade --install erp infra/helm/erp-suite",
+    "test:ui-styles": "node scripts/audit-frontend-styles.mjs",
     "test:quality": "node scripts/audit-test-quality.mjs",
     "check-encoding": "powershell -ExecutionPolicy Bypass -File ./scripts/check-encoding.ps1",
     "fix-encoding": "powershell -ExecutionPolicy Bypass -File ./scripts/fix-encoding.ps1"

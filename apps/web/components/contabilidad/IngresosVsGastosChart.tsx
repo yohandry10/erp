@@ -37,7 +37,7 @@ export function IngresosVsGastosChart({ ingresos, costos, gastos }: IngresosVsGa
   }
 
   return (
-    <div style={{ width: '100%', height: '300px' }}>
+    <div className="w-[100%] h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}

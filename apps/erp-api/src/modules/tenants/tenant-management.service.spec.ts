@@ -47,6 +47,7 @@ describe('TenantManagementService', () => {
             insert: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            rpc: jest.fn(),
             single: jest.fn(),
             maybeSingle: jest.fn(),
         };
@@ -258,6 +259,41 @@ describe('TenantManagementService', () => {
 
             await expect(service.createTenant(createDto as any))
                 .rejects.toThrow(ConflictException);
+        });
+
+        it('should create canonical tenant and seed operational RBAC before admin user', async () => {
+            const createDto = {
+                razon_social: 'New Company S.A.C.',
+                ruc: '20987654321',
+                email: 'new@company.com',
+                direccion: 'Av. Nueva 123',
+                pais_id: 1,
+                admin_email: 'admin@newcompany.com',
+                admin_password: 'StrongPass123!',
+            };
+
+            mockClient.single
+                .mockResolvedValueOnce({ data: { id: 1, codigo_iso: 'PE', moneda_codigo: 'PEN' }, error: null })
+                .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
+                .mockResolvedValueOnce({ data: mockTenant, error: null })
+                .mockResolvedValueOnce({ data: { id: 'role-admin' }, error: null });
+
+            mockClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+            mockClient.insert
+                .mockReturnValueOnce({ error: null })
+                .mockReturnValueOnce(mockClient);
+            mockClient.rpc.mockResolvedValueOnce({
+                data: [{ permisos_seeded: 195, roles_seeded: 10, role_permissions_seeded: 466 }],
+                error: null,
+            });
+
+            const result = await service.createTenant(createDto as any);
+
+            expect(result.success).toBe(true);
+            expect(mockClient.from).toHaveBeenCalledWith('tenants');
+            expect(mockClient.rpc).toHaveBeenCalledWith('seed_operational_rbac_for_tenant', {
+                p_tenant_id: expect.any(String),
+            });
         });
     });
 });

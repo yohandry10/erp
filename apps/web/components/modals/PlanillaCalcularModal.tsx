@@ -215,14 +215,7 @@ export default function PlanillaCalcularModal({ isOpen, onClose, onSuccess, plan
 
   return createPortal(
     <div className="modal-overlay">
-      <div className="modal-content calculation" style={{ 
-        width: '95vw', 
-        maxWidth: '1600px', 
-        height: '90vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      <div className="modal-content calculation max-w-[1600px] overflow-hidden flex flex-col">
         <div className="modal-header">
           <h2 className="modal-title">
             🧮 Calcular Planilla {planilla?.periodo}
@@ -230,23 +223,10 @@ export default function PlanillaCalcularModal({ isOpen, onClose, onSuccess, plan
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body" style={{ 
-          flex: 1, 
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
+        <div className="modal-body flex-[1] overflow-hidden flex flex-col">
           {/* Información de la planilla */}
-          <div className="modal-info" style={{ marginBottom: '1rem', flexShrink: 0 }}>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(4, 1fr)', 
-              gap: '1rem',
-              background: 'var(--blue-50)',
-              padding: '1rem',
-              borderRadius: 'var(--border-radius)',
-              border: '1px solid var(--blue-200)'
-            }}>
+          <div className="modal-info mb-4 shrink-0">
+            <div className="grid grid-cols-[repeat(4,_1fr)] gap-4 bg-[var(--blue-50)] p-4 border">
               <div>
                 <strong>Período:</strong> {planilla?.periodo}
               </div>
@@ -269,299 +249,168 @@ export default function PlanillaCalcularModal({ isOpen, onClose, onSuccess, plan
           </div>
 
           {/* Totales */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(4, 1fr)', 
-            gap: '1rem',
-            marginBottom: '1rem',
-            flexShrink: 0
-          }}>
-            <div style={{ 
-              background: 'var(--emerald-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid var(--emerald-200)'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--emerald-600)' }}>
+          <div className="grid grid-cols-[repeat(4,_1fr)] gap-4 mb-4 shrink-0">
+            <div className="bg-[var(--emerald-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--emerald-600)]">
                 {empleados.length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--emerald-700)' }}>
+              <div className="text-[0.875rem] text-[var(--emerald-700)]">
                 Empleados
               </div>
             </div>
-            <div style={{ 
-              background: 'var(--blue-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid var(--blue-200)'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-600)' }}>
+            <div className="bg-[var(--blue-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--blue-600)]">
                 S/ {totalIngresos.toFixed(2)}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--blue-700)' }}>
+              <div className="text-[0.875rem] text-[var(--blue-700)]">
                 Total Ingresos
               </div>
             </div>
-            <div style={{ 
-              background: 'var(--red-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid #fecaca'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--red-600)' }}>
+            <div className="bg-[var(--red-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--red-600)]">
                 S/ {totalDescuentos.toFixed(2)}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--red-700)' }}>
+              <div className="text-[0.875rem] text-[var(--red-700)]">
                 Total Descuentos
               </div>
             </div>
-            <div style={{ 
-              background: '#f0f9ff', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid #0ea5e9'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0ea5e9' }}>
+            <div className="bg-[#f0f9ff] p-4 text-center border">
+              <div className="text-6 font-bold text-[#0ea5e9]">
                 S/ {totalNeto.toFixed(2)}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#0c4a6e' }}>
+              <div className="text-[0.875rem] text-[#0c4a6e]">
                 Total Neto
               </div>
             </div>
           </div>
 
           {/* Tabla de empleados estilo Excel */}
-          <div style={{ 
-            flex: 1,
-            overflow: 'auto',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)'
-          }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse', 
-              fontSize: '0.875rem',
-              background: 'white'
-            }}>
-              <thead style={{ 
-                position: 'sticky', 
-                top: 0, 
-                background: 'var(--primary-100)',
-                zIndex: 10
-              }}>
+          <div className="flex-[1] overflow-auto border">
+            <table className="w-[100%] text-[0.875rem] bg-white">
+              <thead className="sticky top-0 bg-[var(--primary-100)] z-[10]">
                 <tr>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '200px' }}>
+                  <th className="p-3 border min-w-[200px]">
                     👤 EMPLEADO
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     💰 SUELDO BASE
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     📅 DÍAS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     ⏰ HE 25%
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     ⏰ HE 35%
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     ⏱️ TARDANZAS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     ❌ FALTAS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     💵 BONOS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     📈 TOTAL INGRESOS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     🏦 AFP/ONP
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     💊 ESSALUD
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     📋 IMP. RENTA
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     💸 NETO A PAGAR
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {empleados.map((empleado, index) => (
-                  <tr key={empleado.id} style={{ 
-                    backgroundColor: index % 2 === 0 ? 'white' : '#f8fafc'
-                  }}>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      position: 'sticky',
-                      left: 0,
-                      background: index % 2 === 0 ? 'white' : '#f8fafc',
-                      fontWeight: '600'
-                    }}>
+                  <tr key={empleado.id}>
+                    <td className="p-3 border sticky left-0 font-semibold">
                       <div>{empleado.nombres} {empleado.apellidos}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                      <div className="text-3 text-[var(--primary-500)]">
                         {empleado.puesto} • {empleado.numero_documento}
                       </div>
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.sueldo_base}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'sueldo_base', parseFloat(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'sueldo_base', parseFloat(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.dias_trabajados}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'dias_trabajados', parseInt(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'dias_trabajados', parseInt(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         max="31"
                         min="0"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.horas_extras_25}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_25', parseFloat(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_25', parseFloat(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         step="0.5"
                         min="0"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.horas_extras_35}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_35', parseFloat(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_35', parseFloat(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         step="0.5"
                         min="0"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.tardanzas_minutos}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'tardanzas_minutos', parseInt(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'tardanzas_minutos', parseInt(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         min="0"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.faltas}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'faltas', parseInt(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'faltas', parseInt(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         min="0"
                       />
                     </td>
-                    <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                    <td className="p-2 border">
                       <input
                         type="number"
                         value={empleado.bonos_adicionales}
-                        onChange={(e) => actualizarEmpleado(empleado.id, 'bonos_adicionales', parseFloat(e.target.value) || 0)}
-                        style={{
-                          width: '100%',
-                          padding: '0.25rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                          textAlign: 'center'
-                        }}
+                        onChange={(e) => actualizarEmpleado(empleado.id, 'bonos_adicionales', parseFloat(e.target.value) || 0)} className="w-[100%] p-1 border rounded-[4px] text-center"
                         step="0.01"
                         min="0"
                       />
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      fontWeight: '600',
-                      color: 'var(--emerald-600)'
-                    }}>
+                    <td className="p-3 border text-center font-semibold text-[var(--emerald-600)]">
                       S/ {empleado.total_ingresos.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      color: 'var(--amber-600)'
-                    }}>
+                    <td className="p-3 border text-center text-[var(--amber-600)]">
                       S/ {empleado.afp_onp.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      color: 'var(--blue-600)'
-                    }}>
+                    <td className="p-3 border text-center text-[var(--blue-600)]">
                       S/ {empleado.essalud.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      color: 'var(--red-600)'
-                    }}>
+                    <td className="p-3 border text-center text-[var(--red-600)]">
                       S/ {empleado.impuesto_renta.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      fontWeight: '700',
-                      color: 'var(--blue-700)',
-                      fontSize: '1rem'
-                    }}>
+                    <td className="p-3 border text-center font-bold text-[var(--blue-700)] text-4">
                       S/ {empleado.neto_pagar.toFixed(2)}
                     </td>
                   </tr>

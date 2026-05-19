@@ -24,18 +24,14 @@ interface ConfigurationStatus {
 export function DashboardNotificationBanners() {
   const [banners, setBanners] = useState<BannerNotification[]>([])
   const { get } = useApi({ showErrorToast: false })
-  const { isSuperAdmin, user, loading } = useTenant()
+  const { isSuperAdmin, loading } = useTenant()
 
   const fetchConfigurationStatus = useCallback(async () => {
     try {
-      // SUPER ADMINS DON'T NEED CONFIGURATION WIZARD - SKIP ENTIRELY
       if (isSuperAdmin === true) {
-        console.log('[DashboardNotificationBanners] ✅ SUPERADMIN DETECTED - SKIPPING ALL BANNERS')
         setBanners([])
         return
       }
-
-      console.log('[DashboardNotificationBanners] Not superadmin, fetching config status...')
 
       const response = await get('/api/configuration/status')
       if (response) {
@@ -93,9 +89,12 @@ export function DashboardNotificationBanners() {
         }
 
         // Filter out dismissed persistent banners
-        const dismissedBanners = JSON.parse(
-          localStorage.getItem('dismissedBanners') || '[]'
-        )
+        let dismissedBanners: Array<{ id: string; dismissedAt: string }> = []
+        try {
+          dismissedBanners = JSON.parse(localStorage.getItem('dismissedBanners') || '[]')
+        } catch {
+          dismissedBanners = []
+        }
 
         const filteredBanners = newBanners.filter(banner => {
           if (!banner.persistent || !banner.dismissible) return true
@@ -119,15 +118,9 @@ export function DashboardNotificationBanners() {
   }, [get, isSuperAdmin])
 
   useEffect(() => {
-    // Don't fetch if still loading user data
     if (loading) {
-      console.log('[DashboardNotificationBanners] Still loading user data...')
       return
     }
-
-    console.log('[DashboardNotificationBanners] Component mounted, checking user...')
-    console.log('[DashboardNotificationBanners] isSuperAdmin from context:', isSuperAdmin)
-    console.log('[DashboardNotificationBanners] user from context:', user)
 
     fetchConfigurationStatus()
 
@@ -135,7 +128,7 @@ export function DashboardNotificationBanners() {
     const interval = setInterval(fetchConfigurationStatus, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [fetchConfigurationStatus, isSuperAdmin, loading, user])
+  }, [fetchConfigurationStatus, loading])
 
   const handleDismiss = (id: string) => {
     setBanners(prev => prev.filter(b => b.id !== id))

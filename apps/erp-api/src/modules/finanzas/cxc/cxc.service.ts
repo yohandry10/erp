@@ -615,15 +615,12 @@ export class CxcService {
   ): Promise<{ success: boolean; data: any }> {
     const client = this.supabase.getClient();
 
+    const montoPago = this.parseMontoPago(dto.monto);
+    const fechaPago = this.parseFechaPago(dto.fecha_pago);
     const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
 
     const pendienteActual = Number(cuenta.monto_pendiente ?? 0);
     const montoTotal = Number(cuenta.monto_total ?? 0);
-    const montoPago = this.round2(Number(dto.monto));
-
-    if (Number.isNaN(montoPago) || montoPago <= 0) {
-      throw new BadRequestException('El monto del pago debe ser mayor a cero');
-    }
 
     if (montoPago - pendienteActual > 0.05) {
       throw new BadRequestException('El monto del pago supera el saldo pendiente');
@@ -704,7 +701,7 @@ export class CxcService {
         documento_id: dto.documento_pago_id ?? null,
         monto: this.round2(montoPago),
         moneda: dto.moneda ?? cuenta.moneda ?? 'PEN',
-        fecha_pago: dto.fecha_pago,
+        fecha_pago: fechaPago,
         metodo_pago: esNotaCredito ? 'NOTA_CREDITO' : dto.metodo_pago ?? null,
         referencia: dto.referencia ?? null,
         notas: dto.notas ?? null,
@@ -761,7 +758,7 @@ export class CxcService {
           cuenta_bancaria_id: dto.cuenta_bancaria_id,
           tipo: 'ABONO',
           monto: this.round2(montoPago),
-          fecha: dto.fecha_pago,
+          fecha: fechaPago,
           descripcion: `Cobro de cliente ${clienteNombre} - Doc: ${numeroDocumento}`,
           referencia: dto.referencia || null,
           metodo_pago: dto.metodo_pago,
@@ -825,10 +822,12 @@ export class CxcService {
       acumulados.anticipo = this.round2(acumulados.anticipo + montoPago);
     }
 
-    const { error: updateError } = await client
+    // HARDENING: Optimistic concurrency — si otro pago ya cambio monto_pendiente, este falla
+    const { data: updateData, error: updateError } = await client
       .from('cuentas_por_cobrar')
       .update({
         monto_pendiente: nuevoPendiente,
+        saldo_pendiente: nuevoPendiente,
         estado: nuevoEstado,
         dias_mora: diasMora,
         retencion_total: acumulados.retencion,
@@ -838,31 +837,24 @@ export class CxcService {
         updated_at: ahora,
       })
       .eq('id', cuentaId)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .eq('monto_pendiente', pendienteActual)
+      .select('id');
 
     if (updateError) {
       console.error('Error actualizando cuenta por cobrar después del pago:', updateError);
       throw new BadRequestException('No se pudo actualizar la cuenta por cobrar');
     }
 
+    if (!updateData || updateData.length === 0) {
+      throw new BadRequestException(
+        'Conflicto de concurrencia: el saldo de la cuenta fue modificado por otro pago simultáneo. Intente de nuevo.'
+      );
+    }
+
     const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
 
     const medioCobro = esNotaCredito ? 'NOTA_CREDITO' : (dto.metodo_pago ?? 'EFECTIVO'); // HARDENING: aseguramos precedencia al calcular medio de cobro.
-
-    if (!esNotaCredito) {
-      this.emitirEventoPagoFactura(
-        tenantId,
-        detalleActualizado,
-        cuentaId,
-        {
-          monto: this.round2(montoPago),
-          metodo: medioCobro,
-          fecha: dto.fecha_pago,
-        },
-        nuevoPendiente,
-        nuevoEstado,
-      );
-    }
 
     this.emitirEventoCobroRegistrado(
       tenantId,
@@ -913,7 +905,7 @@ export class CxcService {
       numeroDocumento,
       monto: this.round2(pagoRegistrado.monto),
       moneda: pagoRegistrado.moneda || 'PEN',
-      fecha: pagoRegistrado.fecha_pago,
+      fecha: fechaPago,
       medio: medioCobro,
       metodo_pago: medioCobro,
       cuenta_bancaria_id: dto.cuenta_bancaria_id || null,
@@ -1503,6 +1495,32 @@ export class CxcService {
     const diff = hoy.getTime() - vencimiento.getTime();
     const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
     return dias > 0 ? dias : 0;
+  }
+
+  private parseMontoPago(value: number): number {
+    const monto = new Decimal(value);
+    if (!monto.isFinite() || monto.lte(0)) {
+      throw new BadRequestException('El monto del pago debe ser mayor a cero');
+    }
+    if (monto.decimalPlaces() > 2) {
+      throw new BadRequestException('El monto del pago admite como máximo 2 decimales');
+    }
+    return monto.toDecimalPlaces(2).toNumber();
+  }
+
+  private parseFechaPago(value: string): string {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException('La fecha de pago debe tener formato YYYY-MM-DD');
+    }
+
+    const [year, month, day] = value.split('-').map(Number);
+    const fecha = new Date(Date.UTC(year, month - 1, day));
+    const fechaNormalizada = fecha.toISOString().slice(0, 10);
+    if (fechaNormalizada !== value) {
+      throw new BadRequestException('La fecha de pago es inválida');
+    }
+
+    return value;
   }
 
   /**

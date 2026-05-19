@@ -20,7 +20,10 @@ export interface Cliente {
   tenant_id: string
   tipo: TipoCliente
   documento_tipo: TipoDocumento
-  documento_numero: string
+  documento_numero: string | null
+  numero_documento?: string | number | null
+  codigo?: string | null
+  ruc?: string | null
   razon_social: string
   nombre_comercial?: string
   direccion?: string

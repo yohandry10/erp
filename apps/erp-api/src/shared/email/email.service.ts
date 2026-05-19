@@ -292,19 +292,6 @@ export class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contraseña Actualizada</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }
-    .header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 40px 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-    .content { padding: 40px 30px; }
-    .success-box { background-color: #d4edda; border-left: 4px solid #28a745; padding: 16px; margin: 24px 0; border-radius: 4px; }
-    .success-box p { margin: 0; color: #155724; font-size: 14px; }
-    .warning-box { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 16px; margin: 24px 0; border-radius: 4px; }
-    .warning-box p { margin: 0; color: #856404; font-size: 14px; }
-    .footer { background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e9ecef; }
-    .footer p { margin: 8px 0; color: #6c757d; font-size: 13px; }
-  </style>
 </head>
 <body>
   <div class="container">

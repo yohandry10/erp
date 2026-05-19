@@ -86,7 +86,7 @@ Write-Host "5️⃣ Verificando evento en outbox_events..." -ForegroundColor Yel
 try {
     $eventosPendientesDespues = Invoke-RestMethod -Uri "$baseUrl/contabilidad/eventos/pendientes" -Method Get -Headers $headers -ErrorAction SilentlyContinue
     Write-Host "📊 Eventos pendientes después: $($eventosPendientesDespues.count)" -ForegroundColor Cyan
-    
+
     if ($eventosPendientesDespues.count -gt 0) {
         Write-Host "✅ Se encontraron eventos pendientes" -ForegroundColor Green
         $eventoVenta = $eventosPendientesDespues | Where-Object { $_.event_type -eq "venta.procesada" } | Select-Object -First 1
@@ -107,7 +107,7 @@ Write-Host "6️⃣ Verificando asiento contable generado..." -ForegroundColor Y
 try {
     $asientos = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?limit=10" -Method Get -Headers $headers
     Write-Host "📊 Total de asientos: $($asientos.data.length)" -ForegroundColor Cyan
-    
+
     # Buscar el asiento más reciente
     if ($asientos.data.length -gt 0) {
         $asientoReciente = $asientos.data[0]
@@ -117,7 +117,7 @@ try {
         Write-Host "   Total Debe: $($asientoReciente.total_debe)" -ForegroundColor Cyan
         Write-Host "   Total Haber: $($asientoReciente.total_haber)" -ForegroundColor Cyan
         Write-Host "   Estado: $($asientoReciente.estado)" -ForegroundColor Cyan
-        
+
         # Verificar que el asiento cuadra
         if ($asientoReciente.total_debe -eq $asientoReciente.total_haber) {
             Write-Host "✅ El asiento cuadra (Debe = Haber)" -ForegroundColor Green

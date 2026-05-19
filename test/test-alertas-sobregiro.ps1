@@ -2,7 +2,7 @@
 # Ejecutar desde la raíz del proyecto
 
 $baseUrl = "http://localhost:3001/api/contabilidad"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." # Reemplazar con token válido
+$token = "REPLACE_WITH_TEST_JWT" # Reemplazar con token válido
 $tenantId = "00000000-0000-0000-0000-000000000001" # Reemplazar con tenant ID válido
 
 Write-Host "🚨 Testing Alertas de Sobregiro Presupuestal" -ForegroundColor Cyan
@@ -23,13 +23,13 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/presupuestos/alertas" -Method Get -Headers $headers
     Write-Host "✅ Alertas obtenidas exitosamente" -ForegroundColor Green
     Write-Host "   Total alertas: $($response.data.Count)" -ForegroundColor White
-    
+
     if ($response.data.Count -gt 0) {
         $sobregiros = ($response.data | Where-Object { $_.nivel_alerta -eq "SOBREGIRO" }).Count
         $advertencias = ($response.data | Where-Object { $_.nivel_alerta -eq "ADVERTENCIA" }).Count
         Write-Host "   Sobregiros: $sobregiros" -ForegroundColor Red
         Write-Host "   Advertencias: $advertencias" -ForegroundColor Yellow
-        
+
         Write-Host ""
         Write-Host "   Primera alerta:" -ForegroundColor Cyan
         $primeraAlerta = $response.data[0]

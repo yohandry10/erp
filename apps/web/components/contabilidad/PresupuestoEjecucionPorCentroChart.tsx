@@ -50,52 +50,28 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          padding: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <p style={{ 
-            margin: '0 0 8px 0', 
-            fontWeight: '600', 
-            color: '#111827',
-            fontSize: '0.875rem'
-          }}>
+        <div className="bg-white border rounded-2 p-3 shadow">
+          <p className="mt-0 mr-0 mb-2 ml-0 font-semibold text-gray-900 text-[0.875rem]">
             {data.nombreCompleto}
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-              <span style={{ color: '#6b7280' }}>Presupuestado:</span>
-              <span style={{ fontWeight: '600', color: '#111827' }}>{formatCurrency(data.presupuestado)}</span>
+          <div className="flex flex-col gap-[4px] text-3">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500">Presupuestado:</span>
+              <span className="font-semibold text-gray-900">{formatCurrency(data.presupuestado)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-              <span style={{ color: '#6b7280' }}>Ejecutado:</span>
-              <span style={{ fontWeight: '600', color: '#111827' }}>{formatCurrency(data.ejecutado)}</span>
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500">Ejecutado:</span>
+              <span className="font-semibold text-gray-900">{formatCurrency(data.ejecutado)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-              <span style={{ color: '#6b7280' }}>Disponible:</span>
-              <span style={{ 
-                fontWeight: '600', 
-                color: data.disponible < 0 ? '#ef4444' : '#10b981' 
-              }}>
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500">Disponible:</span>
+              <span className="font-semibold">
                 {formatCurrency(data.disponible)}
               </span>
             </div>
-            <div style={{ 
-              marginTop: '4px', 
-              paddingTop: '4px', 
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '16px'
-            }}>
-              <span style={{ color: '#6b7280' }}>% Ejecución:</span>
-              <span style={{ 
-                fontWeight: '700', 
-                color: data.color 
-              }}>
+            <div className="mt-[4px] pt-[4px] border-t flex justify-between gap-4">
+              <span className="text-gray-500">% Ejecución:</span>
+              <span className="font-bold">
                 {formatPercentage(data.porcentaje)}
               </span>
             </div>
@@ -108,20 +84,14 @@ export default function PresupuestoEjecucionPorCentroChart({ centros }: Presupue
 
   if (centros.length === 0) {
     return (
-      <div style={{
-        padding: '3rem',
-        background: '#f9fafb',
-        borderRadius: '12px',
-        textAlign: 'center',
-        color: '#6b7280'
-      }}>
-        <p style={{ margin: 0 }}>No hay datos disponibles para mostrar</p>
+      <div className="p-12 bg-[#f9fafb] rounded-3 text-center text-gray-500">
+        <p className="m-0">No hay datos disponibles para mostrar</p>
       </div>
     )
   }
 
   return (
-    <div style={{ width: '100%', height: '400px' }}>
+    <div className="w-[100%] h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={chartData}

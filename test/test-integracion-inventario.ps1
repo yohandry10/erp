@@ -34,18 +34,18 @@ Write-Host "-----------------------------------------------" -ForegroundColor Ye
 # Buscar una recepción cerrada reciente
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/recepciones?estado=CERRADA" -Method GET -Headers $headers -ErrorAction Stop
-    
+
     if ($response.Count -gt 0) {
         $recepcion = $response[0]
         Write-Host "✅ Recepción encontrada: $($recepcion.numero)" -ForegroundColor Green
         Write-Host "   Estado: $($recepcion.estado)" -ForegroundColor Gray
         Write-Host "   Fecha: $($recepcion.fecha_recepcion)" -ForegroundColor Gray
         Write-Host "   Items: $($recepcion.items.Count)" -ForegroundColor Gray
-        
+
         # Verificar que tiene items con almacén asignado
         $itemsConAlmacen = ($recepcion.items | Where-Object { $_.almacen_id -ne $null }).Count
         Write-Host "   Items con almacén: $itemsConAlmacen" -ForegroundColor Gray
-        
+
         if ($itemsConAlmacen -gt 0) {
             Write-Host "✅ Integración Recepción → Inventario: FUNCIONAL" -ForegroundColor Green
         } else {
@@ -65,7 +65,7 @@ Write-Host "------------------------------------------------" -ForegroundColor Y
 # Buscar una devolución emitida reciente
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/devoluciones?estado=EMITIDA" -Method GET -Headers $headers -ErrorAction Stop
-    
+
     if ($response.Count -gt 0) {
         $devolucion = $response[0]
         Write-Host "✅ Devolución encontrada: $($devolucion.numero)" -ForegroundColor Green
@@ -73,7 +73,7 @@ try {
         Write-Host "   Fecha: $($devolucion.fecha_devolucion)" -ForegroundColor Gray
         Write-Host "   Items: $($devolucion.items.Count)" -ForegroundColor Gray
         Write-Host "   Total: S/ $($devolucion.total)" -ForegroundColor Gray
-        
+
         Write-Host "✅ Integración Devolución → Inventario: FUNCIONAL" -ForegroundColor Green
     } else {
         Write-Host "⚠️  No hay devoluciones emitidas para verificar" -ForegroundColor Yellow
@@ -90,16 +90,16 @@ Write-Host "----------------------------------------------" -ForegroundColor Yel
 try {
     # Buscar movimientos tipo ENTRADA (recepciones)
     $response = Invoke-RestMethod -Uri "$baseUrl/inventario/movimientos?tipo=ENTRADA&referencia_tipo=RECEPCION" -Method GET -Headers $headers -ErrorAction Stop
-    
+
     $movimientosEntrada = $response.Count
     Write-Host "✅ Movimientos ENTRADA (Recepciones): $movimientosEntrada" -ForegroundColor Green
-    
+
     # Buscar movimientos tipo SALIDA (devoluciones)
     $response = Invoke-RestMethod -Uri "$baseUrl/inventario/movimientos?tipo=SALIDA&referencia_tipo=DEVOLUCION_PROVEEDOR" -Method GET -Headers $headers -ErrorAction Stop
-    
+
     $movimientosSalida = $response.Count
     Write-Host "✅ Movimientos SALIDA (Devoluciones): $movimientosSalida" -ForegroundColor Green
-    
+
     if ($movimientosEntrada -gt 0 -or $movimientosSalida -gt 0) {
         Write-Host "✅ Movimientos de Inventario: REGISTRADOS CORRECTAMENTE" -ForegroundColor Green
     } else {

@@ -2,7 +2,7 @@
 # Este test asume que ya existe una conciliación creada
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyYWRtaW4iLCJ0ZW5hbnRfaWQiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJpYXQiOjE3MzAwMDAwMDAsImV4cCI6OTk5OTk5OTk5OX0.placeholder"
+$token = "REPLACE_WITH_TEST_JWT"
 
 Write-Host "=== TEST: Importar CSV a Conciliación ===" -ForegroundColor Cyan
 Write-Host ""
@@ -13,7 +13,7 @@ $conciliacionId = Read-Host "Ingrese el ID de la conciliación (o presione Enter
 if ([string]::IsNullOrWhiteSpace($conciliacionId)) {
     Write-Host ""
     Write-Host "Listando conciliaciones disponibles..." -ForegroundColor Yellow
-    
+
     try {
         $conciliaciones = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion" `
             -Method Get `
@@ -85,7 +85,7 @@ try {
     Write-Host "  Total abonos: S/. $($importarResponse.data.total_abonos)" -ForegroundColor White
     Write-Host "  Total cargos: S/. $($importarResponse.data.total_cargos)" -ForegroundColor White
     Write-Host "  Saldo final: S/. $($importarResponse.data.saldo_final)" -ForegroundColor White
-    
+
     if ($importarResponse.data.errores -and $importarResponse.data.errores.Count -gt 0) {
         Write-Host "  Errores: $($importarResponse.data.errores.Count)" -ForegroundColor Yellow
         foreach ($error in $importarResponse.data.errores) {

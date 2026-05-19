@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../auth/current-user.decorator';
 
 @ApiTags('compras/proveedores')
 @Controller('compras/proveedores')
@@ -36,11 +37,12 @@ export class ProveedoresController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() createDto: CreateProveedorDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
       // HARDENING: tenant proviene del contexto autenticado.
-      const proveedor = await this.proveedoresService.create(createDto, tenantId);
+      const proveedor = await this.proveedoresService.create(createDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Proveedor creado exitosamente',
@@ -171,10 +173,11 @@ export class ProveedoresController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateProveedorDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
-      const proveedor = await this.proveedoresService.update(id, updateDto, tenantId);
+      const proveedor = await this.proveedoresService.update(id, updateDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Proveedor actualizado exitosamente',

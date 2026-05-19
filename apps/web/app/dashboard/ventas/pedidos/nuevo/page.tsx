@@ -38,24 +38,9 @@ export default function NuevoPedidoPage() {
 
   return (
     <div className="dashboard-container">
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div className="mb-6">
         <button
-          onClick={handleCancel}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: 'var(--primary-700)',
-            background: 'rgba(255, 255, 255, 0.8)',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            marginBottom: '1rem'
-          }}
+          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition mb-4"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -67,7 +52,7 @@ export default function NuevoPedidoPage() {
             e.currentTarget.style.transform = 'translateX(0)'
           }}
         >
-          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeft className="w-4 h-4" />
           Volver a Pedidos
         </button>
         

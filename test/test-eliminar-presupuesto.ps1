@@ -37,20 +37,20 @@ $headers = @{
 Write-Host "2. Obteniendo centros de costo..." -ForegroundColor Yellow
 try {
     $centrosCosto = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Get -Headers $headers
-    
+
     if ($centrosCosto.data -and $centrosCosto.data.Count -gt 0) {
         $centroCostoId = $centrosCosto.data[0].id
         Write-Host "✓ Centro de costo encontrado: $centroCostoId" -ForegroundColor Green
     } else {
         Write-Host "⚠ No hay centros de costo. Creando uno..." -ForegroundColor Yellow
-        
+
         $nuevoCentro = @{
             codigo = "CC-TEST-DEL-001"
             nombre = "Centro de Costo Test Delete"
             descripcion = "Centro de costo para pruebas de eliminación"
             activo = $true
         } | ConvertTo-Json
-        
+
         $centroCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Post -Body $nuevoCentro -Headers $headers
         $centroCostoId = $centroCreado.data.id
         Write-Host "✓ Centro de costo creado: $centroCostoId" -ForegroundColor Green
@@ -65,10 +65,10 @@ try {
 Write-Host "3. Obteniendo cuentas contables..." -ForegroundColor Yellow
 try {
     $cuentas = Invoke-RestMethod -Uri "$baseUrl/contabilidad/plan-cuentas" -Method Get -Headers $headers
-    
+
     if ($cuentas.data -and $cuentas.data.Count -gt 0) {
         $cuentaGasto = $cuentas.data | Where-Object { $_.codigo -like "9*" } | Select-Object -First 1
-        
+
         if ($cuentaGasto) {
             $cuentaId = $cuentaGasto.id
             Write-Host "✓ Cuenta contable encontrada: $cuentaId" -ForegroundColor Green
@@ -90,24 +90,24 @@ try {
 Write-Host "4. Obteniendo períodos contables..." -ForegroundColor Yellow
 try {
     $periodos = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
-    
+
     $periodoAbierto = $periodos.data | Where-Object { $_.estado -eq "ABIERTO" } | Select-Object -First 1
-    
+
     if ($periodoAbierto) {
         $periodoId = $periodoAbierto.id
         Write-Host "✓ Período contable abierto encontrado: $periodoId" -ForegroundColor Green
         Write-Host "  Período: $($periodoAbierto.anio)-$($periodoAbierto.mes.ToString().PadLeft(2,'0'))" -ForegroundColor Gray
     } else {
         Write-Host "⚠ No hay períodos abiertos. Creando uno..." -ForegroundColor Yellow
-        
+
         $anioActual = (Get-Date).Year
         $mesActual = (Get-Date).Month
-        
+
         $nuevoPeriodo = @{
             anio = $anioActual
             mes = $mesActual
         } | ConvertTo-Json
-        
+
         $periodoCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Body $nuevoPeriodo -Headers $headers
         $periodoId = $periodoCreado.data.id
         Write-Host "✓ Período contable creado: $periodoId" -ForegroundColor Green
@@ -132,7 +132,7 @@ $presupuestoBody = @{
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos" -Method Post -Body $presupuestoBody -Headers $headers
     $presupuestoId = $response.data.id
-    
+
     Write-Host "✓ Presupuesto creado exitosamente" -ForegroundColor Green
     Write-Host "  ID: $presupuestoId" -ForegroundColor Gray
     Write-Host "  Monto: S/ $($response.data.monto_presupuestado)" -ForegroundColor Gray
@@ -146,7 +146,7 @@ try {
 Write-Host "6. Eliminando presupuesto..." -ForegroundColor Yellow
 try {
     $deleteResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$presupuestoId" -Method Delete -Headers $headers
-    
+
     Write-Host "✓ Presupuesto eliminado exitosamente" -ForegroundColor Green
     Write-Host ""
     Write-Host "=== RESPUESTA ===" -ForegroundColor Cyan
@@ -158,7 +158,7 @@ try {
     Write-Host "Monto Presupuestado: S/ $($deleteResponse.data.monto_presupuestado)" -ForegroundColor White
     Write-Host "Estado: $($deleteResponse.data.estado)" -ForegroundColor White
     Write-Host ""
-    
+
     # Validación: el presupuesto debe haber sido eliminado
     if ($deleteResponse.success -eq $true) {
         Write-Host "✓ Respuesta indica éxito" -ForegroundColor Green
@@ -166,16 +166,16 @@ try {
         Write-Host "✗ Respuesta no indica éxito" -ForegroundColor Red
         exit 1
     }
-    
+
 } catch {
     Write-Host "✗ Error eliminando presupuesto" -ForegroundColor Red
     Write-Host "  Status: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Red
     Write-Host "  Mensaje: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "  Detalles: $($_.ErrorDetails.Message)" -ForegroundColor Red
     }
-    
+
     Write-Host ""
     Write-Host "=== TEST FALLIDO ===" -ForegroundColor Red
     exit 1
@@ -233,7 +233,7 @@ try {
     $periodoCerrar = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Body $periodoCerrarBody -Headers $headers
     $periodoCerrarId = $periodoCerrar.data.id
     Write-Host "  Período creado: $anioTest-$mesTest" -ForegroundColor Gray
-    
+
     # Crear presupuesto en ese período
     $presupuestoCerradoBody = @{
         centro_costo_id = $centroCostoId
@@ -243,15 +243,15 @@ try {
         notas = "Presupuesto para test de período cerrado"
         estado = "ACTIVO"
     } | ConvertTo-Json
-    
+
     $presupuestoCerrado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos" -Method Post -Body $presupuestoCerradoBody -Headers $headers
     $presupuestoCerradoId = $presupuestoCerrado.data.id
     Write-Host "  Presupuesto creado: $presupuestoCerradoId" -ForegroundColor Gray
-    
+
     # Cerrar el período
     $cerrarResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos/$periodoCerrarId/cerrar" -Method Post -Headers $headers
     Write-Host "  Período cerrado" -ForegroundColor Gray
-    
+
     # Intentar eliminar presupuesto en período cerrado
     try {
         $deleteEnCerrado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$presupuestoCerradoId" -Method Delete -Headers $headers
@@ -265,7 +265,7 @@ try {
             Write-Host "⚠ Error inesperado: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Yellow
         }
     }
-    
+
 } catch {
     Write-Host "⚠ No se pudo completar test de período cerrado: $_" -ForegroundColor Yellow
     Write-Host "  Continuando con otros tests..." -ForegroundColor Gray

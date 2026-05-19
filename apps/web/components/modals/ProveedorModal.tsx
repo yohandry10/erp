@@ -146,52 +146,18 @@ export default function ProveedorModal({
   if (!isOpen) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]"
     >
-      <div
-        style={{
-          background: 'white',
-          borderRadius: '8px',
-          padding: '2rem',
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '90vh',
-          overflow: 'auto',
-        }}
+      <div className="bg-white rounded-2 p-8 w-[90%] max-w-[600px] overflow-auto"
       >
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1.5rem',
-          }}
+        <div className="flex justify-between items-center mb-6"
         >
-          <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+          <h2 className="m-0 text-6 font-semibold">
             {proveedor ? 'Editar Proveedor' : 'Nuevo Proveedor'}
           </h2>
           <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#6b7280',
-            }}
+            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
           >
             ×
           </button>
@@ -199,26 +165,14 @@ export default function ProveedorModal({
 
         <form onSubmit={handleSubmit}>
           {/* Información fiscal */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
+          <div className="mb-6">
+            <h3 className="text-4 font-semibold mb-4 text-gray-700">
               Información Fiscal
             </h3>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1rem',
-              }}
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   RUC *
                 </label>
@@ -226,100 +180,51 @@ export default function ProveedorModal({
                   type="text"
                   value={formData.ruc}
                   onChange={(e) => handleInputChange('ruc', e.target.value)}
-                  maxLength={11}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: `1px solid ${errors.ruc ? '#ef4444' : '#d1d5db'}`,
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  maxLength={11} className="w-[100%] p-2 rounded-1.5 bg-white"
                   placeholder="Ingrese RUC (11 dígitos)"
                 />
                 {errors.ruc && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.ruc}</p>
+                  <p className="text-red-500 text-3 mt-1">{errors.ruc}</p>
                 )}
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Razón Social *
                 </label>
                 <input
                   type="text"
                   value={formData.razon_social}
-                  onChange={(e) => handleInputChange('razon_social', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: `1px solid ${errors.razon_social ? '#ef4444' : '#d1d5db'}`,
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('razon_social', e.target.value)} className="w-[100%] p-2 rounded-1.5 bg-white"
                   placeholder="Razón social completa"
                 />
                 {errors.razon_social && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.razon_social}</p>
+                  <p className="text-red-500 text-3 mt-1">{errors.razon_social}</p>
                 )}
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Nombre Comercial
                 </label>
                 <input
                   type="text"
                   value={formData.nombre_comercial}
-                  onChange={(e) => handleInputChange('nombre_comercial', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('nombre_comercial', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
                   placeholder="Nombre comercial (opcional)"
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Condiciones de Pago
                 </label>
                 <select
                   value={formData.condiciones_pago}
-                  onChange={(e) => handleInputChange('condiciones_pago', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('condiciones_pago', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
                 >
                   <option value="CONTADO">Contado</option>
                   <option value="CREDITO_15">Crédito 15 días</option>
@@ -332,97 +237,50 @@ export default function ProveedorModal({
           </div>
 
           {/* Información de contacto */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: '#374151' }}>
+          <div className="mb-6">
+            <h3 className="text-4 font-semibold mb-4 text-gray-700">
               Información de Contacto
             </h3>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1rem',
-              }}
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4"
             >
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Teléfono
                 </label>
                 <input
                   type="text"
                   value={formData.telefono}
-                  onChange={(e) => handleInputChange('telefono', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('telefono', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
                   placeholder="Teléfono principal"
                 />
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Email
                 </label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: `1px solid ${errors.email ? '#ef4444' : '#d1d5db'}`,
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('email', e.target.value)} className="w-[100%] p-2 rounded-1.5 bg-white"
                   placeholder="email@ejemplo.com"
                 />
                 {errors.email && (
-                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{errors.email}</p>
+                  <p className="text-red-500 text-3 mt-1">{errors.email}</p>
                 )}
               </div>
 
               <div>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                  }}
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
                 >
                   Persona de Contacto
                 </label>
                 <input
                   type="text"
                   value={formData.contacto}
-                  onChange={(e) => handleInputChange('contacto', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: 'white',
-                  }}
+                  onChange={(e) => handleInputChange('contacto', e.target.value)} className="w-[100%] p-2 border rounded-1.5 bg-white"
                   placeholder="Nombre del contacto"
                 />
               </div>
@@ -430,70 +288,31 @@ export default function ProveedorModal({
           </div>
 
           {/* Dirección */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#374151',
-                marginBottom: '0.5rem',
-              }}
+          <div className="mb-6">
+            <label className="block text-[0.875rem] font-medium text-gray-700 mb-2"
             >
               Dirección
             </label>
             <textarea
               value={formData.direccion}
               onChange={(e) => handleInputChange('direccion', e.target.value)}
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                backgroundColor: 'white',
-                resize: 'vertical',
-              }}
+              rows={3} className="w-[100%] p-2 border rounded-1.5 bg-white"
               placeholder="Dirección completa del proveedor"
             />
           </div>
 
           {/* Botones */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '1rem',
-              paddingTop: '1rem',
-              borderTop: '1px solid #e5e7eb',
-            }}
+          <div className="flex justify-end gap-4 pt-4 border-t"
           >
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                backgroundColor: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-              }}
+              onClick={onClose} className="py-2 px-4 border rounded-1.5 bg-white text-gray-700 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading}
-              style={{
-                padding: '0.5rem 1rem',
-                border: 'none',
-                borderRadius: '0.375rem',
-                backgroundColor: isLoading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-              }}
+              disabled={isLoading} className="py-2 px-4 border-0 rounded-1.5 text-white font-medium"
             >
               {isLoading ? 'Guardando...' : proveedor ? 'Actualizar' : 'Crear Proveedor'}
             </button>

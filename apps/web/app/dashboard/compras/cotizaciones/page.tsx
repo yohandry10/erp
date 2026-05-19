@@ -130,17 +130,7 @@ export default function CotizacionesCompraPage() {
     const badge = badges[estado as keyof typeof badges] || badges.BORRADOR
     
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: badge.bg,
-        color: 'white'
-      }}>
+      <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
         {badge.icon}
         {badge.text}
       </span>
@@ -183,11 +173,11 @@ export default function CotizacionesCompraPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
+            <FileText className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{totalCotizaciones}</div>
           <div className="stat-subtitle">Cotizaciones</div>
@@ -196,7 +186,7 @@ export default function CotizacionesCompraPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>BORRADORES</h3>
-            <Edit className="stat-icon" style={{ color: '#f59e0b' }} />
+            <Edit className="stat-icon text-amber-500" />
           </div>
           <div className="stat-value">
             {cotizaciones.filter(c => c.estado === 'BORRADOR').length}
@@ -207,7 +197,7 @@ export default function CotizacionesCompraPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>ENVIADAS</h3>
-            <Send className="stat-icon" style={{ color: '#3b82f6' }} />
+            <Send className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">
             {cotizaciones.filter(c => c.estado === 'ENVIADA').length}
@@ -218,7 +208,7 @@ export default function CotizacionesCompraPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>APROBADAS</h3>
-            <CheckCircle className="stat-icon" style={{ color: '#10b981' }} />
+            <CheckCircle className="stat-icon text-[#10b981]" />
           </div>
           <div className="stat-value">
             {cotizaciones.filter(c => c.estado === 'APROBADA').length}
@@ -229,7 +219,7 @@ export default function CotizacionesCompraPage() {
         <div className="stat-card alert">
           <div className="stat-header">
             <h3>VENCIDAS</h3>
-            <Clock className="stat-icon" style={{ color: '#ef4444' }} />
+            <Clock className="stat-icon text-red-500" />
           </div>
           <div className="stat-value warning">
             {cotizaciones.filter(c => c.estado === 'VENCIDA').length}
@@ -240,22 +230,14 @@ export default function CotizacionesCompraPage() {
 
       {/* Filters */}
       <div className="activity-section">
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+        <div className="flex gap-4 mb-6 flex-wrap items-end">
+          <div className="flex-[1] min-w-[200px]">
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Estado
             </label>
             <select
               value={estadoFilter}
-              onChange={(e) => handleEstadoFilterChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              onChange={(e) => handleEstadoFilterChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-2 border text-[0.875rem] bg-white"
             >
               <option value="">Todos los estados</option>
               <option value="BORRADOR">Borrador</option>
@@ -266,21 +248,13 @@ export default function CotizacionesCompraPage() {
             </select>
           </div>
 
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+          <div className="flex-[1] min-w-[200px]">
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Proveedor
             </label>
             <select
               value={proveedorFilter}
-              onChange={(e) => handleProveedorFilterChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              onChange={(e) => handleProveedorFilterChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-2 border text-[0.875rem] bg-white"
             >
               <option value="">Todos los proveedores</option>
               {proveedores.map((proveedor) => (
@@ -291,60 +265,31 @@ export default function CotizacionesCompraPage() {
             </select>
           </div>
 
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+          <div className="flex-[1] min-w-[180px]">
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Fecha Desde
             </label>
             <input
               type="date"
               value={fechaDesde}
-              onChange={(e) => handleFechaDesdeChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              onChange={(e) => handleFechaDesdeChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-2 border text-[0.875rem] bg-white"
             />
           </div>
 
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+          <div className="flex-[1] min-w-[180px]">
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Fecha Hasta
             </label>
             <input
               type="date"
               value={fechaHasta}
-              onChange={(e) => handleFechaHastaChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              onChange={(e) => handleFechaHastaChange(e.target.value)} className="w-[100%] py-3 px-4 rounded-2 border text-[0.875rem] bg-white"
             />
           </div>
 
           {isFilterActive && (
             <button
-              onClick={handleClearFilters}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#ef4444'
-              }}
+              onClick={handleClearFilters} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-red-500"
             >
               <XCircle size={16} />
               Limpiar Filtros
@@ -352,19 +297,7 @@ export default function CotizacionesCompraPage() {
           )}
 
           <button
-            onClick={handleExport}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={handleExport} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <Download size={16} />
             Exportar
@@ -372,8 +305,7 @@ export default function CotizacionesCompraPage() {
 
           <button
             onClick={loadCotizaciones}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1rem' }}
+            className="refresh-btn py-3 px-4"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -388,12 +320,12 @@ export default function CotizacionesCompraPage() {
               <p>Cargando cotizaciones...</p>
             </div>
           ) : cotizaciones.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <div className="text-center p-12 text-gray-500">
+              <FileText size={48} className="text-gray-400" />
+              <h3 className="text-[1.125rem] font-semibold mb-2">
                 No hay cotizaciones
               </h3>
-              <p style={{ marginBottom: '1.5rem' }}>
+              <p className="mb-6">
                 {isFilterActive
                   ? 'No se encontraron cotizaciones con los filtros aplicados'
                   : 'Comienza creando tu primera cotización de compra'}
@@ -410,95 +342,79 @@ export default function CotizacionesCompraPage() {
             </div>
           ) : (
             <>
-              <div style={{ overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="overflow-auto">
+                <table className="w-[100%]">
                   <thead>
-                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <tr>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         N° Cotización
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Proveedor
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Fecha Cotización
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Vencimiento
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Total
                       </th>
-                      <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-center p-4 font-semibold text-3 text-gray-500">
                         Estado
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Acciones
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {cotizaciones.map((cotizacion) => (
-                      <tr key={cotizacion.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
+                      <tr key={cotizacion.id} className="border-b">
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-semibold">
                             {cotizacion.numero}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-semibold text-gray-900">
                             {cotizacion.proveedores?.razon_social || 'N/A'}
                           </div>
                           {cotizacion.proveedores?.ruc && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            <div className="text-3 text-gray-500">
                               RUC: {cotizacion.proveedores.ruc}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                        <td className="p-4 text-[0.875rem] text-gray-700">
                           {formatDate(cotizacion.fecha_cotizacion)}
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] text-gray-700">
                             {formatDate(cotizacion.fecha_vencimiento)}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                          <div className="text-3 text-gray-500">
                             ({cotizacion.validez_dias} días)
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+                        <td className="p-4 text-right text-[0.875rem] font-semibold text-gray-700">
                           {formatCurrency(cotizacion.total)}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <td className="p-4 text-center">
                           {getEstadoBadge(cotizacion.estado)}
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}`)}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: '#3b82f6',
-                                color: 'white',
-                                cursor: 'pointer'
-                              }}
+                              onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}`)} className="p-2 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer"
                               title="Ver detalle"
                             >
                               <Eye size={16} />
                             </button>
                             {cotizacion.estado === 'BORRADOR' && (
                               <button
-                                onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}/editar`)}
-                                style={{
-                                  padding: '0.5rem',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: '#10b981',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}
+                                onClick={() => router.push(`/dashboard/compras/cotizaciones/${cotizacion.id}/editar`)} className="p-2 rounded-[6px] border-0 bg-[#10b981] text-white cursor-pointer"
                                 title="Editar"
                               >
                                 <Edit size={16} />
@@ -514,30 +430,16 @@ export default function CotizacionesCompraPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div style={{ 
-                  padding: '1rem', 
-                  borderTop: '1px solid rgba(0,0,0,0.1)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                <div className="p-4 border-t flex justify-between items-center">
+                  <div className="text-[0.875rem] text-gray-700">
                     Mostrando <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> a{' '}
                     <strong>{Math.min(currentPage * itemsPerPage, totalCotizaciones)}</strong> de{' '}
                     <strong>{totalCotizaciones}</strong> cotizaciones
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: currentPage === 1 ? '#f3f4f6' : 'white',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem'
-                      }}
+                      disabled={currentPage === 1} className="py-2 px-4 rounded-[6px] border text-[0.875rem]"
                     >
                       Anterior
                     </button>
@@ -556,17 +458,7 @@ export default function CotizacionesCompraPage() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            background: currentPage === pageNum ? '#3b82f6' : 'white',
-                            color: currentPage === pageNum ? 'white' : '#374151',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            minWidth: '40px'
-                          }}
+                          onClick={() => setCurrentPage(pageNum)} className="py-2 px-4 rounded-[6px] border cursor-pointer text-[0.875rem] min-w-10"
                         >
                           {pageNum}
                         </button>
@@ -574,15 +466,7 @@ export default function CotizacionesCompraPage() {
                     })}
                     <button
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: currentPage === totalPages ? '#f3f4f6' : 'white',
-                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem'
-                      }}
+                      disabled={currentPage === totalPages} className="py-2 px-4 rounded-[6px] border text-[0.875rem]"
                     >
                       Siguiente
                     </button>

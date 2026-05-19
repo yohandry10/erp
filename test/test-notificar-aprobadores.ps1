@@ -85,12 +85,12 @@ try {
     Write-Host "   Estado: $($ordenResponse.estado)" -ForegroundColor $(if ($ordenResponse.estado -eq "APROBACION") { "Green" } else { "Yellow" })
     Write-Host "   Total: $($ordenResponse.total)" -ForegroundColor Green
     Write-Host "   ID: $($ordenResponse.id)" -ForegroundColor Gray
-    
+
     if ($ordenResponse.estado -ne "APROBACION") {
         Write-Host "   ⚠️  ADVERTENCIA: La orden no está en estado APROBACION" -ForegroundColor Yellow
         Write-Host "   Esto puede indicar que el monto no excede el límite configurado" -ForegroundColor Yellow
     }
-    
+
     $ordenId = $ordenResponse.id
 } catch {
     Write-Host "   ❌ Error al crear orden: $_" -ForegroundColor Red
@@ -108,9 +108,9 @@ Write-Host ""
 Write-Host "6. Verificando notificaciones creadas..." -ForegroundColor Yellow
 try {
     $notificacionesResponse = Invoke-RestMethod -Uri "$BASE_URL/api/notifications?type=oc_requiere_aprobacion&leida=false" -Method Get -Headers $headers
-    
+
     $notificacionesOrden = $notificacionesResponse | Where-Object { $_.message -like "*$numeroOrden*" }
-    
+
     if ($notificacionesOrden.Count -gt 0) {
         Write-Host "   ✅ Se crearon $($notificacionesOrden.Count) notificaciones" -ForegroundColor Green
         foreach ($notif in $notificacionesOrden) {
@@ -136,7 +136,7 @@ try {
     $cancelarData = @{
         motivo_cancelacion = "Test completado - Orden de prueba"
     } | ConvertTo-Json
-    
+
     $cancelResponse = Invoke-RestMethod -Uri "$BASE_URL/api/compras/ordenes/$ordenId/cancelar" -Method Post -Headers $headers -Body $cancelarData
     Write-Host "   ✅ Orden cancelada exitosamente" -ForegroundColor Green
 } catch {

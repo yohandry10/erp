@@ -29,7 +29,7 @@ $createBody = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones" -Method Post -Body $createBody -ContentType "application/json"
-    
+
     if ($createResponse.success) {
         $cotizacionId = $createResponse.data.id
         Write-Host "✓ Cotización creada con ID: $cotizacionId" -ForegroundColor Green
@@ -37,10 +37,10 @@ try {
         Write-Host "  Estado: $($createResponse.data.estado)" -ForegroundColor Gray
         Write-Host "  Total: $($createResponse.data.total)" -ForegroundColor Gray
         Write-Host ""
-        
+
         # Now update the cotizacion
         Write-Host "Step 2: Updating the cotizacion..." -ForegroundColor Yellow
-        
+
         $updateBody = @{
             tenant_id = $tenantId
             numero = "COT-TEST-UPDATE-001-MODIFIED"
@@ -61,9 +61,9 @@ try {
                 }
             )
         } | ConvertTo-Json -Depth 10
-        
+
         $updateResponse = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId" -Method Put -Body $updateBody -ContentType "application/json"
-        
+
         if ($updateResponse.success) {
             Write-Host "✓ Cotización actualizada exitosamente" -ForegroundColor Green
             Write-Host ""
@@ -77,11 +77,11 @@ try {
             Write-Host "  Total: $($updateResponse.data.total)" -ForegroundColor Gray
             Write-Host "  Cantidad de detalles: $($updateResponse.data.detalles.Count)" -ForegroundColor Gray
             Write-Host ""
-            
+
             # Verify the update by fetching the cotizacion
             Write-Host "Step 3: Verifying the update..." -ForegroundColor Yellow
             $getResponse = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId`?tenant_id=$tenantId" -Method Get
-            
+
             if ($getResponse.success) {
                 Write-Host "✓ Verificación exitosa" -ForegroundColor Green
                 Write-Host "  Número verificado: $($getResponse.data.numero)" -ForegroundColor Gray
@@ -90,30 +90,30 @@ try {
                 Write-Host "  Detalles verificados: $($getResponse.data.detalles.Count) items" -ForegroundColor Gray
             }
             Write-Host ""
-            
+
             # Test updating a non-BORRADOR cotizacion (should fail)
             Write-Host "Step 4: Testing update restriction (non-BORRADOR)..." -ForegroundColor Yellow
-            
+
             # First change estado to ENVIADA
             $changeEstadoBody = @{
                 tenant_id = $tenantId
                 estado = "ENVIADA"
             } | ConvertTo-Json
-            
+
             $changeEstadoResponse = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId" -Method Put -Body $changeEstadoBody -ContentType "application/json"
-            
+
             if ($changeEstadoResponse.success) {
                 Write-Host "  Estado cambiado a ENVIADA" -ForegroundColor Gray
-                
+
                 # Now try to update again (should fail)
                 $failUpdateBody = @{
                     tenant_id = $tenantId
                     observaciones = "Esto no debería funcionar"
                 } | ConvertTo-Json
-                
+
                 try {
                     $failResponse = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId" -Method Put -Body $failUpdateBody -ContentType "application/json"
-                    
+
                     if (-not $failResponse.success) {
                         Write-Host "✓ Restricción funcionando correctamente" -ForegroundColor Green
                         Write-Host "  Error esperado: $($failResponse.error)" -ForegroundColor Gray
@@ -124,15 +124,15 @@ try {
                     Write-Host "✓ Restricción funcionando correctamente (excepción capturada)" -ForegroundColor Green
                 }
             }
-            
+
         } else {
             Write-Host "✗ Error al actualizar: $($updateResponse.error)" -ForegroundColor Red
         }
-        
+
     } else {
         Write-Host "✗ Error al crear cotización: $($createResponse.error)" -ForegroundColor Red
     }
-    
+
 } catch {
     Write-Host "✗ Error en la prueba: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.Exception.StackTrace -ForegroundColor Red

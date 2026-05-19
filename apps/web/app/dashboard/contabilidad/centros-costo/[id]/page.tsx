@@ -2,8 +2,11 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Building2, Calendar, TrendingUp, AlertCircle, FileText, DollarSign } from 'lucide-react'
+import { AlertCircle, ArrowLeft, BarChart3, Building2, Calendar, DollarSign, FileText, Loader2, Pencil, TrendingUp } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface CentroCosto {
   id: string
@@ -59,11 +62,12 @@ interface ReporteGastos {
   }
 }
 
-export default function CentroCostoDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
+export default function CentroCostoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { get } = useApi()
   const [centroId, setCentroId] = useState<string>('')
@@ -84,7 +88,6 @@ export default function CentroCostoDetailPage({
     try {
       setLoading(true)
       setError(null)
-
       const response = await get(`/api/contabilidad/centros-costo/${centroId}`)
 
       if (response?.success && response.data) {
@@ -107,10 +110,8 @@ export default function CentroCostoDetailPage({
       if (response?.success && response.data) {
         const periodosAbiertos = response.data.filter((p: Periodo) => p.estado === 'ABIERTO')
         setPeriodos(periodosAbiertos)
-        
-        if (periodosAbiertos.length > 0) {
-          setSelectedPeriodoId(periodosAbiertos[0].id)
-        }
+
+        if (periodosAbiertos.length > 0) setSelectedPeriodoId(periodosAbiertos[0].id)
       }
     } catch (err) {
       console.error('Error loading periodos:', err)
@@ -123,16 +124,16 @@ export default function CentroCostoDetailPage({
     try {
       setLoadingPresupuestos(true)
       setError(null)
-
-      const response = await get(
-        `/api/contabilidad/presupuestos/centro/${centro.id}/periodo/${selectedPeriodoId}`
-      )
-
-      if (response?.success && response.data) {
-        setPresupuestos(response.data)
-      } else {
-        setPresupuestos([])
-      }
+      const response = await get(`/api/contabilidad/presupuestos/centro/${centro.id}/periodo/${selectedPeriodoId}`)
+      const payload = response?.data
+      const items = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.presupuestos)
+          ? payload.presupuestos
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : []
+      setPresupuestos(items)
     } catch (err) {
       console.error('Error loading presupuestos:', err)
       setError('Error al cargar los presupuestos')
@@ -148,22 +149,15 @@ export default function CentroCostoDetailPage({
       setLoadingReporte(true)
       setError(null)
 
-      const periodo = periodos.find(p => p.id === selectedPeriodoId)
+      const periodo = periodos.find((p) => p.id === selectedPeriodoId)
       if (!periodo) return
 
       const fechaDesde = `${periodo.anio}-${String(periodo.mes).padStart(2, '0')}-01`
       const lastDay = new Date(periodo.anio, periodo.mes, 0).getDate()
       const fechaHasta = `${periodo.anio}-${String(periodo.mes).padStart(2, '0')}-${lastDay}`
 
-      const response = await get(
-        `/api/contabilidad/centros-costo/${centro.id}/reporte-gastos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`
-      )
-
-      if (response?.success && response.data) {
-        setReporteGastos(response.data)
-      } else {
-        setReporteGastos(null)
-      }
+      const response = await get(`/api/contabilidad/centros-costo/${centro.id}/reporte-gastos?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`)
+      setReporteGastos(response?.success && response.data ? response.data : null)
     } catch (err) {
       console.error('Error loading reporte gastos:', err)
       setError('Error al cargar el reporte de gastos')
@@ -186,662 +180,380 @@ export default function CentroCostoDetailPage({
 
   useEffect(() => {
     if (selectedPeriodoId && centro) {
-      if (activeTab === 'presupuestos') {
-        loadPresupuestos()
-      } else {
-        loadReporteGastos()
-      }
+      if (activeTab === 'presupuestos') loadPresupuestos()
+      else loadReporteGastos()
     }
   }, [activeTab, centro, loadPresupuestos, loadReporteGastos, selectedPeriodoId])
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: 'PEN',
     }).format(value)
-  }
 
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`
-  }
-
-  const getAlertColor = (alerta: string | null) => {
-    switch (alerta) {
-      case 'SOBREGIRO':
-        return '#ef4444'
-      case 'ADVERTENCIA':
-        return '#f59e0b'
-      default:
-        return '#10b981'
-    }
-  }
-
-  const getAlertBgColor = (alerta: string | null) => {
-    switch (alerta) {
-      case 'SOBREGIRO':
-        return '#fee2e2'
-      case 'ADVERTENCIA':
-        return '#fef3c7'
-      default:
-        return '#d1fae5'
-    }
-  }
+  const formatPercentage = (value: number) => `${value.toFixed(1)}%`
 
   const getAlertText = (alerta: string | null) => {
-    switch (alerta) {
-      case 'SOBREGIRO':
-        return 'Sobregiro'
-      case 'ADVERTENCIA':
-        return 'Advertencia'
-      default:
-        return 'Normal'
-    }
+    if (alerta === 'SOBREGIRO') return 'Sobregiro'
+    if (alerta === 'ADVERTENCIA') return 'Advertencia'
+    return 'Normal'
   }
+
+  const selectedPeriodo = periodos.find((p) => p.id === selectedPeriodoId)
+  const totalPresupuestado = presupuestos.reduce((sum, item) => sum + item.monto_presupuestado, 0)
+  const totalEjecutado = presupuestos.reduce((sum, item) => sum + item.monto_ejecutado, 0)
+  const totalDisponible = presupuestos.reduce((sum, item) => sum + item.monto_disponible, 0)
+  const detailTabs: Array<{ label: string; value: 'presupuestos' | 'gastos'; icon: typeof DollarSign }> = [
+    { label: 'Presupuesto', value: 'presupuestos', icon: DollarSign },
+    { label: 'Gastos', value: 'gastos', icon: TrendingUp },
+  ]
 
   if (loading) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p style={{ color: '#6b7280' }}>Cargando...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando centro de costo...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (error && !centro) {
     return (
-      <div style={{ padding: '2rem' }}>
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#fee2e2',
-          border: '1px solid #fecaca',
-          borderRadius: '0.5rem',
-          color: '#991b1b'
-        }}>
-          {error}
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[220px] flex-col items-center justify-center gap-4 p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-cyan-100" />
+            <p className="text-sm text-slate-300">{error}</p>
+            <Button onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="bg-blue-600 text-white hover:bg-blue-500">
+              Volver
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   if (!centro) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <p style={{ color: '#6b7280' }}>Centro de costo no encontrado</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1200px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[220px] items-center justify-center p-6 text-center text-sm text-slate-300">
+            Centro de costo no encontrado
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  const selectedPeriodo = periodos.find(p => p.id === selectedPeriodoId)
-
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-          <button
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <Button
+            type="button"
             onClick={() => router.push('/dashboard/contabilidad/centros-costo')}
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              backgroundColor: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f9fafb'
-              e.currentTarget.style.borderColor = '#d1d5db'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'white'
-              e.currentTarget.style.borderColor = '#e5e7eb'
-            }}
+            variant="outline"
+            className="mb-4 gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
           >
-            <ArrowLeft size={20} color="#6b7280" />
-          </button>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-              <Building2 size={24} color="#3b82f6" />
-              <h1 className="dashboard-title" style={{ margin: 0 }}>
-                {centro.codigo} - {centro.nombre}
-              </h1>
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </Button>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <Building2 className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                  {centro.activo ? 'Centro activo' : 'Centro inactivo'}
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-white">
+                  {centro.codigo} - {centro.nombre}
+                </h1>
+                {centro.descripcion && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{centro.descripcion}</p>}
+              </div>
             </div>
-            {centro.descripcion && (
-              <p className="dashboard-subtitle" style={{ margin: 0 }}>
-                {centro.descripcion}
-              </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => router.push(`/dashboard/contabilidad/presupuestos/comparacion?centroId=${centro.id}&periodoId=${selectedPeriodoId}`)}
+                disabled={!selectedPeriodoId}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white disabled:opacity-50"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Comparacion
+              </Button>
+              <Button
+                type="button"
+                onClick={() => router.push(`/dashboard/contabilidad/centros-costo/${centro.id}/editar`)}
+                className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-4">
+            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-end">
+                <label className="space-y-2">
+                  <span className={labelClass}>Periodo</span>
+                  <select value={selectedPeriodoId} onChange={(e) => setSelectedPeriodoId(e.target.value)} className={inputClass}>
+                    <option value="">Seleccionar periodo</option>
+                    {periodos.map((periodo) => (
+                      <option key={periodo.id} value={periodo.id}>
+                        {new Date(periodo.anio, periodo.mes - 1).toLocaleDateString('es-PE', {
+                          year: 'numeric',
+                          month: 'long',
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {detailTabs.map(({ label, value, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setActiveTab(value as 'presupuestos' | 'gastos')}
+                      className={cn(
+                        'flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition',
+                        activeTab === value
+                          ? 'border-cyan-300/40 bg-cyan-400/15 text-white'
+                          : 'border-cyan-400/15 bg-white/[0.03] text-slate-300 hover:bg-white/[0.07]',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {!selectedPeriodoId ? (
+              <EmptyPanel icon={Calendar} title="Selecciona un periodo" description="Elige un periodo abierto para revisar presupuesto o gastos." />
+            ) : activeTab === 'presupuestos' ? (
+              <BudgetPanel
+                loading={loadingPresupuestos}
+                presupuestos={presupuestos}
+                formatCurrency={formatCurrency}
+                formatPercentage={formatPercentage}
+                getAlertText={getAlertText}
+                onCreate={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}
+              />
+            ) : (
+              <ExpensesPanel loading={loadingReporte} reporteGastos={reporteGastos} formatCurrency={formatCurrency} />
             )}
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={() => router.push(`/dashboard/contabilidad/presupuestos/comparacion?centroId=${centro.id}&periodoId=${selectedPeriodoId}`)}
-              className="secondary-btn"
-              style={{ padding: '0.75rem 1.5rem' }}
-              disabled={!selectedPeriodoId}
-              title={!selectedPeriodoId ? 'Selecciona un período primero' : 'Ver comparación completa'}
-            >
-              Ver Comparación Completa
-            </button>
-            <button
-              onClick={() => router.push(`/dashboard/contabilidad/centros-costo/${centro.id}/editar`)}
-              className="secondary-btn"
-              style={{ padding: '0.75rem 1.5rem' }}
-            >
-              Editar
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Period Selector */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '1.5rem',
-        marginBottom: '1.5rem',
-        border: '1px solid #e5e7eb'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Calendar size={20} color="#6b7280" />
-          <label style={{ fontWeight: '500', color: '#374151' }}>
-            Período:
-          </label>
-          <select
-            value={selectedPeriodoId}
-            onChange={(e) => setSelectedPeriodoId(e.target.value)}
-            style={{
-              flex: 1,
-              maxWidth: '300px',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.5rem',
-              fontSize: '0.875rem',
-              color: '#374151'
-            }}
-          >
-            <option value="">Seleccionar período</option>
-            {periodos.map((periodo) => (
-              <option key={periodo.id} value={periodo.id}>
-                {new Date(periodo.anio, periodo.mes - 1).toLocaleDateString('es-PE', {
-                  year: 'numeric',
-                  month: 'long'
-                })}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+          <aside className="space-y-4">
+            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+                <CardTitle className="text-base text-white">Resumen</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 p-5">
+                {[
+                  ['Periodo', selectedPeriodo ? `${selectedPeriodo.mes}/${selectedPeriodo.anio}` : 'Sin seleccion'],
+                  ['Presupuestado', formatCurrency(totalPresupuestado)],
+                  ['Ejecutado', formatCurrency(totalEjecutado)],
+                  ['Disponible', formatCurrency(totalDisponible)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between rounded-xl border border-cyan-400/15 bg-white/[0.03] px-3 py-3">
+                    <span className={labelClass}>{label}</span>
+                    <span className="text-sm font-bold text-white">{value}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-      {/* Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '1.5rem',
-        borderBottom: '2px solid #e5e7eb'
-      }}>
-        <button
-          onClick={() => setActiveTab('presupuestos')}
-          style={{
-            padding: '1rem 1.5rem',
-            border: 'none',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-            fontWeight: '500',
-            color: activeTab === 'presupuestos' ? '#3b82f6' : '#6b7280',
-            borderBottom: activeTab === 'presupuestos' ? '2px solid #3b82f6' : '2px solid transparent',
-            marginBottom: '-2px',
-            transition: 'all 0.2s'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <DollarSign size={18} />
-            <span>Presupuestos vs Real</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('gastos')}
-          style={{
-            padding: '1rem 1.5rem',
-            border: 'none',
-            backgroundColor: 'transparent',
-            cursor: 'pointer',
-            fontWeight: '500',
-            color: activeTab === 'gastos' ? '#3b82f6' : '#6b7280',
-            borderBottom: activeTab === 'gastos' ? '2px solid #3b82f6' : '2px solid transparent',
-            marginBottom: '-2px',
-            transition: 'all 0.2s'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <TrendingUp size={18} />
-            <span>Reporte de Gastos</span>
-          </div>
-        </button>
+            {error && (
+              <Card className="border-cyan-400/20 bg-cyan-400/10 text-cyan-50">
+                <CardContent className="flex items-center gap-3 p-4 text-sm font-medium">
+                  <AlertCircle className="h-5 w-5" />
+                  {error}
+                </CardContent>
+              </Card>
+            )}
+          </aside>
+        </section>
       </div>
+    </div>
+  )
+}
 
-      {/* Content */}
-      {!selectedPeriodoId ? (
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '3rem',
-          textAlign: 'center',
-          border: '1px solid #e5e7eb'
-        }}>
-          <Calendar size={48} color="#d1d5db" style={{ margin: '0 auto 1rem' }} />
-          <p style={{ color: '#6b7280', fontSize: '1rem' }}>
-            Selecciona un período para ver la información
-          </p>
+function EmptyPanel({ icon: Icon, title, description }: { icon: typeof Calendar; title: string; description: string }) {
+  return (
+    <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
+        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+          <Icon className="h-10 w-10 text-cyan-100" />
         </div>
-      ) : activeTab === 'presupuestos' ? (
         <div>
-          {loadingPresupuestos ? (
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '3rem',
-              textAlign: 'center',
-              border: '1px solid #e5e7eb'
-            }}>
-              <p style={{ color: '#6b7280' }}>Cargando presupuestos...</p>
-            </div>
-          ) : presupuestos.length === 0 ? (
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '3rem',
-              textAlign: 'center',
-              border: '1px solid #e5e7eb'
-            }}>
-              <FileText size={48} color="#d1d5db" style={{ margin: '0 auto 1rem' }} />
-              <p style={{ color: '#6b7280', fontSize: '1rem', marginBottom: '0.5rem' }}>
-                No hay presupuestos configurados para este centro de costo en el período seleccionado
-              </p>
-              <button
-                onClick={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}
-                className="primary-btn"
-                style={{ marginTop: '1rem' }}
-              >
-                Crear Presupuesto
-              </button>
-            </div>
-          ) : (
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              overflow: 'hidden'
-            }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'left',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        Cuenta
-                      </th>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'right',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        Presupuestado
-                      </th>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'right',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        Ejecutado
-                      </th>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'right',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        Disponible
-                      </th>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'right',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        % Ejecutado
-                      </th>
-                      <th style={{
-                        padding: '1rem',
-                        textAlign: 'center',
-                        fontWeight: '600',
-                        color: '#374151',
-                        fontSize: '0.875rem'
-                      }}>
-                        Estado
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {presupuestos.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{
-                          borderBottom: '1px solid #e5e7eb',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f9fafb'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                      >
-                        <td style={{ padding: '1rem' }}>
-                          <div>
-                            <div style={{ fontWeight: '500', color: '#111827', marginBottom: '0.25rem' }}>
-                              {item.cuenta_codigo}
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                              {item.cuenta_nombre}
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#111827' }}>
-                          {formatCurrency(item.monto_presupuestado)}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#111827' }}>
-                          {formatCurrency(item.monto_ejecutado)}
-                        </td>
-                        <td style={{
-                          padding: '1rem',
-                          textAlign: 'right',
-                          fontWeight: '500',
-                          color: item.monto_disponible < 0 ? '#ef4444' : '#10b981'
-                        }}>
-                          {formatCurrency(item.monto_disponible)}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: '500', color: '#111827' }}>
-                              {formatPercentage(item.porcentaje_ejecutado)}
-                            </span>
-                            <div style={{
-                              width: '100px',
-                              height: '8px',
-                              backgroundColor: '#e5e7eb',
-                              borderRadius: '4px',
-                              overflow: 'hidden'
-                            }}>
-                              <div style={{
-                                width: `${Math.min(item.porcentaje_ejecutado, 100)}%`,
-                                height: '100%',
-                                backgroundColor: getAlertColor(item.alerta),
-                                transition: 'width 0.3s'
-                              }} />
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            backgroundColor: getAlertBgColor(item.alerta),
-                            color: getAlertColor(item.alerta)
-                          }}>
-                            {item.alerta === 'SOBREGIRO' || item.alerta === 'ADVERTENCIA' ? (
-                              <AlertCircle size={12} />
-                            ) : null}
-                            {getAlertText(item.alerta)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ backgroundColor: '#f9fafb', borderTop: '2px solid #e5e7eb' }}>
-                      <td style={{ padding: '1rem', fontWeight: '600', color: '#111827' }}>
-                        TOTAL
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#111827' }}>
-                        {formatCurrency(presupuestos.reduce((sum, item) => sum + item.monto_presupuestado, 0))}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#111827' }}>
-                        {formatCurrency(presupuestos.reduce((sum, item) => sum + item.monto_ejecutado, 0))}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#111827' }}>
-                        {formatCurrency(presupuestos.reduce((sum, item) => sum + item.monto_disponible, 0))}
-                      </td>
-                      <td colSpan={2}></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          )}
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="mt-2 text-sm text-slate-400">{description}</p>
         </div>
-      ) : (
-        <div>
-          {loadingReporte ? (
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '3rem',
-              textAlign: 'center',
-              border: '1px solid #e5e7eb'
-            }}>
-              <p style={{ color: '#6b7280' }}>Cargando reporte...</p>
-            </div>
-          ) : !reporteGastos || reporteGastos.gastos_por_cuenta.length === 0 ? (
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '3rem',
-              textAlign: 'center',
-              border: '1px solid #e5e7eb'
-            }}>
-              <FileText size={48} color="#d1d5db" style={{ margin: '0 auto 1rem' }} />
-              <p style={{ color: '#6b7280', fontSize: '1rem' }}>
-                No hay gastos registrados para este centro de costo en el período seleccionado
-              </p>
-            </div>
-          ) : (
-            <div>
-              {/* Summary Cards */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{
-                  backgroundColor: 'white',
-                  borderRadius: '12px',
-                  padding: '1.5rem',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <DollarSign size={20} color="#3b82f6" />
-                    <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>
-                      Total Gastos
+      </CardContent>
+    </Card>
+  )
+}
+
+function BudgetPanel({
+  loading,
+  presupuestos,
+  formatCurrency,
+  formatPercentage,
+  getAlertText,
+  onCreate,
+}: {
+  loading: boolean
+  presupuestos: PresupuestoItem[]
+  formatCurrency: (value: number) => string
+  formatPercentage: (value: number) => string
+  getAlertText: (alerta: string | null) => string
+  onCreate: () => void
+}) {
+  if (loading) {
+    return <EmptyPanel icon={Loader2 as typeof Calendar} title="Cargando presupuestos" description="Consultando ejecucion presupuestal del periodo." />
+  }
+
+  if (presupuestos.length === 0) {
+    return (
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
+          <FileText className="h-10 w-10 text-cyan-100" />
+          <div>
+            <h3 className="text-lg font-semibold text-white">Sin presupuestos configurados</h3>
+            <p className="mt-2 text-sm text-slate-400">No hay presupuesto para este centro en el periodo seleccionado.</p>
+          </div>
+          <Button type="button" onClick={onCreate} className="bg-blue-600 text-white hover:bg-blue-500">
+            Crear presupuesto
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+        <CardTitle className="text-base text-white">Presupuesto vs real</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] border-collapse">
+            <thead className="bg-cyan-400/10">
+              <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                <th className="px-4 py-3">Cuenta</th>
+                <th className="px-4 py-3 text-right">Presupuestado</th>
+                <th className="px-4 py-3 text-right">Ejecutado</th>
+                <th className="px-4 py-3 text-right">Disponible</th>
+                <th className="px-4 py-3 text-right">% Ejecutado</th>
+                <th className="px-4 py-3 text-center">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {presupuestos.map((item) => (
+                <tr key={item.id} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold text-white">{item.cuenta_codigo}</div>
+                    <div className="mt-1 text-xs text-slate-400">{item.cuenta_nombre}</div>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(item.monto_presupuestado)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(item.monto_ejecutado)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-cyan-100">{formatCurrency(item.monto_disponible)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-100">{formatPercentage(item.porcentaje_ejecutado)}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                      {getAlertText(item.alerta)}
                     </span>
-                  </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
-                    {formatCurrency(reporteGastos.resumen.total_gastos)}
-                  </div>
-                </div>
-
-                <div style={{
-                  backgroundColor: 'white',
-                  borderRadius: '12px',
-                  padding: '1.5rem',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <FileText size={20} color="#10b981" />
-                    <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>
-                      Total Movimientos
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
-                    {reporteGastos.resumen.total_movimientos}
-                  </div>
-                </div>
-
-                {reporteGastos.resumen.cuenta_mayor_gasto && (
-                  <div style={{
-                    backgroundColor: 'white',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                      <TrendingUp size={20} color="#f59e0b" />
-                      <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>
-                        Mayor Gasto
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
-                      {reporteGastos.resumen.cuenta_mayor_gasto.codigo}
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                      {reporteGastos.resumen.cuenta_mayor_gasto.nombre}
-                    </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ef4444' }}>
-                      {formatCurrency(reporteGastos.resumen.cuenta_mayor_gasto.monto)}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Gastos Table */}
-              <div style={{
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                border: '1px solid #e5e7eb',
-                overflow: 'hidden'
-              }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{
-                          padding: '1rem',
-                          textAlign: 'left',
-                          fontWeight: '600',
-                          color: '#374151',
-                          fontSize: '0.875rem'
-                        }}>
-                          Cuenta
-                        </th>
-                        <th style={{
-                          padding: '1rem',
-                          textAlign: 'right',
-                          fontWeight: '600',
-                          color: '#374151',
-                          fontSize: '0.875rem'
-                        }}>
-                          Debe
-                        </th>
-                        <th style={{
-                          padding: '1rem',
-                          textAlign: 'right',
-                          fontWeight: '600',
-                          color: '#374151',
-                          fontSize: '0.875rem'
-                        }}>
-                          Haber
-                        </th>
-                        <th style={{
-                          padding: '1rem',
-                          textAlign: 'right',
-                          fontWeight: '600',
-                          color: '#374151',
-                          fontSize: '0.875rem'
-                        }}>
-                          Saldo
-                        </th>
-                        <th style={{
-                          padding: '1rem',
-                          textAlign: 'center',
-                          fontWeight: '600',
-                          color: '#374151',
-                          fontSize: '0.875rem'
-                        }}>
-                          Movimientos
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reporteGastos.gastos_por_cuenta.map((gasto, index) => (
-                        <tr
-                          key={index}
-                          style={{
-                            borderBottom: '1px solid #e5e7eb',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f9fafb'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                          }}
-                        >
-                          <td style={{ padding: '1rem' }}>
-                            <div>
-                              <div style={{ fontWeight: '500', color: '#111827', marginBottom: '0.25rem' }}>
-                                {gasto.cuenta_codigo}
-                              </div>
-                              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                                {gasto.cuenta_nombre}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#111827' }}>
-                            {formatCurrency(gasto.total_debe)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#111827' }}>
-                            {formatCurrency(gasto.total_haber)}
-                          </td>
-                          <td style={{
-                            padding: '1rem',
-                            textAlign: 'right',
-                            fontWeight: '500',
-                            color: gasto.saldo < 0 ? '#ef4444' : '#10b981'
-                          }}>
-                            {formatCurrency(Math.abs(gasto.saldo))}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
-                            {gasto.cantidad_movimientos}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ExpensesPanel({
+  loading,
+  reporteGastos,
+  formatCurrency,
+}: {
+  loading: boolean
+  reporteGastos: ReporteGastos | null
+  formatCurrency: (value: number) => string
+}) {
+  if (loading) {
+    return <EmptyPanel icon={Loader2 as typeof Calendar} title="Cargando gastos" description="Consultando movimientos del centro de costo." />
+  }
+
+  if (!reporteGastos || reporteGastos.gastos_por_cuenta.length === 0) {
+    return <EmptyPanel icon={FileText as typeof Calendar} title="Sin gastos registrados" description="No hay gastos para este centro de costo en el periodo seleccionado." />
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="grid gap-3 md:grid-cols-3">
+        {[
+          ['Total gastos', formatCurrency(reporteGastos.resumen.total_gastos)],
+          ['Movimientos', reporteGastos.resumen.total_movimientos],
+          ['Mayor gasto', reporteGastos.resumen.cuenta_mayor_gasto?.codigo || 'Sin datos'],
+        ].map(([label, value]) => (
+          <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardContent className="p-4">
+              <div className={labelClass}>{label}</div>
+              <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+          <CardTitle className="text-base text-white">Gastos por cuenta</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse">
+              <thead className="bg-cyan-400/10">
+                <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                  <th className="px-4 py-3">Cuenta</th>
+                  <th className="px-4 py-3 text-right">Debe</th>
+                  <th className="px-4 py-3 text-right">Haber</th>
+                  <th className="px-4 py-3 text-right">Saldo</th>
+                  <th className="px-4 py-3 text-center">Movimientos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reporteGastos.gastos_por_cuenta.map((gasto, index) => (
+                  <tr key={index} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-white">{gasto.cuenta_codigo}</div>
+                      <div className="mt-1 text-xs text-slate-400">{gasto.cuenta_nombre}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(gasto.total_debe)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(gasto.total_haber)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-cyan-100">{formatCurrency(Math.abs(gasto.saldo))}</td>
+                    <td className="px-4 py-3 text-center text-slate-300">{gasto.cantidad_movimientos}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -32,16 +32,16 @@ try {
 Write-Host "2️⃣ Obteniendo períodos contables..." -ForegroundColor Yellow
 try {
     $periodosResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
-    
+
     if ($periodosResponse.data.Count -eq 0) {
         Write-Host "⚠️ No hay períodos contables creados" -ForegroundColor Yellow
         Write-Host "   Creando período de prueba..." -ForegroundColor Yellow
-        
+
         $createPeriodoBody = @{
             anio = 2025
             mes = 1
         } | ConvertTo-Json
-        
+
         $periodoResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Body $createPeriodoBody -Headers $headers
         $periodoId = $periodoResponse.data.id
         Write-Host "✅ Período creado: $periodoId" -ForegroundColor Green
@@ -64,10 +64,10 @@ Write-Host ""
 
 try {
     $comparacionResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/comparacion/$periodoId" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Comparación obtenida exitosamente" -ForegroundColor Green
     Write-Host ""
-    
+
     # Mostrar información del período
     Write-Host "📅 PERÍODO:" -ForegroundColor Cyan
     Write-Host "   Año: $($comparacionResponse.data.periodo.anio)" -ForegroundColor White
@@ -75,7 +75,7 @@ try {
     Write-Host "   Estado: $($comparacionResponse.data.periodo.estado)" -ForegroundColor White
     Write-Host "   Descripción: $($comparacionResponse.data.periodo.descripcion)" -ForegroundColor White
     Write-Host ""
-    
+
     # Mostrar resumen global
     Write-Host "📊 RESUMEN GLOBAL:" -ForegroundColor Cyan
     $resumen = $comparacionResponse.data.resumen_global
@@ -89,26 +89,26 @@ try {
     Write-Host "   % Ejecución: $($resumen.porcentaje_ejecucion.ToString('N2'))%" -ForegroundColor White
     Write-Host "   % Variación: $($resumen.variacion_porcentaje.ToString('N2'))%" -ForegroundColor White
     Write-Host ""
-    
+
     # Mostrar alertas
     Write-Host "🚨 ALERTAS:" -ForegroundColor Cyan
     Write-Host "   Sobregiros: $($resumen.alertas.sobregiros)" -ForegroundColor $(if ($resumen.alertas.sobregiros -gt 0) { "Red" } else { "Green" })
     Write-Host "   Advertencias: $($resumen.alertas.advertencias)" -ForegroundColor $(if ($resumen.alertas.advertencias -gt 0) { "Yellow" } else { "Green" })
     Write-Host "   Normales: $($resumen.alertas.normales)" -ForegroundColor Green
     Write-Host ""
-    
+
     # Mostrar detalle por centro de costo
     if ($comparacionResponse.data.centros_costo.Count -gt 0) {
         Write-Host "🏢 DETALLE POR CENTRO DE COSTO:" -ForegroundColor Cyan
         Write-Host ""
-        
+
         foreach ($centro in $comparacionResponse.data.centros_costo) {
             $alertColor = switch ($centro.totales.alerta) {
                 "SOBREGIRO" { "Red" }
                 "ADVERTENCIA" { "Yellow" }
                 default { "Green" }
             }
-            
+
             Write-Host "   📍 $($centro.centro_costo.nombre) [$($centro.centro_costo.codigo)]" -ForegroundColor White
             Write-Host "      Presupuestado: S/ $($centro.totales.presupuestado.ToString('N2'))" -ForegroundColor Gray
             Write-Host "      Ejecutado: S/ $($centro.totales.ejecutado.ToString('N2'))" -ForegroundColor Gray
@@ -118,7 +118,7 @@ try {
             Write-Host "      Alerta: $($centro.totales.alerta)" -ForegroundColor $alertColor
             Write-Host "      Cuentas: $($centro.cuentas.Count)" -ForegroundColor Gray
             Write-Host ""
-            
+
             # Mostrar primeras 3 cuentas como ejemplo
             if ($centro.cuentas.Count -gt 0) {
                 Write-Host "      📋 Cuentas (mostrando primeras 3):" -ForegroundColor Gray
@@ -143,11 +143,11 @@ try {
         Write-Host "ℹ️ No hay presupuestos registrados para este período" -ForegroundColor Yellow
         Write-Host ""
     }
-    
+
     Write-Host "✅ TEST COMPLETADO EXITOSAMENTE" -ForegroundColor Green
     Write-Host ""
     Write-Host "📝 Mensaje: $($comparacionResponse.message)" -ForegroundColor Cyan
-    
+
 } catch {
     Write-Host "❌ Error obteniendo comparación: $_" -ForegroundColor Red
     Write-Host ""

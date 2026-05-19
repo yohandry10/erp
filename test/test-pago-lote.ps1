@@ -2,7 +2,7 @@
 # Endpoint: POST /api/finanzas/tesoreria/lote
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1cGxpY2F0ZWQgd2l0aCBQb3N0bWFuIiwidHlwIjoiSldUIn0.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYxNDI5NTk5LCJpYXQiOjE3Mjk4OTM1OTksImlzcyI6Imh0dHBzOi8vdGVzdC5zdXBhYmFzZS5jbyIsInN1YiI6IjEyMzQ1Njc4LTEyMzQtMTIzNC0xMjM0LTEyMzQ1Njc4OTAxMiIsImVtYWlsIjoidGVzdEB0ZXN0LmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnt9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzI5ODkzNTk5fV0sInNlc3Npb25faWQiOiIxMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODkwMTIifQ.test-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440001"
 
 Write-Host "=== TEST: Registrar Pago Masivo a Proveedores ===" -ForegroundColor Cyan
@@ -22,7 +22,7 @@ try {
     Write-Host "✅ Programación obtenida:" -ForegroundColor Green
     Write-Host ($programacion | ConvertTo-Json -Depth 5)
     Write-Host ""
-    
+
     if ($programacion.data -and $programacion.data.Count -gt 0) {
         # Seleccionar las primeras 2-3 CxP para el lote
         $cxpsParaLote = $programacion.data | Select-Object -First 3
@@ -50,7 +50,7 @@ try {
     Write-Host "✅ Cuentas bancarias obtenidas:" -ForegroundColor Green
     Write-Host ($cuentas | ConvertTo-Json -Depth 3)
     Write-Host ""
-    
+
     if ($cuentas.data -and $cuentas.data.Count -gt 0) {
         $cuentaBancaria = $cuentas.data[0]
         Write-Host "Cuenta bancaria seleccionada:" -ForegroundColor Cyan
@@ -78,12 +78,12 @@ foreach ($cxp in $cxpsParaLote) {
     if ($cxp.moneda -eq $cuentaBancaria.moneda) {
         # Pagar el 50% del saldo o el saldo completo si es menor a 1000
         $montoPago = if ($cxp.saldo -lt 1000) { $cxp.saldo } else { [Math]::Round($cxp.saldo * 0.5, 2) }
-        
+
         $pagos += @{
             cxp_id = $cxp.id
             monto = $montoPago
         }
-        
+
         $montoTotalLote += $montoPago
     }
 }
@@ -131,7 +131,7 @@ try {
     Write-Host "✅ Lote de pagos registrado exitosamente:" -ForegroundColor Green
     Write-Host ($response | ConvertTo-Json -Depth 10)
     Write-Host ""
-    
+
     # Resumen
     Write-Host "=== RESUMEN DEL LOTE ===" -ForegroundColor Cyan
     Write-Host "Lote ID: $($response.data.lote_id)" -ForegroundColor White
@@ -144,7 +144,7 @@ try {
     Write-Host "  - Saldo anterior: $($response.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor White
     Write-Host "  - Saldo nuevo: $($response.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor White
     Write-Host ""
-    
+
     Write-Host "Detalle de pagos:" -ForegroundColor Cyan
     foreach ($pago in $response.data.pagos) {
         Write-Host "  - $($pago.numero_documento) ($($pago.proveedor)):" -ForegroundColor White
@@ -152,12 +152,12 @@ try {
         Write-Host "    Estado: $($pago.estado_anterior) → $($pago.estado_nuevo)" -ForegroundColor $(if ($pago.estado_nuevo -eq "PAGADA") { "Green" } else { "Yellow" })
         Write-Host "    Saldo: $($pago.saldo_anterior) → $($pago.saldo_nuevo)" -ForegroundColor White
     }
-    
+
 } catch {
     Write-Host "❌ Error registrando lote de pagos:" -ForegroundColor Red
     Write-Host "Status Code: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Red
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "Detalles:" -ForegroundColor Red
         Write-Host $_.ErrorDetails.Message

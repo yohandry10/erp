@@ -2,7 +2,7 @@
 # Endpoint: POST /api/finanzas/cxp
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzY5YzI5Yy1hNzI5LTRhNzAtYjI5Ny1lNzI5YzI5YzI5YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.fake-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 
 Write-Host "🧪 Test: Cálculo Automático de Fecha de Vencimiento" -ForegroundColor Cyan
@@ -66,13 +66,13 @@ try {
     Write-Host "   Fecha vencimiento: $($response1.data.fecha_vencimiento)" -ForegroundColor White
     Write-Host "   Fecha esperada: $fechaVencimientoEsperada1" -ForegroundColor White
     Write-Host "   Días crédito: $($response1.data.dias_credito)" -ForegroundColor White
-    
+
     if ($response1.data.fecha_vencimiento -eq $fechaVencimientoEsperada1) {
         Write-Host "   ✅ Fecha calculada correctamente!" -ForegroundColor Green
     } else {
         Write-Host "   ⚠ Fecha no coincide con la esperada" -ForegroundColor Yellow
     }
-    
+
     if ($response1.data.dias_credito -eq 30) {
         Write-Host "   ✅ Días crédito correctos (30)" -ForegroundColor Green
     } else {
@@ -120,13 +120,13 @@ try {
     Write-Host "   Fecha vencimiento: $($response2.data.fecha_vencimiento)" -ForegroundColor White
     Write-Host "   Fecha esperada: $fechaVencimientoEsperada2" -ForegroundColor White
     Write-Host "   Días crédito: $($response2.data.dias_credito)" -ForegroundColor White
-    
+
     if ($response2.data.fecha_vencimiento -eq $fechaVencimientoEsperada2) {
         Write-Host "   ✅ Fecha calculada correctamente!" -ForegroundColor Green
     } else {
         Write-Host "   ⚠ Fecha no coincide con la esperada" -ForegroundColor Yellow
     }
-    
+
     if ($response2.data.dias_credito -eq 0) {
         Write-Host "   ✅ Días crédito correctos (0)" -ForegroundColor Green
     } else {
@@ -175,7 +175,7 @@ try {
     Write-Host "   Fecha vencimiento: $($response3.data.fecha_vencimiento)" -ForegroundColor White
     Write-Host "   Fecha esperada: $fechaVencimientoExplicita" -ForegroundColor White
     Write-Host "   Días crédito: $($response3.data.dias_credito)" -ForegroundColor White
-    
+
     if ($response3.data.fecha_vencimiento -eq $fechaVencimientoExplicita) {
         Write-Host "   ✅ Fecha respetada correctamente!" -ForegroundColor Green
     } else {
@@ -224,13 +224,13 @@ try {
     Write-Host "   Fecha vencimiento: $($response4.data.fecha_vencimiento)" -ForegroundColor White
     Write-Host "   Fecha esperada: $fechaVencimientoEsperada4" -ForegroundColor White
     Write-Host "   Días crédito: $($response4.data.dias_credito)" -ForegroundColor White
-    
+
     if ($response4.data.fecha_vencimiento -eq $fechaVencimientoEsperada4) {
         Write-Host "   ✅ Fecha calculada correctamente con días personalizados!" -ForegroundColor Green
     } else {
         Write-Host "   ⚠ Fecha no coincide con la esperada" -ForegroundColor Yellow
     }
-    
+
     if ($response4.data.dias_credito -eq $diasCreditoPersonalizado) {
         Write-Host "   ✅ Días crédito correctos ($diasCreditoPersonalizado)" -ForegroundColor Green
     } else {

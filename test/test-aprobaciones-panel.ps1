@@ -37,7 +37,7 @@ try {
     -Method Post `
     -Body $ordenData `
     -ContentType "application/json"
-  
+
   if ($response.success) {
     $ordenId = $response.data.id
     Write-Host "✓ Orden creada exitosamente: $($response.data.numero)" -ForegroundColor Green
@@ -62,11 +62,11 @@ try {
   $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/aprobaciones?tenant_id=$tenantId" `
     -Method Get `
     -ContentType "application/json"
-  
+
   if ($response.success) {
     Write-Host "✓ Aprobaciones obtenidas exitosamente" -ForegroundColor Green
     Write-Host "  Total de aprobaciones: $($response.count)" -ForegroundColor Gray
-    
+
     if ($response.data.Count -gt 0) {
       Write-Host ""
       Write-Host "  Detalle de aprobaciones:" -ForegroundColor Cyan
@@ -109,7 +109,7 @@ try {
     -Method Post `
     -Body $aprobarData `
     -ContentType "application/json"
-  
+
   if ($response.success) {
     Write-Host "✓ Orden aprobada exitosamente" -ForegroundColor Green
     Write-Host "  Nuevo estado: $($response.data.estado)" -ForegroundColor Gray
@@ -129,14 +129,14 @@ try {
   $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/aprobaciones?tenant_id=$tenantId" `
     -Method Get `
     -ContentType "application/json"
-  
+
   if ($response.success) {
     Write-Host "✓ Aprobaciones actualizadas obtenidas" -ForegroundColor Green
-    
+
     $pendientes = ($response.data | Where-Object { $_.estado -eq 'PENDIENTE' }).Count
     $aprobadas = ($response.data | Where-Object { $_.estado -eq 'APROBADA' }).Count
     $rechazadas = ($response.data | Where-Object { $_.estado -eq 'RECHAZADA' }).Count
-    
+
     Write-Host ""
     Write-Host "  Resumen de aprobaciones:" -ForegroundColor Cyan
     Write-Host "    Pendientes: $pendientes" -ForegroundColor Yellow

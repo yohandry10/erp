@@ -4,109 +4,67 @@ import { Info, Upload, RefreshCw, Eye, AlertCircle, FileCheck } from 'lucide-rea
 
 export default function ConciliacionGuide() {
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      borderRadius: '0.5rem',
-      padding: '2rem',
-      color: 'white',
-      marginBottom: '2rem'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+    <div className="rounded-2 p-8 text-white mb-8">
+      <div className="flex items-center gap-3 mb-6">
         <Info size={24} />
-        <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: 0 }}>
+        <h3 className="text-5 font-semibold m-0">
           Guía Rápida: Proceso de Conciliación
         </h3>
       </div>
 
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '1rem' 
-      }}>
-        <div style={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          borderRadius: '0.5rem', 
-          padding: '1rem',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
+        <div className="bg-[rgba(255,_255,_255,_0.1)] rounded-2 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <Upload size={20} />
-            <span style={{ fontWeight: '600' }}>1. Importar</span>
+            <span className="font-semibold">1. Importar</span>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
+          <p className="text-[0.875rem] m-0 opacity-[0.9]">
             Sube el extracto bancario en formato CSV
           </p>
         </div>
 
-        <div style={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          borderRadius: '0.5rem', 
-          padding: '1rem',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div className="bg-[rgba(255,_255,_255,_0.1)] rounded-2 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <RefreshCw size={20} />
-            <span style={{ fontWeight: '600' }}>2. Auto-Match</span>
+            <span className="font-semibold">2. Auto-Match</span>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
+          <p className="text-[0.875rem] m-0 opacity-[0.9]">
             El sistema concilia automáticamente
           </p>
         </div>
 
-        <div style={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          borderRadius: '0.5rem', 
-          padding: '1rem',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div className="bg-[rgba(255,_255,_255,_0.1)] rounded-2 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <Eye size={20} />
-            <span style={{ fontWeight: '600' }}>3. Ajustar</span>
+            <span className="font-semibold">3. Ajustar</span>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
+          <p className="text-[0.875rem] m-0 opacity-[0.9]">
             Revisa y ajusta manualmente
           </p>
         </div>
 
-        <div style={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          borderRadius: '0.5rem', 
-          padding: '1rem',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div className="bg-[rgba(255,_255,_255,_0.1)] rounded-2 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <AlertCircle size={20} />
-            <span style={{ fontWeight: '600' }}>4. Revisar</span>
+            <span className="font-semibold">4. Revisar</span>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
+          <p className="text-[0.875rem] m-0 opacity-[0.9]">
             Verifica saldos y diferencias
           </p>
         </div>
 
-        <div style={{ 
-          background: 'rgba(255, 255, 255, 0.1)', 
-          borderRadius: '0.5rem', 
-          padding: '1rem',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div className="bg-[rgba(255,_255,_255,_0.1)] rounded-2 p-4">
+          <div className="flex items-center gap-2 mb-2">
             <FileCheck size={20} />
-            <span style={{ fontWeight: '600' }}>5. Cerrar</span>
+            <span className="font-semibold">5. Cerrar</span>
           </div>
-          <p style={{ fontSize: '0.875rem', margin: 0, opacity: 0.9 }}>
+          <p className="text-[0.875rem] m-0 opacity-[0.9]">
             Finaliza la conciliación
           </p>
         </div>
       </div>
 
-      <div style={{ 
-        marginTop: '1.5rem', 
-        padding: '1rem', 
-        background: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: '0.5rem',
-        fontSize: '0.875rem',
-        backdropFilter: 'blur(10px)'
-      }}>
+      <div className="mt-6 p-4 bg-[rgba(255,_255,_255,_0.15)] rounded-2 text-[0.875rem]">
         <strong>💡 Consejo:</strong> Usa el modo Wizard para una experiencia guiada paso a paso, 
         o la vista detallada para control total del proceso.
       </div>

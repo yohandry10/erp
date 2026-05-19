@@ -2,7 +2,7 @@
 # This script tests the GET /api/finanzas/cxp endpoint with various filters
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzY5YzI5Yy1hNzI5LTRhNzAtYjI5Ny1lNzI5YzI5YzI5YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.fake-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 
 $headers = @{

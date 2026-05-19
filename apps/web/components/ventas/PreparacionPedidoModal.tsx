@@ -219,29 +219,29 @@ export function PreparacionPedidoModal({ pedido, onClose, onSuccess }: Preparaci
   const clienteNombre = pedido.cliente?.razon_social || 'Cliente sin datos'
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={styles.iconBubble}>
-              <Package style={{ width: '22px', height: '22px' }} />
+    <div>
+      <div>
+        <div>
+          <div className="flex items-center gap-4">
+            <div>
+              <Package className="w-[22px] h-[22px]" />
             </div>
             <div>
-              <h2 style={styles.title}>Preparar Pedido {pedido.numero}</h2>
-              <p style={styles.subTitle}>Cliente: {clienteNombre}</p>
+              <h2>Preparar Pedido {pedido.numero}</h2>
+              <p>Cliente: {clienteNombre}</p>
             </div>
           </div>
-          <button style={styles.closeButton} onClick={onClose}>
-            <X style={{ width: '24px', height: '24px' }} />
+          <button onClick={onClose}>
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        <div style={styles.body}>
-          <div style={styles.helperText}>
-            <Info style={{ width: '18px', height: '18px', marginTop: '2px' }} />
+        <div>
+          <div>
+            <Info className="w-[18px] h-[18px] mt-[2px]" />
             <div>
-              <div style={{ fontWeight: 600 }}>Cómo avanzar este pedido</div>
-              <div style={{ marginTop: '0.25rem' }}>
+              <div className="font-semibold">Cómo avanzar este pedido</div>
+              <div className="mt-1">
                 1) Marca cada producto cuando lo tengas listo. 2) Cuando todos estén listos, pulsa “Marcar como Listo”.
                 3) El siguiente paso será <strong>Despacho</strong> y luego la <strong>Facturación</strong>.
               </div>
@@ -249,61 +249,50 @@ export function PreparacionPedidoModal({ pedido, onClose, onSuccess }: Preparaci
           </div>
 
           {(pedido.detalle || []).map((item: PedidoDetalle) => (
-            <div key={item.id} style={styles.itemRow}>
+            <div key={item.id}>
               <Checkbox
                 id={`item-${item.id}`}
                 checked={checkedItems[item.id] || false}
-                onCheckedChange={() => handleToggleItem(item.id)}
-                style={{ marginTop: '0.15rem' }}
+                onCheckedChange={() => handleToggleItem(item.id)} className="mt-[0.15rem]"
               />
-              <label htmlFor={`item-${item.id}`} style={styles.itemLabel}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+              <label htmlFor={`item-${item.id}`}>
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p style={styles.itemTitle}>{item.descripcion}</p>
-                    <p style={styles.itemDetail}>
+                    <p>{item.descripcion}</p>
+                    <p>
                       Cantidad: <strong>{item.cantidad}</strong>
                     </p>
                   </div>
-                  {checkedItems[item.id] && <CheckCircle style={{ color: '#22C55E', width: '20px', height: '20px' }} />}
+                  {checkedItems[item.id] && <CheckCircle className="text-[#22C55E] w-5 h-5" />}
                 </div>
               </label>
             </div>
           ))}
 
           {someItemsChecked && (
-            <div style={styles.progressBox}>
+            <div>
               {preparedCount} de {totalItems} ítems preparados
             </div>
           )}
         </div>
 
-        <div style={styles.footer}>
-          <Button variant="outline" onClick={onClose} disabled={loading} style={styles.cancelButton}>
+        <div>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
           <Button
             onClick={handleMarcarListo}
             disabled={!allItemsChecked || loading}
-            style={styles.primaryButton}
           >
             {loading ? (
               <>
-                <div
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '9999px',
-                    border: '2px solid rgba(255,255,255,0.6)',
-                    borderTopColor: 'transparent',
-                    marginRight: '0.5rem',
-                    animation: 'spin 1s linear infinite',
-                  }}
+                <div className="w-4 h-4 rounded-full mr-2"
                 />
                 Procesando...
               </>
             ) : (
               <>
-                <CheckCircle style={{ width: '18px', height: '18px', marginRight: '0.4rem' }} />
+                <CheckCircle className="w-[18px] h-[18px] mr-1.5" />
                 Marcar como Listo
               </>
             )}

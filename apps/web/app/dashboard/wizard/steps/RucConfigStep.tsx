@@ -25,30 +25,18 @@ export function RucConfigStep() {
   }
 
   return (
-    <div style={{ padding: '1rem 0' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderRadius: '8px',
-      }}>
-        <Building2 size={24} style={{ color: 'var(--primary-600)' }} />
-        <p style={{
-          fontSize: '0.875rem',
-          color: 'var(--primary-700)',
-          margin: 0,
-        }}>
+    <div className="py-4 px-0">
+      <div className="flex items-center gap-3 mb-6 p-4 bg-[rgba(59,_130,_246,_0.1)] rounded-2">
+        <Building2 size={24} className="text-[var(--primary-600)]" />
+        <p className="text-[0.875rem] text-[var(--primary-700)] m-0">
           Ingresa los datos de tu empresa tal como aparecen en {country.servicioFiscal}
         </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div className="flex flex-col gap-6">
         <div>
-          <Label htmlFor="ruc" style={{ marginBottom: '0.5rem', display: 'block' }}>
-            {country.documentoFiscal} <span style={{ color: '#ef4444' }}>*</span>
+          <Label htmlFor="ruc" className="mb-2 block">
+            {country.documentoFiscal} <span className="text-red-500">*</span>
           </Label>
           <Input
             id="ruc"
@@ -56,70 +44,49 @@ export function RucConfigStep() {
             placeholder={country.paisCodigo === 'PE' ? 'Ej: 20123456789' : country.paisCodigo === 'CO' ? 'Ej: 900123456-7' : 'Ingrese documento fiscal'}
             value={state.configuration.ruc}
             onChange={(e) => handleInputChange('ruc', e.target.value)}
-            maxLength={country.paisCodigo === 'PE' ? 11 : country.paisCodigo === 'CO' ? 12 : 20}
-            style={{
-              fontSize: '1rem',
-            }}
+            maxLength={country.paisCodigo === 'PE' ? 11 : country.paisCodigo === 'CO' ? 12 : 20} className="text-4"
           />
-          <p style={{
-            fontSize: '0.75rem',
-            color: 'var(--primary-500)',
-            marginTop: '0.25rem',
-          }}>
+          <p className="text-3 text-[var(--primary-500)] mt-1">
             {country.paisCodigo === 'PE' ? 'Debe tener 11 dígitos' : country.paisCodigo === 'CO' ? 'Formato: 9-10 dígitos + dígito de verificación' : 'Ingrese documento fiscal válido'}
           </p>
         </div>
 
         <div>
-          <Label htmlFor="razonSocial" style={{ marginBottom: '0.5rem', display: 'block' }}>
-            Razón Social <span style={{ color: '#ef4444' }}>*</span>
+          <Label htmlFor="razonSocial" className="mb-2 block">
+            Razón Social <span className="text-red-500">*</span>
           </Label>
           <Input
             id="razonSocial"
             type="text"
             placeholder="Ej: EMPRESA EJEMPLO S.A.C."
             value={state.configuration.razonSocial}
-            onChange={(e) => handleInputChange('razonSocial', e.target.value)}
-            style={{
-              fontSize: '1rem',
-            }}
+            onChange={(e) => handleInputChange('razonSocial', e.target.value)} className="text-4"
           />
-          <p style={{
-            fontSize: '0.75rem',
-            color: 'var(--primary-500)',
-            marginTop: '0.25rem',
-          }}>
+          <p className="text-3 text-[var(--primary-500)] mt-1">
             Nombre completo de la empresa
           </p>
         </div>
 
         <div>
-          <Label htmlFor="direccion" style={{ marginBottom: '0.5rem', display: 'block' }}>
-            Dirección Fiscal <span style={{ color: '#ef4444' }}>*</span>
+          <Label htmlFor="direccion" className="mb-2 block">
+            Dirección Fiscal <span className="text-red-500">*</span>
           </Label>
           <Input
             id="direccion"
             type="text"
             placeholder="Ej: Av. Principal 123, Lima, Lima"
             value={state.configuration.direccion}
-            onChange={(e) => handleInputChange('direccion', e.target.value)}
-            style={{
-              fontSize: '1rem',
-            }}
+            onChange={(e) => handleInputChange('direccion', e.target.value)} className="text-4"
           />
-          <p style={{
-            fontSize: '0.75rem',
-            color: 'var(--primary-500)',
-            marginTop: '0.25rem',
-          }}>
+          <p className="text-3 text-[var(--primary-500)] mt-1">
             Dirección registrada en {country.servicioFiscal}
           </p>
         </div>
 
         {/* Logo de la empresa */}
         <div>
-          <Label style={{ marginBottom: '0.5rem', display: 'block' }}>
-            Logo de la Empresa <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(opcional)</span>
+          <Label className="mb-2 block">
+            Logo de la Empresa <span className="text-slate-400 font-normal">(opcional)</span>
           </Label>
           <LogoUploader
             currentLogoUrl={state.configuration.logoUrl}
@@ -130,19 +97,8 @@ export function RucConfigStep() {
 
       </div>
 
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem',
-        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-        borderRadius: '8px',
-        border: '1px solid rgba(251, 191, 36, 0.2)',
-      }}>
-        <p style={{
-          fontSize: '0.875rem',
-          color: 'var(--warning-700)',
-          margin: 0,
-          lineHeight: '1.5',
-        }}>
+      <div className="mt-8 p-4 bg-[rgba(251,_191,_36,_0.1)] rounded-2 border">
+        <p className="text-[0.875rem] text-[var(--warning-700)] m-0 leading-6">
           <strong>⚠️ Importante:</strong> Asegúrate de que los datos coincidan exactamente con
           los registrados en {country.servicioFiscal} para evitar rechazos en la emisión de comprobantes.
         </p>

@@ -165,38 +165,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
   const total = subtotal + totalIgv
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        width: '95%',
-        maxWidth: '900px',
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>Nuevo Comprobante Electrónico</h2>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
+      <div className="bg-white rounded-3 p-8 w-[95%] max-w-[900px] overflow-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-6 font-semibold text-gray-800">Nuevo Comprobante Electrónico</h2>
           <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: '#6b7280'
-            }}
+            onClick={onClose} className="border-0 text-6 cursor-pointer text-gray-500"
           >
             ×
           </button>
@@ -204,27 +178,20 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
         <form onSubmit={handleSubmit}>
           {/* Datos del Comprobante */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+          <div className="mb-8">
+            <h3 className="text-5 font-semibold mb-4 text-gray-700">
               Datos del Comprobante
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Tipo de Comprobante *
                 </label>
                 <select
                   name="tipoComprobante"
                   value={formData.tipoComprobante}
                   onChange={handleChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 >
                   <option value="01">01 - Factura</option>
                   <option value="03">03 - Boleta de Venta</option>
@@ -234,7 +201,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Serie *
                 </label>
                 <input
@@ -242,19 +209,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="serie"
                   value={formData.serie}
                   onChange={handleChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Fecha de Emisión *
                 </label>
                 <input
@@ -262,32 +222,18 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="fechaEmision"
                   value={formData.fechaEmision}
                   onChange={handleChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Moneda
                 </label>
                 <select
                   name="moneda"
                   value={formData.moneda}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 >
                   <option value="PEN">PEN - Soles</option>
                   <option value="USD">USD - Dólares</option>
@@ -297,13 +243,13 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           </div>
 
           {/* Datos del Cliente */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+          <div className="mb-8">
+            <h3 className="text-5 font-semibold mb-4 text-gray-700">
               Datos del Cliente
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4">
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   RUC/DNI *
                 </label>
                 <input
@@ -311,19 +257,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRuc"
                   value={formData.clienteRuc}
                   onChange={handleChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Razón Social/Nombre *
                 </label>
                 <input
@@ -331,132 +270,80 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                   name="clienteRazonSocial"
                   value={formData.clienteRazonSocial}
                   onChange={handleChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  required className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <div>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Dirección
                 </label>
                 <input
                   type="text"
                   name="clienteDireccion"
                   value={formData.clienteDireccion}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
             </div>
           </div>
 
           {/* Items */}
-          <div style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#374151' }}>
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-5 font-semibold text-gray-700">
                 Detalle de Items
               </h3>
               <button
                 type="button"
-                onClick={addItem}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: '1px solid #3b82f6',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3b82f6',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
+                onClick={addItem} className="py-2 px-4 rounded-[6px] border bg-[rgba(59,_130,_246,_0.1)] text-blue-500 cursor-pointer text-3.5"
               >
                 + Agregar Item
               </button>
             </div>
 
             {formData.items.map((item, index) => (
-              <div key={index} style={{ 
-                border: '1px solid #e5e7eb', 
-                borderRadius: '8px', 
-                padding: '1rem', 
-                marginBottom: '1rem',
-                backgroundColor: '#f9fafb'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+              <div key={index} className="border rounded-2 p-4 mb-4 bg-[#f9fafb]">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-4 font-semibold text-gray-700">
                     Item {index + 1}
                   </h4>
                   {formData.items.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => removeItem(index)}
-                      style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '4px',
-                        border: '1px solid #ef4444',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem'
-                      }}
+                      onClick={() => removeItem(index)} className="py-1 px-2 rounded-[4px] border bg-[rgba(239,_68,_68,_0.1)] text-red-500 cursor-pointer text-[0.8rem]"
                     >
                       Eliminar
                     </button>
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4">
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       Código
                     </label>
                     <input
                       type="text"
                       value={item.codigo}
-                      onChange={(e) => handleItemChange(index, 'codigo', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem'
-                      }}
+                      onChange={(e) => handleItemChange(index, 'codigo', e.target.value)} className="w-[100%] p-2 border rounded-[4px] text-3.5"
                     />
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                  <div>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       Descripción *
                     </label>
                     <input
                       type="text"
                       value={item.descripcion}
                       onChange={(e) => handleItemChange(index, 'descripcion', e.target.value)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem'
-                      }}
+                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       Cantidad *
                     </label>
                     <input
@@ -465,19 +352,12 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       onChange={(e) => handleItemChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem'
-                      }}
+                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       Valor Unitario *
                     </label>
                     <input
@@ -486,53 +366,29 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                       onChange={(e) => handleItemChange(index, 'valorUnitario', parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem'
-                      }}
+                      required className="w-[100%] p-2 border rounded-[4px] text-3.5"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       IGV
                     </label>
                     <input
                       type="number"
                       value={item.igv.toFixed(2)}
-                      readOnly
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem',
-                        backgroundColor: '#f3f4f6'
-                      }}
+                      readOnly className="w-[100%] p-2 border rounded-[4px] text-3.5 bg-[#f3f4f6]"
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                    <label className="block mb-2 font-semibold text-gray-700">
                       Total
                     </label>
                     <input
                       type="number"
                       value={item.total.toFixed(2)}
-                      readOnly
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '0.9rem',
-                        backgroundColor: '#f3f4f6',
-                        fontWeight: '600'
-                      }}
+                      readOnly className="w-[100%] p-2 border rounded-[4px] text-3.5 bg-[#f3f4f6] font-semibold"
                     />
                   </div>
                 </div>
@@ -541,81 +397,49 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
           </div>
 
           {/* Totales */}
-          <div style={{ 
-            backgroundColor: '#f8fafc', 
-            padding: '1.5rem', 
-            borderRadius: '8px', 
-            marginBottom: '2rem',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+          <div className="bg-slate-50 p-6 rounded-2 mb-8 border">
+            <h3 className="text-5 font-semibold mb-4 text-gray-700">
               Resumen
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', textAlign: 'right' }}>
+            <div className="grid grid-cols-[repeat(3,_1fr)] gap-4 text-right">
               <div>
-                <div style={{ fontWeight: '600', color: '#6b7280' }}>Subtotal:</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: '600' }}>S/ {subtotal.toFixed(2)}</div>
+                <div className="font-semibold text-gray-500">Subtotal:</div>
+                <div className="text-4 font-semibold">S/ {subtotal.toFixed(2)}</div>
               </div>
               <div>
-                <div style={{ fontWeight: '600', color: '#6b7280' }}>IGV (18%):</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: '600' }}>S/ {totalIgv.toFixed(2)}</div>
+                <div className="font-semibold text-gray-500">IGV (18%):</div>
+                <div className="text-4 font-semibold">S/ {totalIgv.toFixed(2)}</div>
               </div>
               <div>
-                <div style={{ fontWeight: '600', color: '#6b7280' }}>Total:</div>
-                <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#059669' }}>S/ {total.toFixed(2)}</div>
+                <div className="font-semibold text-gray-500">Total:</div>
+                <div className="text-[1.3rem] font-bold text-emerald-600">S/ {total.toFixed(2)}</div>
               </div>
             </div>
           </div>
 
           {/* Observaciones */}
-          <div style={{ marginBottom: '2rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+          <div className="mb-8">
+            <label className="block mb-2 font-semibold text-gray-700">
               Observaciones
             </label>
             <textarea
               name="observaciones"
               value={formData.observaciones}
               onChange={handleChange}
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '0.9rem',
-                resize: 'vertical'
-              }}
+              rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+          <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={api.loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: api.loading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                cursor: api.loading ? 'not-allowed' : 'pointer',
-                fontWeight: '600'
-              }}
+              disabled={api.loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
             >
               {api.loading ? 'Creando...' : 'Crear Comprobante'}
             </button>

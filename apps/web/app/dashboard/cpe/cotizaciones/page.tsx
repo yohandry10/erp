@@ -259,7 +259,7 @@ export default function CotizacionesPage() {
           <h1 className="dashboard-title">Gestión de Cotizaciones</h1>
           <p className="dashboard-subtitle">Cargando datos...</p>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+        <div className="flex justify-center items-center h-[200px]">
           <div>🔄 Cargando...</div>
         </div>
       </div>
@@ -274,31 +274,18 @@ export default function CotizacionesPage() {
         <h1 className="dashboard-title">Gestión de Cotizaciones</h1>
         <p className="dashboard-subtitle">Administra tus cotizaciones y seguimiento comercial</p>
         <button
-          className="refresh-btn"
+          className="refresh-btn bg-[rgba(34,_197,_94,_0.2)] text-[#22c55e] border font-semibold"
           onClick={loadData}
-          style={{
-            background: 'rgba(34, 197, 94, 0.2)',
-            color: '#22c55e',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            fontWeight: '600'
-          }}
         >
           🔄 Actualizar
         </button>
         <button
-          className="refresh-btn"
+          className="refresh-btn text-white border-0 font-semibold shadow"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
             console.log('🎯 [BTN CLICK] Click detectado en botón Nueva Cotización')
             handleCrearCotizacion()
-          }}
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            color: 'white',
-            border: 'none',
-            fontWeight: '600',
-            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
           }}
         >
           ✨ Nueva Cotización
@@ -306,7 +293,7 @@ export default function CotizacionesPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>COTIZACIONES DEL MES</h3>
@@ -346,28 +333,14 @@ export default function CotizacionesPage() {
 
       {/* Filtros */}
       <div className="activity-section">
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h2 className="activity-title" style={{ marginBottom: '1rem' }}>Filtros de Búsqueda</h2>
+        <div className="mb-6">
+          <h2 className="activity-title mb-4">Filtros de Búsqueda</h2>
 
           {/* Filtros en grid responsive */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-4">
             <select
               value={filters.estado}
-              onChange={(e) => handleFilterChange('estado', e.target.value)}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#374151',
-                fontSize: '0.875rem',
-                minWidth: '150px'
-              }}
+              onChange={(e) => handleFilterChange('estado', e.target.value)} className="py-3 px-4 rounded-2 border bg-white text-gray-700 text-[0.875rem] min-w-[150px]"
             >
               <option value="">Todos los estados</option>
               <option value="BORRADOR">📝 Borrador - En preparación</option>
@@ -380,80 +353,39 @@ export default function CotizacionesPage() {
               type="text"
               placeholder="Buscar por vendedor"
               value={filters.vendedor}
-              onChange={(e) => handleFilterChange('vendedor', e.target.value)}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#374151',
-                fontSize: '0.875rem',
-                minWidth: '150px'
-              }}
+              onChange={(e) => handleFilterChange('vendedor', e.target.value)} className="py-3 px-4 rounded-2 border bg-white text-gray-700 text-[0.875rem] min-w-[150px]"
             />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <label style={{ color: '#374151', fontSize: '0.75rem', fontWeight: '500' }}>Fecha desde</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-700 text-3 font-medium">Fecha desde</label>
               <input
                 type="date"
                 value={filters.fecha_desde}
-                onChange={(e) => handleFilterChange('fecha_desde', e.target.value)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  color: '#374151',
-                  fontSize: '0.875rem',
-                  minWidth: '150px'
-                }}
+                onChange={(e) => handleFilterChange('fecha_desde', e.target.value)} className="py-3 px-4 rounded-2 border bg-white text-gray-700 text-[0.875rem] min-w-[150px]"
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <label style={{ color: '#374151', fontSize: '0.75rem', fontWeight: '500' }}>Fecha hasta</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-gray-700 text-3 font-medium">Fecha hasta</label>
               <input
                 type="date"
                 value={filters.fecha_hasta}
-                onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  color: '#374151',
-                  fontSize: '0.875rem',
-                  minWidth: '150px'
-                }}
+                onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)} className="py-3 px-4 rounded-2 border bg-white text-gray-700 text-[0.875rem] min-w-[150px]"
               />
             </div>
           </div>
 
           {/* Botones de acción */}
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="flex gap-4 flex-wrap">
             <button
               onClick={applyFilters}
-              className="refresh-btn"
-              style={{
-                background: 'rgba(168, 85, 247, 0.2)',
-                color: '#a855f7',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                fontWeight: '600',
-                padding: '0.75rem 1.5rem'
-              }}
+              className="refresh-btn bg-[rgba(168,_85,_247,_0.2)] text-[#a855f7] border font-semibold py-3 px-6"
             >
               🔍 Aplicar Filtros
             </button>
             <button
               onClick={clearFilters}
-              className="refresh-btn"
-              style={{
-                background: 'rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                fontWeight: '600',
-                padding: '0.75rem 1.5rem'
-              }}
+              className="refresh-btn bg-[rgba(239,_68,_68,_0.2)] text-red-500 border font-semibold py-3 px-6"
             >
               🗑️ Limpiar Filtros
             </button>
@@ -463,17 +395,11 @@ export default function CotizacionesPage() {
 
       {/* Quotations Section */}
       <div className="activity-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div className="flex justify-between items-center mb-6">
           <h2 className="activity-title">Cotizaciones Recientes</h2>
           <button
-            className="refresh-btn"
+            className="refresh-btn bg-[rgba(34,_197,_94,_0.2)] text-[#22c55e] border font-semibold"
             onClick={loadData}
-            style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              color: '#22c55e',
-              border: '1px solid rgba(34, 197, 94, 0.3)',
-              fontWeight: '600'
-            }}
           >
             📥 Actualizar
           </button>
@@ -482,37 +408,17 @@ export default function CotizacionesPage() {
         {/* Quotations Table */}
         <div className="activity-card">
           {cotizaciones.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: '#e2e8f0',
-              background: 'rgba(0,0,0,0.3)',
-              borderRadius: '12px',
-              border: '2px dashed rgba(255,255,255,0.2)'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem', color: '#f1f5f9' }}>
+            <div className="text-center p-12 text-slate-200 bg-[rgba(0,0,0,0.3)] rounded-3">
+              <div className="text-12 mb-4">📄</div>
+              <div className="text-6 font-semibold mb-2 text-slate-100">
                 No hay cotizaciones registradas
               </div>
-              <div style={{ color: '#94a3b8', marginBottom: '2rem' }}>
+              <div className="text-slate-400 mb-8">
                 Comienza creando tu primera cotización para gestionar tus ventas
               </div>
                              <button
-                 className="refresh-btn"
+                 className="refresh-btn mt-4 text-white border-0 py-3 px-6 rounded-2 text-4 font-semibold cursor-pointer shadow transition"
                  onClick={handleCrearCotizacion}
-                 style={{
-                   marginTop: '1rem',
-                   background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                   color: 'white',
-                   border: 'none',
-                   padding: '12px 24px',
-                   borderRadius: '8px',
-                   fontSize: '1rem',
-                   fontWeight: '600',
-                   cursor: 'pointer',
-                   boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                   transition: 'all 0.2s ease'
-                 }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)'
                     e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)'
@@ -526,92 +432,61 @@ export default function CotizacionesPage() {
                </button>
             </div>
           ) : (
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="overflow-auto">
+            <table className="w-[100%]">
               <thead>
-                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>N° COTIZACIÓN</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>CLIENTE</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>FECHA</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>VENCIMIENTO</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>TOTAL</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>PROB.</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>ESTADO</th>
-                    <th style={{ padding: '1rem', textAlign: 'left', color: '#1f2937', fontWeight: '700', fontSize: '0.875rem' }}>ACCIONES</th>
+                  <tr className="bg-slate-50">
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">N° COTIZACIÓN</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">CLIENTE</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">FECHA</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">VENCIMIENTO</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">TOTAL</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">PROB.</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">ESTADO</th>
+                    <th className="p-4 text-left text-gray-800 font-bold text-[0.875rem]">ACCIONES</th>
                 </tr>
               </thead>
               <tbody>
                   {cotizaciones.map((cotizacion) => (
-                    <tr key={cotizacion.id} style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.1)',
-                      backgroundColor: 'rgba(255,255,255,0.05)'
-                    }}>
-                      <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '600', backgroundColor: 'white' }}>
+                    <tr key={cotizacion.id} className="border-b bg-[rgba(255,255,255,0.05)]">
+                      <td className="p-4 text-gray-800 font-semibold bg-white">
                         {cotizacion.numero}
                       </td>
-                      <td style={{ padding: '1rem', backgroundColor: 'white' }}>
+                      <td className="p-4 bg-white">
                         <div>
-                           <div style={{ color: '#1f2937', fontWeight: '500' }}>
+                           <div className="text-gray-800 font-medium">
                              Cliente ID: {cotizacion.cliente_id || 'Sin asignar'}
                            </div>
-                           <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                           <div className="text-gray-500 text-[0.875rem]">
                              (Información de cliente en desarrollo)
                            </div>
                         </div>
                       </td>
-                      <td style={{ padding: '1rem', color: '#1f2937', backgroundColor: 'white' }}>
+                      <td className="p-4 text-gray-800 bg-white">
                         {formatDate(cotizacion.fecha_cotizacion)}
                       </td>
-                      <td style={{ padding: '1rem', color: '#1f2937', backgroundColor: 'white' }}>
+                      <td className="p-4 text-gray-800 bg-white">
                         {formatDate(cotizacion.fecha_vencimiento)}
                       </td>
-                      <td style={{ padding: '1rem', color: '#059669', fontWeight: '600', backgroundColor: 'white' }}>
+                      <td className="p-4 text-emerald-600 font-semibold bg-white">
                         {formatCurrency(cotizacion.total)}
                       </td>
-                      <td style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <div style={{
-                          width: '60px',
-                          height: '20px',
-                          borderRadius: '10px',
-                          background: getProbabilityColor(cotizacion.probabilidad),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'white',
-                          fontSize: '0.75rem',
-                          fontWeight: '600'
-                        }}>
+                      <td className="p-4 bg-white">
+                        <div className="w-[60px] h-5 rounded-2.5 flex items-center justify-center text-white text-3 font-semibold">
                           {cotizacion.probabilidad}%
                         </div>
                       </td>
-                      <td style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <span style={{
-                          ...getStatusColor(cotizacion.estado),
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600'
-                        }}>
+                      <td className="p-4 bg-white">
+                        <span className="py-1 px-3 rounded-3 text-3 font-semibold">
                           {cotizacion.estado?.toUpperCase() === 'EN PROCESO' || cotizacion.estado?.toUpperCase() === 'PROCESO' || cotizacion.estado?.toUpperCase() === 'PENDIENTE'
                             ? 'BORRADOR'
                             : (cotizacion.estado?.toUpperCase() || 'BORRADOR')}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', backgroundColor: 'white' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <td className="p-4 bg-white">
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => handleVerCotizacion(cotizacion)}
-                            style={{
-                              background: '#3b82f6',
-                              color: 'white',
-                              border: 'none',
-                              padding: '0.5rem 0.75rem',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                              fontWeight: '500',
-                              transition: 'all 0.2s'
-                            }}
+                            onClick={() => handleVerCotizacion(cotizacion)} className="bg-blue-500 text-white border-0 py-2 px-3 rounded-[6px] text-3 cursor-pointer font-medium transition"
                             onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
                             onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
                           >
@@ -632,18 +507,7 @@ export default function CotizacionesPage() {
 
                               // Aquí iría la lógica para generar y descargar el PDF
                               console.log('📄 Generando PDF para cotización:', cotizacion.numero);
-                            }}
-                                                        style={{
-                            background: '#dc2626',
-                            color: 'white',
-                            border: 'none',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            cursor: 'pointer',
-                            fontWeight: '500',
-                            transition: 'all 0.2s'
-                          }}
+                            }} className="bg-red-600 text-white border-0 py-2 px-3 rounded-[6px] text-3 cursor-pointer font-medium transition"
                           onMouseOver={(e) => (e.currentTarget.style.background = '#b91c1c')}
                           onMouseOut={(e) => (e.currentTarget.style.background = '#dc2626')}
                         >
@@ -664,48 +528,37 @@ export default function CotizacionesPage() {
       {clientesTop.length > 0 && (
       <div className="activity-section">
         <h2 className="activity-title">Clientes Principales</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-4 mt-4">
             {clientesTop.slice(0, 3).map((cliente) => (
-              <div key={cliente.id} className="activity-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div key={cliente.id} className="activity-card p-6">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                    <h3 style={{ color: '#f8fafc', fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.25rem' }}>
+                    <h3 className="text-slate-50 text-[1.125rem] font-semibold mb-1">
                       {cliente.nombre}
                     </h3>
-                    <div style={{ color: '#64748b', fontSize: '0.875rem' }}>
+                    <div className="text-slate-500 text-[0.875rem]">
                       RUC: {cliente.ruc}
                     </div>
                 </div>
-                <div style={{
-                    width: '60px',
-                    height: '60px',
-                  borderRadius: '50%',
-                    background: `conic-gradient(${getConversionColor(cliente.conversion)} ${cliente.conversion}%, rgba(255,255,255,0.1) 0)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                    color: 'white',
-                    fontWeight: '600',
-                    fontSize: '0.875rem'
-                }}>
+                <div className="w-[60px] h-[60px] rounded-full flex items-center justify-center text-white font-semibold text-[0.875rem]">
                     {cliente.conversion}%
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.875rem' }}>
+                <div className="grid grid-cols-[1fr_1fr] gap-4 text-[0.875rem]">
                   <div>
-                    <div style={{ color: '#64748b' }}>Cotizaciones</div>
-                    <div style={{ color: '#f8fafc', fontWeight: '600' }}>{cliente.cotizaciones}</div>
+                    <div className="text-slate-500">Cotizaciones</div>
+                    <div className="text-slate-50 font-semibold">{cliente.cotizaciones}</div>
               </div>
                 <div>
-                    <div style={{ color: '#64748b' }}>Total cotizado</div>
-                    <div style={{ color: '#22c55e', fontWeight: '600' }}>{formatCurrency(cliente.totalCotizado)}</div>
+                    <div className="text-slate-500">Total cotizado</div>
+                    <div className="text-[#22c55e] font-semibold">{formatCurrency(cliente.totalCotizado)}</div>
                   </div>
                 </div>
 
-                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.875rem' }}>
-                  <div style={{ color: '#64748b' }}>Última cotización</div>
-                  <div style={{ color: '#f8fafc' }}>{formatDate(cliente.ultimaCotizacion)}</div>
+                <div className="mt-4 pt-4 border-t text-[0.875rem]">
+                  <div className="text-slate-500">Última cotización</div>
+                  <div className="text-slate-50">{formatDate(cliente.ultimaCotizacion)}</div>
               </div>
             </div>
           ))}

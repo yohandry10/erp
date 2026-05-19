@@ -2,7 +2,7 @@
 # Verifica que el saldo se actualiza correctamente al crear movimientos
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1MnMwL3VBZGRLMnBKL0QiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2Vqb2Fxd3Fkb2Fhb2Fhb2Fhb2Fhby5zdXBhYmFzZS5jby9hdXRoL3YxIiwic3ViIjoiNDU0YzI3YzItNjI5Zi00YzI5LWI5YzAtNzU5YzI3YzI3YzI3IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsImV4cCI6MTc2NzIyNTYwMCwiaWF0IjoxNzM1Njg5NjAwLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3MzU2ODk2MDB9XSwic2Vzc2lvbl9pZCI6IjEyMzQ1Njc4LTEyMzQtMTIzNC0xMjM0LTEyMzQ1Njc4OTBhYiIsImlzX2Fub255bW91cyI6ZmFsc2V9.test-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
 $headers = @{
@@ -37,7 +37,7 @@ try {
     Write-Host "  Saldo Inicial: $($crearResponse.data.saldo)" -ForegroundColor Gray
 
     $cuentaId = $crearResponse.data.id
-    
+
     if ($crearResponse.data.saldo -ne $saldoInicial) {
         Write-Host "✗ ERROR: Saldo inicial incorrecto" -ForegroundColor Red
         exit 1
@@ -68,7 +68,7 @@ try {
     Write-Host "  Monto: +$montoAbono" -ForegroundColor Gray
     Write-Host "  Saldo Anterior: $($abonoResponse.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor Gray
     Write-Host "  Saldo Nuevo: $($abonoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Gray
-    
+
     $saldoEsperado = $saldoInicial + $montoAbono
     if ($abonoResponse.data.cuenta_bancaria.saldo_nuevo -ne $saldoEsperado) {
         Write-Host "✗ ERROR: Saldo después de ABONO incorrecto" -ForegroundColor Red
@@ -76,7 +76,7 @@ try {
         Write-Host "  Obtenido: $($abonoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Red
         exit 1
     }
-    
+
     $saldoActual = $abonoResponse.data.cuenta_bancaria.saldo_nuevo
 } catch {
     Write-Host "✗ Error creando movimiento ABONO: $($_.Exception.Message)" -ForegroundColor Red
@@ -93,7 +93,7 @@ try {
     $cuentaResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId" -Method Get -Headers $headers
     Write-Host "✓ Cuenta obtenida" -ForegroundColor Green
     Write-Host "  Saldo: $($cuentaResponse.data.saldo)" -ForegroundColor Gray
-    
+
     if ($cuentaResponse.data.saldo -ne $saldoActual) {
         Write-Host "✗ ERROR: Saldo en cuenta no coincide" -ForegroundColor Red
         Write-Host "  Esperado: $saldoActual" -ForegroundColor Red
@@ -126,7 +126,7 @@ try {
     Write-Host "  Monto: -$montoCargo" -ForegroundColor Gray
     Write-Host "  Saldo Anterior: $($cargoResponse.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor Gray
     Write-Host "  Saldo Nuevo: $($cargoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Gray
-    
+
     $saldoEsperado = $saldoActual - $montoCargo
     if ($cargoResponse.data.cuenta_bancaria.saldo_nuevo -ne $saldoEsperado) {
         Write-Host "✗ ERROR: Saldo después de CARGO incorrecto" -ForegroundColor Red
@@ -134,7 +134,7 @@ try {
         Write-Host "  Obtenido: $($cargoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Red
         exit 1
     }
-    
+
     $saldoActual = $cargoResponse.data.cuenta_bancaria.saldo_nuevo
 } catch {
     Write-Host "✗ Error creando movimiento CARGO: $($_.Exception.Message)" -ForegroundColor Red
@@ -151,7 +151,7 @@ try {
     $cuentaFinalResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId" -Method Get -Headers $headers
     Write-Host "✓ Cuenta obtenida" -ForegroundColor Green
     Write-Host "  Saldo Final: $($cuentaFinalResponse.data.saldo)" -ForegroundColor Gray
-    
+
     $saldoEsperadoFinal = $saldoInicial + $montoAbono - $montoCargo
     if ($cuentaFinalResponse.data.saldo -ne $saldoEsperadoFinal) {
         Write-Host "✗ ERROR: Saldo final incorrecto" -ForegroundColor Red
@@ -229,12 +229,12 @@ try {
     Write-Host "✓ Movimiento con sobregiro creado" -ForegroundColor Green
     Write-Host "  Saldo Anterior: $($sobregiroMovResponse.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor Gray
     Write-Host "  Saldo Nuevo: $($sobregiroMovResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Gray
-    
+
     if ($sobregiroMovResponse.data.cuenta_bancaria.saldo_nuevo -ge 0) {
         Write-Host "✗ ERROR: Saldo debería ser negativo" -ForegroundColor Red
         exit 1
     }
-    
+
     Write-Host "  ✓ Saldo negativo permitido con sobregiro" -ForegroundColor Green
 } catch {
     Write-Host "✗ Error creando movimiento con sobregiro: $($_.Exception.Message)" -ForegroundColor Red

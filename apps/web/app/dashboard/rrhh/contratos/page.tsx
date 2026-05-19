@@ -233,6 +233,12 @@ const ContratosPage = () => {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Gestión de Contratos</h1>
+            <p className="dashboard-subtitle">Cargando contratos laborales, empleados vinculados y estados de renovación.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando contratos...</p>
@@ -249,7 +255,7 @@ const ContratosPage = () => {
           <h1 className="dashboard-title">Gestión de Contratos</h1>
           <p className="dashboard-subtitle">Control de contratos laborales y renovaciones</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className="flex gap-4">
           <button 
             className="refresh-btn"
             onClick={() => setShowModal(true)}
@@ -302,23 +308,15 @@ const ContratosPage = () => {
       </div>
 
       {/* Filtros */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px'
-      }}>
+      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Estado:
           </label>
           <select 
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
+            className="form-control w-[150px]"
           >
             <option value="todos">Todos</option>
             <option value="activo">Activo</option>
@@ -330,14 +328,13 @@ const ContratosPage = () => {
         </div>
 
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Tipo:
           </label>
           <select 
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="form-control"
-            style={{ width: '180px' }}
+            className="form-control w-[180px]"
           >
             <option value="todos">Todos</option>
             <option value="indefinido">Indefinido</option>
@@ -406,7 +403,7 @@ const ContratosPage = () => {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div className="flex gap-2 flex-wrap">
                         <button
                           onClick={() => generarContrato(contrato.id)}
                           className="action-btn bg-blue-500 hover:bg-blue-600 text-white"
@@ -453,11 +450,7 @@ const ContratosPage = () => {
           </table>
 
           {filtrarContratos().length === 0 && (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '2rem',
-              color: '#6b7280'
-            }}>
+            <div className="text-center p-8 text-gray-500">
               No hay contratos que coincidan con los filtros seleccionados.
             </div>
           )}
@@ -466,17 +459,11 @@ const ContratosPage = () => {
 
       {/* Alertas de vencimiento */}
       {stats.porVencer > 0 && (
-        <div style={{
-          marginTop: '2rem',
-          padding: '1rem',
-          background: '#fef3c7',
-          border: '1px solid #f59e0b',
-          borderRadius: '8px'
-        }}>
-          <h3 style={{ color: '#92400e', margin: '0 0 0.5rem 0' }}>
+        <div className="mt-8 p-4 bg-[#fef3c7] border rounded-2">
+          <h3 className="text-[#92400e] mt-0 mr-0 mb-2 ml-0">
             ⚠️ Contratos por Vencer
           </h3>
-          <p style={{ color: '#92400e', margin: 0 }}>
+          <p className="text-[#92400e] m-0">
             Hay {stats.porVencer} contrato(s) que vencen en los próximos 30 días. 
             Revisar la tabla para tomar las acciones necesarias.
           </p>
@@ -530,51 +517,23 @@ const ContratosPage = () => {
 
       {/* Modal de Detalle del Contrato */}
       {showDetailModal && contratoDetail && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            padding: '1rem'
-          }}
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
           onClick={() => {
             setShowDetailModal(false);
             setContratoDetail(null);
           }}
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '700px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-            }}
+          <div className="bg-white rounded-3 w-[100%] max-w-[700px] overflow-y-auto shadow"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ 
-              padding: '2rem 2rem 1rem 2rem',
-              borderBottom: '2px solid #e5e7eb',
-              background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-              color: 'white',
-              borderRadius: '12px 12px 0 0'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="pt-8 pr-8 pb-4 pl-8 text-white">
+              <div className="flex justify-between items-center">
                 <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: 0 }}>
+                  <h2 className="text-7 font-bold m-0">
                     📄 Detalle del Contrato
                   </h2>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.9, margin: '0.5rem 0 0 0' }}>
+                  <p className="text-[0.875rem] opacity-[0.9] mt-2 mr-0 mb-0 ml-0">
                     Información completa del contrato laboral
                   </p>
                 </div>
@@ -583,17 +542,7 @@ const ContratosPage = () => {
                   onClick={() => {
                     setShowDetailModal(false);
                     setContratoDetail(null);
-                  }}
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '1.25rem'
-                  }}
+                  }} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer text-5"
                 >
                   ✕
                 </button>
@@ -601,41 +550,27 @@ const ContratosPage = () => {
             </div>
 
             {/* Contenido */}
-            <div style={{ padding: '2rem' }}>
+            <div className="p-8">
               {/* Información del Empleado */}
-              <div style={{ 
-                marginBottom: '1.5rem',
-                padding: '1.5rem',
-                backgroundColor: '#f8fafc',
-                borderRadius: '8px',
-                border: '1px solid #e2e8f0'
-              }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600', 
-                  color: '#1e293b', 
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
+              <div className="mb-6 p-6 bg-slate-50 rounded-2 border">
+                <h3 className="text-[1.125rem] font-semibold text-slate-800 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
                   👤 Información del Empleado
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="grid grid-cols-[1fr_1fr] gap-4">
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       EMPLEADO
                     </label>
-                    <div style={{ fontSize: '1rem', fontWeight: '600', color: '#374151' }}>
+                    <div className="text-4 font-semibold text-gray-700">
                       {getEmpleadoNombre(contratoDetail?.empleado_id || '')}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       ID CONTRATO
                     </label>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                    <div className="text-[0.875rem] text-gray-500">
                       {contratoDetail?.id}
                     </div>
                   </div>
@@ -643,74 +578,36 @@ const ContratosPage = () => {
               </div>
 
               {/* Detalles del Contrato */}
-              <div style={{ 
-                marginBottom: '1.5rem',
-                padding: '1.5rem',
-                backgroundColor: '#f0fdf4',
-                borderRadius: '8px',
-                border: '1px solid #bbf7d0'
-              }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600', 
-                  color: '#14532d', 
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
+              <div className="mb-6 p-6 bg-[#f0fdf4] rounded-2 border">
+                <h3 className="text-[1.125rem] font-semibold text-[#14532d] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
                   📋 Detalles del Contrato
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       TIPO DE CONTRATO
                     </label>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '6px',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      backgroundColor: contratoDetail.tipo_contrato === 'indefinido' ? '#dbeafe' : 
-                                     contratoDetail.tipo_contrato === 'temporal' ? '#fed7aa' :
-                                     contratoDetail?.tipo_contrato === 'practicas' ? '#e9d5ff' : '#fce7f3',
-                      color: contratoDetail.tipo_contrato === 'indefinido' ? '#1e40af' : 
-                             contratoDetail.tipo_contrato === 'temporal' ? '#ea580c' :
-                             contratoDetail.tipo_contrato === 'practicas' ? '#7c3aed' : '#be185d'
-                    }}>
+                    <span className="inline-block py-2 px-4 rounded-[6px] text-[0.875rem] font-semibold">
                       {contratoDetail.tipo_contrato?.replace('_', ' ').toUpperCase() || 'N/A'}
                     </span>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       ESTADO
                     </label>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '6px',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      backgroundColor: contratoDetail.estado === 'activo' ? '#d1fae5' : 
-                                     contratoDetail.estado === 'vencido' ? '#fee2e2' :
-                                     contratoDetail.estado === 'renovado' ? '#dbeafe' : '#f3f4f6',
-                      color: contratoDetail.estado === 'activo' ? '#065f46' : 
-                             contratoDetail.estado === 'vencido' ? '#dc2626' :
-                             contratoDetail.estado === 'renovado' ? '#1e40af' : '#374151'
-                    }}>
+                    <span className="inline-block py-2 px-4 rounded-[6px] text-[0.875rem] font-semibold">
                       {contratoDetail.estado?.replace('_', ' ').toUpperCase() || 'ACTIVO'}
                     </span>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div className="grid grid-cols-[1fr_1fr_1fr] gap-4">
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       FECHA INICIO
                     </label>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    <div className="text-[0.875rem] font-medium text-gray-700">
                       {new Date(contratoDetail.fecha_inicio).toLocaleDateString('es-PE', { 
                         year: 'numeric', 
                         month: 'long', 
@@ -719,10 +616,10 @@ const ContratosPage = () => {
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       FECHA FIN
                     </label>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    <div className="text-[0.875rem] font-medium text-gray-700">
                       {contratoDetail.fecha_fin ? 
                         new Date(contratoDetail.fecha_fin).toLocaleDateString('es-PE', { 
                           year: 'numeric', 
@@ -734,20 +631,10 @@ const ContratosPage = () => {
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       DÍAS RESTANTES
                     </label>
-                    <div style={{ 
-                      fontSize: '0.875rem', 
-                      fontWeight: '600',
-                      color: (() => {
-                        const dias = calcularDiasRestantes(contratoDetail.fecha_fin);
-                        if (dias === null) return '#374151';
-                        if (dias < 0) return '#dc2626';
-                        if (dias <= 30) return '#f59e0b';
-                        return '#16a34a';
-                      })()
-                    }}>
+                    <div className="text-[0.875rem] font-semibold">
                       {(() => {
                         const dias = calcularDiasRestantes(contratoDetail.fecha_fin);
                         if (dias === null) return 'Indefinido';
@@ -760,39 +647,25 @@ const ContratosPage = () => {
               </div>
 
               {/* Información Económica */}
-              <div style={{ 
-                marginBottom: '1.5rem',
-                padding: '1.5rem',
-                backgroundColor: '#fef3c7',
-                borderRadius: '8px',
-                border: '1px solid #f59e0b'
-              }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600', 
-                  color: '#92400e', 
-                  margin: '0 0 1rem 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
+              <div className="mb-6 p-6 bg-[#fef3c7] rounded-2 border">
+                <h3 className="text-[1.125rem] font-semibold text-[#92400e] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
                   💰 Información Económica
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="grid grid-cols-[1fr_1fr] gap-4">
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       SALARIO MENSUAL
                     </label>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#16a34a' }}>
+                    <div className="text-6 font-bold text-[#16a34a]">
                       S/ {(contratoDetail.salario || 0).toLocaleString('es-PE')}
                     </div>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <label className="block text-3 font-semibold text-gray-500 mb-1">
                       BENEFICIOS
                     </label>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+                    <div className="text-[0.875rem] font-medium text-gray-700">
                       {contratoDetail.beneficios || 'Beneficios estándar según ley'}
                     </div>
                   </div>
@@ -801,52 +674,20 @@ const ContratosPage = () => {
 
               {/* Observaciones */}
               {contratoDetail.observaciones && (
-                <div style={{ 
-                  marginBottom: '1.5rem',
-                  padding: '1.5rem',
-                  backgroundColor: '#f1f5f9',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1'
-                }}>
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: '600', 
-                    color: '#475569', 
-                    margin: '0 0 1rem 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
+                <div className="mb-6 p-6 bg-slate-100 rounded-2 border">
+                  <h3 className="text-[1.125rem] font-semibold text-slate-600 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
                     📝 Observaciones
                   </h3>
-                  <div style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.5' }}>
+                  <div className="text-[0.875rem] text-slate-600 leading-6">
                     {contratoDetail.observaciones}
                   </div>
                 </div>
               )}
 
               {/* Botones de Acción */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                gap: '1rem',
-                paddingTop: '1rem',
-                borderTop: '1px solid #e5e7eb'
-              }}>
+              <div className="flex justify-end gap-4 pt-4 border-t">
                 <button
-                  onClick={() => generarContrato(contratoDetail.id)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    border: 'none',
-                    borderRadius: '6px',
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
+                  onClick={() => generarContrato(contratoDetail.id)} className="py-3 px-6 border-0 rounded-[6px] bg-blue-500 text-white cursor-pointer font-medium flex items-center gap-2"
                 >
                   📄 Descargar PDF
                 </button>
@@ -854,16 +695,7 @@ const ContratosPage = () => {
                   onClick={() => {
                     setShowDetailModal(false);
                     setContratoDetail(null);
-                  }}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: 'white',
-                    color: '#374151',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
+                  }} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-medium"
                 >
                   Cerrar
                 </button>

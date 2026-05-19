@@ -52,13 +52,13 @@ try {
         $vencimientos = $response.data.vencimientos
         Write-Host "Summary:" -ForegroundColor Cyan
         Write-Host "  Total vencimientos: $($vencimientos.Count)" -ForegroundColor White
-        
+
         $vencidos = $vencimientos | Where-Object { $_.dias_restantes -lt 0 }
         $proximos = $vencimientos | Where-Object { $_.dias_restantes -ge 0 }
-        
+
         Write-Host "  Vencidos: $($vencidos.Count)" -ForegroundColor Red
         Write-Host "  Próximos: $($proximos.Count)" -ForegroundColor Yellow
-        
+
         if ($response.data.resumen.por_moneda) {
             Write-Host ""
             Write-Host "  Por moneda:" -ForegroundColor Cyan
@@ -66,13 +66,13 @@ try {
                 Write-Host "    $($_.Name): $($_.Value.cantidad) cuentas - Monto: $($_.Value.monto)" -ForegroundColor White
             }
         }
-        
+
         Write-Host ""
         Write-Host "Detalles de vencimientos:" -ForegroundColor Cyan
         $vencimientos | ForEach-Object {
             $color = if ($_.dias_restantes -lt 0) { "Red" } elseif ($_.dias_restantes -le 3) { "Yellow" } else { "White" }
-            $status = if ($_.dias_restantes -lt 0) { 
-                "⚠️ Vencido hace $([Math]::Abs($_.dias_restantes)) días" 
+            $status = if ($_.dias_restantes -lt 0) {
+                "⚠️ Vencido hace $([Math]::Abs($_.dias_restantes)) días"
             } elseif ($_.dias_restantes -eq 0) {
                 "🔴 Vence HOY"
             } else {
@@ -101,15 +101,15 @@ try {
 
     Write-Host "✓ Request successful" -ForegroundColor Green
     Write-Host ""
-    
+
     if ($response.success -and $response.data.vencimientos) {
         $vencimientos = $response.data.vencimientos
         Write-Host "Summary (30 days):" -ForegroundColor Cyan
         Write-Host "  Total vencimientos: $($vencimientos.Count)" -ForegroundColor White
-        
+
         $vencidos = $vencimientos | Where-Object { $_.dias_restantes -lt 0 }
         $proximos = $vencimientos | Where-Object { $_.dias_restantes -ge 0 }
-        
+
         Write-Host "  Vencidos: $($vencidos.Count)" -ForegroundColor Red
         Write-Host "  Próximos: $($proximos.Count)" -ForegroundColor Yellow
     }
@@ -133,16 +133,16 @@ try {
 
     if ($cxpResponse.success -and $cxpResponse.data.Count -gt 0) {
         $proveedorId = $cxpResponse.data[0].proveedor_id
-        
+
         Write-Host "Testing with proveedor_id: $proveedorId" -ForegroundColor Yellow
-        
+
         $response = Invoke-RestMethod -Uri "$apiUrl/api/finanzas/cxp/vencimientos?dias=30&proveedor_id=$proveedorId" `
             -Method GET `
             -Headers $headers
 
         Write-Host "✓ Request successful" -ForegroundColor Green
         Write-Host ""
-        
+
         if ($response.success -and $response.data.vencimientos) {
             $vencimientos = $response.data.vencimientos
             Write-Host "Summary (filtered by proveedor):" -ForegroundColor Cyan

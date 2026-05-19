@@ -1,20 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CreditCard, DollarSign, Plus, RefreshCw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
-import { 
-  Plus, 
-  RefreshCw,
-  CreditCard,
-  DollarSign,
-  Eye,
-  Edit,
-  TrendingUp,
-  TrendingDown,
-  Building2
-} from 'lucide-react'
 import CuentaBancariaCard from '@/components/finanzas/CuentaBancariaCard'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface CuentaBancaria {
   id: string
@@ -52,10 +44,12 @@ interface SaldosConsolidados {
   total_cuentas_activas: number
 }
 
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
 export default function BancosPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([])
   const [saldosConsolidados, setSaldosConsolidados] = useState<SaldosConsolidados | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,11 +59,7 @@ export default function BancosPage() {
     try {
       setLoading(true)
       const response = await get('/api/finanzas/bancos/cuentas')
-      
-      if (response?.success) {
-        const data = response.data || []
-        setCuentas(data)
-      }
+      if (response?.success) setCuentas(response.data || [])
     } catch (error) {
       console.error('Error loading cuentas bancarias:', error)
       alert('Error: No se pudieron cargar las cuentas bancarias')
@@ -82,10 +72,7 @@ export default function BancosPage() {
     try {
       setLoadingSaldos(true)
       const response = await get('/api/finanzas/bancos/saldos')
-      
-      if (response?.success) {
-        setSaldosConsolidados(response.data)
-      }
+      if (response?.success) setSaldosConsolidados(response.data)
     } catch (error) {
       console.error('Error loading saldos consolidados:', error)
     } finally {
@@ -102,191 +89,133 @@ export default function BancosPage() {
     const currency = moneda === 'USD' ? 'USD' : moneda === 'EUR' ? 'EUR' : 'PEN'
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: currency,
+      currency,
     }).format(amount)
   }
 
-  const cuentasActivas = cuentas.filter(c => c.activa)
-  const cuentasInactivas = cuentas.filter(c => !c.activa)
+  const cuentasActivas = cuentas.filter((cuenta) => cuenta.activa)
+  const cuentasInactivas = cuentas.filter((cuenta) => !cuenta.activa)
+
+  const refresh = () => {
+    loadCuentas()
+    loadSaldosConsolidados()
+  }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Cuentas Bancarias</h1>
-          <p className="dashboard-subtitle">Gestiona las cuentas bancarias de la empresa</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            onClick={() => {
-              loadCuentas()
-              loadSaldosConsolidados()
-            }}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button 
-            className="refresh-btn"
-            onClick={() => router.push('/dashboard/finanzas/bancos/nueva')}
-          >
-            <Plus size={20} />
-            Nueva Cuenta
-          </button>
-        </div>
-      </div>
-
-      {/* Stats - Saldos Consolidados */}
-      {!loadingSaldos && saldosConsolidados && (
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
-          <div className="stat-card">
-            <div className="stat-header">
-              <h3>TOTAL CUENTAS</h3>
-              <CreditCard className="stat-icon" style={{ color: '#3b82f6' }} />
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP Treasury Bank
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Cuentas Bancarias</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">Saldos, cuentas activas y trazabilidad bancaria para tesoreria.</p>
             </div>
-            <div className="stat-value">{saldosConsolidados.total_cuentas}</div>
-            <div className="stat-subtitle">
-              {saldosConsolidados.total_cuentas_activas} activas
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={refresh} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => router.push('/dashboard/finanzas/bancos/nueva')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Nueva cuenta
+              </Button>
             </div>
           </div>
+        </section>
 
-          {saldosConsolidados.por_moneda.map((consolidado) => (
-            <div key={consolidado.moneda} className="stat-card">
-              <div className="stat-header">
-                <h3>SALDO {consolidado.moneda}</h3>
-                <DollarSign className="stat-icon" style={{ 
-                  color: consolidado.saldo_activas >= 0 ? '#10b981' : '#ef4444' 
-                }} />
-              </div>
-              <div className="stat-value" style={{ 
-                fontSize: '1.25rem',
-                color: consolidado.saldo_activas >= 0 ? '#10b981' : '#ef4444'
-              }}>
-                {formatCurrency(consolidado.saldo_activas, consolidado.moneda)}
-              </div>
-              <div className="stat-subtitle">
-                {consolidado.cantidad_activas} {consolidado.cantidad_activas === 1 ? 'cuenta activa' : 'cuentas activas'}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        {!loadingSaldos && saldosConsolidados && (
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>Total cuentas</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{saldosConsolidados.total_cuentas}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">{saldosConsolidados.total_cuentas_activas} activas</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <CreditCard className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
 
-      {/* Cuentas Activas */}
-      <div className="activity-section">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1.5rem'
-        }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
-            Cuentas Activas
-          </h2>
-          <span style={{ 
-            fontSize: '0.875rem', 
-            color: '#6b7280',
-            fontWeight: '500'
-          }}>
-            {cuentasActivas.length} {cuentasActivas.length === 1 ? 'cuenta' : 'cuentas'}
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="loading">
-            <div className="loading-spinner"></div>
-            <p>Cargando cuentas bancarias...</p>
-          </div>
-        ) : cuentasActivas.length === 0 ? (
-          <div className="activity-card">
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <CreditCard size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                No hay cuentas bancarias activas
-              </h3>
-              <p style={{ marginBottom: '1.5rem' }}>
-                Crea una nueva cuenta bancaria para comenzar
-              </p>
-              <button
-                onClick={() => router.push('/dashboard/finanzas/bancos/nueva')}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#3b82f6',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <Plus size={16} />
-                Nueva Cuenta Bancaria
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-            gap: '1.5rem'
-          }}>
-            {cuentasActivas.map((cuenta) => (
-              <CuentaBancariaCard
-                key={cuenta.id}
-                cuenta={cuenta}
-                onView={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}`)}
-                onEdit={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}/editar`)}
-              />
+            {saldosConsolidados.por_moneda.map((consolidado) => (
+              <Card key={consolidado.moneda} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+                <CardContent className="flex items-start justify-between gap-3 p-4">
+                  <div>
+                    <div className={labelClass}>Saldo {consolidado.moneda}</div>
+                    <div className="mt-3 text-xl font-bold text-cyan-50">{formatCurrency(consolidado.saldo_activas, consolidado.moneda)}</div>
+                    <div className="mt-1 text-xs text-cyan-100/55">{consolidado.cantidad_activas} cuentas activas</div>
+                  </div>
+                  <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                    <DollarSign className="h-5 w-5" />
+                  </span>
+                </CardContent>
+              </Card>
             ))}
+          </section>
+        )}
+
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/65 p-5 shadow-xl shadow-blue-950/20">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white">Cuentas activas</h2>
+              <p className="text-sm text-slate-400">{cuentasActivas.length} cuentas disponibles</p>
+            </div>
           </div>
+
+          {loading ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 text-slate-300">
+              <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+              <p>Cargando cuentas bancarias...</p>
+            </div>
+          ) : cuentasActivas.length === 0 ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-8 text-center">
+              <CreditCard className="mb-3 h-12 w-12 text-cyan-200/50" />
+              <h3 className="text-lg font-bold text-white">No hay cuentas bancarias activas</h3>
+              <p className="mt-2 text-sm text-slate-400">Crea una nueva cuenta bancaria para comenzar.</p>
+              <Button type="button" onClick={() => router.push('/dashboard/finanzas/bancos/nueva')} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Nueva cuenta bancaria
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              {cuentasActivas.map((cuenta) => (
+                <CuentaBancariaCard
+                  key={cuenta.id}
+                  cuenta={cuenta}
+                  onView={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}`)}
+                  onEdit={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}/editar`)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {cuentasInactivas.length > 0 && (
+          <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/50 p-5 shadow-xl shadow-blue-950/20">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Cuentas inactivas</h2>
+                <p className="text-sm text-slate-400">{cuentasInactivas.length} cuentas archivadas</p>
+              </div>
+            </div>
+            <div className="grid gap-4 opacity-75 md:grid-cols-2 2xl:grid-cols-3">
+              {cuentasInactivas.map((cuenta) => (
+                <CuentaBancariaCard
+                  key={cuenta.id}
+                  cuenta={cuenta}
+                  onView={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}`)}
+                  onEdit={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}/editar`)}
+                />
+              ))}
+            </div>
+          </section>
         )}
       </div>
-
-      {/* Cuentas Inactivas */}
-      {cuentasInactivas.length > 0 && (
-        <div className="activity-section" style={{ marginTop: '2rem' }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '1.5rem'
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#6b7280' }}>
-              Cuentas Inactivas
-            </h2>
-            <span style={{ 
-              fontSize: '0.875rem', 
-              color: '#9ca3af',
-              fontWeight: '500'
-            }}>
-              {cuentasInactivas.length} {cuentasInactivas.length === 1 ? 'cuenta' : 'cuentas'}
-            </span>
-          </div>
-
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-            gap: '1.5rem',
-            opacity: 0.7
-          }}>
-            {cuentasInactivas.map((cuenta) => (
-              <CuentaBancariaCard
-                key={cuenta.id}
-                cuenta={cuenta}
-                onView={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}`)}
-                onEdit={() => router.push(`/dashboard/finanzas/bancos/${cuenta.id}/editar`)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

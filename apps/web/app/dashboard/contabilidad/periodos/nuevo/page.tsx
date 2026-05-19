@@ -54,22 +54,7 @@ export default function NuevoPeriodoPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.back()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              background: '#f3f4f6',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              marginBottom: '1rem',
-              transition: 'all 0.2s'
-            }}
+            onClick={() => router.back()} className="inline-flex items-center gap-2 py-2 px-4 bg-[#f3f4f6] text-gray-700 border-0 rounded-2 cursor-pointer text-[0.875rem] font-semibold mb-4 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#e5e7eb'
             }}
@@ -88,26 +73,11 @@ export default function NuevoPeriodoPage() {
       </div>
 
       {/* Form */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        padding: '2rem',
-        maxWidth: '600px'
-      }}>
+      <div className="bg-white rounded-3 shadow p-8 max-w-[600px]">
         {error && (
-          <div style={{
-            padding: '1rem',
-            background: '#fee2e2',
-            border: '1px solid #fecaca',
-            borderRadius: '8px',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0, marginTop: '0.125rem' }} />
-            <p style={{ margin: 0, color: '#991b1b', fontSize: '0.875rem' }}>
+          <div className="p-4 bg-[#fee2e2] border rounded-2 mb-6 flex items-start gap-3">
+            <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
+            <p className="m-0 text-red-800 text-[0.875rem]">
               {error}
             </p>
           </div>
@@ -115,36 +85,18 @@ export default function NuevoPeriodoPage() {
 
         <form onSubmit={handleSubmit}>
           {/* Año */}
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div className="mb-6">
             <label
-              htmlFor="anio"
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#374151'
-              }}
+              htmlFor="anio" className="block mb-2 text-[0.875rem] font-semibold text-gray-700"
             >
-              Año <span style={{ color: '#dc2626' }}>*</span>
+              Año <span className="text-red-600">*</span>
             </label>
             <select
               id="anio"
               value={formData.anio}
               onChange={(e) => setFormData({ ...formData, anio: parseInt(e.target.value) })}
               required
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                color: '#1f2937',
-                background: loading ? '#f9fafb' : 'white',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
+              disabled={loading} className="w-[100%] p-3 border rounded-2 text-[0.875rem] text-gray-800 transition"
             >
               {years.map((year) => (
                 <option key={year} value={year}>
@@ -155,36 +107,18 @@ export default function NuevoPeriodoPage() {
           </div>
 
           {/* Mes */}
-          <div style={{ marginBottom: '2rem' }}>
+          <div className="mb-8">
             <label
-              htmlFor="mes"
-              style={{
-                display: 'block',
-                marginBottom: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#374151'
-              }}
+              htmlFor="mes" className="block mb-2 text-[0.875rem] font-semibold text-gray-700"
             >
-              Mes <span style={{ color: '#dc2626' }}>*</span>
+              Mes <span className="text-red-600">*</span>
             </label>
             <select
               id="mes"
               value={formData.mes}
               onChange={(e) => setFormData({ ...formData, mes: parseInt(e.target.value) })}
               required
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                color: '#1f2937',
-                background: loading ? '#f9fafb' : 'white',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
+              disabled={loading} className="w-[100%] p-3 border rounded-2 text-[0.875rem] text-gray-800 transition"
             >
               {meses.map((mes, index) => (
                 <option key={index + 1} value={index + 1}>
@@ -195,19 +129,8 @@ export default function NuevoPeriodoPage() {
           </div>
 
           {/* Info Box */}
-          <div style={{
-            padding: '1rem',
-            background: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '8px',
-            marginBottom: '2rem'
-          }}>
-            <p style={{
-              margin: 0,
-              fontSize: '0.875rem',
-              color: '#1e40af',
-              lineHeight: '1.5'
-            }}>
+          <div className="p-4 bg-[#eff6ff] border rounded-2 mb-8">
+            <p className="m-0 text-[0.875rem] text-[#1e40af] leading-6">
               <strong>Nota:</strong> El período se creará en estado <strong>ABIERTO</strong>, 
               permitiendo el registro de asientos contables. Podrás cerrarlo más tarde desde 
               la lista de períodos.
@@ -215,27 +138,11 @@ export default function NuevoPeriodoPage() {
           </div>
 
           {/* Actions */}
-          <div style={{
-            display: 'flex',
-            gap: '1rem',
-            justifyContent: 'flex-end'
-          }}>
+          <div className="flex gap-4 justify-end">
             <button
               type="button"
               onClick={() => router.back()}
-              disabled={loading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-                opacity: loading ? 0.5 : 1
-              }}
+              disabled={loading} className="py-3 px-6 bg-[#f3f4f6] text-gray-700 border rounded-2 text-[0.875rem] font-semibold transition"
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = '#e5e7eb'
@@ -249,22 +156,7 @@ export default function NuevoPeriodoPage() {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: loading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-                boxShadow: loading ? 'none' : '0 1px 3px rgba(0,0,0,0.1)'
-              }}
+              disabled={loading} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 text-[0.875rem] font-semibold transition"
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = '#2563eb'
@@ -282,14 +174,7 @@ export default function NuevoPeriodoPage() {
             >
               {loading ? (
                 <>
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid white',
-                    borderTopColor: 'transparent',
-                    borderRadius: '50%',
-                    animation: 'spin 0.6s linear infinite'
-                  }} />
+                  <div className="w-4 h-4 rounded-full" />
                   Creando...
                 </>
               ) : (
@@ -302,12 +187,6 @@ export default function NuevoPeriodoPage() {
           </div>
         </form>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

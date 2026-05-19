@@ -27,7 +27,8 @@ describe('AsientosGeneratorService', () => {
       order: jest.fn(),
       limit: jest.fn(),
       single: jest.fn(),
-      maybeSingle: jest.fn()
+      maybeSingle: jest.fn(),
+      rpc: jest.fn()
     };
 
     // Make all methods return the mock itself for chaining
@@ -43,6 +44,16 @@ describe('AsientosGeneratorService', () => {
     mock.order.mockImplementation(returnMock);
     mock.limit.mockImplementation(returnMock);
     mock.maybeSingle.mockImplementation(returnMock);
+    mock.rpc.mockImplementation((fn: string) => {
+      if (fn === 'obtener_siguiente_numero_asiento') {
+        return Promise.resolve({
+          data: [{ numero: 1, codigo: 'A-202410-000001' }],
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: true, error: null });
+    });
 
     return mock;
   };
@@ -164,6 +175,40 @@ describe('AsientosGeneratorService', () => {
       await expect(
         service.generarAsiento(tenantId, fecha, concepto, detallesDescuadrados)
       ).rejects.toThrow('El asiento no cuadra');
+    });
+
+    it('no usa advisory locks de sesión para eventos contables', async () => {
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+      const sourceEventId = 'event-no-session-lock';
+      const asientoCreado = {
+        id: 'asiento-session-lock',
+        tenant_id: tenantId,
+        numero_asiento: 1,
+        codigo: 'A-202410-000001',
+        fecha: fecha.toISOString(),
+        concepto,
+        total_debe: 1000,
+        total_haber: 1000,
+        estado: 'CONFIRMADO',
+        source_event_id: sourceEventId,
+      };
+
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: null,
+          error: { code: 'PGRST116', message: 'No rows found' },
+        })
+        .mockResolvedValueOnce({ data: asientoCreado, error: null })
+        .mockResolvedValueOnce({ data: asientoCreado, error: null });
+
+      await service.generarAsiento(tenantId, fecha, concepto, detalles, 'REF-LOCK', sourceEventId);
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('obtener_siguiente_numero_asiento', {
+        p_tenant_id: tenantId,
+        p_fecha: fecha.toISOString(),
+      });
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith('acquire_pos_lock', expect.anything());
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalledWith('release_pos_lock', expect.anything());
     });
 
     it('debe crear asiento correctamente cuando el período está abierto', async () => {
@@ -288,6 +333,99 @@ describe('AsientosGeneratorService', () => {
       expect(resultado).toEqual(asientoCreado);
       expect(resultado.source_event_id).toBe(sourceEventId);
       expect(mockSupabaseClient.insert).toHaveBeenCalled();
+    });
+
+    it('debe rechazar source_event_id duplicado en lugar de crear otro asiento', async () => {
+      const sourceEventId = 'event-duplicado-corrupto';
+
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: 'PGRST116',
+          details: 'Results contain 3 rows, application/vnd.pgrst.object+json requires 1 row',
+          message: 'JSON object requested, multiple (or no) rows returned',
+        },
+      });
+
+      await expect(
+        service.generarAsiento(
+          tenantId,
+          fecha,
+          concepto,
+          detalles,
+          undefined,
+          sourceEventId
+        )
+      ).rejects.toThrow('Idempotencia contable corrupta');
+
+      expect(mockSupabaseClient.insert).not.toHaveBeenCalled();
+    });
+
+    it('debe retornar el asiento existente si la inserción detecta source_event_id duplicado', async () => {
+      const sourceEventId = 'event-race-123';
+      const asientoExistente = {
+        id: 'asiento-race-1',
+        tenant_id: tenantId,
+        numero_asiento: 1001,
+        codigo: 'A-202410-001001',
+        fecha: fecha.toISOString(),
+        concepto,
+        total_debe: 1000,
+        total_haber: 1000,
+        estado: 'CONFIRMADO',
+        source_event_id: sourceEventId
+      };
+
+      periodosService.validarPeriodoAbierto.mockResolvedValue();
+
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: null,
+          error: { code: 'PGRST116' }
+        })
+        .mockResolvedValueOnce({
+          data: null,
+          error: {
+            code: '23505',
+            details: `Key (tenant_id, source_event_id)=(${tenantId}, ${sourceEventId}) already exists.`,
+            message: 'duplicate key value violates unique constraint "idx_asientos_contables_tenant_source_event_unique"'
+          }
+        })
+        .mockResolvedValueOnce({
+          data: asientoExistente,
+          error: null
+        });
+
+      const resultado = await service.generarAsiento(
+        tenantId,
+        fecha,
+        concepto,
+        detalles,
+        undefined,
+        sourceEventId
+      );
+
+      expect(resultado).toEqual(asientoExistente);
+      expect(mockSupabaseClient.insert).toHaveBeenCalledTimes(1);
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'completed' })
+      );
+    });
+
+    it('no debe degradar a fallido un evento que ya fue completado por otro worker', async () => {
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({
+        data: {
+          retry_count: 0,
+          status: 'completed'
+        },
+        error: null
+      });
+
+      await service.marcarEventoComoFallido('event-completed', 'Tipo de evento no manejado');
+
+      expect(mockSupabaseClient.update).not.toHaveBeenCalled();
     });
 
     it('debe procesar múltiples intentos del mismo evento retornando el mismo asiento', async () => {
@@ -787,17 +925,17 @@ describe('AsientosGeneratorService', () => {
       periodosService.validarPeriodoAbierto.mockResolvedValue();
 
       const mockCuentas = new Map([
-        ['62', createMockPlanCuenta('62', 'Gastos de Personal', 'GASTO')],
-        ['40', createMockPlanCuenta('40', 'Tributos por Pagar', 'PASIVO')],
-        ['41', createMockPlanCuenta('41', 'Remuneraciones por Pagar', 'PASIVO')]
+        ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
 
       const asientoCreado = {
         id: 'asiento-planilla-1',
         numero_asiento: 'A-202410-0008',
-        total_debe: 10930,
-        total_haber: 10930
+        total_debe: 10000,
+        total_haber: 10000
       };
 
       mockSupabaseClient.single.mockResolvedValueOnce({
@@ -821,7 +959,14 @@ describe('AsientosGeneratorService', () => {
       expect(resultado.id).toBe('asiento-planilla-1');
       expect(planCuentasService.obtenerCuentasPorCodigos).toHaveBeenCalledWith(
         evento.tenant_id,
-        ['62', '40', '41']
+        ['621', '403', '411']
+      );
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ cuenta_id: 'cuenta-621', debe: 10000, haber: 0 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-403', debe: 0, haber: 1300 }),
+          expect.objectContaining({ cuenta_id: 'cuenta-411', debe: 0, haber: 8700 }),
+        ])
       );
     });
   });
@@ -1119,8 +1264,8 @@ describe('AsientosGeneratorService', () => {
         numero_asiento: 'A-202410-0006',
         fecha: evento.fecha,
         concepto: 'Planilla de sueldos',
-        total_debe: 10930,
-        total_haber: 10930,
+        total_debe: 10000,
+        total_haber: 10000,
         estado: 'CONFIRMADO',
         source_event_id: evento.event_id
       };
@@ -1128,9 +1273,9 @@ describe('AsientosGeneratorService', () => {
       periodosService.validarPeriodoAbierto.mockResolvedValue();
 
       const mockCuentas = new Map([
-        ['62', createMockPlanCuenta('62', 'Gastos de Personal', 'GASTO')],
-        ['40', createMockPlanCuenta('40', 'Tributos por Pagar', 'PASIVO')],
-        ['41', createMockPlanCuenta('41', 'Remuneraciones por Pagar', 'PASIVO')]
+        ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
 
@@ -1396,9 +1541,9 @@ describe('AsientosGeneratorService', () => {
       };
 
       const mockCuentas = new Map([
-        ['62', createMockPlanCuenta('62', 'Gastos de Personal', 'GASTO')],
-        ['40', createMockPlanCuenta('40', 'Tributos por Pagar', 'PASIVO')],
-        ['41', createMockPlanCuenta('41', 'Remuneraciones por Pagar', 'PASIVO')]
+        ['621', createMockPlanCuenta('621', 'Remuneraciones', 'GASTO')],
+        ['403', createMockPlanCuenta('403', 'Instituciones publicas', 'PASIVO')],
+        ['411', createMockPlanCuenta('411', 'Remuneraciones por Pagar', 'PASIVO')]
       ]);
       planCuentasService.obtenerCuentasPorCodigos.mockResolvedValue(mockCuentas);
 

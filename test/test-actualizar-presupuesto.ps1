@@ -2,7 +2,7 @@
 # Endpoint: PUT /api/contabilidad/presupuestos/:id
 
 $baseUrl = "http://localhost:3000/api"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Reemplazar con token válido
+$token = "REPLACE_WITH_TEST_JWT"  # Reemplazar con token válido
 $tenantId = "00000000-0000-0000-0000-000000000001"  # Reemplazar con tenant válido
 $presupuestoId = "PRESUPUESTO_ID_AQUI"  # Reemplazar con ID de presupuesto existente
 
@@ -22,7 +22,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$presupuestoId" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Presupuesto obtenido:" -ForegroundColor Green
     Write-Host "   ID: $($response.data.id)"
     Write-Host "   Monto actual: S/ $($response.data.monto_presupuestado)"
@@ -53,7 +53,7 @@ try {
         -Method Put `
         -Headers $headers `
         -Body $updateData
-    
+
     Write-Host "✅ Presupuesto actualizado exitosamente:" -ForegroundColor Green
     Write-Host "   ID: $($response.data.id)"
     Write-Host "   Nuevo monto: S/ $($response.data.monto_presupuestado)"
@@ -78,7 +78,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$presupuestoId" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Verificación exitosa:" -ForegroundColor Green
     Write-Host "   Monto confirmado: S/ $($response.data.monto_presupuestado)"
     Write-Host "   Estado confirmado: $($response.data.estado)"
@@ -101,7 +101,7 @@ try {
         -Method Put `
         -Headers $headers `
         -Body $updateNotasData
-    
+
     Write-Host "✅ Notas actualizadas:" -ForegroundColor Green
     Write-Host "   Nuevas notas: $($response.data.notas)"
     Write-Host "   Monto sin cambios: S/ $($response.data.monto_presupuestado)"
@@ -124,7 +124,7 @@ try {
         -Method Put `
         -Headers $headers `
         -Body $invalidData
-    
+
     Write-Host "❌ ERROR: Debería haber rechazado el monto negativo" -ForegroundColor Red
     exit 1
 } catch {

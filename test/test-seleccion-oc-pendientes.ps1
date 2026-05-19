@@ -73,10 +73,10 @@ Write-Host "GET /api/compras/ordenes?tenant_id=$tenantId (filtrar APROBADA y PAR
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes?tenant_id=$tenantId" -Method Get -ContentType "application/json"
     $ordenesRecepcionables = $response.data | Where-Object { $_.estado -eq "APROBADA" -or $_.estado -eq "PARCIAL" }
-    
+
     Write-Host "✓ Órdenes recepcionables obtenidas:" -ForegroundColor Green
     Write-Host "  Total: $($ordenesRecepcionables.Count)" -ForegroundColor White
-    
+
     $conPendientes = 0
     foreach ($orden in $ordenesRecepcionables) {
         if ($orden.detalles) {
@@ -93,7 +93,7 @@ try {
             }
         }
     }
-    
+
     Write-Host "  Órdenes con items pendientes: $conPendientes" -ForegroundColor Cyan
     Write-Host ""
 } catch {

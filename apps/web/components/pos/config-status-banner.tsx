@@ -38,37 +38,20 @@ export function ConfigStatusBanner({ onOpenWizard, configurationStatus }: Config
 
   // Mostrar banner de configuración incompleta con estilos consistentes del sistema
   return (
-    <div
-      style={{
-        background: 'linear-gradient(135deg, #FFF3CD 0%, #FFE69C 100%)',
-        border: '2px solid #FFC107',
-        borderRadius: 'var(--border-radius)',
-        padding: '1rem 1.5rem',
-        marginBottom: '1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem',
-      }}
+    <div className="py-4 px-6 mb-6 flex items-center gap-4"
     >
-      <div style={{ fontSize: '2rem' }}>⚠️</div>
-      <div style={{ flex: 1 }}>
-        <h3 style={{ margin: 0, color: '#856404', fontSize: '1.1rem', fontWeight: 'bold' }}>
+      <div className="text-8">⚠️</div>
+      <div className="flex-[1]">
+        <h3 className="m-0 text-[#856404] text-4 font-bold">
           Configuración Incompleta
         </h3>
-        <p style={{ margin: '0.5rem 0 0 0', color: '#856404' }}>
+        <p className="mt-2 mr-0 mb-0 ml-0 text-[#856404]">
           Las ventas pueden fallar si no se completa la configuración.
         </p>
       </div>
       <button
         onClick={onOpenWizard}
-        className="btn"
-        style={{
-          background: '#FFC107',
-          color: '#856404',
-          border: 'none',
-          fontWeight: 'bold',
-          whiteSpace: 'nowrap',
-        }}
+        className="btn bg-[#FFC107] text-[#856404] border-0 font-bold whitespace-nowrap"
       >
         Completar Configuración
       </button>

@@ -94,9 +94,9 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
 
   if (loading) {
     return (
-      <div className="activity-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-        <p style={{ color: '#6b7280' }}>Cargando movimientos bancarios...</p>
+      <div className="activity-card p-8 text-center">
+        <div className="loading-spinner"></div>
+        <p className="text-gray-500">Cargando movimientos bancarios...</p>
       </div>
     )
   }
@@ -104,40 +104,21 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
   return (
     <div className="activity-card">
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <FileText size={24} style={{ color: '#f59e0b' }} />
+      <div className="flex justify-between items-center mb-6 pb-4 border-b">
+        <div className="flex items-center gap-3">
+          <FileText size={24} className="text-amber-500" />
           <div>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>
+            <h3 className="text-[1.125rem] font-semibold text-gray-900">
               Movimientos Bancarios por Período
             </h3>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            <p className="text-[0.875rem] text-gray-500 mt-1">
               {movimientosFiltrados.length} movimiento{movimientosFiltrados.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="flex gap-2">
           <button
-            onClick={loadMovimientos}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={loadMovimientos} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -146,25 +127,14 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       </div>
 
       {/* Filters */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '1.5rem',
-        flexWrap: 'wrap'
-      }}>
+      <div className="flex gap-4 mb-6 flex-wrap">
         <div>
-          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>
+          <label className="text-3 font-semibold text-gray-500 block mb-1">
             Tipo
           </label>
           <select
             value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value as any)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.875rem'
-            }}
+            onChange={(e) => setFiltroTipo(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >
             <option value="TODOS">Todos</option>
             <option value="ABONO">Abonos</option>
@@ -172,18 +142,12 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
           </select>
         </div>
         <div>
-          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', display: 'block', marginBottom: '0.25rem' }}>
+          <label className="text-3 font-semibold text-gray-500 block mb-1">
             Conciliado
           </label>
           <select
             value={filtroConciliado}
-            onChange={(e) => setFiltroConciliado(e.target.value as any)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.875rem'
-            }}
+            onChange={(e) => setFiltroConciliado(e.target.value as any)} className="p-2 rounded-[6px] border text-[0.875rem]"
           >
             <option value="TODOS">Todos</option>
             <option value="SI">Conciliados</option>
@@ -193,29 +157,19 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
       </div>
 
       {/* Summary Cards */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
         {Object.entries(totales).map(([moneda, datos]) => (
-          <div key={moneda} style={{
-            padding: '1rem',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            color: 'white'
-          }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', opacity: 0.9 }}>
+          <div key={moneda} className="p-4 rounded-2 text-white">
+            <div className="text-3 font-semibold opacity-[0.9]">
               Flujo Neto {moneda}
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: '700', marginTop: '0.5rem' }}>
+            <div className="text-7 font-bold mt-2">
               {formatCurrency(datos.neto, moneda)}
             </div>
-            <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.9 }}>
+            <div className="text-3 mt-2 opacity-[0.9]">
               Abonos: {formatCurrency(datos.abonos, moneda)}
             </div>
-            <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+            <div className="text-3 opacity-[0.9]">
               Cargos: {formatCurrency(datos.cargos, moneda)}
             </div>
           </div>
@@ -224,131 +178,69 @@ export default function MovimientosBancariosReport({ fechaDesde, fechaHasta }: M
 
       {/* Movements Table */}
       {movimientosFiltrados.length === 0 ? (
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-          <p style={{ color: '#6b7280' }}>No hay movimientos en el período seleccionado</p>
+        <div className="p-12 text-center">
+          <FileText size={48} className="text-gray-400" />
+          <p className="text-gray-500">No hay movimientos en el período seleccionado</p>
         </div>
       ) : (
-        <div style={{ overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="overflow-auto">
+          <table className="w-[100%]">
             <thead>
-              <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                <th style={{ 
-                  textAlign: 'left', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+              <tr>
+                <th className="text-left p-3 font-semibold text-3 text-gray-500">
                   Fecha
                 </th>
-                <th style={{ 
-                  textAlign: 'left', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+                <th className="text-left p-3 font-semibold text-3 text-gray-500">
                   Cuenta / Banco
                 </th>
-                <th style={{ 
-                  textAlign: 'left', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+                <th className="text-left p-3 font-semibold text-3 text-gray-500">
                   Descripción
                 </th>
-                <th style={{ 
-                  textAlign: 'center', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+                <th className="text-center p-3 font-semibold text-3 text-gray-500">
                   Tipo
                 </th>
-                <th style={{ 
-                  textAlign: 'right', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+                <th className="text-right p-3 font-semibold text-3 text-gray-500">
                   Monto
                 </th>
-                <th style={{ 
-                  textAlign: 'center', 
-                  padding: '0.75rem', 
-                  fontWeight: '600', 
-                  fontSize: '0.75rem', 
-                  textTransform: 'uppercase', 
-                  color: '#6b7280' 
-                }}>
+                <th className="text-center p-3 font-semibold text-3 text-gray-500">
                   Estado
                 </th>
               </tr>
             </thead>
             <tbody>
               {movimientosFiltrados.map((mov) => (
-                <tr key={mov.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                  <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                <tr key={mov.id} className="border-b">
+                  <td className="p-3 text-[0.875rem]">
                     {formatDate(mov.fecha)}
                   </td>
-                  <td style={{ padding: '0.75rem' }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <td className="p-3">
+                    <div className="text-[0.875rem] font-medium">
                       {mov.cuenta_nombre}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    <div className="text-3 text-gray-500">
                       {mov.banco}
                     </div>
                   </td>
-                  <td style={{ padding: '0.75rem' }}>
-                    <div style={{ fontSize: '0.875rem' }}>
+                  <td className="p-3">
+                    <div className="text-[0.875rem]">
                       {mov.descripcion}
                     </div>
                     {mov.referencia && (
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      <div className="text-3 text-gray-500">
                         Ref: {mov.referencia}
                       </div>
                     )}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      background: mov.tipo === 'ABONO' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: mov.tipo === 'ABONO' ? '#059669' : '#dc2626'
-                    }}>
+                  <td className="p-3 text-center">
+                    <span className="py-1 px-3 rounded-full text-3 font-semibold">
                       {mov.tipo}
                     </span>
                   </td>
-                  <td style={{ 
-                    padding: '0.75rem', 
-                    textAlign: 'right', 
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: mov.tipo === 'ABONO' ? '#059669' : '#dc2626'
-                  }}>
+                  <td className="p-3 text-right text-[0.875rem] font-semibold">
                     {mov.tipo === 'ABONO' ? '+' : '-'}{formatCurrency(mov.monto, mov.moneda)}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      background: mov.conciliado ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                      color: mov.conciliado ? '#059669' : '#d97706'
-                    }}>
+                  <td className="p-3 text-center">
+                    <span className="py-1 px-3 rounded-full text-3 font-semibold">
                       {mov.conciliado ? 'Conciliado' : 'Pendiente'}
                     </span>
                   </td>

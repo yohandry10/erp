@@ -30,7 +30,7 @@ $nuevaCotizacion = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones" -Method Post -Body $nuevaCotizacion -ContentType "application/json"
-    
+
     if ($response.success) {
         $cotizacionId = $response.data.id
         Write-Host "✓ Cotización creada exitosamente" -ForegroundColor Green
@@ -55,7 +55,7 @@ $aprobarBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/aprobar" -Method Post -Body $aprobarBody -ContentType "application/json"
-    
+
     if (-not $response.success) {
         Write-Host "✓ Validación correcta: $($response.error)" -ForegroundColor Green
         Write-Host ""
@@ -77,7 +77,7 @@ $enviarBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/enviar" -Method Post -Body $enviarBody -ContentType "application/json"
-    
+
     if ($response.success) {
         Write-Host "✓ Cotización enviada exitosamente" -ForegroundColor Green
         Write-Host "  Estado anterior: BORRADOR" -ForegroundColor Gray
@@ -97,7 +97,7 @@ Write-Host "4. Intentando enviar nuevamente (debe fallar)..." -ForegroundColor Y
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/enviar" -Method Post -Body $enviarBody -ContentType "application/json"
-    
+
     if (-not $response.success) {
         Write-Host "✓ Validación correcta: $($response.error)" -ForegroundColor Green
         Write-Host ""
@@ -115,7 +115,7 @@ Write-Host "5. Aprobando cotización (ENVIADA → APROBADA)..." -ForegroundColor
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/aprobar" -Method Post -Body $aprobarBody -ContentType "application/json"
-    
+
     if ($response.success) {
         Write-Host "✓ Cotización aprobada exitosamente" -ForegroundColor Green
         Write-Host "  Estado anterior: ENVIADA" -ForegroundColor Gray
@@ -135,7 +135,7 @@ Write-Host "6. Verificando estado final..." -ForegroundColor Yellow
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($response.success -and $response.data.estado -eq "APROBADA") {
         Write-Host "✓ Estado final verificado correctamente: APROBADA" -ForegroundColor Green
         Write-Host ""
@@ -171,7 +171,7 @@ $nuevaCotizacion2 = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones" -Method Post -Body $nuevaCotizacion2 -ContentType "application/json"
-    
+
     if ($response.success) {
         $cotizacionId2 = $response.data.id
         Write-Host "✓ Segunda cotización creada exitosamente" -ForegroundColor Green
@@ -191,7 +191,7 @@ Write-Host "8. Enviando segunda cotización..." -ForegroundColor Yellow
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId2/enviar" -Method Post -Body $enviarBody -ContentType "application/json"
-    
+
     if ($response.success) {
         Write-Host "✓ Segunda cotización enviada" -ForegroundColor Green
         Write-Host ""
@@ -214,7 +214,7 @@ $rechazarBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId2/rechazar" -Method Post -Body $rechazarBody -ContentType "application/json"
-    
+
     if ($response.success) {
         Write-Host "✓ Cotización rechazada exitosamente" -ForegroundColor Green
         Write-Host "  Estado anterior: ENVIADA" -ForegroundColor Gray
@@ -235,7 +235,7 @@ Write-Host "10. Intentando aprobar cotización rechazada (debe fallar)..." -Fore
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId2/aprobar" -Method Post -Body $aprobarBody -ContentType "application/json"
-    
+
     if (-not $response.success) {
         Write-Host "✓ Validación correcta: $($response.error)" -ForegroundColor Green
         Write-Host ""

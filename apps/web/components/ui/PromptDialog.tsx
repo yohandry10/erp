@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { cn } from '@/lib/utils'
 
 interface PromptDialogProps {
   isOpen: boolean
@@ -62,97 +63,32 @@ export default function PromptDialog({
     }
   }
 
-  const getButtonStyle = () => {
+  const getVariantClasses = () => {
     switch (variant) {
       case 'danger':
-        return {
-          background: 'var(--gradient-danger)',
-          color: 'white'
-        }
+        return 'bg-gradient-to-br from-slate-700 to-slate-500 text-white'
       case 'warning':
-        return {
-          background: 'var(--gradient-warning)',
-          color: 'white'
-        }
+        return 'bg-gradient-to-br from-blue-800 to-cyan-400 text-white'
       default:
-        return {
-          background: 'var(--gradient-primary)',
-          color: 'white'
-        }
+        return 'bg-gradient-to-br from-blue-800 via-blue-500 to-cyan-500 text-white'
     }
   }
 
   return (
     <div 
-      className="modal-overlay"
+      className="modal-overlay fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur"
       onClick={onClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(15, 23, 42, 0.8)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem',
-        zIndex: 1000,
-        animation: 'modal-overlay-enter 0.3s ease-out'
-      }}
     >
       <div 
-        className="modal-content"
+        className="modal-content relative w-[90%] max-w-[500px] overflow-hidden rounded-2xl border border-white/30 bg-gradient-to-br from-white/95 to-slate-50/90 p-8 shadow-2xl backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          borderRadius: 'var(--border-radius-xl)',
-          padding: '2rem',
-          width: '90%',
-          maxWidth: '500px',
-          boxShadow: 'var(--shadow-2xl)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          animation: 'modal-content-enter 0.3s ease-out',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
       >
         {/* Header bar */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: variant === 'danger' ? 'var(--gradient-danger)' : 
-                      variant === 'warning' ? 'var(--gradient-warning)' : 
-                      'var(--gradient-primary)',
-          borderRadius: 'var(--border-radius-xl) var(--border-radius-xl) 0 0'
-        }} />
+        <div className={cn('absolute inset-x-0 top-0 h-1 rounded-t-2xl', getVariantClasses())} />
 
         {/* Header */}
-        <div className="modal-header" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1.5rem'
-        }}>
-          <h2 className="modal-title" style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            background: variant === 'danger' ? 'var(--gradient-danger)' : 
-                       variant === 'warning' ? 'var(--gradient-warning)' : 
-                       'var(--gradient-primary)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
+        <div className="modal-header mb-6 flex items-center justify-between">
+          <h2 className={cn('modal-title m-0 flex items-center gap-2 bg-clip-text text-2xl font-bold text-transparent', getVariantClasses())}>
             {variant === 'danger' && '⚠️'}
             {variant === 'warning' && '⚡'}
             {variant === 'default' && '✏️'}
@@ -160,39 +96,16 @@ export default function PromptDialog({
           </h2>
           <button
             onClick={onClose}
-            className="modal-close"
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              color: 'var(--primary-500)',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px'
-            }}
+            className="modal-close flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="modal-body" style={{
-          marginBottom: '1.5rem'
-        }}>
+        <div className="modal-body mb-6">
           {message && (
-            <p style={{
-              color: 'var(--primary-700)',
-              fontSize: '1rem',
-              lineHeight: '1.6',
-              margin: '0 0 1rem 0',
-              whiteSpace: 'pre-line'
-            }}>
+            <p className="m-0 mb-4 whitespace-pre-line text-base leading-relaxed text-slate-700">
               {message}
             </p>
           )}
@@ -205,28 +118,7 @@ export default function PromptDialog({
               disabled={isLoading}
               rows={4}
               autoFocus
-              style={{
-                width: '100%',
-                padding: '0.875rem 1rem',
-                border: '2px solid var(--primary-200)',
-                borderRadius: 'var(--border-radius)',
-                fontSize: '1rem',
-                transition: 'all 0.3s ease',
-                background: 'rgba(255, 255, 255, 0.8)',
-                color: 'var(--primary-800)',
-                resize: 'vertical',
-                fontFamily: 'inherit'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--blue-500)'
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                e.target.style.background = 'white'
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'var(--primary-200)'
-                e.target.style.boxShadow = 'none'
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)'
-              }}
+              className="w-full resize-y rounded-xl border-2 border-slate-200 bg-white/80 px-4 py-3.5 font-sans text-base text-slate-800 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             />
           ) : (
             <input
@@ -237,93 +129,28 @@ export default function PromptDialog({
               placeholder={placeholder}
               disabled={isLoading}
               autoFocus
-              style={{
-                width: '100%',
-                padding: '0.875rem 1rem',
-                border: '2px solid var(--primary-200)',
-                borderRadius: 'var(--border-radius)',
-                fontSize: '1rem',
-                transition: 'all 0.3s ease',
-                background: 'rgba(255, 255, 255, 0.8)',
-                color: 'var(--primary-800)'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--blue-500)'
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                e.target.style.background = 'white'
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'var(--primary-200)'
-                e.target.style.boxShadow = 'none'
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)'
-              }}
+              className="w-full rounded-xl border-2 border-slate-200 bg-white/80 px-4 py-3.5 text-base text-slate-800 transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             />
           )}
         </div>
 
         {/* Actions */}
-        <div className="modal-actions" style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'flex-end',
-          flexWrap: 'wrap'
-        }}>
+        <div className="modal-actions flex flex-wrap justify-end gap-4">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="modal-btn modal-btn-secondary"
-            style={{
-              padding: '0.75rem 1.5rem',
-              border: '1px solid var(--primary-300)',
-              borderRadius: 'var(--border-radius)',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              minWidth: '120px',
-              justifyContent: 'center',
-              background: 'var(--primary-100)',
-              color: 'var(--primary-700)',
-              opacity: isLoading ? 0.6 : 1
-            }}
+            className="modal-btn modal-btn-secondary flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-6 py-3 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelText}
           </button>
           <button
             onClick={handleConfirm}
             disabled={isLoading || !value.trim()}
-            className="modal-btn"
-            style={{
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: 'var(--border-radius)',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              minWidth: '120px',
-              justifyContent: 'center',
-              boxShadow: 'var(--shadow-md)',
-              opacity: (isLoading || !value.trim()) ? 0.6 : 1,
-              ...getButtonStyle()
-            }}
+            className={cn('modal-btn flex min-w-[120px] items-center justify-center gap-2 rounded-xl border-0 px-6 py-3 text-sm font-semibold shadow-md transition disabled:cursor-not-allowed disabled:opacity-60', getVariantClasses())}
           >
             {isLoading ? (
               <>
-                <span style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  borderTop: '2px solid white',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 Procesando...
               </>
             ) : (

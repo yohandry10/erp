@@ -87,20 +87,10 @@ export default function PresupuestoEjecucionIndicator({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+    <div className="flex flex-col items-center gap-2">
       {/* Badge with label */}
       {showLabel && (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          padding: sizeConfig.badge,
-          borderRadius: '9999px',
-          fontSize: sizeConfig.fontSize,
-          fontWeight: '600',
-          background: config.bg,
-          color: 'white'
-        }}>
+        <span className="inline-flex items-center gap-1.5 rounded-full font-semibold text-white">
           <Icon size={sizeConfig.iconSize} />
           {labels[status]}
         </span>
@@ -108,30 +98,15 @@ export default function PresupuestoEjecucionIndicator({
 
       {/* Percentage display */}
       {showPercentage && (
-        <div style={{
-          fontSize: sizeConfig.fontSize,
-          fontWeight: '700',
-          color: config.bg
-        }}>
+        <div className="font-bold">
           {porcentajeEjecutado.toFixed(1)}%
         </div>
       )}
 
       {/* Progress bar */}
       {showProgressBar && (
-        <div style={{
-          width: sizeConfig.progressWidth,
-          height: sizeConfig.progressHeight,
-          background: '#e5e7eb',
-          borderRadius: '9999px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${Math.min(porcentajeEjecutado, 100)}%`,
-            height: '100%',
-            background: config.bg,
-            transition: 'width 0.3s ease'
-          }} />
+        <div className="bg-[#e5e7eb] rounded-full overflow-hidden">
+          <div className="h-[100%] transition" />
         </div>
       )}
     </div>

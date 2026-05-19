@@ -13,7 +13,7 @@ $listResponse = Invoke-RestMethod -Uri "$API_URL/api/finanzas/cxp" -Method GET -
 if ($listResponse.success -and $listResponse.data.Count -gt 0) {
     # Buscar una CxP que tenga saldo menor al total (indica que tiene pagos)
     $cxpConPagos = $listResponse.data | Where-Object { $_.saldo -lt $_.total } | Select-Object -First 1
-    
+
     if ($cxpConPagos) {
         $cxpId = $cxpConPagos.id
         Write-Host "   ✓ CxP encontrada: $($cxpConPagos.numero_documento)" -ForegroundColor Green
@@ -21,19 +21,19 @@ if ($listResponse.success -and $listResponse.data.Count -gt 0) {
         Write-Host "     Saldo: $($cxpConPagos.saldo) $($cxpConPagos.moneda)" -ForegroundColor Gray
         Write-Host "     Pagado: $($cxpConPagos.total - $cxpConPagos.saldo) $($cxpConPagos.moneda)" -ForegroundColor Gray
         Write-Host ""
-        
+
         # Obtener historial de pagos
         Write-Host "2. Obteniendo historial de pagos..." -ForegroundColor Yellow
         $historialResponse = Invoke-RestMethod -Uri "$API_URL/api/finanzas/cxp/$cxpId/pagos" -Method GET -ContentType "application/json"
-        
+
         if ($historialResponse.success) {
             Write-Host "   ✓ Historial obtenido exitosamente" -ForegroundColor Green
             Write-Host ""
-            
+
             if ($historialResponse.data.Count -gt 0) {
                 Write-Host "   📊 PAGOS REGISTRADOS ($($historialResponse.data.Count)):" -ForegroundColor Cyan
                 Write-Host ""
-                
+
                 $totalPagado = 0
                 foreach ($pago in $historialResponse.data) {
                     Write-Host "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
@@ -41,23 +41,23 @@ if ($listResponse.success -and $listResponse.data.Count -gt 0) {
                     Write-Host "   Monto:           $($pago.monto) $($cxpConPagos.moneda)" -ForegroundColor Green
                     Write-Host "   Método:          $($pago.metodo_pago)" -ForegroundColor White
                     Write-Host "   Referencia:      $($pago.referencia)" -ForegroundColor Gray
-                    
+
                     if ($pago.cuenta_bancaria) {
                         Write-Host "   Cuenta:          $($pago.cuenta_bancaria.banco) - $($pago.cuenta_bancaria.numero_cuenta)" -ForegroundColor White
                     }
-                    
+
                     $estadoConciliado = if ($pago.conciliado) { "✓ Conciliado" } else { "⏳ Pendiente" }
                     $colorConciliado = if ($pago.conciliado) { "Green" } else { "Yellow" }
                     Write-Host "   Estado:          $estadoConciliado" -ForegroundColor $colorConciliado
                     Write-Host ""
-                    
+
                     $totalPagado += $pago.monto
                 }
-                
+
                 Write-Host "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
                 Write-Host "   TOTAL PAGADO:    $totalPagado $($cxpConPagos.moneda)" -ForegroundColor Green
                 Write-Host ""
-                
+
                 # Verificar que el total pagado coincida
                 $totalEsperado = $cxpConPagos.total - $cxpConPagos.saldo
                 if ([Math]::Abs($totalPagado - $totalEsperado) -lt 0.01) {
@@ -76,12 +76,12 @@ if ($listResponse.success -and $listResponse.data.Count -gt 0) {
         Write-Host "   ℹ No se encontraron CxP con pagos aplicados" -ForegroundColor Yellow
         Write-Host "   Probando con la primera CxP disponible..." -ForegroundColor Gray
         Write-Host ""
-        
+
         $cxpId = $listResponse.data[0].id
         Write-Host "   CxP seleccionada: $($listResponse.data[0].numero_documento)" -ForegroundColor White
-        
+
         $historialResponse = Invoke-RestMethod -Uri "$API_URL/api/finanzas/cxp/$cxpId/pagos" -Method GET -ContentType "application/json"
-        
+
         if ($historialResponse.success) {
             Write-Host "   ✓ Endpoint funciona correctamente" -ForegroundColor Green
             Write-Host "   Pagos encontrados: $($historialResponse.data.Count)" -ForegroundColor White

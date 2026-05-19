@@ -871,7 +871,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
       conciliacion_id: conciliacionId,
     };
 
-    it('debe calcular y registrar la diferencia automáticamente cuando los montos no coinciden', async () => {
+    it('debe rechazar la conciliación con montos distintos sin autorización explícita', async () => {
       // Mock: Conciliación existe y está abierta
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
@@ -881,28 +881,12 @@ describe('ConciliacionService - Validación de Cierre', () => {
       // Mock: Movimiento del extracto existe
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtracto));
 
-      // Mock: Update movimiento sistema
-      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
-
-      // Mock: Update movimiento extracto
-      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
-
-      // Ejecutar: Marcar item sin especificar diferencia
-      const resultado = await service.marcarItem(tenantId, conciliacionId, {
-        movimiento_sistema_id: mockMovimientoSistema.id,
-        movimiento_extracto_id: mockMovimientoExtracto.id,
-      });
-
-      // Verificar: Diferencia calculada correctamente
-      expect(resultado.success).toBe(true);
-      expect(resultado.data.diferencia).toBe(14.50); // |1500.00 - 1485.50|
-      expect(resultado.data.mensaje).toContain('diferencia de 14.5');
-
-      // Verificar: Se llamó a update con la diferencia
-      const updateCalls = mockSupabaseClient.from.mock.calls.filter(
-        call => call[0] === 'movimientos_bancarios'
-      );
-      expect(updateCalls.length).toBeGreaterThanOrEqual(2); // Al menos 2 updates (sistema + extracto)
+      await expect(
+        service.marcarItem(tenantId, conciliacionId, {
+          movimiento_sistema_id: mockMovimientoSistema.id,
+          movimiento_extracto_id: mockMovimientoExtracto.id,
+        }),
+      ).rejects.toThrow(/montos no coinciden/i);
     });
 
     it('debe registrar diferencia cero cuando los montos coinciden exactamente', async () => {
@@ -936,7 +920,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
       expect(resultado.data.mensaje).toContain('sin diferencias');
     });
 
-    it('debe permitir especificar una diferencia manualmente', async () => {
+    it('debe permitir una diferencia manual si está autorizada explícitamente', async () => {
       // Mock: Conciliación existe
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
@@ -951,16 +935,32 @@ describe('ConciliacionService - Validación de Cierre', () => {
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       // Ejecutar: Con diferencia manual
-      const diferenciaManual = 20.00;
+      const diferenciaManual = 14.50;
       const resultado = await service.marcarItem(tenantId, conciliacionId, {
         movimiento_sistema_id: mockMovimientoSistema.id,
         movimiento_extracto_id: mockMovimientoExtracto.id,
         diferencia: diferenciaManual,
+        aceptar_diferencia: true,
       });
 
       // Verificar: Se usó la diferencia manual
       expect(resultado.success).toBe(true);
       expect(resultado.data.diferencia).toBe(diferenciaManual);
+    });
+
+    it('debe rechazar una diferencia manual que no coincide con la diferencia real', async () => {
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoSistema));
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockMovimientoExtracto));
+
+      await expect(
+        service.marcarItem(tenantId, conciliacionId, {
+          movimiento_sistema_id: mockMovimientoSistema.id,
+          movimiento_extracto_id: mockMovimientoExtracto.id,
+          diferencia: 20,
+          aceptar_diferencia: true,
+        }),
+      ).rejects.toThrow(/no coincide con la diferencia real/i);
     });
 
     it('debe rechazar el match si los tipos de movimiento no coinciden', async () => {
@@ -1019,6 +1019,7 @@ describe('ConciliacionService - Validación de Cierre', () => {
       await service.marcarItem(tenantId, conciliacionId, {
         movimiento_sistema_id: mockMovimientoSistema.id,
         movimiento_extracto_id: mockMovimientoExtracto.id,
+        aceptar_diferencia: true,
       });
 
       // Verificar: Vinculación correcta

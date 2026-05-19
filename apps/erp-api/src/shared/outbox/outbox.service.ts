@@ -150,6 +150,17 @@ export class OutboxService {
       throw new Error(`No se pudo marcar evento como completado: ${error.message}`);
     }
 
+    const { error: clearError } = await client
+      .from('outbox_events')
+      .update({ error_message: null, next_retry_at: null, updated_at: new Date().toISOString() })
+      .eq('id', eventId)
+      .eq('status', 'completed');
+
+    if (clearError) {
+      this.logger.error(`❌ Error limpiando estado de error del evento completado ${eventId}:`, clearError);
+      throw new Error(`No se pudo limpiar estado de error del evento completado: ${clearError.message}`);
+    }
+
     this.logger.log(`✅ Evento ${eventId} marcado como completado`);
   }
 
@@ -158,6 +169,22 @@ export class OutboxService {
    */
   async markEventFailed(eventId: string, errorMessage: string): Promise<void> {
     const client = this.supabase.getClient();
+
+    const { data: current, error: currentError } = await client
+      .from('outbox_events')
+      .select('status')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (currentError) {
+      this.logger.error(`❌ Error leyendo estado del evento ${eventId}:`, currentError);
+      throw new Error(`No se pudo leer estado del evento: ${currentError.message}`);
+    }
+
+    if (String(current?.status ?? '').toLowerCase() === 'completed') {
+      this.logger.warn(`⚠️ Evento ${eventId} ya estaba completado; no se degrada a fallido`);
+      return;
+    }
 
     const { error } = await client.rpc('mark_outbox_event_failed', {
       p_event_id: eventId,

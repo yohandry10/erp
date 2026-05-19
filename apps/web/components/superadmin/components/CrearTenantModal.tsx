@@ -5,6 +5,22 @@ import { createPortal } from 'react-dom'
 import { useApiCall } from '@/hooks/use-api'
 import { usePaises } from '@/hooks/use-paises'
 import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+const sectionClass = 'mb-8'
+const sectionHeaderClass = 'mb-5 flex items-center gap-3 border-b-2 border-slate-200 pb-3'
+const sectionIconClass = 'flex items-center justify-center rounded-lg bg-blue-600 p-2 text-white'
+const sectionTitleClass = 'm-0 text-lg font-bold text-slate-800'
+const formGridClass = 'grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]'
+const labelClass = 'mb-2 flex items-center gap-2 text-sm font-semibold text-slate-600'
+const labelIconClass = 'size-3.5 text-slate-500'
+const requiredClass = 'text-slate-500'
+const inputClass = 'w-full rounded-[10px] border-2 border-slate-200 bg-white px-4 py-3 text-[0.9rem] outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
+const helperClass = 'mt-1 text-xs text-slate-500'
+const fullSpanClass = 'md:col-span-full'
+const optionCardClass = 'flex cursor-pointer items-center rounded-[10px] border-2 border-slate-200 bg-white p-4 transition hover:border-blue-500 hover:bg-blue-50'
+const optionCardActiveClass = 'border-blue-500 bg-blue-50'
+const checkboxClass = 'mr-3 size-5 cursor-pointer accent-blue-600'
 
 interface Tenant {
   id?: string
@@ -282,78 +298,35 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
       {/* Backdrop */}
       <div
         onClick={credentials ? undefined : onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 9999,
-          animation: 'fadeIn 0.2s ease-out',
-        }}
+        className="fixed inset-0 z-[9999] animate-in fade-in duration-200 bg-black/60 backdrop-blur-sm"
       />
 
       {/* Contenedor Modal */}
       <div
-        style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          pointerEvents: 'none',
-        }}
+        className="pointer-events-none fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto overflow-x-hidden p-4"
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          style={{
-            background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-            borderRadius: 16,
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
-            width: '100%',
-            maxWidth: 1200,
-            maxHeight: '95vh',
-            animation: 'slideUp 0.3s ease-out',
-            pointerEvents: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
+          className="pointer-events-auto flex max-h-[95vh] w-full max-w-[1200px] animate-in slide-in-from-bottom-4 flex-col overflow-hidden rounded-2xl bg-gradient-to-b from-white to-slate-50 shadow-2xl ring-1 ring-black/5 duration-300"
         >
           {/* Header */}
           <div
-            style={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              padding: '1.75rem 2rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
+            className="relative overflow-hidden border-b border-white/10 bg-gradient-to-br from-blue-500 to-blue-600 px-8 py-7"
           >
             <div
-              style={{
-                position: 'absolute',
-                top: '-50%',
-                right: '-10%',
-                width: 300, height: 300,
-                background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-                borderRadius: '50%',
-              }}
+              className="absolute -right-[10%] -top-1/2 size-[300px] rounded-full bg-white/10"
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '0.5rem', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 style={{ width: 24, height: 24, color: 'white' }} />
+            <div className="relative z-[1] flex items-start justify-between">
+              <div className="flex-1">
+                <div className="mb-2 flex items-center gap-3">
+                  <div className="flex items-center justify-center rounded-[10px] bg-white/20 p-2">
+                    <Building2 className="size-6 text-white" />
                   </div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: 'white', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                  <h2 className="m-0 text-3xl font-bold text-white drop-shadow-sm">
                     {isEditing ? 'Editar Empresa' : 'Nueva Empresa'}
                   </h2>
                 </div>
-                <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.9)', margin: 0, fontWeight: 400 }}>
+                <p className="m-0 text-sm font-normal text-white/90">
                   {isEditing ? 'Actualiza la información de la empresa' : 'Configura una nueva empresa en el sistema'}
                 </p>
               </div>
@@ -361,23 +334,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               <button
                 onClick={onClose}
                 disabled={isLoading}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '0.5rem',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  color: 'white',
-                  opacity: isLoading ? 0.5 : 1,
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.3)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
+                className="flex items-center justify-center rounded-lg border-0 bg-white/20 p-2 text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <X style={{ width: 20, height: 20 }} />
+                <X className="size-5" />
               </button>
             </div>
           </div>
@@ -385,47 +344,32 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
           {/* Error */}
           {error && (
             <div
-              style={{
-                margin: '1.5rem 2rem 0',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: 10,
-                padding: '1rem',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.75rem',
-                animation: 'slideDown 0.3s ease-out',
-              }}
+              className="mx-8 mt-6 flex animate-in slide-in-from-top-2 items-start gap-3 rounded-[10px] border border-slate-300 bg-slate-50 p-4 duration-300"
             >
-              <AlertCircle style={{ width: 20, height: 20, color: '#dc2626', flexShrink: 0, marginTop: 2 }} />
-              <div style={{ flex: 1 }}>
-                <p style={{ color: '#dc2626', fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>{error}</p>
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-slate-600" />
+              <div className="flex-1">
+                <p className="m-0 text-sm font-semibold text-slate-700">{error}</p>
               </div>
             </div>
           )}
 
           {/* Contenido + Form */}
-          <div style={{ 
-            padding: '2rem', 
-            overflowY: 'auto',
-            flex: 1,
-            minHeight: 0
-          }}>
+          <div className="min-h-0 flex-1 overflow-y-auto p-8">
             <form onSubmit={handleSubmit} id="tenant-form">
               {/* Información Básica */}
-              <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '2px solid #e5e7eb' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', padding: '0.5rem', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 style={{ width: 18, height: 18, color: 'white' }} />
+              <div className={sectionClass}>
+                <div className={sectionHeaderClass}>
+                  <div className={sectionIconClass}>
+                    <Building2 className="size-[18px]" />
                   </div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Información Básica</h3>
+                  <h3 className={sectionTitleClass}>Información Básica</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div className={formGridClass}>
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <MapPin style={{ width: 14, height: 14, color: '#64748b' }} />
-                      País <span style={{ color: '#ef4444' }}>*</span>
+                    <label className={labelClass}>
+                      <MapPin className={labelIconClass} />
+                      País <span className={requiredClass}>*</span>
                     </label>
                     <select
                       name="pais"
@@ -433,9 +377,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       onChange={handleChange}
                       required
                       disabled={paisesLoading}
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white', cursor: paisesLoading ? 'not-allowed' : 'pointer' }}
-                      onFocus={(e) => { if (!paisesLoading) { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' } }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={cn(inputClass, !paisesLoading && 'cursor-pointer')}
                     >
                       {paisesLoading && <option value="">Cargando países...</option>}
                       {!paisesLoading && (
@@ -452,9 +394,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <FileText style={{ width: 14, height: 14, color: '#64748b' }} />
-                      {documentoConfig.label} <span style={{ color: '#ef4444' }}>*</span>
+                    <label className={labelClass}>
+                      <FileText className={labelIconClass} />
+                      {documentoConfig.label} <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="text"
@@ -465,18 +407,16 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       maxLength={documentoConfig.maxLength}
                       pattern={documentoConfig.pattern}
                       placeholder={documentoConfig.placeholder}
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    <p className={helperClass}>
                       {documentoConfig.helper}
                     </p>
                   </div>
 
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Phone style={{ width: 14, height: 14, color: '#64748b' }} />
+                    <label className={labelClass}>
+                      <Phone className={labelIconClass} />
                       Teléfono
                     </label>
                     <input
@@ -485,16 +425,14 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       value={formData.telefono}
                       onChange={handleChange}
                       placeholder="999999999"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Building2 style={{ width: 14, height: 14, color: '#64748b' }} />
-                      Razón Social <span style={{ color: '#ef4444' }}>*</span>
+                  <div className={fullSpanClass}>
+                    <label className={labelClass}>
+                      <Building2 className={labelIconClass} />
+                      Razón Social <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="text"
@@ -503,15 +441,13 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       onChange={handleChange}
                       required
                       placeholder="EMPRESA EJEMPLO S.A.C."
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Building2 style={{ width: 14, height: 14, color: '#64748b' }} />
+                  <div className={fullSpanClass}>
+                    <label className={labelClass}>
+                      <Building2 className={labelIconClass} />
                       Nombre Comercial
                     </label>
                     <input
@@ -520,16 +456,14 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       value={formData.nombre_comercial}
                       onChange={handleChange}
                       placeholder="Nombre comercial (opcional)"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <MapPin style={{ width: 14, height: 14, color: '#64748b' }} />
-                      Dirección <span style={{ color: '#ef4444' }}>*</span>
+                  <div className={fullSpanClass}>
+                    <label className={labelClass}>
+                      <MapPin className={labelIconClass} />
+                      Dirección <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="text"
@@ -538,16 +472,14 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       onChange={handleChange}
                       required
                       placeholder="Av. Principal 123, Lima"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Mail style={{ width: 14, height: 14, color: '#64748b' }} />
-                      Email <span style={{ color: '#ef4444' }}>*</span>
+                  <div className={fullSpanClass}>
+                    <label className={labelClass}>
+                      <Mail className={labelIconClass} />
+                      Email <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="email"
@@ -556,11 +488,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       onChange={handleChange}
                       required
                       placeholder="contacto@empresa.com"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    <p className={helperClass}>
                       Este será el email del usuario administrador
                     </p>
                   </div>
@@ -568,19 +498,19 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               </div>
 
               {/* Credenciales del Administrador */}
-              <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '2px solid #e5e7eb' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', padding: '0.5rem', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Settings style={{ width: 18, height: 18, color: 'white' }} />
+              <div className={sectionClass}>
+                <div className={sectionHeaderClass}>
+                  <div className={sectionIconClass}>
+                    <Settings className="size-[18px]" />
                   </div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Credenciales del Administrador</h3>
+                  <h3 className={sectionTitleClass}>Credenciales del Administrador</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div className={formGridClass}>
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Building2 style={{ width: 14, height: 14, color: '#64748b' }} />
-                      Nombre del Administrador <span style={{ color: '#ef4444' }}>*</span>
+                    <label className={labelClass}>
+                      <Building2 className={labelIconClass} />
+                      Nombre del Administrador <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="text"
@@ -589,16 +519,14 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       onChange={handleChange}
                       required
                       placeholder="Juan Pérez"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#8b5cf6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      <Settings style={{ width: 14, height: 14, color: '#64748b' }} />
-                      Contraseña Inicial <span style={{ color: '#ef4444' }}>*</span>
+                    <label className={labelClass}>
+                      <Settings className={labelIconClass} />
+                      Contraseña Inicial <span className={requiredClass}>*</span>
                     </label>
                     <input
                       type="password"
@@ -608,11 +536,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                       required
                       minLength={8}
                       placeholder="Mínimo 8 caracteres"
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#8b5cf6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={inputClass}
                     />
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    <p className={helperClass}>
                       💡 El administrador podrá cambiarla después
                     </p>
                   </div>
@@ -620,79 +546,52 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               </div>
 
               {/* Configuración de Ventas */}
-              <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '2px solid #e5e7eb' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '0.5rem', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Settings style={{ width: 18, height: 18, color: 'white' }} />
+              <div className={sectionClass}>
+                <div className={sectionHeaderClass}>
+                  <div className={sectionIconClass}>
+                    <Settings className="size-[18px]" />
                   </div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Configuración de Ventas</h3>
+                  <h3 className={sectionTitleClass}>Configuración de Ventas</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
-                      Tipo de Empresa <span style={{ color: '#ef4444' }}>*</span>
+                <div className={formGridClass}>
+                  <div className={fullSpanClass}>
+                    <label className="mb-2 block text-sm font-semibold text-slate-600">
+                      Tipo de Empresa <span className={requiredClass}>*</span>
                     </label>
                     <select
                       name="tipo_empresa"
                       value={formData.tipo_empresa}
                       onChange={handleChange}
                       required
-                      style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white', cursor: 'pointer' }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      className={cn(inputClass, 'cursor-pointer')}
                     >
                       <option value="MICRO">Microempresa</option>
                       <option value="PEQUEÑA">Pequeña Empresa</option>
                       <option value="MEDIANA">Mediana Empresa</option>
                       <option value="GRANDE">Gran Empresa</option>
                     </select>
-                    <div
-                      style={{
-                        marginTop: '0.5rem',
-                        padding: '0.75rem',
-                        background: formData.tipo_empresa === 'MICRO' || formData.tipo_empresa === 'PEQUEÑA'
-                          ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                          : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                        borderRadius: 8,
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: formData.tipo_empresa === 'MICRO' || formData.tipo_empresa === 'PEQUEÑA' ? '#1e40af' : '#065f46',
-                      }}
-                    >
+                    <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs font-semibold text-blue-800">
                       {formData.tipo_empresa === 'MICRO' || formData.tipo_empresa === 'PEQUEÑA'
                         ? '💡 Flujo simplificado (sin logística)'
                         : '💡 Flujo completo (con logística)'}
                     </div>
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
+                  <div className={fullSpanClass}>
                     <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        padding: '1rem',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: 10,
-                        backgroundColor: formData.usar_flujo_logistica ? '#eff6ff' : 'white',
-                        transition: 'all 0.2s',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.backgroundColor = '#eff6ff' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; if (!formData.usar_flujo_logistica) e.currentTarget.style.backgroundColor = 'white' }}
+                      className={cn(optionCardClass, formData.usar_flujo_logistica && optionCardActiveClass)}
                     >
                       <input
                         type="checkbox"
                         name="usar_flujo_logistica"
                         checked={formData.usar_flujo_logistica}
                         onChange={handleChange}
-                        style={{ marginRight: '0.75rem', width: 20, height: 20, cursor: 'pointer', accentColor: '#3b82f6' }}
+                        className={checkboxClass}
                       />
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Usar Flujo Logístico</span>
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
+                      <div className="flex-1">
+                        <span className="text-[0.95rem] font-bold text-slate-800">Usar Flujo Logístico</span>
+                        <p className="mt-1 text-xs text-slate-500">
                           Incluye preparación y despacho en almacén
                         </p>
                       </div>
@@ -702,35 +601,29 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               </div>
 
               {/* Configuración de GRE */}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '2px solid #e5e7eb' }}>
-                  <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', padding: '0.5rem', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileText style={{ width: 18, height: 18, color: 'white' }} />
+              <div className="mb-4">
+                <div className={sectionHeaderClass}>
+                  <div className={sectionIconClass}>
+                    <FileText className="size-[18px]" />
                   </div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Configuración de Guías de Remisión (GRE)</h3>
+                  <h3 className={sectionTitleClass}>Configuración de Guías de Remisión (GRE)</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                <div className={formGridClass}>
                   <div>
                     <label
-                      style={{
-                        display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1rem',
-                        border: '2px solid #e2e8f0', borderRadius: 10,
-                        backgroundColor: formData.gre_obligatorio ? '#fef3c7' : 'white', transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.backgroundColor = '#fef3c7' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; if (!formData.gre_obligatorio) e.currentTarget.style.backgroundColor = 'white' }}
+                      className={cn(optionCardClass, formData.gre_obligatorio && optionCardActiveClass)}
                     >
                       <input
                         type="checkbox"
                         name="gre_obligatorio"
                         checked={formData.gre_obligatorio}
                         onChange={handleChange}
-                        style={{ marginRight: '0.75rem', width: 20, height: 20, cursor: 'pointer', accentColor: '#f59e0b' }}
+                        className={checkboxClass}
                       />
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>GRE Obligatorio</span>
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
+                      <div className="flex-1">
+                        <span className="text-[0.95rem] font-bold text-slate-800">GRE Obligatorio</span>
+                        <p className="mt-1 text-xs text-slate-500">
                           Exigir GRE para todas las ventas
                         </p>
                       </div>
@@ -739,24 +632,18 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
                   <div>
                     <label
-                      style={{
-                        display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '1rem',
-                        border: '2px solid #e2e8f0', borderRadius: 10,
-                        backgroundColor: formData.gre_automatico_habilitado ? '#fef3c7' : 'white', transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.backgroundColor = '#fef3c7' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; if (!formData.gre_automatico_habilitado) e.currentTarget.style.backgroundColor = 'white' }}
+                      className={cn(optionCardClass, formData.gre_automatico_habilitado && optionCardActiveClass)}
                     >
                       <input
                         type="checkbox"
                         name="gre_automatico_habilitado"
                         checked={formData.gre_automatico_habilitado}
                         onChange={handleChange}
-                        style={{ marginRight: '0.75rem', width: 20, height: 20, cursor: 'pointer', accentColor: '#f59e0b' }}
+                        className={checkboxClass}
                       />
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>Sugerencia Automática</span>
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
+                      <div className="flex-1">
+                        <span className="text-[0.95rem] font-bold text-slate-800">Sugerencia Automática</span>
+                        <p className="mt-1 text-xs text-slate-500">
                           Sugerir GRE según monto
                         </p>
                       </div>
@@ -764,8 +651,8 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                   </div>
 
                   {formData.gre_automatico_habilitado && (
-                    <div style={{ gridColumn: '1 / -1', animation: 'slideDown 0.3s ease-out' }}>
-                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem', color: '#475569' }}>
+                    <div className={cn(fullSpanClass, 'animate-in slide-in-from-top-2 duration-300')}>
+                      <label className="mb-2 block text-sm font-semibold text-slate-600">
                         Umbral para Sugerencia (S/)
                       </label>
                       <input
@@ -775,11 +662,9 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                         onChange={handleChange}
                         min={0}
                         step={0.01}
-                        style={{ width: '100%', padding: '0.75rem 1rem', border: '2px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', transition: 'all 0.2s', background: 'white' }}
-                        onFocus={(e) => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.1)' }}
-                        onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                        className={inputClass}
                       />
-                      <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem' }}>
+                      <p className="mt-2 text-xs text-slate-500">
                         💡 Sugerir GRE si el monto de venta supera este valor
                       </p>
                     </div>
@@ -788,32 +673,12 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
               </div>
 
               {/* ACCIONES (sin footer, dentro del form) */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '1rem',
-                  justifyContent: 'flex-end',
-                  marginTop: '1.25rem',
-                }}
-              >
+              <div className="mt-5 flex justify-end gap-4">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isLoading}
-                  style={{
-                    padding: '0.75rem 1.75rem',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: 10,
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    opacity: isLoading ? 0.5 : 1,
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => { if (!isLoading) { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = '#f8fafc' } }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = 'white' }}
+                  className="rounded-[10px] border-2 border-slate-200 bg-white px-7 py-3 text-[0.9rem] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -821,42 +686,16 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                 <button
                   type="submit"
                   disabled={isLoading}
-                  style={{
-                    padding: '0.75rem 2rem',
-                    border: 'none',
-                    borderRadius: 10,
-                    background: isLoading
-                      ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                      : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    fontWeight: 700,
-                    fontSize: '0.9rem',
-                    boxShadow: isLoading ? 'none' : '0 4px 12px rgba(59,130,246,0.4)',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(59,130,246,0.5)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.4)'
-                  }}
+                  className="flex items-center gap-2 rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-600 px-8 py-3 text-[0.9rem] font-bold text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-0.5 hover:shadow-blue-500/40 disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500 disabled:shadow-none"
                 >
                   {isLoading ? (
                     <>
-                      <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <div className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       Creando...
                     </>
                   ) : (
                     <>
-                      <Building2 style={{ width: 18, height: 18 }} />
+                      <Building2 className="size-[18px]" />
                       Crear Empresa
                     </>
                   )}
@@ -869,131 +708,50 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
       {credentials && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 11000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            animation: 'fadeIn 0.2s ease-out',
-          }}
+          className="fixed inset-0 z-[11000] flex animate-in fade-in items-center justify-center bg-black/60 backdrop-blur-sm duration-200"
         >
           <div
-            style={{
-              background: 'white',
-              borderRadius: 16,
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-              maxWidth: 500,
-              width: '90%',
-              padding: '2rem',
-            }}
+            className="w-[90%] max-w-[500px] rounded-2xl bg-white p-8 shadow-2xl"
           >
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  margin: '0 auto 1rem',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '2rem',
-                }}
-              >
-                ✅
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-2xl text-white">
+                <Building2 className="size-8" />
               </div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b', margin: '0 0 0.5rem 0' }}>
+              <h2 className="mb-2 text-2xl font-bold text-slate-800">
                 ¡Empresa Creada!
               </h2>
-              <p style={{ color: '#64748b', margin: 0 }}>
+              <p className="m-0 text-slate-500">
                 Guarda estas credenciales del administrador
               </p>
             </div>
 
-            <div
-              style={{
-                background: '#f8fafc',
-                border: '2px solid #e2e8f0',
-                borderRadius: 12,
-                padding: '1.25rem',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '0.25rem' }}>
+            <div className="mb-6 rounded-xl border-2 border-slate-200 bg-slate-50 p-5">
+              <div className="mb-4">
+                <label className="mb-1 block text-xs font-semibold text-slate-500">
                   EMAIL
                 </label>
-                <div
-                  style={{
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 8,
-                    padding: '0.75rem',
-                    fontFamily: 'monospace',
-                    fontSize: '0.9rem',
-                    color: '#1e293b',
-                  }}
-                >
+                <div className="rounded-lg border border-slate-200 bg-white p-3 font-mono text-[0.9rem] text-slate-800">
                   {credentials.email}
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginBottom: '0.25rem' }}>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">
                   CONTRASEÑA TEMPORAL
                 </label>
-                <div
-                  style={{
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 8,
-                    padding: '0.75rem',
-                    fontFamily: 'monospace',
-                    fontSize: '0.9rem',
-                    color: '#dc2626',
-                    fontWeight: 700,
-                  }}
-                >
+                <div className="rounded-lg border border-slate-200 bg-white p-3 font-mono text-[0.9rem] font-bold text-slate-800">
                   {credentials.temporaryPassword}
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                background: '#fef3c7',
-                border: '1px solid #fbbf24',
-                borderRadius: 8,
-                padding: '0.75rem',
-                marginBottom: '1.5rem',
-                fontSize: '0.85rem',
-                color: '#92400e',
-              }}
-            >
+            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-3 text-[0.85rem] text-blue-900">
               ⚠️ <strong>Importante:</strong> El usuario deberá cambiar esta contraseña en su primer inicio de sesión.
             </div>
 
             <button
               onClick={handleCloseCredentials}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 10,
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(59,130,246,0.4)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)' }}
+              className="w-full rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-600 p-3 text-[0.95rem] font-bold text-white shadow-lg shadow-blue-500/30 transition hover:-translate-y-px"
             >
               Entendido
             </button>
@@ -1001,21 +759,6 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
         </div>
       )}
 
-      {/* Animaciones y Responsive */}
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        
-        @media (max-width: 768px) {
-          .modal-content-responsive {
-            max-width: 100% !important;
-            margin: 0.5rem !important;
-            max-height: 98vh !important;
-          }
-        }
-      `}</style>
     </>
   )
 

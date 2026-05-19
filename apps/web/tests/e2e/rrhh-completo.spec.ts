@@ -8,6 +8,8 @@ import { gotoAuthenticated, login } from './helpers/auth';
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
 const runId = Date.now().toString().slice(-9);
+const qaStamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+const qaPrefix = `QA-PROD-READY-${qaStamp}-CASE17-${runId}`;
 const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:13002';
 const api = (route: string) => `/api${route}`;
 const today = () => new Date().toISOString().split('T')[0];
@@ -152,11 +154,11 @@ test.describe('T15 RRHH completo', () => {
     const empleado = await parseOk<any>(
       await apiContext.post(api('/rrhh/empleados'), {
         data: {
-          nombres: `Empleado T15 ${runId}`,
+          nombres: `${qaPrefix} Empleado`,
           apellidos: 'Auditoria RRHH',
           tipo_documento: 'DNI',
           numero_documento: documento,
-          email: `rrhh-t15-${runId}@example.com`,
+          email: `rrhh-case17-${runId}@example.com`,
           telefono: '999888777',
           puesto: 'Analista RRHH',
           fecha_ingreso: today(),
@@ -182,7 +184,7 @@ test.describe('T15 RRHH completo', () => {
 
     const empleadoEditado = await parseOk<any>(
       await apiContext.put(api(`/rrhh/empleados/${empleado.id}`), {
-        data: { puesto: 'Coordinador RRHH', email: `rrhh-t15-editado-${runId}@example.com` },
+        data: { puesto: 'Coordinador RRHH', email: `rrhh-case17-editado-${runId}@example.com` },
       }),
       'editar empleado T15',
     );
@@ -199,6 +201,45 @@ test.describe('T15 RRHH completo', () => {
       'reactivar empleado T15',
     );
     expect(empleadoReactivado.estado).toBe('activo');
+
+    const asistenciaEntrada = await parseOk<any>(
+      await apiContext.post(api('/rrhh/asistencias/marcar'), {
+        data: {
+          empleado_id: empleado.id,
+          fecha: today(),
+          tipo: 'entrada',
+          hora: '08:00',
+        },
+      }),
+      'registrar entrada asistencia RRHH CASE17',
+    );
+    expect(asistenciaEntrada.id ?? asistenciaEntrada.data?.id, 'entrada asistencia debe persistir').toBeTruthy();
+
+    const asistenciaSalida = await parseOk<any>(
+      await apiContext.post(api('/rrhh/asistencias/marcar'), {
+        data: {
+          empleado_id: empleado.id,
+          fecha: today(),
+          tipo: 'salida',
+          hora: '17:00',
+        },
+      }),
+      'registrar salida asistencia RRHH CASE17',
+    );
+    expect(Number(asistenciaSalida.horas_trabajadas ?? asistenciaSalida.data?.horas_trabajadas), 'horas asistencia RRHH').toBeCloseTo(9, 2);
+
+    await expectStatus(
+      await apiContext.post(api('/rrhh/asistencias/marcar'), {
+        data: {
+          empleado_id: empleado.id,
+          fecha: today(),
+          tipo: 'entrada',
+          hora: '08:05',
+        },
+      }),
+      409,
+      'no duplicar entrada asistencia RRHH',
+    );
 
     const contrato = await parseOk<any>(
       await apiContext.post(api('/rrhh/contratos'), {
@@ -280,8 +321,8 @@ test.describe('T15 RRHH completo', () => {
         data: {
           empleados_ids: [empleadoPlanillaId],
           metodo_pago: 'transferencia',
-          numero_operacion: `RRHH-T15-${runId}`,
-          observaciones: 'Pago auditado T15',
+          numero_operacion: `QA17-RRHH-${runId}`,
+          observaciones: `${qaPrefix} Pago auditado`,
         },
       }),
       'pagar empleado de planilla T15',
@@ -306,9 +347,10 @@ test.describe('T15 RRHH completo', () => {
     const asiento = await waitForAsientoByReference(supabase, tenantId, `PLANILLA-${planilla.id}`);
     expectAsientoCuadrado(asiento);
 
+    await login(page);
     await gotoAuthenticated(page, '/dashboard/rrhh/');
     await expect(page.getByRole('heading', { name: /Recursos Humanos/i })).toBeVisible({ timeout: 30000 });
-    const empleadoRow = page.locator('tr').filter({ hasText: `Empleado T15 ${runId}` });
+    const empleadoRow = page.locator('tr').filter({ hasText: qaPrefix });
     await expect(empleadoRow).toBeVisible({ timeout: 30000 });
     await expect(empleadoRow).toContainText('Coordinador RRHH');
 

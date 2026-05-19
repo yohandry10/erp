@@ -46,7 +46,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl$estadosEndpoint`?anio=2025&mes=1" -Method Get -Headers @{
         "x-tenant-id" = "550e8400-e29b-41d4-a716-446655440000"
     }
-    
+
     if ($response.success) {
         Write-Host "✅ PASS: Balance obtenido exitosamente" -ForegroundColor Green
         Write-Host ""
@@ -58,7 +58,7 @@ try {
         Write-Host "  Total Haber: $($response.data.totales.haber)" -ForegroundColor White
         Write-Host "  Diferencia: $($response.data.totales.diferencia)" -ForegroundColor White
         Write-Host "  Cuadrado: $($response.data.totales.cuadrado)" -ForegroundColor White
-        
+
         if ($response.data.cuentas.Count -gt 0) {
             Write-Host ""
             Write-Host "📋 Primeras 5 cuentas:" -ForegroundColor Cyan
@@ -81,7 +81,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl$estadosEndpoint`?anio=2025&mes=13" -Method Get -Headers @{
         "x-tenant-id" = "550e8400-e29b-41d4-a716-446655440000"
     }
-    
+
     if ($response.success -eq $false) {
         Write-Host "✅ PASS: Retornó error correctamente" -ForegroundColor Green
         Write-Host "Mensaje: $($response.message)" -ForegroundColor Gray
@@ -99,7 +99,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl$estadosEndpoint`?anio=2024&mes=12" -Method Get -Headers @{
         "x-tenant-id" = "550e8400-e29b-41d4-a716-446655440000"
     }
-    
+
     if ($response.success) {
         Write-Host "✅ PASS: Balance obtenido exitosamente" -ForegroundColor Green
         Write-Host "  Período: $($response.data.periodo.descripcion)" -ForegroundColor White
@@ -124,7 +124,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl$legacyEndpoint`?anio=2025&mes=1" -Method Get -Headers @{
         "x-tenant-id" = "550e8400-e29b-41d4-a716-446655440000"
     }
-    
+
     if ($response.success) {
         Write-Host "✅ PASS: Legacy endpoint funciona con anio y mes" -ForegroundColor Green
         Write-Host "  Período: $($response.data.periodo.descripcion)" -ForegroundColor White
@@ -143,7 +143,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl$legacyEndpoint" -Method Get -Headers @{
         "x-tenant-id" = "550e8400-e29b-41d4-a716-446655440000"
     }
-    
+
     if ($response.success) {
         Write-Host "✅ PASS: Legacy endpoint funciona sin parámetros (fallback)" -ForegroundColor Green
         Write-Host "  Tipo de respuesta: $(if ($response.data.periodo) { 'Nuevo formato' } else { 'Formato antiguo' })" -ForegroundColor White

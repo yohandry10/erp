@@ -1,3 +1,6 @@
+@tailwind base;
+@tailwind components;
+
 /* Modern CSS Reset */
 * {
   margin: 0;
@@ -7,6 +10,25 @@
 
 /* CSS Variables for Professional Theme - NO PURPLE */
 :root {
+  /* shadcn/Tailwind semantic tokens. Values are HSL components. */
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 217 91% 60%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 214 32% 91%;
+  --accent-foreground: 222 47% 11%;
+
   --primary-50: #f8fafc;
   --primary-100: #f1f5f9;
   --primary-200: #e2e8f0;
@@ -26,27 +48,27 @@
   --blue-800: #1e40af;
   --blue-900: #1e3a8a;
   
-  --emerald-50: #ecfdf5;
-  --emerald-100: #d1fae5;
-  --emerald-400: #34d399;
-  --emerald-500: #10b981;
-  --emerald-600: #059669;
-  --emerald-700: #047857;
+  --emerald-50: #eff6ff;
+  --emerald-100: #dbeafe;
+  --emerald-400: #38bdf8;
+  --emerald-500: #0ea5e9;
+  --emerald-600: #0284c7;
+  --emerald-700: #0369a1;
   
-  --amber-500: #f59e0b;
-  --amber-600: #d97706;
+  --amber-500: #38bdf8;
+  --amber-600: #0284c7;
   
-  --red-50: #fef2f2;
-  --red-100: #fee2e2;
-  --red-200: #fecaca;
-  --red-400: #f87171;
-  --red-500: #ef4444;
-  --red-600: #dc2626;
-  --red-700: #b91c1c;
+  --red-50: #f8fafc;
+  --red-100: #f1f5f9;
+  --red-200: #cbd5e1;
+  --red-400: #64748b;
+  --red-500: #475569;
+  --red-600: #334155;
+  --red-700: #1e293b;
   
-  --success: #22c55e;
-  --warning: #eab308;
-  --error: #ef4444;
+  --success: #0ea5e9;
+  --warning: #0284c7;
+  --error: #475569;
   --info: #0ea5e9;
   
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -56,9 +78,9 @@
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   
   --gradient-primary: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%);
-  --gradient-success: linear-gradient(135deg, #047857 0%, #10b981 100%);
-  --gradient-warning: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
-  --gradient-danger: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  --gradient-success: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%);
+  --gradient-warning: linear-gradient(135deg, #1e40af 0%, #38bdf8 100%);
+  --gradient-danger: linear-gradient(135deg, #334155 0%, #64748b 100%);
   
   --border-radius: 12px;
   --border-radius-lg: 16px;
@@ -80,6 +102,48 @@ body {
   overflow-x: hidden;
   font-weight: 400;
   letter-spacing: -0.01em;
+}
+
+.erp-light-scope {
+  background: linear-gradient(135deg, #f8fafc 0%, #eef6ff 52%, #e2e8f0 100%) !important;
+  color: #0f172a !important;
+}
+
+.erp-light-scope [class*="bg-slate-950"],
+.erp-light-scope [class*="bg-slate-900"],
+.erp-light-scope [class*="bg-white/["],
+.erp-light-scope [class*="bg-white\\/"] {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.erp-light-scope [class*="text-white"],
+.erp-light-scope [class*="text-slate-100"],
+.erp-light-scope [class*="text-slate-200"],
+.erp-light-scope [class*="text-slate-300"] {
+  color: #0f172a !important;
+}
+
+.erp-light-scope [class*="text-slate-400"],
+.erp-light-scope [class*="text-slate-500"] {
+  color: #475569 !important;
+}
+
+.erp-light-scope [class*="border-cyan-400"],
+.erp-light-scope [class*="border-cyan-300"],
+.erp-light-scope [class*="border-white/"] {
+  border-color: rgba(14, 116, 144, 0.22) !important;
+}
+
+.erp-light-scope [class*="shadow-blue-950"],
+.erp-light-scope [class*="shadow-cyan-950"] {
+  --tw-shadow-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+.erp-light-scope input,
+.erp-light-scope select,
+.erp-light-scope textarea {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
 }
 
 /* Layout Containers */
@@ -532,7 +596,7 @@ body {
 }
 
 .notification-badge {
-  background-color: #ef4444;
+  background-color: #1e40af;
   color: white;
   border-radius: 12px;
   padding: 0.25rem 0.625rem;
@@ -715,8 +779,9 @@ body {
   border: 1px solid var(--red-200);
 }
 
-/* Table Styles */
-table {
+/* Legacy table styles are scoped so they cannot override Tailwind/shadcn modules. */
+.dashboard-container table,
+.legacy-ui table {
   width: 100%;
   border-collapse: collapse;
   background: white;
@@ -726,13 +791,17 @@ table {
   margin: 1rem 0;
 }
 
-th, td {
+.dashboard-container th,
+.dashboard-container td,
+.legacy-ui th,
+.legacy-ui td {
   padding: 1rem;
   text-align: left;
   border-bottom: 1px solid var(--primary-200);
 }
 
-th {
+.dashboard-container th,
+.legacy-ui th {
   background: var(--primary-50);
   font-weight: 600;
   color: var(--primary-700);
@@ -741,12 +810,18 @@ th {
   letter-spacing: 0.05em;
 }
 
-tr:hover {
+.dashboard-container tr:hover,
+.legacy-ui tr:hover {
   background: var(--primary-50);
 }
 
-/* Form Styles */
-input, select, textarea {
+/* Legacy form styles are scoped so shadcn/Tailwind inputs keep module ownership. */
+.dashboard-container input,
+.dashboard-container select,
+.dashboard-container textarea,
+.legacy-ui input,
+.legacy-ui select,
+.legacy-ui textarea {
   width: 100%;
   padding: 0.875rem 1rem;
   border: 1px solid var(--primary-300);
@@ -757,7 +832,12 @@ input, select, textarea {
   color: var(--primary-800);
 }
 
-input:focus, select:focus, textarea:focus {
+.dashboard-container input:focus,
+.dashboard-container select:focus,
+.dashboard-container textarea:focus,
+.legacy-ui input:focus,
+.legacy-ui select:focus,
+.legacy-ui textarea:focus {
   outline: none;
   border-color: var(--blue-500);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -1020,19 +1100,19 @@ label {
   margin: 0;
 }
 
-/* Enhanced Status Colors */
-.text-green-600 { color: #059669; }
+/* Enhanced Status Colors remapped to ERP palette */
+.text-green-600 { color: #0284c7; }
 .text-blue-600 { color: #2563eb; }
-.text-purple-600 { color: #7c3aed; }
-.text-orange-600 { color: #ea580c; }
-.text-indigo-600 { color: #4f46e5; }
+.text-purple-600 { color: #1e40af; }
+.text-orange-600 { color: #0369a1; }
+.text-indigo-600 { color: #1d4ed8; }
 .text-gray-600 { color: #4b5563; }
-.text-yellow-600 { color: #d97706; }
-.text-red-600 { color: #dc2626; }
+.text-yellow-600 { color: #0284c7; }
+.text-red-600 { color: #334155; }
 
-.bg-green-100 { background-color: #dcfce7; }
-.bg-yellow-100 { background-color: #fef3c7; }
-.bg-red-100 { background-color: #fee2e2; }
+.bg-green-100 { background-color: #e0f2fe; }
+.bg-yellow-100 { background-color: #dbeafe; }
+.bg-red-100 { background-color: #f1f5f9; }
 .bg-gray-100 { background-color: #f3f4f6; }
 
 /* Animations */
@@ -1741,4 +1821,233 @@ label {
 .pos-page textarea {
   border-radius: 8px;
   border: 1px solid var(--primary-300);
+}
+
+/* ==============================
+   Dashboard dark-theme compatibility
+   Legacy modules still use dashboard-container/stat-card/bg-white classes.
+   These rules keep those modules visually aligned with the ERP shell while
+   each page is migrated to Tailwind/shadcn primitives.
+   ============================== */
+[data-erp-theme="dark"] .dashboard-container,
+[data-erp-theme="dark"] .legacy-ui {
+  color: #e2e8f0;
+}
+
+[data-erp-theme="dark"] .dashboard-header,
+[data-erp-theme="dark"] .stat-card,
+[data-erp-theme="dark"] .activity-card,
+[data-erp-theme="dark"] .modal-content,
+[data-erp-theme="dark"] .dashboard-container .bg-white,
+[data-erp-theme="dark"] .legacy-ui .bg-white,
+[data-erp-theme="dark"] .dashboard-container [class~="bg-white"],
+[data-erp-theme="dark"] .legacy-ui [class~="bg-white"] {
+  background: linear-gradient(135deg, rgba(2, 6, 23, 0.88) 0%, rgba(8, 47, 73, 0.72) 100%) !important;
+  border-color: rgba(103, 232, 249, 0.22) !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 22px 45px rgba(2, 6, 23, 0.32) !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container .bg-slate-50,
+[data-erp-theme="dark"] .dashboard-container .bg-gray-50,
+[data-erp-theme="dark"] .dashboard-container [class~="bg-slate-50"],
+[data-erp-theme="dark"] .dashboard-container [class~="bg-gray-50"] {
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-erp-theme="dark"] .dashboard-title {
+  background: linear-gradient(135deg, #dbeafe 0%, #38bdf8 55%, #60a5fa 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-erp-theme="dark"] .dashboard-subtitle,
+[data-erp-theme="dark"] .stat-subtitle,
+[data-erp-theme="dark"] .activity-description,
+[data-erp-theme="dark"] .activity-content p,
+[data-erp-theme="dark"] .dashboard-container p,
+[data-erp-theme="dark"] .legacy-ui p {
+  color: #94a3b8 !important;
+}
+
+[data-erp-theme="dark"] .stat-header h3,
+[data-erp-theme="dark"] .activity-title,
+[data-erp-theme="dark"] .activity-content h4,
+[data-erp-theme="dark"] .activity-content strong,
+[data-erp-theme="dark"] .dashboard-container h1,
+[data-erp-theme="dark"] .dashboard-container h2,
+[data-erp-theme="dark"] .dashboard-container h3,
+[data-erp-theme="dark"] .dashboard-container h4,
+[data-erp-theme="dark"] .dashboard-container h5,
+[data-erp-theme="dark"] .dashboard-container h6,
+[data-erp-theme="dark"] .legacy-ui h1,
+[data-erp-theme="dark"] .legacy-ui h2,
+[data-erp-theme="dark"] .legacy-ui h3,
+[data-erp-theme="dark"] .legacy-ui h4 {
+  color: #f8fafc !important;
+}
+
+[data-erp-theme="dark"] .stat-value,
+[data-erp-theme="dark"] .stat-value.conversion,
+[data-erp-theme="dark"] .stat-value.warning {
+  color: #f8fafc !important;
+  text-shadow: none !important;
+}
+
+[data-erp-theme="dark"] .activity-item,
+[data-erp-theme="dark"] .dashboard-container li,
+[data-erp-theme="dark"] .dashboard-container [class~="border"],
+[data-erp-theme="dark"] .legacy-ui [class~="border"] {
+  border-color: rgba(103, 232, 249, 0.18) !important;
+}
+
+[data-erp-theme="dark"] .activity-item {
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container table,
+[data-erp-theme="dark"] .legacy-ui table,
+[data-erp-theme="dark"] .pos-page table {
+  background: rgba(2, 6, 23, 0.72) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(103, 232, 249, 0.16) !important;
+  box-shadow: 0 18px 36px rgba(2, 6, 23, 0.28) !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container th,
+[data-erp-theme="dark"] .legacy-ui th,
+[data-erp-theme="dark"] .pos-page th {
+  background: rgba(15, 23, 42, 0.9) !important;
+  color: #a5f3fc !important;
+  border-color: rgba(103, 232, 249, 0.16) !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container td,
+[data-erp-theme="dark"] .legacy-ui td,
+[data-erp-theme="dark"] .pos-page td {
+  color: #cbd5e1 !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container tr:hover,
+[data-erp-theme="dark"] .legacy-ui tr:hover {
+  background: rgba(14, 165, 233, 0.08) !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container input,
+[data-erp-theme="dark"] .dashboard-container select,
+[data-erp-theme="dark"] .dashboard-container textarea,
+[data-erp-theme="dark"] .legacy-ui input,
+[data-erp-theme="dark"] .legacy-ui select,
+[data-erp-theme="dark"] .legacy-ui textarea,
+[data-erp-theme="dark"] .pos-page input,
+[data-erp-theme="dark"] .pos-page select,
+[data-erp-theme="dark"] .pos-page textarea {
+  background: rgba(2, 6, 23, 0.78) !important;
+  border-color: rgba(103, 232, 249, 0.22) !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+[data-erp-theme="dark"] .dashboard-container input::placeholder,
+[data-erp-theme="dark"] .dashboard-container textarea::placeholder,
+[data-erp-theme="dark"] .legacy-ui input::placeholder,
+[data-erp-theme="dark"] .legacy-ui textarea::placeholder {
+  color: #64748b !important;
+}
+
+[data-erp-theme="dark"] label,
+[data-erp-theme="dark"] .dashboard-container label,
+[data-erp-theme="dark"] .legacy-ui label {
+  color: #cbd5e1 !important;
+}
+
+[data-erp-theme="dark"] .btn-secondary,
+[data-erp-theme="dark"] .btn-outline,
+[data-erp-theme="dark"] .dashboard-container button.bg-white,
+[data-erp-theme="dark"] .dashboard-container a.bg-white,
+[data-erp-theme="dark"] .legacy-ui button.bg-white,
+[data-erp-theme="dark"] .legacy-ui a.bg-white {
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-color: rgba(103, 232, 249, 0.24) !important;
+  color: #e0f2fe !important;
+}
+
+[data-erp-theme="dark"] .status-success,
+[data-erp-theme="dark"] .status-warning,
+[data-erp-theme="dark"] .status-error {
+  background: rgba(14, 165, 233, 0.14) !important;
+  border-color: rgba(125, 211, 252, 0.22) !important;
+  color: #bae6fd !important;
+}
+
+@tailwind utilities;
+
+/* ==============================
+   ERP shell dark hardening
+   Some legacy modules still ship Tailwind light utilities directly in page
+   markup. In dark mode the shell owns the surface contract: no white islands.
+   ============================== */
+[data-erp-theme="dark"] [class~="bg-white"],
+[data-erp-theme="dark"] [class~="bg-slate-50"],
+[data-erp-theme="dark"] [class~="bg-gray-50"],
+[data-erp-theme="dark"] [class*="bg-[rgba(255"],
+[data-erp-theme="dark"] [class*="bg-[rgba(248"],
+[data-erp-theme="dark"] [class*="bg-[rgba(241"],
+[data-erp-theme="dark"] [class*="bg-[rgba(239"],
+[data-erp-theme="dark"] [class*="bg-[rgba(226"],
+[data-erp-theme="dark"] [class*="bg-[rgba(219"],
+[data-erp-theme="dark"] [class*="bg-[rgba(191"],
+[data-erp-theme="dark"] [class*="bg-[rgba(187"],
+[data-erp-theme="dark"] [class*="bg-[rgba(254"] {
+  background: linear-gradient(135deg, rgba(2, 6, 23, 0.92) 0%, rgba(8, 47, 73, 0.76) 100%) !important;
+  border-color: rgba(103, 232, 249, 0.22) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-erp-theme="dark"] [class~="text-slate-950"],
+[data-erp-theme="dark"] [class~="text-gray-950"],
+[data-erp-theme="dark"] [class~="text-gray-900"],
+[data-erp-theme="dark"] [class~="text-gray-800"],
+[data-erp-theme="dark"] [class~="text-slate-900"],
+[data-erp-theme="dark"] [class~="text-slate-800"] {
+  color: #f8fafc !important;
+}
+
+[data-erp-theme="dark"] [class~="text-slate-700"],
+[data-erp-theme="dark"] [class~="text-slate-600"],
+[data-erp-theme="dark"] [class~="text-gray-700"],
+[data-erp-theme="dark"] [class~="text-gray-600"] {
+  color: #cbd5e1 !important;
+}
+
+[data-erp-theme="dark"] [class~="text-slate-500"],
+[data-erp-theme="dark"] [class~="text-slate-400"],
+[data-erp-theme="dark"] [class~="text-gray-500"],
+[data-erp-theme="dark"] [class~="text-gray-400"] {
+  color: #94a3b8 !important;
+}
+
+[data-erp-theme="dark"] [class~="text-blue-700"],
+[data-erp-theme="dark"] [class~="text-blue-600"],
+[data-erp-theme="dark"] [class~="text-teal-700"],
+[data-erp-theme="dark"] [class~="text-emerald-700"],
+[data-erp-theme="dark"] [class~="text-red-700"],
+[data-erp-theme="dark"] [class~="text-red-800"] {
+  color: #67e8f9 !important;
+}
+
+[data-erp-theme="dark"] [class~="border-gray-200"],
+[data-erp-theme="dark"] [class~="border-slate-200"],
+[data-erp-theme="dark"] [class~="border-slate-300"],
+[data-erp-theme="dark"] [class~="border-green-200"] {
+  border-color: rgba(103, 232, 249, 0.22) !important;
+}
+
+[data-erp-theme="dark"] [class~="divide-gray-200"] > :not([hidden]) ~ :not([hidden]),
+[data-erp-theme="dark"] [class~="divide-slate-200"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(103, 232, 249, 0.16) !important;
 }

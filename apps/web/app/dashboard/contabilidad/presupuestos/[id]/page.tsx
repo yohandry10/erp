@@ -54,7 +54,7 @@ export default function EditarPresupuestoPage() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="loading" style={{ padding: '3rem', textAlign: 'center' }}>
+        <div className="loading p-12 text-center">
           <div className="loading-spinner"></div>
           <p>Cargando presupuesto...</p>
         </div>
@@ -65,39 +65,24 @@ export default function EditarPresupuestoPage() {
   if (error || !presupuesto) {
     return (
       <div className="dashboard-container">
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className="mb-6">
           <button
             onClick={() => router.push('/dashboard/contabilidad/presupuestos/lista')}
-            className="secondary-btn"
-            style={{
-              padding: '0.5rem 1rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            className="secondary-btn py-2 px-4 inline-flex items-center gap-2"
           >
             <ArrowLeft size={18} />
             Volver a Presupuestos
           </button>
         </div>
 
-        <div className="activity-card" style={{ padding: '2rem', textAlign: 'center' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: '#fef2f2',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1rem'
-          }}>
-            <AlertCircle size={32} style={{ color: '#dc2626' }} />
+        <div className="activity-card p-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-[#fef2f2] flex items-center justify-center">
+            <AlertCircle size={32} className="text-red-600" />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--primary-800)' }}>
+          <h3 className="text-5 font-semibold mb-2 text-[var(--primary-800)]">
             Error al cargar presupuesto
           </h3>
-          <p style={{ color: 'var(--primary-600)', marginBottom: '1.5rem' }}>
+          <p className="text-[var(--primary-600)] mb-6">
             {error || 'El presupuesto no existe o no tiene permisos para verlo'}
           </p>
           <button
@@ -113,16 +98,10 @@ export default function EditarPresupuestoPage() {
 
   return (
     <div className="dashboard-container">
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div className="mb-6">
         <button
           onClick={() => router.push('/dashboard/contabilidad/presupuestos/lista')}
-          className="secondary-btn"
-          style={{
-            padding: '0.5rem 1rem',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+          className="secondary-btn py-2 px-4 inline-flex items-center gap-2"
         >
           <ArrowLeft size={18} />
           Volver a Presupuestos

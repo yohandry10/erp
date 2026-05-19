@@ -2,7 +2,7 @@
 # Endpoint: PUT /api/finanzas/bancos/cuentas/:id
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1MnMwL3VBZGRLMnBKL0QiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2Vqb2Fxd3Fkb2Fhb2Fhb2Fhb2Fhby5zdXBhYmFzZS5jby9hdXRoL3YxIiwic3ViIjoiNDU0YzI3YzItNjI5Zi00YzI5LWI5YzAtNzU5YzI3YzI3YzI3IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsImV4cCI6MTc2NzIyNTYwMCwiaWF0IjoxNzM1Njg5NjAwLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3MzU2ODk2MDB9XSwic2Vzc2lvbl9pZCI6IjEyMzQ1Njc4LTEyMzQtMTIzNC0xMjM0LTEyMzQ1Njc4OTBhYiIsImlzX2Fub255bW91cyI6ZmFsc2V9.test-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
 $headers = @{
@@ -38,7 +38,7 @@ try {
     Write-Host "  Número: $($crearResponse.data.numero_cuenta)" -ForegroundColor Gray
     Write-Host "  Tipo: $($crearResponse.data.tipo_cuenta)" -ForegroundColor Gray
     Write-Host "  Saldo: $($crearResponse.data.saldo)" -ForegroundColor Gray
-    
+
     $cuentaId = $crearResponse.data.id
 } catch {
     Write-Host "✗ Error creando cuenta: $($_.Exception.Message)" -ForegroundColor Red
@@ -81,43 +81,43 @@ Write-Host "`nPASO 3: Verificar cambios..." -ForegroundColor Yellow
 try {
     $verificarResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId" -Method Get -Headers $headers
     Write-Host "✓ Cuenta obtenida para verificación" -ForegroundColor Green
-    
+
     # Verificar cambios
     $cambiosCorrectos = $true
-    
+
     if ($verificarResponse.data.nombre -ne "Cuenta Test Actualizada") {
         Write-Host "  ✗ Nombre no actualizado correctamente" -ForegroundColor Red
         $cambiosCorrectos = $false
     } else {
         Write-Host "  ✓ Nombre actualizado correctamente" -ForegroundColor Green
     }
-    
+
     if ($verificarResponse.data.banco -ne "Banco Actualizado") {
         Write-Host "  ✗ Banco no actualizado correctamente" -ForegroundColor Red
         $cambiosCorrectos = $false
     } else {
         Write-Host "  ✓ Banco actualizado correctamente" -ForegroundColor Green
     }
-    
+
     if ($verificarResponse.data.tipo_cuenta -ne "AHORROS") {
         Write-Host "  ✗ Tipo de cuenta no actualizado correctamente" -ForegroundColor Red
         $cambiosCorrectos = $false
     } else {
         Write-Host "  ✓ Tipo de cuenta actualizado correctamente" -ForegroundColor Green
     }
-    
+
     if ($verificarResponse.data.permite_sobregiro -ne $true) {
         Write-Host "  ✗ Permite sobregiro no actualizado correctamente" -ForegroundColor Red
         $cambiosCorrectos = $false
     } else {
         Write-Host "  ✓ Permite sobregiro actualizado correctamente" -ForegroundColor Green
     }
-    
+
     if (-not $cambiosCorrectos) {
         Write-Host "`n✗ Algunos cambios no se aplicaron correctamente" -ForegroundColor Red
         exit 1
     }
-    
+
 } catch {
     Write-Host "✗ Error verificando cuenta: $($_.Exception.Message)" -ForegroundColor Red
     exit 1

@@ -15,8 +15,9 @@ export default function NuevoClientePage() {
     try {
       const response = await post('/api/ventas/clientes', data)
       
-      // El backend devuelve directamente el cliente creado (con id)
-      if (response?.id) {
+      const clienteCreado = response?.data || response;
+
+      if (clienteCreado?.id) {
         toast({
           title: 'Cliente creado',
           description: `Cliente ${data.razon_social} creado exitosamente`
@@ -40,37 +41,11 @@ export default function NuevoClientePage() {
   }
 
   return (
-    <div style={{
-      padding: '2rem',
-      maxWidth: '1200px',
-      margin: '0 auto',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem'
-    }}>
+    <div className="p-8 max-w-[1200px] my-0 mx-auto flex flex-col gap-6">
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem'
-      }}>
+      <div className="flex items-center gap-4">
         <Link
-          href="/dashboard/ventas/clientes"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: 'var(--primary-700)',
-            background: 'rgba(255, 255, 255, 0.8)',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            textDecoration: 'none',
-          }}
+          href="/dashboard/ventas/clientes" className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -82,33 +57,17 @@ export default function NuevoClientePage() {
             e.currentTarget.style.transform = 'translateX(0)'
           }}
         >
-          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeft className="w-4 h-4" />
           Volver
         </Link>
         <div>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: 'var(--primary-900)',
-            margin: 0
-          }}>Nuevo Cliente</h1>
-          <p style={{
-            fontSize: '1rem',
-            color: 'var(--primary-600)',
-            margin: '0.25rem 0 0 0'
-          }}>Registra un nuevo cliente en el sistema</p>
+          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">Nuevo Cliente</h1>
+          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">Registra un nuevo cliente en el sistema</p>
         </div>
       </div>
 
       {/* Form Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '2rem',
-        boxShadow: 'var(--shadow-xl)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
+      <div className="p-8 shadow border">
         <ClienteForm
           onSubmit={handleSubmit}
           onCancel={handleCancel}

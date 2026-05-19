@@ -11,6 +11,22 @@ const AsistenciaPage = () => {
   const { get, post } = useApi();
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
+  const normalizeArrayResponse = (response: any) => {
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.data)) return response.data;
+    return [];
+  };
+
+  const formatLocalDate = (date: string) => {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('es-PE', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
       setEmpleados([]);
@@ -23,15 +39,11 @@ const AsistenciaPage = () => {
       
       // Cargar empleados
       const empleadosData = await get('/api/rrhh/empleados');
-      if (empleadosData && Array.isArray(empleadosData)) {
-        setEmpleados(empleadosData);
-      }
+      setEmpleados(normalizeArrayResponse(empleadosData));
 
       // Cargar asistencias del día
       const asistenciasData = await get(`/api/rrhh/asistencias?fecha=${fecha}`);
-      if (asistenciasData && Array.isArray(asistenciasData)) {
-        setAsistencias(asistenciasData);
-      }
+      setAsistencias(normalizeArrayResponse(asistenciasData));
     } catch (error) {
       console.error('Error cargando asistencias:', error);
     } finally {
@@ -58,7 +70,7 @@ const AsistenciaPage = () => {
   };
 
   const getAsistenciaEmpleado = (empleadoId: string) => {
-    return asistencias.find(a => a.empleado_id === empleadoId);
+    return asistencias.find(a => a.empleado_id === empleadoId || a.id_empleado === empleadoId);
   };
 
   const calcularEstadisticas = () => {
@@ -88,6 +100,12 @@ const AsistenciaPage = () => {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Control de Asistencia</h1>
+            <p className="dashboard-subtitle">Cargando asistencias del día, empleados y marcaciones de entrada o salida.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando asistencias...</p>
@@ -104,13 +122,12 @@ const AsistenciaPage = () => {
           <h1 className="dashboard-title">Control de Asistencia</h1>
           <p className="dashboard-subtitle">Marcado de entrada y salida del personal</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           <input
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="form-control"
-            style={{ width: 'auto' }}
+            className="form-control w-auto"
           />
           <button className="refresh-btn" onClick={loadData}>
             🔄 Actualizar
@@ -160,12 +177,7 @@ const AsistenciaPage = () => {
       {/* Tabla de asistencias */}
       <div className="table-container">
         <div className="table-header">
-          <h2>Asistencia del {new Date(fecha).toLocaleDateString('es-PE', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</h2>
+          <h2>Asistencia del {formatLocalDate(fecha)}</h2>
         </div>
 
         <div className="table-wrapper">
@@ -204,7 +216,7 @@ const AsistenciaPage = () => {
                     <td>
                       <div>
                         <div className="font-medium">{empleado.nombres} {empleado.apellidos}</div>
-                        <div className="text-sm text-gray-500">{empleado.documento}</div>
+                        <div className="text-sm text-gray-500">{empleado.numero_documento || empleado.documento}</div>
                       </div>
                     </td>
                     <td>{empleado.departamento?.nombre || 'N/A'}</td>
@@ -217,7 +229,7 @@ const AsistenciaPage = () => {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div className="flex gap-2">
                         {!asistencia?.hora_entrada ? (
                           <button
                             onClick={() => marcarAsistencia(empleado.id, 'entrada')}

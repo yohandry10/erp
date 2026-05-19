@@ -68,6 +68,23 @@ interface Devolucion {
   items?: DevolucionItem[]
 }
 
+const ESTADO_CONFIG = {
+  PENDIENTE: { icon: Clock, className: 'bg-blue-500/20 text-blue-100 ring-blue-400/40' },
+  EMITIDA: { icon: CheckCircle, className: 'bg-cyan-500/20 text-cyan-100 ring-cyan-300/40' },
+  ANULADA: { icon: XCircle, className: 'bg-slate-800 text-slate-100 ring-slate-500/40' }
+}
+
+const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
+const panelClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const panelHeaderClass = 'mb-5 flex items-center gap-3 border-b border-blue-400/20 pb-4'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
+const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const valueClass = 'm-0 text-sm font-semibold text-slate-100'
+const primaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60'
+const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
+
 export default function DevolucionDetallePage() {
   const router = useRouter()
   const params = useParams()
@@ -76,6 +93,7 @@ export default function DevolucionDetallePage() {
   const [devolucion, setDevolucion] = useState<Devolucion | null>(null)
   const [loading, setLoading] = useState(true)
   const [emitiendo, setEmitiendo] = useState(false)
+  const [pageMessage, setPageMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const devolucionId = params.id as string | undefined
 
@@ -84,6 +102,7 @@ export default function DevolucionDetallePage() {
 
     try {
       setLoading(true)
+      setPageMessage(null)
       const response = await get(`/api/compras/devoluciones/${devolucionId}`)
       const devolucionData = response?.data ?? response
       if (devolucionData?.id) {
@@ -91,7 +110,7 @@ export default function DevolucionDetallePage() {
       }
     } catch (error) {
       console.error('Error loading devolucion:', error)
-      alert('Error al cargar devolución')
+      setPageMessage({ type: 'error', text: 'No se pudo cargar la devolución.' })
     } finally {
       setLoading(false)
     }
@@ -102,26 +121,25 @@ export default function DevolucionDetallePage() {
   }, [loadDevolucion])
 
   const handleEmitir = async () => {
-    if (!devolucion || devolucion.estado !== 'PENDIENTE') return
-
-    if (!confirm('¿Está seguro de emitir esta devolución? Esta acción actualizará el inventario y creará una nota de crédito.')) {
+    if (!devolucion || devolucion.estado !== 'PENDIENTE' || emitiendo) {
       return
     }
 
     try {
       setEmitiendo(true)
+      setPageMessage(null)
       const response = await post(`/api/compras/devoluciones/${devolucion.id}/emitir`, {})
       const devolucionEmitida = response?.data ?? response
 
       if (devolucionEmitida?.id || response?.success) {
-        alert('Devolución emitida exitosamente')
-        loadDevolucion()
+        setPageMessage({ type: 'success', text: 'Devolución emitida correctamente.' })
+        await loadDevolucion()
       } else {
-        alert(response?.message || 'Error al emitir devolución')
+        setPageMessage({ type: 'error', text: response?.message || 'No se pudo emitir la devolución.' })
       }
     } catch (error) {
       console.error('Error emitiendo devolucion:', error)
-      alert('Error al emitir devolución')
+      setPageMessage({ type: 'error', text: 'No se pudo emitir la devolución.' })
     } finally {
       setEmitiendo(false)
     }
@@ -153,28 +171,12 @@ export default function DevolucionDetallePage() {
     })
   }
 
-  const getEstadoBadge = (estado: string) => {
-    const styles = {
-      PENDIENTE: { bg: 'var(--amber-100)', color: 'var(--amber-800)', icon: Clock },
-      EMITIDA: { bg: 'var(--emerald-100)', color: 'var(--emerald-800)', icon: CheckCircle },
-      ANULADA: { bg: 'var(--red-100)', color: 'var(--red-800)', icon: XCircle }
-    }
-
-    const style = styles[estado as keyof typeof styles] || styles.PENDIENTE
-    const Icon = style.icon
+  const getEstadoBadge = (estado: Devolucion['estado']) => {
+    const config = ESTADO_CONFIG[estado] || ESTADO_CONFIG.PENDIENTE
+    const Icon = config.icon
 
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '6px 14px',
-        borderRadius: '12px',
-        fontSize: '13px',
-        fontWeight: '600',
-        backgroundColor: style.bg,
-        color: style.color
-      }}>
+      <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ring-1 ${config.className}`}>
         <Icon size={16} />
         {estado}
       </span>
@@ -183,9 +185,9 @@ export default function DevolucionDetallePage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '24px' }}>
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>
-          Cargando devolución...
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className={panelClass}>Cargando devolución...</div>
         </div>
       </div>
     )
@@ -193,71 +195,36 @@ export default function DevolucionDetallePage() {
 
   if (!devolucion) {
     return (
-      <div style={{ padding: '24px' }}>
-        <div style={{ textAlign: 'center', padding: '60px' }}>
-          <PackageX size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
-          <p style={{ color: 'var(--text-secondary)' }}>Devolución no encontrada</p>
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className={`${panelClass} max-w-xl text-center`}>
+            <PackageX className="mx-auto mb-4 size-12 text-slate-300" />
+            <p className="m-0 text-sm text-slate-300">Devolución no encontrada</p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <button
-          onClick={() => router.back()}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '16px'
-          }}
-        >
+    <div className={pageClass}>
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
+        <button onClick={() => router.back()} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
           <ArrowLeft size={18} />
           Volver
         </button>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: '700' }}>
-                Devolución {devolucion.numero}
-              </h1>
+            <div className="mb-2 flex flex-wrap items-center gap-4">
+              <h1 className="m-0 text-3xl font-bold text-white">Devolución {devolucion.numero}</h1>
               {getEstadoBadge(devolucion.estado)}
             </div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-              Creada el {formatDateTime(devolucion.created_at)}
-            </p>
+            <p className="m-0 text-sm text-slate-300">Creada el {formatDateTime(devolucion.created_at)}</p>
           </div>
 
           {devolucion.estado === 'PENDIENTE' && (
-            <button
-              onClick={handleEmitir}
-              disabled={emitiendo}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 24px',
-                backgroundColor: 'var(--emerald-600)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: emitiendo ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                opacity: emitiendo ? 0.6 : 1
-              }}
-            >
+            <button onClick={handleEmitir} disabled={emitiendo} className={primaryActionClass}>
               <CheckCircle size={18} />
               {emitiendo ? 'Emitiendo...' : 'Emitir Devolución'}
             </button>
@@ -265,96 +232,64 @@ export default function DevolucionDetallePage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-        {/* Columna Principal */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Información General */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>
-              Información General
-            </h2>
+      {pageMessage && (
+        <div className={`mb-6 rounded-xl border p-4 text-sm font-semibold ${pageMessage.type === 'error' ? 'border-slate-500/40 bg-slate-900/80 text-slate-100' : 'border-blue-400/30 bg-blue-500/10 text-blue-100'}`}>
+          <div className="flex items-center gap-3">
+            {pageMessage.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
+            {pageMessage.text}
+          </div>
+        </div>
+      )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <div className="grid gap-6">
+          <div className={panelClass}>
+            <div className={panelHeaderClass}>
+              <div className={iconBoxClass}><FileText size={20} /></div>
+              <h2 className="m-0 text-lg font-bold text-white">Información de la Devolución</h2>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Orden de Compra
-                </label>
-                <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                  {devolucion.orden?.numero || '-'}
-                </p>
+                <label className={labelClass}>Número</label>
+                <p className={valueClass}>{devolucion.numero}</p>
               </div>
-
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Recepción
-                </label>
-                <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                  {devolucion.recepcion?.numero || '-'}
-                </p>
+                <label className={labelClass}>Fecha</label>
+                <p className={valueClass}>{formatDate(devolucion.fecha_devolucion)}</p>
               </div>
-
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Fecha Devolución
-                </label>
-                <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                  {formatDate(devolucion.fecha_devolucion)}
-                </p>
+                <label className={labelClass}>Orden de Compra</label>
+                <p className={valueClass}>{devolucion.orden?.numero || 'N/A'}</p>
               </div>
-
-              {devolucion.recepcion?.fecha_recepcion && (
+              {devolucion.recepcion && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Fecha Recepción Original
-                  </label>
-                  <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {formatDate(devolucion.recepcion.fecha_recepcion)}
-                  </p>
+                  <label className={labelClass}>Recepción</label>
+                  <p className={valueClass}>{devolucion.recepcion.numero}</p>
+                  <p className="mt-1 text-xs text-slate-400">Recibida: {formatDate(devolucion.recepcion.fecha_recepcion)}</p>
                 </div>
               )}
             </div>
 
-            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Motivo
-              </label>
-              <p style={{ fontSize: '14px', fontWeight: '500', marginBottom: '12px' }}>
-                {devolucion.motivo}
-              </p>
-
+            <div className="mt-5 border-t border-blue-400/20 pt-5">
+              <label className={labelClass}>Motivo</label>
+              <p className="mb-4 text-sm font-semibold text-slate-100">{devolucion.motivo}</p>
               {devolucion.observaciones && (
                 <>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                    Observaciones
-                  </label>
-                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                    {devolucion.observaciones}
-                  </p>
+                  <label className={labelClass}>Observaciones</label>
+                  <p className="m-0 text-sm leading-6 text-slate-300">{devolucion.observaciones}</p>
                 </>
               )}
             </div>
 
-            {devolucion.estado === 'EMITIDA' && devolucion.emitido_at && (
-              <div style={{
-                marginTop: '20px',
-                padding: '16px',
-                backgroundColor: 'var(--emerald-50)',
-                border: '1px solid var(--emerald-200)',
-                borderRadius: '8px'
-              }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'start' }}>
-                  <CheckCircle size={20} style={{ color: 'var(--emerald-600)', flexShrink: 0, marginTop: '2px' }} />
+            {devolucion.estado === 'EMITIDA' && (
+              <div className="mt-5 rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="mt-0.5 size-5 shrink-0 text-blue-200" />
                   <div>
-                    <p style={{ fontWeight: '600', color: 'var(--emerald-900)', marginBottom: '4px' }}>
-                      Devolución Emitida
-                    </p>
-                    <p style={{ fontSize: '13px', color: 'var(--emerald-800)' }}>
-                      Emitida el {formatDateTime(devolucion.emitido_at)}
+                    <p className="mb-1 font-semibold text-blue-100">Devolución emitida</p>
+                    <p className="m-0 text-sm text-slate-300">
+                      Emitida el {devolucion.emitido_at ? formatDateTime(devolucion.emitido_at) : 'N/A'}
                       {devolucion.emitido_por && ` por ${devolucion.emitido_por}`}
                     </p>
                   </div>
@@ -363,80 +298,40 @@ export default function DevolucionDetallePage() {
             )}
           </div>
 
-          {/* Items */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }}>
-            <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '600' }}>
-                Items Devueltos ({devolucion.items?.length || 0})
-              </h2>
+          <div className={panelClass}>
+            <div className={panelHeaderClass}>
+              <div className={iconBoxClass}><PackageX size={20} /></div>
+              <h2 className="m-0 text-lg font-bold text-white">Items Devueltos</h2>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-x-auto rounded-xl border border-blue-400/10">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      PRODUCTO
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      CANTIDAD
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      P. UNITARIO
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      SUBTOTAL
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                      MOTIVO
-                    </th>
+                  <tr className="border-b border-blue-400/20 bg-blue-500/5">
+                    <th className={tableHeadClass}>Producto</th>
+                    <th className={`${tableHeadClass} text-center`}>Cantidad</th>
+                    <th className={`${tableHeadClass} text-right`}>Precio Unit.</th>
+                    <th className={`${tableHeadClass} text-right`}>Subtotal</th>
+                    <th className={tableHeadClass}>Motivo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {devolucion.items?.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '16px' }}>
-                        <div>
-                          <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '2px' }}>
-                            {item.producto?.nombre || '-'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                            Código: {item.producto?.codigo || '-'}
-                          </div>
-                        </div>
+                    <tr key={item.id} className="border-b border-blue-400/10 last:border-b-0 hover:bg-blue-500/5">
+                      <td className={tableCellClass}>
+                        <div className="font-semibold text-white">{item.producto?.nombre || 'N/A'}</div>
+                        <div className="text-xs text-slate-400">{item.producto?.codigo || 'N/A'}</div>
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'center', fontSize: '14px', fontWeight: '500' }}>
+                      <td className={`${tableCellClass} text-center font-semibold text-white`}>
                         {item.cantidad} {item.producto?.unidad_medida || ''}
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right', fontSize: '14px' }}>
-                        {formatCurrency(item.precio_unitario)}
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', fontWeight: '600' }}>
-                        {formatCurrency(item.subtotal)}
-                      </td>
-                      <td style={{ padding: '16px', fontSize: '13px' }}>
-                        <div>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            backgroundColor: 'var(--red-100)',
-                            color: 'var(--red-800)'
-                          }}>
-                            {item.motivo_detalle || item.motivo || '-'}
-                          </span>
-                          {item.observaciones && (
-                            <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                              {item.observaciones}
-                            </div>
-                          )}
-                        </div>
+                      <td className={`${tableCellClass} text-right`}>{formatCurrency(item.precio_unitario)}</td>
+                      <td className={`${tableCellClass} text-right font-semibold text-white`}>{formatCurrency(item.subtotal)}</td>
+                      <td className={tableCellClass}>
+                        <span className="inline-flex rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-100 ring-1 ring-slate-500/40">
+                          {item.motivo || devolucion.motivo}
+                        </span>
+                        {item.motivo_detalle && <div className="mt-2 text-xs text-slate-400">{item.motivo_detalle}</div>}
                       </td>
                     </tr>
                   ))}
@@ -444,136 +339,84 @@ export default function DevolucionDetallePage() {
               </table>
             </div>
 
-            {/* Totales */}
-            <div style={{ padding: '24px', backgroundColor: 'var(--gray-50)', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ maxWidth: '300px', marginLeft: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Subtotal:</span>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>{formatCurrency(devolucion.subtotal)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>IGV (18%):</span>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>{formatCurrency(devolucion.igv)}</span>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  paddingTop: '12px',
-                  borderTop: '2px solid var(--border-color)'
-                }}>
-                  <span style={{ fontSize: '16px', fontWeight: '600' }}>Total:</span>
-                  <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary-600)' }}>
-                    {formatCurrency(devolucion.total)}
-                  </span>
-                </div>
+            <div className="ml-auto mt-6 grid max-w-sm gap-2 rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Subtotal:</span>
+                <span className="font-semibold text-slate-100">{formatCurrency(devolucion.subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">IGV (18%):</span>
+                <span className="font-semibold text-slate-100">{formatCurrency(devolucion.igv)}</span>
+              </div>
+              <div className="flex justify-between border-t border-blue-400/20 pt-2 text-lg">
+                <span className="font-semibold text-white">Total:</span>
+                <span className="font-bold text-blue-100">{formatCurrency(devolucion.total)}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Columna Lateral */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Proveedor */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>
-              Proveedor
-            </h2>
-
-            <div style={{ marginBottom: '16px' }}>
-              <p style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
-                {devolucion.proveedor?.razon_social || '-'}
-              </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                RUC: {devolucion.proveedor?.ruc || '-'}
-              </p>
+        <div className="grid content-start gap-6">
+          <div className={panelClass}>
+            <div className={panelHeaderClass}>
+              <div className={iconBoxClass}><User size={20} /></div>
+              <h2 className="m-0 text-lg font-bold text-white">Proveedor</h2>
             </div>
-
-            {devolucion.proveedor?.direccion && (
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Dirección
-                </label>
-                <p style={{ fontSize: '13px' }}>
-                  {devolucion.proveedor.direccion}
-                </p>
-              </div>
-            )}
-
-            {devolucion.proveedor?.telefono && (
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Teléfono
-                </label>
-                <p style={{ fontSize: '13px' }}>
-                  {devolucion.proveedor.telefono}
-                </p>
-              </div>
-            )}
-
-            {devolucion.proveedor?.email && (
+            <div className="grid gap-4">
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Email
-                </label>
-                <p style={{ fontSize: '13px' }}>
-                  {devolucion.proveedor.email}
-                </p>
+                <p className={valueClass}>{devolucion.proveedor?.razon_social || 'N/A'}</p>
+                <p className="mt-1 text-xs text-slate-400">RUC: {devolucion.proveedor?.ruc || 'N/A'}</p>
               </div>
-            )}
+              {devolucion.proveedor?.direccion && (
+                <div>
+                  <label className={labelClass}>Dirección</label>
+                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.direccion}</p>
+                </div>
+              )}
+              {devolucion.proveedor?.telefono && (
+                <div>
+                  <label className={labelClass}>Teléfono</label>
+                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.telefono}</p>
+                </div>
+              )}
+              {devolucion.proveedor?.email && (
+                <div>
+                  <label className={labelClass}>Email</label>
+                  <p className="m-0 text-sm text-slate-300">{devolucion.proveedor.email}</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Información Adicional */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '24px'
-          }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px' }}>
-              Información Adicional
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                <Calendar size={18} style={{ color: 'var(--text-tertiary)', flexShrink: 0, marginTop: '2px' }} />
+          <div className={panelClass}>
+            <div className={panelHeaderClass}>
+              <div className={iconBoxClass}><Calendar size={20} /></div>
+              <h2 className="m-0 text-lg font-bold text-white">Auditoría</h2>
+            </div>
+            <div className="grid gap-4">
+              <div className="flex items-start gap-3">
+                <Calendar className="mt-0.5 size-5 shrink-0 text-blue-200" />
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                    Fecha de Creación
-                  </p>
-                  <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {formatDateTime(devolucion.created_at)}
-                  </p>
+                  <p className="mb-1 text-xs text-slate-400">Creada</p>
+                  <p className={valueClass}>{formatDateTime(devolucion.created_at)}</p>
                 </div>
               </div>
 
               {devolucion.created_by && (
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                  <User size={18} style={{ color: 'var(--text-tertiary)', flexShrink: 0, marginTop: '2px' }} />
+                <div className="flex items-start gap-3">
+                  <User className="mt-0.5 size-5 shrink-0 text-blue-200" />
                   <div>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                      Creado por
-                    </p>
-                    <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                      {devolucion.created_by}
-                    </p>
+                    <p className="mb-1 text-xs text-slate-400">Creada por</p>
+                    <p className={valueClass}>{devolucion.created_by}</p>
                   </div>
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                <FileText size={18} style={{ color: 'var(--text-tertiary)', flexShrink: 0, marginTop: '2px' }} />
+              <div className="flex items-start gap-3">
+                <FileText className="mt-0.5 size-5 shrink-0 text-blue-200" />
                 <div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                    Número de Devolución
-                  </p>
-                  <p style={{ fontSize: '14px', fontWeight: '500' }}>
-                    {devolucion.numero}
-                  </p>
+                  <p className="mb-1 text-xs text-slate-400">Estado actual</p>
+                  <p className={valueClass}>{devolucion.estado}</p>
                 </div>
               </div>
             </div>

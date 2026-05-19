@@ -1,5 +1,7 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
+
 interface UserRowProps {
   usuario: any
   currentUserId?: string
@@ -7,35 +9,16 @@ interface UserRowProps {
   onChangeStatus: (usuario: any, estado: string) => void
 }
 
-const getStatusColor = (estado: string) => {
+const getStatusClass = (estado: string) => {
   switch (estado) {
     case 'ACTIVO':
-      return { background: '#10b981', color: 'white' }
+      return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
     case 'INACTIVO':
-      return { background: '#ef4444', color: 'white' }
+      return 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'
     case 'SUSPENDIDO':
-      return { background: '#f59e0b', color: 'white' }
+      return 'border-amber-300/25 bg-amber-300/10 text-amber-100 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-700'
     default:
-      return { background: '#6b7280', color: 'white' }
-  }
-}
-
-const getRoleColor = (rol: string) => {
-  switch (rol) {
-    case 'ADMIN':
-      return { background: '#8b5cf6', color: 'white' }
-    case 'CONTADOR':
-      return { background: '#3b82f6', color: 'white' }
-    case 'VENDEDOR':
-      return { background: '#10b981', color: 'white' }
-    case 'ALMACENERO':
-      return { background: '#f59e0b', color: 'white' }
-    case 'CAJERO':
-      return { background: '#ec4899', color: 'white' }
-    case 'SUPERVISOR':
-      return { background: '#6366f1', color: 'white' }
-    default:
-      return { background: '#6b7280', color: 'white' }
+      return 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'
   }
 }
 
@@ -55,125 +38,69 @@ const getTimeAgo = (dateString: string) => {
 }
 
 export default function UserRow({ usuario, currentUserId, onEdit, onChangeStatus }: UserRowProps) {
-  const statusStyle = getStatusColor(usuario.estado)
   const roleName = usuario.roles_usuario?.[0]?.roles?.nombre || 'Sin rol'
-  const roleStyle = getRoleColor(roleName)
   const isCurrentUser = usuario.id === currentUserId
 
-  const buttonBaseStyle = {
-    padding: '0.5rem 1rem',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.8rem'
-  }
-
   return (
-    <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-      <td style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ 
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: '600',
-            fontSize: '1.1rem'
-          }}>
+    <tr className="transition hover:bg-white/[0.03] group-data-[erp-theme=light]/dashboard:hover:bg-slate-50">
+      <td className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 text-sm font-bold text-white">
             {usuario.nombre?.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
           </div>
           <div>
-            <div style={{ fontWeight: '600' }}>{usuario.nombre}</div>
-            <div style={{ fontSize: '0.8rem', opacity: '0.7' }}>
+            <div className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">{usuario.nombre}</div>
+            <div className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
               {roleName}
             </div>
           </div>
         </div>
       </td>
-      <td style={{ padding: '1rem' }}>{usuario.email}</td>
-      <td style={{ padding: '1rem', textAlign: 'center' }}>
-        <span style={{ 
-          background: roleStyle.background, 
-          color: roleStyle.color, 
-          padding: '0.25rem 0.75rem', 
-          borderRadius: '20px', 
-          fontSize: '0.8rem',
-          fontWeight: '500'
-        }}>
+      <td className="p-4 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{usuario.email}</td>
+      <td className="p-4 text-center">
+        <Badge className="border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
           {roleName}
-        </span>
+        </Badge>
       </td>
-      <td style={{ padding: '1rem' }}>
+      <td className="p-4">
         <div>{getTimeAgo(usuario.fecha_ultimo_acceso)}</div>
-        <div style={{ fontSize: '0.8rem', opacity: '0.7' }}>
+        <div className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
           {usuario.fecha_ultimo_acceso ? 
             new Date(usuario.fecha_ultimo_acceso).toLocaleDateString('es-PE') :
             'Nunca'
           }
         </div>
       </td>
-      <td style={{ padding: '1rem' }}>
+      <td className="p-4">
         {new Date(usuario.created_at).toLocaleDateString('es-PE')}
       </td>
-      <td style={{ padding: '1rem', textAlign: 'center' }}>
-        <span style={{ 
-          background: statusStyle.background, 
-          color: statusStyle.color, 
-          padding: '0.25rem 0.75rem', 
-          borderRadius: '20px', 
-          fontSize: '0.8rem',
-          fontWeight: '500'
-        }}>
+      <td className="p-4 text-center">
+        <Badge className={getStatusClass(usuario.estado)}>
           {usuario.estado}
-        </span>
+        </Badge>
       </td>
-      <td style={{ padding: '1rem', textAlign: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+      <td className="p-4 text-center">
+        <div className="flex gap-2 justify-center">
           {isCurrentUser ? (
-            <span style={{ 
-              fontSize: '0.75rem', 
-              color: '#6b7280',
-              fontStyle: 'italic'
-            }}>
+            <span className="text-xs text-slate-400">
               (Tu cuenta)
             </span>
           ) : (
             <>
               <button 
-                onClick={() => onEdit(usuario)}
-                style={{ 
-                  ...buttonBaseStyle,
-                  background: 'rgba(59, 130, 246, 0.1)', 
-                  border: '1px solid rgba(59, 130, 246, 0.2)', 
-                  color: '#3b82f6'
-                }}
+                onClick={() => onEdit(usuario)} className="rounded-md border border-blue-300/25 bg-blue-300/10 px-3 py-2 text-xs font-semibold text-blue-100 transition hover:bg-blue-300/20 group-data-[erp-theme=light]/dashboard:text-blue-700"
               >
                 Editar
               </button>
               {usuario.estado === 'ACTIVO' ? (
                 <button 
-                  onClick={() => onChangeStatus(usuario, 'INACTIVO')}
-                  style={{ 
-                    ...buttonBaseStyle,
-                    background: 'rgba(239, 68, 68, 0.1)', 
-                    border: '1px solid rgba(239, 68, 68, 0.2)', 
-                    color: '#ef4444'
-                  }}
+                  onClick={() => onChangeStatus(usuario, 'INACTIVO')} className="rounded-md border border-slate-300/25 bg-slate-300/10 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-300/20 group-data-[erp-theme=light]/dashboard:text-slate-700"
                 >
                   Desactivar
                 </button>
               ) : (
                 <button 
-                  onClick={() => onChangeStatus(usuario, 'ACTIVO')}
-                  style={{ 
-                    ...buttonBaseStyle,
-                    background: 'rgba(16, 185, 129, 0.1)', 
-                    border: '1px solid rgba(16, 185, 129, 0.2)', 
-                    color: '#10b981'
-                  }}
+                  onClick={() => onChangeStatus(usuario, 'ACTIVO')} className="rounded-md border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/20 group-data-[erp-theme=light]/dashboard:text-cyan-700"
                 >
                   Activar
                 </button>

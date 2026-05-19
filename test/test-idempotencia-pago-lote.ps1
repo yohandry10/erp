@@ -115,7 +115,7 @@ try {
     Write-Host "  Monto total: $($primerResultado.data.monto_total)" -ForegroundColor Gray
     Write-Host "  Pagos exitosos: $($primerResultado.data.pagos_exitosos)" -ForegroundColor Gray
     Write-Host "  Idempotente: $($primerResultado.data.idempotent)" -ForegroundColor Gray
-    
+
     # Store first result for comparison
     $primerLoteId = $primerResultado.data.lote_id
     $primerMontoTotal = $primerResultado.data.monto_total
@@ -156,7 +156,7 @@ try {
     Write-Host "  Monto total: $($segundoResultado.data.monto_total)" -ForegroundColor Gray
     Write-Host "  Pagos exitosos: $($segundoResultado.data.pagos_exitosos)" -ForegroundColor Gray
     Write-Host "  Idempotente: $($segundoResultado.data.idempotent)" -ForegroundColor Gray
-    
+
     # Verify idempotency
     if ($segundoResultado.data.idempotent -eq $true) {
         Write-Host ""
@@ -167,7 +167,7 @@ try {
         Write-Host "✗✗✗ FALLO DE IDEMPOTENCIA ✗✗✗" -ForegroundColor Red
         Write-Host "  El segundo request procesó el lote nuevamente (no debería)" -ForegroundColor Red
     }
-    
+
     # Compare results
     Write-Host ""
     Write-Host "8. Comparando resultados..." -ForegroundColor Yellow
@@ -176,19 +176,19 @@ try {
     } else {
         Write-Host "  ✗ Lote ID NO coincide" -ForegroundColor Red
     }
-    
+
     if ($primerMontoTotal -eq $segundoResultado.data.monto_total) {
         Write-Host "  ✓ Monto total coincide" -ForegroundColor Green
     } else {
         Write-Host "  ✗ Monto total NO coincide" -ForegroundColor Red
     }
-    
+
     if ($primerPagosExitosos -eq $segundoResultado.data.pagos_exitosos) {
         Write-Host "  ✓ Pagos exitosos coincide" -ForegroundColor Green
     } else {
         Write-Host "  ✗ Pagos exitosos NO coincide" -ForegroundColor Red
     }
-    
+
 } catch {
     Write-Host "✗ Error procesando segundo lote: $_" -ForegroundColor Red
     Write-Host $_.Exception.Response.StatusCode -ForegroundColor Red
@@ -201,7 +201,7 @@ foreach ($cxpId in $cxpIds) {
     try {
         $cxpResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/$cxpId" -Method Get -Headers $headers
         Write-Host "  CxP $($cxpResponse.data.numero_documento): Estado=$($cxpResponse.data.estado), Saldo=$($cxpResponse.data.saldo)" -ForegroundColor Gray
-        
+
         # Verify saldo is still 0 (not negative)
         if ($cxpResponse.data.saldo -eq 0) {
             Write-Host "    ✓ Saldo correcto (0 - no se reprocesó)" -ForegroundColor Green

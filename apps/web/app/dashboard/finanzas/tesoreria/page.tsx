@@ -1,20 +1,34 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
-import { 
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  CreditCard,
+import {
   AlertCircle,
-  RefreshCw,
   ArrowRight,
+  Calendar,
+  CheckCircle,
   Clock,
-  CheckCircle
+  CreditCard,
+  DollarSign,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
+
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useApi } from '@/hooks/use-api'
+import { cn } from '@/lib/utils'
 
 interface CuentaBancaria {
   id: string
@@ -51,35 +65,30 @@ interface ResumenFlujo {
 const URGENCIA_CONFIG = {
   VENCIDA: {
     label: 'Vencida',
-    color: '#ef4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
+    className: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
   },
   HOY: {
-    label: 'Vence Hoy',
-    color: '#f59e0b',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
+    label: 'Vence hoy',
+    className: 'border-amber-300/35 bg-amber-300/10 text-amber-100',
   },
   URGENTE: {
     label: 'Urgente',
-    color: '#f59e0b',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
+    className: 'border-sky-300/35 bg-sky-300/10 text-sky-100',
   },
   PROXIMA: {
     label: 'Próxima',
-    color: '#3b82f6',
-    bgColor: 'rgba(59, 130, 246, 0.1)',
+    className: 'border-cyan-300/35 bg-cyan-300/10 text-cyan-100',
   },
   NORMAL: {
     label: 'Normal',
-    color: '#10b981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
+    className: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
   },
 }
 
 export default function TesoreriaPage() {
   const router = useRouter()
   const { get } = useApi({ retries: 1, timeoutMs: 8000 })
-  
+
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([])
   const [proximosPagos, setProximosPagos] = useState<PagoProximo[]>([])
   const [resumenFlujo, setResumenFlujo] = useState<ResumenFlujo[]>([])
@@ -89,25 +98,22 @@ export default function TesoreriaPage() {
     try {
       setLoading(true)
 
-      // Cargar cuentas bancarias
       const cuentasResponse = await get('/api/finanzas/bancos/cuentas')
       if (cuentasResponse?.success) {
         setCuentas(cuentasResponse.data || [])
       }
 
-      // Cargar próximos pagos (próximos 15 días)
       const hoy = new Date()
       const en15Dias = new Date()
       en15Dias.setDate(hoy.getDate() + 15)
-      
+
       const programacionResponse = await get(
-        `/api/finanzas/tesoreria/programacion?fecha_hasta=${en15Dias.toISOString().split('T')[0]}&limit=10`
+        `/api/finanzas/tesoreria/programacion?fecha_hasta=${en15Dias.toISOString().split('T')[0]}&limit=10`,
       )
       if (programacionResponse?.success) {
         setProximosPagos(programacionResponse.data || [])
       }
 
-      // Cargar resumen de flujo de caja (próximos 30 días)
       const flujoResponse = await get('/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=30')
       if (flujoResponse?.success && flujoResponse.data?.resumen) {
         setResumenFlujo(flujoResponse.data.resumen || [])
@@ -127,537 +133,281 @@ export default function TesoreriaPage() {
     const currency = moneda === 'USD' ? 'USD' : 'PEN'
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: currency,
+      currency,
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     })
-  }
 
   const getUrgenciaBadge = (urgencia: string) => {
     const config = URGENCIA_CONFIG[urgencia as keyof typeof URGENCIA_CONFIG]
     if (!config) return null
-    
+
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: config.color,
-        color: 'white'
-      }}>
+      <Badge variant="outline" className={cn('whitespace-nowrap', config.className)}>
         {config.label}
-      </span>
+      </Badge>
     )
   }
 
-  const totalSaldoPEN = cuentas
-    .filter(c => c.moneda === 'PEN')
-    .reduce((sum, c) => sum + c.saldo, 0)
+  const totalSaldoPEN = cuentas.filter((c) => c.moneda === 'PEN').reduce((sum, c) => sum + c.saldo, 0)
+  const totalSaldoUSD = cuentas.filter((c) => c.moneda === 'USD').reduce((sum, c) => sum + c.saldo, 0)
+  const totalPorPagarPEN = proximosPagos.filter((p) => p.moneda === 'PEN').reduce((sum, p) => sum + p.saldo, 0)
+  const totalPorPagarUSD = proximosPagos.filter((p) => p.moneda === 'USD').reduce((sum, p) => sum + p.saldo, 0)
+  const pagosVencidos = proximosPagos.filter((p) => p.urgencia === 'VENCIDA').length
+  const pagosUrgentes = proximosPagos.filter((p) => p.urgencia === 'HOY' || p.urgencia === 'URGENTE').length
 
-  const totalSaldoUSD = cuentas
-    .filter(c => c.moneda === 'USD')
-    .reduce((sum, c) => sum + c.saldo, 0)
-
-  const totalPorPagarPEN = proximosPagos
-    .filter(p => p.moneda === 'PEN')
-    .reduce((sum, p) => sum + p.saldo, 0)
-
-  const totalPorPagarUSD = proximosPagos
-    .filter(p => p.moneda === 'USD')
-    .reduce((sum, p) => sum + p.saldo, 0)
-
-  const pagosVencidos = proximosPagos.filter(p => p.urgencia === 'VENCIDA').length
-  const pagosUrgentes = proximosPagos.filter(p => p.urgencia === 'HOY' || p.urgencia === 'URGENTE').length
+  if (loading) {
+    return (
+      <div className="min-h-full bg-slate-950 p-6 text-slate-100">
+        <Card className="border-cyan-400/20 bg-slate-950/70">
+          <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
+            <RefreshCw className="h-8 w-8 animate-spin text-cyan-300" />
+            <p className="text-sm text-slate-300">Cargando información de tesorería...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Tesorería</h1>
-          <p className="dashboard-subtitle">Gestiona los pagos a proveedores y el flujo de caja</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            onClick={loadDashboardData}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando información de tesorería...</p>
-        </div>
-      ) : (
-        <>
-          {/* Saldos de Cuentas Bancarias */}
-          <div className="activity-section">
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Saldos Disponibles</h2>
-              <button
-                onClick={() => router.push('/dashboard/finanzas/bancos')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                Ver Todas las Cuentas
-                <ArrowRight size={16} />
-              </button>
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.22),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:p-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+        <Card className="border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-white">
+          <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+                ERP Treasury Center
+              </Badge>
+              <h1 className="text-2xl font-semibold tracking-normal text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:text-3xl">
+                Tesorería
+              </h1>
+              <p className="mt-1 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                Saldos bancarios, pagos próximos, flujo proyectado y acciones financieras críticas.
+              </p>
             </div>
+            <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={loadDashboardData}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Actualizar
+            </Button>
+          </CardContent>
+        </Card>
 
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>SALDO PEN</h3>
-                  <DollarSign className="stat-icon" style={{ color: '#10b981' }} />
-                </div>
-                <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-                  {formatCurrency(totalSaldoPEN, 'PEN')}
-                </div>
-                <div className="stat-subtitle">
-                  {cuentas.filter(c => c.moneda === 'PEN').length} cuenta(s)
-                </div>
-              </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard icon={DollarSign} label="Saldo PEN" value={formatCurrency(totalSaldoPEN, 'PEN')} detail={`${cuentas.filter((c) => c.moneda === 'PEN').length} cuenta(s)`} />
+          <MetricCard icon={DollarSign} label="Saldo USD" value={formatCurrency(totalSaldoUSD, 'USD')} detail={`${cuentas.filter((c) => c.moneda === 'USD').length} cuenta(s)`} />
+          <MetricCard icon={TrendingDown} label="Por pagar 15 días" value={formatCurrency(totalPorPagarPEN, 'PEN')} detail={`${formatCurrency(totalPorPagarUSD, 'USD')} en USD`} />
+          <MetricCard icon={AlertCircle} label="Alertas" value={(pagosVencidos + pagosUrgentes).toString()} detail={`${pagosVencidos} vencidos, ${pagosUrgentes} urgentes`} />
+        </div>
 
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>SALDO USD</h3>
-                  <DollarSign className="stat-icon" style={{ color: '#3b82f6' }} />
-                </div>
-                <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-                  {formatCurrency(totalSaldoUSD, 'USD')}
-                </div>
-                <div className="stat-subtitle">
-                  {cuentas.filter(c => c.moneda === 'USD').length} cuenta(s)
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>POR PAGAR (15 DÍAS)</h3>
-                  <TrendingDown className="stat-icon" style={{ color: '#ef4444' }} />
-                </div>
-                <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                  {formatCurrency(totalPorPagarPEN, 'PEN')}
-                </div>
-                <div className="stat-subtitle">
-                  {proximosPagos.filter(p => p.moneda === 'PEN').length} pago(s)
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>ALERTAS</h3>
-                  <AlertCircle className="stat-icon" style={{ color: '#f59e0b' }} />
-                </div>
-                <div className="stat-value">
-                  {pagosVencidos + pagosUrgentes}
-                </div>
-                <div className="stat-subtitle">
-                  {pagosVencidos} vencidos, {pagosUrgentes} urgentes
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Resumen de Flujo de Caja */}
-          {resumenFlujo.length > 0 && (
-            <div className="activity-section">
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                marginBottom: '1.5rem'
-              }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Proyección de Flujo (30 días)</h2>
-                <button
-                  onClick={() => router.push('/dashboard/finanzas/tesoreria/flujo-caja')}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    background: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  Ver Detalle
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-
-              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                {resumenFlujo.map((resumen) => (
-                  <div key={resumen.moneda} className="activity-card" style={{ padding: '1.5rem' }}>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem' }}>
-                        {resumen.moneda}
-                      </h3>
-                      <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
-                        {formatCurrency(resumen.saldo_proyectado, resumen.moneda)}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                        Saldo proyectado
-                      </div>
+        {resumenFlujo.length > 0 && (
+          <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-cyan-400/10 p-4">
+              <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Proyección de flujo (30 días)</CardTitle>
+              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/flujo-caja')}>
+                Ver detalle
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+              {resumenFlujo.map((resumen) => (
+                <Card key={resumen.moneda} className="border-cyan-400/20 bg-slate-950/55">
+                  <CardContent className="space-y-4 p-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-cyan-200/75">{resumen.moneda}</p>
+                      <p className="mt-2 text-2xl font-semibold text-slate-50">{formatCurrency(resumen.saldo_proyectado, resumen.moneda)}</p>
+                      <p className="text-xs text-slate-400">Saldo proyectado</p>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280' }}>Ingresos:</span>
-                        <span style={{ fontWeight: '600', color: '#10b981' }}>
-                          +{formatCurrency(resumen.total_ingresos, resumen.moneda)}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: '#6b7280' }}>Egresos:</span>
-                        <span style={{ fontWeight: '600', color: '#ef4444' }}>
-                          -{formatCurrency(resumen.total_egresos, resumen.moneda)}
-                        </span>
-                      </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        paddingTop: '0.5rem',
-                        borderTop: '1px solid #e5e7eb'
-                      }}>
-                        <span style={{ fontWeight: '600' }}>Flujo Neto:</span>
-                        <span style={{ 
-                          fontWeight: '700',
-                          color: resumen.flujo_neto >= 0 ? '#10b981' : '#ef4444'
-                        }}>
-                          {resumen.flujo_neto >= 0 ? '+' : ''}{formatCurrency(resumen.flujo_neto, resumen.moneda)}
-                        </span>
+                    <div className="space-y-2 text-sm">
+                      <FlowLine label="Ingresos" value={`+${formatCurrency(resumen.total_ingresos, resumen.moneda)}`} tone="positive" />
+                      <FlowLine label="Egresos" value={`-${formatCurrency(resumen.total_egresos, resumen.moneda)}`} tone="negative" />
+                      <div className="border-t border-cyan-400/10 pt-2">
+                        <FlowLine
+                          label="Flujo neto"
+                          value={`${resumen.flujo_neto >= 0 ? '+' : ''}${formatCurrency(resumen.flujo_neto, resumen.moneda)}`}
+                          tone={resumen.flujo_neto >= 0 ? 'positive' : 'negative'}
+                          strong
+                        />
                       </div>
                     </div>
 
                     {resumen.alerta && (
-                      <div style={{
-                        marginTop: '1rem',
-                        padding: '0.5rem',
-                        borderRadius: '6px',
-                        background: resumen.alerta === 'SALDO_NEGATIVO' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                        color: resumen.alerta === 'SALDO_NEGATIVO' ? '#ef4444' : '#f59e0b',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
-                        <AlertCircle size={14} />
-                        {resumen.alerta === 'SALDO_NEGATIVO' ? 'Saldo negativo proyectado' : 'Saldo bajo proyectado'}
-                      </div>
+                      <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {resumen.alerta === 'SALDO_NEGATIVO' ? 'Saldo negativo proyectado' : 'Saldo bajo proyectado'}
+                        </AlertDescription>
+                      </Alert>
                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  </CardContent>
+                </Card>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Próximos Pagos */}
-          <div className="activity-section">
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Próximos Pagos (15 días)</h2>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                  onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    background: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <Calendar size={16} />
-                  Ver Programación
-                </button>
-                <button
-                  onClick={() => router.push('/dashboard/finanzas/tesoreria/lote')}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: '#3b82f6',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <CreditCard size={16} />
-                  Pago Masivo
-                </button>
-              </div>
+        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+          <CardHeader className="flex flex-col gap-3 border-b border-cyan-400/10 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle className="text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">Próximos pagos (15 días)</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Ver programación
+              </Button>
+              <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white" onClick={() => router.push('/dashboard/finanzas/tesoreria/lote')}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Pago masivo
+              </Button>
             </div>
-
-            <div className="activity-card">
-              {proximosPagos.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                  <CheckCircle size={48} style={{ margin: '0 auto 1rem', color: '#10b981' }} />
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                    No hay pagos próximos
-                  </h3>
-                  <p>No hay cuentas por pagar con vencimiento en los próximos 15 días</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {proximosPagos.length === 0 ? (
+              <div className="flex min-h-72 flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                  <CheckCircle className="h-7 w-7" />
                 </div>
-              ) : (
-                <div style={{ overflow: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Urgencia
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Proveedor
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          N° Documento
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Vencimiento
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Monto
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {proximosPagos.map((pago) => (
-                        <tr key={pago.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                          <td style={{ padding: '1rem' }}>
-                            {getUrgenciaBadge(pago.urgencia)}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                              {pago.proveedor?.razon_social || 'N/A'}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
-                              {pago.numero_documento}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem' }}>
-                              {formatDate(pago.fecha_vencimiento)}
-                            </div>
-                            <div style={{ 
-                              fontSize: '0.75rem', 
-                              color: pago.dias_hasta_vencimiento < 0 ? '#ef4444' : '#6b7280'
-                            }}>
-                              {pago.dias_hasta_vencimiento < 0 
-                                ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
-                                : pago.dias_hasta_vencimiento === 0
-                                ? 'Vence hoy'
-                                : `Vence en ${pago.dias_hasta_vencimiento} días`
-                              }
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#ef4444' }}>
-                              {formatCurrency(pago.saldo, pago.moneda)}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <button
-                              onClick={() => router.push(`/dashboard/finanzas/cxp/${pago.id}`)}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: '#3b82f6',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                fontWeight: '600',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              Ver Detalle
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">No hay pagos próximos</h2>
+                  <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                    No hay cuentas por pagar con vencimiento en los próximos 15 días.
+                  </p>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-cyan-400/10 hover:bg-transparent">
+                    <TableHead>Urgencia</TableHead>
+                    <TableHead>Proveedor</TableHead>
+                    <TableHead>N° documento</TableHead>
+                    <TableHead>Vencimiento</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {proximosPagos.map((pago) => (
+                    <TableRow key={pago.id} className="border-cyan-400/10 hover:bg-cyan-400/5">
+                      <TableCell>{getUrgenciaBadge(pago.urgencia)}</TableCell>
+                      <TableCell className="font-medium text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                        {pago.proveedor?.razon_social || 'N/A'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">{pago.numero_documento}</TableCell>
+                      <TableCell>
+                        <div className="text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">{formatDate(pago.fecha_vencimiento)}</div>
+                        <div className={cn('mt-1 text-xs', pago.dias_hasta_vencimiento < 0 ? 'text-amber-200' : 'text-slate-400')}>
+                          {pago.dias_hasta_vencimiento < 0
+                            ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
+                            : pago.dias_hasta_vencimiento === 0
+                              ? 'Vence hoy'
+                              : `Vence en ${pago.dias_hasta_vencimiento} días`}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-amber-100">
+                        {formatCurrency(pago.saldo, pago.moneda)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white" onClick={() => router.push(`/dashboard/finanzas/cxp/${pago.id}`)}>
+                          Ver detalle
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Quick Actions */}
-          <div className="activity-section">
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem' }}>Acciones Rápidas</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
-              <button
-                onClick={() => router.push('/dashboard/finanzas/cxp')}
-                className="activity-card"
-                style={{
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  border: '1px solid #e5e7eb',
-                  background: 'white',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6'
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <Clock size={32} style={{ color: '#3b82f6', marginBottom: '1rem' }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Ver Cuentas por Pagar
-                </h3>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Gestiona todas las cuentas por pagar a proveedores
-                </p>
-              </button>
-
-              <button
-                onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')}
-                className="activity-card"
-                style={{
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  border: '1px solid #e5e7eb',
-                  background: 'white',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6'
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <Calendar size={32} style={{ color: '#10b981', marginBottom: '1rem' }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Programación de Pagos
-                </h3>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Planifica los pagos por fecha de vencimiento
-                </p>
-              </button>
-
-              <button
-                onClick={() => router.push('/dashboard/finanzas/tesoreria/lote')}
-                className="activity-card"
-                style={{
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  border: '1px solid #e5e7eb',
-                  background: 'white',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6'
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <CreditCard size={32} style={{ color: '#f59e0b', marginBottom: '1rem' }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Pago Masivo
-                </h3>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Procesa múltiples pagos en una sola operación
-                </p>
-              </button>
-
-              <button
-                onClick={() => router.push('/dashboard/finanzas/bancos')}
-                className="activity-card"
-                style={{
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  border: '1px solid #e5e7eb',
-                  background: 'white',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6'
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <DollarSign size={32} style={{ color: '#8b5cf6', marginBottom: '1rem' }} />
-                <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Cuentas Bancarias
-                </h3>
-                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Administra las cuentas bancarias de la empresa
-                </p>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <QuickAction icon={Clock} title="Cuentas por pagar" description="Gestiona cuentas pendientes con proveedores." onClick={() => router.push('/dashboard/finanzas/cxp')} />
+          <QuickAction icon={Calendar} title="Programación de pagos" description="Planifica pagos por fecha de vencimiento." onClick={() => router.push('/dashboard/finanzas/tesoreria/programacion')} />
+          <QuickAction icon={CreditCard} title="Pago masivo" description="Procesa múltiples pagos en una operación." onClick={() => router.push('/dashboard/finanzas/tesoreria/lote')} />
+          <QuickAction icon={DollarSign} title="Cuentas bancarias" description="Administra saldos y bancos de la empresa." onClick={() => router.push('/dashboard/finanzas/bancos')} />
+        </section>
+      </div>
     </div>
+  )
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+  detail: string
+}) {
+  return (
+    <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-slate-500">{label}</p>
+            <p className="mt-2 text-xl font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{value}</p>
+            <p className="mt-1 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">{detail}</p>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function FlowLine({
+  label,
+  value,
+  tone,
+  strong = false,
+}: {
+  label: string
+  value: string
+  tone: 'positive' | 'negative'
+  strong?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className={cn('text-slate-400', strong && 'font-semibold text-slate-200')}>{label}:</span>
+      <span className={cn('font-semibold', tone === 'positive' ? 'text-cyan-200' : 'text-amber-100', strong && 'font-bold')}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function QuickAction({
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: React.ElementType
+  title: string
+  description: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group rounded-lg border border-cyan-400/20 bg-slate-950/70 p-4 text-left shadow-lg shadow-cyan-950/10 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white"
+    >
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 transition group-hover:bg-cyan-400/20">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h3 className="text-sm font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">{description}</p>
+    </button>
   )
 }

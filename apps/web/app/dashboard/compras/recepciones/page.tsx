@@ -115,11 +115,10 @@ export default function RecepcionesPage() {
           <h1 className="dashboard-title">Recepciones de Mercancía</h1>
           <p className="dashboard-subtitle">Selecciona una orden de compra para recepcionar mercancía</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           <button
             onClick={loadOrdenesPendientes}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+            className="refresh-btn py-3 px-6"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -128,11 +127,11 @@ export default function RecepcionesPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>ÓRDENES PENDIENTES</h3>
-            <Package className="stat-icon" style={{ color: '#3b82f6' }} />
+            <Package className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{ordenesPendientes.length}</div>
           <div className="stat-subtitle">Con items por recibir</div>
@@ -141,7 +140,7 @@ export default function RecepcionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>APROBADAS</h3>
-            <CheckCircle className="stat-icon" style={{ color: '#10b981' }} />
+            <CheckCircle className="stat-icon text-[#10b981]" />
           </div>
           <div className="stat-value">
             {ordenesPendientes.filter(o => o.estado === 'APROBADA').length}
@@ -152,7 +151,7 @@ export default function RecepcionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>PARCIALES</h3>
-            <Clock className="stat-icon" style={{ color: '#f59e0b' }} />
+            <Clock className="stat-icon text-amber-500" />
           </div>
           <div className="stat-value">
             {ordenesPendientes.filter(o => o.estado === 'PARCIAL').length}
@@ -169,12 +168,12 @@ export default function RecepcionesPage() {
             <p>Cargando órdenes pendientes...</p>
           </div>
         ) : ordenesPendientes.length === 0 ? (
-          <div className="activity-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <Package size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+          <div className="activity-card text-center p-12">
+            <Package size={48} className="text-gray-400" />
+            <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
               No hay órdenes pendientes de recepción
             </h3>
-            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+            <p className="text-gray-500 mb-6">
               Todas las órdenes aprobadas han sido recepcionadas completamente
             </p>
             <button
@@ -186,26 +185,14 @@ export default function RecepcionesPage() {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1.5rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fill,_minmax(400px,_1fr))] gap-6">
             {ordenesPendientes.map((orden) => {
               const pendingQty = getPendingQuantity(orden)
               const receivedPct = getReceivedPercentage(orden)
               
               return (
                 <div
-                  key={orden.id}
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    boxShadow: 'var(--shadow-md)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}
+                  key={orden.id} className="rounded-3 p-6 shadow border cursor-pointer transition relative overflow-hidden"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-4px)'
                     e.currentTarget.style.boxShadow = 'var(--shadow-xl)'
@@ -217,199 +204,91 @@ export default function RecepcionesPage() {
                   onClick={() => router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)}
                 >
                   {/* Top Border Indicator */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      background: orden.estado === 'APROBADA' ? '#10b981' : '#f59e0b',
-                      borderRadius: '12px 12px 0 0'
-                    }}
+                  <div className="absolute top-0 left-0 right-0 h-[4px]"
                   />
 
                   {/* Estado Badge */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      background: orden.estado === 'APROBADA' ? '#10b981' : '#f59e0b',
-                      color: 'white'
-                    }}>
+                  <div className="mb-4">
+                    <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
                       {orden.estado === 'APROBADA' ? <CheckCircle size={14} /> : <Clock size={14} />}
                       {orden.estado === 'APROBADA' ? 'Aprobada' : 'Parcial'}
                     </span>
                   </div>
 
                   {/* Order Number */}
-                  <div style={{ marginBottom: '0.75rem' }}>
-                    <div style={{
-                      fontSize: '0.875rem',
-                      fontWeight: '700',
-                      color: 'var(--primary-800)',
-                      fontFamily: 'monospace',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div className="mb-3">
+                    <div className="text-[0.875rem] font-bold text-[var(--primary-800)] mb-1">
                       {orden.numero}
                     </div>
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-500)'
-                    }}>
+                    <div className="text-3 text-[var(--primary-500)]">
                       {formatDate(orden.fecha_orden)}
                     </div>
                   </div>
 
                   {/* Provider */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div className="mb-4">
+                    <div className="text-[0.875rem] font-semibold text-[var(--primary-700)] mb-1">
                       {orden.proveedores?.razon_social || 'Proveedor N/A'}
                     </div>
                     {orden.proveedores?.ruc && (
-                      <div style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--primary-500)'
-                      }}>
+                      <div className="text-3 text-[var(--primary-500)]">
                         RUC: {orden.proveedores.ruc}
                       </div>
                     )}
                   </div>
 
                   {/* Progress Bar */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary-600)', fontWeight: '600' }}>
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-3 text-[var(--primary-600)] font-semibold">
                         Progreso de Recepción
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary-600)', fontWeight: '700' }}>
+                      <span className="text-3 text-[var(--primary-600)] font-bold">
                         {receivedPct}%
                       </span>
                     </div>
-                    <div style={{
-                      width: '100%',
-                      height: '8px',
-                      background: 'var(--primary-200)',
-                      borderRadius: '9999px',
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        width: `${receivedPct}%`,
-                        height: '100%',
-                        background: receivedPct === 100 ? '#10b981' : '#3b82f6',
-                        transition: 'width 0.3s ease'
-                      }} />
+                    <div className="w-[100%] h-2 bg-[var(--primary-200)] rounded-full overflow-hidden">
+                      <div className="h-[100%] transition" />
                     </div>
                   </div>
 
                   {/* Pending Items */}
-                  <div
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      borderRadius: '8px',
-                      padding: '0.75rem',
-                      marginBottom: '1rem'
-                    }}
+                  <div className="bg-[rgba(59,_130,_246,_0.1)] rounded-2 p-3 mb-4"
                   >
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-600)',
-                      marginBottom: '0.25rem'
-                    }}>
+                    <div className="text-3 text-[var(--primary-600)] mb-1">
                       Items Pendientes
                     </div>
-                    <div style={{
-                      fontSize: '1.5rem',
-                      fontWeight: '700',
-                      color: '#3b82f6'
-                    }}>
+                    <div className="text-6 font-bold text-blue-500">
                       {pendingQty}
                     </div>
                   </div>
 
                   {/* Total */}
-                  <div
-                    style={{
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      borderRadius: '8px',
-                      padding: '0.75rem',
-                      marginBottom: '1rem'
-                    }}
+                  <div className="bg-[rgba(16,_185,_129,_0.1)] rounded-2 p-3 mb-4"
                   >
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-600)',
-                      marginBottom: '0.25rem'
-                    }}>
+                    <div className="text-3 text-[var(--primary-600)] mb-1">
                       Total Orden
                     </div>
-                    <div style={{
-                      fontSize: '1.25rem',
-                      fontWeight: '700',
-                      color: '#10b981'
-                    }}>
+                    <div className="text-5 font-bold text-[#10b981]">
                       {formatCurrency(orden.total)}
                     </div>
                   </div>
 
                   {/* Expected Delivery */}
                   {orden.fecha_entrega_esperada && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-500)',
-                      marginBottom: '1rem'
-                    }}>
+                    <div className="flex items-center gap-2 text-3 text-[var(--primary-500)] mb-4">
                       <Clock size={14} />
                       <span>Entrega esperada: {formatDate(orden.fecha_entrega_esperada)}</span>
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    paddingTop: '1rem',
-                    borderTop: '1px solid var(--primary-200)'
-                  }}>
+                  <div className="flex gap-2 pt-4 border-t">
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         router.push(`/dashboard/compras/recepciones/nueva?orden_id=${orden.id}`)
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '0.75rem',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: '#3b82f6',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        transition: 'all 0.2s ease'
-                      }}
+                      }} className="flex-[1] p-3 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold flex items-center justify-center gap-2 transition"
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#2563eb'
                       }}
@@ -424,21 +303,7 @@ export default function RecepcionesPage() {
                       onClick={(e) => {
                         e.stopPropagation()
                         router.push(`/dashboard/compras/ordenes/${orden.id}`)
-                      }}
-                      style={{
-                        padding: '0.75rem',
-                        borderRadius: '6px',
-                        border: '1px solid var(--primary-300)',
-                        background: 'white',
-                        color: 'var(--primary-700)',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease'
-                      }}
+                      }} className="p-3 rounded-[6px] border bg-white text-[var(--primary-700)] cursor-pointer text-[0.875rem] font-semibold flex items-center justify-center transition"
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = 'var(--primary-50)'
                       }}

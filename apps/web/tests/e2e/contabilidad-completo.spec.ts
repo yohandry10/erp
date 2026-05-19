@@ -8,6 +8,8 @@ import { gotoAuthenticated, login } from './helpers/auth';
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
 const runId = Date.now().toString().slice(-9);
+const qaStamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+const qaPrefix = `QA-PROD-READY-${qaStamp}-CASE16-${runId}`;
 const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:13002';
 const api = (route: string) => `/api${route}`;
 const today = () => new Date().toISOString().split('T')[0];
@@ -153,7 +155,7 @@ async function createBankAccount(apiContext: APIRequestContext) {
   return parseOk<any>(
     await apiContext.post(api('/finanzas/bancos/cuentas'), {
       data: {
-        nombre: `Banco Contabilidad T14 ${runId}`,
+        nombre: `${qaPrefix} Banco Contabilidad`,
         banco: 'GENERICO',
         numero_cuenta: `T14-${runId}`,
         tipo_cuenta: 'CORRIENTE',
@@ -173,7 +175,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
         tipo: 'PERSONA',
         documento_tipo: 'DNI',
         documento_numero: runId.slice(-8),
-        razon_social: `Cliente Contabilidad T14 ${runId}`,
+        razon_social: `${qaPrefix} Cliente Contabilidad`,
         direccion: 'Av. Contabilidad Ventas 1400',
         email: `cliente-conta-${runId}@example.com`,
       },
@@ -185,7 +187,7 @@ async function createSaleWithCxc(apiContext: APIRequestContext) {
     await apiContext.post(api('/inventario/productos'), {
       data: {
         codigo: `CON-V-${runId}`,
-        nombre: `Producto Venta Contabilidad ${runId}`,
+        nombre: `${qaPrefix} Producto Venta Contabilidad`,
         categoria: 'AUDITORIA',
         precio_compra: 40,
         precio_venta: 118,
@@ -231,8 +233,8 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     await apiContext.post(api('/compras/proveedores'), {
       data: {
         ruc: `20${runId}`,
-        razon_social: `Proveedor Contabilidad T14 ${runId} S.A.C.`,
-        nombre_comercial: `Proveedor Conta ${runId}`,
+        razon_social: `${qaPrefix} Proveedor Contabilidad S.A.C.`,
+        nombre_comercial: `${qaPrefix} Proveedor Conta`,
         email: `proveedor-conta-${runId}@example.com`,
         direccion: 'Av. Contabilidad Compras 1400',
         condiciones_pago: 'CREDITO_30',
@@ -246,7 +248,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
     await apiContext.post(api('/inventario/productos'), {
       data: {
         codigo: `CON-C-${runId}`,
-        nombre: `Producto Compra Contabilidad ${runId}`,
+        nombre: `${qaPrefix} Producto Compra Contabilidad`,
         categoria: 'AUDITORIA',
         precio_compra: 200,
         precio_venta: 260,
@@ -343,8 +345,8 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
   await supabase.from('empresa_config').upsert({
     tenant_id: tenantId,
     ruc: `20${runId.padStart(9, '0').slice(-9)}`,
-    razon_social: 'ERP Contabilidad E2E SAC',
-    nombre_comercial: 'ERP Contabilidad E2E',
+    razon_social: `${qaPrefix} ERP Contabilidad E2E SAC`,
+    nombre_comercial: `${qaPrefix} ERP Contabilidad E2E`,
     email: `contabilidad-e2e-${runId}@example.com`,
     direccion: 'Av. Contabilidad POS 1400',
     direccion_fiscal: 'Av. Contabilidad POS 1400',
@@ -358,7 +360,7 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
     id: crypto.randomUUID(),
     tenant_id: tenantId,
     codigo: `CAJA-CON-${runId}`,
-    nombre: `Caja Contabilidad ${runId}`,
+    nombre: `${qaPrefix} Caja Contabilidad`,
     estado: 'ACTIVO',
   }).select('*').single();
   expect(cajaError?.message || '', 'crear caja Contabilidad T14').toBe('');
@@ -370,7 +372,7 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
     tenant_id: tenantId,
     codigo: `POS-CON-${runId}`,
     codigo_barras: `778${runId}`,
-    nombre: `Producto POS Contabilidad ${runId}`,
+    nombre: `${qaPrefix} Producto POS Contabilidad`,
     categoria: 'AUDITORIA',
     precio: 50,
     precio_venta: 50,
@@ -406,7 +408,7 @@ async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseCl
       data: {
         idempotency_key: `pos-con-${runId}`,
         sesion_caja_id: sesionId,
-        cliente_nombre: `Cliente POS Contabilidad ${runId}`,
+        cliente_nombre: `${qaPrefix} Cliente POS Contabilidad`,
         cliente_documento: `6${runId.slice(-7)}`,
         metodo_pago_id: metodoPago.id,
         items: [{

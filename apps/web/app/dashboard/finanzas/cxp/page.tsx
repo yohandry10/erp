@@ -1,25 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { AlertCircle, BarChart3, CheckCircle, Clock, DollarSign, Download, Eye, FileText, List, Plus, RefreshCw, XCircle, type LucideIcon } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
-import { 
-  Plus, 
-  RefreshCw,
-  FileText,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Eye,
-  Filter,
-  Download,
-  DollarSign,
-  BarChart3,
-  List
-} from 'lucide-react'
 import AgingCxpChart from '@/components/finanzas/AgingCxpChart'
 import VencimientosAlert from '@/components/finanzas/VencimientosAlert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface CuentaPorPagar {
   id: string
@@ -41,54 +29,27 @@ interface CuentaPorPagar {
 
 type EstadoCxp = 'PENDIENTE' | 'PARCIAL' | 'PAGADA' | 'VENCIDA' | 'ANULADA'
 
-const ESTADOS_CONFIG: Record<EstadoCxp, {
-  label: string
-  color: string
-  bgColor: string
-  icon: any
-}> = {
-  PENDIENTE: {
-    label: 'Pendiente',
-    color: '#f59e0b',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    icon: Clock
-  },
-  PARCIAL: {
-    label: 'Parcial',
-    color: '#3b82f6',
-    bgColor: 'rgba(59, 130, 246, 0.1)',
-    icon: AlertCircle
-  },
-  PAGADA: {
-    label: 'Pagada',
-    color: '#10b981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
-    icon: CheckCircle
-  },
-  VENCIDA: {
-    label: 'Vencida',
-    color: '#ef4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    icon: XCircle
-  },
-  ANULADA: {
-    label: 'Anulada',
-    color: '#6b7280',
-    bgColor: 'rgba(107, 114, 128, 0.1)',
-    icon: XCircle
-  }
+const ESTADOS_CONFIG: Record<EstadoCxp, { label: string; className: string; icon: LucideIcon }> = {
+  PENDIENTE: { label: 'Pendiente', className: 'border-amber-300/25 bg-amber-300/10 text-amber-100', icon: Clock },
+  PARCIAL: { label: 'Parcial', className: 'border-blue-300/25 bg-blue-300/10 text-blue-100', icon: AlertCircle },
+  PAGADA: { label: 'Pagada', className: 'border-cyan-300/25 bg-cyan-300/10 text-cyan-100', icon: CheckCircle },
+  VENCIDA: { label: 'Vencida', className: 'border-slate-300/25 bg-slate-300/10 text-slate-100', icon: XCircle },
+  ANULADA: { label: 'Anulada', className: 'border-slate-300/25 bg-slate-300/10 text-slate-100', icon: XCircle },
 }
+
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
 export default function CuentasPorPagarPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [cuentas, setCuentas] = useState<CuentaPorPagar[]>([])
   const [proveedores, setProveedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'list' | 'aging'>('list')
-  
-  // Filters
   const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
   const [vencimientoDesde, setVencimientoDesde] = useState<string>('')
@@ -98,7 +59,7 @@ export default function CuentasPorPagarPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      
+
       if (estadoFilter) params.append('estado', estadoFilter)
       if (proveedorFilter) params.append('proveedor_id', proveedorFilter)
       if (vencimientoDesde) params.append('vencimiento_desde', vencimientoDesde)
@@ -106,11 +67,7 @@ export default function CuentasPorPagarPage() {
 
       const queryString = params.toString()
       const response = await get(`/api/finanzas/cxp${queryString ? `?${queryString}` : ''}`)
-      
-      if (response?.success) {
-        const data = response.data || []
-        setCuentas(data)
-      }
+      if (response?.success) setCuentas(response.data || [])
     } catch (error) {
       console.error('Error loading cuentas por pagar:', error)
       alert('Error: No se pudieron cargar las cuentas por pagar')
@@ -122,9 +79,7 @@ export default function CuentasPorPagarPage() {
   const loadProveedores = useCallback(async () => {
     try {
       const response = await get('/api/compras/proveedores?activo=true')
-      if (response?.success) {
-        setProveedores(response.data || [])
-      }
+      if (response?.success) setProveedores(response.data || [])
     } catch (error) {
       console.error('Error loading proveedores:', error)
     }
@@ -138,22 +93,6 @@ export default function CuentasPorPagarPage() {
     loadCuentas()
   }, [loadCuentas])
 
-  const handleEstadoFilterChange = (value: string) => {
-    setEstadoFilter(value)
-  }
-
-  const handleProveedorFilterChange = (value: string) => {
-    setProveedorFilter(value)
-  }
-
-  const handleVencimientoDesdeChange = (value: string) => {
-    setVencimientoDesde(value)
-  }
-
-  const handleVencimientoHastaChange = (value: string) => {
-    setVencimientoHasta(value)
-  }
-
   const handleClearFilters = () => {
     setEstadoFilter('')
     setProveedorFilter('')
@@ -161,24 +100,19 @@ export default function CuentasPorPagarPage() {
     setVencimientoHasta('')
   }
 
-  const handleExport = () => {
-    alert('📥 Funcionalidad de exportación próximamente')
-  }
+  const handleExport = () => alert('Funcionalidad de exportacion proximamente')
 
   const formatCurrency = (amount: number | undefined, moneda: string = 'PEN') => {
     if (!amount) return '-'
     const currency = moneda === 'USD' ? 'USD' : 'PEN'
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount)
+    return new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     })
   }
 
@@ -186,8 +120,7 @@ export default function CuentasPorPagarPage() {
     const today = new Date()
     const dueDate = new Date(vencimiento)
     const diffTime = dueDate.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
   const isFilterActive = estadoFilter || proveedorFilter || vencimientoDesde || vencimientoHasta
@@ -195,455 +128,208 @@ export default function CuentasPorPagarPage() {
   const getEstadoBadge = (estado: string) => {
     const config = ESTADOS_CONFIG[estado as EstadoCxp]
     if (!config) return null
-    
     const Icon = config.icon
-    
+
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: config.color,
-        color: 'white'
-      }}>
-        <Icon size={14} />
+      <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${config.className}`}>
+        <Icon className="h-3.5 w-3.5" />
         {config.label}
       </span>
     )
   }
 
   const totalPendiente = cuentas
-    .filter(c => c.estado === 'PENDIENTE' || c.estado === 'PARCIAL' || c.estado === 'VENCIDA')
-    .reduce((sum, c) => sum + c.saldo, 0)
+    .filter((cuenta) => cuenta.estado === 'PENDIENTE' || cuenta.estado === 'PARCIAL' || cuenta.estado === 'VENCIDA')
+    .reduce((sum, cuenta) => sum + cuenta.saldo, 0)
 
-  const totalVencido = cuentas
-    .filter(c => c.estado === 'VENCIDA')
-    .reduce((sum, c) => sum + c.saldo, 0)
+  const totalVencido = cuentas.filter((cuenta) => cuenta.estado === 'VENCIDA').reduce((sum, cuenta) => sum + cuenta.saldo, 0)
+
+  const statCards = [
+    { label: 'Total', value: cuentas.length, description: 'Cuentas', icon: FileText },
+    { label: 'Pendientes', value: cuentas.filter((cuenta) => cuenta.estado === 'PENDIENTE').length, description: 'Por pagar', icon: Clock },
+    { label: 'Vencidas', value: cuentas.filter((cuenta) => cuenta.estado === 'VENCIDA').length, description: formatCurrency(totalVencido), icon: XCircle },
+    { label: 'Saldo total', value: formatCurrency(totalPendiente), description: 'Por pagar', icon: DollarSign },
+  ]
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Cuentas por Pagar</h1>
-          <p className="dashboard-subtitle">Gestiona las cuentas por pagar a proveedores</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {/* View Mode Toggle */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem',
-            background: '#f3f4f6',
-            padding: '0.25rem',
-            borderRadius: '8px'
-          }}>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: viewMode === 'list' ? 'white' : 'transparent',
-                color: viewMode === 'list' ? '#3b82f6' : '#6b7280',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.2s ease',
-                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              <List size={16} />
-              Lista
-            </button>
-            <button
-              onClick={() => setViewMode('aging')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: viewMode === 'aging' ? 'white' : 'transparent',
-                color: viewMode === 'aging' ? '#3b82f6' : '#6b7280',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.2s ease',
-                boxShadow: viewMode === 'aging' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              <BarChart3 size={16} />
-              Aging
-            </button>
-          </div>
-          
-          <button
-            onClick={loadCuentas}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button 
-            className="refresh-btn"
-            onClick={() => router.push('/dashboard/finanzas/cxp/nueva')}
-          >
-            <Plus size={20} />
-            Nueva CxP
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>TOTAL</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
-          </div>
-          <div className="stat-value">{cuentas.length}</div>
-          <div className="stat-subtitle">Cuentas</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>PENDIENTES</h3>
-            <Clock className="stat-icon" style={{ color: '#f59e0b' }} />
-          </div>
-          <div className="stat-value">
-            {cuentas.filter(c => c.estado === 'PENDIENTE').length}
-          </div>
-          <div className="stat-subtitle">Por pagar</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>VENCIDAS</h3>
-            <XCircle className="stat-icon" style={{ color: '#ef4444' }} />
-          </div>
-          <div className="stat-value">
-            {cuentas.filter(c => c.estado === 'VENCIDA').length}
-          </div>
-          <div className="stat-subtitle">Atrasadas</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>SALDO TOTAL</h3>
-            <DollarSign className="stat-icon" style={{ color: '#10b981' }} />
-          </div>
-          <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-            {formatCurrency(totalPendiente)}
-          </div>
-          <div className="stat-subtitle">Por pagar</div>
-        </div>
-      </div>
-
-      {/* Alerts for upcoming due dates */}
-      <VencimientosAlert 
-        diasAdelante={7}
-        proveedorId={proveedorFilter || undefined}
-        onCuentaClick={(cuentaId) => router.push(`/dashboard/finanzas/cxp/${cuentaId}`)}
-      />
-
-      {/* Filters */}
-      <div className="activity-section">
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-              Estado
-            </label>
-            <select
-              value={estadoFilter}
-              onChange={(e) => handleEstadoFilterChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="PARCIAL">Parcial</option>
-              <option value="PAGADA">Pagada</option>
-              <option value="VENCIDA">Vencida</option>
-              <option value="ANULADA">Anulada</option>
-            </select>
-          </div>
-
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-              Proveedor
-            </label>
-            <select
-              value={proveedorFilter}
-              onChange={(e) => handleProveedorFilterChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="">Todos los proveedores</option>
-              {proveedores.map((proveedor) => (
-                <option key={proveedor.id} value={proveedor.id}>
-                  {proveedor.razon_social}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-              Vencimiento Desde
-            </label>
-            <input
-              type="date"
-              value={vencimientoDesde}
-              onChange={(e) => handleVencimientoDesdeChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            />
-          </div>
-
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-              Vencimiento Hasta
-            </label>
-            <input
-              type="date"
-              value={vencimientoHasta}
-              onChange={(e) => handleVencimientoHastaChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            />
-          </div>
-
-          {isFilterActive && (
-            <button
-              onClick={handleClearFilters}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#ef4444'
-              }}
-            >
-              <XCircle size={16} />
-              Limpiar Filtros
-            </button>
-          )}
-
-          <button
-            onClick={handleExport}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
-          >
-            <Download size={16} />
-            Exportar
-          </button>
-        </div>
-      </div>
-
-      {/* Content - Aging View or List */}
-      {viewMode === 'aging' ? (
-        <AgingCxpChart proveedorId={proveedorFilter || undefined} />
-      ) : (
-        <div className="activity-section">
-          {loading ? (
-            <div className="loading">
-              <div className="loading-spinner"></div>
-              <p>Cargando cuentas por pagar...</p>
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP Payables
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Cuentas por Pagar</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">CxP de proveedores con vencimientos, aging y pagos pendientes.</p>
             </div>
-          ) : (
-            <div className="activity-card">
-            {cuentas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  No hay cuentas por pagar
-                </h3>
-                <p style={{ marginBottom: '1.5rem' }}>
-                  {isFilterActive
-                    ? 'No se encontraron cuentas con los filtros aplicados'
-                    : 'Las cuentas por pagar se crearán automáticamente desde las recepciones'}
-                </p>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex rounded-2xl border border-cyan-400/20 bg-slate-950/70 p-1">
+                <Button type="button" onClick={() => setViewMode('list')} className={`gap-2 rounded-xl ${viewMode === 'list' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+                  <List className="h-4 w-4" />
+                  Lista
+                </Button>
+                <Button type="button" onClick={() => setViewMode('aging')} className={`gap-2 rounded-xl ${viewMode === 'aging' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}>
+                  <BarChart3 className="h-4 w-4" />
+                  Aging
+                </Button>
               </div>
-            ) : (
-              <div style={{ overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        N° Documento
-                      </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Proveedor
-                      </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Fecha Emisión
-                      </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Vencimiento
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Total
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Saldo
-                      </th>
-                      <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Estado
-                      </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cuentas.map((cuenta) => {
-                      const daysUntilDue = getDaysUntilDue(cuenta.fecha_vencimiento)
-                      const isOverdue = daysUntilDue < 0
-                      const isDueSoon = daysUntilDue >= 0 && daysUntilDue <= 7
-
-                      return (
-                        <tr key={cuenta.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
-                              {cuenta.numero_documento}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                              {cuenta.tipo_documento}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                              {cuenta.proveedores?.razon_social || 'N/A'}
-                            </div>
-                            {cuenta.proveedores?.ruc && (
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                RUC: {cuenta.proveedores.ruc}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                            {formatDate(cuenta.fecha_emision)}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem' }}>
-                              {formatDate(cuenta.fecha_vencimiento)}
-                            </div>
-                            {(isOverdue || isDueSoon) && cuenta.estado !== 'PAGADA' && cuenta.estado !== 'ANULADA' && (
-                              <div style={{ 
-                                fontSize: '0.75rem', 
-                                color: isOverdue ? '#ef4444' : '#f59e0b',
-                                fontWeight: '500'
-                              }}>
-                                {isOverdue 
-                                  ? `Vencido hace ${Math.abs(daysUntilDue)} días`
-                                  : `Vence en ${daysUntilDue} días`
-                                }
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600' }}>
-                            {formatCurrency(cuenta.total, cuenta.moneda)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <div style={{ 
-                              fontSize: '0.875rem', 
-                              fontWeight: '700',
-                              color: cuenta.saldo > 0 ? '#ef4444' : '#10b981'
-                            }}>
-                              {formatCurrency(cuenta.saldo, cuenta.moneda)}
-                            </div>
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            {getEstadoBadge(cuenta.estado)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right' }}>
-                            <button
-                              onClick={() => router.push(`/dashboard/finanzas/cxp/${cuenta.id}`)}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: '#3b82f6',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                fontWeight: '600',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                transition: 'all 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#2563eb'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#3b82f6'
-                              }}
-                            >
-                              <Eye size={14} />
-                              Ver
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+              <Button type="button" onClick={loadCuentas} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => router.push('/dashboard/finanzas/cxp/nueva')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Nueva CxP
+              </Button>
+            </div>
           </div>
-          )}
-        </div>
-      )}
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {statCards.map(({ label, value, description, icon: Icon }) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>{label}</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <Icon className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <VencimientosAlert diasAdelante={7} proveedorId={proveedorFilter || undefined} onCuentaClick={(cuentaId) => router.push(`/dashboard/finanzas/cxp/${cuentaId}`)} />
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[180px_minmax(220px,1fr)_170px_170px_auto_auto] xl:items-end">
+            <label className="space-y-2">
+              <span className={labelClass}>Estado</span>
+              <select className={inputClass} value={estadoFilter} onChange={(event) => setEstadoFilter(event.target.value)}>
+                <option value="">Todos los estados</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="PARCIAL">Parcial</option>
+                <option value="PAGADA">Pagada</option>
+                <option value="VENCIDA">Vencida</option>
+                <option value="ANULADA">Anulada</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Proveedor</span>
+              <select className={inputClass} value={proveedorFilter} onChange={(event) => setProveedorFilter(event.target.value)}>
+                <option value="">Todos los proveedores</option>
+                {proveedores.map((proveedor) => (
+                  <option key={proveedor.id} value={proveedor.id}>
+                    {proveedor.razon_social}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Desde</span>
+              <input className={inputClass} type="date" value={vencimientoDesde} onChange={(event) => setVencimientoDesde(event.target.value)} />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Hasta</span>
+              <input className={inputClass} type="date" value={vencimientoHasta} onChange={(event) => setVencimientoHasta(event.target.value)} />
+            </label>
+            {isFilterActive && (
+              <Button type="button" onClick={handleClearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <XCircle className="h-4 w-4" />
+                Limpiar
+              </Button>
+            )}
+            <Button type="button" onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+              <Download className="h-4 w-4" />
+              Exportar
+            </Button>
+          </CardContent>
+        </Card>
+
+        {viewMode === 'aging' ? (
+          <div className="rounded-3xl border border-cyan-400/20 bg-slate-950/65 p-4 shadow-xl shadow-blue-950/20">
+            <AgingCxpChart proveedorId={proveedorFilter || undefined} />
+          </div>
+        ) : (
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-slate-300">
+                  <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+                  <p>Cargando cuentas por pagar...</p>
+                </div>
+              ) : cuentas.length === 0 ? (
+                <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
+                  <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
+                  <h3 className="text-lg font-bold text-white">No hay cuentas por pagar</h3>
+                  <p className="mt-2 max-w-xl text-sm text-slate-400">
+                    {isFilterActive ? 'No se encontraron cuentas con los filtros aplicados.' : 'Las CxP se crean automaticamente desde recepciones.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1040px] border-collapse text-sm">
+                    <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                      <tr>
+                        <th className="px-4 py-3 text-left">Documento</th>
+                        <th className="px-4 py-3 text-left">Proveedor</th>
+                        <th className="px-4 py-3 text-left">Emision</th>
+                        <th className="px-4 py-3 text-left">Vencimiento</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-right">Saldo</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cyan-400/10">
+                      {cuentas.map((cuenta) => {
+                        const daysUntilDue = getDaysUntilDue(cuenta.fecha_vencimiento)
+                        const isOverdue = daysUntilDue < 0
+                        const isDueSoon = daysUntilDue >= 0 && daysUntilDue <= 7
+
+                        return (
+                          <tr key={cuenta.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
+                            <td className="px-4 py-3">
+                              <div className="font-mono font-semibold text-white">{cuenta.numero_documento}</div>
+                              <div className="text-xs text-cyan-100/55">{cuenta.tipo_documento}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-100">{cuenta.proveedores?.razon_social || 'N/A'}</div>
+                              {cuenta.proveedores?.ruc && <div className="text-xs text-cyan-100/55">RUC: {cuenta.proveedores.ruc}</div>}
+                            </td>
+                            <td className="px-4 py-3 text-slate-300">{formatDate(cuenta.fecha_emision)}</td>
+                            <td className="px-4 py-3">
+                              <div className="text-slate-300">{formatDate(cuenta.fecha_vencimiento)}</div>
+                              {(isOverdue || isDueSoon) && cuenta.estado !== 'PAGADA' && cuenta.estado !== 'ANULADA' && (
+                                <div className="text-xs font-semibold text-amber-100">
+                                  {isOverdue ? `Vencido hace ${Math.abs(daysUntilDue)} dias` : `Vence en ${daysUntilDue} dias`}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(cuenta.total, cuenta.moneda)}</td>
+                            <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(cuenta.saldo, cuenta.moneda)}</td>
+                            <td className="px-4 py-3 text-center">{getEstadoBadge(cuenta.estado)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <Button type="button" size="sm" onClick={() => router.push(`/dashboard/finanzas/cxp/${cuenta.id}`)} className="h-9 gap-1 bg-blue-600 px-3 text-xs text-white hover:bg-blue-500">
+                                <Eye className="h-3.5 w-3.5" />
+                                Ver
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

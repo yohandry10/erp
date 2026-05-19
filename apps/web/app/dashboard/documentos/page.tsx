@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Download, Edit, FileText, Plus, RefreshCw, Send, XCircle, type LucideIcon } from 'lucide-react'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
 import DocumentoModal from '@/components/modals/DocumentoModal'
 import { apiSucceeded, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/components/ui/use-toast'
 
 interface Documento {
   id: string
@@ -30,8 +34,39 @@ interface DocumentoStats {
   pendientesEnvio: number
 }
 
+type StatCard = {
+  label: string
+  value: number
+  description: string
+  icon: LucideIcon
+}
+
+const emptyStats: DocumentoStats = {
+  totalDocumentos: 0,
+  facturas: 0,
+  boletas: 0,
+  notasCredito: 0,
+  contratos: 0,
+  pendientesEnvio: 0,
+}
+
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
+const estadoClasses: Record<string, string> = {
+  BORRADOR: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
+  EMITIDO: 'border-blue-300/30 bg-blue-300/10 text-blue-100',
+  ENVIADO_SUNAT: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+  ACEPTADO: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+  RECHAZADO: 'border-amber-300/30 bg-amber-300/10 text-amber-100',
+  ANULADO: 'border-slate-300/30 bg-slate-300/10 text-slate-100',
+}
+
 export default function DocumentosPage() {
   const country = useCountryContext()
+  const { toast } = useToast()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [stats, setStats] = useState<DocumentoStats | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -42,7 +77,7 @@ export default function DocumentosPage() {
     fecha_desde: '',
     fecha_hasta: '',
     receptor_numero_doc: '',
-    serie: ''
+    serie: '',
   })
 
   const {
@@ -61,15 +96,9 @@ export default function DocumentosPage() {
 
       const response = await getDocumentos(`/api/documentos/lista?${queryParams}`)
       const documentos = unwrapApiArray<Documento>(response)
-      if (apiSucceeded(response)) {
-        console.log('📊 Documentos recibidos:', documentos)
-        setDocumentos(documentos)
-      } else {
-        console.log('❌ No hay documentos o respuesta incorrecta:', response)
-        setDocumentos([])
-      }
+      setDocumentos(apiSucceeded(response) ? documentos : [])
     } catch (error) {
-      console.error('💥 Error al cargar documentos:', error)
+      console.error('Error al cargar documentos:', error)
       setDocumentos([])
     }
   }, [filters, getDocumentos])
@@ -77,56 +106,28 @@ export default function DocumentosPage() {
   const loadStats = useCallback(async () => {
     try {
       const response = await getStats('/api/documentos/stats')
-      if (apiSucceeded(response)) {
-        const stats = unwrapApiObject<DocumentoStats>(response, {
-          totalDocumentos: 0,
-          facturas: 0,
-          boletas: 0,
-          notasCredito: 0,
-          contratos: 0,
-          pendientesEnvio: 0
-        })
-        console.log('📊 Stats documentos recibidas:', stats)
-        setStats(stats)
-      } else {
-        console.log('❌ No hay estadísticas documentos o respuesta incorrecta:', response)
-        setStats({
-          totalDocumentos: 0,
-          facturas: 0,
-          boletas: 0,
-          notasCredito: 0,
-          contratos: 0,
-          pendientesEnvio: 0
-        })
-      }
+      setStats(apiSucceeded(response) ? unwrapApiObject<DocumentoStats>(response, emptyStats) : emptyStats)
     } catch (error) {
-      console.error('💥 Error al cargar estadísticas:', error)
-      setStats({
-        totalDocumentos: 0,
-        facturas: 0,
-        boletas: 0,
-        notasCredito: 0,
-        contratos: 0,
-        pendientesEnvio: 0
-      })
+      console.error('Error al cargar estadisticas:', error)
+      setStats(emptyStats)
     }
   }, [getStats])
 
   const loadData = useCallback(async () => {
-    await Promise.all([
-      loadDocumentos(),
-      loadStats()
-    ])
+    await Promise.all([loadDocumentos(), loadStats()])
   }, [loadDocumentos, loadStats])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
+  const showSuccessToast = (message: string) => toast({ title: 'Operacion completada', description: message })
+  const showErrorToast = (message: string) => toast({ title: 'No se pudo completar', description: message, variant: 'destructive' })
+
   const enviarFiscal = async (documentoId: string) => {
     const response = await postDocumentoAction(`/api/documentos/${documentoId}/enviar-sunat`)
     if (apiSucceeded(response)) {
-      loadDocumentos() // Reload documents to update status
+      loadDocumentos()
       showSuccessToast(`Documento enviado a ${country.servicioFiscal} correctamente`)
     } else {
       showErrorToast(response?.message || `Error al enviar documento a ${country.servicioFiscal}`)
@@ -136,7 +137,7 @@ export default function DocumentosPage() {
   const generarXML = async (documentoId: string) => {
     const response = await postDocumentoAction(`/api/documentos/${documentoId}/generar-xml`)
     if (apiSucceeded(response)) {
-      loadDocumentos() // Reload documents
+      loadDocumentos()
       showSuccessToast('XML generado correctamente')
     } else {
       showErrorToast(response?.message || 'Error al generar XML')
@@ -147,7 +148,6 @@ export default function DocumentosPage() {
     const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-pdf`)
     const pdf = unwrapApiData<string | Blob | null>(response, null)
     if (apiSucceeded(response) && pdf) {
-      // Create and download the file
       const blob = new Blob([pdf], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -165,7 +165,6 @@ export default function DocumentosPage() {
     const response = await getDocumentos(`/api/documentos/${documentoId}/descargar-xml`)
     const xml = unwrapApiData<string | Blob | null>(response, null)
     if (apiSucceeded(response) && xml) {
-      // Create and download the file
       const blob = new Blob([xml], { type: 'application/xml' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -189,593 +188,281 @@ export default function DocumentosPage() {
     }
   }
 
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'BORRADOR':
-        return { background: '#6b7280', color: 'white' }
-      case 'EMITIDO':
-        return { background: '#3b82f6', color: 'white' }
-      case 'ENVIADO_SUNAT':
-        return { background: '#10b981', color: 'white' }
-      case 'ACEPTADO':
-        return { background: '#059669', color: 'white' }
-      case 'RECHAZADO':
-        return { background: '#ef4444', color: 'white' }
-      case 'ANULADO':
-        return { background: '#dc2626', color: 'white' }
-      default:
-        return { background: '#6b7280', color: 'white' }
-    }
-  }
-
   const getEstadoText = (estado: string) => {
     const estados: Record<string, string> = {
-      'BORRADOR': 'Borrador',
-      'EMITIDO': 'Emitido',
-      'ENVIADO_SUNAT': `Enviado ${country.servicioFiscal}`,
-      'ACEPTADO': 'Aceptado',
-      'RECHAZADO': 'Rechazado',
-      'ANULADO': 'Anulado'
+      BORRADOR: 'Borrador',
+      EMITIDO: 'Emitido',
+      ENVIADO_SUNAT: `Enviado ${country.servicioFiscal}`,
+      ACEPTADO: 'Aceptado',
+      RECHAZADO: 'Rechazado',
+      ANULADO: 'Anulado',
     }
     return estados[estado] || estado
   }
 
   const getTipoDocumentoDisplay = (tipo: string) => {
     const tipos: Record<string, string> = {
-      'FACTURA': 'Factura',
-      'BOLETA': 'Boleta',
-      'NOTA_CREDITO': 'Nota de Crédito',
-      'NOTA_DEBITO': 'Nota de Débito',
-      'CONTRATO': 'Contrato',
-      'GUIA_REMISION': 'Guía de Remisión'
+      FACTURA: 'Factura',
+      BOLETA: 'Boleta',
+      NOTA_CREDITO: 'Nota de Credito',
+      NOTA_DEBITO: 'Nota de Debito',
+      CONTRATO: 'Contrato',
+      GUIA_REMISION: 'Guia de Remision',
     }
     return tipos[tipo] || tipo
   }
 
   const handleDocumentoCreated = () => {
-    loadData() // Reload all data when a new document is created
+    loadData()
     setIsModalOpen(false)
     setSelectedDocumento(null)
   }
 
-  const showSuccessToast = (message: string) => {
-    if (typeof window !== 'undefined') {
-      const toast = document.createElement('div')
-      toast.innerHTML = `
-        <div style="
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 1rem 1.5rem;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          z-index: 9999;
-          font-weight: 600;
-          animation: slideIn 0.3s ease-out;
-        ">
-          ✅ ${message}
-        </div>
-        <style>
-          @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-          }
-        </style>
-      `
-      document.body.appendChild(toast)
-      setTimeout(() => {
-        document.body.removeChild(toast)
-      }, 3000)
-    }
-  }
+  const clearFilters = () =>
+    setFilters({
+      tipo_documento: '',
+      estado: '',
+      fecha_desde: '',
+      fecha_hasta: '',
+      receptor_numero_doc: '',
+      serie: '',
+    })
 
-  const showErrorToast = (message: string) => {
-    if (typeof window !== 'undefined') {
-      const toast = document.createElement('div')
-      toast.innerHTML = `
-        <div style="
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #ef4444;
-          color: white;
-          padding: 1rem 1.5rem;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          z-index: 9999;
-          font-weight: 600;
-          animation: slideIn 0.3s ease-out;
-        ">
-          ❌ ${message}
-        </div>
-        <style>
-          @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-          }
-        </style>
-      `
-      document.body.appendChild(toast)
-      setTimeout(() => {
-        document.body.removeChild(toast)
-      }, 3000)
-    }
-  }
+  const statCards: StatCard[] = [
+    { label: 'Total documentos', value: stats?.totalDocumentos || 0, description: 'Registrados', icon: FileText },
+    { label: 'Facturas', value: stats?.facturas || 0, description: 'Emitidas', icon: FileText },
+    { label: 'Boletas', value: stats?.boletas || 0, description: 'Emitidas', icon: FileText },
+    { label: 'Notas credito', value: stats?.notasCredito || 0, description: 'Notas emitidas', icon: FileText },
+    { label: 'Contratos', value: stats?.contratos || 0, description: 'Registrados', icon: FileText },
+    { label: 'Pendientes envio', value: stats?.pendientesEnvio || 0, description: `Por enviar a ${country.servicioFiscal}`, icon: Send },
+  ]
 
   if (documentosLoading && documentos.length === 0) {
     return (
-      <div className="dashboard-container">
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '4px solid #f3f4f6',
-              borderTop: '4px solid #3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }}></div>
-            <p>Cargando documentos...</p>
-          </div>
+      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
+        <div className="mx-auto flex min-h-[420px] w-full max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
+          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+          <p className="text-sm text-slate-300">Cargando documentos...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Gestión Documental y Facturación Electrónica</h1>
-        <p className="dashboard-subtitle">Gestiona facturas, boletas, notas y contratos con validación {country.servicioFiscal}</p>
-        <button
-          className="refresh-btn"
-          onClick={() => setIsModalOpen(true)}
-        >
-          + Crear Documento
-        </button>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>TOTAL DOCUMENTOS</h3>
-            <span className="stat-icon">📄</span>
-          </div>
-          <div className="stat-value">{stats?.totalDocumentos || 0}</div>
-          <div className="stat-subtitle">Documentos registrados</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>FACTURAS</h3>
-            <span className="stat-icon">🧾</span>
-          </div>
-          <div className="stat-value">{stats?.facturas || 0}</div>
-          <div className="stat-subtitle">Facturas emitidas</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>BOLETAS</h3>
-            <span className="stat-icon">🎫</span>
-          </div>
-          <div className="stat-value">{stats?.boletas || 0}</div>
-          <div className="stat-subtitle">Boletas emitidas</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>NOTAS CRÉDITO</h3>
-            <span className="stat-icon">📝</span>
-          </div>
-          <div className="stat-value">{stats?.notasCredito || 0}</div>
-          <div className="stat-subtitle">Notas emitidas</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>CONTRATOS</h3>
-            <span className="stat-icon">📋</span>
-          </div>
-          <div className="stat-value">{stats?.contratos || 0}</div>
-          <div className="stat-subtitle">Contratos registrados</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>PENDIENTES ENVÍO</h3>
-            <span className="stat-icon">⏳</span>
-          </div>
-          <div className="stat-value">{stats?.pendientesEnvio || 0}</div>
-          <div className="stat-subtitle">Por enviar a {country.servicioFiscal}</div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div style={{
-        background: 'white',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        marginBottom: '1.5rem'
-      }}>
-        <h3 style={{ marginBottom: '1rem', color: '#1f2937' }}>Filtros de búsqueda</h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Tipo de Documento</label>
-            <select
-              value={filters.tipo_documento}
-              onChange={(e) => setFilters(prev => ({ ...prev, tipo_documento: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            >
-              <option value="">Todos los tipos</option>
-              <option value="FACTURA">Facturas</option>
-              <option value="BOLETA">Boletas</option>
-              <option value="NOTA_CREDITO">Notas de Crédito</option>
-              <option value="NOTA_DEBITO">Notas de Débito</option>
-              <option value="CONTRATO">Contratos</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Estado</label>
-            <select
-              value={filters.estado}
-              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            >
-              <option value="">Todos los estados</option>
-              <option value="BORRADOR">Borrador</option>
-              <option value="EMITIDO">Emitido</option>
-              <option value="ENVIADO_SUNAT">Enviado {country.servicioFiscal}</option>
-              <option value="ACEPTADO">Aceptado</option>
-              <option value="RECHAZADO">Rechazado</option>
-              <option value="ANULADO">Anulado</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>RUC/DNI Cliente</label>
-            <input
-              type="text"
-              value={filters.receptor_numero_doc}
-              onChange={(e) => setFilters(prev => ({ ...prev, receptor_numero_doc: e.target.value }))}
-              placeholder="Buscar por documento..."
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Serie</label>
-            <input
-              type="text"
-              value={filters.serie}
-              onChange={(e) => setFilters(prev => ({ ...prev, serie: e.target.value }))}
-              placeholder="Ej: F001, B001..."
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Fecha Desde</label>
-            <input
-              type="date"
-              value={filters.fecha_desde}
-              onChange={(e) => setFilters(prev => ({ ...prev, fecha_desde: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Fecha Hasta</label>
-            <input
-              type="date"
-              value={filters.fecha_hasta}
-              onChange={(e) => setFilters(prev => ({ ...prev, fecha_hasta: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px'
-              }}
-            />
-          </div>
-        </div>
-
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={() => setFilters({
-              tipo_documento: '',
-              estado: '',
-              fecha_desde: '',
-              fecha_hasta: '',
-              receptor_numero_doc: '',
-              serie: ''
-            })}
-            style={{
-              padding: '0.5rem 1rem',
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            Limpiar Filtros
-          </button>
-        </div>
-      </div>
-
-      {/* Documents List */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          padding: '1.5rem',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h2 style={{ margin: 0, color: '#1f2937' }}>Lista de Documentos</h2>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              + Nuevo Documento
-            </button>
-            <button
-              onClick={loadData}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              🔄 Actualizar
-            </button>
-          </div>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>TIPO</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>NÚMERO</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>FECHA</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>CLIENTE</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>TOTAL</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>ESTADO</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#374151', fontSize: '0.875rem' }}>ACCIONES</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documentos.map((documento) => (
-                <tr key={documento.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <div>
-                      <div style={{ fontWeight: '500' }}>{getTipoDocumentoDisplay(documento.tipo_documento)}</div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                      {documento.serie}-{documento.numero}
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    {new Date(documento.fecha_emision).toLocaleDateString('es-PE')}
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <div>
-                      <div style={{ fontWeight: '500' }}>{documento.receptor_razon_social}</div>
-                      <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>{documento.receptor_numero_doc}</div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <div style={{ fontWeight: '600', color: '#1f2937' }}>
-                      {documento.moneda} {documento.total.toFixed(2)}
-                    </div>
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <span style={{
-                      ...getEstadoColor(documento.estado),
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600'
-                    }}>
-                      {getEstadoText(documento.estado)}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {documento.estado === 'BORRADOR' && (
-                        <>
-                          <button
-                            onClick={() => generarXML(documento.id)}
-                            style={{
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              border: '1px solid rgba(59, 130, 246, 0.2)',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '6px',
-                              color: '#3b82f6',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            Generar XML
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedDocumento(documento)
-                              setIsModalOpen(true)
-                            }}
-                            style={{
-                              background: 'rgba(107, 114, 128, 0.1)',
-                              border: '1px solid rgba(107, 114, 128, 0.2)',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '6px',
-                              color: '#6b7280',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            Editar
-                          </button>
-                        </>
-                      )}
-                      {documento.estado === 'EMITIDO' && (
-                        <button
-                          onClick={() => enviarFiscal(documento.id)}
-                          style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '6px',
-                            color: '#10b981',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          Enviar {country.servicioFiscal}
-                        </button>
-                      )}
-                      {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
-                        <>
-                          <button
-                            onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.2)',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '6px',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            PDF
-                          </button>
-                          <button
-                            onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)}
-                            style={{
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              border: '1px solid rgba(59, 130, 246, 0.2)',
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '6px',
-                              color: '#3b82f6',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem'
-                            }}
-                          >
-                            XML
-                          </button>
-                        </>
-                      )}
-                      {!['ANULADO'].includes(documento.estado) && (
-                        <button
-                          onClick={() => {
-                            const motivo = prompt('Ingrese el motivo de anulación:')
-                            if (motivo) {
-                              anularDocumento(documento.id, motivo)
-                            }
-                          }}
-                          style={{
-                            background: 'rgba(220, 38, 38, 0.1)',
-                            border: '1px solid rgba(220, 38, 38, 0.2)',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '6px',
-                            color: '#dc2626',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          Anular
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {documentos.length === 0 && !documentosLoading && (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
-              <h3 style={{ marginBottom: '0.5rem' }}>No hay documentos registrados</h3>
-              <p style={{ marginBottom: '1.5rem' }}>Comienza creando tu primer documento</p>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#3b82f6',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                + Crear Primer Documento
-              </button>
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP Document Center
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Gestion Documental y Facturacion Electronica</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                Facturas, boletas, notas y contratos con validacion {country.servicioFiscal}.
+              </p>
             </div>
-          )}
-        </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Crear documento
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          {statCards.map(({ label, value, description, icon: Icon }) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex h-full items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>{label}</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">{description}</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <Icon className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Filtros de busqueda</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[180px_180px_1fr_150px_150px_150px_auto] xl:items-end">
+            <label className="space-y-2">
+              <span className={labelClass}>Tipo</span>
+              <select className={inputClass} value={filters.tipo_documento} onChange={(event) => setFilters((prev) => ({ ...prev, tipo_documento: event.target.value }))}>
+                <option value="">Todos los tipos</option>
+                <option value="FACTURA">Facturas</option>
+                <option value="BOLETA">Boletas</option>
+                <option value="NOTA_CREDITO">Notas de Credito</option>
+                <option value="NOTA_DEBITO">Notas de Debito</option>
+                <option value="CONTRATO">Contratos</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Estado</span>
+              <select className={inputClass} value={filters.estado} onChange={(event) => setFilters((prev) => ({ ...prev, estado: event.target.value }))}>
+                <option value="">Todos</option>
+                <option value="BORRADOR">Borrador</option>
+                <option value="EMITIDO">Emitido</option>
+                <option value="ENVIADO_SUNAT">Enviado {country.servicioFiscal}</option>
+                <option value="ACEPTADO">Aceptado</option>
+                <option value="RECHAZADO">Rechazado</option>
+                <option value="ANULADO">Anulado</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>RUC/DNI cliente</span>
+              <input className={inputClass} type="text" value={filters.receptor_numero_doc} onChange={(event) => setFilters((prev) => ({ ...prev, receptor_numero_doc: event.target.value }))} placeholder="Buscar por documento" />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Serie</span>
+              <input className={inputClass} type="text" value={filters.serie} onChange={(event) => setFilters((prev) => ({ ...prev, serie: event.target.value }))} placeholder="F001" />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Desde</span>
+              <input className={inputClass} type="date" value={filters.fecha_desde} onChange={(event) => setFilters((prev) => ({ ...prev, fecha_desde: event.target.value }))} />
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Hasta</span>
+              <input className={inputClass} type="date" value={filters.fecha_hasta} onChange={(event) => setFilters((prev) => ({ ...prev, fecha_hasta: event.target.value }))} />
+            </label>
+            <Button type="button" onClick={clearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+              <XCircle className="h-4 w-4" />
+              Limpiar
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="flex flex-col gap-3 border-b border-cyan-400/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="text-base text-white">Lista de documentos</CardTitle>
+              <p className="mt-1 text-sm text-slate-400">{documentos.length} registros cargados</p>
+            </div>
+            <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Plus className="h-4 w-4" />
+              Nuevo documento
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {documentos.length === 0 && !documentosLoading ? (
+              <div className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
+                <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
+                <h3 className="text-lg font-bold text-white">No hay documentos registrados</h3>
+                <p className="mt-2 text-sm text-slate-400">Comienza creando tu primer documento.</p>
+                <Button type="button" onClick={() => setIsModalOpen(true)} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                  <Plus className="h-4 w-4" />
+                  Crear primer documento
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1080px] border-collapse text-sm">
+                  <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Tipo</th>
+                      <th className="px-4 py-3 text-left">Numero</th>
+                      <th className="px-4 py-3 text-left">Fecha</th>
+                      <th className="px-4 py-3 text-left">Cliente</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3 text-center">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-cyan-400/10">
+                    {documentos.map((documento) => (
+                      <tr key={documento.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
+                        <td className="px-4 py-3 font-semibold text-slate-100">{getTipoDocumentoDisplay(documento.tipo_documento)}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-white">{documento.serie}-{documento.numero}</td>
+                        <td className="px-4 py-3 text-slate-300">{new Date(documento.fecha_emision).toLocaleDateString('es-PE')}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-100">{documento.receptor_razon_social}</div>
+                          <div className="text-xs text-cyan-100/55">{documento.receptor_numero_doc}</div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-cyan-50">{documento.moneda} {documento.total.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${estadoClasses[documento.estado] || estadoClasses.BORRADOR}`}>
+                            {getEstadoText(documento.estado)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {documento.estado === 'BORRADOR' && (
+                              <>
+                                <Button type="button" size="sm" onClick={() => generarXML(documento.id)} className="gap-1 bg-blue-600 text-white hover:bg-blue-500">
+                                  <FileText className="h-4 w-4" />
+                                  XML
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedDocumento(documento)
+                                    setIsModalOpen(true)
+                                  }}
+                                  variant="outline"
+                                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  Editar
+                                </Button>
+                              </>
+                            )}
+                            {documento.estado === 'EMITIDO' && (
+                              <Button type="button" size="sm" onClick={() => enviarFiscal(documento.id)} className="gap-1 bg-cyan-600 text-white hover:bg-cyan-500">
+                                <Send className="h-4 w-4" />
+                                Enviar
+                              </Button>
+                            )}
+                            {['ENVIADO_SUNAT', 'ACEPTADO'].includes(documento.estado) && (
+                              <>
+                                <Button type="button" size="sm" onClick={() => descargarPDF(documento.id, `${documento.serie}-${documento.numero}.pdf`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+                                  <Download className="h-4 w-4" />
+                                  PDF
+                                </Button>
+                                <Button type="button" size="sm" onClick={() => descargarXML(documento.id, `${documento.serie}-${documento.numero}.xml`)} variant="outline" className="gap-1 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+                                  <Download className="h-4 w-4" />
+                                  XML
+                                </Button>
+                              </>
+                            )}
+                            {!['ANULADO'].includes(documento.estado) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  const motivo = prompt('Ingrese el motivo de anulacion:')
+                                  if (motivo) anularDocumento(documento.id, motivo)
+                                }}
+                                variant="outline"
+                                className="gap-1 border-slate-300/20 bg-slate-400/10 text-slate-100 hover:bg-slate-400/15 hover:text-white"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                Anular
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Document Modal */}
       <DocumentoModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -785,13 +472,6 @@ export default function DocumentosPage() {
         onSuccess={handleDocumentoCreated}
         documento={selectedDocumento}
       />
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

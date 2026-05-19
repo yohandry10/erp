@@ -33,7 +33,7 @@ Write-Host ""
 
 try {
     Write-Host "Creating devolucion..." -ForegroundColor Yellow
-    
+
     $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/devoluciones" `
         -Method POST `
         -Headers @{
@@ -53,11 +53,11 @@ try {
     Write-Host "  Total: $($response.total)" -ForegroundColor White
     Write-Host "  Items: $($response.items.Count)" -ForegroundColor White
     Write-Host ""
-    
+
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "✅ TEST PASSED!" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Cyan
-    
+
 } catch {
     Write-Host "❌ Error:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
@@ -65,7 +65,7 @@ try {
         Write-Host "Details:" -ForegroundColor Red
         Write-Host $_.ErrorDetails.Message -ForegroundColor Red
     }
-    
+
     # This is expected if the orden/proveedor don't exist
     Write-Host ""
     Write-Host "Note: This error is expected if the test data doesn't exist in the database." -ForegroundColor Yellow

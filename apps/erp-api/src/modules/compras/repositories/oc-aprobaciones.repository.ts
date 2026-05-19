@@ -9,6 +9,7 @@ export interface CreateAprobacionDto {
   estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
   fecha_aprobacion?: string;
   comentarios?: string;
+  tenant_id?: string;
 }
 
 @Injectable()
@@ -27,6 +28,10 @@ export class OcAprobacionesRepository {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+
+    if (createDto.tenant_id) {
+      aprobacionData.tenant_id = createDto.tenant_id;
+    }
 
     if (createDto.fecha_aprobacion) {
       aprobacionData.fecha_aprobacion = createDto.fecha_aprobacion;
@@ -49,14 +54,19 @@ export class OcAprobacionesRepository {
     return data;
   }
 
-  async findByOrdenId(ordenId: string) {
+  async findByOrdenId(ordenId: string, tenantId?: string) {
     const supabase = this.supabaseService.getClient();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('oc_aprobaciones')
       .select('*')
-      .eq('orden_id', ordenId)
-      .order('nivel', { ascending: true });
+      .eq('orden_id', ordenId);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.order('nivel', { ascending: true });
 
     if (error) {
       throw new Error(`Error al obtener aprobaciones: ${error.message}`);
@@ -68,7 +78,8 @@ export class OcAprobacionesRepository {
   async updateEstado(
     id: string,
     estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA',
-    comentarios?: string
+    comentarios?: string,
+    tenantId?: string,
   ) {
     const supabase = this.supabaseService.getClient();
 
@@ -82,12 +93,16 @@ export class OcAprobacionesRepository {
       updateData.comentarios = comentarios;
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('oc_aprobaciones')
       .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.select().single();
 
     if (error) {
       throw new Error(`Error al actualizar estado de aprobación: ${error.message}`);
@@ -124,14 +139,20 @@ export class OcAprobacionesRepository {
     return data || [];
   }
 
-  async countPendingByOrdenId(ordenId: string): Promise<number> {
+  async countPendingByOrdenId(ordenId: string, tenantId?: string): Promise<number> {
     const supabase = this.supabaseService.getClient();
 
-    const { count, error } = await supabase
+    let query = supabase
       .from('oc_aprobaciones')
       .select('*', { count: 'exact', head: true })
       .eq('orden_id', ordenId)
       .eq('estado', 'PENDIENTE');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { count, error } = await query;
 
     if (error) {
       throw new Error(`Error al contar aprobaciones pendientes: ${error.message}`);
@@ -140,14 +161,20 @@ export class OcAprobacionesRepository {
     return count || 0;
   }
 
-  async hasRejectedApprovals(ordenId: string): Promise<boolean> {
+  async hasRejectedApprovals(ordenId: string, tenantId?: string): Promise<boolean> {
     const supabase = this.supabaseService.getClient();
 
-    const { count, error } = await supabase
+    let query = supabase
       .from('oc_aprobaciones')
       .select('*', { count: 'exact', head: true })
       .eq('orden_id', ordenId)
       .eq('estado', 'RECHAZADA');
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    const { count, error } = await query;
 
     if (error) {
       throw new Error(`Error al verificar aprobaciones rechazadas: ${error.message}`);

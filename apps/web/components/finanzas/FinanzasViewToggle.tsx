@@ -24,13 +24,7 @@ export default function FinanzasViewToggle({
   onChange
 }: FinanzasViewToggleProps) {
   return (
-    <div style={{ 
-      display: 'flex', 
-      gap: '0.5rem',
-      background: '#f3f4f6',
-      padding: '0.25rem',
-      borderRadius: '8px'
-    }}>
+    <div className="flex gap-2 bg-[#f3f4f6] p-1 rounded-2">
       {options.map((option) => {
         const Icon = option.icon
         const isActive = value === option.value
@@ -38,22 +32,7 @@ export default function FinanzasViewToggle({
         return (
           <button
             key={option.value}
-            onClick={() => onChange(option.value)}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '6px',
-              border: 'none',
-              background: isActive ? 'white' : 'transparent',
-              color: isActive ? '#3b82f6' : '#6b7280',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s ease',
-              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-            }}
+            onClick={() => onChange(option.value)} className="py-2 px-4 rounded-[6px] border-0 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 transition"
           >
             <Icon size={16} />
             {option.label}

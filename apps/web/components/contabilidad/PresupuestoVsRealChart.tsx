@@ -273,85 +273,45 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '3rem',
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#3b82f6' }} />
-        <span style={{ marginLeft: '0.75rem', color: '#6b7280' }}>Cargando comparación...</span>
+      <div className="flex items-center justify-center p-12 bg-white rounded-3 shadow">
+        <Loader2 size={24} className="text-blue-500" />
+        <span className="ml-3 text-gray-500">Cargando comparación...</span>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div style={{
-        padding: '2rem',
-        background: '#fef2f2',
-        border: '1px solid #fecaca',
-        borderRadius: '12px',
-        color: '#991b1b'
-      }}>
-        <p style={{ margin: 0, fontWeight: '600' }}>Error al cargar la comparación</p>
-        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>{error}</p>
+      <div className="p-8 bg-[#fef2f2] border rounded-3 text-red-800">
+        <p className="m-0 font-semibold">Error al cargar la comparación</p>
+        <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">{error}</p>
       </div>
     )
   }
 
   if (!data) {
     return (
-      <div style={{
-        padding: '2rem',
-        background: '#f9fafb',
-        border: '1px solid #e5e7eb',
-        borderRadius: '12px',
-        textAlign: 'center',
-        color: '#6b7280'
-      }}>
-        <p style={{ margin: 0 }}>No hay datos disponibles para este período</p>
+      <div className="p-8 bg-[#f9fafb] border rounded-3 text-center text-gray-500">
+        <p className="m-0">No hay datos disponibles para este período</p>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="flex flex-col gap-6">
       {/* Header con información del período */}
-      <div style={{
-        background: 'white',
-        padding: '1.5rem',
-        borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="bg-white p-6 rounded-3 shadow">
+        <div className="flex justify-between items-center">
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+            <h2 className="m-0 text-6 font-bold text-gray-900">
               Comparación Presupuesto vs Real
             </h2>
-            <p style={{ margin: '0.5rem 0 0 0', color: '#6b7280' }}>
+            <p className="mt-2 mr-0 mb-0 ml-0 text-gray-500">
               Período: {data.periodo.descripcion} ({data.periodo.estado})
             </p>
           </div>
           <button
-            onClick={handleExportToExcel}
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: '1px solid #10b981',
-              background: '#10b981',
-              color: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              transition: 'all 0.2s ease'
-            }}
+            onClick={handleExportToExcel} className="py-3 px-6 rounded-2 border bg-[#10b981] text-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#059669'
               e.currentTarget.style.borderColor = '#059669'
@@ -368,45 +328,24 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
       </div>
 
       {/* Resumen Global */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem'
-      }}>
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
+        <div className="bg-white p-6 rounded-3 shadow">
+          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
             Total Presupuestado
           </p>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold text-gray-900">
             {formatCurrency(data.resumen_global.total_presupuestado)}
           </p>
         </div>
 
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+        <div className="bg-white p-6 rounded-3 shadow">
+          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
             Total Ejecutado
           </p>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold text-gray-900">
             {formatCurrency(data.resumen_global.total_ejecutado)}
           </p>
-          <div style={{ 
-            marginTop: '0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            fontSize: '0.875rem',
-            color: data.resumen_global.porcentaje_ejecucion > 100 ? '#ef4444' : '#10b981'
-          }}>
+          <div className="mt-2 flex items-center gap-1 text-[0.875rem]">
             {data.resumen_global.porcentaje_ejecucion > 100 ? (
               <TrendingUp size={14} />
             ) : (
@@ -416,45 +355,30 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
           </div>
         </div>
 
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+        <div className="bg-white p-6 rounded-3 shadow">
+          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
             Total Disponible
           </p>
-          <p style={{ 
-            margin: '0.5rem 0 0 0', 
-            fontSize: '1.5rem', 
-            fontWeight: '700',
-            color: data.resumen_global.total_disponible < 0 ? '#ef4444' : '#111827'
-          }}>
+          <p className="mt-2 mr-0 mb-0 ml-0 text-6 font-bold">
             {formatCurrency(data.resumen_global.total_disponible)}
           </p>
         </div>
 
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', fontWeight: '600' }}>
+        <div className="bg-white p-6 rounded-3 shadow">
+          <p className="m-0 text-[0.875rem] text-gray-500 font-semibold">
             Alertas
           </p>
-          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '1rem', fontSize: '0.875rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+          <div className="mt-2 flex gap-4 text-[0.875rem]">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
               <span>{data.resumen_global.alertas.sobregiros}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
               <span>{data.resumen_global.alertas.advertencias}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-[#10b981]" />
               <span>{data.resumen_global.alertas.normales}</span>
             </div>
           </div>
@@ -463,18 +387,8 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
       {/* Gráfico de Ejecución por Centro */}
       {data.centros_costo.length > 0 && (
-        <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <h3 style={{ 
-            margin: '0 0 1.5rem 0', 
-            fontSize: '1.125rem', 
-            fontWeight: '600', 
-            color: '#111827' 
-          }}>
+        <div className="bg-white p-6 rounded-3 shadow">
+          <h3 className="mt-0 mr-0 mb-6 ml-0 text-[1.125rem] font-semibold text-gray-900">
             Ejecución Presupuestal por Centro de Costo
           </h3>
           <PresupuestoEjecucionPorCentroChart centros={data.centros_costo} />
@@ -482,38 +396,21 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
       )}
 
       {/* Detalle por Centro de Costo */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="flex flex-col gap-4">
         {data.centros_costo.map((centro) => {
           const isExpanded = expandedCentros.has(centro.centro_costo.id)
           
           return (
             <div
-              key={centro.centro_costo.id}
-              style={{
-                background: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                overflow: 'hidden'
-              }}
+              key={centro.centro_costo.id} className="bg-white rounded-3 shadow overflow-hidden"
             >
               {/* Header del Centro de Costo */}
               <button
-                onClick={() => toggleCentro(centro.centro_costo.id)}
-                style={{
-                  width: '100%',
-                  padding: '1.5rem',
-                  background: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  textAlign: 'left'
-                }}
+                onClick={() => toggleCentro(centro.centro_costo.id)} className="w-[100%] p-6 bg-white border-0 cursor-pointer flex justify-between items-center text-left"
               >
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>
+                <div className="flex-[1]">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="m-0 text-[1.125rem] font-semibold text-gray-900">
                       {centro.centro_costo.codigo} - {centro.centro_costo.nombre}
                     </h3>
                     <PresupuestoEjecucionIndicator
@@ -524,51 +421,42 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
                       showProgressBar={false}
                     />
                   </div>
-                  <div style={{ display: 'flex', gap: '2rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                  <div className="flex gap-8 text-[0.875rem] text-gray-500">
                     <span>Presupuestado: {formatCurrency(centro.totales.presupuestado)}</span>
                     <span>Ejecutado: {formatCurrency(centro.totales.ejecutado)}</span>
                     <span>Disponible: {formatCurrency(centro.totales.disponible)}</span>
-                    <span style={{ 
-                      color: centro.totales.porcentaje_ejecucion > 100 ? '#ef4444' : '#10b981',
-                      fontWeight: '600'
-                    }}>
+                    <span className="font-semibold">
                       {centro.totales.porcentaje_ejecucion.toFixed(2)}%
                     </span>
                   </div>
                 </div>
-                <div style={{
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  background: '#f3f4f6',
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
-                }}>
+                <div className="p-2 rounded-[4px] bg-[#f3f4f6] transition">
                   ▼
                 </div>
               </button>
 
               {/* Detalle de Cuentas */}
               {isExpanded && (
-                <div style={{ borderTop: '1px solid #e5e7eb' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="border-t">
+                  <table className="w-[100%]">
                     <thead>
-                      <tr style={{ background: '#f9fafb' }}>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                      <tr className="bg-[#f9fafb]">
+                        <th className="py-3 px-6 text-left text-3 font-semibold text-gray-500">
                           Cuenta
                         </th>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
                           Presupuestado
                         </th>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
                           Ejecutado
                         </th>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
                           Disponible
                         </th>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                        <th className="py-3 px-6 text-right text-3 font-semibold text-gray-500">
                           % Ejecución
                         </th>
-                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
+                        <th className="py-3 px-6 text-center text-3 font-semibold text-gray-500">
                           Estado
                         </th>
                       </tr>
@@ -576,64 +464,36 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
                     <tbody>
                       {centro.cuentas.map((cuenta, idx) => (
                         <tr 
-                          key={idx}
-                          style={{ 
-                            borderTop: '1px solid #f3f4f6',
-                            background: idx % 2 === 0 ? 'white' : '#fafafa'
-                          }}
+                          key={idx} className="border-t"
                         >
-                          <td style={{ padding: '1rem 1.5rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+                          <td className="py-4 px-6">
+                            <div className="text-[0.875rem] font-semibold text-gray-900">
                               {cuenta.cuenta.codigo}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                            <div className="text-3 text-gray-500 mt-1">
                               {cuenta.cuenta.nombre}
                             </div>
                           </td>
-                          <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.875rem', color: '#111827' }}>
+                          <td className="py-4 px-6 text-right text-[0.875rem] text-gray-900">
                             {formatCurrency(cuenta.monto_presupuestado)}
                           </td>
-                          <td style={{ padding: '1rem 1.5rem', textAlign: 'right', fontSize: '0.875rem', color: '#111827' }}>
+                          <td className="py-4 px-6 text-right text-[0.875rem] text-gray-900">
                             {formatCurrency(cuenta.monto_ejecutado)}
                           </td>
-                          <td style={{ 
-                            padding: '1rem 1.5rem', 
-                            textAlign: 'right', 
-                            fontSize: '0.875rem',
-                            color: cuenta.monto_disponible < 0 ? '#ef4444' : '#111827',
-                            fontWeight: cuenta.monto_disponible < 0 ? '600' : 'normal'
-                          }}>
+                          <td className="py-4 px-6 text-right text-[0.875rem]">
                             {formatCurrency(cuenta.monto_disponible)}
                           </td>
-                          <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              <div style={{
-                                flex: 1,
-                                maxWidth: '100px',
-                                height: '8px',
-                                background: '#e5e7eb',
-                                borderRadius: '4px',
-                                overflow: 'hidden'
-                              }}>
-                                <div style={{
-                                  width: `${Math.min(cuenta.porcentaje_ejecutado, 100)}%`,
-                                  height: '100%',
-                                  background: getEjecucionColor(cuenta.porcentaje_ejecutado),
-                                  transition: 'width 0.3s ease'
-                                }} />
+                          <td className="py-4 px-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="flex-[1] max-w-[100px] h-2 bg-[#e5e7eb] rounded-[4px] overflow-hidden">
+                                <div className="h-[100%] transition" />
                               </div>
-                              <span style={{ 
-                                fontSize: '0.875rem',
-                                fontWeight: '600',
-                                color: getEjecucionColor(cuenta.porcentaje_ejecutado),
-                                minWidth: '60px',
-                                textAlign: 'right'
-                              }}>
+                              <span className="text-[0.875rem] font-semibold min-w-[60px] text-right">
                                 {cuenta.porcentaje_ejecutado.toFixed(1)}%
                               </span>
                             </div>
                           </td>
-                          <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
+                          <td className="py-4 px-6 text-center">
                             <PresupuestoEjecucionIndicator
                               porcentajeEjecutado={cuenta.porcentaje_ejecutado}
                               size="sm"
@@ -655,17 +515,11 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
 
       {/* Mensaje si no hay centros */}
       {data.centros_costo.length === 0 && (
-        <div style={{
-          padding: '3rem',
-          background: 'white',
-          borderRadius: '12px',
-          textAlign: 'center',
-          color: '#6b7280'
-        }}>
-          <p style={{ margin: 0, fontSize: '1rem' }}>
+        <div className="p-12 bg-white rounded-3 text-center text-gray-500">
+          <p className="m-0 text-4">
             No hay presupuestos configurados para este período
           </p>
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+          <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem]">
             Configure presupuestos por centro de costo para ver la comparación
           </p>
         </div>

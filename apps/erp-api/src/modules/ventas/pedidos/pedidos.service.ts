@@ -587,18 +587,22 @@ export class PedidosService {
       updateData.igv = igv;
       updateData.total = total;
 
-      // Eliminar detalle anterior
-      await client.from('pedidos_venta_detalle').delete().eq('pedido_id', id);
-
-      // Crear nuevo detalle
+      // Insertar nuevo detalle ANTES de eliminar el anterior (para evitar pérdida de datos si INSERT falla)
       const detalleData = updatePedidoDto.detalle.map((item) => ({
         pedido_id: id,
+        tenant_id: tenantId,
         producto_id: item.producto_id,
         descripcion: item.descripcion,
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,
         subtotal: item.cantidad * item.precio_unitario,
       }));
+
+      // Obtener IDs de detalle anterior para eliminar después del INSERT exitoso
+      const { data: detalleAnterior } = await client
+        .from('pedidos_venta_detalle')
+        .select('id')
+        .eq('pedido_id', id);
 
       const { error: detalleError } = await client
         .from('pedidos_venta_detalle')
@@ -607,6 +611,12 @@ export class PedidosService {
       if (detalleError) {
         console.error('Error updating pedido detalle:', detalleError);
         throw new BadRequestException('Error al actualizar el detalle del pedido');
+      }
+
+      // Eliminar detalle anterior solo después de INSERT exitoso
+      if (detalleAnterior && detalleAnterior.length > 0) {
+        const idsAnteriores = detalleAnterior.map((d) => d.id);
+        await client.from('pedidos_venta_detalle').delete().in('id', idsAnteriores);
       }
     }
 
@@ -1656,6 +1666,7 @@ export class PedidosService {
       pedido,
       tenantId,
       cpeIdempotencyKey,
+      userId,
     );
     const facturaDocumentoId = facturaResultado.documento_id ?? null;
 
@@ -1832,13 +1843,53 @@ export class PedidosService {
    * Generar número de pedido
    * Formato: PV-YYYY-NNNN
    */
-  private async generarNumero(tenantId: string): Promise<string> {
+  private async generarNumero(tenantId: string, maxRetries = 3): Promise<string> {
     const client = this.supabase.getClient();
     const year = new Date().getFullYear();
     const prefix = `PV-${year}-`;
 
-    // Obtener el último número del año
-    const { data, error } = await client
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Obtener el último número del año
+      const { data, error } = await client
+        .from('pedidos_venta')
+        .select('numero')
+        .eq('tenant_id', tenantId)
+        .like('numero', `${prefix}%`)
+        .order('numero', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error generating numero:', error);
+        throw new BadRequestException('Error al generar número de pedido');
+      }
+
+      let nextNumber = 1;
+      if (data && data.length > 0) {
+        const lastNumero = data[0].numero;
+        const lastNumber = parseInt(lastNumero.split('-')[2], 10);
+        nextNumber = lastNumber + 1;
+      }
+
+      const candidato = `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+
+      // Check if this number already exists (another concurrent request may have used it)
+      const { count } = await client
+        .from('pedidos_venta')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('numero', candidato);
+
+      if (!count || count === 0) {
+        return candidato;
+      }
+
+      // Collision detected, retry with updated MAX
+      console.warn(`⚠️ [Pedidos] Colisión en numeración ${candidato}, reintento ${attempt + 1}/${maxRetries}`);
+    }
+
+    // Fallback: append timestamp suffix to guarantee uniqueness
+    const ts = Date.now().toString(36).slice(-4);
+    const { data } = await client
       .from('pedidos_venta')
       .select('numero')
       .eq('tenant_id', tenantId)
@@ -1846,19 +1897,13 @@ export class PedidosService {
       .order('numero', { ascending: false })
       .limit(1);
 
-    if (error) {
-      console.error('Error generating numero:', error);
-      throw new BadRequestException('Error al generar número de pedido');
-    }
-
     let nextNumber = 1;
     if (data && data.length > 0) {
-      const lastNumero = data[0].numero;
-      const lastNumber = parseInt(lastNumero.split('-')[2], 10);
+      const lastNumber = parseInt(data[0].numero.split('-')[2], 10);
       nextNumber = lastNumber + 1;
     }
 
-    return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
+    return `${prefix}${nextNumber.toString().padStart(4, '0')}-${ts}`;
   }
 
   /**

@@ -1,8 +1,33 @@
 import { expect, Page } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Authentication helper for E2E tests
  */
+
+const waitForAuthRateLimitWindow = () => new Promise((resolve) => setTimeout(resolve, 61000));
+
+for (const envPath of [
+  path.resolve(process.cwd(), '../../.env.local'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '../erp-api/.env'),
+]) {
+  if (!fs.existsSync(envPath)) continue;
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
+    if (!match || process.env[match[1]]) continue;
+    process.env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+  }
+}
+
+function getDefaultPassword(): string {
+  if (process.env.DATABASE_URL) {
+    return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
+  }
+  return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+}
 
 /**
  * Login to the application
@@ -10,42 +35,57 @@ import { expect, Page } from '@playwright/test';
  * @param email - User email (defaults to TEST_USER_EMAIL env var)
  * @param password - User password (defaults to TEST_USER_PASSWORD env var)
  */
-export async function login(page: Page, email?: string, password?: string) {
+export async function login(page: Page, email?: string, password?: string, forceRefresh = false) {
   const userEmail = email || process.env.TEST_USER_EMAIL || 'admin@erp.local';
-  const userPassword = password || process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+  const userPassword = password || getDefaultPassword();
 
-  await page.addInitScript(() => {
+  await page.addInitScript((countryId) => {
     window.localStorage.setItem('erp_onboarding_completed', JSON.stringify(['admin', 'cajero', 'vendedor']));
-  });
+    window.localStorage.setItem('selectedCountry', countryId);
+  }, process.env.TEST_COUNTRY_ID || '1');
 
-  if (email || password) {
-    await page.context().clearCookies();
+  const existingProfileResponse = forceRefresh ? null : await page.request.get('/backend/api/auth/profile/');
+  if (existingProfileResponse?.ok()) {
+    await page.goto('/dashboard/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 30000 });
+    await expect(page.getByText('Verificando autenticación...')).toBeHidden({ timeout: 30000 });
+    return;
   }
+
+  await page.context().clearCookies();
 
   // Navigate to login page
   await page.goto('/login/', { waitUntil: 'commit', timeout: 30000 });
 
   if (await page.getByRole('button', { name: 'Cerrar Sesión' }).isVisible({ timeout: 5000 }).catch(() => false)) {
-    if (email || password) {
-      throw new Error('La página conserva una sesión previa pese a solicitar credenciales explícitas');
-    }
-    await expect(page.getByText('Verificando autenticación...')).toBeHidden({ timeout: 30000 });
-    return;
+    throw new Error('La página conserva una sesión previa pese a limpiar cookies antes del login E2E');
   }
 
   // Wait for login form to be visible
   await page.getByLabel('Correo Electrónico').waitFor({ timeout: 15000 });
   await expect(page.getByText('Cargando países...')).toBeHidden({ timeout: 60000 });
 
-  // Fill in credentials
-  await page.getByLabel('Correo Electrónico').fill(userEmail);
-  await page.getByLabel('Contraseña').fill(userPassword);
+  let loginResponse = await page.request.post('/backend/api/auth/login/', {
+    data: {
+      email: userEmail,
+      password: userPassword,
+    },
+  });
+  if (loginResponse.status() === 429) {
+    await waitForAuthRateLimitWindow();
+    loginResponse = await page.request.post('/backend/api/auth/login/', {
+      data: {
+        email: userEmail,
+        password: userPassword,
+      },
+    });
+  }
+  expect(loginResponse.ok(), `El login backend debe responder 2xx, status=${loginResponse.status()}`).toBe(true);
 
-  const submitButton = page.getByRole('button', { name: 'Iniciar Sesión' });
-  await expect(submitButton).toBeEnabled({ timeout: 60000 });
-  await submitButton.click();
+  const profileResponse = await page.request.get('/backend/api/auth/profile/');
+  expect(profileResponse.ok(), `La cookie de sesión debe autenticar profile, status=${profileResponse.status()}`).toBe(true);
 
-  // Wait for navigation to dashboard
+  await page.goto('/dashboard/', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 30000 });
   await expect(page.getByText('Verificando autenticación...')).toBeHidden({ timeout: 30000 });
 

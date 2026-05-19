@@ -2,7 +2,7 @@
 # Endpoint: POST /api/finanzas/conciliacion/:id/importar-csv
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyYWRtaW4iLCJ0ZW5hbnRfaWQiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJpYXQiOjE3MzAwMDAwMDAsImV4cCI6OTk5OTk5OTk5OX0.placeholder"
+$token = "REPLACE_WITH_TEST_JWT"
 
 Write-Host "=== TEST: Importar CSV a Conciliación Bancaria ===" -ForegroundColor Cyan
 Write-Host ""
@@ -158,7 +158,7 @@ try {
     Write-Host "  Total abonos: $($importarResponse.data.total_abonos)" -ForegroundColor White
     Write-Host "  Total cargos: $($importarResponse.data.total_cargos)" -ForegroundColor White
     Write-Host "  Saldo final: $($importarResponse.data.saldo_final)" -ForegroundColor White
-    
+
     if ($importarResponse.data.errores -and $importarResponse.data.errores.Count -gt 0) {
         Write-Host "  Errores: $($importarResponse.data.errores.Count)" -ForegroundColor Yellow
         foreach ($error in $importarResponse.data.errores) {

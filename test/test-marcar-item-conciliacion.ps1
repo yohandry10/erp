@@ -2,7 +2,7 @@
 # Descripción: Prueba el endpoint de match manual de conciliación bancaria
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1cDJsL3lRQkQ4L0JOZnciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2R2ZHBxZGRxZnVxcGhxZGRxZGRxLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYxNTI4NTU5LCJpYXQiOjE3Mjk5OTI1NTksImVtYWlsIjoiYWRtaW5AdmllcmRlcy5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoiYWRtaW5AdmllcmRlcy5jb20iLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5vbWJyZSI6IkFkbWluaXN0cmFkb3IiLCJwaG9uZV92ZXJpZmllZCI6ZmFsc2UsInN1YiI6IjlmNDAzNjdmLWE3MTctNGE3MC1iNTlmLWU3MTliMjliMjliMiJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzI5OTkyNTU5fV0sInNlc3Npb25faWQiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJpc19zdXBlcl9hZG1pbiI6dHJ1ZX0.iy_0HdBjPzVHER-Nt-Aq-Aq-Aq-Aq-Aq-Aq-Aq-Aq-Aq-Aq"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "9f40367f-a717-4a70-b59f-e719b29b29b2"
 
 $headers = @{
@@ -18,7 +18,7 @@ Write-Host ""
 Write-Host "Paso 1: Obteniendo conciliaciones..." -ForegroundColor Yellow
 try {
     $conciliaciones = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion" -Method Get -Headers $headers
-    
+
     if ($conciliaciones.data -and $conciliaciones.data.Count -gt 0) {
         $conciliacion = $conciliaciones.data[0]
         $conciliacionId = $conciliacion.id
@@ -40,7 +40,7 @@ Write-Host ""
 Write-Host "Paso 2: Obteniendo movimientos del sistema..." -ForegroundColor Yellow
 try {
     $movimientosSistema = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$($conciliacion.cuenta_bancaria_id)/movimientos?conciliado=false&es_extracto=false" -Method Get -Headers $headers
-    
+
     if ($movimientosSistema.data -and $movimientosSistema.data.Count -gt 0) {
         $movSistema = $movimientosSistema.data[0]
         Write-Host "✓ Movimiento sistema encontrado: $($movSistema.id)" -ForegroundColor Green
@@ -64,7 +64,7 @@ Write-Host ""
 Write-Host "Paso 3: Obteniendo movimientos del extracto..." -ForegroundColor Yellow
 try {
     $movimientosExtracto = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$($conciliacion.cuenta_bancaria_id)/movimientos?conciliado=false&es_extracto=true&conciliacion_id=$conciliacionId" -Method Get -Headers $headers
-    
+
     if ($movimientosExtracto.data -and $movimientosExtracto.data.Count -gt 0) {
         $movExtracto = $movimientosExtracto.data[0]
         Write-Host "✓ Movimiento extracto encontrado: $($movExtracto.id)" -ForegroundColor Green
@@ -99,16 +99,16 @@ Write-Host ""
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion/$conciliacionId/marcar-item" -Method Post -Headers $headers -Body $body
-    
+
     Write-Host "✓ Match manual realizado exitosamente" -ForegroundColor Green
     Write-Host ""
     Write-Host "Response:" -ForegroundColor Cyan
     Write-Host ($response | ConvertTo-Json -Depth 10) -ForegroundColor White
-    
+
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
     $errorBody = $_.ErrorDetails.Message
-    
+
     Write-Host "✗ Error al marcar item: Status $statusCode" -ForegroundColor Red
     Write-Host "Error Details:" -ForegroundColor Red
     Write-Host $errorBody -ForegroundColor Red

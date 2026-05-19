@@ -1,20 +1,46 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react';
-import Link from 'next/link';
-import EmpleadoModal from '@/components/modals/EmpleadoModal';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { useApi } from '@/hooks/use-api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import {
+  BadgeDollarSign,
+  Briefcase,
+  CalendarClock,
+  FileText,
+  UserPlus,
+  Users,
+} from 'lucide-react'
+import EmpleadoModal from '@/components/modals/EmpleadoModal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { useApi } from '@/hooks/use-api'
+import { PageShell } from '@/components/erp/page-shell'
+import { MetricCard } from '@/components/erp/metric-card'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
-const RrhhPage = () => {
-  const [empleados, setEmpleados] = useState<any[]>([]);
-  const [departamentos, setDepartamentos] = useState<any[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { get, post, put, delete: del } = useApi();
+const rrhhModules = [
+  { href: '/dashboard/rrhh/planillas', title: 'Planillas', description: 'Cálculo de sueldos y beneficios', icon: BadgeDollarSign },
+  { href: '/dashboard/rrhh/asistencia', title: 'Asistencia', description: 'Control de horarios y marcaciones', icon: CalendarClock },
+  { href: '/dashboard/rrhh/contratos', title: 'Contratos', description: 'Gestión de contratos laborales', icon: FileText },
+  { href: '/dashboard/rrhh/candidatos', title: 'Candidatos', description: 'Reclutamiento y selección', icon: Users },
+  { href: '/dashboard/rrhh/pagos', title: 'Pagos', description: 'Control de pagos mensuales', icon: BadgeDollarSign },
+  { href: '/dashboard/rrhh/reportes', title: 'Reportes', description: 'Indicadores y trazabilidad RRHH', icon: Briefcase },
+]
 
-  // Estado para diálogo de confirmación
+const formatDate = (dateString?: string) => {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleDateString('es-PE')
+}
+
+export default function RrhhPage() {
+  const [empleados, setEmpleados] = useState<any[]>([])
+  const [departamentos, setDepartamentos] = useState<any[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [empleadoEditando, setEmpleadoEditando] = useState<any | null>(null)
+  const [loading, setLoading] = useState(true)
+  const { get, post, put, delete: del } = useApi()
+
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
     title: string
@@ -26,495 +52,229 @@ const RrhhPage = () => {
     title: '',
     message: '',
     onConfirm: () => {},
-    variant: 'default'
-  });
+    variant: 'default',
+  })
 
-  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
+  const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
 
   const loadData = useCallback(async () => {
     if (!rrhhEnabled) {
-      setLoading(false);
-      setEmpleados([]);
-      setDepartamentos([]);
-      return;
+      setLoading(false)
+      setEmpleados([])
+      setDepartamentos([])
+      return
     }
-    try {
-      setLoading(true);
-      
-      // ✅ Cargar empleados usando useApi
-      const empleadosData = await get('/rrhh/empleados');
-      if (empleadosData && empleadosData.success && Array.isArray(empleadosData.data)) {
-        setEmpleados(empleadosData.data);
-      } else if (Array.isArray(empleadosData)) {
-        setEmpleados(empleadosData);
-      } else {
-        setEmpleados([]);
-      }
 
-      // ✅ Cargar departamentos usando useApi
-      const departamentosData = await get('/rrhh/departamentos');
-      if (departamentosData && departamentosData.success && Array.isArray(departamentosData.data)) {
-        setDepartamentos(departamentosData.data);
-      } else if (Array.isArray(departamentosData)) {
-        setDepartamentos(departamentosData);
-      } else {
-        setDepartamentos([]);
-      }
-      
+    try {
+      setLoading(true)
+      const empleadosData = await get('/rrhh/empleados')
+      setEmpleados(
+        empleadosData?.success && Array.isArray(empleadosData.data)
+          ? empleadosData.data
+          : Array.isArray(empleadosData)
+            ? empleadosData
+            : [],
+      )
+
+      const departamentosData = await get('/rrhh/departamentos')
+      setDepartamentos(
+        departamentosData?.success && Array.isArray(departamentosData.data)
+          ? departamentosData.data
+          : Array.isArray(departamentosData)
+            ? departamentosData
+            : [],
+      )
     } catch (error) {
-      console.error('Error cargando datos:', error);
-      setEmpleados([]);
-      setDepartamentos([]);
+      console.error('Error cargando datos:', error)
+      setEmpleados([])
+      setDepartamentos([])
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [get, rrhhEnabled]);
+  }, [get, rrhhEnabled])
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadData()
+  }, [loadData])
+
+  const stats = useMemo(() => {
+    const activos = empleados.filter((emp: any) => emp?.estado === 'activo').length
+    const nuevos = empleados.filter((emp: any) => {
+      if (!emp?.fecha_ingreso) return false
+      const fechaIngreso = new Date(emp.fecha_ingreso)
+      const haceUnMes = new Date()
+      haceUnMes.setMonth(haceUnMes.getMonth() - 1)
+      return fechaIngreso > haceUnMes
+    }).length
+
+    return {
+      total: empleados.length,
+      activos,
+      departamentos: departamentos.length,
+      nuevos,
+    }
+  }, [departamentos.length, empleados])
 
   const openCreateEmpleado = () => {
-    setEmpleadoEditando(null);
-    setIsModalOpen(true);
-  };
+    setEmpleadoEditando(null)
+    setIsModalOpen(true)
+  }
 
   const handleSubmitEmpleado = async (empleadoData: any) => {
     try {
       const response = empleadoEditando?.id
         ? await put(`/rrhh/empleados/${empleadoEditando.id}`, empleadoData)
-        : await post('/rrhh/empleados', empleadoData);
+        : await post('/rrhh/empleados', empleadoData)
 
       if (response) {
-        setIsModalOpen(false);
-        setEmpleadoEditando(null);
-        loadData(); // Recargar la lista
+        setIsModalOpen(false)
+        setEmpleadoEditando(null)
+        loadData()
       } else {
-        throw new Error(empleadoEditando ? 'Error al actualizar empleado' : 'Error al crear empleado');
+        throw new Error(empleadoEditando ? 'Error al actualizar empleado' : 'Error al crear empleado')
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error:', error)
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('es-PE');
-  };
+  }
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando datos de RRHH...</p>
+      <PageShell title="Recursos Humanos" description="Cargando empleados, departamentos, contratos y planillas operativas.">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
+            <p className="text-sm font-semibold">Cargando datos de RRHH...</p>
+          </div>
         </div>
-      </div>
-    );
+      </PageShell>
+    )
   }
 
   if (!rrhhEnabled) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          {/* // HARDENING: RRHH deshabilitado por feature flag. */}
-          <p>El módulo de RRHH está deshabilitado en este entorno.</p>
-        </div>
-      </div>
-    );
+      <PageShell title="Recursos Humanos" description="El módulo de RRHH está deshabilitado en este entorno.">
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <CardContent className="p-8 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+            Activa la bandera de RRHH para usar empleados, asistencia, contratos y planillas.
+          </CardContent>
+        </Card>
+      </PageShell>
+    )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Recursos Humanos</h1>
-          <p className="dashboard-subtitle">Gestión de empleados, contratos y planillas</p>
-        </div>
-        <button className="refresh-btn" onClick={openCreateEmpleado}>
-          <span>👤</span>
-          Agregar Empleado
-        </button>
+    <PageShell
+      title="Recursos Humanos"
+      description="Operación diaria de empleados, contratos, asistencia, pagos y planillas."
+      actions={<Button className="gap-2" onClick={openCreateEmpleado}><UserPlus className="h-4 w-4" /> Agregar empleado</Button>}
+    >
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Total empleados" value={stats.total} description="Personal registrado" icon={Users} tone="info" />
+        <MetricCard title="Activos" value={stats.activos} description="Personal en actividad" icon={UserPlus} tone="success" />
+        <MetricCard title="Departamentos" value={stats.departamentos} description="Áreas organizacionales" icon={Briefcase} tone="default" />
+        <MetricCard title="Nuevos ingresos" value={stats.nuevos} description="Últimos 30 días" icon={CalendarClock} tone="warning" />
       </div>
 
-      {/* Navegación de módulos RRHH */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-        gap: '1.5rem', 
-        marginBottom: '2rem' 
-      }}>
-        <Link href="/dashboard/rrhh/planillas" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%)',
-            border: '2px solid rgba(16, 185, 129, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)';
-          }}
-          >
-            <div style={{ fontSize: '2.5rem' }}>💰</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--emerald-700)' }}>
-                Planillas
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Cálculo de sueldos y beneficios
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/rrhh/asistencia" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)',
-            border: '2px solid rgba(59, 130, 246, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
-          }}>
-            <div style={{ fontSize: '2.5rem' }}>⏰</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--blue-700)' }}>
-                Asistencia
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Control de horarios y marcado
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/rrhh/contratos" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%)',
-            border: '2px solid rgba(245, 158, 11, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)';
-          }}>
-            <div style={{ fontSize: '2.5rem' }}>📄</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--amber-700)' }}>
-                Contratos
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Gestión de contratos laborales
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/rrhh/candidatos" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%)',
-            border: '2px solid rgba(168, 85, 247, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)';
-          }}>
-            <div style={{ fontSize: '2.5rem' }}>📋</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--purple-700)' }}>
-                CVs & Candidatos
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Reclutamiento y selección
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/rrhh/pagos" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(22, 163, 74, 0.05) 100%)',
-            border: '2px solid rgba(34, 197, 94, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.2)';
-          }}>
-            <div style={{ fontSize: '2.5rem' }}>💳</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--green-700)' }}>
-                Pagos & Comprobantes
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Control de pagos mensuales
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/dashboard/rrhh/reportes" style={{ textDecoration: 'none' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
-            border: '2px solid rgba(239, 68, 68, 0.2)',
-            borderRadius: 'var(--border-radius-lg)',
-            padding: '1.5rem',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
-            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-          }}>
-            <div style={{ fontSize: '2.5rem' }}>📊</div>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'var(--red-700)' }}>
-                Reportes RRHH
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-                Análisis y estadísticas
-              </p>
-            </div>
-          </div>
-        </Link>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {rrhhModules.map((module) => {
+          const Icon = module.icon
+          return (
+            <Link key={module.href} href={module.href} className="block">
+              <Card className="h-full border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{module.title}</h3>
+                    <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">{module.description}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )
+        })}
       </div>
 
-      {/* Estadísticas */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>Total Empleados</h3>
-            <div className="stat-icon">👥</div>
-          </div>
-          <div className="stat-value text-blue-600">{Array.isArray(empleados) ? empleados.length : 0}</div>
-          <div className="stat-subtitle">Personal registrado</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>Empleados Activos</h3>
-            <div className="stat-icon">✅</div>
-          </div>
-          <div className="stat-value text-green-600">
-            {Array.isArray(empleados) ? empleados.filter((emp: any) => emp?.estado === 'activo').length : 0}
-          </div>
-          <div className="stat-subtitle">Personal en actividad</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>Departamentos</h3>
-            <div className="stat-icon">🏢</div>
-          </div>
-          <div className="stat-value text-purple-600">{Array.isArray(departamentos) ? departamentos.length : 0}</div>
-          <div className="stat-subtitle">Áreas organizacionales</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>Nuevos Ingresos</h3>
-            <div className="stat-icon">📈</div>
-          </div>
-          <div className="stat-value text-indigo-600">
-            {Array.isArray(empleados) ? empleados.filter((emp: any) => {
-              if (!emp?.fecha_ingreso) return false;
-              const fechaIngreso = new Date(emp.fecha_ingreso);
-              const haceUnMes = new Date();
-              haceUnMes.setMonth(haceUnMes.getMonth() - 1);
-              return fechaIngreso > haceUnMes;
-            }).length : 0}
-          </div>
-          <div className="stat-subtitle">Último mes</div>
-        </div>
-      </div>
-
-      {/* Sección de Empleados */}
-      <div className="activity-section">
-        <div className="activity-header">
-          <h2 className="activity-title">Lista de Empleados</h2>
-          <div className="activity-meta">
-            <span>Última actualización: {new Date().toLocaleString('es-PE')}</span>
-          </div>
-        </div>
-
-        <div className="activity-card">
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <CardHeader>
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Lista de Empleados</CardTitle>
+          <p className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Última actualización: {new Date().toLocaleString('es-PE')}
+          </p>
+        </CardHeader>
+        <CardContent>
           {!Array.isArray(empleados) || empleados.length === 0 ? (
-            <div className="activity-empty">
-              <h3>No hay empleados registrados</h3>
-              <p>Comienza agregando el primer empleado al sistema</p>
-              <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-                Agregar Primer Empleado
-              </button>
+            <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-8 text-center group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50">
+              <h3 className="text-lg font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">No hay empleados registrados</h3>
+              <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Comienza agregando el primer empleado al sistema.</p>
+              <Button className="mt-4" onClick={() => setIsModalOpen(true)}>Agregar primer empleado</Button>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table>
-                <thead>
+            <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
                   <tr>
-                    <th>Nombre Completo</th>
-                    <th>Documento</th>
-                    <th>Email</th>
-                    <th>Puesto</th>
-                    <th>Departamento</th>
-                    <th>Fecha Ingreso</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
+                    <th className="px-4 py-3 text-left">Nombre</th>
+                    <th className="px-4 py-3 text-left">Documento</th>
+                    <th className="px-4 py-3 text-left">Email</th>
+                    <th className="px-4 py-3 text-left">Puesto</th>
+                    <th className="px-4 py-3 text-left">Departamento</th>
+                    <th className="px-4 py-3 text-left">Ingreso</th>
+                    <th className="px-4 py-3 text-left">Estado</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-cyan-400/10 group-data-[erp-theme=light]/dashboard:divide-slate-100">
                   {empleados.map((empleado: any) => (
-                    <tr key={empleado.id}>
-                      <td>
-                        <strong>{empleado.nombres} {empleado.apellidos}</strong>
+                    <tr key={empleado.id} className="transition hover:bg-white/[0.03] group-data-[erp-theme=light]/dashboard:hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                        {empleado.nombres} {empleado.apellidos}
                       </td>
-                      <td>
-                        <span>{empleado.tipo_documento}: {empleado.numero_documento}</span>
-                      </td>
-                      <td>
-                        {empleado.email ? (
-                          <a href={`mailto:${empleado.email}`} style={{ color: 'var(--blue-600)' }}>
-                            {empleado.email}
-                          </a>
-                        ) : (
-                          <span style={{ color: 'var(--primary-400)' }}>Sin email</span>
-                        )}
-                      </td>
-                      <td>
-                        <span>{empleado.puesto || 'Sin asignar'}</span>
-                      </td>
-                      <td>
-                        <span>{empleado.departamentos?.nombre || 'Sin departamento'}</span>
-                      </td>
-                      <td>
-                        <span>{formatDate(empleado.fecha_ingreso)}</span>
-                      </td>
-                      <td>
-                        <span className={empleado.estado === 'activo' ? 'status-success' : 'status-error'}>
+                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.tipo_documento}: {empleado.numero_documento}</td>
+                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.email || 'Sin email'}</td>
+                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.puesto || 'Sin asignar'}</td>
+                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{empleado.departamentos?.nombre || 'Sin departamento'}</td>
+                      <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{formatDate(empleado.fecha_ingreso)}</td>
+                      <td className="px-4 py-3">
+                        <Badge className={empleado.estado === 'activo' ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'}>
                           {empleado.estado}
-                        </span>
+                        </Badge>
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button 
-                            className="btn-icon" 
-                            title="Ver empleado"
-                            onClick={() => {
-                              const detalles = `
-INFORMACIÓN DEL EMPLEADO
-Nombre: ${empleado.nombres} ${empleado.apellidos}
-Documento: ${empleado.tipo_documento} ${empleado.numero_documento}
-Email: ${empleado.email || 'No registrado'}
-Teléfono: ${empleado.telefono || 'No registrado'}
-Puesto: ${empleado.puesto || 'Sin asignar'}
-Departamento: ${empleado.departamentos?.nombre || 'Sin departamento'}
-Fecha Ingreso: ${formatDate(empleado.fecha_ingreso)}
-Estado: ${empleado.estado}
-Dirección: ${empleado.direccion || 'No registrada'}
-                              `;
-                              alert(detalles);
-                            }}
-                          >
-                            👁️
-                          </button>
-                          <button 
-                            className="btn-icon" 
-                            title="Editar empleado"
-                            onClick={() => {
-                              setEmpleadoEditando(empleado);
-                              setIsModalOpen(true);
-                            }}
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            className="btn-icon-danger" 
-                            title="Inactivar empleado"
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => { setEmpleadoEditando(empleado); setIsModalOpen(true) }}>
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => {
                               setConfirmDialog({
                                 isOpen: true,
-                                title: 'Inactivar Empleado',
+                                title: 'Inactivar empleado',
                                 message: `¿Está seguro de inactivar a ${empleado.nombres} ${empleado.apellidos}?\n\nEl historial se conserva para planillas, pagos y contabilidad.`,
                                 variant: 'warning',
                                 onConfirm: async () => {
                                   try {
-                                    const response = await del(`/rrhh/empleados/${empleado.id}`);
-                                    
+                                    const response = await del(`/rrhh/empleados/${empleado.id}`)
                                     if (response) {
-                                      loadData();
-                                      alert('Empleado inactivado exitosamente');
+                                      loadData()
+                                      alert('Empleado inactivado exitosamente')
                                     } else {
-                                      throw new Error('Error al inactivar empleado');
+                                      throw new Error('Error al inactivar empleado')
                                     }
                                   } catch (error) {
-                                    console.error('Error:', error);
-                                    alert('Error al inactivar empleado');
+                                    console.error('Error:', error)
+                                    alert('Error al inactivar empleado')
                                   }
-                                }
-                              });
+                                },
+                              })
                             }}
                           >
-                            🚫
-                          </button>
+                            Inactivar
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -523,14 +283,14 @@ Dirección: ${empleado.direccion || 'No registrada'}
               </table>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <EmpleadoModal
         isOpen={isModalOpen}
         onClose={() => {
-          setIsModalOpen(false);
-          setEmpleadoEditando(null);
+          setIsModalOpen(false)
+          setEmpleadoEditando(null)
         }}
         onSubmit={handleSubmitEmpleado}
         departamentos={departamentos}
@@ -544,12 +304,10 @@ Dirección: ${empleado.direccion || 'No registrada'}
         variant={confirmDialog.variant}
         onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
         onConfirm={async () => {
-          await confirmDialog.onConfirm();
-          setConfirmDialog({ ...confirmDialog, isOpen: false });
+          await confirmDialog.onConfirm()
+          setConfirmDialog({ ...confirmDialog, isOpen: false })
         }}
       />
-    </div>
-  );
-};
-
-export default RrhhPage;
+    </PageShell>
+  )
+}

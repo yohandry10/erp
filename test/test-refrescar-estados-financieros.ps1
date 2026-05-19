@@ -18,7 +18,7 @@ try {
     $loginResponse = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method Post -Body $loginBody -ContentType "application/json"
     $token = $loginResponse.access_token
     $tenantId = $loginResponse.user.tenant_id
-    
+
     Write-Host "✅ Login exitoso" -ForegroundColor Green
     Write-Host "   Token: $($token.Substring(0, 20))..." -ForegroundColor Gray
     Write-Host "   Tenant ID: $tenantId" -ForegroundColor Gray
@@ -45,26 +45,26 @@ $refrescarBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/estados/refrescar" -Method Post -Headers $headers -Body $refrescarBody
-    
+
     Write-Host "✅ Respuesta recibida:" -ForegroundColor Green
     Write-Host ($response | ConvertTo-Json -Depth 10) -ForegroundColor White
     Write-Host ""
-    
+
     if ($response.success) {
         Write-Host "✅ Estados financieros refrescados exitosamente" -ForegroundColor Green
         Write-Host "   Mensaje: $($response.message)" -ForegroundColor Gray
-        
+
         if ($response.data) {
             Write-Host "   Período: $($response.data.periodo.descripcion)" -ForegroundColor Gray
-            
+
             if ($response.data.vistas_refrescadas) {
                 Write-Host "   Vistas refrescadas: $($response.data.vistas_refrescadas -join ', ')" -ForegroundColor Gray
             }
-            
+
             if ($response.data.duracion_ms) {
                 Write-Host "   Duración: $($response.data.duracion_ms) ms" -ForegroundColor Gray
             }
-            
+
             if ($response.data.vistas_materializadas -eq $false) {
                 Write-Host "   ℹ️ No hay vistas materializadas configuradas" -ForegroundColor Yellow
             }
@@ -73,7 +73,7 @@ try {
         Write-Host "⚠️ La operación no fue completamente exitosa" -ForegroundColor Yellow
         Write-Host "   Mensaje: $($response.message)" -ForegroundColor Gray
     }
-    
+
 } catch {
     Write-Host "❌ Error refrescando estados financieros:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red

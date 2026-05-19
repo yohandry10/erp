@@ -23,13 +23,13 @@ Write-Host ""
 Write-Host "📋 Listando centros de costo..." -ForegroundColor Cyan
 try {
   $centrosResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Get -Headers $headers
-  
+
   if ($centrosResponse.success -and $centrosResponse.data.Count -gt 0) {
     Write-Host "✅ Centros de costo encontrados:" -ForegroundColor Green
     foreach ($centro in $centrosResponse.data) {
       Write-Host "  - [$($centro.codigo)] $($centro.nombre)" -ForegroundColor White
     }
-    
+
     # Usar el primer centro de costo para el reporte
     $centroCostoId = $centrosResponse.data[0].id
     $centroCostoNombre = $centrosResponse.data[0].nombre
@@ -38,13 +38,13 @@ try {
   } else {
     Write-Host "⚠️ No se encontraron centros de costo" -ForegroundColor Yellow
     Write-Host "Creando un centro de costo de prueba..." -ForegroundColor Yellow
-    
+
     $nuevoCentro = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Post -Headers $headers -Body (@{
       codigo = "CC001"
       nombre = "Centro de Costo Prueba"
       descripcion = "Centro de costo para pruebas"
     } | ConvertTo-Json)
-    
+
     $centroCostoId = $nuevoCentro.data.id
     $centroCostoNombre = $nuevoCentro.data.nombre
     Write-Host "✅ Centro de costo creado: $centroCostoNombre" -ForegroundColor Green
@@ -60,7 +60,7 @@ Write-Host ""
 Write-Host "📊 Obteniendo reporte de gastos (todo el período)..." -ForegroundColor Cyan
 try {
   $reporteResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo/$centroCostoId/reporte-gastos" -Method Get -Headers $headers
-  
+
   if ($reporteResponse.success) {
     Write-Host "✅ Reporte generado exitosamente" -ForegroundColor Green
     Write-Host ""
@@ -68,27 +68,27 @@ try {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
     Write-Host "Período: $($reporteResponse.data.periodo.fecha_desde) a $($reporteResponse.data.periodo.fecha_hasta)" -ForegroundColor White
     Write-Host ""
-    
+
     # Resumen
     Write-Host "📊 RESUMEN:" -ForegroundColor Yellow
     Write-Host "  Total Gastos: S/ $($reporteResponse.data.resumen.total_gastos.ToString('N2'))" -ForegroundColor White
     Write-Host "  Total Movimientos: $($reporteResponse.data.resumen.total_movimientos)" -ForegroundColor White
-    
+
     if ($reporteResponse.data.resumen.cuenta_mayor_gasto) {
       Write-Host "  Cuenta con Mayor Gasto:" -ForegroundColor White
       Write-Host "    [$($reporteResponse.data.resumen.cuenta_mayor_gasto.codigo)] $($reporteResponse.data.resumen.cuenta_mayor_gasto.nombre)" -ForegroundColor White
       Write-Host "    Monto: S/ $($reporteResponse.data.resumen.cuenta_mayor_gasto.monto.ToString('N2'))" -ForegroundColor White
     }
-    
+
     Write-Host ""
-    
+
     # Detalle por cuenta
     if ($reporteResponse.data.gastos_por_cuenta.Count -gt 0) {
       Write-Host "💰 GASTOS POR CUENTA:" -ForegroundColor Yellow
       Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
       Write-Host ("{0,-10} {1,-40} {2,15} {3,15} {4,15} {5,10}" -f "Código", "Nombre", "Debe", "Haber", "Saldo", "Movs.") -ForegroundColor Cyan
       Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
-      
+
       foreach ($cuenta in $reporteResponse.data.gastos_por_cuenta) {
         $nombreCorto = if ($cuenta.cuenta_nombre.Length -gt 40) { $cuenta.cuenta_nombre.Substring(0, 37) + "..." } else { $cuenta.cuenta_nombre }
         Write-Host ("{0,-10} {1,-40} {2,15} {3,15} {4,15} {5,10}" -f `
@@ -99,12 +99,12 @@ try {
           ("S/ " + $cuenta.saldo.ToString('N2')), `
           $cuenta.cantidad_movimientos) -ForegroundColor White
       }
-      
+
       Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Gray
     } else {
       Write-Host "ℹ️ No hay gastos registrados para este centro de costo en el período seleccionado" -ForegroundColor Yellow
     }
-    
+
     Write-Host ""
     Write-Host $reporteResponse.message -ForegroundColor Green
   } else {
@@ -124,7 +124,7 @@ $fechaDesde = (Get-Date).AddMonths(-1).ToString("yyyy-MM-dd")
 Write-Host "📊 Obteniendo reporte de gastos (último mes: $fechaDesde a $fechaHasta)..." -ForegroundColor Cyan
 try {
   $reporteMesResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo/$centroCostoId/reporte-gastos?fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta" -Method Get -Headers $headers
-  
+
   if ($reporteMesResponse.success) {
     Write-Host "✅ Reporte mensual generado exitosamente" -ForegroundColor Green
     Write-Host ""

@@ -429,6 +429,7 @@ describe('RecepcionesService', () => {
         eventType: 'recepcion.registrada',
         aggregateType: 'recepcion',
       }));
+      expect(eventBusService.emitCompraEntregada).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when recepcion is not BORRADOR', async () => {

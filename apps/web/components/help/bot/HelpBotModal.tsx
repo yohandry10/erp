@@ -55,82 +55,32 @@ export function HelpBotModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        bottom: '80px',
-        right: '16px',
-        zIndex: 50,
-        width: '384px',
-        maxWidth: 'calc(100vw - 32px)',
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-        display: 'flex',
-        flexDirection: 'column',
-        animation: 'slideUp 0.2s ease-out',
-      }}
+      className="fixed bottom-20 right-4 z-50 flex w-96 max-w-[calc(100vw-32px)] animate-in slide-in-from-bottom-2 flex-col rounded-xl bg-white shadow-2xl"
       role="dialog"
       aria-label="Asistente de ayuda"
     >
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 16px',
-          backgroundColor: '#2563eb',
-          borderRadius: '12px 12px 0 0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '8px',
-              height: '8px',
-              backgroundColor: '#4ade80',
-              borderRadius: '50%',
-              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            }}
-          />
-          <h2 style={{ color: 'white', fontWeight: 600, margin: 0, fontSize: '16px' }}>
+      <div className="flex items-center justify-between rounded-t-xl bg-blue-600 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-cyan-200" />
+          <h2 className="m-0 text-base font-semibold text-white">
             Asistente ERP
           </h2>
         </div>
         <button
           onClick={onClose}
-          style={{
-            color: 'rgba(255,255,255,0.8)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          className="flex cursor-pointer items-center justify-center rounded-md p-1 text-white/80 transition hover:bg-white/10 hover:text-white"
           aria-label="Cerrar"
         >
-          <X style={{ width: '20px', height: '20px' }} />
+          <X className="h-5 w-5" />
         </button>
       </div>
 
       {/* Messages area */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          maxHeight: '320px',
-          minHeight: '200px',
-        }}
-      >
+      <div className="flex max-h-80 min-h-52 flex-1 flex-col gap-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <p style={{ color: '#4b5563', fontSize: '14px', margin: 0 }}>
+          <div className="flex flex-col gap-4">
+            <p className="m-0 text-sm text-slate-600">
               ¡Hola! Soy tu asistente. ¿En qué puedo ayudarte?
             </p>
             <HelpBotSuggestions
@@ -145,22 +95,9 @@ export function HelpBotModal({
               <HelpBotMessage key={msg.id} message={msg} />
             ))}
             {isLoading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div
-                  style={{
-                    backgroundColor: '#f1f5f9',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                  }}
-                >
-                  <Loader2
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      color: '#64748b',
-                      animation: 'spin 1s linear infinite',
-                    }}
-                  />
+              <div className="flex justify-start">
+                <div className="rounded-lg bg-slate-100 px-3 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
                 </div>
               </div>
             )}
@@ -170,8 +107,8 @@ export function HelpBotModal({
       </div>
 
       {/* Input area */}
-      <div style={{ padding: '12px', borderTop: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div className="border-t border-slate-200 p-3">
+        <div className="flex gap-2">
           <input
             ref={inputRef}
             type="text"
@@ -180,65 +117,18 @@ export function HelpBotModal({
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu pregunta..."
             disabled={isLoading}
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              fontSize: '14px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              outline: 'none',
-            }}
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
           <button
             onClick={onSubmit}
             disabled={!query.trim() || isLoading}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              backgroundColor: !query.trim() || isLoading ? '#94a3b8' : '#2563eb',
-              color: 'white',
-              border: 'none',
-              cursor: !query.trim() || isLoading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className="flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             aria-label="Enviar"
           >
-            <Send style={{ width: '16px', height: '16px' }} />
+            <Send className="h-4 w-4" />
           </button>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
     </div>
   )
 }

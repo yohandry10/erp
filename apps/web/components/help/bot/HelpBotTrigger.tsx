@@ -1,6 +1,7 @@
 'use client'
 
 import { HelpCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface HelpBotTriggerProps {
   onClick: () => void
@@ -13,35 +14,12 @@ export function HelpBotTrigger({ onClick, isOpen }: HelpBotTriggerProps) {
       onClick={onClick}
       aria-label={isOpen ? 'Cerrar ayuda' : 'Abrir ayuda'}
       aria-expanded={isOpen}
-      style={{
-        position: 'fixed',
-        bottom: '16px',
-        right: '16px',
-        zIndex: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '56px',
-        height: '56px',
-        borderRadius: '50%',
-        backgroundColor: '#2563eb',
-        color: 'white',
-        border: 'none',
-        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-        cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = '#1d4ed8'
-        ;(e.currentTarget as HTMLElement).style.transform = isOpen ? 'rotate(45deg) scale(1.05)' : 'scale(1.05)'
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor = '#2563eb'
-        ;(e.currentTarget as HTMLElement).style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)'
-      }}
+      className={cn(
+        'fixed bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full border-0 bg-blue-600 text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-blue-700',
+        isOpen && 'rotate-45 hover:rotate-45',
+      )}
     >
-      <HelpCircle style={{ width: '24px', height: '24px' }} />
+      <HelpCircle className="h-6 w-6" />
     </button>
   )
 }

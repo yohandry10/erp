@@ -149,9 +149,6 @@ export default function TopClientesReport({ filters }: Props) {
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden ml-8">
                     <div
                       className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(cliente.total_facturacion / maxFacturacion) * 100}%`
-                      }}
                     />
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { HelpItem, TooltipPosition } from './types'
+import { cn } from '@/lib/utils'
 
 interface HelpTooltipContentProps {
   content: HelpItem
@@ -8,72 +9,45 @@ interface HelpTooltipContentProps {
 }
 
 export function HelpTooltipContent({ content, position = 'top' }: HelpTooltipContentProps) {
-  const getPositionStyles = (): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      position: 'absolute',
-      zIndex: 50,
-      width: '256px',
-      padding: '12px',
-      fontSize: '14px',
-      backgroundColor: '#1e293b',
-      color: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-      opacity: 0,
-      visibility: 'hidden' as const,
-      transition: 'all 0.2s ease-out',
-      pointerEvents: 'none' as const,
-    }
-
+  const getPositionClasses = () => {
     switch (position) {
       case 'top':
-        return { ...base, bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '8px' }
+        return 'bottom-full left-1/2 mb-2 -translate-x-1/2'
       case 'bottom':
-        return { ...base, top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: '8px' }
+        return 'left-1/2 top-full mt-2 -translate-x-1/2'
       case 'left':
-        return { ...base, right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: '8px' }
+        return 'right-full top-1/2 mr-2 -translate-y-1/2'
       case 'right':
-        return { ...base, left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: '8px' }
+        return 'left-full top-1/2 ml-2 -translate-y-1/2'
       default:
-        return base
+        return 'bottom-full left-1/2 mb-2 -translate-x-1/2'
     }
   }
 
   return (
     <div
       role="tooltip"
-      className="help-tooltip-content"
-      style={getPositionStyles()}
+      className={cn(
+        'help-tooltip-content pointer-events-none invisible absolute z-50 w-64 rounded-lg bg-slate-800 p-3 text-sm text-white opacity-0 shadow-lg transition-all duration-200',
+        getPositionClasses(),
+      )}
     >
-      <p style={{ fontWeight: 600, color: 'white', marginBottom: '4px', margin: 0 }}>
+      <p className="m-0 mb-1 font-semibold text-white">
         {content.title}
       </p>
-      <p style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.5, margin: 0 }}>
+      <p className="m-0 text-xs leading-5 text-slate-300">
         {content.description}
       </p>
       {content.tips && content.tips.length > 0 && (
-        <ul style={{ marginTop: '8px', paddingLeft: 0, listStyle: 'none' }}>
+        <ul className="mt-2 list-none space-y-1 pl-0">
           {content.tips.map((tip, index) => (
-            <li key={index} style={{ 
-              fontSize: '12px', 
-              color: '#94a3b8', 
-              display: 'flex', 
-              alignItems: 'flex-start', 
-              gap: '4px',
-              marginBottom: '4px'
-            }}>
-              <span style={{ color: '#3b82f6', marginTop: '2px' }}>•</span>
+            <li key={index} className="flex items-start gap-1 text-xs text-slate-400">
+              <span className="mt-0.5 text-blue-400">•</span>
               <span>{tip}</span>
             </li>
           ))}
         </ul>
       )}
-      <style jsx global>{`
-        .help-icon-wrapper:hover .help-tooltip-content {
-          opacity: 1 !important;
-          visibility: visible !important;
-        }
-      `}</style>
     </div>
   )
 }

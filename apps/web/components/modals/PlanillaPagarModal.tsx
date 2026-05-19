@@ -211,20 +211,6 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
     <head>
         <meta charset="UTF-8">
         <title>Comprobante de Pago - Planilla ${planilla.periodo}</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
-            .company { font-size: 28px; font-weight: bold; color: #2563eb; }
-            .title { font-size: 20px; margin: 10px 0; }
-            .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
-            .info-box { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #2563eb; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #2563eb; color: white; }
-            .number { text-align: right; }
-            .total-row { font-weight: bold; background-color: #f0f9ff; }
-            .footer { margin-top: 40px; text-align: center; color: #6b7280; }
-        </style>
     </head>
     <body>
         <div class="header">
@@ -298,14 +284,7 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
 
   return createPortal(
     <div className="modal-overlay">
-      <div className="modal-content payment" style={{ 
-        width: '95vw', 
-        maxWidth: '1400px', 
-        height: '90vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+      <div className="modal-content payment max-w-[1400px] overflow-hidden flex flex-col">
         <div className="modal-header">
           <h2 className="modal-title">
             💰 Pagar Planilla {planilla?.periodo}
@@ -313,108 +292,56 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div className="modal-body" style={{ 
-          flex: 1, 
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
+        <div className="modal-body flex-[1] overflow-hidden flex flex-col">
           {/* Resumen superior */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(4, 1fr)', 
-            gap: '1rem',
-            marginBottom: '1rem',
-            flexShrink: 0
-          }}>
-            <div style={{ 
-              background: 'var(--blue-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid var(--blue-200)'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-600)' }}>
+          <div className="grid grid-cols-[repeat(4,_1fr)] gap-4 mb-4 shrink-0">
+            <div className="bg-[var(--blue-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--blue-600)]">
                 {empleados.length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--blue-700)' }}>
+              <div className="text-[0.875rem] text-[var(--blue-700)]">
                 Total Empleados
               </div>
             </div>
-            <div style={{ 
-              background: 'var(--emerald-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid var(--emerald-200)'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--emerald-600)' }}>
+            <div className="bg-[var(--emerald-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--emerald-600)]">
                 {empleadosSeleccionados.length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--emerald-700)' }}>
+              <div className="text-[0.875rem] text-[var(--emerald-700)]">
                 Seleccionados
               </div>
             </div>
-            <div style={{ 
-              background: 'var(--blue-50)', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid var(--blue-200)'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--blue-600)' }}>
+            <div className="bg-[var(--blue-50)] p-4 text-center border">
+              <div className="text-6 font-bold text-[var(--blue-600)]">
                 S/ {totalASerPagado.toFixed(2)}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--blue-700)' }}>
+              <div className="text-[0.875rem] text-[var(--blue-700)]">
                 A Pagar Ahora
               </div>
             </div>
-            <div style={{ 
-              background: '#f0f9ff', 
-              padding: '1rem', 
-              borderRadius: 'var(--border-radius)',
-              textAlign: 'center',
-              border: '1px solid #0ea5e9'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0ea5e9' }}>
+            <div className="bg-[#f0f9ff] p-4 text-center border">
+              <div className="text-6 font-bold text-[#0ea5e9]">
                 S/ {totalYaPagado.toFixed(2)}
               </div>
-              <div style={{ fontSize: '0.875rem', color: '#0c4a6e' }}>
+              <div className="text-[0.875rem] text-[#0c4a6e]">
                 Ya Pagado
               </div>
             </div>
           </div>
 
           {/* Configuración de pago */}
-          <div style={{ 
-            background: 'var(--primary-50)', 
-            padding: '1rem', 
-            borderRadius: 'var(--border-radius)',
-            marginBottom: '1rem',
-            flexShrink: 0
-          }}>
-            <h3 style={{ margin: '0 0 1rem 0', color: 'var(--primary-700)' }}>
+          <div className="bg-[var(--primary-50)] p-4 mb-4 shrink-0">
+            <h3 className="mt-0 mr-0 mb-4 ml-0 text-[var(--primary-700)]">
               💳 Configuración del Pago
             </h3>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'auto auto 1fr auto auto', 
-              gap: '1rem',
-              alignItems: 'center'
-            }}>
+            <div className="grid grid-cols-[auto_auto_1fr_auto_auto] gap-4 items-center">
               <div>
-                <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-700)' }}>
+                <label className="text-[0.875rem] font-semibold text-[var(--primary-700)]">
                   Método:
                 </label>
                 <select
                   value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value as 'efectivo' | 'transferencia')}
-                  style={{
-                    padding: '0.5rem',
-                    border: '1px solid var(--primary-300)',
-                    borderRadius: '4px',
-                    marginLeft: '0.5rem'
-                  }}
+                  onChange={(e) => setMetodoPago(e.target.value as 'efectivo' | 'transferencia')} className="p-2 border rounded-[4px] ml-2"
                 >
                   <option value="transferencia">Transferencia</option>
                   <option value="efectivo">Efectivo</option>
@@ -423,21 +350,14 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
               
               {metodoPago === 'transferencia' && (
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-700)' }}>
+                  <label className="text-[0.875rem] font-semibold text-[var(--primary-700)]">
                     N° Operación:
                   </label>
                   <input
                     type="text"
                     value={numeroOperacion}
                     onChange={(e) => setNumeroOperacion(e.target.value)}
-                    placeholder="Ej: 123456789"
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid var(--primary-300)',
-                      borderRadius: '4px',
-                      marginLeft: '0.5rem',
-                      width: '150px'
-                    }}
+                    placeholder="Ej: 123456789" className="p-2 border rounded-[4px] ml-2 w-[150px]"
                   />
                 </div>
               )}
@@ -447,28 +367,20 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
                   type="text"
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
-                  placeholder="Observaciones adicionales..."
-                  style={{
-                    padding: '0.5rem',
-                    border: '1px solid var(--primary-300)',
-                    borderRadius: '4px',
-                    width: '100%'
-                  }}
+                  placeholder="Observaciones adicionales..." className="p-2 border rounded-[4px] w-[100%]"
                 />
               </div>
               
               <button
-                className="btn btn-secondary"
+                className="btn btn-secondary text-[0.875rem] py-2 px-4"
                 onClick={seleccionarTodos}
-                style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
               >
                 ✅ Seleccionar Todos
               </button>
               
               <button
-                className="btn btn-secondary"
+                className="btn btn-secondary text-[0.875rem] py-2 px-4"
                 onClick={deseleccionarTodos}
-                style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
               >
                 ❌ Deseleccionar
               </button>
@@ -476,141 +388,76 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
           </div>
 
           {/* Lista de empleados */}
-          <div style={{ 
-            flex: 1,
-            overflow: 'auto',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)'
-          }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse', 
-              fontSize: '0.875rem',
-              background: 'white'
-            }}>
-              <thead style={{ 
-                position: 'sticky', 
-                top: 0, 
-                background: 'var(--primary-100)',
-                zIndex: 10
-              }}>
+          <div className="flex-[1] overflow-auto border">
+            <table className="w-[100%] text-[0.875rem] bg-white">
+              <thead className="sticky top-0 bg-[var(--primary-100)] z-[10]">
                 <tr>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', width: '50px' }}>
+                  <th className="p-3 border w-[50px]">
                     ✓
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '200px' }}>
+                  <th className="p-3 border min-w-[200px]">
                     👤 EMPLEADO
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     📄 DOCUMENTO
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '80px' }}>
+                  <th className="p-3 border min-w-[80px]">
                     📅 DÍAS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     💰 INGRESOS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     💸 DESCUENTOS
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     💵 NETO A PAGAR
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '120px' }}>
+                  <th className="p-3 border min-w-[120px]">
                     📊 ESTADO
                   </th>
-                  <th style={{ padding: '0.75rem', border: '1px solid var(--primary-200)', minWidth: '100px' }}>
+                  <th className="p-3 border min-w-[100px]">
                     📅 FECHA PAGO
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {empleados.map((empleado, index) => (
-                  <tr key={empleado.id} style={{ 
-                    backgroundColor: empleado.estado_pago === 'pagado' ? '#f0fdf4' : 
-                                   empleadosSeleccionados.includes(empleado.id) ? '#eff6ff' :
-                                   index % 2 === 0 ? 'white' : '#f8fafc'
-                  }}>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center'
-                    }}>
+                  <tr key={empleado.id}>
+                    <td className="p-3 border text-center">
                       {/* SIEMPRE mostrar checkbox - se puede pagar múltiples veces */}
                       <input
                         type="checkbox"
                         checked={empleadosSeleccionados.includes(empleado.id)}
-                        onChange={() => toggleEmpleado(empleado.id)}
-                        style={{ width: '16px', height: '16px' }}
+                        onChange={() => toggleEmpleado(empleado.id)} className="w-4 h-4"
                       />
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      fontWeight: '600'
-                    }}>
+                    <td className="p-3 border font-semibold">
                       {empleado.empleado_nombre}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      color: 'var(--primary-600)'
-                    }}>
+                    <td className="p-3 border text-[var(--primary-600)]">
                       {empleado.empleado_documento}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center'
-                    }}>
+                    <td className="p-3 border text-center">
                       {empleado.dias_trabajados}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'right',
-                      color: 'var(--emerald-600)',
-                      fontWeight: '600'
-                    }}>
+                    <td className="p-3 border text-right text-[var(--emerald-600)] font-semibold">
                       S/ {empleado.total_ingresos.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'right',
-                      color: 'var(--red-600)',
-                      fontWeight: '600'
-                    }}>
+                    <td className="p-3 border text-right text-[var(--red-600)] font-semibold">
                       S/ {empleado.total_descuentos.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'right',
-                      color: 'var(--blue-700)',
-                      fontWeight: '700',
-                      fontSize: '1rem'
-                    }}>
+                    <td className="p-3 border text-right text-[var(--blue-700)] font-bold text-4">
                       S/ {empleado.neto_pagar.toFixed(2)}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center'
-                    }}>
+                    <td className="p-3 border text-center">
                       <span className={
                         empleado.estado_pago === 'pagado' ? 'status-success' : 'status-warning'
                       }>
                         {empleado.estado_pago === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}
                       </span>
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      border: '1px solid var(--primary-200)',
-                      textAlign: 'center',
-                      fontSize: '0.8rem',
-                      color: 'var(--primary-600)'
-                    }}>
+                    <td className="p-3 border text-center text-[0.8rem] text-[var(--primary-600)]">
                       {empleado.fecha_pago ? new Date(empleado.fecha_pago).toLocaleDateString('es-PE') : '-'}
                     </td>
                   </tr>
@@ -621,48 +468,37 @@ export default function PlanillaPagarModal({ isOpen, onClose, onSuccess, planill
 
           {/* Historial de pagos */}
           {historialPagos.length > 0 && (
-            <div style={{ 
-              marginTop: '1rem',
-              flexShrink: 0
-            }}>
-              <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary-700)' }}>
+            <div className="mt-4 shrink-0">
+              <h3 className="mt-0 mr-0 mb-2 ml-0 text-[var(--primary-700)]">
                 📊 Historial de Pagos de esta Planilla
               </h3>
-              <div style={{ 
-                maxHeight: '150px',
-                overflow: 'auto',
-                border: '1px solid var(--primary-200)',
-                borderRadius: 'var(--border-radius)',
-                background: 'white'
-              }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                  <thead style={{ background: 'var(--primary-50)' }}>
+              <div className="max-h-[150px] overflow-auto border bg-white">
+                <table className="w-[100%] text-[0.8rem]">
+                  <thead className="bg-[var(--primary-50)]">
                     <tr>
-                      <th style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>Fecha</th>
-                      <th style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>Método</th>
-                      <th style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>Empleados</th>
-                      <th style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>Monto</th>
-                      <th style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>N° Operación</th>
+                      <th className="p-2 border">Fecha</th>
+                      <th className="p-2 border">Método</th>
+                      <th className="p-2 border">Empleados</th>
+                      <th className="p-2 border">Monto</th>
+                      <th className="p-2 border">N° Operación</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historialPagos.map((pago, index) => (
-                      <tr key={pago.id} style={{ 
-                        backgroundColor: index % 2 === 0 ? 'white' : '#f8fafc'
-                      }}>
-                        <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                      <tr key={pago.id}>
+                        <td className="p-2 border">
                           {new Date(pago.fecha).toLocaleDateString('es-PE')}
                         </td>
-                        <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                        <td className="p-2 border">
                           {pago.metodo === 'efectivo' ? '💵 Efectivo' : '🏦 Transferencia'}
                         </td>
-                        <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)', textAlign: 'center' }}>
+                        <td className="p-2 border text-center">
                           {pago.empleados_count}
                         </td>
-                        <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)', textAlign: 'right', fontWeight: '600' }}>
+                        <td className="p-2 border text-right font-semibold">
                           S/ {pago.monto.toFixed(2)}
                         </td>
-                        <td style={{ padding: '0.5rem', border: '1px solid var(--primary-200)' }}>
+                        <td className="p-2 border">
                           {pago.numero_operacion || '-'}
                         </td>
                       </tr>

@@ -154,7 +154,7 @@ Write-Host "      o acceso directo a la base de datos" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Consulta SQL para verificar:" -ForegroundColor Cyan
 Write-Host @"
-SELECT 
+SELECT
     numero,
     proveedor_id,
     tipo_documento,
@@ -202,16 +202,16 @@ Write-Host "¿Deseas limpiar los datos de prueba? (S/N): " -NoNewline -Foregroun
 $cleanup = Read-Host
 if ($cleanup -eq "S" -or $cleanup -eq "s") {
     Write-Host "Limpiando datos de prueba..." -ForegroundColor Yellow
-    
+
     # Eliminar CxP (si existe endpoint)
     # Invoke-RestMethod -Uri "$BASE_URL/api/finanzas/cuentas-por-pagar/$CXP_ID" -Method DELETE -Headers $headers
-    
+
     # Eliminar recepción
     # Invoke-RestMethod -Uri "$BASE_URL/api/compras/recepciones/$RECEPCION_ID" -Method DELETE -Headers $headers
-    
+
     # Eliminar orden
     # Invoke-RestMethod -Uri "$BASE_URL/api/compras/ordenes/$ORDEN_ID" -Method DELETE -Headers $headers
-    
+
     # Eliminar proveedor
     try {
         Invoke-RestMethod -Uri "$BASE_URL/api/compras/proveedores/$PROVEEDOR_ID" -Method DELETE -Headers $headers
@@ -219,7 +219,7 @@ if ($cleanup -eq "S" -or $cleanup -eq "s") {
     } catch {
         Write-Host "⚠️ No se pudo eliminar el proveedor: $_" -ForegroundColor Yellow
     }
-    
+
     Write-Host "Nota: Limpieza manual requerida para CxP, recepción y orden" -ForegroundColor Gray
 }
 

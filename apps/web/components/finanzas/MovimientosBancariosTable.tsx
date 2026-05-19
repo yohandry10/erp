@@ -1,4 +1,4 @@
-import { 
+import {
   TrendingUp, 
   TrendingDown, 
   CheckCircle, 
@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react'
+import { formatDate, formatDateTime } from '@/lib/format-utils'
 
 interface MovimientoBancario {
   id: string
@@ -58,24 +59,6 @@ export default function MovimientosBancariosTable({
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-PE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   if (loading) {
     return (
       <div className="activity-card">
@@ -90,9 +73,9 @@ export default function MovimientosBancariosTable({
   if (movimientos.length === 0) {
     return (
       <div className="activity-card">
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-          <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+        <div className="text-center p-12 text-gray-500">
+          <FileText size={48} className="text-gray-400" />
+          <h3 className="text-[1.125rem] font-semibold mb-2">
             No hay movimientos
           </h3>
           <p>
@@ -106,92 +89,29 @@ export default function MovimientosBancariosTable({
   return (
     <div className="activity-card">
       {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse',
-          fontSize: '0.875rem'
-        }}>
+      <div className="overflow-x-auto">
+        <table className="w-[100%] text-[0.875rem]">
           <thead>
-            <tr style={{ 
-              borderBottom: '2px solid #e5e7eb',
-              background: '#f9fafb'
-            }}>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+            <tr className="bg-[#f9fafb]">
+              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
                 Fecha
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
                 Tipo
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
                 Descripción
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
                 Proveedor
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'left',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-left font-semibold text-gray-700 text-3">
                 Referencia
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'right',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-right font-semibold text-gray-700 text-3">
                 Monto
               </th>
-              <th style={{ 
-                padding: '0.75rem 1rem', 
-                textAlign: 'center',
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <th className="py-3 px-4 text-center font-semibold text-gray-700 text-3">
                 Estado
               </th>
             </tr>
@@ -199,12 +119,7 @@ export default function MovimientosBancariosTable({
           <tbody>
             {movimientos.map((movimiento, index) => (
               <tr 
-                key={movimiento.id}
-                style={{ 
-                  borderBottom: '1px solid #e5e7eb',
-                  transition: 'background-color 0.15s ease',
-                  background: index % 2 === 0 ? 'white' : '#f9fafb'
-                }}
+                key={movimiento.id} className="border-b transition"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#f3f4f6'
                 }}
@@ -213,38 +128,18 @@ export default function MovimientosBancariosTable({
                 }}
               >
                 {/* Fecha */}
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: '500', 
-                    color: '#111827',
-                    marginBottom: '0.125rem'
-                  }}>
+                <td className="p-4">
+                  <div className="text-[0.875rem] font-medium text-gray-900 mb-0.5">
                     {formatDate(movimiento.fecha)}
                   </div>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    color: '#6b7280' 
-                  }}>
+                  <div className="text-3 text-gray-500">
                     {formatDateTime(movimiento.created_at)}
                   </div>
                 </td>
 
                 {/* Tipo */}
-                <td style={{ padding: '1rem' }}>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.375rem',
-                    padding: '0.375rem 0.75rem',
-                    borderRadius: '9999px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    background: movimiento.tipo === 'ABONO' 
-                      ? 'rgba(16, 185, 129, 0.1)' 
-                      : 'rgba(239, 68, 68, 0.1)',
-                    color: movimiento.tipo === 'ABONO' ? '#10b981' : '#ef4444'
-                  }}>
+                <td className="p-4">
+                  <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-3 font-semibold">
                     {movimiento.tipo === 'ABONO' ? (
                       <TrendingUp size={12} />
                     ) : (
@@ -255,113 +150,59 @@ export default function MovimientosBancariosTable({
                 </td>
 
                 {/* Descripción */}
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: '500', 
-                    color: '#111827',
-                    maxWidth: '300px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
+                <td className="p-4">
+                  <div className="text-[0.875rem] font-medium text-gray-900 max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {movimiento.descripcion}
                   </div>
                 </td>
 
                 {/* Proveedor */}
-                <td style={{ padding: '1rem' }}>
+                <td className="p-4">
                   {movimiento.proveedores ? (
                     <div>
-                      <div style={{ 
-                        fontSize: '0.875rem', 
-                        fontWeight: '500', 
-                        color: '#111827',
-                        marginBottom: '0.125rem'
-                      }}>
+                      <div className="text-[0.875rem] font-medium text-gray-900 mb-0.5">
                         {movimiento.proveedores.razon_social}
                       </div>
-                      <div style={{ 
-                        fontSize: '0.75rem', 
-                        color: '#6b7280',
-                        fontFamily: 'monospace'
-                      }}>
+                      <div className="text-3 text-gray-500">
                         RUC: {movimiento.proveedores.ruc}
                       </div>
                     </div>
                   ) : (
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#9ca3af',
-                      fontStyle: 'italic'
-                    }}>
+                    <span className="text-[0.875rem] text-gray-400">
                       -
                     </span>
                   )}
                 </td>
 
                 {/* Referencia */}
-                <td style={{ padding: '1rem' }}>
+                <td className="p-4">
                   {movimiento.referencia ? (
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      fontWeight: '500', 
-                      color: '#6b7280',
-                      fontFamily: 'monospace'
-                    }}>
+                    <span className="text-[0.875rem] font-medium text-gray-500">
                       {movimiento.referencia}
                     </span>
                   ) : (
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#9ca3af',
-                      fontStyle: 'italic'
-                    }}>
+                    <span className="text-[0.875rem] text-gray-400">
                       -
                     </span>
                   )}
                 </td>
 
                 {/* Monto */}
-                <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  <span style={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: '700',
-                    color: movimiento.tipo === 'ABONO' ? '#10b981' : '#ef4444'
-                  }}>
+                <td className="p-4 text-right">
+                  <span className="text-[0.875rem] font-bold">
                     {movimiento.tipo === 'ABONO' ? '+' : '-'} {formatCurrency(movimiento.monto, moneda)}
                   </span>
                 </td>
 
                 {/* Estado Conciliación */}
-                <td style={{ padding: '1rem', textAlign: 'center' }}>
+                <td className="p-4 text-center">
                   {movimiento.conciliado ? (
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.625rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      color: '#10b981'
-                    }}>
+                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-3 font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
                       <CheckCircle size={12} />
                       Conciliado
                     </span>
                   ) : (
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.625rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      background: 'rgba(245, 158, 11, 0.1)',
-                      color: '#f59e0b'
-                    }}>
+                    <span className="inline-flex items-center gap-1 py-1 px-2.5 rounded-full text-3 font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
                       <Clock size={12} />
                       Pendiente
                     </span>
@@ -375,67 +216,29 @@ export default function MovimientosBancariosTable({
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginTop: '1.5rem',
-          paddingTop: '1.5rem',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+        <div className="flex justify-between items-center mt-6 pt-6 border-t">
+          <div className="text-[0.875rem] text-gray-500">
             Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} movimientos
           </div>
           
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="flex gap-2">
             <button
               onClick={() => onPageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
-              style={{
-                padding: '0.5rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                background: pagination.page === 1 ? '#f3f4f6' : 'white',
-                color: pagination.page === 1 ? '#9ca3af' : '#374151',
-                cursor: pagination.page === 1 ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
+              disabled={pagination.page === 1} className="py-2 px-3 rounded-[6px] border text-[0.875rem] font-medium flex items-center gap-1"
             >
               <ChevronLeft size={16} />
               Anterior
             </button>
 
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem',
-              padding: '0 0.5rem'
-            }}>
-              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <div className="flex items-center gap-2 py-0 px-2">
+              <span className="text-[0.875rem] text-gray-500">
                 Página {pagination.page} de {pagination.totalPages}
               </span>
             </div>
 
             <button
               onClick={() => onPageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.totalPages}
-              style={{
-                padding: '0.5rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                background: pagination.page === pagination.totalPages ? '#f3f4f6' : 'white',
-                color: pagination.page === pagination.totalPages ? '#9ca3af' : '#374151',
-                cursor: pagination.page === pagination.totalPages ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
+              disabled={pagination.page === pagination.totalPages} className="py-2 px-3 rounded-[6px] border text-[0.875rem] font-medium flex items-center gap-1"
             >
               Siguiente
               <ChevronRight size={16} />

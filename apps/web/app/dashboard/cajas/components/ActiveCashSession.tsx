@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils'
 import { CashOperationsPanel } from './CashOperationsPanel';
 import { CashMovementsTable } from './CashMovementsTable';
 
@@ -25,85 +26,37 @@ interface ActiveCashSessionProps {
 
 export function ActiveCashSession({ sesion, onCloseSession, className = '' }: ActiveCashSessionProps) {
     return (
-        <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className={cn(className, "flex flex-col gap-6")}>
             {/* Header */}
-            <div
-                style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    borderRadius: '16px',
-                    padding: '1.5rem',
-                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    position: 'relative',
-                    overflow: 'hidden',
-                }}
+            <div className="rounded-4 p-6 shadow border flex justify-between items-start relative overflow-hidden"
             >
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '4px',
-                        background: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
-                        borderRadius: '16px 16px 0 0',
-                    }}
+                <div className="absolute top-0 left-0 right-0 h-[4px]"
                 />
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                        <h2
-                            style={{
-                                fontSize: '1.5rem',
-                                fontWeight: 700,
-                                color: '#1e293b',
-                                margin: 0,
-                            }}
+                    <div className="flex items-center gap-3 mb-3">
+                        <h2 className="text-6 font-bold text-slate-800 m-0"
                         >
                             💰 {sesion.caja?.nombre || 'Caja Principal'}
                         </h2>
-                        <span
-                            style={{
-                                padding: '0.375rem 0.75rem',
-                                fontSize: '0.875rem',
-                                fontWeight: 600,
-                                background: '#dcfce7',
-                                color: '#047857',
-                                borderRadius: '9999px',
-                                border: '1px solid #bbf7d0',
-                            }}
+                        <span className="py-1.5 px-3 text-[0.875rem] font-semibold bg-[#dcfce7] text-emerald-700 rounded-full border"
                         >
                             {sesion.estado}
                         </span>
                     </div>
-                    <div style={{ fontSize: '0.9rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <p style={{ margin: 0 }}>
-                            Abierto por: <span style={{ fontWeight: 600, color: '#1e293b' }}>{sesion.usuario?.nombres} {sesion.usuario?.apellidos}</span>
+                    <div className="text-3.5 text-slate-500 flex flex-col gap-1">
+                        <p className="m-0">
+                            Abierto por: <span className="font-semibold text-slate-800">{sesion.usuario?.nombres} {sesion.usuario?.apellidos}</span>
                         </p>
-                        <p style={{ margin: 0 }}>
-                            Hora apertura: <span style={{ fontWeight: 600, color: '#1e293b' }}>{new Date(sesion.hora_apertura).toLocaleString('es-PE')}</span>
+                        <p className="m-0">
+                            Hora apertura: <span className="font-semibold text-slate-800">{new Date(sesion.hora_apertura).toLocaleString('es-PE')}</span>
                         </p>
-                        <p style={{ margin: 0 }}>
-                            Monto inicial: <span style={{ fontWeight: 700, color: '#059669' }}>S/ {sesion.monto_inicio.toFixed(2)}</span>
+                        <p className="m-0">
+                            Monto inicial: <span className="font-bold text-emerald-600">S/ {sesion.monto_inicio.toFixed(2)}</span>
                         </p>
                     </div>
                 </div>
                 <button
-                    onClick={onCloseSession}
-                    style={{
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '8px',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                    }}
+                    onClick={onCloseSession} className="bg-slate-100 text-slate-600 border py-2 px-4 rounded-2 text-[0.875rem] font-medium cursor-pointer transition"
                     onMouseEnter={(e) => {
                         e.currentTarget.style.background = '#e2e8f0';
                         e.currentTarget.style.borderColor = '#94a3b8';
@@ -124,41 +77,13 @@ export function ActiveCashSession({ sesion, onCloseSession, className = '' }: Ac
             />
 
             {/* Movements Table */}
-            <div
-                style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                    backdropFilter: 'blur(20px) saturate(180%)',
-                    borderRadius: '16px',
-                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    overflow: 'hidden',
-                    position: 'relative',
-                }}
+            <div className="rounded-4 shadow border overflow-hidden relative"
             >
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '4px',
-                        background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-                        borderRadius: '16px 16px 0 0',
-                    }}
+                <div className="absolute top-0 left-0 right-0 h-[4px]"
                 />
-                <div
-                    style={{
-                        padding: '1.25rem 1.5rem',
-                        borderBottom: '1px solid #e2e8f0',
-                    }}
+                <div className="py-5 px-6 border-b"
                 >
-                    <h3
-                        style={{
-                            fontSize: '1.125rem',
-                            fontWeight: 700,
-                            color: '#1e293b',
-                            margin: 0,
-                        }}
+                    <h3 className="text-[1.125rem] font-bold text-slate-800 m-0"
                     >
                         📋 Movimientos del Turno
                     </h3>

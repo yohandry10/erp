@@ -7,6 +7,7 @@ import { gotoAuthenticated, login } from './helpers/auth';
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: any };
 
 const runId = Date.now().toString().slice(-9);
+const qaPrefix = `QA-PROD-READY-${runId}`;
 const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:13002';
 const api = (route: string) => `/api${route}`;
 
@@ -29,6 +30,16 @@ function unwrap<T>(payload: ApiEnvelope<T> | T): T {
 }
 
 async function parseOk<T>(response: APIResponse, label: string): Promise<T> {
+  const text = await response.text();
+  expect(response.ok(), `${label} debe responder 2xx, status=${response.status()}: ${text}`).toBeTruthy();
+  const body = text ? (JSON.parse(text) as ApiEnvelope<T> | T) : ({} as T);
+  if (body && typeof body === 'object' && 'success' in body) {
+    expect((body as ApiEnvelope<T>).success, `${label} debe devolver success=true: ${text}`).not.toBe(false);
+  }
+  return unwrap<T>(body);
+}
+
+async function parsePageOk<T>(response: Awaited<ReturnType<Page['waitForResponse']>>, label: string): Promise<T> {
   const text = await response.text();
   expect(response.ok(), `${label} debe responder 2xx, status=${response.status()}: ${text}`).toBeTruthy();
   const body = text ? (JSON.parse(text) as ApiEnvelope<T> | T) : ({} as T);
@@ -93,8 +104,8 @@ test.describe('T11 GRE completo', () => {
           tipo: 'EMPRESA',
           documento_tipo: 'RUC',
           documento_numero: `20${runId}`,
-          razon_social: `Cliente GRE T11 ${runId}`,
-          direccion: 'Av. Logistica GRE 123',
+          razon_social: `${qaPrefix} Cliente GRE T11`,
+          direccion: `${qaPrefix} Av. Logistica GRE 123`,
           email: `gre-t11-${runId}@example.com`,
         },
       }),
@@ -104,8 +115,8 @@ test.describe('T11 GRE completo', () => {
     const producto = await parseOk<any>(
       await apiContext.post(api('/inventario/productos'), {
         data: {
-          codigo: `GRE-T11-${runId}`,
-          nombre: `Producto GRE T11 ${runId}`,
+          codigo: `${qaPrefix}-GRE-T11`,
+          nombre: `${qaPrefix} Producto GRE T11`,
           categoria: 'AUDITORIA',
           precio_compra: 30,
           precio_venta: 80,
@@ -128,7 +139,7 @@ test.describe('T11 GRE completo', () => {
             cantidad: 2,
             precio_unitario: 80,
           }],
-          notas: 'Pedido origen GRE T11',
+          notas: `${qaPrefix} Pedido origen GRE T11`,
         },
       }),
       'crear pedido origen GRE',
@@ -145,7 +156,7 @@ test.describe('T11 GRE completo', () => {
           motivo: 'VENTA',
           pesoTotal: 1,
           transportista: 'Transportes GRE',
-          idempotencyKey: `gre-invalid-required-${runId}`,
+          idempotencyKey: `${qaPrefix}-gre-invalid-required`,
         },
       }),
       'no debe emitir GRE sin datos obligatorios',
@@ -162,7 +173,7 @@ test.describe('T11 GRE completo', () => {
           motivo: 'VENTA',
           pesoTotal: 0,
           transportista: 'Transportes GRE',
-          idempotencyKey: `gre-invalid-qty-${runId}`,
+          idempotencyKey: `${qaPrefix}-gre-invalid-qty`,
         },
       }),
       'no debe emitir GRE con cantidad/peso inválido',
@@ -180,7 +191,7 @@ test.describe('T11 GRE completo', () => {
           pesoTotal: 3,
           transportista: 'Transportes GRE',
           pedidoId: '11111111-1111-4111-8111-111111111111',
-          idempotencyKey: `gre-invalid-origin-${runId}`,
+          idempotencyKey: `${qaPrefix}-gre-invalid-origin`,
         },
       }),
       'no debe emitir GRE con documento origen inexistente',
@@ -198,23 +209,39 @@ test.describe('T11 GRE completo', () => {
       licenciaConducir: `Q${runId.slice(-8)}`,
       pedidoId: pedido.id,
       pedidoNumero: pedido.numero,
-      despachosAsociados: [`DESP-T11-${runId}`],
+      despachosAsociados: [`${qaPrefix}-DESP-T11`],
       datosAdicionales: {
         destinatarioDocumentoTipo: '6',
         destinatarioDocumento: `20${runId}`,
       },
-      observaciones: `GRE T11 desde despacho ${runId}`,
-      idempotencyKey: `gre-t11-${tenantId}-${runId}`,
+      observaciones: `${qaPrefix} GRE T11 desde despacho`,
     };
+    const expectedIdempotencyKey = `${tenantId}:pedido:${pedido.id}`;
 
-    const gre = await parseOk<any>(
-      await apiContext.post(api('/gre/guias'), { data: grePayload }),
-      'crear GRE desde pedido/despacho',
+    await gotoAuthenticated(page, `/dashboard/gre/nueva?pedido_id=${pedido.id}&despacho=${encodeURIComponent(grePayload.despachosAsociados[0])}`);
+    await expect(page.getByRole('heading', { name: 'Nueva Guía de Remisión Electrónica', level: 1 })).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('body')).toContainText(pedido.numero);
+    await expect(page.locator('body')).toContainText(producto.nombre);
+    await page.getByLabel('Dirección de Destino *').fill(grePayload.direccionDestino);
+    await page.getByLabel('Fecha de Traslado *').fill(grePayload.fechaTraslado.split('T')[0]);
+    await page.getByLabel('Modalidad de Transporte *').selectOption(grePayload.modalidad);
+    await page.getByLabel('Peso Total (Kg) *').fill(String(grePayload.pesoTotal));
+    await page.getByLabel('Placa del Vehículo').fill(grePayload.placaVehiculo);
+    await page.getByLabel('Licencia de Conducir').fill(grePayload.licenciaConducir);
+    await page.getByLabel('Observaciones').fill(grePayload.observaciones);
+    const createGreResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/gre/guias') && response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Crear GRE' }).click();
+    const createGreResponse = await createGreResponsePromise;
+    const gre = await parsePageOk<any>(
+      createGreResponse,
+      'crear GRE desde pedido/despacho en UI',
     );
     expect(gre.id).toBeTruthy();
     expect(gre.numero).toMatch(/^T001-\d{8}$/);
     expect(['FIRMADO', 'BORRADOR', 'ERROR']).toContain(String(gre.estado));
-    expect(gre.idempotencyKey).toBe(grePayload.idempotencyKey);
+    expect(gre.idempotencyKey).toBe(expectedIdempotencyKey);
 
     const greDuplicada = await parseOk<any>(
       await apiContext.post(api('/gre/guias'), { data: grePayload }),
@@ -258,9 +285,9 @@ test.describe('T11 GRE completo', () => {
       .eq('id', gre.id)
       .single();
     expect(greDbError?.message || '', 'leer GRE persistida').toBe('');
-    expect(greDb?.idempotency_key).toBe(grePayload.idempotencyKey);
+    expect(greDb?.idempotency_key).toBe(expectedIdempotencyKey);
     expect(greDb?.xml_firmado || greDb?.hash_gre || greDb?.error_message).toBeTruthy();
-    expect(JSON.stringify(greDb?.datos_adicionales || {})).toContain(`DESP-T11-${runId}`);
+    expect(JSON.stringify(greDb?.datos_adicionales || {})).toContain(`${qaPrefix}-DESP-T11`);
 
     const { data: greDetalles, error: greDetallesError } = await supabase
       .from('gre_detalles')

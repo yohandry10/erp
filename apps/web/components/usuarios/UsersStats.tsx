@@ -1,5 +1,8 @@
 'use client'
 
+import { Shield, UserCheck, UserX, Users } from 'lucide-react'
+import { MetricCard } from '@/components/erp/metric-card'
+
 interface UsersStatsProps {
   stats: {
     totalUsuarios: number
@@ -11,42 +14,11 @@ interface UsersStatsProps {
 
 export default function UsersStats({ stats }: UsersStatsProps) {
   return (
-    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
-      <div className="stat-card">
-        <div className="stat-header">
-          <h3>USUARIOS TOTALES</h3>
-          <span className="stat-icon">👥</span>
-        </div>
-        <div className="stat-value">{stats.totalUsuarios}</div>
-        <div className="stat-subtitle">Usuarios registrados</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <h3>USUARIOS ACTIVOS</h3>
-          <span className="stat-icon">✅</span>
-        </div>
-        <div className="stat-value">{stats.usuariosActivos}</div>
-        <div className="stat-subtitle">Activos en el sistema</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <h3>ROLES DEFINIDOS</h3>
-          <span className="stat-icon">🔑</span>
-        </div>
-        <div className="stat-value">{stats.totalRoles}</div>
-        <div className="stat-subtitle">Roles configurados</div>
-      </div>
-
-      <div className="stat-card alert">
-        <div className="stat-header">
-          <h3>INACTIVOS</h3>
-          <span className="stat-icon">⚠️</span>
-        </div>
-        <div className="stat-value warning">{stats.usuariosInactivos}</div>
-        <div className="stat-subtitle">Usuarios inactivos</div>
-      </div>
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <MetricCard title="Usuarios totales" value={stats.totalUsuarios} description="Usuarios registrados" icon={Users} tone="info" />
+      <MetricCard title="Usuarios activos" value={stats.usuariosActivos} description="Activos en el sistema" icon={UserCheck} tone="success" />
+      <MetricCard title="Roles definidos" value={stats.totalRoles} description="Roles configurados" icon={Shield} tone="default" />
+      <MetricCard title="Inactivos" value={stats.usuariosInactivos} description="Usuarios inactivos" icon={UserX} tone="warning" />
     </div>
   )
 }

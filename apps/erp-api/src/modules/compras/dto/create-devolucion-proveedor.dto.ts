@@ -48,10 +48,9 @@ export class ItemDevolucionDto {
 }
 
 export class CreateDevolucionProveedorDto {
-  @ApiPropertyOptional({ description: 'ID de la recepción de origen (opcional)' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID de la recepción cerrada de origen' })
   @IsUUID()
-  recepcion_id?: string;
+  recepcion_id: string;
 
   @ApiProperty({ description: 'ID de la orden de compra' })
   @IsUUID()

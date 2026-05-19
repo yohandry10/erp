@@ -11,8 +11,9 @@ COPY libs/ ./libs/
 COPY apps/worker/ ./apps/worker/
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm run build --filter=@erp-suite/dtos --filter=@erp-suite/crypto
-RUN pnpm run build --filter=@erp-suite/worker
+RUN pnpm --filter=@erp-suite/dtos build
+RUN pnpm --filter=@erp-suite/crypto build
+RUN pnpm --filter=@erp-suite/worker build
 
 FROM node:20-alpine AS production
 

@@ -84,86 +84,20 @@ export default function PeriodoCierreWizard({
   const canClose = validationResults?.asientos.valido && validationResults?.eventos.valido
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(15, 23, 42, 0.8)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem',
-      zIndex: 1000,
-      animation: 'modal-overlay-enter 0.3s ease-out'
-    }}>
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: '24px',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '600px',
-        boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        animation: 'modal-content-enter 0.3s ease-out',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1000]">
+      <div className="rounded-6 p-8 w-[90%] max-w-[600px] shadow border relative overflow-hidden">
         {/* Header Bar */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-          borderRadius: '24px 24px 0 0'
-        }} />
+        <div className="absolute top-0 left-0 right-0 h-[4px]" />
 
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1.5rem'
-        }}>
-          <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-6 font-bold m-0 flex items-center gap-2">
             <Lock size={24} />
             Cerrar Período Contable
           </h2>
           <button
             onClick={onClose}
-            disabled={loading}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              color: '#64748b',
-              padding: '0.5rem',
-              borderRadius: '50%',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '40px',
-              height: '40px',
-              opacity: loading ? 0.5 : 1
-            }}
+            disabled={loading} className="border-0 text-6 text-slate-500 p-2 rounded-full transition flex items-center justify-center w-10 h-10"
             onMouseEnter={(e) => {
               if (!loading) {
                 e.currentTarget.style.background = '#f1f5f9'
@@ -180,119 +114,51 @@ export default function PeriodoCierreWizard({
         </div>
 
         {/* Period Info */}
-        <div style={{
-          background: '#eff6ff',
-          border: '1px solid #bfdbfe',
-          borderRadius: '12px',
-          padding: '1rem',
-          marginBottom: '1.5rem'
-        }}>
-          <p style={{
-            margin: 0,
-            fontSize: '0.875rem',
-            color: '#1e40af',
-            fontWeight: '500'
-          }}>
-            Período: <strong style={{ fontSize: '1rem' }}>{formatPeriodo(anio, mes)}</strong>
+        <div className="bg-[#eff6ff] border rounded-3 p-4 mb-6">
+          <p className="m-0 text-[0.875rem] text-[#1e40af] font-medium">
+            Período: <strong className="text-4">{formatPeriodo(anio, mes)}</strong>
           </p>
         </div>
 
         {/* Content */}
         {step === 'validating' && (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem 0'
-          }}>
-            <Loader2 size={48} style={{
-              color: '#3b82f6',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }} />
-            <p style={{
-              margin: 0,
-              fontSize: '1rem',
-              color: '#475569',
-              fontWeight: '500'
-            }}>
+          <div className="text-center py-8 px-0">
+            <Loader2 size={48} className="text-blue-500" />
+            <p className="m-0 text-4 text-slate-600 font-medium">
               Validando período contable...
             </p>
-            <p style={{
-              margin: '0.5rem 0 0 0',
-              fontSize: '0.875rem',
-              color: '#64748b'
-            }}>
+            <p className="mt-2 mr-0 mb-0 ml-0 text-[0.875rem] text-slate-500">
               Verificando asientos y eventos pendientes
             </p>
           </div>
         )}
 
         {step === 'results' && validationResults && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
+          <div className="flex flex-col gap-4 mb-6">
             {/* Validation: Asientos */}
-            <div style={{
-              background: validationResults.asientos.valido ? '#dcfce7' : '#fee2e2',
-              border: `1px solid ${validationResults.asientos.valido ? '#bbf7d0' : '#fecaca'}`,
-              borderRadius: '12px',
-              padding: '1rem'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '0.5rem'
-              }}>
+            <div className="rounded-3 p-4">
+              <div className="flex items-center gap-3 mb-2">
                 {validationResults.asientos.valido ? (
-                  <CheckCircle size={24} style={{ color: '#059669', flexShrink: 0 }} />
+                  <CheckCircle size={24} className="text-emerald-600 shrink-0" />
                 ) : (
-                  <XCircle size={24} style={{ color: '#dc2626', flexShrink: 0 }} />
+                  <XCircle size={24} className="text-red-600 shrink-0" />
                 )}
-                <h3 style={{
-                  margin: 0,
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  color: validationResults.asientos.valido ? '#166534' : '#991b1b'
-                }}>
+                <h3 className="m-0 text-4 font-semibold">
                   Validación de Asientos Contables
                 </h3>
               </div>
-              <p style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                color: validationResults.asientos.valido ? '#166534' : '#991b1b'
-              }}>
+              <p className="m-0 text-[0.875rem]">
                 {validationResults.asientos.valido
                   ? '✓ Todos los asientos cuadran correctamente (Debe = Haber)'
                   : `✗ Hay ${validationResults.asientos.asientosDescuadrados.length} asiento(s) descuadrado(s)`
                 }
               </p>
               {!validationResults.asientos.valido && validationResults.asientos.asientosDescuadrados.length > 0 && (
-                <div style={{
-                  marginTop: '0.75rem',
-                  padding: '0.75rem',
-                  background: 'rgba(255, 255, 255, 0.5)',
-                  borderRadius: '8px'
-                }}>
-                  <p style={{
-                    margin: '0 0 0.5rem 0',
-                    fontSize: '0.75rem',
-                    fontWeight: '600',
-                    color: '#991b1b',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
+                <div className="mt-3 p-3 bg-[rgba(255,_255,_255,_0.5)] rounded-2">
+                  <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-semibold text-red-800">
                     Asientos con problemas:
                   </p>
-                  <ul style={{
-                    margin: 0,
-                    paddingLeft: '1.25rem',
-                    fontSize: '0.875rem',
-                    color: '#991b1b'
-                  }}>
+                  <ul className="m-0 pl-5 text-[0.875rem] text-red-800">
                     {validationResults.asientos.asientosDescuadrados.slice(0, 5).map((asiento: any) => (
                       <li key={asiento.id}>
                         {asiento.numero_asiento} - Diferencia: S/ {Math.abs(asiento.total_debe - asiento.total_haber).toFixed(2)}
@@ -307,37 +173,18 @@ export default function PeriodoCierreWizard({
             </div>
 
             {/* Validation: Eventos */}
-            <div style={{
-              background: validationResults.eventos.valido ? '#dcfce7' : '#fef3c7',
-              border: `1px solid ${validationResults.eventos.valido ? '#bbf7d0' : '#fde68a'}`,
-              borderRadius: '12px',
-              padding: '1rem'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '0.5rem'
-              }}>
+            <div className="rounded-3 p-4">
+              <div className="flex items-center gap-3 mb-2">
                 {validationResults.eventos.valido ? (
-                  <CheckCircle size={24} style={{ color: '#059669', flexShrink: 0 }} />
+                  <CheckCircle size={24} className="text-emerald-600 shrink-0" />
                 ) : (
-                  <AlertTriangle size={24} style={{ color: '#d97706', flexShrink: 0 }} />
+                  <AlertTriangle size={24} className="text-[#d97706] shrink-0" />
                 )}
-                <h3 style={{
-                  margin: 0,
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  color: validationResults.eventos.valido ? '#166534' : '#92400e'
-                }}>
+                <h3 className="m-0 text-4 font-semibold">
                   Validación de Eventos Pendientes
                 </h3>
               </div>
-              <p style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                color: validationResults.eventos.valido ? '#166534' : '#92400e'
-              }}>
+              <p className="m-0 text-[0.875rem]">
                 {validationResults.eventos.valido
                   ? '✓ No hay eventos pendientes de procesar'
                   : `⚠ Hay ${validationResults.eventos.eventosPendientes} evento(s) pendiente(s) de procesar`
@@ -347,18 +194,8 @@ export default function PeriodoCierreWizard({
 
             {/* Error Message */}
             {error && (
-              <div style={{
-                background: '#fee2e2',
-                border: '1px solid #fecaca',
-                borderRadius: '12px',
-                padding: '1rem'
-              }}>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  color: '#991b1b',
-                  fontWeight: '500'
-                }}>
+              <div className="bg-[#fee2e2] border rounded-3 p-4">
+                <p className="m-0 text-[0.875rem] text-red-800 font-medium">
                   ⚠️ {error}
                 </p>
               </div>
@@ -366,18 +203,8 @@ export default function PeriodoCierreWizard({
 
             {/* Warning if cannot close */}
             {!canClose && (
-              <div style={{
-                background: '#fef3c7',
-                border: '1px solid #fde68a',
-                borderRadius: '12px',
-                padding: '1rem'
-              }}>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  color: '#92400e',
-                  fontWeight: '500'
-                }}>
+              <div className="bg-[#fef3c7] border rounded-3 p-4">
+                <p className="m-0 text-[0.875rem] text-[#92400e] font-medium">
                   ⚠️ No se puede cerrar el período hasta que se corrijan todos los problemas detectados.
                 </p>
               </div>
@@ -386,34 +213,14 @@ export default function PeriodoCierreWizard({
         )}
 
         {step === 'confirming' && (
-          <div style={{
-            background: '#fef3c7',
-            border: '1px solid #fde68a',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            marginBottom: '1.5rem'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem'
-            }}>
-              <AlertTriangle size={24} style={{ color: '#d97706', flexShrink: 0, marginTop: '0.125rem' }} />
+          <div className="bg-[#fef3c7] border rounded-3 p-6 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={24} className="text-[#d97706] shrink-0 mt-0.5" />
               <div>
-                <h3 style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  color: '#92400e'
-                }}>
+                <h3 className="mt-0 mr-0 mb-2 ml-0 text-4 font-semibold text-[#92400e]">
                   ¿Está seguro de cerrar este período?
                 </h3>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  color: '#92400e',
-                  lineHeight: '1.5'
-                }}>
+                <p className="m-0 text-[0.875rem] text-[#92400e] leading-6">
                   Una vez cerrado, no se podrán crear nuevos asientos contables en este período.
                   Solo un superadministrador podrá reabrir el período.
                 </p>
@@ -423,52 +230,21 @@ export default function PeriodoCierreWizard({
         )}
 
         {step === 'processing' && (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem 0',
-            marginBottom: '1.5rem'
-          }}>
-            <Loader2 size={48} style={{
-              color: '#3b82f6',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }} />
-            <p style={{
-              margin: 0,
-              fontSize: '1rem',
-              color: '#475569',
-              fontWeight: '500'
-            }}>
+          <div className="text-center py-8 px-0 mb-6">
+            <Loader2 size={48} className="text-blue-500" />
+            <p className="m-0 text-4 text-slate-600 font-medium">
               Cerrando período contable...
             </p>
           </div>
         )}
 
         {/* Actions */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'flex-end',
-          flexWrap: 'wrap'
-        }}>
+        <div className="flex gap-4 justify-end flex-wrap">
           {step === 'results' && (
             <>
               <button
                 onClick={onClose}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#f1f5f9',
-                  color: '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  fontSize: '0.875rem',
-                  minWidth: '120px',
-                  opacity: loading ? 0.5 : 1
-                }}
+                disabled={loading} className="py-3 px-6 bg-slate-100 text-slate-700 border rounded-3 font-semibold transition text-[0.875rem] min-w-[120px]"
                 onMouseEnter={(e) => {
                   if (!loading) {
                     e.currentTarget.style.background = '#e2e8f0'
@@ -485,25 +261,7 @@ export default function PeriodoCierreWizard({
               {canClose && (
                 <button
                   onClick={() => setStep('confirming')}
-                  disabled={loading}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontWeight: '600',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    fontSize: '0.875rem',
-                    minWidth: '120px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    justifyContent: 'center',
-                    opacity: loading ? 0.5 : 1
-                  }}
+                  disabled={loading} className="py-3 px-6 text-white border-0 rounded-3 font-semibold transition shadow text-[0.875rem] min-w-[120px] flex items-center gap-2 justify-center"
                   onMouseEnter={(e) => {
                     if (!loading) {
                       e.currentTarget.style.transform = 'translateY(-2px)'
@@ -526,20 +284,7 @@ export default function PeriodoCierreWizard({
             <>
               <button
                 onClick={() => setStep('results')}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#f1f5f9',
-                  color: '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  fontSize: '0.875rem',
-                  minWidth: '120px',
-                  opacity: loading ? 0.5 : 1
-                }}
+                disabled={loading} className="py-3 px-6 bg-slate-100 text-slate-700 border rounded-3 font-semibold transition text-[0.875rem] min-w-[120px]"
                 onMouseEnter={(e) => {
                   if (!loading) {
                     e.currentTarget.style.background = '#e2e8f0'
@@ -555,25 +300,7 @@ export default function PeriodoCierreWizard({
               </button>
               <button
                 onClick={cerrarPeriodo}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  fontSize: '0.875rem',
-                  minWidth: '120px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  justifyContent: 'center',
-                  opacity: loading ? 0.5 : 1
-                }}
+                disabled={loading} className="py-3 px-6 text-white border-0 rounded-3 font-semibold transition shadow text-[0.875rem] min-w-[120px] flex items-center gap-2 justify-center"
                 onMouseEnter={(e) => {
                   if (!loading) {
                     e.currentTarget.style.transform = 'translateY(-2px)'
@@ -587,7 +314,7 @@ export default function PeriodoCierreWizard({
               >
                 {loading ? (
                   <>
-                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    <Loader2 size={16} />
                     Cerrando...
                   </>
                 ) : (
@@ -601,26 +328,6 @@ export default function PeriodoCierreWizard({
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes modal-overlay-enter {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes modal-content-enter {
-          from {
-            opacity: 0;
-            transform: translateY(-20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
     </div>
   )
 }

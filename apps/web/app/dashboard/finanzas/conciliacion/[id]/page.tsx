@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MatchManualModal from '@/components/finanzas/MatchManualModal';
 import { ImportarExtractoCSV, ConciliacionTable, ConciliacionWizard, ConciliacionGuide } from '@/components/finanzas';
+import { formatCurrency, formatDateLong } from '@/lib/format-utils';
 
 interface Conciliacion {
   id: string;
@@ -229,21 +230,6 @@ export default function ConciliacionDetailPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
   const getEstadoBadge = (estado: string) => {
     const badges = {
       ABIERTA: 'bg-blue-100 text-blue-800',
@@ -293,7 +279,7 @@ export default function ConciliacionDetailPage() {
           <CardContent>
             <p className="text-lg font-semibold">{conciliacion.periodo}</p>
             <p className="text-xs text-gray-500 mt-1">
-              {formatDate(conciliacion.fecha_desde)} - {formatDate(conciliacion.fecha_hasta)}
+              {formatDateLong(conciliacion.fecha_desde)} - {formatDateLong(conciliacion.fecha_hasta)}
             </p>
           </CardContent>
         </Card>

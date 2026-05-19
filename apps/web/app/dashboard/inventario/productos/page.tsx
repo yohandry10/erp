@@ -101,7 +101,7 @@ export default function ProductosPage() {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <div>
-          <h1 className="dashboard-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1 className="dashboard-title flex items-center gap-3">
             <Package size={32} />
             Gestión de Productos
           </h1>
@@ -116,31 +116,29 @@ export default function ProductosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="activity-card" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div className="activity-card mb-8">
+        <div className="flex items-center gap-2 mb-4">
           <Filter size={20} />
-          <h3 style={{ margin: 0, fontWeight: 600 }}>Filtros</h3>
+          <h3 className="m-0 font-semibold">Filtros</h3>
         </div>
-        <div className="modal-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <div className="modal-grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
-              <Search size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
+            <label className="block mb-2 text-[0.875rem]">
+              <Search size={16} className="mr-1" />
               Buscar
             </label>
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              placeholder="Código, nombre o código de barras"
-              style={{ width: '100%' }}
+              placeholder="Código, nombre o código de barras" className="w-[100%]"
             />
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Categoría</label>
+            <label className="block mb-2 text-[0.875rem]">Categoría</label>
             <select
               value={filters.categoria}
-              onChange={(e) => setFilters(prev => ({ ...prev, categoria: e.target.value }))}
-              style={{ width: '100%' }}
+              onChange={(e) => setFilters(prev => ({ ...prev, categoria: e.target.value }))} className="w-[100%]"
             >
               <option value="">Todas</option>
               {categorias.map(cat => (
@@ -149,25 +147,24 @@ export default function ProductosPage() {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Estado</label>
+            <label className="block mb-2 text-[0.875rem]">Estado</label>
             <select
               value={filters.estado}
-              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value as any }))}
-              style={{ width: '100%' }}
+              onChange={(e) => setFilters(prev => ({ ...prev, estado: e.target.value as any }))} className="w-[100%]"
             >
               <option value="TODOS">Todos</option>
               <option value="ACTIVO">Activos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filters.soloCriticos}
                 onChange={(e) => setFilters(prev => ({ ...prev, soloCriticos: e.target.checked }))}
               />
-              <span style={{ fontSize: '0.875rem' }}>Solo stock crítico</span>
+              <span className="text-[0.875rem]">Solo stock crítico</span>
             </label>
           </div>
         </div>
@@ -175,7 +172,7 @@ export default function ProductosPage() {
 
       {/* Tabla de productos */}
       <div className="activity-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div className="flex justify-between items-center mb-4">
           <h2 className="activity-title">Productos ({productosFiltrados.length})</h2>
           <button onClick={loadProductos} className="btn btn-secondary">
             Actualizar
@@ -188,12 +185,12 @@ export default function ProductosPage() {
             <p>Cargando productos...</p>
           </div>
         ) : productosFiltrados.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-500)' }}>
-            <Package size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+          <div className="text-center p-12 text-[var(--primary-500)]">
+            <Package size={48} className="opacity-[0.5] mb-4" />
             <p>No se encontraron productos</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="overflow-x-auto">
             <table>
               <thead>
                 <tr>
@@ -238,7 +235,7 @@ export default function ProductosPage() {
                       <td>
                         <strong>{producto.codigo}</strong>
                         {producto.codigo_barras && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                          <div className="text-3 text-[var(--primary-500)]">
                             {producto.codigo_barras}
                           </div>
                         )}
@@ -247,7 +244,7 @@ export default function ProductosPage() {
                         <div>
                           <strong>{producto.nombre}</strong>
                           {producto.descripcion && (
-                            <div style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>
+                            <div className="text-[0.875rem] text-[var(--primary-600)]">
                               {producto.descripcion.substring(0, 50)}
                               {producto.descripcion.length > 50 && '...'}
                             </div>
@@ -257,24 +254,24 @@ export default function ProductosPage() {
                       <td>{producto.categoria || '—'}</td>
                       <td>
                         S/ {Number(producto.precio_venta || 0).toFixed(2)}
-                        <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                        <div className="text-3 text-[var(--primary-500)]">
                           Compra: S/ {Number(producto.precio_compra || 0).toFixed(2)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <strong style={{ color: critico ? 'var(--red-600)' : 'inherit' }}>{stockActual}</strong>
+                      <td className="text-center">
+                        <strong>{stockActual}</strong>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={badgeStyle}>
+                      <td className="text-center">
+                        <div>
                           {sinStock ? '⚠️ Sin stock' : critico ? '⚠️ Crítico' : '✅ Disponible'} {Number(disponible).toFixed(2)}
                         </div>
                         {reservado > 0 && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--amber-600)', marginTop: '0.15rem' }}>
+                          <div className="text-3 text-[var(--amber-600)] mt-[0.15rem]">
                             ({reservado} reservado)
                           </div>
                         )}
                       </td>
-                      <td style={{ textAlign: 'center', color: critico ? 'var(--red-600)' : 'inherit', fontWeight: critico ? 700 : 400 }}>
+                      <td className="text-center">
                         {producto.stock_minimo || '—'}
                       </td>
                       <td>
@@ -283,7 +280,7 @@ export default function ProductosPage() {
                         </span>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div className="flex gap-2">
                           <button
                             onClick={() => router.push(`/dashboard/inventario/productos/${producto.id}/editar`)}
                             className="btn-icon"

@@ -1,7 +1,12 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CheckCircle2, Clock3, Eye, Printer, RefreshCw } from 'lucide-react'
 import { printTicket } from './TicketPrint'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { useApi } from '@/hooks/use-api'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 interface VentaExitosaModalProps {
   isOpen: boolean
@@ -14,6 +19,7 @@ interface VentaExitosaModalProps {
     impuestos: number
     estado: string
     factura_electronica: boolean
+    facturacion_pendiente?: boolean
     cpe_id?: string
     cliente_nombre?: string
     fecha?: string
@@ -34,10 +40,61 @@ interface VentaExitosaModalProps {
 
 export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaData }: VentaExitosaModalProps) {
   const country = useCountryContext()
+  const { get, post } = useApi({ showErrorToast: false, retries: 1, timeoutMs: 15000 })
+  const [currentCpeId, setCurrentCpeId] = useState<string | null>(null)
+  const [facturacionPendiente, setFacturacionPendiente] = useState(false)
+  const [facturando, setFacturando] = useState(false)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  const [facturacionError, setFacturacionError] = useState<string | null>(null)
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const documentoFiscal = country.documentoFiscal || 'RUC'
   const documentoLabel = country.paisCodigo === 'PE' ? 'BOLETA' : 'TICKET'
+
+  useEffect(() => {
+    if (!isOpen || !ventaData) return
+
+    setCurrentCpeId(ventaData.cpe_id || null)
+    setFacturacionPendiente(Boolean(ventaData.facturacion_pendiente && !ventaData.cpe_id))
+    setFacturacionError(null)
+  }, [isOpen, ventaData])
+
+  useEffect(() => {
+    if (!isOpen || !ventaData?.venta_id || ventaData.cpe_id) return
+
+    let cancelled = false
+    let attempts = 0
+    const ventaId = encodeURIComponent(String(ventaData.venta_id))
+
+    const consultarEstado = async () => {
+      attempts += 1
+      setCheckingStatus(true)
+      const result = await get(`/api/pos/facturacion/${ventaId}`)
+      if (cancelled) return
+
+      const data = result?.data || result
+      if (data) {
+        setCurrentCpeId(data.cpe_id || null)
+        setFacturacionPendiente(Boolean(data.cpe_pendiente && !data.cpe_id))
+        setFacturacionError(data.error_facturacion || null)
+      }
+      setCheckingStatus(false)
+    }
+
+    consultarEstado()
+    const timer = window.setInterval(() => {
+      if (cancelled || attempts >= 4) {
+        window.clearInterval(timer)
+        return
+      }
+      consultarEstado()
+    }, 3500)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [get, isOpen, ventaData])
 
   if (!isOpen || !ventaData) return null
 
@@ -60,203 +117,147 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
   }
 
   const handleVerComprobante = () => {
-    if (!ventaData.cpe_id) {
-      alert('No hay CPE asociado')
-      return
+    window.location.assign(`/dashboard/cpe${currentCpeId ? `?cpe_id=${encodeURIComponent(currentCpeId)}` : ''}`)
+  }
+
+  const handleEmitirCpe = async () => {
+    if (!ventaData.venta_id || facturando) return
+
+    setFacturando(true)
+    setFacturacionError(null)
+    const ventaId = encodeURIComponent(String(ventaData.venta_id))
+    const result = await post(`/api/pos/reintentar-facturacion/${ventaId}`)
+    const data = result?.data || result
+
+    if (data?.success && data?.cpe_id) {
+      setCurrentCpeId(data.cpe_id)
+      setFacturacionPendiente(false)
+    } else {
+      setFacturacionPendiente(true)
+      setFacturacionError(data?.message || 'No se pudo emitir el CPE en este intento.')
     }
-    window.open(`/dashboard/cpe`, '_blank')
+    setFacturando(false)
   }
 
   const formatMoney = (value: number) => value.toFixed(2)
   const formatCurrency = (value: number) => `${currencySymbol} ${formatMoney(value)}`
 
+  const cpeListo = Boolean(currentCpeId)
+  const puedeEmitirCpe = !cpeListo && Boolean(ventaData.venta_id)
+
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10000,
-        padding: '20px',
-      }}
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 p-5 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '450px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
-        }}
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-cyan-300/20 bg-slate-950 text-slate-100 shadow-[0_28px_80px_rgba(0,0,0,0.55)] dark:bg-slate-950"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header con icono de éxito */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            padding: '24px',
-            textAlign: 'center',
-            color: 'white',
-          }}
-        >
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px',
-              fontSize: '32px',
-            }}
-          >
-            ✓
+        <div className="border-b border-cyan-300/15 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/70 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200/80">Venta registrada</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">{ventaData.numero_ticket}</h2>
+              </div>
+            </div>
+            <Badge className="border border-cyan-300/20 bg-cyan-400/10 text-cyan-100">
+              {ventaData.estado}
+            </Badge>
           </div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
-            ¡Venta Exitosa!
-          </h2>
-          <p style={{ margin: '8px 0 0', opacity: 0.9, fontSize: '14px' }}>
-            {ventaData.factura_electronica ? 'Comprobante electrónico generado' : 'Venta registrada'}
-          </p>
         </div>
 
-        {/* Contenido */}
-        <div style={{ padding: '24px' }}>
-          {/* Número de ticket destacado */}
-          <div
-            style={{
-              backgroundColor: '#f3f4f6',
-              borderRadius: '12px',
-              padding: '16px',
-              textAlign: 'center',
-              marginBottom: '20px',
-            }}
-          >
-            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', textTransform: 'uppercase' }}>
-              Ticket
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>
-              {ventaData.numero_ticket}
-            </p>
-          </div>
-
-          {/* Detalles de la venta */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }}>
-              <span style={{ color: '#6b7280' }}>Cliente</span>
-              <span style={{ fontWeight: '500' }}>{ventaData.cliente_nombre || 'Cliente General'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }}>
-              <span style={{ color: '#6b7280' }}>Subtotal</span>
-              <span>{formatCurrency(ventaData.subtotal)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }}>
-              <span style={{ color: '#6b7280' }}>{taxLabel}</span>
-              <span>{formatCurrency(ventaData.impuestos)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: '4px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>TOTAL</span>
-              <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
-                {formatCurrency(ventaData.total)}
+        <div className="space-y-4 p-6">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-900/75 p-4">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-700/70 pb-3">
+              <span className="text-sm text-slate-400">Cliente</span>
+              <span className="max-w-[250px] text-right text-sm font-semibold text-slate-100">
+                {ventaData.cliente_nombre || 'Cliente General'}
               </span>
             </div>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Subtotal</span>
+                <span className="font-medium text-slate-100">{formatCurrency(ventaData.subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">{taxLabel}</span>
+                <span className="font-medium text-slate-100">{formatCurrency(ventaData.impuestos)}</span>
+              </div>
+              <div className="flex items-end justify-between pt-3">
+                <span className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400">Total</span>
+                <span className="text-3xl font-black text-cyan-200">{formatCurrency(ventaData.total)}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Estado del CPE */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px',
-              backgroundColor: ventaData.factura_electronica ? '#ecfdf5' : '#fef3c7',
-              borderRadius: '8px',
-              marginBottom: '20px',
-            }}
-          >
-            <span style={{ fontSize: '20px' }}>
-              {ventaData.factura_electronica ? '✅' : '⏳'}
-            </span>
-            <span style={{ fontSize: '14px', color: ventaData.factura_electronica ? '#065f46' : '#92400e' }}>
-              {ventaData.factura_electronica 
-                ? 'Boleta electrónica generada correctamente' 
-                : 'Comprobante pendiente de emisión'}
-            </span>
+          <div className="flex items-center gap-3 rounded-xl border border-cyan-300/15 bg-cyan-400/10 p-4 text-sm text-cyan-50">
+            {cpeListo ? <CheckCircle2 className="h-5 w-5 text-cyan-200" /> : <Clock3 className="h-5 w-5 text-cyan-200" />}
+            <div>
+              <p className="font-semibold">
+                {cpeListo ? 'Comprobante electrónico generado' : 'Comprobante pendiente de emisión fiscal'}
+              </p>
+              <p className="text-xs text-cyan-100/75">
+                {cpeListo
+                  ? 'Disponible para revisión fiscal.'
+                  : facturacionPendiente || checkingStatus
+                    ? 'La venta ya quedó registrada. Puedes emitir/reintentar el CPE ahora o continuar vendiendo mientras el worker fiscal lo procesa.'
+                    : 'La venta quedó registrada, pero el estado fiscal debe verificarse antes de cerrar el control diario.'}
+              </p>
+            </div>
           </div>
 
-          {/* Botones de acción */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-            <button
-              onClick={handleImprimirTicket}
-              disabled={!ventaData.cpe_id}
-              style={{
-                flex: 1,
-                padding: '14px',
-                backgroundColor: ventaData.cpe_id ? '#3b82f6' : '#d1d5db',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: ventaData.cpe_id ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              🖨️ Imprimir
-            </button>
-            <button
-              onClick={handleVerComprobante}
-              disabled={!ventaData.cpe_id}
-              style={{
-                flex: 1,
-                padding: '14px',
-                backgroundColor: ventaData.cpe_id ? '#10b981' : '#d1d5db',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: ventaData.cpe_id ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              👁️ Ver CPE
-            </button>
+          {facturacionError && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-300/25 bg-amber-400/10 p-4 text-sm text-amber-50">
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-200" />
+              <div>
+                <p className="font-semibold">CPE pendiente de atención</p>
+                <p className="text-xs text-amber-100/80">{facturacionError}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" onClick={handleImprimirTicket} className="h-12 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+              <Printer className="h-4 w-4" />
+              Imprimir ticket
+            </Button>
+            {cpeListo ? (
+              <Button
+                type="button"
+                onClick={handleVerComprobante}
+                variant="outline"
+                className="h-12 gap-2 border-cyan-300/25 bg-slate-900 text-cyan-100 hover:bg-slate-800"
+              >
+                <Eye className="h-4 w-4" />
+                Ver CPE
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleEmitirCpe}
+                disabled={!puedeEmitirCpe || facturando || checkingStatus}
+                variant="outline"
+                className="h-12 gap-2 border-cyan-300/25 bg-slate-900 text-cyan-100 hover:bg-slate-800 disabled:opacity-45"
+              >
+                <RefreshCw className={`h-4 w-4 ${facturando ? 'animate-spin' : ''}`} />
+                {facturando ? 'Emitiendo' : checkingStatus ? 'Verificando' : 'Emitir CPE'}
+              </Button>
+            )}
           </div>
 
-          {/* Botón cerrar */}
-          <button
+          <Button
+            type="button"
             onClick={onClose}
-            style={{
-              width: '100%',
-              padding: '14px',
-              backgroundColor: '#f3f4f6',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '15px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
+            variant="secondary"
+            className="h-12 w-full bg-slate-800 text-slate-100 hover:bg-slate-700"
           >
-            Continuar Vendiendo
-          </button>
+            Continuar vendiendo
+          </Button>
         </div>
       </div>
     </div>

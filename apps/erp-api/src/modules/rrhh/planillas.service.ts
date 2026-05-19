@@ -5,6 +5,19 @@ import Decimal from 'decimal.js';
 import { OutboxEventBuilder } from '../../shared/outbox/outbox-event.interface';
 import { v4 as uuidv4 } from 'uuid';
 
+const CONCEPTOS_PLANILLA_BASE = [
+  { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
+  { codigo: '003', nombre: 'Horas extras 25%', tipo: 'ingreso' },
+  { codigo: '004', nombre: 'Horas extras 35%', tipo: 'ingreso' },
+  { codigo: '005', nombre: 'Bono adicional', tipo: 'ingreso' },
+  { codigo: '101', nombre: 'Aporte AFP', tipo: 'descuento' },
+  { codigo: '102', nombre: 'Comision AFP', tipo: 'descuento' },
+  { codigo: '103', nombre: 'Seguro AFP', tipo: 'descuento' },
+  { codigo: '104', nombre: 'Aporte ONP', tipo: 'descuento' },
+  { codigo: '106', nombre: 'Tardanzas', tipo: 'descuento' },
+  { codigo: '107', nombre: 'Faltas', tipo: 'descuento' },
+];
+
 @Injectable()
 export class PlanillasService {
   constructor(
@@ -41,6 +54,15 @@ export class PlanillasService {
       throw new BadRequestException('Debe enviar periodo de planilla en formato YYYY-MM');
     }
 
+    const metadataBase =
+      planillaData?.metadata && typeof planillaData.metadata === 'object' && !Array.isArray(planillaData.metadata)
+        ? planillaData.metadata
+        : {};
+    const metadata = {
+      ...metadataBase,
+      ...(planillaData?.observaciones ? { observaciones: String(planillaData.observaciones).trim() } : {}),
+    };
+
     const camposPermitidos = [
       'id',
       'periodo',
@@ -56,7 +78,6 @@ export class PlanillasService {
       'asientos_generados',
       'fecha_asientos',
       'centro_costo_id',
-      'observaciones',
       'metadata',
     ];
     const datosLimpios = Object.fromEntries(
@@ -64,6 +85,9 @@ export class PlanillasService {
         .filter(([key]) => camposPermitidos.includes(key))
         .filter(([, value]) => value !== '' && value !== undefined && value !== null)
     );
+    if (Object.keys(metadata).length > 0) {
+      datosLimpios.metadata = metadata;
+    }
 
     const dataToInsert = tenantId 
       ? { ...datosLimpios, tenant_id: tenantId }
@@ -82,6 +106,19 @@ export class PlanillasService {
   async calcularPlanillaMensual(planillaId: string, tenantId?: string) {
     console.log(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
+
+    // Idempotencia: verificar que la planilla no esté ya calculada o pagada
+    const { data: planillaEstado } = await client
+      .from('planillas')
+      .select('estado')
+      .eq('id', planillaId)
+      .single();
+
+    if (planillaEstado?.estado === 'calculada' || planillaEstado?.estado === 'pagada') {
+      throw new Error(
+        `La planilla ya fue ${planillaEstado.estado}. No se puede recalcular sin anular primero.`,
+      );
+    }
 
     // Obtener empleados activos
     let empleadosQuery = client
@@ -312,26 +349,30 @@ export class PlanillasService {
         totalDescuentos += aporteAFP;
       }
 
-      // AFP - Comisión (varía por AFP, promedio 1.25%)
-      const comisionAFP = new Decimal(sueldoBasico).times(0.0125).toDecimalPlaces(2).toNumber();
+      // AFP - Comisión (varía por AFP — usar tasas vigentes SBS)
+      // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
+      // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
+      const tasaComisionAFP = contratoActual?.tasa_comision_afp ?? 0.0155;
+      const comisionAFP = new Decimal(sueldoBasico).times(tasaComisionAFP).toDecimalPlaces(2).toNumber();
       const conceptoComisionAFP = conceptos.find(c => c.codigo === '102');
       if (conceptoComisionAFP) {
         conceptosDetalle.push({
           id: conceptoComisionAFP.id,
           monto: comisionAFP,
-          observaciones: 'Comisión AFP 1.25%'
+          observaciones: `Comisión AFP ${(tasaComisionAFP * 100).toFixed(2)}%`
         });
         totalDescuentos += comisionAFP;
       }
 
-      // AFP - Seguro (1.36%)
-      const seguroAFP = new Decimal(sueldoBasico).times(0.0136).toDecimalPlaces(2).toNumber();
+      // AFP - Seguro de invalidez (prima de seguro vigente SBS: 1.84%)
+      const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ?? 0.0184;
+      const seguroAFP = new Decimal(sueldoBasico).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
       const conceptoSeguroAFP = conceptos.find(c => c.codigo === '103');
       if (conceptoSeguroAFP) {
         conceptosDetalle.push({
           id: conceptoSeguroAFP.id,
           monto: seguroAFP,
-          observaciones: 'Seguro AFP 1.36%'
+          observaciones: `Seguro AFP ${(tasaSeguroAFP * 100).toFixed(2)}%`
         });
         totalDescuentos += seguroAFP;
       }
@@ -449,10 +490,10 @@ export class PlanillasService {
   }
 
   // Obtener detalle de planilla por empleado
-  async getDetallePlanilla(planillaId: string) {
+  async getDetallePlanilla(planillaId: string, tenantId?: string) {
     console.log(`📊 Obteniendo detalle de planilla: ${planillaId}`);
 
-    const { data, error } = await this.supabaseService.getClient()
+    const query = this.supabaseService.getClient()
       .from('empleado_planilla')
       .select(`
         *,
@@ -460,10 +501,16 @@ export class PlanillasService {
         empleado_planilla_conceptos(
           monto,
           observaciones,
-          conceptos_planilla(codigo, nombre, tipo)
+          conceptos_planilla(codigo, nombre, metadata)
         )
       `)
       .eq('id_planilla', planillaId);
+
+    if (tenantId) {
+      query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('❌ Error obteniendo detalle de planilla:', error);
@@ -471,12 +518,23 @@ export class PlanillasService {
     }
 
     console.log(`📋 Detalle obtenido: ${data?.length || 0} empleados`);
-    return data || [];
+    return (data || []).map((empleadoPlanilla: any) => ({
+      ...empleadoPlanilla,
+      empleado_planilla_conceptos: (empleadoPlanilla.empleado_planilla_conceptos || []).map((concepto: any) => ({
+        ...concepto,
+        conceptos_planilla: concepto.conceptos_planilla
+          ? {
+              ...concepto.conceptos_planilla,
+              tipo: concepto.conceptos_planilla.metadata?.tipo || null,
+            }
+          : concepto.conceptos_planilla,
+      })),
+    }));
   }
 
   // Generar boleta de pago individual
-  async getBoleta(empleadoPlanillaId: string) {
-    const { data, error } = await this.supabaseService.getClient()
+  async getBoleta(empleadoPlanillaId: string, tenantId?: string) {
+    const query = this.supabaseService.getClient()
       .from('empleado_planilla')
       .select(`
         *,
@@ -485,30 +543,51 @@ export class PlanillasService {
         empleado_planilla_conceptos(
           monto,
           observaciones,
-          conceptos_planilla(codigo, nombre, tipo)
+          conceptos_planilla(codigo, nombre, metadata)
         )
       `)
-      .eq('id', empleadoPlanillaId)
-      .single();
+      .eq('id', empleadoPlanillaId);
+
+    if (tenantId) {
+      query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) throw error;
-    return data;
+    return {
+      ...data,
+      empleado_planilla_conceptos: (data.empleado_planilla_conceptos || []).map((concepto: any) => ({
+        ...concepto,
+        conceptos_planilla: concepto.conceptos_planilla
+          ? {
+              ...concepto.conceptos_planilla,
+              tipo: concepto.conceptos_planilla.metadata?.tipo || null,
+            }
+          : concepto.conceptos_planilla,
+      })),
+    };
   }
 
   // Actualizar planilla (para cambiar estado, por ejemplo)
-  async updatePlanilla(planillaId: string, updateData: any) {
-    const { data, error } = await this.supabaseService.getClient()
+  async updatePlanilla(planillaId: string, updateData: any, tenantId?: string) {
+    const query = this.supabaseService.getClient()
       .from('planillas')
       .update(updateData)
-      .eq('id', planillaId)
-      .select();
+      .eq('id', planillaId);
+
+    if (tenantId) {
+      query.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await query.select();
 
     if (error) throw error;
     return data[0];
   }
 
   // Eliminar planilla y todos sus datos asociados
-  async deletePlanilla(planillaId: string) {
+  async deletePlanilla(planillaId: string, tenantId?: string) {
     console.log(`🗑️ Iniciando eliminación de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
 
@@ -521,11 +600,16 @@ export class PlanillasService {
 
       // 3. Eliminar la planilla principal
       console.log('🧹 Eliminando planilla principal...');
-      const { data, error } = await client
+      const query = client
         .from('planillas')
         .delete()
-        .eq('id', planillaId)
-        .select();
+        .eq('id', planillaId);
+
+      if (tenantId) {
+        query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.select();
 
       if (error) {
         console.error('❌ Error eliminando planilla:', error);
@@ -561,28 +645,43 @@ export class PlanillasService {
 
     const { data, error } = await query;
     if (error) throw error;
+
+    if (tenantId && (!data || data.length === 0)) {
+      const conceptosBase = CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
+        tenant_id: tenantId,
+        codigo: concepto.codigo,
+        nombre: concepto.nombre,
+        estado: 'ACTIVO',
+        activo: true,
+        metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
+      }));
+      const { data: seeded, error: seedError } = await client
+        .from('conceptos_planilla')
+        .insert(conceptosBase)
+        .select('*')
+        .order('codigo', { ascending: true });
+
+      if (seedError) throw seedError;
+      return {
+        success: true,
+        data: seeded || []
+      };
+    }
+
     return {
       success: true,
       data: data || []
     };
   }
 
-  async calcularPlanillaPersonalizada(planillaId: string, empleadosPersonalizados: any[]) {
+  async calcularPlanillaPersonalizada(planillaId: string, empleadosPersonalizados: any[], tenantId?: string) {
     console.log(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
     console.log(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
 
     const client = this.supabaseService.getClient();
 
-    // Obtener conceptos de planilla
-    const { data: conceptos, error: conceptosError } = await client
-      .from('conceptos_planilla')
-      .select('*')
-      .eq('activo', true);
-
-    if (conceptosError) {
-      console.error('❌ Error obteniendo conceptos:', conceptosError);
-      throw conceptosError;
-    }
+    const conceptosResult = await this.getConceptos(tenantId);
+    const conceptos = conceptosResult.data;
 
     console.log(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
 
@@ -815,9 +914,13 @@ export class PlanillasService {
     const regimenPensionario = empleado.contratos?.[0]?.regimen_pensionario || 'AFP';
 
     if (regimenPensionario === 'AFP') {
+      // TODO: Tasas AFP deben ser configurables por tenant y AFP del empleado
+      const contratoEmpleado = empleado.contratos?.[0];
+      const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ?? 0.0155;
+      const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ?? 0.0184;
       const aporteAFP = new Decimal(totalIngresos).times(0.10).toDecimalPlaces(2).toNumber();
-      const comisionAFP = new Decimal(totalIngresos).times(0.0125).toDecimalPlaces(2).toNumber();
-      const seguroAFP = new Decimal(totalIngresos).times(0.0136).toDecimalPlaces(2).toNumber();
+      const comisionAFP = new Decimal(totalIngresos).times(tasaComisionAFP2).toDecimalPlaces(2).toNumber();
+      const seguroAFP = new Decimal(totalIngresos).times(tasaSeguroAFP2).toDecimalPlaces(2).toNumber();
 
       const conceptoAporteAFP = conceptos.find(c => c.codigo === '101');
       if (conceptoAporteAFP) {
@@ -834,7 +937,7 @@ export class PlanillasService {
         conceptosDetalle.push({
           id: conceptoComisionAFP.id,
           monto: comisionAFP,
-          observaciones: 'Comisión AFP 1.25%'
+          observaciones: `Comisión AFP ${(tasaComisionAFP2 * 100).toFixed(2)}%`
         });
         totalDescuentos += comisionAFP;
       }
@@ -844,7 +947,7 @@ export class PlanillasService {
         conceptosDetalle.push({
           id: conceptoSeguroAFP.id,
           monto: seguroAFP,
-          observaciones: 'Seguro AFP 1.36%'
+          observaciones: `Seguro AFP ${(tasaSeguroAFP2 * 100).toFixed(2)}%`
         });
         totalDescuentos += seguroAFP;
       }
@@ -875,12 +978,12 @@ export class PlanillasService {
   /**
    * Pagar planilla completa - Genera pagos individuales y emite evento contable
    */
-  async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia') {
+  async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia', tenantId?: string) {
     try {
       console.log(`💰 [RRHH] Iniciando pago de planilla ${planillaId} por ${metodoPago}`);
 
       // 1. Obtener planilla con detalles
-      const { data: planilla, error: planillaError } = await this.supabaseService.getClient()
+      let planillaQuery = this.supabaseService.getClient()
         .from('planillas')
         .select(`
           *,
@@ -889,8 +992,13 @@ export class PlanillasService {
             empleados(*)
           )
         `)
-        .eq('id', planillaId)
-        .single();
+        .eq('id', planillaId);
+
+      if (tenantId) {
+        planillaQuery = planillaQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: planilla, error: planillaError } = await planillaQuery.single();
 
       if (planillaError || !planilla) {
         throw new Error('Planilla no encontrada');
@@ -908,6 +1016,7 @@ export class PlanillasService {
 
       // 2. Crear registro de pago para cada empleado
       const pagosCreados = [];
+      const pagosFallidos = [];
       let totalPagado = 0;
 
       for (const empleadoPlanilla of planilla.empleado_planilla) {
@@ -933,11 +1042,22 @@ export class PlanillasService {
 
         if (pagoError) {
           console.error('❌ Error creando pago para empleado:', pagoError);
+          pagosFallidos.push({
+            empleado_id: empleadoPlanilla.empleado_id,
+            error: pagoError.message,
+          });
           continue;
         }
 
         pagosCreados.push(pago);
         totalPagado += montoPago;
+      }
+
+      // Si hubo pagos fallidos, abortar — no marcar la planilla como PAGADO
+      if (pagosFallidos.length > 0) {
+        throw new Error(
+          `No se pudo completar el pago de la planilla. ${pagosFallidos.length} empleados fallaron: ${pagosFallidos.map(f => f.empleado_id).join(', ')}. Los pagos exitosos (${pagosCreados.length}) requieren revisión manual.`,
+        );
       }
 
       // 3. Actualizar estado de la planilla
@@ -949,7 +1069,8 @@ export class PlanillasService {
           metodo_pago: metodoPago,
           total_pagado: totalPagado
         })
-        .eq('id', planillaId);
+        .eq('id', planillaId)
+        .eq('tenant_id', tenantId || planilla.tenant_id);
 
       if (updateError) {
         throw updateError;
@@ -1301,51 +1422,74 @@ export class PlanillasService {
       // Encolado outbox opcional para que Contabilidad genere asiento de planilla (pipeline resiliente)
       const usarOutboxPlanilla = process.env.PLANILLA_OUTBOX_ENABLED === 'true';
       if (usarOutboxPlanilla) {
-        const eventId = uuidv4();
-        const outboxEvent = OutboxEventBuilder.build({
-          tenantId: planilla.tenant_id,
-          eventType: 'planilla.liquidada',
-          aggregateType: 'planilla',
-          aggregateId: planillaId,
-          idempotencyKey: `planilla.liquidada:${planilla.tenant_id}:${planillaId}:${planilla.periodo}`,
-          eventData: {
-            planillaId,
-            periodo: planilla.periodo,
-            fecha: new Date().toISOString(),
-            totalIngresos,
-            totalAportes,
-            totalDescuentos,
-            totalNeto,
-            centro_costo_id: planilla.centro_costo_id,
-            eventId,
-          },
-        });
+        const idempotencyKey = `planilla.liquidada:${planilla.tenant_id}:${planillaId}:${planilla.periodo}`;
+        const buscarEventoExistente = async () => {
+          const { data: eventoExistente, error: eventoExistenteError } = await this.supabaseService.getClient()
+            .from('outbox_events')
+            .select('event_id, status, processed_at, error_message')
+            .eq('tenant_id', planilla.tenant_id)
+            .eq('event_type', 'planilla.liquidada')
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
 
-        const { error: outboxError } = await this.supabaseService.getClient()
-          .from('outbox_events')
-          .insert(outboxEvent);
+          if (eventoExistenteError) {
+            throw new Error(`Error validando evento contable existente de planilla: ${eventoExistenteError.message}`);
+          }
 
-        if (outboxError) {
-          throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
-        }
-
-        await this.supabaseService.getClient()
-          .from('planillas')
-          .update({
-            asientos_generados: true,
-            fecha_asientos: new Date().toISOString(),
-          })
-          .eq('id', planillaId);
-
-        return {
-          success: true,
-          message: 'Evento planilla.liquidada encolado para generación de asiento contable',
-          data: {
-            outbox_event_id: outboxEvent.event_id,
-            planilla_id: planillaId,
-            periodo: planilla.periodo,
-          },
+          return eventoExistente;
         };
+
+        const eventoPrevio = await buscarEventoExistente();
+        if (eventoPrevio?.event_id) {
+          console.log(
+            `♻️ [RRHH] Evento planilla.liquidada ya estaba encolado (${eventoPrevio.event_id}); se garantiza asiento sincronico por idempotencia`
+          );
+        } else {
+          const eventId = uuidv4();
+          const outboxEvent = OutboxEventBuilder.build({
+            tenantId: planilla.tenant_id,
+            eventType: 'planilla.liquidada',
+            aggregateType: 'planilla',
+            aggregateId: planillaId,
+            idempotencyKey,
+            eventData: {
+              planillaId,
+              periodo: planilla.periodo,
+              fecha: new Date().toISOString(),
+              totalIngresos,
+              totalAportes,
+              totalDescuentos,
+              totalNeto,
+              centro_costo_id: planilla.centro_costo_id,
+              eventId,
+            },
+          });
+
+          const { error: outboxError } = await this.supabaseService.getClient()
+            .from('outbox_events')
+            .insert(outboxEvent);
+
+          if (outboxError) {
+            const isDuplicateOutbox = outboxError.code === '23505' ||
+              String(outboxError.message || '').toLowerCase().includes('duplicate key');
+            if (isDuplicateOutbox) {
+              const eventoDuplicado = await buscarEventoExistente();
+              if (eventoDuplicado?.event_id) {
+                console.log(
+                  `♻️ [RRHH] Insercion idempotente detecto evento planilla.liquidada existente (${eventoDuplicado.event_id}); se garantiza asiento sincronico`
+                );
+              } else {
+                throw new Error(`No se pudo resolver evento contable duplicado de planilla: ${outboxError.message}`);
+              }
+            } else {
+              throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
+            }
+          } else {
+            console.log(
+              `✅ [RRHH] Evento planilla.liquidada encolado; se crea asiento sincronico para cumplir contrato del endpoint`
+            );
+          }
+        }
       }
 
       // 🎯 CREAR ASIENTOS EN SISTEMA PRINCIPAL DIRECTAMENTE
@@ -1482,13 +1626,18 @@ export class PlanillasService {
   /**
    * Obtener historial de pagos de una planilla
    */
-  async getHistorialPagos(planillaId: string) {
+  async getHistorialPagos(planillaId: string, tenantId?: string) {
     try {
-      const { data, error } = await this.supabaseService.getClient()
+      const query = this.supabaseService.getClient()
         .from('historial_pagos_planilla')
         .select('*')
-        .eq('planilla_id', planillaId)
-        .order('fecha', { ascending: false });
+        .eq('planilla_id', planillaId);
+
+      if (tenantId) {
+        query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('fecha', { ascending: false });
 
       if (error) {
         console.warn('Tabla historial_pagos_planilla no existe:', error);

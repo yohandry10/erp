@@ -192,7 +192,7 @@ export default function PresupuestoForm({
 
   if (loadingData) {
     return (
-      <div className="loading" style={{ padding: '3rem', textAlign: 'center' }}>
+      <div className="loading p-12 text-center">
         <div className="loading-spinner"></div>
         <p>Cargando formulario...</p>
       </div>
@@ -200,23 +200,14 @@ export default function PresupuestoForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="activity-card" style={{ padding: '2rem' }}>
-      <div className="dashboard-header" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white'
-          }}>
+    <form onSubmit={handleSubmit} className="activity-card p-8">
+      <div className="dashboard-header mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-3 flex items-center justify-center text-white">
             <DollarSign size={24} />
           </div>
           <div>
-            <h2 className="dashboard-title" style={{ marginBottom: '0.25rem' }}>
+            <h2 className="dashboard-title mb-1">
               {presupuestoId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
             </h2>
             <p className="dashboard-subtitle">
@@ -229,47 +220,23 @@ export default function PresupuestoForm({
       </div>
 
       {error && (
-        <div style={{
-          padding: '1rem',
-          marginBottom: '1.5rem',
-          borderRadius: '8px',
-          background: '#fef2f2',
-          border: '1px solid #fecaca',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <AlertCircle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
-          <p style={{ margin: 0, color: '#991b1b', fontSize: '0.875rem' }}>{error}</p>
+        <div className="p-4 mb-6 rounded-2 bg-[#fef2f2] border flex items-center gap-3">
+          <AlertCircle size={20} className="text-red-600 shrink-0" />
+          <p className="m-0 text-red-800 text-[0.875rem]">{error}</p>
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: '1.5rem' }}>
+      <div className="grid gap-6">
         {/* Centro de Costo */}
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--primary-700)'
-          }}>
-            Centro de Costo <span style={{ color: '#dc2626' }}>*</span>
+          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+            Centro de Costo <span className="text-red-600">*</span>
           </label>
           <select
             value={formData.centro_costo_id}
             onChange={(e) => setFormData({ ...formData, centro_costo_id: e.target.value })}
             disabled={!!presupuestoId}
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid var(--primary-200)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              background: presupuestoId ? '#f9fafb' : 'white',
-              cursor: presupuestoId ? 'not-allowed' : 'pointer'
-            }}
+            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
           >
             <option value="">Seleccione un centro de costo</option>
             {centrosCosto.map((centro) => (
@@ -279,7 +246,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+            <p className="mt-2 text-3 text-[var(--primary-500)]">
               No se puede cambiar el centro de costo al editar
             </p>
           )}
@@ -287,29 +254,14 @@ export default function PresupuestoForm({
 
         {/* Cuenta Contable */}
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--primary-700)'
-          }}>
-            Cuenta Contable <span style={{ color: '#dc2626' }}>*</span>
+          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+            Cuenta Contable <span className="text-red-600">*</span>
           </label>
           <select
             value={formData.cuenta_id}
             onChange={(e) => setFormData({ ...formData, cuenta_id: e.target.value })}
             disabled={!!presupuestoId}
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid var(--primary-200)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              background: presupuestoId ? '#f9fafb' : 'white',
-              cursor: presupuestoId ? 'not-allowed' : 'pointer'
-            }}
+            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
           >
             <option value="">Seleccione una cuenta</option>
             {cuentas.map((cuenta) => (
@@ -319,7 +271,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+            <p className="mt-2 text-3 text-[var(--primary-500)]">
               No se puede cambiar la cuenta al editar
             </p>
           )}
@@ -327,29 +279,14 @@ export default function PresupuestoForm({
 
         {/* Período Contable */}
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--primary-700)'
-          }}>
-            Período Contable <span style={{ color: '#dc2626' }}>*</span>
+          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+            Período Contable <span className="text-red-600">*</span>
           </label>
           <select
             value={formData.periodo_contable_id}
             onChange={(e) => setFormData({ ...formData, periodo_contable_id: e.target.value })}
             disabled={!!presupuestoId}
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid var(--primary-200)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              background: presupuestoId ? '#f9fafb' : 'white',
-              cursor: presupuestoId ? 'not-allowed' : 'pointer'
-            }}
+            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
           >
             <option value="">Seleccione un período</option>
             {periodos.map((periodo) => (
@@ -359,7 +296,7 @@ export default function PresupuestoForm({
             ))}
           </select>
           {presupuestoId && (
-            <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+            <p className="mt-2 text-3 text-[var(--primary-500)]">
               No se puede cambiar el período al editar
             </p>
           )}
@@ -367,14 +304,8 @@ export default function PresupuestoForm({
 
         {/* Monto Presupuestado */}
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--primary-700)'
-          }}>
-            Monto Presupuestado (S/) <span style={{ color: '#dc2626' }}>*</span>
+          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
+            Monto Presupuestado (S/) <span className="text-red-600">*</span>
           </label>
           <input
             type="number"
@@ -382,41 +313,20 @@ export default function PresupuestoForm({
             min="0"
             value={formData.monto_presupuestado}
             onChange={(e) => setFormData({ ...formData, monto_presupuestado: parseFloat(e.target.value) || 0 })}
-            required
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid var(--primary-200)',
-              borderRadius: '8px',
-              fontSize: '0.875rem'
-            }}
+            required className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
             placeholder="0.00"
           />
         </div>
 
         {/* Notas */}
         <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--primary-700)'
-          }}>
+          <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
             Notas (Opcional)
           </label>
           <textarea
             value={formData.notas}
             onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-            rows={3}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid var(--primary-200)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              resize: 'vertical'
-            }}
+            rows={3} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
             placeholder="Comentarios adicionales sobre el presupuesto..."
           />
         </div>
@@ -424,25 +334,12 @@ export default function PresupuestoForm({
         {/* Estado (only when editing) */}
         {presupuestoId && (
           <div>
-            <label style={{
-              display: 'block',
-              marginBottom: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: 'var(--primary-700)'
-            }}>
+            <label className="block mb-2 text-[0.875rem] font-semibold text-[var(--primary-700)]">
               Estado
             </label>
             <select
               value={formData.estado}
-              onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-200)',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setFormData({ ...formData, estado: e.target.value })} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
             >
               <option value="ACTIVO">ACTIVO</option>
               <option value="BLOQUEADO">BLOQUEADO</option>
@@ -453,25 +350,11 @@ export default function PresupuestoForm({
       </div>
 
       {/* Action Buttons */}
-      <div style={{
-        display: 'flex',
-        gap: '1rem',
-        marginTop: '2rem',
-        paddingTop: '2rem',
-        borderTop: '1px solid var(--primary-100)'
-      }}>
+      <div className="flex gap-4 mt-8 pt-8 border-t">
         <button
           type="submit"
           disabled={loading}
-          className="primary-btn"
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem'
-          }}
+          className="primary-btn flex-[1] py-3 px-6 flex items-center justify-center gap-2"
         >
           <Save size={18} />
           {loading ? 'Guardando...' : presupuestoId ? 'Actualizar Presupuesto' : 'Crear Presupuesto'}
@@ -480,15 +363,7 @@ export default function PresupuestoForm({
           type="button"
           onClick={handleCancel}
           disabled={loading}
-          className="secondary-btn"
-          style={{
-            flex: 1,
-            padding: '0.75rem 1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem'
-          }}
+          className="secondary-btn flex-[1] py-3 px-6 flex items-center justify-center gap-2"
         >
           <X size={18} />
           Cancelar

@@ -2,7 +2,7 @@
 # Este script verifica que la proyección de flujo de caja funcione correctamente
 
 $baseUrl = "http://localhost:3001"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjQyMDJiYy1hMzBjLTRjMzItYjI3Yy1lNzE5YzI3YzI3YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.mZIcfH5ujiRjoF-EyHCVs8KqNPwJLKqZl0x0FqXqqqo"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "vierdes"
 
 $headers = @{
@@ -21,14 +21,14 @@ try {
     if ($response.success) {
         Write-Host "✅ Proyección obtenida exitosamente" -ForegroundColor Green
         Write-Host ""
-        
+
         # Período
         Write-Host "📅 PERÍODO:" -ForegroundColor Cyan
         Write-Host "   Desde: $($response.data.periodo.fecha_desde)" -ForegroundColor Gray
         Write-Host "   Hasta: $($response.data.periodo.fecha_hasta)" -ForegroundColor Gray
         Write-Host "   Días: $($response.data.periodo.dias)" -ForegroundColor Gray
         Write-Host ""
-        
+
         # Cuentas bancarias
         Write-Host "🏦 CUENTAS BANCARIAS:" -ForegroundColor Cyan
         $response.data.cuentas_bancarias | ForEach-Object {
@@ -37,7 +37,7 @@ try {
             Write-Host "     Saldo actual: $($_.saldo_actual)" -ForegroundColor Gray
         }
         Write-Host ""
-        
+
         # Resumen por moneda
         Write-Host "💰 RESUMEN POR MONEDA:" -ForegroundColor Cyan
         $response.data.resumen | ForEach-Object {
@@ -52,14 +52,14 @@ try {
             }
             Write-Host ""
         }
-        
+
         # Estadísticas
         Write-Host "📊 ESTADÍSTICAS:" -ForegroundColor Cyan
         Write-Host "   CxP pendientes: $($response.data.estadisticas.total_cxp_pendientes)" -ForegroundColor Gray
         Write-Host "   CxC pendientes: $($response.data.estadisticas.total_cxc_pendientes)" -ForegroundColor Gray
         Write-Host "   Días con movimientos: $($response.data.estadisticas.total_movimientos)" -ForegroundColor Gray
         Write-Host ""
-        
+
         # Primeros 5 días de proyección
         if ($response.data.proyeccion -and $response.data.proyeccion.Count -gt 0) {
             Write-Host "📈 PRIMEROS 5 DÍAS DE PROYECCIÓN:" -ForegroundColor Cyan
@@ -106,7 +106,7 @@ try {
     if ($cuentasResponse.success -and $cuentasResponse.data.Count -gt 0) {
         $primeraCuenta = $cuentasResponse.data[0]
         Write-Host "✅ Probando proyección filtrada por cuenta: $($primeraCuenta.nombre)" -ForegroundColor Green
-        
+
         $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=30&cuenta_bancaria_id=$($primeraCuenta.id)" -Method Get -Headers $headers
         if ($response.success) {
             Write-Host "✅ Proyección filtrada obtenida exitosamente" -ForegroundColor Green

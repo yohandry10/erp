@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { useApi } from '@/hooks/use-api'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
 interface CuentaPorCobrarResumen {
@@ -207,9 +206,9 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
               <Label htmlFor="monto">Monto</Label>
               <Input
                 id="monto"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                pattern="^[0-9]+([.][0-9]{1,2})?$"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 required
@@ -231,55 +230,52 @@ export function CobroModal({ isOpen, cuenta, onClose, onSuccess }: CobroModalPro
             </div>
 
             <div>
-              <Label>Método de pago</Label>
-              <Select
+              <Label htmlFor="metodo_pago">Método de pago</Label>
+              <select
+                id="metodo_pago"
                 value={metodoPago}
-                onValueChange={setMetodoPago}
+                onChange={(event) => setMetodoPago(event.target.value)}
                 disabled={loadingMetodosPago}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={loadingMetodosPago ? 'Cargando métodos...' : 'Seleccione método'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {metodosPago.length === 0 && (
-                    <SelectItem value="EFECTIVO">Efectivo</SelectItem>
-                  )}
-                  {metodosPago.map((metodo) => {
+                {loadingMetodosPago && <option value={metodoPago}>Cargando métodos...</option>}
+                {!loadingMetodosPago && metodosPago.length === 0 && <option value="EFECTIVO">Efectivo</option>}
+                {!loadingMetodosPago &&
+                  metodosPago.map((metodo) => {
                     const value = (metodo.codigo || metodo.id || metodo.nombre || '').toString()
                     const label = metodo.nombre || metodo.codigo || metodo.id || 'Método'
                     return (
-                      <SelectItem key={value} value={value}>
+                      <option key={value} value={value}>
                         {label}
-                      </SelectItem>
+                      </option>
                     )
                   })}
-                </SelectContent>
-              </Select>
+              </select>
             </div>
 
             <div>
-              <Label>Cuenta bancaria (opcional)</Label>
-              <Select
+              <Label htmlFor="cuenta_bancaria_id">Cuenta bancaria (opcional)</Label>
+              <select
+                id="cuenta_bancaria_id"
                 value={cuentaBancariaId}
-                onValueChange={setCuentaBancariaId}
+                onChange={(event) => setCuentaBancariaId(event.target.value)}
                 disabled={loadingBancos || cuentasBancarias.length === 0}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingBancos ? 'Cargando cuentas...' : 'Selecciona una cuenta'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SIN_CUENTA">Sin cuenta bancaria</SelectItem>
-                  {cuentasBancarias.map((cuentaBanco) => (
-                    <SelectItem key={cuentaBanco.id} value={cuentaBanco.id}>
+                {loadingBancos ? (
+                  <option value="SIN_CUENTA">Cargando cuentas...</option>
+                ) : (
+                  <option value="SIN_CUENTA">Sin cuenta bancaria</option>
+                )}
+                {!loadingBancos &&
+                  cuentasBancarias.map((cuentaBanco) => (
+                    <option key={cuentaBanco.id} value={cuentaBanco.id}>
                       {`${cuentaBanco.nombre || cuentaBanco.banco || 'Cuenta'}${
                         cuentaBanco.numero_cuenta ? ` - ${cuentaBanco.numero_cuenta}` : ''
                       }`}
-                    </SelectItem>
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
+              </select>
             </div>
 
             <div>

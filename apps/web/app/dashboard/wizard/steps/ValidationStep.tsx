@@ -72,97 +72,41 @@ export function ValidationStep() {
   const allValid = certificateResult?.isValid && rucResult?.isValid
 
   return (
-    <div style={{ padding: '1rem 0' }}>
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '2rem',
-      }}>
+    <div className="py-4 px-0">
+      <div className="text-center mb-8">
         {isValidating ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '2rem',
-          }}>
-            <Loader2 className="animate-spin" size={48} style={{ color: 'var(--primary-600)' }} />
-            <p style={{
-              fontSize: '1rem',
-              color: 'var(--primary-700)',
-              fontWeight: '500',
-            }}>
+          <div className="flex flex-col items-center gap-4 p-8">
+            <Loader2 className="animate-spin text-[var(--primary-600)]" size={48} />
+            <p className="text-4 text-[var(--primary-700)] font-medium">
               Validando tu configuración...
             </p>
-            <p style={{
-              fontSize: '0.875rem',
-              color: 'var(--primary-500)',
-            }}>
+            <p className="text-[0.875rem] text-[var(--primary-500)]">
               Esto puede tomar unos segundos
             </p>
           </div>
         ) : hasValidated ? (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '2rem',
-          }}>
+          <div className="flex flex-col items-center gap-4 p-8">
             {allValid ? (
               <>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--success-100)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <CheckCircle size={48} style={{ color: 'var(--success-600)' }} />
+                <div className="w-[80px] h-[80px] rounded-full bg-[var(--success-100)] flex items-center justify-center">
+                  <CheckCircle size={48} className="text-[var(--success-600)]" />
                 </div>
-                <h3 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '700',
-                  color: 'var(--success-700)',
-                  margin: 0,
-                }}>
+                <h3 className="text-6 font-bold text-[var(--success-700)] m-0">
                   ¡Validación Exitosa!
                 </h3>
-                <p style={{
-                  fontSize: '1rem',
-                  color: 'var(--primary-600)',
-                  margin: 0,
-                }}>
+                <p className="text-4 text-[var(--primary-600)] m-0">
                   Tu configuración está lista para usar
                 </p>
               </>
             ) : (
               <>
-                <div style={{
-                  width: '80px',
-                  height: '80px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--error-100)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <XCircle size={48} style={{ color: 'var(--error-600)' }} />
+                <div className="w-[80px] h-[80px] rounded-full bg-[var(--error-100)] flex items-center justify-center">
+                  <XCircle size={48} className="text-[var(--error-600)]" />
                 </div>
-                <h3 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '700',
-                  color: 'var(--error-700)',
-                  margin: 0,
-                }}>
+                <h3 className="text-6 font-bold text-[var(--error-700)] m-0">
                   Se encontraron problemas
                 </h3>
-                <p style={{
-                  fontSize: '1rem',
-                  color: 'var(--primary-600)',
-                  margin: 0,
-                }}>
+                <p className="text-4 text-[var(--primary-600)] m-0">
                   Revisa los detalles a continuación
                 </p>
               </>
@@ -172,79 +116,42 @@ export function ValidationStep() {
       </div>
 
       {hasValidated && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-4">
           {/* Certificate Validation Result */}
-          <div style={{
-            padding: '1.25rem',
-            backgroundColor: certificateResult?.isValid
-              ? 'rgba(16, 185, 129, 0.05)'
-              : 'rgba(239, 68, 68, 0.05)',
-            border: `1px solid ${certificateResult?.isValid ? 'var(--success-300)' : 'var(--error-300)'}`,
-            borderRadius: '8px',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              marginBottom: '0.75rem',
-            }}>
+          <div className="p-5 rounded-2">
+            <div className="flex items-center gap-3 mb-3">
               {certificateResult?.isValid ? (
-                <CheckCircle size={24} style={{ color: 'var(--success-600)' }} />
+                <CheckCircle size={24} className="text-[var(--success-600)]" />
               ) : (
-                <XCircle size={24} style={{ color: 'var(--error-600)' }} />
+                <XCircle size={24} className="text-[var(--error-600)]" />
               )}
-              <h4 style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: certificateResult?.isValid ? 'var(--success-700)' : 'var(--error-700)',
-                margin: 0,
-              }}>
+              <h4 className="text-4 font-semibold m-0">
                 Certificado Digital
               </h4>
             </div>
 
             {certificateResult?.isValid ? (
-              <div style={{ paddingLeft: '2rem' }}>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: 'var(--success-700)',
-                  margin: '0 0 0.5rem 0',
-                }}>
+              <div className="pl-8">
+                <p className="text-[0.875rem] text-[var(--success-700)] mt-0 mr-0 mb-2 ml-0">
                   ✓ Certificado válido y activo
                 </p>
                 {certificateResult.subject && (
-                  <p style={{
-                    fontSize: '0.85rem',
-                    color: 'var(--primary-600)',
-                    margin: '0 0 0.25rem 0',
-                  }}>
+                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Entidad:</strong> {certificateResult.subject}
                   </p>
                 )}
                 {certificateResult.issuer && (
-                  <p style={{
-                    fontSize: '0.85rem',
-                    color: 'var(--primary-600)',
-                    margin: '0 0 0.25rem 0',
-                  }}>
+                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Emisor:</strong> {certificateResult.issuer}
                   </p>
                 )}
                 {certificateResult.serialNumber && (
-                  <p style={{
-                    fontSize: '0.85rem',
-                    color: 'var(--primary-600)',
-                    margin: '0 0 0.25rem 0',
-                  }}>
+                  <p className="text-3.5 text-[var(--primary-600)] mt-0 mr-0 mb-1 ml-0">
                     <strong>Serie:</strong> {certificateResult.serialNumber}
                   </p>
                 )}
                 {certificateResult.expiresAt && (
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: 'var(--primary-600)',
-                    margin: 0,
-                  }}>
+                  <p className="text-[0.875rem] text-[var(--primary-600)] m-0">
                     Expira el: {certificateResult.expiresAt.toLocaleDateString('es-PE')}
                     {certificateResult.daysUntilExpiration !== undefined && (
                       <span> ({certificateResult.daysUntilExpiration} días restantes)</span>
@@ -252,19 +159,11 @@ export function ValidationStep() {
                   </p>
                 )}
                 {certificateResult.warnings && certificateResult.warnings.length > 0 && (
-                  <div style={{ marginTop: '0.75rem' }}>
+                  <div className="mt-3">
                     {certificateResult.warnings.map((warning, index) => (
-                      <div key={index} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginTop: '0.25rem',
-                      }}>
-                        <AlertTriangle size={16} style={{ color: 'var(--warning-600)' }} />
-                        <span style={{
-                          fontSize: '0.875rem',
-                          color: 'var(--warning-700)',
-                        }}>
+                      <div key={index} className="flex items-center gap-2 mt-1">
+                        <AlertTriangle size={16} className="text-[var(--warning-600)]" />
+                        <span className="text-[0.875rem] text-[var(--warning-700)]">
                           {warning}
                         </span>
                       </div>
@@ -273,23 +172,15 @@ export function ValidationStep() {
                 )}
               </div>
             ) : (
-              <div style={{ paddingLeft: '2rem' }}>
+              <div className="pl-8">
                 {certificateResult?.errors && certificateResult.errors.length > 0 ? (
                   certificateResult.errors.map((error, index) => (
-                    <p key={index} style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--error-700)',
-                      margin: '0.25rem 0',
-                    }}>
+                    <p key={index} className="text-[0.875rem] text-[var(--error-700)] my-1 mx-0">
                       ✗ {error}
                     </p>
                   ))
                 ) : (
-                  <p style={{
-                    fontSize: '0.875rem',
-                    color: 'var(--error-700)',
-                    margin: 0,
-                  }}>
+                  <p className="text-[0.875rem] text-[var(--error-700)] m-0">
                     ✗ Error al validar el certificado
                   </p>
                 )}
@@ -298,76 +189,42 @@ export function ValidationStep() {
           </div>
 
           {/* Documento Fiscal Validation Result */}
-          <div style={{
-            padding: '1.25rem',
-            backgroundColor: rucResult?.isValid
-              ? 'rgba(16, 185, 129, 0.05)'
-              : 'rgba(239, 68, 68, 0.05)',
-            border: `1px solid ${rucResult?.isValid ? 'var(--success-300)' : 'var(--error-300)'}`,
-            borderRadius: '8px',
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              marginBottom: '0.75rem',
-            }}>
+          <div className="p-5 rounded-2">
+            <div className="flex items-center gap-3 mb-3">
               {rucResult?.isValid ? (
-                <CheckCircle size={24} style={{ color: 'var(--success-600)' }} />
+                <CheckCircle size={24} className="text-[var(--success-600)]" />
               ) : (
-                <XCircle size={24} style={{ color: 'var(--error-600)' }} />
+                <XCircle size={24} className="text-[var(--error-600)]" />
               )}
-              <h4 style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: rucResult?.isValid ? 'var(--success-700)' : 'var(--error-700)',
-                margin: 0,
-              }}>
+              <h4 className="text-4 font-semibold m-0">
                 Configuración {documentoFiscal}
               </h4>
             </div>
 
             {rucResult?.isValid ? (
-              <div style={{ paddingLeft: '2rem' }}>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: 'var(--success-700)',
-                  margin: 0,
-                }}>
+              <div className="pl-8">
+                <p className="text-[0.875rem] text-[var(--success-700)] m-0">
                   ✓ Todos los datos están completos y válidos
                 </p>
               </div>
             ) : (
-              <div style={{ paddingLeft: '2rem' }}>
+              <div className="pl-8">
                 {rucResult?.missingFields && rucResult.missingFields.length > 0 && (
                   <div>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: 'var(--error-700)',
-                      margin: '0 0 0.5rem 0',
-                      fontWeight: '600',
-                    }}>
+                    <p className="text-[0.875rem] text-[var(--error-700)] mt-0 mr-0 mb-2 ml-0 font-semibold">
                       Campos faltantes:
                     </p>
                     {rucResult.missingFields.map((field, index) => (
-                      <p key={index} style={{
-                        fontSize: '0.875rem',
-                        color: 'var(--error-700)',
-                        margin: '0.25rem 0',
-                      }}>
+                      <p key={index} className="text-[0.875rem] text-[var(--error-700)] my-1 mx-0">
                         ✗ {field}
                       </p>
                     ))}
                   </div>
                 )}
                 {rucResult?.errors && rucResult.errors.length > 0 && (
-                  <div style={{ marginTop: '0.5rem' }}>
+                  <div className="mt-2">
                     {rucResult.errors.map((error, index) => (
-                      <p key={index} style={{
-                        fontSize: '0.875rem',
-                        color: 'var(--error-700)',
-                        margin: '0.25rem 0',
-                      }}>
+                      <p key={index} className="text-[0.875rem] text-[var(--error-700)] my-1 mx-0">
                         ✗ {error}
                       </p>
                     ))}
@@ -382,13 +239,7 @@ export function ValidationStep() {
             <Button
               onClick={runValidations}
               disabled={isValidating}
-              variant="outline"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginTop: '0.5rem',
-              }}
+              variant="outline" className="flex items-center gap-2 mt-2"
             >
               <RefreshCw size={18} className={isValidating ? 'animate-spin' : ''} />
               Validar Nuevamente
@@ -398,19 +249,8 @@ export function ValidationStep() {
       )}
 
       {allValid && (
-        <div style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          borderRadius: '8px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-        }}>
-          <p style={{
-            fontSize: '0.875rem',
-            color: 'var(--success-700)',
-            margin: 0,
-            lineHeight: '1.5',
-          }}>
+        <div className="mt-6 p-4 bg-[rgba(16,_185,_129,_0.1)] rounded-2 border">
+          <p className="text-[0.875rem] text-[var(--success-700)] m-0 leading-6">
             <strong>✓ Todo listo:</strong> Puedes continuar al siguiente paso para finalizar la configuración.
           </p>
         </div>

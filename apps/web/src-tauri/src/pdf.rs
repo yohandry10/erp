@@ -108,15 +108,6 @@ fn create_default_template(data: &HashMap<String, String>) -> String {
     <head>
         <meta charset="UTF-8">
         <title>Comprobante Electrónico</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 20px; }}
-            .header {{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }}
-            .content {{ margin: 20px 0; }}
-            .footer {{ margin-top: 30px; font-size: 12px; }}
-            table {{ width: 100%; border-collapse: collapse; }}
-            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-            th {{ background-color: #f2f2f2; }}
-        </style>
     </head>
     <body>
         <div class="header">
@@ -142,7 +133,7 @@ fn create_default_template(data: &HashMap<String, String>) -> String {
                 </tr>
             </table>
             
-            <div style="text-align: right; margin-top: 20px;">
+            <div class="totals">
                 <p><strong>IGV:</strong> S/ {}</p>
                 <p><strong>TOTAL:</strong> S/ {}</p>
             </div>

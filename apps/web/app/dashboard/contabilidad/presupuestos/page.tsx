@@ -64,11 +64,7 @@ export default function PresupuestosPage() {
       </div>
 
       {/* Sections Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1.5rem'
-      }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
         {sections.map((section) => {
           const Icon = section.icon
           
@@ -76,19 +72,7 @@ export default function PresupuestosPage() {
             <button
               key={section.id}
               onClick={() => section.available && router.push(section.path)}
-              disabled={!section.available}
-              style={{
-                padding: '2rem',
-                borderRadius: '12px',
-                border: '2px solid transparent',
-                background: 'white',
-                cursor: section.available ? 'pointer' : 'not-allowed',
-                textAlign: 'left',
-                transition: 'all 0.2s ease',
-                opacity: section.available ? 1 : 0.6,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                position: 'relative'
-              }}
+              disabled={!section.available} className="p-8 rounded-3 bg-white text-left transition shadow relative"
               onMouseEnter={(e) => {
                 if (section.available) {
                   e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)'
@@ -105,71 +89,29 @@ export default function PresupuestosPage() {
               }}
             >
               {!section.available && (
-                <div style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  background: '#6b7280',
-                  color: 'white',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  textTransform: 'uppercase'
-                }}>
+                <div className="absolute top-4 right-4 py-1 px-3 rounded-full bg-gray-500 text-white text-3 font-semibold">
                   Próximamente
                 </div>
               )}
               
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'flex-start', 
-                gap: '1rem',
-                marginBottom: '1rem'
-              }}>
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '12px',
-                  background: `${section.color}15`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Icon size={28} style={{ color: section.color }} />
+              <div className="flex items-start gap-4 mb-4">
+                <div className="p-4 rounded-3 flex items-center justify-center shrink-0">
+                  <Icon size={28} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: '600', 
-                    color: '#111827',
-                    margin: '0 0 0.5rem 0'
-                  }}>
+                <div className="flex-[1]">
+                  <h3 className="text-[1.125rem] font-semibold text-gray-900 mt-0 mr-0 mb-2 ml-0">
                     {section.title}
                   </h3>
-                  <p style={{ 
-                    fontSize: '0.875rem', 
-                    color: '#6b7280',
-                    margin: 0,
-                    lineHeight: '1.5'
-                  }}>
+                  <p className="text-[0.875rem] text-gray-500 m-0 leading-6">
                     {section.description}
                   </p>
                 </div>
               </div>
 
               {section.available && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: section.color,
-                  marginTop: '1rem'
-                }}>
+                <div className="flex items-center gap-2 text-[0.875rem] font-semibold mt-4">
                   Ver más
-                  <span style={{ fontSize: '1.25rem' }}>→</span>
+                  <span className="text-5">→</span>
                 </div>
               )}
             </button>
@@ -178,27 +120,11 @@ export default function PresupuestosPage() {
       </div>
 
       {/* Info Box */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1.5rem',
-        background: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '12px'
-      }}>
-        <h4 style={{ 
-          margin: '0 0 0.5rem 0', 
-          fontSize: '1rem', 
-          fontWeight: '600', 
-          color: '#1e40af' 
-        }}>
+      <div className="mt-8 p-6 bg-[#eff6ff] border rounded-3">
+        <h4 className="mt-0 mr-0 mb-2 ml-0 text-4 font-semibold text-[#1e40af]">
           💡 Acerca de los Presupuestos
         </h4>
-        <p style={{ 
-          margin: 0, 
-          fontSize: '0.875rem', 
-          color: '#1e40af',
-          lineHeight: '1.6'
-        }}>
+        <p className="m-0 text-[0.875rem] text-[#1e40af] leading-7">
           Los presupuestos permiten planificar y controlar los gastos por centro de costo y cuenta contable.
           El sistema calcula automáticamente la ejecución presupuestal basándose en los asientos contables
           generados y emite alertas cuando se supera el 90% de ejecución o cuando hay sobregiros.

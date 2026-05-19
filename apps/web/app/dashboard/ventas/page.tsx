@@ -57,35 +57,18 @@ export default function VentasPage() {
               <Link
                 key={section.href}
                 href={section.href}
-                className="activity-card"
-                style={{
-                  display: 'block',
-                  padding: '1.25rem',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                }}
+                className="activity-card block p-5"
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.875rem' }}>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 8,
-                      background: 'rgba(59, 130, 246, 0.1)',
-                      color: '#2563eb',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
+                <div className="flex items-start gap-[0.875rem]">
+                  <div className="bg-[rgba(59,_130,_246,_0.1)] text-blue-600 flex items-center justify-center shrink-0"
                   >
                     <Icon size={20} />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 0.25rem' }}>
+                    <h2 className="text-4 font-bold">
                       {section.title}
                     </h2>
-                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
+                    <p className="text-[0.875rem] text-slate-500 m-0">
                       {section.description}
                     </p>
                   </div>

@@ -122,25 +122,10 @@ export default function PeriodoDetailPage() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '3rem',
-          background: 'white',
-          borderRadius: '12px'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #e5e7eb',
-              borderTopColor: '#3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }} />
-            <p style={{ color: '#6b7280' }}>Cargando período...</p>
+        <div className="flex items-center justify-center p-12 bg-white rounded-3">
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full" />
+            <p className="text-gray-500">Cargando período...</p>
           </div>
         </div>
       </div>
@@ -150,26 +135,10 @@ export default function PeriodoDetailPage() {
   if (error || !periodo) {
     return (
       <div className="dashboard-container">
-        <div style={{
-          padding: '2rem',
-          background: '#fee2e2',
-          border: '1px solid #fecaca',
-          borderRadius: '12px',
-          color: '#991b1b'
-        }}>
-          <p style={{ margin: 0, fontWeight: '600' }}>⚠️ {error || 'Período no encontrado'}</p>
+        <div className="p-8 bg-[#fee2e2] border rounded-3 text-red-800">
+          <p className="m-0 font-semibold">⚠️ {error || 'Período no encontrado'}</p>
           <button
-            onClick={() => router.push('/dashboard/contabilidad/periodos')}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1rem',
-              background: '#dc2626',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
+            onClick={() => router.push('/dashboard/contabilidad/periodos')} className="mt-4 py-2 px-4 bg-red-600 text-white border-0 rounded-[6px] cursor-pointer font-semibold"
           >
             Volver a Períodos
           </button>
@@ -186,22 +155,7 @@ export default function PeriodoDetailPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.push('/dashboard/contabilidad/periodos')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              background: 'transparent',
-              color: '#64748b',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              marginBottom: '1rem',
-              transition: 'all 0.2s'
-            }}
+            onClick={() => router.push('/dashboard/contabilidad/periodos')} className="inline-flex items-center gap-2 py-2 px-4 bg-transparent text-slate-500 border-0 rounded-2 cursor-pointer font-semibold text-[0.875rem] mb-4 transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(100, 116, 139, 0.1)'
               e.currentTarget.style.color = '#334155'
@@ -219,25 +173,10 @@ export default function PeriodoDetailPage() {
             {formatPeriodo(periodo.anio, periodo.mes)}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className="flex gap-4">
           {periodo.estado === 'ABIERTO' && (
             <button
-              onClick={() => setShowWizard(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                transition: 'all 0.2s',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-              }}
+              onClick={() => setShowWizard(true)} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 cursor-pointer font-semibold text-[0.875rem] transition shadow"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)'
                 e.currentTarget.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1)'
@@ -262,23 +201,7 @@ export default function PeriodoDetailPage() {
                   onConfirm: handleReabrirPeriodo
                 })
               }}
-              disabled={reopening}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.5rem',
-                background: reopening ? '#9ca3af' : 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: reopening ? 'not-allowed' : 'pointer',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                transition: 'all 0.2s',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                opacity: reopening ? 0.7 : 1
-              }}
+              disabled={reopening} className="flex items-center gap-2 py-3 px-6 text-white border-0 rounded-2 font-semibold text-[0.875rem] transition shadow"
               onMouseEnter={(e) => {
                 if (!reopening) {
                   e.currentTarget.style.transform = 'translateY(-2px)'
@@ -298,46 +221,15 @@ export default function PeriodoDetailPage() {
       </div>
 
       {/* Period Info Card */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        overflow: 'hidden',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          padding: '2rem',
-          borderBottom: '1px solid #f3f4f6'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '2rem'
-          }}>
+      <div className="bg-white rounded-3 shadow overflow-hidden mb-8">
+        <div className="p-8 border-b">
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-8">
             {/* Estado */}
             <div>
-              <p style={{
-                margin: '0 0 0.5rem 0',
-                fontSize: '0.75rem',
-                fontWeight: '700',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
                 Estado
               </p>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: estadoColor.bg,
-                color: estadoColor.text,
-                border: `1px solid ${estadoColor.border}`,
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}>
+              <div className="inline-flex items-center gap-2 py-2 px-4 rounded-2 text-[0.875rem] font-semibold">
                 {getEstadoIcon(periodo.estado)}
                 {periodo.estado}
               </div>
@@ -345,44 +237,20 @@ export default function PeriodoDetailPage() {
 
             {/* Año */}
             <div>
-              <p style={{
-                margin: '0 0 0.5rem 0',
-                fontSize: '0.75rem',
-                fontWeight: '700',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
                 Año
               </p>
-              <p style={{
-                margin: 0,
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1f2937'
-              }}>
+              <p className="m-0 text-6 font-bold text-gray-800">
                 {periodo.anio}
               </p>
             </div>
 
             {/* Mes */}
             <div>
-              <p style={{
-                margin: '0 0 0.5rem 0',
-                fontSize: '0.75rem',
-                fontWeight: '700',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
                 Mes
               </p>
-              <p style={{
-                margin: 0,
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1f2937'
-              }}>
+              <p className="m-0 text-6 font-bold text-gray-800">
                 {String(periodo.mes).padStart(2, '0')}
               </p>
             </div>
@@ -390,22 +258,10 @@ export default function PeriodoDetailPage() {
             {/* Fecha de Cierre */}
             {periodo.fecha_cierre && (
               <div>
-                <p style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '0.75rem',
-                  fontWeight: '700',
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
+                <p className="mt-0 mr-0 mb-2 ml-0 text-3 font-bold text-gray-500">
                   Fecha de Cierre
                 </p>
-                <p style={{
-                  margin: 0,
-                  fontSize: '1rem',
-                  fontWeight: '600',
-                  color: '#1f2937'
-                }}>
+                <p className="m-0 text-4 font-semibold text-gray-800">
                   {new Date(periodo.fecha_cierre).toLocaleDateString('es-PE', {
                     year: 'numeric',
                     month: 'long',
@@ -418,54 +274,22 @@ export default function PeriodoDetailPage() {
         </div>
 
         {/* Additional Info */}
-        <div style={{
-          padding: '1.5rem 2rem',
-          background: '#f9fafb'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1.5rem'
-          }}>
+        <div className="py-6 px-8 bg-[#f9fafb]">
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6">
             <div>
-              <p style={{
-                margin: '0 0 0.25rem 0',
-                fontSize: '0.75rem',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
                 ID del Período
               </p>
-              <p style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#1f2937',
-                fontFamily: 'monospace'
-              }}>
+              <p className="m-0 text-[0.875rem] font-medium text-gray-800">
                 {periodo.id}
               </p>
             </div>
 
             <div>
-              <p style={{
-                margin: '0 0 0.25rem 0',
-                fontSize: '0.75rem',
-                fontWeight: '600',
-                color: '#6b7280',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
+              <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
                 Fecha de Creación
               </p>
-              <p style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#1f2937'
-              }}>
+              <p className="m-0 text-[0.875rem] font-medium text-gray-800">
                 {new Date(periodo.created_at).toLocaleDateString('es-PE', {
                   year: 'numeric',
                   month: 'short',
@@ -476,23 +300,10 @@ export default function PeriodoDetailPage() {
 
             {periodo.cerrado_por && (
               <div>
-                <p style={{
-                  margin: '0 0 0.25rem 0',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
+                <p className="mt-0 mr-0 mb-1 ml-0 text-3 font-semibold text-gray-500">
                   Cerrado Por
                 </p>
-                <p style={{
-                  margin: 0,
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#1f2937',
-                  fontFamily: 'monospace'
-                }}>
+                <p className="m-0 text-[0.875rem] font-medium text-gray-800">
                   {periodo.cerrado_por}
                 </p>
               </div>
@@ -502,29 +313,15 @@ export default function PeriodoDetailPage() {
       </div>
 
       {/* Info Box */}
-      <div style={{
-        padding: '1.5rem',
-        background: periodo.estado === 'ABIERTO' ? '#dcfce7' : '#eff6ff',
-        border: `1px solid ${periodo.estado === 'ABIERTO' ? '#bbf7d0' : '#bfdbfe'}`,
-        borderRadius: '12px'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem'
-        }}>
+      <div className="p-6 rounded-3">
+        <div className="flex items-start gap-3">
           {periodo.estado === 'ABIERTO' ? (
-            <CheckCircle size={24} style={{ color: '#059669', flexShrink: 0, marginTop: '0.125rem' }} />
+            <CheckCircle size={24} className="text-emerald-600 shrink-0 mt-0.5" />
           ) : (
-            <Lock size={24} style={{ color: '#2563eb', flexShrink: 0, marginTop: '0.125rem' }} />
+            <Lock size={24} className="text-blue-600 shrink-0 mt-0.5" />
           )}
           <div>
-            <h4 style={{
-              margin: '0 0 0.5rem 0',
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: periodo.estado === 'ABIERTO' ? '#166534' : '#1e40af'
-            }}>
+            <h4 className="mt-0 mr-0 mb-2 ml-0 text-4 font-semibold">
               {periodo.estado === 'ABIERTO' 
                 ? 'Período Abierto' 
                 : periodo.estado === 'CERRADO'
@@ -532,12 +329,7 @@ export default function PeriodoDetailPage() {
                 : 'Período Bloqueado'
               }
             </h4>
-            <p style={{
-              margin: 0,
-              fontSize: '0.875rem',
-              color: periodo.estado === 'ABIERTO' ? '#166534' : '#1e40af',
-              lineHeight: '1.6'
-            }}>
+            <p className="m-0 text-[0.875rem] leading-7">
               {periodo.estado === 'ABIERTO' 
                 ? 'Este período está abierto y permite el registro de nuevos asientos contables. Puedes cerrarlo cuando hayas terminado todas las operaciones del mes.'
                 : periodo.estado === 'CERRADO'
@@ -571,26 +363,6 @@ export default function PeriodoDetailPage() {
         message={confirmDialog.message}
         variant={confirmDialog.variant}
       />
-
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @keyframes modal-overlay-enter {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes modal-content-enter {
-          from {
-            opacity: 0;
-            transform: translateY(-20px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
     </div>
   )
 }

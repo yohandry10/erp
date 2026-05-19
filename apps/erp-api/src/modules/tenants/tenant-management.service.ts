@@ -14,6 +14,29 @@ export class TenantManagementService {
     private readonly tenantContext: TenantContextService,
   ) { }
 
+  private async rollbackTenantCreation(client: any, tenantId: string): Promise<void> {
+    const { error } = await client
+      .from('tenants')
+      .delete()
+      .eq('id', tenantId);
+
+    if (error) {
+      console.error('Error rolling back tenant creation:', error);
+    }
+  }
+
+  private async seedOperationalRbac(client: any, tenantId: string): Promise<void> {
+    const { data, error } = await client
+      .rpc('seed_operational_rbac_for_tenant', { p_tenant_id: tenantId });
+
+    if (error) {
+      console.error('Error seeding operational RBAC for tenant:', error);
+      throw new BadRequestException('Error al sembrar roles y permisos operativos del tenant');
+    }
+
+    console.log('✅ [TENANT-MGMT] RBAC operativo sembrado para tenant:', tenantId, data?.[0] || data);
+  }
+
   /**
    * Create a new tenant with first admin user
    * Requirements: 1.2, 1.3
@@ -79,6 +102,25 @@ export class TenantManagementService {
     const adminNombre = tenantData.admin_nombre || 'Administrador';
     const paisId = paisData.id;
 
+    const { error: canonicalTenantError } = await client
+      .from('tenants')
+      .insert({
+        id: tenantId,
+        nombre: tenantData.razon_social,
+        ruc: tenantData.ruc,
+        pais,
+        plan: 'BASICO',
+        estado: 'ACTIVO',
+        activo: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (canonicalTenantError) {
+      console.error('Error creating canonical tenant:', canonicalTenantError);
+      throw new BadRequestException(`Error al crear tenant canónico: ${canonicalTenantError.message}`);
+    }
+
     // Insert tenant record with sales configuration
     const { data: newTenant, error: tenantError } = await client
       .from('empresa_config')
@@ -110,6 +152,7 @@ export class TenantManagementService {
       .single();
 
     if (tenantError) {
+      await this.rollbackTenantCreation(client, tenantId);
       console.error('Error creating tenant:', tenantError);
       throw new BadRequestException(`Error al crear tenant: ${tenantError.message}`);
     }
@@ -118,92 +161,18 @@ export class TenantManagementService {
 
     // Create first admin user for tenant
     try {
-      // First, get or create the ADMIN role for this tenant
-      let adminRoleId: string;
+      await this.seedOperationalRbac(client, tenantId);
 
-      const { data: existingRole } = await client
+      const { data: adminRole, error: adminRoleError } = await client
         .from('roles')
         .select('id')
         .eq('tenant_id', tenantId)
         .eq('nombre', 'ADMIN')
         .single();
 
-      if (existingRole) {
-        adminRoleId = existingRole.id;
-      } else {
-        // Create ADMIN role for this tenant
-        const { data: newRole, error: roleError } = await client
-          .from('roles')
-          .insert({
-            tenant_id: tenantId,
-            nombre: 'ADMIN',
-            descripcion: 'Administrador del tenant con acceso completo',
-            is_system_role: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-
-        if (roleError) {
-          console.error('Error creating ADMIN role:', roleError);
-          throw new BadRequestException('Error al crear rol de administrador');
-        }
-
-        adminRoleId = newRole.id;
-        console.log('✅ [TENANT-MGMT] Rol ADMIN creado para tenant:', tenantId);
-
-        // Copy permissions from template tenant (VIERDES)
-        // Vierdes is the template tenant with base permissions (44 permisos)
-        // Super-admin tenant has additional permissions (52 permisos) that should NOT be copied
-        const TEMPLATE_TENANT_ID = '25593ea2-5129-42f3-a9d0-f4da8d59dc1a'; // VIERDES
-
-        // Get all permissions from template tenant
-        const { data: templatePermissions } = await client
-          .from('permisos')
-          .select('modulo, accion, recurso, descripcion')
-          .eq('tenant_id', TEMPLATE_TENANT_ID);
-
-        if (templatePermissions && templatePermissions.length > 0) {
-          // Create permissions for new tenant
-          const newPermissions = templatePermissions.map(perm => ({
-            tenant_id: tenantId,
-            modulo: perm.modulo,
-            accion: perm.accion,
-            recurso: perm.recurso,
-            descripcion: perm.descripcion,
-            activo: true,
-            created_at: new Date().toISOString()
-          }));
-
-          const { data: createdPermissions, error: permCreateError } = await client
-            .from('permisos')
-            .insert(newPermissions)
-            .select('id');
-
-          if (permCreateError) {
-            console.error('Error creating permissions for new tenant:', permCreateError);
-          } else if (createdPermissions && createdPermissions.length > 0) {
-            console.log(`✅ [TENANT-MGMT] ${createdPermissions.length} permisos creados para el tenant`);
-
-            // Assign all new permissions to ADMIN role
-            const rolePermissions = createdPermissions.map(permission => ({
-              role_id: adminRoleId,
-              permiso_id: permission.id,
-              created_at: new Date().toISOString()
-            }));
-
-            const { error: permAssignError } = await client
-              .from('rol_permisos')
-              .insert(rolePermissions);
-
-            if (permAssignError) {
-              console.error('Error assigning permissions to ADMIN role:', permAssignError);
-            } else {
-              console.log(`✅ [TENANT-MGMT] ${rolePermissions.length} permisos asignados al rol ADMIN`);
-            }
-          }
-        }
+      if (adminRoleError || !adminRole?.id) {
+        console.error('Error resolving ADMIN role after RBAC seed:', adminRoleError);
+        throw new BadRequestException('Error al resolver rol de administrador');
       }
 
       // Create the admin user with custom password if provided
@@ -212,7 +181,7 @@ export class TenantManagementService {
         apellido: tenantData.admin_apellido,
         email: adminEmail,
         password: tenantData.admin_password, // Use custom password if provided
-        roles: [adminRoleId]
+        roles: [adminRole.id]
       });
 
       console.log('✅ [TENANT-MGMT] Usuario admin creado - Email:', adminEmail);
@@ -231,11 +200,8 @@ export class TenantManagementService {
         }
       };
     } catch (error) {
-      // Rollback: delete the tenant if user creation fails
-      await client
-        .from('empresa_config')
-        .delete()
-        .eq('tenant_id', tenantId);
+      // Rollback: tenants cascades to empresa_config, roles, permissions and users.
+      await this.rollbackTenantCreation(client, tenantId);
 
       console.error('Error creating admin user, tenant rolled back:', error);
       throw new BadRequestException('Error al crear usuario administrador del tenant');

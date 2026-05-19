@@ -11,8 +11,12 @@ describe('EstadosFinancierosService', () => {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     gte: jest.fn().mockReturnThis(),
+    lt: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
+    limit: jest.fn(),
+    range: jest.fn(),
     single: jest.fn(),
     rpc: jest.fn(),
   };
@@ -86,6 +90,10 @@ describe('EstadosFinancierosService', () => {
 
     it('should handle empty balance', async () => {
       mockSupabaseClient.order.mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+      mockSupabaseClient.range.mockResolvedValueOnce({
         data: [],
         error: null,
       });

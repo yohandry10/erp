@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Activity, CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, XCircle } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface EventStats {
   pending: number
@@ -28,6 +31,20 @@ interface AsientoPorTipo {
   cantidad: number
 }
 
+const metricCards: Array<{
+  key: keyof EventStats
+  label: string
+  helper?: string
+  icon: typeof Activity
+}> = [
+  { key: 'pending', label: 'Eventos pendientes', helper: 'En cola contable', icon: Clock },
+  { key: 'processed_today', label: 'Procesados hoy', helper: 'Ciclo actual', icon: CheckCircle },
+  { key: 'failed', label: 'Eventos con error', helper: 'Requieren revisión', icon: AlertTriangle },
+  { key: 'dead_letter', label: 'Dead letter', helper: 'Intervención manual', icon: XCircle },
+  { key: 'processed', label: 'Total procesados', helper: 'Histórico operativo', icon: Activity },
+  { key: 'avg_processing_time_ms', label: 'Tiempo promedio', helper: 'Latencia de procesamiento', icon: Clock },
+]
+
 export default function MonitoreoPage() {
   const [stats, setStats] = useState<EventStats>({
     pending: 0,
@@ -35,7 +52,7 @@ export default function MonitoreoPage() {
     processed_today: 0,
     failed: 0,
     dead_letter: 0,
-    avg_processing_time_ms: null
+    avg_processing_time_ms: null,
   })
   const [eventosFallidos, setEventosFallidos] = useState<EventoFallido[]>([])
   const [asientosPorTipo, setAsientosPorTipo] = useState<AsientoPorTipo[]>([])
@@ -94,419 +111,223 @@ export default function MonitoreoPage() {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     })
   }
 
   const getEventTypeLabel = (eventType: string) => {
     const labels: Record<string, string> = {
-      'VentaFacturada': 'Venta Facturada',
-      'CobroRegistrado': 'Cobro Registrado',
-      'RecepcionRegistrada': 'Recepción Registrada',
-      'PagoProveedorRegistrado': 'Pago Proveedor',
-      'AjusteInventarioAplicado': 'Ajuste Inventario',
-      'PlanillaLiquidada': 'Planilla Liquidada',
-      'DepreciacionGenerada': 'Depreciación'
+      VentaFacturada: 'Venta Facturada',
+      CobroRegistrado: 'Cobro Registrado',
+      RecepcionRegistrada: 'Recepción Registrada',
+      PagoProveedorRegistrado: 'Pago Proveedor',
+      AjusteInventarioAplicado: 'Ajuste Inventario',
+      PlanillaLiquidada: 'Planilla Liquidada',
+      DepreciacionGenerada: 'Depreciación',
     }
     return labels[eventType] || eventType
   }
 
   const formatProcessingTime = (ms: number | null) => {
-    if (ms === null || ms === undefined) {
-      return 'N/A'
-    }
-    
-    if (ms < 1000) {
-      return `${ms}ms`
-    } else if (ms < 60000) {
-      return `${(ms / 1000).toFixed(1)}s`
-    } else {
-      const minutes = Math.floor(ms / 60000)
-      const seconds = Math.floor((ms % 60000) / 1000)
-      return `${minutes}m ${seconds}s`
-    }
+    if (ms === null || ms === undefined) return 'N/A'
+    if (ms < 1000) return `${ms}ms`
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}m ${seconds}s`
+  }
+
+  const totalAsientos = asientosPorTipo.reduce((sum, item) => sum + item.cantidad, 0)
+
+  const metricValue = (key: keyof EventStats) => {
+    if (key === 'avg_processing_time_ms') return formatProcessingTime(stats.avg_processing_time_ms)
+    return stats[key]
   }
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h1 className="dashboard-title">Monitoreo de Eventos Contables</h1>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '3rem',
-          color: '#6b7280'
-        }}>
-          <Activity className="animate-spin" size={24} style={{ marginRight: '0.5rem' }} />
-          Cargando datos de monitoreo...
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardHeader className="border-b border-cyan-400/10">
+            <CardTitle>Monitoreo de Eventos Contables</CardTitle>
+          </CardHeader>
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <Activity className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando datos de monitoreo...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Monitoreo de Eventos Contables</h1>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.375rem',
-            cursor: refreshing ? 'not-allowed' : 'pointer',
-            opacity: refreshing ? 0.6 : 1
-          }}
-        >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          Actualizar
-        </button>
-      </div>
-
-      {error && (
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#fee2e2',
-          border: '1px solid #fecaca',
-          borderRadius: '0.375rem',
-          color: '#991b1b',
-          marginBottom: '1.5rem'
-        }}>
-          {error}
-        </div>
-      )}
-
-      {/* Metrics Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
-        {/* Eventos Pendientes */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Eventos Pendientes</span>
-            <Clock size={20} style={{ color: '#f59e0b' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {stats.pending}
-          </div>
-        </div>
-
-        {/* Eventos Procesados Hoy */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Procesados Hoy</span>
-            <CheckCircle size={20} style={{ color: '#10b981' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {stats.processed_today}
-          </div>
-        </div>
-
-        {/* Eventos con Error */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Eventos con Error</span>
-            <AlertTriangle size={20} style={{ color: '#ef4444' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {stats.failed}
-          </div>
-          {stats.failed > 0 && (
-            <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-              Requieren atención
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                ERP Event Control
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Monitoreo de Eventos Contables</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                Cola, asientos generados, reintentos y eventos que requieren intervención contable.
+              </p>
             </div>
-          )}
-        </div>
+            <Button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="gap-2 bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500"
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+              Actualizar
+            </Button>
+          </div>
+        </section>
 
-        {/* Dead Letter */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Dead Letter</span>
-            <XCircle size={20} style={{ color: '#dc2626' }} />
+        {error && (
+          <div className="rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm font-medium text-blue-50">
+            {error}
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {stats.dead_letter}
-          </div>
-          {stats.dead_letter > 0 && (
-            <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem' }}>
-              Fallidos permanentemente
-            </div>
-          )}
-        </div>
+        )}
 
-        {/* Total Procesados */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Total Procesados</span>
-            <Activity size={20} style={{ color: '#3b82f6' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {stats.processed}
-          </div>
-        </div>
-
-        {/* Tiempo Promedio de Procesamiento */}
-        <div style={{
-          backgroundColor: 'white',
-          padding: '1.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: 500 }}>Tiempo Promedio</span>
-            <Clock size={20} style={{ color: '#8b5cf6' }} />
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827' }}>
-            {formatProcessingTime(stats.avg_processing_time_ms)}
-          </div>
-          {stats.avg_processing_time_ms !== null && (
-            <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              Tiempo de procesamiento
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Asientos Generados por Tipo */}
-      {asientosPorTipo.length > 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-          overflow: 'hidden',
-          marginBottom: '2rem'
-        }}>
-          <div style={{
-            padding: '1rem 1.5rem',
-            borderBottom: '1px solid #e5e7eb',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>
-              Asientos Generados por Tipo
-            </h2>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              Distribución de asientos contables según el tipo de evento
-            </p>
-          </div>
-
-          <div style={{ padding: '1.5rem' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem'
-            }}>
-              {asientosPorTipo.map((item) => (
-                <div
-                  key={item.tipo}
-                  style={{
-                    padding: '1rem',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #e5e7eb'
-                  }}
-                >
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                    {getEventTypeLabel(item.tipo)}
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          {metricCards.map(({ key, label, helper, icon: Icon }) => (
+            <Card key={key} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
+                      {label}
+                    </div>
+                    <div className="mt-3 text-2xl font-bold text-white">{metricValue(key)}</div>
+                    {helper && <div className="mt-1 text-xs text-slate-400">{helper}</div>}
                   </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-                    {item.cantidad}
+                  <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-2 text-cyan-100">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+              <CardTitle className="text-base text-white">Asientos generados por tipo</CardTitle>
+              <p className="text-xs text-slate-400">Distribución según el evento operativo que originó contabilidad.</p>
+            </CardHeader>
+            <CardContent className="p-4">
+              {asientosPorTipo.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {asientosPorTipo.map((item) => (
+                      <div key={item.tipo} className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-3">
+                        <div className="truncate text-sm font-semibold text-slate-200">{getEventTypeLabel(item.tipo)}</div>
+                        <div className="mt-2 text-2xl font-bold text-cyan-100">{item.cantidad}</div>
+                        <div className="text-xs text-slate-500">asiento{item.cantidad !== 1 ? 's' : ''}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    asiento{item.cantidad !== 1 ? 's' : ''}
+                  <div className="flex items-center justify-between rounded-xl border border-cyan-400/15 bg-cyan-400/10 px-4 py-3">
+                    <span className="text-sm font-semibold text-cyan-100">Total de asientos generados</span>
+                    <span className="text-2xl font-bold text-white">{totalAsientos}</span>
                   </div>
                 </div>
+              ) : (
+                <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-8 text-center text-sm text-slate-400">
+                  No hay asientos clasificados por tipo en el periodo consultado.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+              <CardTitle className="text-base text-white">Estado de cola</CardTitle>
+              <p className="text-xs text-slate-400">Señales para detectar fallos de procesamiento sin abrir logs técnicos.</p>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4">
+              {[
+                ['Pendientes', stats.pending],
+                ['Procesados hoy', stats.processed_today],
+                ['Fallidos', stats.failed],
+                ['Dead letter', stats.dead_letter],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between rounded-xl border border-cyan-400/15 bg-white/[0.03] px-4 py-3">
+                  <span className="text-sm text-slate-300">{label}</span>
+                  <span className="text-lg font-bold text-white">{value}</span>
+                </div>
               ))}
-            </div>
+            </CardContent>
+          </Card>
+        </section>
 
-            {/* Total */}
-            <div style={{
-              marginTop: '1.5rem',
-              paddingTop: '1.5rem',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280' }}>
-                Total de Asientos Generados
-              </span>
-              <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-                {asientosPorTipo.reduce((sum, item) => sum + item.cantidad, 0)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Failed Events Table */}
-      {eventosFallidos.length > 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            padding: '1rem 1.5rem',
-            borderBottom: '1px solid #e5e7eb',
-            backgroundColor: '#f9fafb'
-          }}>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>
-              Eventos Fallidos Recientes
-            </h2>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              Últimos 10 eventos que requieren atención
-            </p>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ backgroundColor: '#f9fafb' }}>
-                <tr>
-                  <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Tipo de Evento
-                  </th>
-                  <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Error
-                  </th>
-                  <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Reintentos
-                  </th>
-                  <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Fecha
-                  </th>
-                  <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventosFallidos.map((evento) => (
-                  <tr key={evento.id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#111827' }}>
-                      {getEventTypeLabel(evento.event_type)}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#6b7280', maxWidth: '300px' }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {evento.error_message || 'Sin mensaje de error'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#111827' }}>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: evento.retry_count >= 3 ? '#fee2e2' : '#fef3c7',
-                        color: evento.retry_count >= 3 ? '#991b1b' : '#92400e',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.75rem',
-                        fontWeight: 500
-                      }}>
-                        {evento.retry_count}/3
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                      {formatDate(evento.created_at)}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      {evento.status === 'failed' && evento.retry_count < 3 && (
-                        <button
-                          onClick={() => handleRetry(evento.event_id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.375rem 0.75rem',
-                            backgroundColor: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <RefreshCw size={12} />
-                          Reintentar
-                        </button>
-                      )}
-                      {(evento.status === 'dead_letter' || evento.retry_count >= 3) && (
-                        <span style={{
-                          fontSize: '0.75rem',
-                          color: '#dc2626',
-                          fontWeight: 500
-                        }}>
-                          Requiere intervención manual
-                        </span>
-                      )}
-                    </td>
+        {eventosFallidos.length > 0 ? (
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+              <CardTitle className="text-base text-white">Eventos fallidos recientes</CardTitle>
+              <p className="text-xs text-slate-400">Últimos 10 eventos que requieren atención.</p>
+            </CardHeader>
+            <CardContent className="overflow-x-auto p-0">
+              <table className="w-full min-w-[900px] border-collapse text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.14em] text-cyan-200/70">
+                  <tr>
+                    <th className="px-5 py-3 text-left font-semibold">Tipo de evento</th>
+                    <th className="px-5 py-3 text-left font-semibold">Error</th>
+                    <th className="px-5 py-3 text-left font-semibold">Reintentos</th>
+                    <th className="px-5 py-3 text-left font-semibold">Fecha</th>
+                    <th className="px-5 py-3 text-left font-semibold">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {eventosFallidos.length === 0 && stats.failed === 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '3rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          textAlign: 'center'
-        }}>
-          <CheckCircle size={48} style={{ color: '#10b981', margin: '0 auto 1rem' }} />
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827', marginBottom: '0.5rem' }}>
-            ¡Todo en orden!
-          </h3>
-          <p style={{ color: '#6b7280' }}>
-            No hay eventos fallidos en este momento
-          </p>
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {eventosFallidos.map((evento) => (
+                    <tr key={evento.id} className="border-t border-cyan-400/10">
+                      <td className="px-5 py-4 font-medium text-white">{getEventTypeLabel(evento.event_type)}</td>
+                      <td className="max-w-[320px] px-5 py-4 text-slate-300">
+                        <div className="truncate">{evento.error_message || 'Sin mensaje de error'}</div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                          {evento.retry_count}/3
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate-400">{formatDate(evento.created_at)}</td>
+                      <td className="px-5 py-4">
+                        {evento.status === 'failed' && evento.retry_count < 3 ? (
+                          <Button
+                            type="button"
+                            onClick={() => handleRetry(evento.event_id)}
+                            size="sm"
+                            className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Reintentar
+                          </Button>
+                        ) : (
+                          <span className="text-xs font-semibold text-blue-100">Requiere intervención manual</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardContent className="flex items-center justify-center gap-4 p-8 text-center">
+              <CheckCircle className="h-10 w-10 text-cyan-200" />
+              <div className="text-left">
+                <h3 className="text-lg font-semibold text-white">Todo en orden</h3>
+                <p className="text-sm text-slate-400">No hay eventos fallidos en este momento.</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 # Descripción: Crear una nueva cuenta bancaria
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjY3YzI0Yy1hMzE0LTRhNzAtYjU5Zi1lNzE0YzY5YzY5YzYiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwidGVuYW50X2lkIjoiNzc3Nzc3NzctNzc3Ny03Nzc3LTc3NzctNzc3Nzc3Nzc3Nzc3IiwiaWF0IjoxNzMwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.T8nEz8VjWvU5l_F-example-token-replace-with-real"
+$token = "REPLACE_WITH_TEST_JWT"
 
 $headers = @{
     "Authorization" = "Bearer $token"

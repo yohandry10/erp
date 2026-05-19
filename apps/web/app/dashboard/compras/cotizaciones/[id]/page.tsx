@@ -15,7 +15,6 @@ import {
   DollarSign,
   Package,
   Clock,
-  AlertCircle,
   ShoppingCart
 } from 'lucide-react'
 
@@ -59,12 +58,24 @@ interface CotizacionDetalle {
 }
 
 const ESTADO_CONFIG = {
-  BORRADOR: { label: 'Borrador', color: '#6b7280', bgColor: '#f3f4f6', icon: Edit },
-  ENVIADA: { label: 'Enviada', color: '#3b82f6', bgColor: '#dbeafe', icon: Send },
-  APROBADA: { label: 'Aprobada', color: '#10b981', bgColor: '#d1fae5', icon: CheckCircle },
-  RECHAZADA: { label: 'Rechazada', color: '#ef4444', bgColor: '#fee2e2', icon: XCircle },
-  VENCIDA: { label: 'Vencida', color: '#f59e0b', bgColor: '#fef3c7', icon: Clock }
+  BORRADOR: { label: 'Borrador', icon: Edit, className: 'bg-slate-700/80 text-slate-100 ring-slate-500/40' },
+  ENVIADA: { label: 'Enviada', icon: Send, className: 'bg-blue-500/20 text-blue-100 ring-blue-400/40' },
+  APROBADA: { label: 'Aprobada', icon: CheckCircle, className: 'bg-blue-500/25 text-blue-50 ring-blue-300/40' },
+  RECHAZADA: { label: 'Rechazada', icon: XCircle, className: 'bg-slate-800 text-slate-100 ring-slate-500/40' },
+  VENCIDA: { label: 'Vencida', icon: Clock, className: 'bg-slate-700/80 text-slate-100 ring-slate-500/40' }
 }
+
+const pageClass = 'min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-slate-100'
+const panelClass = 'rounded-2xl border border-blue-400/20 bg-slate-950/70 p-5 shadow-xl shadow-blue-950/20 backdrop-blur'
+const panelHeaderClass = 'mb-5 flex items-center gap-3 border-b border-blue-400/20 pb-4'
+const iconBoxClass = 'flex size-10 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200'
+const labelClass = 'mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const valueClass = 'm-0 text-sm font-semibold text-slate-100'
+const actionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/15 px-4 py-2.5 text-sm font-semibold text-blue-50 transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60'
+const primaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60'
+const secondaryActionClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-500/40 bg-slate-900/70 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+const tableHeadClass = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-400'
+const tableCellClass = 'px-4 py-3 text-sm text-slate-200'
 
 export default function CotizacionDetallePage() {
   const router = useRouter()
@@ -187,9 +198,9 @@ export default function CotizacionDetallePage() {
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '1.125rem', color: '#6b7280' }}>Cargando cotización...</div>
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className={panelClass}>Cargando cotización...</div>
         </div>
       </div>
     )
@@ -197,9 +208,9 @@ export default function CotizacionDetallePage() {
 
   if (!cotizacion) {
     return (
-      <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div style={{ fontSize: '1.125rem', color: '#ef4444' }}>Cotización no encontrada</div>
+      <div className={pageClass}>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className={panelClass}>Cotización no encontrada</div>
         </div>
       </div>
     )
@@ -214,402 +225,205 @@ export default function CotizacionDetallePage() {
   const puedeConvertir = cotizacion.estado === 'APROBADA' && !cotizacion.orden_compra_id && !isVencida
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <button
-            onClick={() => router.push('/dashboard/compras/cotizaciones')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
-          >
-            <ArrowLeft size={16} />
-            Volver a Cotizaciones
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <h1 className="dashboard-title" style={{ marginBottom: 0 }}>
-              Cotización {cotizacion.numero}
-            </h1>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '9999px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: estadoConfig.color,
-                backgroundColor: estadoConfig.bgColor
-              }}
-            >
-              <EstadoIcon size={16} />
-              {estadoConfig.label}
-            </span>
+    <div className={pageClass}>
+      <div className="mb-6 rounded-3xl border border-blue-400/20 bg-slate-950/80 p-6 shadow-2xl shadow-blue-950/30">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <button onClick={() => router.push('/dashboard/compras/cotizaciones')} className="mb-4 inline-flex items-center gap-2 rounded-lg border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-blue-500/20">
+              <ArrowLeft size={16} />
+              Volver a Cotizaciones
+            </button>
+            <div className="mb-2 flex flex-wrap items-center gap-4">
+              <h1 className="m-0 text-3xl font-bold text-white">Cotización {cotizacion.numero}</h1>
+              <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ring-1 ${estadoConfig.className}`}>
+                <EstadoIcon size={16} />
+                {estadoConfig.label}
+              </span>
+            </div>
+            <p className="m-0 text-sm text-slate-300">
+              Proveedor: {cotizacion.proveedores?.razon_social || 'N/A'}
+            </p>
           </div>
-          <p className="dashboard-subtitle">
-            Proveedor: {cotizacion.proveedores?.razon_social || 'N/A'}
-          </p>
-        </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          {puedeEnviar && (
-            <button
-              onClick={handleEnviar}
-              disabled={actionLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'var(--primary-600)',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1
-              }}
-            >
-              <Send size={16} />
-              Enviar
-            </button>
-          )}
-
-          {puedeAprobar && (
-            <button
-              onClick={handleAprobar}
-              disabled={actionLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#10b981',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1
-              }}
-            >
-              <CheckCircle size={16} />
-              Aprobar
-            </button>
-          )}
-
-          {puedeRechazar && (
-            <button
-              onClick={handleRechazar}
-              disabled={actionLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '8px',
-                border: '1px solid #ef4444',
-                background: 'white',
-                color: '#ef4444',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1
-              }}
-            >
-              <XCircle size={16} />
-              Rechazar
-            </button>
-          )}
-
-          {puedeConvertir && (
-            <button
-              onClick={handleConvertirOC}
-              disabled={actionLoading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'var(--primary-600)',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1
-              }}
-            >
-              <ShoppingCart size={16} />
-              Convertir a OC
-            </button>
-          )}
+          <div className="flex flex-wrap gap-3">
+            {puedeEnviar && (
+              <button onClick={handleEnviar} disabled={actionLoading} className={primaryActionClass}>
+                <Send size={16} />
+                Enviar
+              </button>
+            )}
+            {puedeAprobar && (
+              <button onClick={handleAprobar} disabled={actionLoading} className={primaryActionClass}>
+                <CheckCircle size={16} />
+                Aprobar
+              </button>
+            )}
+            {puedeRechazar && (
+              <button onClick={handleRechazar} disabled={actionLoading} className={secondaryActionClass}>
+                <XCircle size={16} />
+                Rechazar
+              </button>
+            )}
+            {puedeConvertir && (
+              <button onClick={handleConvertirOC} disabled={actionLoading} className={primaryActionClass}>
+                <ShoppingCart size={16} />
+                Convertir a OC
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        {/* Información General */}
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
-            Información General
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <FileText size={18} style={{ color: '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Número</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{cotizacion.numero}</div>
-              </div>
+      <div className="mb-6 grid gap-6 xl:grid-cols-2">
+        <div className={panelClass}>
+          <div className={panelHeaderClass}>
+            <div className={iconBoxClass}><FileText size={20} /></div>
+            <h2 className="m-0 text-lg font-bold text-white">Información General</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Número</label>
+              <p className={valueClass}>{cotizacion.numero}</p>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Calendar size={18} style={{ color: '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Fecha Cotización</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                  {new Date(cotizacion.fecha_cotizacion).toLocaleDateString('es-PE')}
-                </div>
-              </div>
+            <div>
+              <label className={labelClass}>Fecha Cotización</label>
+              <p className={valueClass}>{new Date(cotizacion.fecha_cotizacion).toLocaleDateString('es-PE')}</p>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Clock size={18} style={{ color: isVencida ? '#ef4444' : '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Fecha Vencimiento</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500', color: isVencida ? '#ef4444' : 'inherit' }}>
-                  {new Date(cotizacion.fecha_vencimiento).toLocaleDateString('es-PE')}
-                  {isVencida && ' (Vencida)'}
-                </div>
-              </div>
+            <div>
+              <label className={labelClass}>Fecha Vencimiento</label>
+              <p className={valueClass}>{new Date(cotizacion.fecha_vencimiento).toLocaleDateString('es-PE')}</p>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <DollarSign size={18} style={{ color: '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Moneda</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{cotizacion.moneda}</div>
-              </div>
+            <div>
+              <label className={labelClass}>Moneda</label>
+              <p className={valueClass}>{cotizacion.moneda}</p>
             </div>
           </div>
         </div>
 
-        {/* Información del Proveedor */}
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
-            Proveedor
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <User size={18} style={{ color: '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Razón Social</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                  {cotizacion.proveedores?.razon_social || 'N/A'}
-                </div>
-              </div>
+        <div className={panelClass}>
+          <div className={panelHeaderClass}>
+            <div className={iconBoxClass}><User size={20} /></div>
+            <h2 className="m-0 text-lg font-bold text-white">Proveedor</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Razón Social</label>
+              <p className={valueClass}>{cotizacion.proveedores?.razon_social || 'N/A'}</p>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <FileText size={18} style={{ color: '#6b7280' }} />
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>RUC</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                  {cotizacion.proveedores?.ruc || 'N/A'}
-                </div>
-              </div>
+            <div>
+              <label className={labelClass}>RUC</label>
+              <p className={valueClass}>{cotizacion.proveedores?.ruc || 'N/A'}</p>
             </div>
-
             {cotizacion.proveedores?.email && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Send size={18} style={{ color: '#6b7280' }} />
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Email</div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                    {cotizacion.proveedores.email}
-                  </div>
-                </div>
+              <div>
+                <label className={labelClass}>Email</label>
+                <p className="m-0 text-sm text-slate-200">{cotizacion.proveedores.email}</p>
               </div>
             )}
-
             {cotizacion.proveedores?.telefono && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <User size={18} style={{ color: '#6b7280' }} />
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Teléfono</div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
-                    {cotizacion.proveedores.telefono}
-                  </div>
-                </div>
+              <div>
+                <label className={labelClass}>Teléfono</label>
+                <p className="m-0 text-sm text-slate-200">{cotizacion.proveedores.telefono}</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Productos */}
-      <div className="dashboard-card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
-          Productos
-        </h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className={`${panelClass} mb-6`}>
+        <div className={panelHeaderClass}>
+          <div className={iconBoxClass}><Package size={20} /></div>
+          <h2 className="m-0 text-lg font-bold text-white">Detalle de Productos</h2>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-blue-400/10">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
-                  Código
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
-                  Producto
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
-                  Cantidad
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
-                  Precio Unit.
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>
-                  Subtotal
-                </th>
+              <tr className="border-b border-blue-400/20 bg-blue-500/5">
+                <th className={tableHeadClass}>Código</th>
+                <th className={tableHeadClass}>Producto</th>
+                <th className={`${tableHeadClass} text-center`}>Cantidad</th>
+                <th className={`${tableHeadClass} text-right`}>Precio Unit.</th>
+                <th className={`${tableHeadClass} text-right`}>Subtotal</th>
               </tr>
             </thead>
             <tbody>
               {cotizacion.detalles?.map((detalle) => (
-                <tr key={detalle.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                    {detalle.productos?.codigo || 'N/A'}
-                  </td>
-                  <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                    {detalle.productos?.nombre || 'N/A'}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.875rem' }}>
-                    {detalle.cantidad} {detalle.productos?.unidad_medida || ''}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem' }}>
-                    {cotizacion.moneda} {detalle.precio_unitario.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '500' }}>
-                    {cotizacion.moneda} {detalle.subtotal.toFixed(2)}
-                  </td>
+                <tr key={detalle.id} className="border-b border-blue-400/10 last:border-b-0 hover:bg-blue-500/5">
+                  <td className={tableCellClass}>{detalle.productos?.codigo || 'N/A'}</td>
+                  <td className={`${tableCellClass} font-semibold text-white`}>{detalle.productos?.nombre || 'N/A'}</td>
+                  <td className={`${tableCellClass} text-center`}>{detalle.cantidad} {detalle.productos?.unidad_medida || ''}</td>
+                  <td className={`${tableCellClass} text-right`}>{cotizacion.moneda} {detalle.precio_unitario.toFixed(2)}</td>
+                  <td className={`${tableCellClass} text-right font-semibold text-white`}>{cotizacion.moneda} {detalle.subtotal.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Totales */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '2px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '300px', marginLeft: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: '#6b7280' }}>Subtotal:</span>
-              <span style={{ fontWeight: '500' }}>{cotizacion.moneda} {cotizacion.subtotal.toFixed(2)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span style={{ color: '#6b7280' }}>IGV (18%):</span>
-              <span style={{ fontWeight: '500' }}>{cotizacion.moneda} {cotizacion.igv.toFixed(2)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.125rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
-              <span style={{ fontWeight: '600' }}>Total:</span>
-              <span style={{ fontWeight: '700', color: 'var(--primary-600)' }}>
-                {cotizacion.moneda} {cotizacion.total.toFixed(2)}
-              </span>
-            </div>
+        <div className="ml-auto mt-6 grid max-w-sm gap-2 rounded-xl border border-blue-400/20 bg-blue-500/10 p-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Subtotal:</span>
+            <span className="font-semibold text-slate-100">{cotizacion.moneda} {cotizacion.subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">IGV (18%):</span>
+            <span className="font-semibold text-slate-100">{cotizacion.moneda} {cotizacion.igv.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between border-t border-blue-400/20 pt-2 text-lg">
+            <span className="font-semibold text-white">Total:</span>
+            <span className="font-bold text-blue-100">{cotizacion.moneda} {cotizacion.total.toFixed(2)}</span>
           </div>
         </div>
       </div>
 
-      {/* Observaciones */}
       {cotizacion.observaciones && (
-        <div className="dashboard-card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#111827' }}>
-            Observaciones
-          </h3>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', lineHeight: '1.5' }}>
-            {cotizacion.observaciones}
-          </p>
+        <div className={`${panelClass} mb-6`}>
+          <h2 className="mb-3 text-lg font-bold text-white">Observaciones</h2>
+          <p className="m-0 text-sm leading-6 text-slate-300">{cotizacion.observaciones}</p>
         </div>
       )}
 
-      {/* Timeline */}
-      {(cotizacion.enviado_at || cotizacion.aprobado_at || cotizacion.rechazado_at) && (
-        <div className="dashboard-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
-            Historial
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {(cotizacion.enviado_at || cotizacion.aprobado_at || cotizacion.rechazado_at || cotizacion.orden_compra_id) && (
+        <div className={panelClass}>
+          <h2 className="mb-4 text-lg font-bold text-white">Historial</h2>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {cotizacion.enviado_at && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Send size={16} style={{ color: '#3b82f6' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><Send size={16} /></div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Enviada</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {new Date(cotizacion.enviado_at).toLocaleString('es-PE')}
-                  </div>
+                  <div className={valueClass}>Enviada</div>
+                  <div className="text-xs text-slate-400">{new Date(cotizacion.enviado_at).toLocaleString('es-PE')}</div>
                 </div>
               </div>
             )}
-
             {cotizacion.aprobado_at && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <CheckCircle size={16} style={{ color: '#10b981' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><CheckCircle size={16} /></div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Aprobada</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {new Date(cotizacion.aprobado_at).toLocaleString('es-PE')}
-                  </div>
+                  <div className={valueClass}>Aprobada</div>
+                  <div className="text-xs text-slate-400">{new Date(cotizacion.aprobado_at).toLocaleString('es-PE')}</div>
                 </div>
               </div>
             )}
-
             {cotizacion.rechazado_at && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <XCircle size={16} style={{ color: '#ef4444' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><XCircle size={16} /></div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Rechazada</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {new Date(cotizacion.rechazado_at).toLocaleString('es-PE')}
-                  </div>
-                  {cotizacion.motivo_rechazo && (
-                    <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                      Motivo: {cotizacion.motivo_rechazo}
-                    </div>
-                  )}
+                  <div className={valueClass}>Rechazada</div>
+                  <div className="text-xs text-slate-400">{new Date(cotizacion.rechazado_at).toLocaleString('es-PE')}</div>
+                  {cotizacion.motivo_rechazo && <div className="mt-1 text-xs text-slate-300">Motivo: {cotizacion.motivo_rechazo}</div>}
                 </div>
               </div>
             )}
-
             {cotizacion.orden_compra_id && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <ShoppingCart size={16} style={{ color: '#10b981' }} />
+              <div className="flex items-center gap-3">
+                <div className={iconBoxClass}><ShoppingCart size={16} /></div>
                 <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>Convertida a OC</div>
+                  <div className={valueClass}>Convertida a OC</div>
                   <button
                     onClick={() => router.push(`/dashboard/compras/ordenes/${cotizacion.orden_compra_id}`)}
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-600)',
-                      textDecoration: 'underline',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer'
-                    }}
+                    className="mt-1 text-xs font-semibold text-blue-200 underline-offset-4 hover:underline"
                   >
                     Ver Orden de Compra
                   </button>

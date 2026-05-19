@@ -2,7 +2,7 @@
 # Este script prueba el endpoint POST /api/finanzas/conciliacion/:id/match-automatico
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjQwMzY3Zi1hNzE3LTRhNzAtYjU5Zi1lNzE5YjI5YjI5YjIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNTE2MjM5MDIyfQ.VRr8IF_5h7lRaLxWQkTmEjHgFqWXJKz5TYqLZ9X0gZo"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "9f40367f-a717-4a70-b59f-e719b29b29b2"
 
 $headers = @{
@@ -19,7 +19,7 @@ Write-Host "1. Listando conciliaciones existentes..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion" -Method Get -Headers $headers
     Write-Host "✓ Conciliaciones encontradas: $($response.data.Count)" -ForegroundColor Green
-    
+
     if ($response.data.Count -gt 0) {
         $conciliacion = $response.data[0]
         $conciliacionId = $conciliacion.id

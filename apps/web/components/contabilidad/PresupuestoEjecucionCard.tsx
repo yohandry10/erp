@@ -35,16 +35,7 @@ export default function PresupuestoEjecucionCard({
 
   return (
     <div
-      onClick={onClick}
-      style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.2s ease',
-        border: `2px solid ${getEjecucionColor(porcentajeEjecutado)}20`
-      }}
+      onClick={onClick} className="bg-white rounded-3 p-6 shadow transition"
       onMouseEnter={(e) => {
         if (onClick) {
           e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)'
@@ -59,31 +50,16 @@ export default function PresupuestoEjecucionCard({
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <DollarSign size={18} style={{ color: getEjecucionColor(porcentajeEjecutado) }} />
-            <h3 style={{ 
-              margin: 0, 
-              fontSize: '1rem', 
-              fontWeight: '600', 
-              color: '#111827',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-[1]">
+          <div className="flex items-center gap-2 mb-1">
+            <DollarSign size={18} />
+            <h3 className="m-0 text-4 font-semibold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
               {titulo}
             </h3>
           </div>
           {subtitulo && (
-            <p style={{ 
-              margin: 0, 
-              fontSize: '0.75rem', 
-              color: '#6b7280',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
+            <p className="m-0 text-3 text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
               {subtitulo}
             </p>
           )}
@@ -98,83 +74,53 @@ export default function PresupuestoEjecucionCard({
       </div>
 
       {/* Amounts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+      <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
         <div>
-          <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+          <p className="m-0 text-3 text-gray-500 mb-1">
             Presupuestado
           </p>
-          <p style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#111827' }}>
+          <p className="m-0 text-4 font-bold text-gray-900">
             {formatCurrency(montoPresupuestado)}
           </p>
         </div>
         <div>
-          <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+          <p className="m-0 text-3 text-gray-500 mb-1">
             Ejecutado
           </p>
-          <p style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: getEjecucionColor(porcentajeEjecutado) }}>
+          <p className="m-0 text-4 font-bold">
             {formatCurrency(montoEjecutado)}
           </p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-3 text-gray-500">
             Ejecución
           </span>
-          <span style={{ 
-            fontSize: '0.875rem', 
-            fontWeight: '700', 
-            color: getEjecucionColor(porcentajeEjecutado)
-          }}>
+          <span className="text-[0.875rem] font-bold">
             {porcentajeEjecutado.toFixed(1)}%
           </span>
         </div>
-        <div style={{
-          width: '100%',
-          height: '8px',
-          background: '#e5e7eb',
-          borderRadius: '9999px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            width: `${Math.min(porcentajeEjecutado, 100)}%`,
-            height: '100%',
-            background: getEjecucionColor(porcentajeEjecutado),
-            transition: 'width 0.3s ease'
-          }} />
+        <div className="w-[100%] h-2 bg-[#e5e7eb] rounded-full overflow-hidden">
+          <div className="h-[100%] transition" />
         </div>
       </div>
 
       {/* Available Amount */}
-      <div style={{
-        padding: '0.75rem',
-        borderRadius: '8px',
-        background: isOverBudget ? '#fee2e2' : '#d1fae5',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="p-3 rounded-2 flex justify-between items-center">
+        <div className="flex items-center gap-2">
           {isOverBudget ? (
-            <TrendingUp size={16} style={{ color: '#dc2626' }} />
+            <TrendingUp size={16} className="text-red-600" />
           ) : (
-            <TrendingDown size={16} style={{ color: '#059669' }} />
+            <TrendingDown size={16} className="text-emerald-600" />
           )}
-          <span style={{ 
-            fontSize: '0.75rem', 
-            fontWeight: '600',
-            color: isOverBudget ? '#991b1b' : '#065f46'
-          }}>
+          <span className="text-3 font-semibold">
             {isOverBudget ? 'Sobregiro' : 'Disponible'}
           </span>
         </div>
-        <span style={{ 
-          fontSize: '0.875rem', 
-          fontWeight: '700',
-          color: isOverBudget ? '#dc2626' : '#059669'
-        }}>
+        <span className="text-[0.875rem] font-bold">
           {formatCurrency(Math.abs(montoDisponible))}
         </span>
       </div>

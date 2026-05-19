@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils'
 import { useApi } from '@/hooks/use-api';
 
 interface SesionCaja {
@@ -170,25 +171,11 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     if (sesiones.length === 0) {
         return (
             <div
-                className={className}
-                style={{
-                    ...cardStyle,
-                    padding: '18px',
-                    textAlign: 'center',
-                    borderStyle: 'dashed',
-                }}
+                className={cn(className, "p-[18px] text-center")}
             >
-                <p style={{ color: 'var(--text-secondary, #6b7280)', marginBottom: '8px' }}>No hay sesiones recientes</p>
+                <p className="text-[var(--text-secondary,_#6b7280)] mb-2">No hay sesiones recientes</p>
                 <button
-                    onClick={() => {/* placeholder for abrir caja */}}
-                    style={{
-                        padding: '10px 14px',
-                        background: 'var(--gradient-primary, linear-gradient(90deg,#2563eb,#1d4ed8))',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                    }}
+                    onClick={() => {/* placeholder for abrir caja */}} className="py-2.5 px-3.5 bg-[var(--gradient-primary,_linear-gradient(90deg,#2563eb,#1d4ed8))] text-[#fff] border-0 rounded-2.5 cursor-pointer"
                 >
                     Abrir Nueva Caja
                 </button>
@@ -197,55 +184,49 @@ export function CashSessionSelector({ onSelect, className = '' }: CashSessionSel
     }
 
     return (
-        <div className={className} style={cardStyle}>
-            <div style={headerStyle}>
-                <h3 style={titleStyle}>Sesiones de Caja</h3>
-                <button onClick={cargarSesiones} style={buttonGhostStyle}>
+        <div className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-3 shadow overflow-hidden")}>
+            <div className="py-3.5 px-4 border-b flex justify-between items-center bg-[var(--bg-subtle,_#f8fafc)]">
+                <h3 className="font-semibold text-[var(--text-primary,_#1f2937)] m-0">Sesiones de Caja</h3>
+                <button onClick={cargarSesiones} className="bg-transparent border-0 text-[var(--primary,_#2563eb)] cursor-pointer text-3.5">
                     Actualizar
                 </button>
             </div>
 
-            <div style={listStyle}>
+            <div className="max-h-[420px] overflow-y-auto">
                 {sesiones.map((sesion) => (
                     <div
                         key={sesion.id}
-                        onClick={() => onSelect(sesion)}
-                        style={rowStyle}
+                        onClick={() => onSelect(sesion)} className="py-3.5 px-4 flex justify-between items-center border-b cursor-pointer bg-[var(--bg-card,_#fff)]"
                         onMouseEnter={(e) => ((e.currentTarget.style.background = 'var(--bg-subtle, #f8fafc)'))}
                         onMouseLeave={(e) => ((e.currentTarget.style.background = 'var(--bg-card, #fff)'))}
                     >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={pillStyle(sesion.estado)}>{sesion.estado}</span>
-                                <span style={{ fontWeight: 600, color: 'var(--text-primary, #111827)' }}>
+                        <div className="flex flex-col gap-[4px]">
+                            <div className="flex items-center gap-2">
+                                <span>{sesion.estado}</span>
+                                <span className="font-semibold text-[var(--text-primary,_#111827)]">
                                     {sesion.caja?.nombre || 'Caja Principal'}
                                 </span>
                             </div>
-                            <div style={labelMuted}>
+                            <div className="text-[var(--text-secondary,_#6b7280)] text-3.5">
                                 {formatearFecha(sesion.hora_apertura)}
                                 {sesion.hora_cierre && ` - ${formatearFecha(sesion.hora_cierre)}`}
                             </div>
-                            <div style={smallMuted}>
+                            <div className="text-[var(--text-tertiary,_#9ca3af)] text-[0.8rem]">
                                 Por: {sesion.usuario?.nombres} {sesion.usuario?.apellidos}
                             </div>
                         </div>
 
-                        <div style={{ textAlign: 'right', minWidth: '120px' }}>
-                            <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary, #111827)' }}>
+                        <div className="text-right min-w-[120px]">
+                            <div className="text-[0.95rem] font-semibold text-[var(--text-primary,_#111827)]">
                                 Ini: S/ {formatMonto(sesion.monto_inicio)}
                             </div>
                             {sesion.monto_cierre !== undefined && (
-                                <div style={{ ...labelMuted, fontSize: '0.9rem' }}>
+                                <div className="text-3.5">
                                     Fin: S/ {formatMonto(sesion.monto_cierre)}
                                 </div>
                             )}
                             {sesion.diferencia !== undefined && sesion.diferencia !== 0 && (
-                                <div
-                                    style={{
-                                        fontSize: '0.85rem',
-                                        fontWeight: 600,
-                                        color: sesion.diferencia > 0 ? '#16a34a' : '#dc2626',
-                                    }}
+                                <div className="text-3.5 font-semibold"
                                 >
                                     Dif: {sesion.diferencia > 0 ? '+' : ''}{formatMonto(sesion.diferencia)}
                                 </div>

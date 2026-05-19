@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent'
+import { AlertTriangle, Boxes, ClipboardList, Package, RefreshCw, Truck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { PageShell } from '@/components/erp/page-shell'
+import { MetricCard } from '@/components/erp/metric-card'
 
 type InventoryStats = {
   totalProductos: number
@@ -74,12 +81,12 @@ const formatDateTime = (value?: string | null) => {
 }
 
 function StatsFallback() {
-  return <div className="status-warning">Necesitas el permiso <code>inventario.stats.read</code> para ver los indicadores.</div>
+  return <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">Necesitas el permiso <code>inventario.stats.read</code> para ver los indicadores.</div>
 }
 
 function ProductsFallback() {
   return (
-    <div className="status-warning">
+    <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
       Solicita acceso a <code>inventario.productos.read</code> para revisar el catálogo de productos.
     </div>
   )
@@ -87,7 +94,7 @@ function ProductsFallback() {
 
 function MovementsFallback() {
   return (
-    <div className="status-warning">
+    <div className="rounded-2xl border border-cyan-400/20 bg-slate-950/60 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
       Necesitas <code>inventario.movimientos.read</code> para consultar la bitácora de movimientos.
     </div>
   )
@@ -224,37 +231,26 @@ export default function InventarioPage() {
   )
 
   return (
-    <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Inventario</h1>
-          <p className="dashboard-subtitle">
-            Resumen del módulo de inventario endurecido. Los datos consideran restricciones multitenant y
-            eventos de recepción y kardex.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <Link href="/dashboard/inventario/productos" className="btn btn-primary">
-            Gestionar Productos →
-          </Link>
-          <Link href="/dashboard/inventario/recepciones" className="btn btn-secondary">
-            Recepciones →
-          </Link>
-          <Link href="/dashboard/inventario/kardex" className="btn btn-secondary">
-            Kardex valorizado →
-          </Link>
-          <button type="button" onClick={loadDashboard} className="refresh-btn">
-            Actualizar
-          </button>
-        </div>
-      </header>
-
-      {error && <div className="status-error">{error}</div>}
+    <PageShell
+      title="Inventario"
+      description="Control operativo de productos, stock crítico, recepciones y movimientos de kardex por tenant."
+      actions={
+        <>
+          <Button asChild variant="secondary"><Link href="/dashboard/inventario/productos">Productos</Link></Button>
+          <Button asChild variant="secondary"><Link href="/dashboard/inventario/recepciones">Recepciones</Link></Button>
+          <Button asChild variant="secondary"><Link href="/dashboard/inventario/kardex">Kardex</Link></Button>
+          <Button type="button" onClick={loadDashboard} className="gap-2"><RefreshCw className="h-4 w-4" /> Actualizar</Button>
+        </>
+      }
+    >
+      {error && <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">{error}</div>}
 
       {loading ? (
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando…</p>
+        <div className="grid min-h-[320px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
+            <p className="text-sm font-semibold">Cargando inventario...</p>
+          </div>
         </div>
       ) : (
         <>
@@ -265,38 +261,11 @@ export default function InventarioPage() {
             accion="read"
             fallback={<StatsFallback />}
           >
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>Productos</h3>
-                </div>
-                <div className="stat-value">{stats.totalProductos.toLocaleString('es-PE')}</div>
-                <div className="stat-subtitle">Activos registrados</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>Valor</h3>
-                </div>
-                <div className="stat-value">{formatCurrency(stats.valorInventario)}</div>
-                <div className="stat-subtitle">Inventario valorizado</div>
-              </div>
-
-              <div className="stat-card alert">
-                <div className="stat-header">
-                  <h3>Críticos</h3>
-                </div>
-                <div className="stat-value warning">{stats.productosStockBajo.toLocaleString('es-PE')}</div>
-                <div className="stat-subtitle">Stock por debajo del mínimo</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-header">
-                  <h3>Movimientos</h3>
-                </div>
-                <div className="stat-value">{stats.movimientosHoy.toLocaleString('es-PE')}</div>
-                <div className="stat-subtitle">Registrados hoy</div>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard title="Productos" value={stats.totalProductos.toLocaleString('es-PE')} description="Activos registrados" icon={Package} tone="info" />
+              <MetricCard title="Valor inventario" value={formatCurrency(stats.valorInventario)} description="Inventario valorizado" icon={Boxes} tone="success" />
+              <MetricCard title="Stock crítico" value={stats.productosStockBajo.toLocaleString('es-PE')} description="Por debajo del mínimo" icon={AlertTriangle} tone="warning" />
+              <MetricCard title="Movimientos" value={stats.movimientosHoy.toLocaleString('es-PE')} description="Registrados hoy" icon={Truck} tone="default" />
             </div>
           </ProtectedComponent>
 
@@ -307,24 +276,28 @@ export default function InventarioPage() {
             accion="read"
             fallback={<ProductsFallback />}
           >
-            <div className="activity-card">
-              <h2 className="activity-title">Productos</h2>
-              <p className="dashboard-subtitle">
-                Filtros aplicados en cliente. Los movimientos y recepciones respetan el tenant activo.
-              </p>
-
-              <div className="modal-grid">
-                <input
+            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950"><ClipboardList className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Productos</CardTitle>
+                <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  Filtros de operación sobre catálogo, stock crítico y última actualización.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <Input
                   type="text"
                   value={filters.search}
                   onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
                   placeholder="Buscar por nombre, código o categoría"
+                  className="bg-slate-900/70 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
                 />
                 <select
                   value={filters.estado}
                   onChange={(event) =>
                     setFilters((prev) => ({ ...prev, estado: event.target.value as Filters['estado'] }))
                   }
+                  className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
                 >
                   {ESTADO_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -335,6 +308,7 @@ export default function InventarioPage() {
                 <select
                   value={filters.categoria}
                   onChange={(event) => setFilters((prev) => ({ ...prev, categoria: event.target.value }))}
+                  className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
                 >
                   <option value="">Todas las categorías</option>
                   {categorias.map((categoria) => (
@@ -343,7 +317,7 @@ export default function InventarioPage() {
                     </option>
                   ))}
                 </select>
-                <label>
+                <label className="flex min-h-10 items-center gap-2 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-700">
                   <input
                     type="checkbox"
                     checked={filters.soloCriticos}
@@ -355,56 +329,59 @@ export default function InventarioPage() {
                 </label>
               </div>
 
-              <table>
-                <thead>
+              <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
                   <tr>
-                    <th>Producto</th>
-                    <th>Categoría</th>
-                    <th>Estado</th>
-                    <th>Stock</th>
-                    <th>Min.</th>
-                    <th>Actualización</th>
+                    <th className="px-4 py-3 text-left">Producto</th>
+                    <th className="px-4 py-3 text-left">Categoría</th>
+                    <th className="px-4 py-3 text-left">Estado</th>
+                    <th className="px-4 py-3 text-right">Stock</th>
+                    <th className="px-4 py-3 text-right">Min.</th>
+                    <th className="px-4 py-3 text-left">Actualización</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-cyan-400/10 group-data-[erp-theme=light]/dashboard:divide-slate-100">
                   {productosFiltrados.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>Sin productos que cumplan los filtros.</td>
+                      <td className="px-4 py-8 text-center text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500" colSpan={6}>Sin productos que cumplan los filtros.</td>
                     </tr>
                   ) : (
                     productosFiltrados.map((producto) => {
                       const critico = producto.stockMinimo > 0 && producto.stockActual <= producto.stockMinimo
                       return (
                         <tr key={producto.id}>
-                          <td>
+                          <td className="px-4 py-3">
                             <div>
-                              <strong>{producto.nombre}</strong>
-                              {producto.codigo && <small>Código: {producto.codigo}</small>}
+                              <strong className="block text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900">{producto.nombre}</strong>
+                              {producto.codigo && <small className="text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Código: {producto.codigo}</small>}
                             </div>
                           </td>
-                          <td>{producto.categoria ?? '—'}</td>
-                          <td>
-                            <span className={producto.activo ? 'status-success' : 'status-error'}>
+                          <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{producto.categoria ?? '—'}</td>
+                          <td className="px-4 py-3">
+                            <Badge className={producto.activo ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'}>
                               {producto.activo ? 'Activo' : 'Inactivo'}
-                            </span>
+                            </Badge>
                           </td>
-                          <td className={critico ? 'text-red-600' : ''}>{formatNumber(producto.stockActual)}</td>
-                          <td>{producto.stockMinimo > 0 ? formatNumber(producto.stockMinimo) : '—'}</td>
-                          <td>{formatDateTime(producto.updatedAt)}</td>
+                          <td className={critico ? 'px-4 py-3 text-right font-bold text-amber-200 group-data-[erp-theme=light]/dashboard:text-amber-700' : 'px-4 py-3 text-right'}>{formatNumber(producto.stockActual)}</td>
+                          <td className="px-4 py-3 text-right">{producto.stockMinimo > 0 ? formatNumber(producto.stockMinimo) : '—'}</td>
+                          <td className="px-4 py-3 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">{formatDateTime(producto.updatedAt)}</td>
                         </tr>
                       )
                     })
                   )}
                 </tbody>
               </table>
+              </div>
 
               {criticos.length > 0 && (
-                <div className="status-error">
+                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
                   <strong>Productos críticos:</strong>{' '}
                   {criticos.map((producto) => producto.nombre).join(', ')}
                 </div>
               )}
-            </div>
+              </CardContent>
+            </Card>
           </ProtectedComponent>
 
           {/* Movimientos recientes */}
@@ -414,25 +391,24 @@ export default function InventarioPage() {
             accion="read"
             fallback={<MovementsFallback />}
           >
-            <div className="activity-card">
-              <div className="activity-header">
-                <h2 className="activity-title">Movimientos recientes</h2>
-                <Link href="/dashboard/inventario/kardex" className="btn btn-primary">
-                  Ver kardex →
-                </Link>
-              </div>
+            <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Movimientos recientes</CardTitle>
+                <Button asChild size="sm"><Link href="/dashboard/inventario/kardex">Ver kardex</Link></Button>
+              </CardHeader>
+              <CardContent>
 
               {movimientos.length === 0 ? (
-                <p>Sin movimientos recientes.</p>
+                <p className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Sin movimientos recientes.</p>
               ) : (
-                <div className="activity-list">
+                <div className="grid gap-3">
                   {movimientos.map((movimiento) => {
                     const producto = movimiento.productoId ? productoPorId.get(movimiento.productoId) : null
                     return (
-                      <div key={movimiento.id} className="activity-item">
-                        <div className="activity-content">
-                          <strong>{producto?.nombre ?? 'Movimiento de inventario'}</strong>
-                          <div className="activity-meta-info">
+                      <div key={movimiento.id} className="flex flex-col gap-2 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 md:flex-row md:items-center md:justify-between">
+                        <div className="min-w-0">
+                          <strong className="block truncate">{producto?.nombre ?? 'Movimiento de inventario'}</strong>
+                          <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
                             <span>
                               Tipo:{' '}
                               <strong>{movimiento.tipo === 'ENTRADA' ? 'Entrada' : movimiento.tipo === 'SALIDA' ? 'Salida' : 'Ajuste'}</strong>
@@ -444,16 +420,17 @@ export default function InventarioPage() {
                             {movimiento.referencia && <span>Ref: {movimiento.referencia}</span>}
                           </div>
                         </div>
-                        <div className="activity-time">{formatDateTime(movimiento.creadoEn)}</div>
+                        <div className="text-xs font-semibold text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700">{formatDateTime(movimiento.creadoEn)}</div>
                       </div>
                     )
                   })}
                 </div>
               )}
-            </div>
+              </CardContent>
+            </Card>
           </ProtectedComponent>
         </>
       )}
-    </div>
+    </PageShell>
   )
 }

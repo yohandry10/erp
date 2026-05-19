@@ -26,15 +26,15 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
       <input
-        className="input"
+        className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         placeholder="Cliente / RUC"
         value={local.cliente}
         onChange={(e) => handleChange('cliente', e.target.value)}
       />
       <select
-        className="input"
+        className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.tipoComprobante}
         onChange={(e) => handleChange('tipoComprobante', e.target.value)}
       >
@@ -45,7 +45,7 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
         <option value="08">Nota Débito</option>
       </select>
       <select
-        className="input"
+        className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.estado}
         onChange={(e) => handleChange('estado', e.target.value)}
       >
@@ -57,19 +57,19 @@ export function ComprobantesFilters({ filters, onChange, onExport }: Props) {
       </select>
       <input
         type="date"
-        className="input"
+        className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.fechaDesde}
         onChange={(e) => handleChange('fechaDesde', e.target.value)}
       />
       <input
         type="date"
-        className="input"
+        className="rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10"
         value={local.fechaHasta}
         onChange={(e) => handleChange('fechaHasta', e.target.value)}
       />
       <div className="flex gap-2">
         <button
-          className="btn btn-secondary w-full"
+          className="w-full rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/15"
           onClick={() => onExport(local)}
         >
           Exportar CSV

@@ -37,21 +37,21 @@ $headers = @{
 Write-Host "2. Obteniendo centros de costo..." -ForegroundColor Yellow
 try {
     $centrosCosto = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Get -Headers $headers
-    
+
     if ($centrosCosto.data -and $centrosCosto.data.Count -gt 0) {
         $centroCostoId = $centrosCosto.data[0].id
         Write-Host "✓ Centro de costo encontrado: $centroCostoId" -ForegroundColor Green
         Write-Host "  Nombre: $($centrosCosto.data[0].nombre)" -ForegroundColor Gray
     } else {
         Write-Host "⚠ No hay centros de costo. Creando uno..." -ForegroundColor Yellow
-        
+
         $nuevoCentro = @{
             codigo = "CC-TEST-001"
             nombre = "Centro de Costo Test"
             descripcion = "Centro de costo para pruebas"
             activo = $true
         } | ConvertTo-Json
-        
+
         $centroCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Post -Body $nuevoCentro -Headers $headers
         $centroCostoId = $centroCreado.data.id
         Write-Host "✓ Centro de costo creado: $centroCostoId" -ForegroundColor Green
@@ -67,11 +67,11 @@ try {
 Write-Host "3. Obteniendo cuentas contables..." -ForegroundColor Yellow
 try {
     $cuentas = Invoke-RestMethod -Uri "$baseUrl/contabilidad/plan-cuentas" -Method Get -Headers $headers
-    
+
     if ($cuentas.data -and $cuentas.data.Count -gt 0) {
         # Buscar una cuenta de gastos (clase 9)
         $cuentaGasto = $cuentas.data | Where-Object { $_.codigo -like "9*" } | Select-Object -First 1
-        
+
         if ($cuentaGasto) {
             $cuentaId = $cuentaGasto.id
             Write-Host "✓ Cuenta contable encontrada: $cuentaId" -ForegroundColor Green
@@ -96,41 +96,41 @@ try {
 Write-Host "4. Obteniendo períodos contables..." -ForegroundColor Yellow
 try {
     $periodos = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
-    
+
     if ($periodos.data -and $periodos.data.Count -gt 0) {
         # Buscar un período abierto
         $periodoAbierto = $periodos.data | Where-Object { $_.estado -eq "ABIERTO" } | Select-Object -First 1
-        
+
         if ($periodoAbierto) {
             $periodoId = $periodoAbierto.id
             Write-Host "✓ Período contable abierto encontrado: $periodoId" -ForegroundColor Green
             Write-Host "  Período: $($periodoAbierto.anio)-$($periodoAbierto.mes.ToString().PadLeft(2,'0'))" -ForegroundColor Gray
         } else {
             Write-Host "⚠ No hay períodos abiertos. Creando uno..." -ForegroundColor Yellow
-            
+
             $anioActual = (Get-Date).Year
             $mesActual = (Get-Date).Month
-            
+
             $nuevoPeriodo = @{
                 anio = $anioActual
                 mes = $mesActual
             } | ConvertTo-Json
-            
+
             $periodoCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Body $nuevoPeriodo -Headers $headers
             $periodoId = $periodoCreado.data.id
             Write-Host "✓ Período contable creado: $periodoId" -ForegroundColor Green
         }
     } else {
         Write-Host "⚠ No hay períodos. Creando uno..." -ForegroundColor Yellow
-        
+
         $anioActual = (Get-Date).Year
         $mesActual = (Get-Date).Month
-        
+
         $nuevoPeriodo = @{
             anio = $anioActual
             mes = $mesActual
         } | ConvertTo-Json
-        
+
         $periodoCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Body $nuevoPeriodo -Headers $headers
         $periodoId = $periodoCreado.data.id
         Write-Host "✓ Período contable creado: $periodoId" -ForegroundColor Green
@@ -158,7 +158,7 @@ Write-Host ""
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos" -Method Post -Body $presupuestoBody -Headers $headers
-    
+
     Write-Host "✓ Presupuesto creado exitosamente" -ForegroundColor Green
     Write-Host ""
     Write-Host "=== RESPUESTA ===" -ForegroundColor Cyan
@@ -179,12 +179,12 @@ try {
     Write-Host "Notas: $($response.data.notas)" -ForegroundColor White
     Write-Host "Creado: $($response.data.created_at)" -ForegroundColor White
     Write-Host ""
-    
+
     # Validaciones
     Write-Host "=== VALIDACIONES ===" -ForegroundColor Cyan
-    
+
     $validaciones = @()
-    
+
     if ($response.data.monto_presupuestado -eq 50000.00) {
         Write-Host "✓ Monto presupuestado correcto" -ForegroundColor Green
         $validaciones += $true
@@ -192,7 +192,7 @@ try {
         Write-Host "✗ Monto presupuestado incorrecto" -ForegroundColor Red
         $validaciones += $false
     }
-    
+
     if ($response.data.monto_ejecutado -eq 0) {
         Write-Host "✓ Monto ejecutado inicializado en 0" -ForegroundColor Green
         $validaciones += $true
@@ -200,7 +200,7 @@ try {
         Write-Host "✗ Monto ejecutado no está en 0" -ForegroundColor Red
         $validaciones += $false
     }
-    
+
     if ($response.data.monto_disponible -eq 50000.00) {
         Write-Host "✓ Monto disponible calculado correctamente" -ForegroundColor Green
         $validaciones += $true
@@ -208,7 +208,7 @@ try {
         Write-Host "✗ Monto disponible incorrecto" -ForegroundColor Red
         $validaciones += $false
     }
-    
+
     if ($response.data.porcentaje_ejecutado -eq 0) {
         Write-Host "✓ Porcentaje ejecutado inicializado en 0%" -ForegroundColor Green
         $validaciones += $true
@@ -216,7 +216,7 @@ try {
         Write-Host "✗ Porcentaje ejecutado no está en 0%" -ForegroundColor Red
         $validaciones += $false
     }
-    
+
     if ($response.data.estado -eq "ACTIVO") {
         Write-Host "✓ Estado correcto (ACTIVO)" -ForegroundColor Green
         $validaciones += $true
@@ -224,25 +224,25 @@ try {
         Write-Host "✗ Estado incorrecto" -ForegroundColor Red
         $validaciones += $false
     }
-    
+
     Write-Host ""
-    
+
     if ($validaciones -contains $false) {
         Write-Host "=== TEST FALLIDO ===" -ForegroundColor Red
         exit 1
     } else {
         Write-Host "=== TEST EXITOSO ===" -ForegroundColor Green
     }
-    
+
 } catch {
     Write-Host "✗ Error creando presupuesto" -ForegroundColor Red
     Write-Host "  Status: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Red
     Write-Host "  Mensaje: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "  Detalles: $($_.ErrorDetails.Message)" -ForegroundColor Red
     }
-    
+
     Write-Host ""
     Write-Host "=== TEST FALLIDO ===" -ForegroundColor Red
     exit 1

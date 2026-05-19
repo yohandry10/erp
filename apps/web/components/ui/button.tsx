@@ -12,10 +12,10 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground group-data-[erp-theme=dark]/dashboard:border-cyan-400/25 group-data-[erp-theme=dark]/dashboard:bg-slate-950/70 group-data-[erp-theme=dark]/dashboard:text-cyan-50 group-data-[erp-theme=dark]/dashboard:hover:bg-cyan-400/10",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 group-data-[erp-theme=dark]/dashboard:border group-data-[erp-theme=dark]/dashboard:border-cyan-400/20 group-data-[erp-theme=dark]/dashboard:bg-slate-900/70 group-data-[erp-theme=dark]/dashboard:text-cyan-50 group-data-[erp-theme=dark]/dashboard:hover:bg-cyan-400/10",
+        ghost: "hover:bg-accent hover:text-accent-foreground group-data-[erp-theme=dark]/dashboard:text-cyan-50 group-data-[erp-theme=dark]/dashboard:hover:bg-cyan-400/10",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

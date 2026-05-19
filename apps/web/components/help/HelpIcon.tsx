@@ -4,6 +4,7 @@ import { HelpCircle } from 'lucide-react'
 import { HelpTooltipContent } from './HelpTooltip'
 import { getHelpItem } from './help-data'
 import { HelpIconProps } from './types'
+import { cn } from '@/lib/utils'
 
 export function HelpIcon({ helpKey, position = 'top', className }: HelpIconProps) {
   const helpItem = getHelpItem(helpKey)
@@ -17,28 +18,12 @@ export function HelpIcon({ helpKey, position = 'top', className }: HelpIconProps
 
   return (
     <span
-      className="help-icon-wrapper"
-      style={{
-        position: 'relative',
-        display: 'inline-flex',
-        cursor: 'help',
-      }}
+      className={cn('help-icon-wrapper relative inline-flex cursor-help', className)}
       aria-label={`Ayuda: ${helpItem.title}`}
     >
       <HelpCircle
-        style={{
-          width: '16px',
-          height: '16px',
-          color: '#94a3b8',
-          transition: 'color 0.2s',
-        }}
+        className="h-4 w-4 text-slate-400 transition hover:text-blue-500"
         aria-hidden="true"
-        onMouseEnter={(e) => {
-          (e.target as HTMLElement).style.color = '#3b82f6'
-        }}
-        onMouseLeave={(e) => {
-          (e.target as HTMLElement).style.color = '#94a3b8'
-        }}
       />
       <HelpTooltipContent content={helpItem} position={position} />
     </span>

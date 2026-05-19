@@ -2,7 +2,7 @@
 # Obtener presupuestos por centro de costo y período
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJlbWFpbCI6ImFkbWluQGVycC5jb20iLCJ0ZW5hbnRfaWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJpYXQiOjE1MTYyMzkwMjJ9.placeholder"
+$token = "REPLACE_WITH_TEST_JWT"
 
 Write-Host "🧪 TEST: Obtener presupuestos por centro de costo y período" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
@@ -23,7 +23,7 @@ if ($centrosResponse.success -and $centrosResponse.data.Count -gt 0) {
     Write-Host "✅ Centro de costo encontrado: $($centroCosto.nombre) (ID: $centroCostoId)" -ForegroundColor Green
 } else {
     Write-Host "❌ No se encontraron centros de costo. Creando uno nuevo..." -ForegroundColor Red
-    
+
     # Crear un centro de costo de prueba
     $nuevoCentro = @{
         codigo = "CC-TEST-001"
@@ -61,7 +61,7 @@ if ($periodosResponse.success -and $periodosResponse.data.Count -gt 0) {
     Write-Host "✅ Período encontrado: $($periodo.anio)-$($periodo.mes) (ID: $periodoId)" -ForegroundColor Green
 } else {
     Write-Host "❌ No se encontraron períodos. Creando uno nuevo..." -ForegroundColor Red
-    
+
     # Crear un período de prueba
     $nuevoPeriodo = @{
         anio = 2025
@@ -93,7 +93,7 @@ $presupuestosExistentes = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupue
 
 if ($presupuestosExistentes.data.Count -eq 0) {
     Write-Host "⚠️ No hay presupuestos. Creando presupuestos de prueba..." -ForegroundColor Yellow
-    
+
     # Obtener cuentas contables
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/plan-cuentas" `
         -Method GET `
@@ -101,7 +101,7 @@ if ($presupuestosExistentes.data.Count -eq 0) {
             "Authorization" = "Bearer $token"
             "Content-Type" = "application/json"
         }
-    
+
     if ($cuentasResponse.success -and $cuentasResponse.data.Count -gt 0) {
         # Crear 2 presupuestos de prueba
         $cuenta1 = $cuentasResponse.data[0]
@@ -172,20 +172,20 @@ try {
     Write-Host ""
     Write-Host "📊 DATOS RECIBIDOS:" -ForegroundColor Cyan
     Write-Host "==================" -ForegroundColor Cyan
-    
+
     # Mostrar información del centro de costo
     Write-Host ""
     Write-Host "🏢 Centro de Costo:" -ForegroundColor Yellow
     Write-Host "  - Código: $($response.data.centro_costo.codigo)" -ForegroundColor White
     Write-Host "  - Nombre: $($response.data.centro_costo.nombre)" -ForegroundColor White
-    
+
     # Mostrar información del período
     Write-Host ""
     Write-Host "📅 Período:" -ForegroundColor Yellow
     Write-Host "  - Año: $($response.data.periodo.anio)" -ForegroundColor White
     Write-Host "  - Mes: $($response.data.periodo.mes)" -ForegroundColor White
     Write-Host "  - Estado: $($response.data.periodo.estado)" -ForegroundColor White
-    
+
     # Mostrar resumen
     Write-Host ""
     Write-Host "📈 Resumen:" -ForegroundColor Yellow
@@ -194,19 +194,19 @@ try {
     Write-Host "  - Total ejecutado: S/ $($response.data.resumen.total_ejecutado.ToString('N2'))" -ForegroundColor White
     Write-Host "  - Total disponible: S/ $($response.data.resumen.total_disponible.ToString('N2'))" -ForegroundColor White
     Write-Host "  - % Ejecución global: $($response.data.resumen.porcentaje_ejecucion_global.ToString('N2'))%" -ForegroundColor White
-    
+
     # Mostrar alertas
     Write-Host ""
     Write-Host "⚠️ Alertas:" -ForegroundColor Yellow
     Write-Host "  - Sobregiros: $($response.data.resumen.alertas.sobregiros)" -ForegroundColor $(if ($response.data.resumen.alertas.sobregiros -gt 0) { "Red" } else { "White" })
     Write-Host "  - Advertencias: $($response.data.resumen.alertas.advertencias)" -ForegroundColor $(if ($response.data.resumen.alertas.advertencias -gt 0) { "Yellow" } else { "White" })
     Write-Host "  - Normales: $($response.data.resumen.alertas.normales)" -ForegroundColor Green
-    
+
     # Mostrar detalle de presupuestos
     Write-Host ""
     Write-Host "💰 Detalle de Presupuestos:" -ForegroundColor Yellow
     Write-Host "============================" -ForegroundColor Yellow
-    
+
     foreach ($presupuesto in $response.data.presupuestos) {
         Write-Host ""
         Write-Host "  📌 Cuenta: $($presupuesto.plan_cuentas.codigo) - $($presupuesto.plan_cuentas.nombre)" -ForegroundColor Cyan
@@ -215,7 +215,7 @@ try {
         Write-Host "     - Comprometido: S/ $($presupuesto.monto_comprometido.ToString('N2'))" -ForegroundColor White
         Write-Host "     - Disponible: S/ $($presupuesto.monto_disponible.ToString('N2'))" -ForegroundColor White
         Write-Host "     - % Ejecutado: $($presupuesto.porcentaje_ejecutado.ToString('N2'))%" -ForegroundColor White
-        
+
         $alertColor = switch ($presupuesto.alerta) {
             "SOBREGIRO" { "Red" }
             "ADVERTENCIA" { "Yellow" }
@@ -223,12 +223,12 @@ try {
         }
         Write-Host "     - Alerta: $($presupuesto.alerta)" -ForegroundColor $alertColor
     }
-    
+
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Cyan
     Write-Host "✅ TEST COMPLETADO EXITOSAMENTE" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Cyan
-    
+
     # Mostrar JSON completo
     Write-Host ""
     Write-Host "📄 JSON Completo:" -ForegroundColor Gray
@@ -241,7 +241,7 @@ try {
     Write-Host ""
     Write-Host "Mensaje: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host ""
-    
+
     if ($_.Exception.Response) {
         $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
         $reader.BaseStream.Position = 0

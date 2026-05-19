@@ -2,6 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
+import { AlertCircle, Printer, RefreshCw, X } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 interface CpeViewModalProps {
   isOpen: boolean
@@ -86,13 +98,13 @@ export default function CpeViewModal({
           const qty = item.cantidad ?? 1
           const unit = item.precio_unitario ?? 0
           return `
-            <div style="display:flex;justify-content:space-between;margin:2px 0;font-size:10px;">
-              <span style="flex:1;">${qty}x ${item.nombre_producto || item.descripcion || 'Producto'}</span>
-              <span style="text-align:right;min-width:50px;">${formatMoney(qty * unit)}</span>
+            <div>
+              <span>${qty}x ${item.nombre_producto || item.descripcion || 'Producto'}</span>
+              <span>${formatMoney(qty * unit)}</span>
             </div>
           `
         }).join('')
-      : '<div style="font-size:10px;">Sin detalle de productos</div>'
+      : '<div>Sin detalle de productos</div>'
 
     const printWindow = window.open('', '_blank', 'width=350,height=600')
     
@@ -105,7 +117,7 @@ export default function CpeViewModal({
 
     // Generar HTML del logo si existe
     const logoHtml = cpeData.logo_url 
-      ? `<img src="${cpeData.logo_url}" alt="Logo" style="max-width: 60mm; max-height: 20mm; margin-bottom: 6px;" />`
+      ? `<img src="${cpeData.logo_url}" alt="Logo" />`
       : ''
 
     printWindow.document.write(`
@@ -113,40 +125,6 @@ export default function CpeViewModal({
       <html>
       <head>
         <title>${getDocumentTypeName()} ${numeroFormateado}</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          @media print { 
-            html, body { width: 80mm; margin: 0; padding: 0; }
-          }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            width: 80mm;
-            max-width: 80mm;
-            padding: 3mm;
-            background: white;
-            color: black;
-            line-height: 1.3;
-          }
-          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
-          .logo { margin-bottom: 6px; }
-          .logo img { max-width: 60mm; max-height: 20mm; }
-          .empresa { font-size: 14px; font-weight: bold; }
-          .ruc { font-size: 10px; }
-          .tipo-doc { font-size: 11px; font-weight: bold; margin: 6px 0 2px; border: 1px solid #000; padding: 4px; }
-          .numero { font-size: 12px; font-weight: bold; }
-          .fecha { font-size: 9px; color: #333; margin-top: 4px; }
-          .seccion { border-bottom: 1px dashed #000; padding: 6px 0; margin-bottom: 6px; }
-          .label { font-size: 9px; color: #666; }
-          .valor { font-size: 10px; }
-          .items { border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
-          .totales { padding: 6px 0; }
-          .total-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 10px; }
-          .total-final { font-size: 14px; font-weight: bold; border-top: 1px solid #000; padding-top: 6px; margin-top: 6px; }
-          .footer { text-align: center; margin-top: 10px; font-size: 8px; border-top: 1px dashed #000; padding-top: 6px; }
-          .hash { font-size: 7px; word-break: break-all; margin: 4px 0; }
-        </style>
       </head>
       <body>
         <div class="header">
@@ -165,7 +143,7 @@ export default function CpeViewModal({
         </div>
         
         <div class="items">
-          <div style="display:flex;justify-content:space-between;font-size:9px;font-weight:bold;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:4px;">
+          <div>
             <span>DESCRIPCIÓN</span>
             <span>TOTAL</span>
           </div>
@@ -181,7 +159,7 @@ export default function CpeViewModal({
         <div class="footer">
           <div class="hash">Hash: ${cpeData.hash || 'N/A'}</div>
           <div>Representación impresa del CPE</div>
-          <div style="margin-top:4px;">¡Gracias por su compra!</div>
+          <div>¡Gracias por su compra!</div>
         </div>
       </body>
       </html>
@@ -209,38 +187,11 @@ export default function CpeViewModal({
     }
   }
 
-  const getDocumentColor = () => {
-    switch (documentType) {
-      case '01':
-        return '#dc2626'
-      case '03':
-        return '#2563eb'
-      case '07':
-        return '#ea580c'
-      case '08':
-        return '#7c3aed'
-      default:
-        return '#6b7280'
-    }
-  }
-
   if (!isOpen) return null
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 999999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-      }}
+      className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
@@ -248,439 +199,201 @@ export default function CpeViewModal({
       }}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '95%',
-          maxWidth: '1400px',
-          maxHeight: '95vh',
-          overflow: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          position: 'relative',
-        }}
+        className="relative max-h-[95vh] w-[95%] max-w-7xl overflow-auto rounded-lg border border-cyan-400/20 bg-slate-950 text-slate-100 shadow-2xl shadow-cyan-950/40"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          style={{
-            backgroundColor: getDocumentColor(),
-            color: 'white',
-            padding: '16px',
-            borderRadius: '8px 8px 0 0',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="sticky top-0 z-10 border-b border-cyan-400/10 bg-slate-950/95 px-5 py-4 backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0 }}>{getDocumentTypeName()}</h2>
-              <p style={{ fontSize: '14px', margin: '4px 0 0 0', opacity: 0.9 }}>
+              <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+                Vista CPE
+              </Badge>
+              <h2 className="text-xl font-semibold tracking-normal text-slate-50">{getDocumentTypeName()}</h2>
+              <p className="mt-1 text-sm text-slate-400">
                 {cpeData
                   ? `${cpeData.serie}-${(typeof cpeData.numero === 'number'
                       ? cpeData.numero
                       : parseInt(String(cpeData.numero || '0'), 10)
                     )
                       .toString()
-                      .padStart(8, '0')}`
+                    .padStart(8, '0')}`
                   : ''}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
+            <div className="flex items-center gap-2">
+              <Button
                 onClick={handlePrint}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
+                className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white"
               >
-                🖨️ Imprimir
-              </button>
-              <button
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+              <Button
                 onClick={onClose}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'white',
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  padding: 0,
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                variant="outline"
+                size="icon"
+                className="border-cyan-400/20 bg-slate-900/80 text-slate-200 hover:bg-cyan-400/10"
                 aria-label="Cerrar"
               >
-                ×
-              </button>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div style={{ padding: '24px' }}>
+        <div className="p-5">
           {loading ? (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                height: '400px',
-                flexDirection: 'column',
-                gap: '16px',
-              }}
-            >
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '4px solid #f3f4f6',
-                  borderTop: '4px solid #3b82f6',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                }}
-              />
-              <p style={{ color: '#6b7280', fontSize: '16px' }}>Cargando comprobante...</p>
+            <div className="flex min-h-96 flex-col items-center justify-center gap-4">
+              <RefreshCw className="h-9 w-9 animate-spin text-cyan-300" />
+              <p className="text-sm text-slate-400">Cargando comprobante...</p>
             </div>
           ) : cpeData ? (
-            <div
-              style={{
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                color: '#000',
-                backgroundColor: 'white',
-              }}
-            >
-              {/* Encabezado con emisor y doc */}
-              <div style={{ marginBottom: '24px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000' }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ border: '1px solid #000', padding: '16px', width: '65%' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>NEON SYSTEM</h1>
-                          <p style={{ fontSize: '14px', margin: '4px 0' }}>Sistema Empresarial Integrado</p>
-                          <p style={{ fontSize: '14px', margin: '4px 0' }}>
-                            <strong>RUC:</strong> {cpeData.ruc_emisor}
-                          </p>
-                          <p style={{ fontSize: '14px', margin: '4px 0' }}>
-                            <strong>Razón Social:</strong> {cpeData.razon_social_emisor}
-                          </p>
-                          <p style={{ fontSize: '14px', margin: '4px 0' }}>Dirección: Lima, Perú</p>
-                        </div>
-                      </td>
-                      <td style={{ border: '1px solid #000', padding: '16px', width: '35%' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ border: '2px solid #000', padding: '12px', marginBottom: '12px' }}>
-                            <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 8px 0' }}>
-                              {getDocumentTypeName()}
-                            </h2>
-                            <p style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>
-                              {cpeData.serie} -{' '}
-                              {(typeof cpeData.numero === 'number'
-                                ? cpeData.numero
-                                : parseInt(String(cpeData.numero || '0'), 10)
-                              )
-                                .toString()
-                                .padStart(8, '0')}
-                            </p>
-                          </div>
-                          <div style={{ fontSize: '14px' }}>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Fecha:</strong>{' '}
-                              {new Date(cpeData.created_at).toLocaleDateString('es-PE')}
-                            </p>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Estado:</strong> {cpeData.estado}
-                            </p>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Moneda:</strong> {cpeData.moneda}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <div className="space-y-5">
+              <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4 text-center">
+                  <h1 className="text-2xl font-semibold text-slate-50">NEON SYSTEM</h1>
+                  <p className="mt-1 text-sm text-slate-400">Sistema Empresarial Integrado</p>
+                  <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-2">
+                    <p><strong>RUC:</strong> {cpeData.ruc_emisor}</p>
+                    <p><strong>Razón social:</strong> {cpeData.razon_social_emisor}</p>
+                    <p className="md:col-span-2">Dirección: Lima, Perú</p>
+                  </div>
+                </div>
 
-              {/* Datos del cliente */}
-              <div style={{ marginBottom: '24px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000' }}>
-                  <thead>
-                    <tr>
-                      <th
-                        style={{
-                          border: '1px solid #000',
-                          backgroundColor: '#f3f4f6',
-                          padding: '8px',
-                          textAlign: 'left',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        DATOS DEL CLIENTE
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ border: '1px solid #000', padding: '12px' }}>
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '16px',
-                            fontSize: '14px',
-                          }}
-                        >
-                          <div>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Cliente:</strong> {cpeData.razon_social_receptor}
-                            </p>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Documento:</strong> {cpeData.documento_receptor}
-                            </p>
-                          </div>
-                          <div>
-                            <p style={{ margin: '4px 0' }}>
-                              <strong>Tipo de Documento:</strong>{' '}
-                              {cpeData.tipo_documento_receptor === '1'
-                                ? 'DNI'
-                                : cpeData.tipo_documento_receptor === '6'
-                                ? 'RUC'
-                                : 'Otro'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                  <div className="rounded-md border border-cyan-400/25 bg-cyan-400/10 p-4 text-center">
+                    <h2 className="text-sm font-semibold uppercase text-cyan-100">{getDocumentTypeName()}</h2>
+                    <p className="mt-2 text-xl font-semibold text-slate-50">
+                      {cpeData.serie} -{' '}
+                      {(typeof cpeData.numero === 'number'
+                        ? cpeData.numero
+                        : parseInt(String(cpeData.numero || '0'), 10)
+                      )
+                        .toString()
+                        .padStart(8, '0')}
+                    </p>
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm text-slate-300">
+                    <p><strong>Fecha:</strong> {new Date(cpeData.created_at).toLocaleDateString('es-PE')}</p>
+                    <p><strong>Estado:</strong> {cpeData.estado}</p>
+                    <p><strong>Moneda:</strong> {cpeData.moneda}</p>
+                  </div>
+                </div>
+              </section>
 
-              {/* Detalle de productos */}
-              <div style={{ marginBottom: '24px' }}>
-                <table
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    border: '1px solid #000',
-                    fontSize: '14px',
-                  }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: '#f3f4f6' }}>
-                      <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-                        #
-                      </th>
-                      <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'left', fontWeight: 'bold' }}>
-                        DESCRIPCIÓN
-                      </th>
-                      <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-                        CANTIDAD
-                      </th>
-                      <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>
-                        PRECIO UNIT.
-                      </th>
-                      <th style={{ border: '1px solid #000', padding: '8px', textAlign: 'right', fontWeight: 'bold' }}>
-                        TOTAL
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+              <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Datos del cliente</h3>
+                <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
+                  <p><strong>Cliente:</strong> {cpeData.razon_social_receptor}</p>
+                  <p><strong>Documento:</strong> {cpeData.documento_receptor}</p>
+                  <p>
+                    <strong>Tipo de documento:</strong>{' '}
+                    {cpeData.tipo_documento_receptor === '1'
+                      ? 'DNI'
+                      : cpeData.tipo_documento_receptor === '6'
+                        ? 'RUC'
+                        : 'Otro'}
+                  </p>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-cyan-400/15 bg-slate-900/50">
+                <div className="border-b border-cyan-400/10 p-4">
+                  <h3 className="text-sm font-semibold uppercase text-cyan-200/80">Detalle de productos</h3>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-cyan-400/10 hover:bg-transparent">
+                      <TableHead className="text-center">#</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead className="text-center">Cantidad</TableHead>
+                      <TableHead className="text-right">Precio unit.</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {Array.isArray(cpeData.items) && cpeData.items.length > 0 ? (
                       cpeData.items.map((item, index) => {
                         const qty = item.cantidad ?? 1
                         const unit = item.precio_unitario ?? 0
                         return (
-                          <tr key={`${index}-${item.nombre_producto ?? item.descripcion ?? 'item'}`}>
-                            <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center' }}>
-                              {index + 1}
-                            </td>
-                            <td style={{ border: '1px solid #000', padding: '8px' }}>
+                          <TableRow key={`${index}-${item.nombre_producto ?? item.descripcion ?? 'item'}`} className="border-cyan-400/10">
+                            <TableCell className="text-center">{index + 1}</TableCell>
+                            <TableCell className="font-medium text-slate-100">
                               {item.nombre_producto || item.descripcion || 'Producto'}
-                            </td>
-                            <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'center' }}>{qty}</td>
-                            <td style={{ border: '1px solid #000', padding: '8px', textAlign: 'right' }}>
+                            </TableCell>
+                            <TableCell className="text-center">{qty}</TableCell>
+                            <TableCell className="text-right">
                               {cpeData.moneda} {unit.toFixed(2)}
-                            </td>
-                            <td
-                              style={{
-                                border: '1px solid #000',
-                                padding: '8px',
-                                textAlign: 'right',
-                                fontWeight: 'bold',
-                              }}
-                            >
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-cyan-100">
                               {cpeData.moneda} {(qty * unit).toFixed(2)}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         )
                       })
                     ) : (
-                      <tr>
-                        <td
+                      <TableRow>
+                        <TableCell
                           colSpan={5}
-                          style={{ border: '1px solid #000', padding: '16px', textAlign: 'center', color: '#6b7280' }}
+                          className="py-8 text-center text-slate-400"
                         >
                           No hay productos disponibles
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </section>
 
-              {/* Totales */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', marginBottom: '24px' }}>
-                <div>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      border: '1px solid #000',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        <th
-                          style={{
-                            border: '1px solid #000',
-                            backgroundColor: '#f3f4f6',
-                            padding: '8px',
-                            textAlign: 'left',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          INFORMACIÓN DE SEGURIDAD
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ border: '1px solid #000', padding: '12px' }}>
-                          <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>Hash de Seguridad:</p>
-                          <p
-                            style={{
-                              fontFamily: 'monospace',
-                              fontSize: '12px',
-                              wordBreak: 'break-all',
-                              margin: '0 0 12px 0',
-                            }}
-                          >
-                            {cpeData.hash || 'N/A'}
-                          </p>
-                          <p style={{ fontSize: '12px', margin: 0 }}>Representación impresa del {getDocumentTypeName()}</p>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+              <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                  <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Información de seguridad</h3>
+                  <p className="text-sm font-semibold text-slate-200">Hash de seguridad:</p>
+                  <p className="mt-2 break-all font-mono text-xs text-slate-400">{cpeData.hash || 'N/A'}</p>
+                  <p className="mt-4 text-xs text-slate-500">Representación impresa del {getDocumentTypeName()}</p>
                 </div>
 
-                <div>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      border: '1px solid #000',
-                      fontSize: '14px',
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        <th
-                          style={{
-                            border: '1px solid #000',
-                            backgroundColor: '#f3f4f6',
-                            padding: '8px',
-                            textAlign: 'left',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          RESUMEN DE TOTALES
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ border: '1px solid #000', padding: '12px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>Subtotal:</span>
-                              <span style={{ fontWeight: 'bold' }}>
-                                {cpeData.moneda} {(cpeData.total_gravadas || 0).toFixed(2)}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>IGV (18%):</span>
-                              <span style={{ fontWeight: 'bold' }}>
-                                {cpeData.moneda} {(cpeData.total_igv || 0).toFixed(2)}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                borderTop: '1px solid #000',
-                                paddingTop: '8px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                              }}
-                            >
-                              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>TOTAL:</span>
-                              <span style={{ fontWeight: 'bold', fontSize: '18px' }}>
-                                {cpeData.moneda} {(cpeData.total_venta || 0).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="rounded-lg border border-cyan-400/15 bg-slate-900/50 p-4">
+                  <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Resumen de totales</h3>
+                  <div className="space-y-3 text-sm">
+                    <TotalRow label="Subtotal" value={`${cpeData.moneda} ${(cpeData.total_gravadas || 0).toFixed(2)}`} />
+                    <TotalRow label="IGV (18%)" value={`${cpeData.moneda} ${(cpeData.total_igv || 0).toFixed(2)}`} />
+                    <div className="flex justify-between border-t border-cyan-400/10 pt-3 text-base font-semibold text-cyan-100">
+                      <span>TOTAL:</span>
+                      <span>{cpeData.moneda} {(cpeData.total_venta || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              {/* Footer */}
-              <div
-                style={{
-                  textAlign: 'center',
-                  fontSize: '12px',
-                  color: '#374151',
-                  borderTop: '1px solid #d1d5db',
-                  paddingTop: '16px',
-                }}
-              >
-                <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>NEON SYSTEM - Sistema Empresarial Integrado</p>
-                <p style={{ margin: '0 0 4px 0' }}>
+              <footer className="border-t border-cyan-400/10 pt-4 text-center text-xs text-slate-400">
+                <p className="font-semibold text-slate-300">NEON SYSTEM - Sistema Empresarial Integrado</p>
+                <p className="mt-1">
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>
-                <p style={{ margin: 0 }}>
+                <p className="mt-1">
                   Para consultas sobre este documento, contacte al emisor • Sistema certificado por SUNAT
                 </p>
-              </div>
+              </footer>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#6b7280' }}>
-              <p style={{ fontSize: '16px' }}>No se pudo cargar el comprobante</p>
-            </div>
+            <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>No se pudo cargar el comprobante</AlertDescription>
+            </Alert>
           )}
         </div>
-
-        <style jsx>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
+    </div>
+  )
+}
+
+function TotalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 text-slate-300">
+      <span>{label}:</span>
+      <span className="font-semibold text-slate-100">{value}</span>
     </div>
   )
 }

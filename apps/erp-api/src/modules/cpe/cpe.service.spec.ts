@@ -10,7 +10,7 @@ import { CacheInvalidationService } from '../../shared/cache/cache-invalidation.
 import { PdfGeneratorService } from './pdf-generator.service';
 import { FiscalAdapterService } from './fiscal-adapter.service';
 import { CreateFacturaDto } from '@erp-suite/dtos';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 // Mock XmlSigner
 jest.mock('@erp-suite/crypto', () => {
@@ -28,6 +28,7 @@ describe('CpeService', () => {
     let supabaseService: jest.Mocked<SupabaseService>;
     let validationService: jest.Mocked<ValidationService>;
     let eventBusService: jest.Mocked<EventBusService>;
+    let auditService: jest.Mocked<AuditService>;
     let module: TestingModule;
 
     let mockSupabaseClient: any;
@@ -148,6 +149,7 @@ describe('CpeService', () => {
         supabaseService = module.get(SupabaseService);
         validationService = module.get(ValidationService);
         eventBusService = module.get(EventBusService);
+        auditService = module.get(AuditService);
     });
 
     afterEach(async () => {
@@ -308,6 +310,96 @@ describe('CpeService', () => {
 
             await expect(service.create(invalidDto, mockTenantId)).rejects.toThrow(/factura requiere receptor con RUC/i);
             errorSpy.mockRestore();
+        });
+    });
+
+    describe('anulación CPE y contabilidad', () => {
+        const createAccountingValidationClient = (responses: Record<string, any>) => ({
+            from: jest.fn((table: string) => {
+                const chain = {
+                    select: jest.fn().mockReturnThis(),
+                    eq: jest.fn().mockReturnThis(),
+                    limit: jest.fn().mockResolvedValue(responses[table] ?? { data: [], error: null }),
+                    maybeSingle: jest.fn().mockResolvedValue(responses[table] ?? { data: null, error: null }),
+                };
+                return chain;
+            }),
+        });
+
+        it('bloquea anulación si el CPE no conserva source_event_id contable y audita el intento', async () => {
+            const cpe = {
+                id: 'cpe-sin-evento',
+                estado: 'FIRMADO',
+                nota_credito_id: null,
+            };
+            const client = createAccountingValidationClient({});
+
+            await expect(
+                (service as any).assertCpeOriginalAccountingReady(
+                    client,
+                    mockTenantId,
+                    cpe,
+                    'user-1',
+                    'QA intento sin contabilidad',
+                ),
+            ).rejects.toThrow(ConflictException);
+
+            expect(auditService.registrarCambio).toHaveBeenCalledWith(
+                'comprobantes_electronicos',
+                'UPDATE',
+                'user-1',
+                expect.objectContaining({
+                    new: expect.objectContaining({ anulacion_bloqueada: true }),
+                }),
+                mockTenantId,
+                'cpe-sin-evento',
+                expect.objectContaining({ accion: 'ANULACION_CPE_BLOQUEADA' }),
+            );
+        });
+
+        it('bloquea anulación si no existe exactamente un asiento original con detalle', async () => {
+            const cpe = {
+                id: 'cpe-sin-asiento',
+                estado: 'FIRMADO',
+                event_id: 'event-cpe-1',
+                nota_credito_id: null,
+            };
+            const client = createAccountingValidationClient({
+                asientos_contables: { data: [], error: null },
+            });
+
+            await expect(
+                (service as any).assertCpeOriginalAccountingReady(
+                    client,
+                    mockTenantId,
+                    cpe,
+                    'user-1',
+                    'QA intento sin asiento',
+                ),
+            ).rejects.toThrow(/se esperaban 1 asiento contable original/i);
+        });
+
+        it('permite continuar si existe un único asiento original con detalle', async () => {
+            const cpe = {
+                id: 'cpe-contabilizado',
+                estado: 'FIRMADO',
+                event_id: 'event-cpe-2',
+                nota_credito_id: null,
+            };
+            const client = createAccountingValidationClient({
+                asientos_contables: { data: [{ id: 'asiento-1' }], error: null },
+                detalle_asientos: { data: [{ id: 'detalle-1' }], error: null },
+            });
+
+            await expect(
+                (service as any).assertCpeOriginalAccountingReady(
+                    client,
+                    mockTenantId,
+                    cpe,
+                    'user-1',
+                    'QA anulación con asiento',
+                ),
+            ).resolves.toBeUndefined();
         });
     });
 

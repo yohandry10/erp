@@ -2,7 +2,7 @@
 # Tests upcoming payment due dates functionality
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1ZGJPdWRYL0JUZjVPRHMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2Vqb2Fxd3VxZGRxZGRxZGRxZGRxLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI5YzI5YjI3Zi1hNzI5LTRhNzAtYjU5Zi1lNzI5YjI3ZjI3MjkiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYxNTI3NjAwLCJpYXQiOjE3Mjk5OTE2MDAsImVtYWlsIjoiYWRtaW5AdmllcmRlcy5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7fSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTcyOTk5MTYwMH1dLCJzZXNzaW9uX2lkIjoiOWMyOWIyN2YtYTcyOS00YTcwLWI1OWYtZTcyOWIyN2YyNzI5In0.dummySignatureForTestingPurposes"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "vierdes"
 
 $headers = @{
@@ -21,21 +21,21 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/vencimientos" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✓ Respuesta exitosa" -ForegroundColor Green
     Write-Host "Fecha consulta: $($response.data.fecha_consulta)" -ForegroundColor White
     Write-Host "Días adelante: $($response.data.dias_adelante)" -ForegroundColor White
     Write-Host "Fecha límite: $($response.data.fecha_limite)" -ForegroundColor White
     Write-Host "Cantidad total: $($response.data.resumen.cantidad_total)" -ForegroundColor White
     Write-Host "Monto total: $($response.data.resumen.monto_total)" -ForegroundColor White
-    
+
     if ($response.data.resumen.por_moneda) {
         Write-Host "`nResumen por moneda:" -ForegroundColor Cyan
         $response.data.resumen.por_moneda.PSObject.Properties | ForEach-Object {
             Write-Host "  $($_.Name): $($_.Value.cantidad) cuentas, Monto: $($_.Value.monto)" -ForegroundColor White
         }
     }
-    
+
     if ($response.data.vencimientos -and $response.data.vencimientos.Count -gt 0) {
         Write-Host "`nPrimeros 5 vencimientos:" -ForegroundColor Cyan
         $response.data.vencimientos | Select-Object -First 5 | ForEach-Object {
@@ -60,12 +60,12 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/vencimientos?dias=7" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✓ Respuesta exitosa" -ForegroundColor Green
     Write-Host "Días adelante: $($response.data.dias_adelante)" -ForegroundColor White
     Write-Host "Cantidad total: $($response.data.resumen.cantidad_total)" -ForegroundColor White
     Write-Host "Monto total: $($response.data.resumen.monto_total)" -ForegroundColor White
-    
+
     if ($response.data.vencimientos -and $response.data.vencimientos.Count -gt 0) {
         Write-Host "`nVencimientos en los próximos 7 días:" -ForegroundColor Cyan
         $response.data.vencimientos | ForEach-Object {
@@ -89,7 +89,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/vencimientos?dias=60" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✓ Respuesta exitosa" -ForegroundColor Green
     Write-Host "Días adelante: $($response.data.dias_adelante)" -ForegroundColor White
     Write-Host "Cantidad total: $($response.data.resumen.cantidad_total)" -ForegroundColor White
@@ -108,21 +108,21 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/vencimientos" `
         -Method Get `
         -Headers $headers
-    
+
     if ($response.data.vencimientos -and $response.data.vencimientos.Count -gt 0) {
         $proveedorId = $response.data.vencimientos[0].proveedor_id
         $proveedorNombre = $response.data.vencimientos[0].proveedor_razon_social
-        
+
         Write-Host "Filtrando por proveedor: $proveedorNombre" -ForegroundColor Cyan
-        
+
         $responseFiltered = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/vencimientos?proveedor_id=$proveedorId" `
             -Method Get `
             -Headers $headers
-        
+
         Write-Host "✓ Respuesta exitosa" -ForegroundColor Green
         Write-Host "Cantidad total: $($responseFiltered.data.resumen.cantidad_total)" -ForegroundColor White
         Write-Host "Monto total: $($responseFiltered.data.resumen.monto_total)" -ForegroundColor White
-        
+
         if ($responseFiltered.data.vencimientos) {
             Write-Host "`nVencimientos del proveedor:" -ForegroundColor Cyan
             $responseFiltered.data.vencimientos | ForEach-Object {

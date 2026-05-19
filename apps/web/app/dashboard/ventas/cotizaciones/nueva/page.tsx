@@ -41,24 +41,12 @@ export default function NuevaCotizacionPage() {
   }
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="p-6 flex flex-col gap-6">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="flex items-center gap-4">
         <button
           onClick={() => router.back()}
-          aria-label="Volver a cotizaciones"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0.5rem',
-            color: 'var(--primary-700)',
-            background: 'rgba(255, 255, 255, 0.8)',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
+          aria-label="Volver a cotizaciones" className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--primary-50)'
             e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -70,13 +58,13 @@ export default function NuevaCotizacionPage() {
             e.currentTarget.style.transform = 'translateX(0)'
           }}
         >
-          <ArrowLeft style={{ width: '1.125rem', height: '1.125rem' }} />
+          <ArrowLeft className="w-[1.125rem] h-[1.125rem]" />
         </button>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary-900)', margin: 0 }}>
+          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">
             Nueva Cotización
           </h1>
-          <p style={{ fontSize: '1rem', color: 'var(--primary-600)', margin: '0.25rem 0 0 0' }}>
+          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">
             Crea una nueva cotización de venta
           </p>
         </div>

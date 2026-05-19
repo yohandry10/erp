@@ -108,16 +108,7 @@ export function ErrorDisplay({
 
   if (variant === 'inline') {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          color: 'var(--red-700)',
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          padding: '0.5rem',
-        }}
+      <div className="flex items-center gap-2 text-[var(--red-700)] text-[0.875rem] font-medium p-2"
       >
         {showIcon && (
           <svg
@@ -138,17 +129,7 @@ export function ErrorDisplay({
         <span>{errorMessage}</span>
         {onDismiss && (
           <button
-            onClick={onDismiss}
-            style={{
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--red-600)',
-              padding: '0.25rem',
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            onClick={onDismiss} className="ml-auto border-0 cursor-pointer text-[var(--red-600)] p-1 flex items-center"
             aria-label="Cerrar error"
           >
             <svg
@@ -172,18 +153,7 @@ export function ErrorDisplay({
 
   if (variant === 'banner') {
     return (
-      <div
-        style={{
-          background: 'var(--gradient-danger)',
-          color: 'white',
-          padding: '1rem',
-          borderRadius: 'var(--border-radius)',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          boxShadow: 'var(--shadow-md)',
-        }}
+      <div className="bg-[var(--gradient-danger)] text-white p-4 mb-4 flex items-center gap-3 shadow"
       >
         {showIcon && (
           <svg
@@ -201,20 +171,10 @@ export function ErrorDisplay({
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         )}
-        <span style={{ flex: 1, fontWeight: '600' }}>{errorMessage}</span>
+        <span className="flex-[1] font-semibold">{errorMessage}</span>
         {onDismiss && (
           <button
-            onClick={onDismiss}
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'white',
-              padding: '0.25rem',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            onClick={onDismiss} className="bg-[rgba(255,_255,_255,_0.2)] border-0 cursor-pointer text-white p-1 rounded-[4px] flex items-center"
             aria-label="Cerrar error"
           >
             <svg
@@ -239,34 +199,12 @@ export function ErrorDisplay({
   // Variant 'card' (default)
   return (
     <div
-      className="activity-card"
-      style={{
-        background: 'var(--red-50)',
-        border: '1px solid var(--red-200)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        marginBottom: '1.5rem',
-      }}
+      className="activity-card bg-[var(--red-50)] border p-6 mb-6"
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '0.75rem',
-        }}
+      <div className="flex items-start gap-3"
       >
         {showIcon && (
-          <div
-            style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: 'var(--red-200)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
+          <div className="w-6 h-6 rounded-full bg-[var(--red-200)] flex items-center justify-center shrink-0"
           >
             <svg
               width="16"
@@ -284,30 +222,15 @@ export function ErrorDisplay({
             </svg>
           </div>
         )}
-        <div style={{ flex: 1 }}>
-          <p
-            style={{
-              margin: 0,
-              fontWeight: '600',
-              color: 'var(--red-700)',
-              fontSize: '0.95rem',
-            }}
+        <div className="flex-[1]">
+          <p className="m-0 font-semibold text-[var(--red-700)] text-[0.95rem]"
           >
             {errorMessage}
           </p>
         </div>
         {onDismiss && (
           <button
-            onClick={onDismiss}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--red-600)',
-              padding: '0.25rem',
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            onClick={onDismiss} className="border-0 cursor-pointer text-[var(--red-600)] p-1 flex items-center"
             aria-label="Cerrar error"
           >
             <svg

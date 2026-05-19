@@ -19,24 +19,11 @@ export default function UsersTable({
 }: UsersTableProps) {
   if (usuarios.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-        <p style={{ color: 'var(--primary-500)', marginBottom: '1rem' }}>
+      <div className="px-0 py-10 text-center">
+        <p className="mb-4 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
           No hay usuarios registrados en el sistema
         </p>
-        <button 
-          style={{
-            marginTop: '1rem',
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'var(--blue-600)',
-            color: 'white',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--blue-700)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--blue-600)'}
+        <button className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
           onClick={onCreateFirst}
         >
           Crear primer usuario
@@ -46,20 +33,20 @@ export default function UsersTable({
   }
 
   return (
-    <div style={{ overflow: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-            <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Usuario</th>
-            <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Email</th>
-            <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Rol</th>
-            <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Último Acceso</th>
-            <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Creado</th>
-            <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Estado</th>
-            <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Acciones</th>
+    <div className="overflow-auto rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:border-slate-200">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          <tr>
+            <th className="text-left p-4 font-semibold">Usuario</th>
+            <th className="text-left p-4 font-semibold">Email</th>
+            <th className="text-center p-4 font-semibold">Rol</th>
+            <th className="text-left p-4 font-semibold">Último Acceso</th>
+            <th className="text-left p-4 font-semibold">Creado</th>
+            <th className="text-center p-4 font-semibold">Estado</th>
+            <th className="text-center p-4 font-semibold">Acciones</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-cyan-400/10 group-data-[erp-theme=light]/dashboard:divide-slate-100">
           {usuarios.map((usuario: any) => (
             <UserRow
               key={usuario.id}

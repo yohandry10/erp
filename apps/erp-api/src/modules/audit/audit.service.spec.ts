@@ -12,6 +12,7 @@ describe('AuditService', () => {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         or: jest.fn().mockReturnThis(),
+        in: jest.fn().mockReturnThis(),
         gte: jest.fn().mockReturnThis(),
         lte: jest.fn().mockReturnThis(),
         insert: jest.fn().mockReturnThis(),

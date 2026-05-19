@@ -16,7 +16,7 @@ export class RegistrarPagoDto {
     minimum: 0.01,
   })
   @IsNotEmpty({ message: 'El monto del pago es requerido' })
-  @IsNumber({}, { message: 'El monto debe ser un número' })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto debe ser un número con máximo 2 decimales' })
   @Min(0.01, { message: 'El monto debe ser mayor a 0' })
   monto: number;
 

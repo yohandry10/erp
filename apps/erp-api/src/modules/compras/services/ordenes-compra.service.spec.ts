@@ -765,7 +765,7 @@ describe('OrdenesCompraService', () => {
       const result = await service.findAprobacionesByOrdenId('orden-123', 'tenant-123');
 
       expect(result).toEqual(mockAprobaciones);
-      expect(ocAprobacionesRepository.findByOrdenId).toHaveBeenCalledWith('orden-123');
+      expect(ocAprobacionesRepository.findByOrdenId).toHaveBeenCalledWith('orden-123', 'tenant-123');
     });
 
     it('should throw NotFoundException when orden not found', async () => {

@@ -546,8 +546,8 @@ pnpm dev
 # SUPABASE
 # ============================================
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+SUPABASE_SERVICE_ROLE_KEY=replace_with_service_role_key
+SUPABASE_ANON_KEY=replace_with_anon_key
 
 # ============================================
 # JWT & AUTH

@@ -460,3 +460,46 @@ Total: 160
 - ventas_pos
 - ventas_pos_pagos
 - wizard_progress
+
+---
+
+## Reglas de Revision Exhaustiva del Sistema
+
+### Regla 1: No asumir - verificar en codigo
+- Cada hallazgo debe incluir archivo exacto y numero de linea
+- Si se reporta "falta validacion X", se debe haber leido el archivo completo, no solo un fragmento
+- Citar el codigo relevante textualmente
+
+### Regla 2: No inventar vulnerabilidades
+- Solo reportar lo que se puede demostrar leyendo el codigo
+- Si no se puede ver la implementacion completa (ej: funcion importada de otro archivo), seguir la cadena hasta el origen antes de concluir
+- Nunca especular sobre lo que "podria" pasar sin evidencia
+
+### Regla 3: Seguir la cadena completa de cada flujo
+- Frontend -> API call -> Controller -> Service -> Database
+- No revisar archivos aislados, sino el flujo end-to-end
+- Verificar que los eventos emitidos tienen listeners y viceversa
+
+### Regla 4: Distinguir severidades reales
+- CRITICO: Explotable ahora (auth bypass, SQL injection, RLS faltante)
+- ALTO: Problema serio pero requiere condiciones (race conditions, data leaks entre tenants)
+- MEDIO: Mala practica que puede escalar (sin validacion, error handling pobre)
+- BAJO: Deuda tecnica, inconsistencias de codigo
+
+### Regla 5: No duplicar lo que Supabase/NestJS ya protege
+- Si Supabase RLS esta activo en una tabla, no reportar "falta auth" en el query
+- Si NestJS tiene un guard global, no reportar "endpoint sin proteccion" sin verificar primero
+- Entender el stack antes de criticarlo
+
+### Regla 6: Verificar imports y dependencias
+- Antes de decir "esta funcion no existe" o "este servicio no esta conectado", buscar el import real
+- Seguir la resolucion de modulos de NestJS (providers, exports, imports)
+
+### Regla 7: Leer los tests antes de decir "no hay tests"
+- Verificar archivos .spec.ts del mismo modulo
+- Verificar scripts .ps1 en test/
+- Verificar tests e2e en apps/web/tests/e2e/
+
+### Regla 8: No reportar como bug lo que es diseno intencional
+- Si algo parece raro, buscar contexto en archivos relacionados antes de reportar
+- Considerar que es un ERP peruano (SUNAT, CPE, GRE, SIRE tienen reglas especificas)

@@ -1,7 +1,7 @@
 # Test GET /api/finanzas/bancos/cuentas/:id/movimientos/exportar
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZjY3YzI0Yy1hMzE0LTRhNzAtYjU5Zi1lNzE0YzY5YzY5YzYiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwidGVuYW50X2lkIjoiNzc3Nzc3NzctNzc3Ny03Nzc3LTc3NzctNzc3Nzc3Nzc3Nzc3IiwiaWF0IjoxNzMwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.T8nEz8VjWvU5l_F-example-token-replace-with-real"
+$token = "REPLACE_WITH_TEST_JWT"
 
 $headers = @{
     "Authorization" = "Bearer $token"
@@ -16,7 +16,7 @@ Write-Host "`n1. Obteniendo cuentas bancarias..." -ForegroundColor Yellow
 try {
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas" -Method Get -Headers $headers
     Write-Host "Cuentas obtenidas: $($cuentasResponse.data.Count)" -ForegroundColor Green
-    
+
     if ($cuentasResponse.data.Count -eq 0) {
         Write-Host "No hay cuentas bancarias. Por favor crea una cuenta primero." -ForegroundColor Red
         exit 1
@@ -34,11 +34,11 @@ try {
 Write-Host "`n2. Exportando todos los movimientos (sin filtros)..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         Write-Host "✓ CSV generado exitosamente" -ForegroundColor Green
         Write-Host "  Nombre archivo: $($response.filename)" -ForegroundColor Gray
-        
+
         # Mostrar las primeras líneas del CSV
         $lines = $response.data -split "`n"
         Write-Host "`n  Primeras líneas del CSV:" -ForegroundColor Gray
@@ -46,7 +46,7 @@ try {
             Write-Host "    $($lines[$i])" -ForegroundColor Gray
         }
         Write-Host "  ... (Total: $($lines.Count) líneas)" -ForegroundColor Gray
-        
+
         # Guardar el CSV en un archivo
         $outputFile = "movimientos_export_test.csv"
         $response.data | Out-File -FilePath $outputFile -Encoding UTF8
@@ -65,7 +65,7 @@ try {
 Write-Host "`n3. Exportando solo movimientos ABONO..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar?tipo=ABONO" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         $lines = $response.data -split "`n"
         Write-Host "✓ CSV generado: $($lines.Count) líneas (incluyendo header)" -ForegroundColor Green
@@ -78,7 +78,7 @@ try {
 Write-Host "`n4. Exportando solo movimientos CARGO..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar?tipo=CARGO" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         $lines = $response.data -split "`n"
         Write-Host "✓ CSV generado: $($lines.Count) líneas (incluyendo header)" -ForegroundColor Green
@@ -91,7 +91,7 @@ try {
 Write-Host "`n5. Exportando solo movimientos no conciliados..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar?conciliado=false" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         $lines = $response.data -split "`n"
         Write-Host "✓ CSV generado: $($lines.Count) líneas (incluyendo header)" -ForegroundColor Green
@@ -106,7 +106,7 @@ try {
     $fechaHasta = Get-Date -Format "yyyy-MM-dd"
     $fechaDesde = (Get-Date).AddMonths(-1).ToString("yyyy-MM-dd")
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar?fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         $lines = $response.data -split "`n"
         Write-Host "✓ CSV generado: $($lines.Count) líneas (incluyendo header)" -ForegroundColor Green
@@ -120,7 +120,7 @@ try {
 Write-Host "`n7. Exportando con múltiples filtros (CARGO + no conciliado)..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$cuentaId/movimientos/exportar?tipo=CARGO&conciliado=false" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data) {
         $lines = $response.data -split "`n"
         Write-Host "✓ CSV generado: $($lines.Count) líneas (incluyendo header)" -ForegroundColor Green

@@ -31,6 +31,7 @@ interface GreModalProps {
   onSuccess: (data?: any) => void
   cpeData?: CpeData | null // Datos opcionales del CPE para pre-llenar
   pedidoContext?: PedidoContext
+  additionalPayload?: Record<string, any>
 }
 
 export default function GreModal({
@@ -38,7 +39,8 @@ export default function GreModal({
   onClose,
   onSuccess,
   cpeData,
-  pedidoContext
+  pedidoContext,
+  additionalPayload
 }: GreModalProps) {
   const [formData, setFormData] = useState({
     destinatario: '',
@@ -96,6 +98,7 @@ export default function GreModal({
     try {
       const greData = {
         ...formData,
+        ...(additionalPayload || {}),
         pesoTotal: parseFloat(formData.pesoTotal) || 0,
         pedidoId: pedidoContext?.id,
         pedidoNumero: pedidoContext?.numero,
@@ -114,27 +117,9 @@ export default function GreModal({
         if (typeof window !== 'undefined') {
           const successToast = document.createElement('div')
           successToast.innerHTML = `
-            <div style="
-              position: fixed;
-              top: 20px;
-              right: 20px;
-              background: #10b981;
-              color: white;
-              padding: 1rem 1.5rem;
-              border-radius: 8px;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              z-index: 9999;
-              font-weight: 600;
-              animation: slideIn 0.3s ease-out;
-            ">
+            <div>
               ✅ ${result.message || 'Guía de remisión creada exitosamente'}
             </div>
-            <style>
-              @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-              }
-            </style>
           `
           document.body.appendChild(successToast)
           setTimeout(() => {
@@ -179,144 +164,85 @@ export default function GreModal({
   if (!isOpen) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '700px',
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center z-[1000]">
+      <div className="bg-white rounded-3 p-8 w-[90%] max-w-[700px] overflow-auto">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1f2937' }}>Nueva Guía de Remisión Electrónica</h2>
+            <h2 className="text-6 font-semibold text-gray-800">Nueva Guía de Remisión Electrónica</h2>
             {cpeData && (
-              <p style={{ fontSize: '0.9rem', color: '#22c55e', marginTop: '0.25rem', fontWeight: '500' }}>
+              <p className="text-3.5 text-[#22c55e] mt-1 font-medium">
                 🔗 Datos pre-llenados desde {(cpeData.tipoDocumento || cpeData.tipoComprobante) === '01' ? 'Factura' : 'Boleta'} {cpeData.serie}-{cpeData.numero.toString().padStart(8, '0')}
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            disabled={isLoading}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.5rem',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              color: '#6b7280',
-              opacity: isLoading ? 0.5 : 1
-            }}
+            disabled={isLoading} className="border-0 text-6 text-gray-500"
           >
             ×
           </button>
         </div>
 
         {error && (
-          <div style={{
-            backgroundColor: '#fee2e2',
-            border: '1px solid #fecaca',
-            color: '#dc2626',
-            padding: '0.75rem',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            fontSize: '0.9rem'
-          }}>
+          <div className="bg-[#fee2e2] border text-red-600 p-3 rounded-[6px] mb-4 text-3.5">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-4 mb-6">
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Destinatario *
               </label>
               <input
+                aria-label="Destinatario *"
                 type="text"
                 name="destinatario"
                 value={formData.destinatario}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+            <div>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Dirección de Destino *
               </label>
               <input
+                aria-label="Dirección de Destino *"
                 type="text"
                 name="direccionDestino"
                 value={formData.direccionDestino}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Fecha de Traslado *
               </label>
               <input
+                aria-label="Fecha de Traslado *"
                 type="date"
                 name="fechaTraslado"
                 value={formData.fechaTraslado}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Modalidad de Transporte *
               </label>
               <select
+                aria-label="Modalidad de Transporte *"
                 name="modalidad"
                 value={formData.modalidad}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               >
                 <option value="TRANSPORTE_PUBLICO">Transporte Público</option>
                 <option value="TRANSPORTE_PRIVADO">Transporte Privado</option>
@@ -324,21 +250,15 @@ export default function GreModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Motivo del Traslado *
               </label>
               <select
+                aria-label="Motivo del Traslado *"
                 name="motivo"
                 value={formData.motivo}
                 onChange={handleChange}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               >
                 <option value="VENTA">Venta</option>
                 <option value="COMPRA">Compra</option>
@@ -350,44 +270,32 @@ export default function GreModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Peso Total (Kg) *
               </label>
               <input
+                aria-label="Peso Total (Kg) *"
                 type="number"
                 name="pesoTotal"
                 value={formData.pesoTotal}
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem'
-                }}
+                required className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             {formData.modalidad === 'TRANSPORTE_PUBLICO' && (
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                <label className="block mb-2 font-semibold text-gray-700">
                   Transportista
                 </label>
                 <input
+                  aria-label="Transportista"
                   type="text"
                   name="transportista"
                   value={formData.transportista}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem'
-                  }}
+                  onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
                 />
               </div>
             )}
@@ -395,94 +303,57 @@ export default function GreModal({
             {formData.modalidad === 'TRANSPORTE_PRIVADO' && (
               <>
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                  <label className="block mb-2 font-semibold text-gray-700">
                     Placa del Vehículo
                   </label>
                   <input
+                    aria-label="Placa del Vehículo"
                     type="text"
                     name="placaVehiculo"
                     value={formData.placaVehiculo}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem'
-                    }}
+                    onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+                  <label className="block mb-2 font-semibold text-gray-700">
                     Licencia de Conducir
                   </label>
                   <input
+                    aria-label="Licencia de Conducir"
                     type="text"
                     name="licenciaConducir"
                     value={formData.licenciaConducir}
-                    onChange={handleChange}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '0.9rem'
-                    }}
+                    onChange={handleChange} className="w-[100%] p-3 border rounded-[6px] text-3.5"
                   />
                 </div>
               </>
             )}
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#374151' }}>
+            <div>
+              <label className="block mb-2 font-semibold text-gray-700">
                 Observaciones
               </label>
               <textarea
+                aria-label="Observaciones"
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  resize: 'vertical'
-                }}
+                rows={3} className="w-[100%] p-3 border rounded-[6px] text-3.5"
               />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+          <div className="flex gap-4 justify-end">
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                backgroundColor: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontWeight: '600'
-              }}
+              onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-semibold"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={isLoading}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: isLoading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                fontWeight: '600'
-              }}
+              disabled={isLoading} className="py-3 px-6 border-0 rounded-[6px] text-white font-semibold"
             >
               {isLoading ? 'Creando...' : 'Crear GRE'}
             </button>

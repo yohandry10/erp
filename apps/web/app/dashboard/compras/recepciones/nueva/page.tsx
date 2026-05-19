@@ -25,25 +25,13 @@ function NuevaRecepcionContent() {
           <div>
             <button
               onClick={() => router.push('/dashboard/compras/recepciones')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                cursor: 'pointer',
-                marginBottom: '1rem',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}
+              className="mb-4 inline-flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-400/10"
             >
               <ArrowLeft size={16} />
               Volver a Recepciones
             </button>
             <h1 className="dashboard-title">Nueva Recepción de Mercancía</h1>
-            <p className="dashboard-subtitle" style={{ color: '#ef4444' }}>
+            <p className="dashboard-subtitle text-cyan-100">
               No se especificó una orden de compra
             </p>
           </div>
@@ -59,19 +47,7 @@ function NuevaRecepcionContent() {
         <div>
           <button
             onClick={() => router.push('/dashboard/compras/recepciones')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-400/10"
           >
             <ArrowLeft size={16} />
             Volver a Recepciones
@@ -97,7 +73,7 @@ function NuevaRecepcionContent() {
 
 export default function NuevaRecepcionPage() {
   return (
-    <Suspense fallback={<div className="dashboard-container">Cargando...</div>}>
+    <Suspense fallback={null}>
       <NuevaRecepcionContent />
     </Suspense>
   )

@@ -74,64 +74,23 @@ export default function EditarClientePage() {
   }
 
   return (
-    <div style={{
-      padding: '2rem',
-      maxWidth: '1200px',
-      margin: '0 auto',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1.5rem'
-    }}>
+    <div className="p-8 max-w-[1200px] my-0 mx-auto flex flex-col gap-6">
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem'
-      }}>
+      <div className="flex items-center gap-4">
         <button
-          onClick={handleCancel}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.625rem 1rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: 'var(--primary-700)',
-            background: 'rgba(255, 255, 255, 0.8)',
-            border: '1px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
+          onClick={handleCancel} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
         >
-          <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
+          <ArrowLeft className="w-4 h-4" />
           Volver
         </button>
         <div>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: 'var(--primary-900)',
-            margin: 0
-          }}>Editar Cliente</h1>
-          <p style={{
-            fontSize: '1rem',
-            color: 'var(--primary-600)',
-            margin: '0.25rem 0 0 0'
-          }}>{cliente.razon_social}</p>
+          <h1 className="text-8 font-bold text-[var(--primary-900)] m-0">Editar Cliente</h1>
+          <p className="text-4 text-[var(--primary-600)] mt-1 mr-0 mb-0 ml-0">{cliente.razon_social}</p>
         </div>
       </div>
 
       {/* Form Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '2rem',
-        boxShadow: 'var(--shadow-xl)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
+      <div className="p-8 shadow border">
         <ClienteForm
           initialData={cliente}
           onSubmit={handleSubmit}

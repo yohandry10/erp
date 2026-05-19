@@ -8,6 +8,19 @@ import { ChevronLeft, ChevronRight, Check, FileText, Package, Eye, Plus, Trash2,
 import { useApi } from '@/hooks/use-api'
 import { useTaxConfig } from '@/hooks/useTaxConfig'
 import { Proveedor } from '@/types/compras'
+import { cn } from '@/lib/utils'
+
+const fieldLabelClass = 'mb-2 block text-sm font-medium text-slate-700'
+const requiredMarkClass = 'text-slate-500'
+const fieldBaseClass = 'w-full rounded-lg border bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
+const fieldNormalClass = 'border-slate-300'
+const fieldErrorClass = 'border-slate-500'
+const fieldErrorTextClass = 'mt-1 text-xs text-slate-600'
+const panelSoftClass = 'activity-card bg-slate-50'
+const tableHeadClass = 'px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500'
+const tableCellClass = 'px-4 py-3 text-sm text-slate-700'
+const summaryLabelClass = 'text-xs font-semibold uppercase tracking-[0.08em] text-slate-500'
+const summaryValueClass = 'mt-1 text-sm font-semibold text-slate-950'
 
 // Validation schemas
 const step1Schema = z.object({
@@ -168,56 +181,36 @@ export function CotizacionCompraWizard({
   return (
     <div className="activity-card">
       {/* Wizard Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem' }}>
+      <div className="mb-8">
+        <h2 className="mb-4 text-2xl font-semibold text-slate-950">
           Nueva Cotización de Compra
         </h2>
 
         {/* Step Indicator */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div className="flex items-center gap-2">
           {[
             { num: 1, label: 'Información Básica', icon: <FileText size={16} /> },
             { num: 2, label: 'Productos', icon: <Package size={16} /> },
             { num: 3, label: 'Revisión', icon: <Eye size={16} /> }
           ].map((step, idx) => (
-            <div key={step.num} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.25rem',
-                flex: 1
-              }}>
-                <div style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '50%',
-                  background: currentStep >= step.num ? '#3b82f6' : '#e5e7eb',
-                  color: currentStep >= step.num ? 'white' : '#6b7280',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: '0.875rem'
-                }}>
+            <div key={step.num} className="flex flex-1 items-center gap-2">
+              <div className="flex flex-1 flex-col items-center gap-1">
+                <div className={cn(
+                  'flex size-10 items-center justify-center rounded-full text-sm font-semibold',
+                  currentStep >= step.num ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-500'
+                )}>
                   {currentStep > step.num ? <Check size={16} /> : step.icon}
                 </div>
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: currentStep === step.num ? '600' : '400',
-                  color: currentStep >= step.num ? '#3b82f6' : '#6b7280',
-                  textAlign: 'center'
-                }}>
+                <span className={cn(
+                  'text-center text-xs',
+                  currentStep === step.num ? 'font-semibold' : 'font-normal',
+                  currentStep >= step.num ? 'text-blue-500' : 'text-slate-500'
+                )}>
                   {step.label}
                 </span>
               </div>
               {idx < 2 && (
-                <div style={{
-                  flex: 0.5,
-                  height: '2px',
-                  background: currentStep > step.num ? '#3b82f6' : '#e5e7eb',
-                  marginTop: '-1.5rem'
-                }} />
+                <div className={cn('-mt-6 h-0.5 flex-[0.5]', currentStep > step.num ? 'bg-blue-500' : 'bg-slate-200')} />
               )}
             </div>
           ))}
@@ -226,49 +219,35 @@ export function CotizacionCompraWizard({
 
       {/* Step 1: Basic Information */}
       {currentStep === 1 && (
-        <div style={{ minHeight: '400px' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+        <div className="min-h-[400px]">
+          <h3 className="mb-6 text-lg font-semibold text-slate-950">
             Información Básica
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+          <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Número de Cotización <span style={{ color: '#ef4444' }}>*</span>
+              <label className={fieldLabelClass}>
+                Número de Cotización <span className={requiredMarkClass}>*</span>
               </label>
               <input
                 type="text"
                 {...register('numero')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: errors.numero ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  fontFamily: 'monospace'
-                }}
+                className={cn(fieldBaseClass, 'font-mono', errors.numero ? fieldErrorClass : fieldNormalClass)}
               />
               {errors.numero && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p className={fieldErrorTextClass}>
                   {errors.numero.message}
                 </p>
               )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Proveedor <span style={{ color: '#ef4444' }}>*</span>
+              <label className={fieldLabelClass}>
+                Proveedor <span className={requiredMarkClass}>*</span>
               </label>
               <select
                 {...register('proveedor_id')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: errors.proveedor_id ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
+                className={cn(fieldBaseClass, errors.proveedor_id ? fieldErrorClass : fieldNormalClass)}
                 disabled={loadingProveedores}
               >
                 <option value="">Seleccione un proveedor</option>
@@ -279,72 +258,53 @@ export function CotizacionCompraWizard({
                 ))}
               </select>
               {errors.proveedor_id && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p className={fieldErrorTextClass}>
                   {errors.proveedor_id.message}
                 </p>
               )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Fecha de Cotización <span style={{ color: '#ef4444' }}>*</span>
+              <label className={fieldLabelClass}>
+                Fecha de Cotización <span className={requiredMarkClass}>*</span>
               </label>
               <input
                 type="date"
                 {...register('fecha_cotizacion')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: errors.fecha_cotizacion ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                className={cn(fieldBaseClass, errors.fecha_cotizacion ? fieldErrorClass : fieldNormalClass)}
               />
               {errors.fecha_cotizacion && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p className={fieldErrorTextClass}>
                   {errors.fecha_cotizacion.message}
                 </p>
               )}
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Días de Validez <span style={{ color: '#ef4444' }}>*</span>
+              <label className={fieldLabelClass}>
+                Días de Validez <span className={requiredMarkClass}>*</span>
               </label>
               <input
                 type="number"
                 {...register('validez_dias', { valueAsNumber: true })}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: errors.validez_dias ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                className={cn(fieldBaseClass, errors.validez_dias ? fieldErrorClass : fieldNormalClass)}
               />
               {errors.validez_dias && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p className={fieldErrorTextClass}>
                   {errors.validez_dias.message}
                 </p>
               )}
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+            <div className="col-span-full">
+              <label className={fieldLabelClass}>
                 Observaciones
               </label>
               <textarea
                 {...register('observaciones')}
                 rows={3}
                 placeholder="Notas adicionales sobre la cotización..."
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  resize: 'vertical'
-                }}
+                className={cn(fieldBaseClass, fieldNormalClass, 'min-h-24 resize-y')}
               />
             </div>
           </div>
@@ -374,32 +334,12 @@ export function CotizacionCompraWizard({
       )}
 
       {/* Navigation Buttons */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        gap: '1rem',
-        paddingTop: '2rem',
-        marginTop: '2rem',
-        borderTop: '1px solid rgba(0,0,0,0.1)'
-      }}>
+      <div className="mt-8 flex justify-between gap-4 border-t border-slate-200 pt-8">
         <button
           type="button"
           onClick={currentStep === 1 ? onCancel : handleBack}
           disabled={isLoading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            color: '#374151',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            opacity: isLoading ? 0.5 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+          className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <ChevronLeft size={16} />
           {currentStep === 1 ? 'Cancelar' : 'Anterior'}
@@ -409,13 +349,7 @@ export function CotizacionCompraWizard({
           <button
             type="button"
             onClick={handleNext}
-            className="refresh-btn"
-            style={{
-              padding: '0.75rem 1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            className="refresh-btn flex items-center gap-2 px-6 py-3"
           >
             Siguiente
             <ChevronRight size={16} />
@@ -425,15 +359,7 @@ export function CotizacionCompraWizard({
             type="button"
             onClick={handleFinalSubmit}
             disabled={isLoading}
-            className="refresh-btn"
-            style={{
-              padding: '0.75rem 1.5rem',
-              opacity: isLoading ? 0.7 : 1,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            className="refresh-btn flex items-center gap-2 px-6 py-3 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <Check size={16} />
             {isLoading ? 'Guardando...' : 'Crear Cotización'}
@@ -487,30 +413,23 @@ function Step2AddProducts({
   }
 
   return (
-    <div style={{ minHeight: '400px' }}>
-      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+    <div className="min-h-[400px]">
+      <h3 className="mb-6 text-lg font-semibold text-slate-950">
         Agregar Productos
       </h3>
 
       {/* Add Product Form */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem', background: '#f9fafb' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+      <div className={cn(panelSoftClass, 'mb-6')}>
+        <div className="grid items-end gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(140px,1fr)_minmax(140px,1fr)_auto]">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+            <label className={fieldLabelClass}>
               Producto
             </label>
             <select
               value={selectedProducto}
               onChange={(e) => setSelectedProducto(e.target.value)}
               disabled={loadingProductos}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              className={cn(fieldBaseClass, fieldNormalClass)}
             >
               <option value="">Seleccione un producto</option>
               {productos.map((p: any) => (
@@ -522,7 +441,7 @@ function Step2AddProducts({
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+            <label className={fieldLabelClass}>
               Cantidad
             </label>
             <input
@@ -531,18 +450,12 @@ function Step2AddProducts({
               onChange={(e) => setCantidad(Number(e.target.value))}
               min="0.01"
               step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              className={cn(fieldBaseClass, fieldNormalClass)}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
+            <label className={fieldLabelClass}>
               Precio Unit.
             </label>
             <input
@@ -551,21 +464,14 @@ function Step2AddProducts({
               onChange={(e) => setPrecio(Number(e.target.value))}
               min="0"
               step="0.01"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              className={cn(fieldBaseClass, fieldNormalClass)}
             />
           </div>
 
           <button
             type="button"
             onClick={handleAdd}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1rem' }}
+            className="refresh-btn flex h-12 items-center justify-center px-4"
           >
             <Plus size={16} />
           </button>
@@ -574,63 +480,56 @@ function Step2AddProducts({
 
       {/* Products List */}
       {detalles.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-          <Package size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-slate-500">
+          <Package size={48} className="mx-auto mb-4 text-slate-400" />
+          <h3 className="mb-2 text-lg font-semibold text-slate-700">
             No hay productos agregados
           </h3>
           <p>Agregue al menos un producto para continuar</p>
         </div>
       ) : (
         <>
-          <div style={{ overflow: 'auto', marginBottom: '1.5rem' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="mb-6 overflow-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full border-collapse">
               <thead>
-                <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                  <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                <tr className="border-b-2 border-slate-200 bg-slate-50">
+                  <th className={cn(tableHeadClass, 'text-left')}>
                     Producto
                   </th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <th className={cn(tableHeadClass, 'text-right')}>
                     Cantidad
                   </th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <th className={cn(tableHeadClass, 'text-right')}>
                     Precio Unit.
                   </th>
-                  <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <th className={cn(tableHeadClass, 'text-right')}>
                     Subtotal
                   </th>
-                  <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <th className={cn(tableHeadClass, 'text-center')}>
                     Acciones
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {detalles.map((detalle: any, index: number) => (
-                  <tr key={index} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                  <tr key={index} className="border-b border-slate-100 last:border-b-0">
+                    <td className={tableCellClass}>
                       {detalle.descripcion}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', color: '#374151' }}>
+                    <td className={cn(tableCellClass, 'text-right')}>
                       {detalle.cantidad}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', color: '#374151' }}>
+                    <td className={cn(tableCellClass, 'text-right')}>
                       {formatCurrency(detalle.precio_unitario)}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+                    <td className={cn(tableCellClass, 'text-right font-semibold')}>
                       {formatCurrency(detalle.subtotal)}
                     </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                    <td className="px-4 py-3 text-center">
                       <button
                         type="button"
                         onClick={() => onRemoveProducto(index)}
-                        style={{
-                          padding: '0.5rem',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: '#ef4444',
-                          color: 'white',
-                          cursor: 'pointer'
-                        }}
+                        className="rounded-md bg-slate-700 p-2 text-white transition hover:bg-slate-900"
                         title="Eliminar"
                       >
                         <Trash2 size={16} />
@@ -658,23 +557,23 @@ function TotalesSummary({ detalles, formatCurrency }: any) {
   const total = subtotal + igv
 
   return (
-    <div className="activity-card" style={{ background: '#f9fafb' }}>
-      <div style={{ maxWidth: '400px', marginLeft: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
-          <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Subtotal:</span>
-          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+    <div className={panelSoftClass}>
+      <div className="ml-auto max-w-md">
+        <div className="flex justify-between border-b border-slate-200 py-3">
+          <span className="text-sm text-slate-500">Subtotal:</span>
+          <span className="text-sm font-semibold text-slate-700">
             {formatCurrency(subtotal)}
           </span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
-          <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>IGV (18%):</span>
-          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+        <div className="flex justify-between border-b border-slate-200 py-3">
+          <span className="text-sm text-slate-500">IGV (18%):</span>
+          <span className="text-sm font-semibold text-slate-700">
             {formatCurrency(igv)}
           </span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0' }}>
-          <span style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>Total:</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+        <div className="flex justify-between py-4">
+          <span className="text-lg font-semibold text-slate-950">Total:</span>
+          <span className="text-xl font-bold text-blue-600">
             {formatCurrency(total)}
           </span>
         </div>
@@ -699,64 +598,64 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
   }
 
   return (
-    <div style={{ minHeight: '400px' }}>
-      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>
+    <div className="min-h-[400px]">
+      <h3 className="mb-6 text-lg font-semibold text-slate-950">
         Revisión Final
       </h3>
 
       {/* Basic Information Summary */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem', background: '#f9fafb' }}>
-        <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className={cn(panelSoftClass, 'mb-6')}>
+        <h4 className="mb-4 text-base font-semibold text-slate-700">
           Información Básica
         </h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: '500' }}>
+            <span className={summaryLabelClass}>
               Número
             </span>
-            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+            <p className={cn(summaryValueClass, 'font-mono')}>
               {formData.numero}
             </p>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: '500' }}>
+            <span className={summaryLabelClass}>
               Proveedor
             </span>
-            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem' }}>
+            <p className={summaryValueClass}>
               {proveedor?.razon_social || 'N/A'}
             </p>
             {proveedor?.ruc && (
-              <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+              <p className="text-xs text-slate-500">
                 RUC: {proveedor.ruc}
               </p>
             )}
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: '500' }}>
+            <span className={summaryLabelClass}>
               Fecha Cotización
             </span>
-            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem' }}>
+            <p className={summaryValueClass}>
               {new Date(formData.fecha_cotizacion).toLocaleDateString('es-PE')}
             </p>
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: '500' }}>
+            <span className={summaryLabelClass}>
               Válida Hasta
             </span>
-            <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem' }}>
+            <p className={summaryValueClass}>
               {calcularFechaVencimiento()}
             </p>
-            <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+            <p className="text-xs text-slate-500">
               ({formData.validez_dias} días)
             </p>
           </div>
         </div>
         {formData.observaciones && (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'uppercase', fontWeight: '500' }}>
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <span className={summaryLabelClass}>
               Observaciones
             </span>
-            <p style={{ fontSize: '0.875rem', color: '#374151', marginTop: '0.25rem' }}>
+            <p className="mt-1 text-sm text-slate-700">
               {formData.observaciones}
             </p>
           </div>
@@ -764,41 +663,41 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
       </div>
 
       {/* Products Summary */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="activity-card mb-6">
+        <h4 className="mb-4 text-base font-semibold text-slate-700">
           Productos ({detalles.length})
         </h4>
-        <div style={{ overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+              <tr className="border-b-2 border-slate-200 bg-slate-50">
+                <th className={cn(tableHeadClass, 'text-left')}>
                   Producto
                 </th>
-                <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                <th className={cn(tableHeadClass, 'text-right')}>
                   Cantidad
                 </th>
-                <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                <th className={cn(tableHeadClass, 'text-right')}>
                   Precio Unit.
                 </th>
-                <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                <th className={cn(tableHeadClass, 'text-right')}>
                   Subtotal
                 </th>
               </tr>
             </thead>
             <tbody>
               {detalles.map((detalle: ProductoDetalle, index: number) => (
-                <tr key={index} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                  <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: '#374151' }}>
+                <tr key={index} className="border-b border-slate-100 last:border-b-0">
+                  <td className={tableCellClass}>
                     {detalle.descripcion}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', color: '#374151' }}>
+                  <td className={cn(tableCellClass, 'text-right')}>
                     {detalle.cantidad}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', color: '#374151' }}>
+                  <td className={cn(tableCellClass, 'text-right')}>
                     {formatCurrency(detalle.precio_unitario)}
                   </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+                  <td className={cn(tableCellClass, 'text-right font-semibold')}>
                     {formatCurrency(detalle.subtotal)}
                   </td>
                 </tr>
@@ -809,23 +708,23 @@ function Step3Review({ formData, detalles, proveedores, calculateTotals, formatC
       </div>
 
       {/* Totals */}
-      <div className="activity-card" style={{ background: '#f9fafb' }}>
-        <div style={{ maxWidth: '400px', marginLeft: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>Subtotal:</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+      <div className={panelSoftClass}>
+        <div className="ml-auto max-w-md">
+          <div className="flex justify-between border-b border-slate-200 py-3">
+            <span className="text-sm text-slate-500">Subtotal:</span>
+            <span className="text-sm font-semibold text-slate-700">
               {formatCurrency(subtotal)}
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
-            <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>IGV (18%):</span>
-            <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+          <div className="flex justify-between border-b border-slate-200 py-3">
+            <span className="text-sm text-slate-500">IGV (18%):</span>
+            <span className="text-sm font-semibold text-slate-700">
               {formatCurrency(igv)}
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem 0' }}>
-            <span style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>Total:</span>
-            <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+          <div className="flex justify-between py-4">
+            <span className="text-lg font-semibold text-slate-950">Total:</span>
+            <span className="text-xl font-bold text-blue-600">
               {formatCurrency(total)}
             </span>
           </div>

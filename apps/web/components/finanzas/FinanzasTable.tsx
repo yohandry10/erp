@@ -37,22 +37,13 @@ export default function FinanzasTable({
 
   return (
     <div className="activity-card">
-      <div style={{ overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="overflow-auto">
+        <table className="w-[100%]">
           <thead>
-            <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
+            <tr>
               {columns.map((column) => (
                 <th
-                  key={column.key}
-                  style={{
-                    textAlign: column.align || 'left',
-                    padding: '1rem',
-                    fontWeight: '600',
-                    fontSize: '0.75rem',
-                    textTransform: 'uppercase',
-                    color: '#6b7280',
-                    width: column.width
-                  }}
+                  key={column.key} className="p-4 font-semibold text-3 text-gray-500"
                 >
                   {column.label}
                 </th>

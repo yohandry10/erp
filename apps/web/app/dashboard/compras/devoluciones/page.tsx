@@ -119,17 +119,7 @@ export default function DevolucionesPage() {
     const Icon = style.icon
     
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '4px',
-        padding: '4px 12px',
-        borderRadius: '12px',
-        fontSize: '12px',
-        fontWeight: '600',
-        backgroundColor: style.bg,
-        color: style.color
-      }}>
+      <span className="inline-flex items-center gap-[4px] py-[4px] px-3 rounded-3 text-3 font-semibold">
         <Icon size={14} />
         {estado}
       </span>
@@ -146,51 +136,26 @@ export default function DevolucionesPage() {
   const hasActiveFilters = filtros.estado || filtros.proveedor_id || filtros.fecha_desde || filtros.fecha_hasta
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div className="p-6">
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '24px'
-      }}>
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>
+          <h1 className="text-6 font-bold mb-[4px]">
             Devoluciones a Proveedor
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+          <p className="text-[var(--text-secondary)] text-3.5">
             Gestión de devoluciones de mercancía
           </p>
         </div>
         
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="flex gap-3">
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              backgroundColor: showFilters ? 'var(--primary-50)' : 'white',
-              color: showFilters ? 'var(--primary-700)' : 'var(--text-primary)',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
+            onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 py-2.5 px-4 border rounded-2 cursor-pointer text-3.5 font-medium"
           >
             <Filter size={18} />
             Filtros
             {hasActiveFilters && (
-              <span style={{
-                backgroundColor: 'var(--primary-600)',
-                color: 'white',
-                borderRadius: '10px',
-                padding: '2px 6px',
-                fontSize: '11px',
-                fontWeight: '600'
-              }}>
+              <span className="bg-[var(--primary-600)] text-white rounded-2.5 py-[2px] px-[6px] text-[11px] font-semibold">
                 {[filtros.estado, filtros.proveedor_id, filtros.fecha_desde, filtros.fecha_hasta]
                   .filter(Boolean).length}
               </span>
@@ -199,40 +164,14 @@ export default function DevolucionesPage() {
           
           <button
             onClick={loadDevoluciones}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 16px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              opacity: loading ? 0.6 : 1
-            }}
+            disabled={loading} className="flex items-center gap-2 py-2.5 px-4 border rounded-2 bg-white text-3.5 font-medium"
           >
-            <RefreshCw size={18} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw size={18} />
             Actualizar
           </button>
           
           <button
-            onClick={() => router.push('/dashboard/compras/devoluciones/nueva')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 20px',
-              backgroundColor: 'var(--primary-600)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}
+            onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="flex items-center gap-2 py-2.5 px-5 bg-[var(--primary-600)] text-white border-0 rounded-2 cursor-pointer text-3.5 font-semibold"
           >
             <Plus size={18} />
             Nueva Devolución
@@ -242,33 +181,15 @@ export default function DevolucionesPage() {
 
       {/* Filtros */}
       {showFilters && (
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '20px',
-          marginBottom: '24px'
-        }}>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '16px'
-          }}>
+        <div className="bg-white border rounded-3 p-5 mb-6">
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-4">
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
+              <label className="block mb-[6px] text-[13px] font-medium">
                 Estado
               </label>
               <select
                 value={filtros.estado}
-                onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
+                onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
               >
                 <option value="">Todos</option>
                 <option value="PENDIENTE">Pendiente</option>
@@ -278,58 +199,31 @@ export default function DevolucionesPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
+              <label className="block mb-[6px] text-[13px] font-medium">
                 Fecha Desde
               </label>
               <input
                 type="date"
                 value={filtros.fecha_desde}
-                onChange={(e) => setFiltros({ ...filtros, fecha_desde: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
+                onChange={(e) => setFiltros({ ...filtros, fecha_desde: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
+              <label className="block mb-[6px] text-[13px] font-medium">
                 Fecha Hasta
               </label>
               <input
                 type="date"
                 value={filtros.fecha_hasta}
-                onChange={(e) => setFiltros({ ...filtros, fecha_hasta: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
+                onChange={(e) => setFiltros({ ...filtros, fecha_hasta: e.target.value })} className="w-[100%] py-2 px-3 border rounded-[6px] text-3.5"
               />
             </div>
           </div>
 
           {hasActiveFilters && (
             <button
-              onClick={() => setFiltros({ estado: '', proveedor_id: '', fecha_desde: '', fecha_hasta: '' })}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                backgroundColor: 'var(--red-50)',
-                color: 'var(--red-700)',
-                border: '1px solid var(--red-200)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: '500'
-              }}
+              onClick={() => setFiltros({ estado: '', proveedor_id: '', fecha_desde: '', fecha_hasta: '' })} className="flex items-center gap-[6px] py-[6px] px-3 bg-[var(--red-50)] text-[var(--red-700)] border rounded-[6px] cursor-pointer text-[13px] font-medium"
             >
               <X size={14} />
               Limpiar filtros
@@ -339,122 +233,65 @@ export default function DevolucionesPage() {
       )}
 
       {/* Estadísticas */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '16px',
-        marginBottom: '24px'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--blue-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <PackageX size={24} style={{ color: 'var(--blue-600)' }} />
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6">
+        <div className="bg-white border rounded-3 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-3 bg-[var(--blue-100)] flex items-center justify-center">
+              <PackageX size={24} className="text-[var(--blue-600)]" />
             </div>
             <div>
-              <p style={{ fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>
+              <p className="text-6 font-bold mb-[2px]">
                 {estadisticas.total}
               </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p className="text-[13px] text-[var(--text-secondary)]">
                 Total Devoluciones
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--amber-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Clock size={24} style={{ color: 'var(--amber-600)' }} />
+        <div className="bg-white border rounded-3 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-3 bg-[var(--amber-100)] flex items-center justify-center">
+              <Clock size={24} className="text-[var(--amber-600)]" />
             </div>
             <div>
-              <p style={{ fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>
+              <p className="text-6 font-bold mb-[2px]">
                 {estadisticas.pendientes}
               </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p className="text-[13px] text-[var(--text-secondary)]">
                 Pendientes
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--emerald-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <CheckCircle size={24} style={{ color: 'var(--emerald-600)' }} />
+        <div className="bg-white border rounded-3 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-3 bg-[var(--emerald-100)] flex items-center justify-center">
+              <CheckCircle size={24} className="text-[var(--emerald-600)]" />
             </div>
             <div>
-              <p style={{ fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>
+              <p className="text-6 font-bold mb-[2px]">
                 {estadisticas.emitidas}
               </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p className="text-[13px] text-[var(--text-secondary)]">
                 Emitidas
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{
-          backgroundColor: 'white',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--red-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <XCircle size={24} style={{ color: 'var(--red-600)' }} />
+        <div className="bg-white border rounded-3 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-3 bg-[var(--red-100)] flex items-center justify-center">
+              <XCircle size={24} className="text-[var(--red-600)]" />
             </div>
             <div>
-              <p style={{ fontSize: '24px', fontWeight: '700', marginBottom: '2px' }}>
+              <p className="text-6 font-bold mb-[2px]">
                 {estadisticas.anuladas}
               </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p className="text-[13px] text-[var(--text-secondary)]">
                 Anuladas
               </p>
             </div>
@@ -463,67 +300,52 @@ export default function DevolucionesPage() {
       </div>
 
       {/* Tabla */}
-      <div style={{
-        backgroundColor: 'white',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        overflow: 'hidden'
-      }}>
+      <div className="bg-white border rounded-3 overflow-hidden">
         {loading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div className="p-[60px] text-center text-[var(--text-secondary)]">
             Cargando devoluciones...
           </div>
         ) : devoluciones.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center' }}>
-            <PackageX size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>
+          <div className="p-[60px] text-center">
+            <PackageX size={48} className="text-[var(--text-tertiary)]" />
+            <p className="text-[var(--text-secondary)] mb-2">
               No hay devoluciones registradas
             </p>
             <button
-              onClick={() => router.push('/dashboard/compras/devoluciones/nueva')}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: 'var(--primary-600)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
+              onClick={() => router.push('/dashboard/compras/devoluciones/nueva')} className="py-2 px-4 bg-[var(--primary-600)] text-white border-0 rounded-[6px] cursor-pointer text-3.5 font-medium"
             >
               Crear primera devolución
             </button>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="w-[100%]">
             <thead>
-              <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+              <tr className="bg-[var(--gray-50)] border-b">
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   NÚMERO
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   PROVEEDOR
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   ORDEN COMPRA
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   RECEPCIÓN
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   FECHA
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-left text-3 font-semibold text-[var(--text-secondary)]">
                   MOTIVO
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-right text-3 font-semibold text-[var(--text-secondary)]">
                   TOTAL
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-center text-3 font-semibold text-[var(--text-secondary)]">
                   ESTADO
                 </th>
-                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                <th className="py-3 px-4 text-center text-3 font-semibold text-[var(--text-secondary)]">
                   ACCIONES
                 </th>
               </tr>
@@ -531,66 +353,44 @@ export default function DevolucionesPage() {
             <tbody>
               {devoluciones.map((devolucion) => (
                 <tr 
-                  key={devolucion.id}
-                  style={{ 
-                    borderBottom: '1px solid var(--border-color)',
-                    transition: 'background-color 0.2s'
-                  }}
+                  key={devolucion.id} className="border-b transition"
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <td style={{ padding: '16px', fontSize: '14px', fontWeight: '600' }}>
+                  <td className="p-4 text-3.5 font-semibold">
                     {devolucion.numero}
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px' }}>
+                  <td className="p-4 text-3.5">
                     <div>
-                      <div style={{ fontWeight: '500' }}>{devolucion.proveedor?.razon_social || '-'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <div className="font-medium">{devolucion.proveedor?.razon_social || '-'}</div>
+                      <div className="text-3 text-[var(--text-secondary)]">
                         RUC: {devolucion.proveedor?.ruc || '-'}
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px' }}>
+                  <td className="p-4 text-3.5">
                     {devolucion.orden?.numero || '-'}
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px' }}>
+                  <td className="p-4 text-3.5">
                     {devolucion.recepcion?.numero || '-'}
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px' }}>
+                  <td className="p-4 text-3.5">
                     {formatDate(devolucion.fecha_devolucion)}
                   </td>
-                  <td style={{ padding: '16px', fontSize: '13px', maxWidth: '200px' }}>
-                    <div style={{ 
-                      overflow: 'hidden', 
-                      textOverflow: 'ellipsis', 
-                      whiteSpace: 'nowrap',
-                      color: 'var(--text-secondary)'
-                    }}>
+                  <td className="p-4 text-[13px] max-w-[200px]">
+                    <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-secondary)]">
                       {devolucion.motivo}
                     </div>
                   </td>
-                  <td style={{ padding: '16px', fontSize: '14px', fontWeight: '600', textAlign: 'right' }}>
+                  <td className="p-4 text-3.5 font-semibold text-right">
                     {formatCurrency(devolucion.total)}
                   </td>
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <td className="p-4 text-center">
                     {getEstadoBadge(devolucion.estado)}
                   </td>
-                  <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <td className="p-4 text-center">
                     <button
-                      onClick={() => router.push(`/dashboard/compras/devoluciones/${devolucion.id}`)}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: 'var(--primary-50)',
-                        color: 'var(--primary-700)',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                      onClick={() => router.push(`/dashboard/compras/devoluciones/${devolucion.id}`)} className="py-[6px] px-3 bg-[var(--primary-50)] text-[var(--primary-700)] border-0 rounded-[6px] cursor-pointer text-[13px] font-medium inline-flex items-center gap-[4px]"
                     >
                       <Eye size={14} />
                       Ver
@@ -602,13 +402,6 @@ export default function DevolucionesPage() {
           </table>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

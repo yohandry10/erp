@@ -197,57 +197,20 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
   const estadoActual = cotizacion.estado?.toUpperCase()
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        zIndex: 999999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px'
-      }}
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.6)] z-[999999] flex items-center justify-center p-5"
       onClick={onClose}
     >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '900px',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-        }}
+      <div className="bg-white rounded-4 w-[100%] max-w-[900px] overflow-auto shadow"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-          color: 'white',
-          padding: '24px',
-          borderRadius: '16px 16px 0 0'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>
+        <div className="text-white p-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-6 font-bold m-0">
               📋 {cotizacion.numero}
             </h2>
             <button
-              onClick={onClose}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: 'none',
-                color: 'white',
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                fontSize: '1.25rem'
-              }}
+              onClick={onClose} className="bg-[rgba(255,_255,_255,_0.2)] border-0 text-white w-10 h-10 rounded-full cursor-pointer text-5"
             >
               ✕
             </button>
@@ -255,114 +218,78 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px' }}>
+        <div className="p-6">
           {/* Estado y Total */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr', 
-            gap: '20px', 
-            marginBottom: '24px' 
-          }}>
-            <div style={{
-              background: '#f8fafc',
-              padding: '16px',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <h3 style={{ margin: '0 0 8px 0', color: '#374151' }}>Estado</h3>
-              <span style={{
-                ...getStatusColor(cotizacion.estado),
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}>
+          <div className="grid grid-cols-[1fr_1fr] gap-5 mb-6">
+            <div className="bg-slate-50 p-4 rounded-3 text-center">
+              <h3 className="mt-0 mr-0 mb-2 ml-0 text-gray-700">Estado</h3>
+              <span className="py-2 px-4 rounded-5 text-[0.875rem] font-semibold">
                 {estadoActual === 'PENDIENTE' || estadoActual === 'EN PROCESO'
                   ? 'BORRADOR' 
                   : (estadoActual || 'BORRADOR')}
               </span>
             </div>
             
-            <div style={{
-              background: '#f0fdf4',
-              padding: '16px',
-              borderRadius: '12px',
-              textAlign: 'center'
-            }}>
-              <h3 style={{ margin: '0 0 8px 0', color: '#374151' }}>Total</h3>
-              <div style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#059669'
-              }}>
+            <div className="bg-[#f0fdf4] p-4 rounded-3 text-center">
+              <h3 className="mt-0 mr-0 mb-2 ml-0 text-gray-700">Total</h3>
+              <div className="text-6 font-bold text-emerald-600">
                 {formatCurrency(cotizacion.total)}
               </div>
             </div>
           </div>
 
           {/* Información detallada */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '16px',
-            fontSize: '0.875rem',
-            marginBottom: '24px'
-          }}>
+          <div className="grid grid-cols-[1fr_1fr] gap-4 text-[0.875rem] mb-6">
             <div>
               <strong>Cliente:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{cotizacion.cliente_id}</span>
+              <span className="text-gray-500">{cotizacion.cliente_id}</span>
             </div>
             <div>
               <strong>Vendedor:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{cotizacion.vendedor || 'No asignado'}</span>
+              <span className="text-gray-500">{cotizacion.vendedor || 'No asignado'}</span>
             </div>
             <div>
               <strong>Fecha Cotización:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{formatDate(cotizacion.fecha_cotizacion)}</span>
+              <span className="text-gray-500">{formatDate(cotizacion.fecha_cotizacion)}</span>
             </div>
             <div>
               <strong>Vencimiento:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{formatDate(cotizacion.fecha_vencimiento)}</span>
+              <span className="text-gray-500">{formatDate(cotizacion.fecha_vencimiento)}</span>
             </div>
             <div>
               <strong>Probabilidad:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{cotizacion.probabilidad}%</span>
+              <span className="text-gray-500">{cotizacion.probabilidad}%</span>
             </div>
             <div>
               <strong>Moneda:</strong><br/>
-              <span style={{ color: '#6b7280' }}>{cotizacion.moneda || 'PEN'}</span>
+              <span className="text-gray-500">{cotizacion.moneda || 'PEN'}</span>
             </div>
           </div>
 
           {/* Información de seguimiento si existe */}
           {(cotizacion.fecha_aprobacion || cotizacion.fecha_conversion || cotizacion.fecha_rechazo) && (
-            <div style={{
-              background: '#f8fafc',
-              padding: '16px',
-              borderRadius: '12px',
-              marginBottom: '24px'
-            }}>
-              <h3 style={{ margin: '0 0 12px 0', color: '#374151' }}>Seguimiento</h3>
+            <div className="bg-slate-50 p-4 rounded-3 mb-6">
+              <h3 className="mt-0 mr-0 mb-3 ml-0 text-gray-700">Seguimiento</h3>
               {cotizacion.fecha_aprobacion && (
-                <div style={{ marginBottom: '8px', fontSize: '0.875rem' }}>
+                <div className="mb-2 text-[0.875rem]">
                   <strong>Aprobada:</strong> {formatDate(cotizacion.fecha_aprobacion)}
                 </div>
               )}
               {cotizacion.fecha_conversion && (
-                <div style={{ marginBottom: '8px', fontSize: '0.875rem' }}>
+                <div className="mb-2 text-[0.875rem]">
                   <strong>Convertida:</strong> {formatDate(cotizacion.fecha_conversion)}
                   {cotizacion.documento_generado_id && (
-                    <span style={{ color: '#059669', marginLeft: '8px' }}>
+                    <span className="text-emerald-600 ml-2">
                       ✅ Documento generado
                     </span>
                   )}
                 </div>
               )}
               {cotizacion.fecha_rechazo && (
-                <div style={{ fontSize: '0.875rem' }}>
+                <div className="text-[0.875rem]">
                   <strong>Rechazada:</strong> {formatDate(cotizacion.fecha_rechazo)}
                   {cotizacion.motivo_rechazo && (
-                    <div style={{ color: '#ef4444', marginTop: '4px' }}>
+                    <div className="text-red-500 mt-[4px]">
                       Motivo: {cotizacion.motivo_rechazo}
                     </div>
                   )}
@@ -372,29 +299,18 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
           )}
 
           {/* Desglose financiero */}
-          <div style={{
-            background: '#f8fafc',
-            padding: '16px',
-            borderRadius: '12px',
-            marginBottom: '24px'
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', color: '#374151' }}>Desglose Financiero</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div className="bg-slate-50 p-4 rounded-3 mb-6">
+            <h3 className="mt-0 mr-0 mb-3 ml-0 text-gray-700">Desglose Financiero</h3>
+            <div className="flex justify-between mb-2">
               <span>Subtotal:</span>
               <span>{formatCurrency(cotizacion.subtotal)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div className="flex justify-between mb-2">
               <span>IGV (18%):</span>
               <span>{formatCurrency(cotizacion.igv)}</span>
             </div>
-            <hr style={{ margin: '8px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              fontWeight: '700',
-              fontSize: '1rem',
-              color: '#059669'
-            }}>
+            <hr className="my-2 mx-0 border-0 border-t" />
+            <div className="flex justify-between font-bold text-4 text-emerald-600">
               <span>Total:</span>
               <span>{formatCurrency(cotizacion.total)}</span>
             </div>
@@ -402,15 +318,9 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
 
           {/* Observaciones */}
           {cotizacion.observaciones && (
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ margin: '0 0 12px 0', color: '#374151' }}>Observaciones</h3>
-              <div style={{
-                background: '#fffbeb',
-                padding: '12px',
-                borderRadius: '8px',
-                color: '#92400e',
-                fontSize: '0.875rem'
-              }}>
+            <div className="mb-6">
+              <h3 className="mt-0 mr-0 mb-3 ml-0 text-gray-700">Observaciones</h3>
+              <div className="bg-[#fffbeb] p-3 rounded-2 text-[#92400e] text-[0.875rem]">
                 {cotizacion.observaciones}
               </div>
             </div>
@@ -418,52 +328,25 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
         </div>
 
         {/* Footer con botones de acción */}
-        <div style={{
-          background: '#f8fafc',
-          padding: '20px 24px',
-          borderRadius: '0 0 16px 16px',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ color: vencimiento.color, fontSize: '0.875rem', fontWeight: '600' }}>
+        <div className="bg-slate-50 py-5 px-6 border-t">
+          <div className="flex justify-between items-center">
+            <div className="text-[0.875rem] font-semibold">
               {vencimiento.texto}
             </div>
             
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="flex gap-3">
               {/* Botones según el estado */}
               {(estadoActual === 'BORRADOR' || estadoActual === 'ENVIADA') && (
                 <>
                   <button
                     onClick={handleAprobar}
-                    disabled={loading}
-                    style={{
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      opacity: loading ? 0.5 : 1
-                    }}
+                    disabled={loading} className="bg-[#10b981] text-white border-0 py-2 px-4 rounded-2 text-[0.875rem] font-semibold"
                   >
                     {loading ? '⏳' : '✅'} Aprobar
                   </button>
                   <button
                     onClick={handleRechazar}
-                    disabled={loading}
-                    style={{
-                      background: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      cursor: loading ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      opacity: loading ? 0.5 : 1
-                    }}
+                    disabled={loading} className="bg-red-500 text-white border-0 py-2 px-4 rounded-2 text-[0.875rem] font-semibold"
                   >
                     {loading ? '⏳' : '❌'} Rechazar
                   </button>
@@ -473,45 +356,20 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
               {estadoActual === 'APROBADA' && (
                 <button
                   onClick={handleConvertir}
-                  disabled={loading}
-                  style={{
-                    background: '#059669',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    opacity: loading ? 0.5 : 1
-                  }}
+                  disabled={loading} className="bg-emerald-600 text-white border-0 py-2 px-4 rounded-2 text-[0.875rem] font-semibold"
                 >
                   {loading ? '⏳' : '🔄'} Convertir en Venta
                 </button>
               )}
 
               {estadoActual === 'CONVERTIDA' && (
-                <div style={{
-                  background: '#dcfce7',
-                  color: '#166534',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: '600'
-                }}>
+                <div className="bg-[#dcfce7] text-[#166534] py-2 px-4 rounded-2 text-[0.875rem] font-semibold">
                   ✅ Ya convertida en venta
                 </div>
               )}
 
               {estadoActual === 'RECHAZADA' && (
-                <div style={{
-                  background: '#fecaca',
-                  color: '#dc2626',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: '600'
-                }}>
+                <div className="bg-[#fecaca] text-red-600 py-2 px-4 rounded-2 text-[0.875rem] font-semibold">
                   ❌ Cotización rechazada
                 </div>
               )}

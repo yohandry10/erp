@@ -26,26 +26,26 @@ function Invoke-ApiRequest {
         [object]$Body = $null,
         [string]$Token = $null
     )
-    
+
     $headers = @{
         "Content-Type" = "application/json"
         "x-tenant-id" = $TENANT_ID
     }
-    
+
     if ($Token) {
         $headers["Authorization"] = "Bearer $Token"
     }
-    
+
     $params = @{
         Method = $Method
         Uri = "$API_URL$Endpoint"
         Headers = $headers
     }
-    
+
     if ($Body) {
         $params["Body"] = ($Body | ConvertTo-Json -Depth 10)
     }
-    
+
     try {
         $response = Invoke-RestMethod @params
         return $response
@@ -197,9 +197,9 @@ Write-Host "🏦 VALIDACIÓN 3: Balance General - Subtotales" -ForegroundColor Y
 Write-Host "Verificando cálculos de activos, pasivos y patrimonio" -ForegroundColor Gray
 
 # Validar Total Activos Corrientes
-$totalActivosCorrientesCalculado = $balanceGeneral.activos.corrientes.efectivo + 
-                                    $balanceGeneral.activos.corrientes.cuentas_por_cobrar + 
-                                    $balanceGeneral.activos.corrientes.inventarios + 
+$totalActivosCorrientesCalculado = $balanceGeneral.activos.corrientes.efectivo +
+                                    $balanceGeneral.activos.corrientes.cuentas_por_cobrar +
+                                    $balanceGeneral.activos.corrientes.inventarios +
                                     $balanceGeneral.activos.corrientes.otros_activos
 
 Write-Host ""
@@ -268,9 +268,9 @@ else {
 }
 
 # Validar Total Pasivos Corrientes
-$totalPasivosCorrientesCalculado = $balanceGeneral.pasivos.corrientes.cuentas_por_pagar + 
-                                    $balanceGeneral.pasivos.corrientes.tributos_por_pagar + 
-                                    $balanceGeneral.pasivos.corrientes.remuneraciones_por_pagar + 
+$totalPasivosCorrientesCalculado = $balanceGeneral.pasivos.corrientes.cuentas_por_pagar +
+                                    $balanceGeneral.pasivos.corrientes.tributos_por_pagar +
+                                    $balanceGeneral.pasivos.corrientes.remuneraciones_por_pagar +
                                     $balanceGeneral.pasivos.corrientes.otros_pasivos
 
 Write-Host ""
@@ -324,8 +324,8 @@ else {
 }
 
 # Validar Total Patrimonio
-$totalPatrimonioCalculado = $balanceGeneral.patrimonio.capital + 
-                             $balanceGeneral.patrimonio.resultados_acumulados + 
+$totalPatrimonioCalculado = $balanceGeneral.patrimonio.capital +
+                             $balanceGeneral.patrimonio.resultados_acumulados +
                              $balanceGeneral.patrimonio.resultado_ejercicio
 
 Write-Host ""
@@ -409,7 +409,7 @@ if ($errores.Count -eq 0 -and $advertencias.Count -eq 0) {
 else {
     Write-Host "❌ SE ENCONTRARON ERRORES EN LOS CÁLCULOS" -ForegroundColor Red
     Write-Host ""
-    
+
     if ($errores.Count -gt 0) {
         Write-Host "ERRORES CRÍTICOS ($($errores.Count)):" -ForegroundColor Red
         foreach ($error in $errores) {
@@ -417,7 +417,7 @@ else {
         }
         Write-Host ""
     }
-    
+
     if ($advertencias.Count -gt 0) {
         Write-Host "ADVERTENCIAS ($($advertencias.Count)):" -ForegroundColor Yellow
         foreach ($advertencia in $advertencias) {
@@ -425,7 +425,7 @@ else {
         }
         Write-Host ""
     }
-    
+
     Write-Host "❌ NO APROBADO - REQUIERE CORRECCIONES" -ForegroundColor Red
     exit 1
 }

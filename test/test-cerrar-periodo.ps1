@@ -52,7 +52,7 @@ try {
     try {
         $periodosResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
         $periodo = $periodosResponse.data | Where-Object { $_.anio -eq 2025 -and $_.mes -eq 1 } | Select-Object -First 1
-        
+
         if ($periodo) {
             $periodoId = $periodo.id
             Write-Host "✅ Found existing period: $periodoId" -ForegroundColor Green

@@ -51,95 +51,6 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
       <html>
       <head>
         <title>Ticket ${ventaData.numero_ticket}</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            width: 80mm;
-            padding: 5mm;
-            background: white;
-            color: black;
-          }
-          .ticket {
-            width: 100%;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-          }
-          .empresa-nombre {
-            font-size: 16px;
-            font-weight: bold;
-          }
-          .empresa-ruc {
-            font-size: 11px;
-          }
-          .ticket-numero {
-            font-size: 14px;
-            font-weight: bold;
-            margin: 8px 0;
-          }
-          .fecha {
-            font-size: 10px;
-            color: #333;
-          }
-          .cliente {
-            border-bottom: 1px dashed #000;
-            padding: 8px 0;
-            margin-bottom: 8px;
-          }
-          .items {
-            border-bottom: 1px dashed #000;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-          }
-          .item {
-            display: flex;
-            justify-content: space-between;
-            margin: 4px 0;
-            font-size: 11px;
-          }
-          .item-nombre {
-            flex: 1;
-          }
-          .item-precio {
-            text-align: right;
-            min-width: 60px;
-          }
-          .totales {
-            padding: 8px 0;
-          }
-          .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 4px 0;
-          }
-          .total-final {
-            font-size: 16px;
-            font-weight: bold;
-            border-top: 1px solid #000;
-            padding-top: 8px;
-            margin-top: 8px;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 16px;
-            font-size: 10px;
-            border-top: 1px dashed #000;
-            padding-top: 8px;
-          }
-        </style>
       </head>
       <body>
         ${printContent}
@@ -174,7 +85,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
   }
 
   return (
-    <div style={{ display: 'none' }}>
+    <div className="hidden">
       <div ref={ticketRef} className="ticket">
         {/* Header */}
         <div className="header">
@@ -277,7 +188,7 @@ export function printTicket(
 
   // Generar HTML del logo si existe
   const logoHtml = empresaData?.logo_url 
-    ? `<img src="${empresaData.logo_url}" alt="Logo" style="max-width: 60mm; max-height: 20mm; margin-bottom: 6px;" />`
+    ? `<img src="${empresaData.logo_url}" alt="Logo" />`
     : ''
 
   printWindow.document.write(`
@@ -285,34 +196,6 @@ export function printTicket(
     <html>
     <head>
       <title>Ticket ${ventaData.numero_ticket}</title>
-      <style>
-        @page { size: 80mm auto; margin: 0; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
-          width: 80mm;
-          padding: 5mm;
-          background: white;
-          color: black;
-        }
-        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px; }
-        .logo { margin-bottom: 6px; }
-        .logo img { max-width: 60mm; max-height: 20mm; }
-        .empresa-nombre { font-size: 16px; font-weight: bold; }
-        .empresa-ruc { font-size: 11px; }
-        .ticket-numero { font-size: 14px; font-weight: bold; margin: 8px 0; }
-        .fecha { font-size: 10px; color: #333; }
-        .cliente { border-bottom: 1px dashed #000; padding: 8px 0; margin-bottom: 8px; }
-        .items { border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px; }
-        .item { display: flex; justify-content: space-between; margin: 4px 0; font-size: 11px; }
-        .item-nombre { flex: 1; }
-        .item-precio { text-align: right; min-width: 60px; }
-        .totales { padding: 8px 0; }
-        .total-row { display: flex; justify-content: space-between; margin: 4px 0; }
-        .total-final { font-size: 16px; font-weight: bold; border-top: 1px solid #000; padding-top: 8px; margin-top: 8px; }
-        .footer { text-align: center; margin-top: 16px; font-size: 10px; border-top: 1px dashed #000; padding-top: 8px; }
-      </style>
     </head>
     <body>
       <div class="header">

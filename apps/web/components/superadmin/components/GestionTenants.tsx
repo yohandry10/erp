@@ -3,15 +3,23 @@
 import { useMemo } from 'react'
 import {
   Building2,
-  Search,
-  Plus,
-  RefreshCw,
-  Mail,
-  Phone,
-  MapPin,
   CheckCircle2,
   CircleOff,
+  Eye,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 interface Tenant {
   id?: string
@@ -43,6 +51,16 @@ interface Props {
   onDemoTenant?: (tenant: Tenant) => void
 }
 
+const shell =
+  'rounded-[1.15rem] border border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70'
+
+const field =
+  'h-11 border-cyan-400/20 bg-slate-950/60 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+
+function isTenantActive(tenant: Tenant) {
+  return tenant.estado ? tenant.estado === 'ACTIVO' : (tenant.is_active ?? true)
+}
+
 export default function GestionTenants({
   tenants,
   loading,
@@ -59,481 +77,173 @@ export default function GestionTenants({
   onDemoTenant,
 }: Props) {
   const empty = !loading && tenants.length === 0
-
   const rows = useMemo(() => tenants, [tenants])
 
   return (
-    <section
-      style={{
-        background: 'linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%)',
-        borderRadius: 16,
-        boxShadow:
-          '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.05)',
-        padding: '1.5rem',
-        margin: '1.5rem 0',
-      }}
-    >
-      {/* Título */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          borderBottom: '2px solid #e5e7eb',
-          paddingBottom: '0.75rem',
-          marginBottom: '1rem',
-        }}
-      >
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-            padding: '0.5rem',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Building2 style={{ width: 18, height: 18, color: 'white' }} />
+    <Card className={`${shell} mt-6 overflow-hidden`}>
+      <CardHeader className="border-b border-cyan-400/15 bg-slate-950/45 px-6 py-5 group-data-[erp-theme=light]/dashboard:bg-slate-50">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                Gestion de tenants
+              </CardTitle>
+              <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                Empresas, estados y demos operativas del entorno multi-tenant.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onRefresh}
+              className="border-cyan-400/20 bg-slate-900/80 text-slate-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Actualizar
+            </Button>
+            <Button type="button" onClick={onCreateClick} className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-950/30">
+              <Plus className="mr-2 h-4 w-4" />
+              Crear tenant
+            </Button>
+          </div>
         </div>
-        <h3
-          style={{
-            fontSize: '1.125rem',
-            fontWeight: 700,
-            color: '#1e293b',
-            margin: 0,
-          }}
-        >
-          Gestión de Tenants
-        </h3>
-      </div>
+      </CardHeader>
 
-      {/* Filtros y acciones */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto auto',
-          gap: '0.75rem',
-          marginBottom: '1rem',
-        }}
-      >
-        {/* Buscador */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'white',
-            border: '2px solid #e2e8f0',
-            borderRadius: 10,
-            padding: '0.5rem 0.75rem',
-          }}
-        >
-          <Search style={{ width: 16, height: 16, color: '#64748b' }} />
-          <input
-            placeholder="Buscar por nombre, email o RUC..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            style={{
-              border: 'none',
-              outline: 'none',
-              width: '100%',
-              marginLeft: '0.5rem',
-              fontSize: '0.9rem',
-              background: 'transparent',
-              color: '#1f2937',
-            }}
-          />
-        </div>
+      <CardContent className="space-y-5 p-6">
+        <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+            <Input
+              placeholder="Buscar por nombre, email, RUC, telefono o direccion"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className={`${field} pl-10`}
+            />
+          </label>
 
-        {/* Filtro de estado */}
-        <select
-          value={statusFilter}
-          onChange={(e) =>
-            onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')
-          }
-          style={{
-            padding: '0.6rem 0.9rem',
-            border: '2px solid #e2e8f0',
-            borderRadius: 10,
-            fontSize: '0.9rem',
-            background: 'white',
-            cursor: 'pointer',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#3b82f6'
-            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#e2e8f0'
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        >
-          <option value="ALL">Todos los estados</option>
-          <option value="ACTIVE">Activos</option>
-          <option value="INACTIVE">Inactivos</option>
-        </select>
-
-        {/* Botones */}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={onRefresh}
-            type="button"
-            style={{
-              padding: '0.6rem 0.9rem',
-              border: '2px solid #e2e8f0',
-              borderRadius: 10,
-              background: 'white',
-              color: '#475569',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#cbd5e1'
-              e.currentTarget.style.backgroundColor = '#f8fafc'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e2e8f0'
-              e.currentTarget.style.backgroundColor = 'white'
-            }}
+          <select
+            value={statusFilter}
+            onChange={(e) => onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+            className={`${field} rounded-md px-3 text-sm outline-none`}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <RefreshCw style={{ width: 16, height: 16 }} />
-              Refrescar
-            </div>
-          </button>
-
-          <button
-            onClick={onCreateClick}
-            type="button"
-            style={{
-              padding: '0.6rem 1rem',
-              border: 'none',
-              borderRadius: 10,
-              background:
-                'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(59,130,246,0.4)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)'
-              e.currentTarget.style.boxShadow =
-                '0 6px 16px rgba(59,130,246,0.5)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow =
-                '0 4px 12px rgba(59,130,246,0.4)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus style={{ width: 18, height: 18 }} />
-              Crear Tenant
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabla / Lista */}
-      <div
-        style={{
-          background: 'white',
-          borderRadius: 12,
-          border: '1px solid #e5e7eb',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header tabla */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 1.5fr 1.5fr 0.8fr 0.6fr',
-            gap: '0.75rem',
-            padding: '0.9rem 1rem',
-            background: '#f8fafc',
-            borderBottom: '1px solid #e5e7eb',
-            fontWeight: 700,
-            color: '#475569',
-            fontSize: '0.85rem',
-          }}
-        >
-          <div>Tenant</div>
-          <div>Contacto</div>
-          <div>Ubicación</div>
-          <div>Estado</div>
-          <div style={{ textAlign: 'right' }}>Acciones</div>
+            <option value="ALL">Todos los estados</option>
+            <option value="ACTIVE">Activos</option>
+            <option value="INACTIVE">Inactivos</option>
+          </select>
         </div>
 
-        {/* Body */}
-        <div style={{ position: 'relative' }}>
-          {/* Loading */}
-          {loading && (
-            <div
-              style={{
-                padding: '1.25rem',
-                textAlign: 'center',
-                color: '#64748b',
-                fontWeight: 600,
-              }}
-            >
-              Cargando...
+        {loading && (
+          <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/60 p-5 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-600">
+            Cargando tenants...
+          </div>
+        )}
+
+        {!loading && !!error && (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-5 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:text-amber-800">
+            {error}
+          </div>
+        )}
+
+        {empty && !error && (
+          <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/60 p-8 text-center group-data-[erp-theme=light]/dashboard:bg-slate-50">
+            <Building2 className="mx-auto h-9 w-9 text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+            <p className="mt-3 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              No hay tenants que coincidan con los filtros.
+            </p>
+          </div>
+        )}
+
+        {!loading && !error && rows.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-cyan-400/15">
+            <div className="grid grid-cols-[minmax(260px,2fr)_minmax(220px,1.4fr)_minmax(180px,1.2fr)_140px_180px] gap-4 bg-slate-900/80 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-100/70 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-500">
+              <div>Tenant</div>
+              <div>Contacto</div>
+              <div>Ubicacion</div>
+              <div>Estado</div>
+              <div className="text-right">Acciones</div>
             </div>
-          )}
 
-          {/* Error */}
-          {!loading && !!error && (
-            <div
-              style={{
-                padding: '1.25rem',
-                textAlign: 'center',
-                color: '#dc2626',
-                fontWeight: 700,
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* Vacío */}
-          {empty && !error && (
-            <div
-              style={{
-                padding: '1.25rem',
-                textAlign: 'center',
-                color: '#64748b',
-              }}
-            >
-              No hay registros que coincidan con la búsqueda/estado.
-            </div>
-          )}
-
-          {/* Filas */}
-          {!loading &&
-            !error &&
-            rows.map((t, idx) => {
-              const activo = t.estado ? t.estado === 'ACTIVO' : (t.is_active ?? true)
-              return (
-                <div
-                  key={(t.id ?? t.ruc) + idx}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2fr 1.5fr 1.5fr 0.8fr 0.6fr',
-                    gap: '0.75rem',
-                    padding: '1rem',
-                    borderBottom: '1px solid #f1f5f9',
-                    alignItems: 'center',
-                  }}
-                >
-                  {/* Tenant */}
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: '#eff6ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px solid #e5e7eb',
-                      }}
-                    >
-                      <Building2 style={{ width: 18, height: 18, color: '#2563eb' }} />
-                    </div>
-                    <div style={{ lineHeight: 1.25 }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                        {t.razon_social}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        RUC: {t.ruc}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contacto */}
-                  <div style={{ lineHeight: 1.35 }}>
-                    {t.email && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          color: '#334155',
-                        }}
-                      >
-                        <Mail style={{ width: 14, height: 14, color: '#64748b' }} />
-                        <span style={{ fontSize: '0.85rem' }}>{t.email}</span>
-                      </div>
-                    )}
-                    {t.telefono && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          color: '#334155',
-                        }}
-                      >
-                        <Phone style={{ width: 14, height: 14, color: '#64748b' }} />
-                        <span style={{ fontSize: '0.85rem' }}>{t.telefono}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ubicación */}
+            <div className="divide-y divide-cyan-400/10">
+              {rows.map((tenant, idx) => {
+                const active = isTenantActive(tenant)
+                return (
                   <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      color: '#334155',
-                    }}
+                    key={(tenant.id ?? tenant.ruc) + idx}
+                    className="grid grid-cols-[minmax(260px,2fr)_minmax(220px,1.4fr)_minmax(180px,1.2fr)_140px_180px] gap-4 px-4 py-4 transition hover:bg-cyan-400/5 group-data-[erp-theme=light]/dashboard:hover:bg-slate-50"
                   >
-                    <MapPin style={{ width: 14, height: 14, color: '#64748b' }} />
-                    <span style={{ fontSize: '0.85rem' }}>{t.direccion || '—'}</span>
-                  </div>
-
-                  {/* Estado */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontWeight: 700,
-                        color: activo ? '#065f46' : '#991b1b',
-                        background: activo ? '#d1fae5' : '#fee2e2',
-                        border: `1px solid ${activo ? '#a7f3d0' : '#fecaca'}`,
-                        borderRadius: 999,
-                        padding: '0.25rem 0.6rem',
-                        justifySelf: 'start',
-                      }}
-                    >
-                      {activo ? (
-                        <CheckCircle2 style={{ width: 16, height: 16 }} />
-                      ) : (
-                        <CircleOff style={{ width: 16, height: 16 }} />
-                      )}
-                      {activo ? 'Activo' : 'Inactivo'}
-                    </div>
-                    {t.is_demo && (
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontWeight: 700,
-                          color: '#1d4ed8',
-                          background: '#dbeafe',
-                          border: '1px solid #bfdbfe',
-                          borderRadius: 999,
-                          padding: '0.2rem 0.5rem',
-                          fontSize: '0.75rem',
-                          width: 'fit-content',
-                        }}
-                      >
-                        DEMO
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+                        <Building2 className="h-5 w-5" />
                       </div>
-                    )}
-                  </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                          {tenant.razon_social}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                          RUC {tenant.ruc}
+                        </p>
+                      </div>
+                    </div>
 
-                  {/* Acciones */}
-                  <div style={{ justifySelf: 'end', display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => onDemoTenant?.(t)}
-                      title="Activar demo"
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        background: 'white',
-                        borderRadius: 8,
-                        padding: 6,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#e0e7ff'
-                        e.currentTarget.style.borderColor = '#6366f1'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.borderColor = '#e5e7eb'
-                      }}
-                    >
-                      🎯
-                    </button>
-                    <button
-                      onClick={() => onViewTenant?.(t)}
-                      title="Ver detalles"
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        background: 'white',
-                        borderRadius: 8,
-                        padding: 6,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#eff6ff'
-                        e.currentTarget.style.borderColor = '#3b82f6'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.borderColor = '#e5e7eb'
-                      }}
-                    >
-                      👁️
-                    </button>
-                    <button
-                      onClick={() => onEditTenant?.(t)}
-                      title="Editar"
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        background: 'white',
-                        borderRadius: 8,
-                        padding: 6,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#fef3c7'
-                        e.currentTarget.style.borderColor = '#f59e0b'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.borderColor = '#e5e7eb'
-                      }}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => onDeleteTenant?.(t)}
-                      title="Eliminar"
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        background: 'white',
-                        borderRadius: 8,
-                        padding: 6,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#fee2e2'
-                        e.currentTarget.style.borderColor = '#ef4444'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.borderColor = '#e5e7eb'
-                      }}
-                    >
-                      🗑️
-                    </button>
+                    <div className="space-y-1 text-xs text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                      {tenant.email && (
+                        <p className="flex min-w-0 items-center gap-2">
+                          <Mail className="h-3.5 w-3.5 shrink-0 text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+                          <span className="truncate">{tenant.email}</span>
+                        </p>
+                      )}
+                      {tenant.telefono && (
+                        <p className="flex items-center gap-2">
+                          <Phone className="h-3.5 w-3.5 text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+                          <span>{tenant.telefono}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="flex min-w-0 items-center gap-2 text-xs text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+                      <span className="truncate">{tenant.direccion || 'Sin direccion registrada'}</span>
+                    </p>
+
+                    <div className="flex flex-col items-start gap-2">
+                      <Badge className={active ? 'border-cyan-300/25 bg-cyan-400/15 text-cyan-100 group-data-[erp-theme=light]/dashboard:text-cyan-800' : 'border-slate-500/30 bg-slate-500/15 text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700'}>
+                        {active ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <CircleOff className="mr-1 h-3 w-3" />}
+                        {active ? 'Activo' : 'Inactivo'}
+                      </Badge>
+                      {tenant.is_demo && (
+                        <Badge className="border-blue-300/25 bg-blue-400/15 text-blue-100 group-data-[erp-theme=light]/dashboard:text-blue-800">
+                          Demo
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" size="icon" variant="outline" title="Activar demo" onClick={() => onDemoTenant?.(tenant)} className="border-cyan-400/20 bg-slate-900/70 text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+                        <ShieldCheck className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" size="icon" variant="outline" title="Ver detalles" onClick={() => onViewTenant?.(tenant)} className="border-cyan-400/20 bg-slate-900/70 text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" size="icon" variant="outline" title="Editar" onClick={() => onEditTenant?.(tenant)} className="border-cyan-400/20 bg-slate-900/70 text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" size="icon" variant="outline" title="Eliminar" onClick={() => onDeleteTenant?.(tenant)} className="border-cyan-400/20 bg-slate-900/70 text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-        </div>
-      </div>
-    </section>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -90,13 +90,12 @@ export default function CxpDetallePage() {
   if (!cxp) {
     return (
       <div className="dashboard-container">
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <XCircle size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
+        <div className="text-center p-12">
+          <XCircle size={48} className="text-red-500" />
           <h3>Cuenta por pagar no encontrada</h3>
           <button 
             onClick={() => router.push('/dashboard/finanzas/cxp')} 
-            className="refresh-btn" 
-            style={{ marginTop: '1rem' }}
+            className="refresh-btn mt-4"
           >
             <ArrowLeft size={16} /> Volver a la lista
           </button>
@@ -110,16 +109,9 @@ export default function CxpDetallePage() {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="flex items-center gap-4">
           <button 
-            onClick={() => router.push('/dashboard/finanzas/cxp')} 
-            style={{
-              padding: '0.5rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer'
-            }}
+            onClick={() => router.push('/dashboard/finanzas/cxp')} className="p-2 rounded-2 border bg-white cursor-pointer"
           >
             <ArrowLeft size={20} />
           </button>
@@ -130,22 +122,7 @@ export default function CxpDetallePage() {
         </div>
         {canApplyPayment && (
           <button
-            onClick={() => setShowPagoModal(true)}
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: '#10b981',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
-            }}
+            onClick={() => setShowPagoModal(true)} className="py-3 px-6 rounded-2 border-0 bg-[#10b981] text-white cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 transition shadow"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = '#059669'
               e.currentTarget.style.boxShadow = '0 4px 6px rgba(16, 185, 129, 0.3)'
@@ -161,13 +138,13 @@ export default function CxpDetallePage() {
         )}
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
+            <FileText className="stat-icon text-blue-500" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem' }}>
+          <div className="stat-value text-6">
             {formatCurrency(cxp.total, cxp.moneda)}
           </div>
           <div className="stat-subtitle">Monto original</div>
@@ -176,9 +153,9 @@ export default function CxpDetallePage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>PAGADO</h3>
-            <CheckCircle className="stat-icon" style={{ color: '#10b981' }} />
+            <CheckCircle className="stat-icon text-[#10b981]" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem', color: '#10b981' }}>
+          <div className="stat-value text-6 text-[#10b981]">
             {formatCurrency(totalPagado, cxp.moneda)}
           </div>
           <div className="stat-subtitle">
@@ -189,9 +166,9 @@ export default function CxpDetallePage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>SALDO</h3>
-            <DollarSign className="stat-icon" style={{ color: cxp.saldo > 0 ? '#ef4444' : '#10b981' }} />
+            <DollarSign className="stat-icon" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem', color: cxp.saldo > 0 ? '#ef4444' : '#10b981' }}>
+          <div className="stat-value text-6">
             {formatCurrency(cxp.saldo, cxp.moneda)}
           </div>
           <div className="stat-subtitle">Por pagar</div>
@@ -200,56 +177,56 @@ export default function CxpDetallePage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>VENCIMIENTO</h3>
-            <Calendar className="stat-icon" style={{ color: '#f59e0b' }} />
+            <Calendar className="stat-icon text-amber-500" />
           </div>
-          <div className="stat-value" style={{ fontSize: '1.125rem' }}>
+          <div className="stat-value text-[1.125rem]">
             {formatDate(cxp.fecha_vencimiento)}
           </div>
           <div className="stat-subtitle">Fecha límite</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(400px,_1fr))] gap-6">
         <div className="activity-section">
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 className="text-[1.125rem] font-semibold mb-4 flex items-center gap-2">
             <FileText size={20} />
             Información del Documento
           </h3>
           <div className="activity-card">
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className="grid gap-4">
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                <div className="text-3 text-gray-500 mb-1">
                   Número de Documento
                 </div>
-                <div style={{ fontSize: '1rem', fontWeight: '600', fontFamily: 'monospace' }}>
+                <div className="text-4 font-semibold">
                   {cxp.numero_documento}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                <div className="text-3 text-gray-500 mb-1">
                   Tipo de Documento
                 </div>
-                <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                <div className="text-[0.875rem] font-medium">
                   {cxp.tipo_documento}
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid grid-cols-[1fr_1fr] gap-4">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Fecha de Emisión
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {formatDate(cxp.fecha_emision)}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Fecha de Vencimiento
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {formatDate(cxp.fecha_vencimiento)}
                   </div>
                 </div>
@@ -257,10 +234,10 @@ export default function CxpDetallePage() {
 
               {cxp.condiciones_pago && (
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Condiciones de Pago
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {cxp.condiciones_pago}
                     {cxp.dias_credito && ` (${cxp.dias_credito} días)`}
                   </div>
@@ -272,36 +249,36 @@ export default function CxpDetallePage() {
 
         {cxp.proveedor && (
           <div className="activity-section">
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h3 className="text-[1.125rem] font-semibold mb-4 flex items-center gap-2">
               <Building2 size={20} />
               Proveedor
             </h3>
             <div className="activity-card">
-              <div style={{ display: 'grid', gap: '1rem' }}>
+              <div className="grid gap-4">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Razón Social
                   </div>
-                  <div style={{ fontSize: '1rem', fontWeight: '600' }}>
+                  <div className="text-4 font-semibold">
                     {cxp.proveedor.razon_social}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     RUC
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500', fontFamily: 'monospace' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {cxp.proveedor.ruc}
                   </div>
                 </div>
 
                 {cxp.proveedor.email && (
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <div className="text-3 text-gray-500 mb-1">
                       Email
                     </div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                    <div className="text-[0.875rem] font-medium">
                       {cxp.proveedor.email}
                     </div>
                   </div>
@@ -309,10 +286,10 @@ export default function CxpDetallePage() {
 
                 {cxp.proveedor.telefono && (
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                    <div className="text-3 text-gray-500 mb-1">
                       Teléfono
                     </div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                    <div className="text-[0.875rem] font-medium">
                       {cxp.proveedor.telefono}
                     </div>
                   </div>
@@ -323,125 +300,98 @@ export default function CxpDetallePage() {
         )}
       </div>
 
-      <div className="activity-section" style={{ marginTop: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="activity-section mt-6">
+        <h3 className="text-[1.125rem] font-semibold mb-4 flex items-center gap-2">
           <History size={20} />
           Historial de Pagos
         </h3>
         <div className="activity-card">
           {loadingPagos ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-              <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+            <div className="text-center p-8 text-gray-500">
+              <div className="loading-spinner"></div>
               <p>Cargando historial de pagos...</p>
             </div>
           ) : pagos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-              <CreditCard size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
+            <div className="text-center p-8 text-gray-500">
+              <CreditCard size={48} className="text-gray-400" />
               <p>No hay pagos registrados para esta cuenta</p>
             </div>
           ) : (
-            <div style={{ overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-auto">
+              <table className="w-[100%]">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <tr>
+                    <th className="text-left p-3 font-semibold text-3 text-gray-500">
                       Fecha
                     </th>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-3 font-semibold text-3 text-gray-500">
                       Cuenta Bancaria
                     </th>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-3 font-semibold text-3 text-gray-500">
                       Referencia
                     </th>
-                    <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-3 font-semibold text-3 text-gray-500">
                       Método
                     </th>
-                    <th style={{ textAlign: 'center', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-center p-3 font-semibold text-3 text-gray-500">
                       Estado
                     </th>
-                    <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-right p-3 font-semibold text-3 text-gray-500">
                       Monto
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {pagos.map((pago: any) => (
-                    <tr key={pago.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                      <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                    <tr key={pago.id} className="border-b">
+                      <td className="p-3 text-[0.875rem]">
                         {formatDate(pago.fecha)}
                       </td>
-                      <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
+                      <td className="p-3 text-[0.875rem]">
                         {pago.cuenta_bancaria ? (
                           <div>
-                            <div style={{ fontWeight: '500' }}>{pago.cuenta_bancaria.banco}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                            <div className="font-medium">{pago.cuenta_bancaria.banco}</div>
+                            <div className="text-3 text-gray-500">
                               {pago.cuenta_bancaria.numero_cuenta}
                             </div>
                           </div>
                         ) : (
-                          <span style={{ color: '#9ca3af' }}>-</span>
+                          <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>
+                      <td className="p-3 text-[0.875rem]">
                         {pago.referencia || '-'}
                       </td>
-                      <td style={{ padding: '0.75rem', fontSize: '0.875rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          background: '#e0f2fe',
-                          color: '#0369a1'
-                        }}>
+                      <td className="p-3 text-[0.875rem]">
+                        <span className="py-1 px-2 rounded-[4px] text-3 font-medium bg-[#e0f2fe] text-[#0369a1]">
                           {pago.metodo_pago || 'N/A'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      <td className="p-3 text-center">
                         {pago.conciliado ? (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            background: '#dcfce7',
-                            color: '#15803d'
-                          }}>
+                          <span className="inline-flex items-center gap-1 py-1 px-2 rounded-[4px] text-3 font-medium bg-[#dcfce7] text-green-700">
                             <CheckCircle size={12} />
                             Conciliado
                           </span>
                         ) : (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            background: '#fef3c7',
-                            color: '#92400e'
-                          }}>
+                          <span className="inline-flex items-center gap-1 py-1 px-2 rounded-[4px] text-3 font-medium bg-[#fef3c7] text-[#92400e]">
                             <Clock size={12} />
                             Pendiente
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '700', color: '#10b981' }}>
+                      <td className="p-3 text-right text-[0.875rem] font-bold text-[#10b981]">
                         {formatCurrency(pago.monto, cxp.moneda)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: '2px solid rgba(0,0,0,0.1)', background: 'rgba(16, 185, 129, 0.05)' }}>
-                    <td colSpan={5} style={{ padding: '0.75rem', fontSize: '0.875rem', fontWeight: '600' }}>
+                  <tr className="bg-[rgba(16,_185,_129,_0.05)]">
+                    <td colSpan={5} className="p-3 text-[0.875rem] font-semibold">
                       Total Pagado
                     </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '1rem', fontWeight: '700', color: '#10b981' }}>
+                    <td className="p-3 text-right text-4 font-bold text-[#10b981]">
                       {formatCurrency(totalPagado, cxp.moneda)}
                     </td>
                   </tr>

@@ -44,20 +44,7 @@ export default function NuevaCotizacionPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.push('/dashboard/compras/cotizaciones')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={() => router.push('/dashboard/compras/cotizaciones')} className="flex items-center gap-2 py-2 px-4 rounded-2 border bg-white cursor-pointer mb-4 text-[0.875rem] font-medium"
           >
             <ArrowLeft size={16} />
             Volver a Cotizaciones

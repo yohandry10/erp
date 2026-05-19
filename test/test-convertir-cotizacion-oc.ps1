@@ -24,7 +24,7 @@ $proveedor = @{
 
 try {
     $responseProveedor = Invoke-RestMethod -Uri "$baseUrl/compras/proveedores" -Method Post -Body $proveedor -ContentType "application/json"
-    
+
     if ($responseProveedor.success) {
         $proveedorId = $responseProveedor.data.id
         Write-Host "✓ Proveedor creado: $proveedorId" -ForegroundColor Green
@@ -67,7 +67,7 @@ $cotizacion = @{
 
 try {
     $responseCotizacion = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones" -Method Post -Body $cotizacion -ContentType "application/json"
-    
+
     if ($responseCotizacion.success) {
         $cotizacionId = $responseCotizacion.data.id
         Write-Host "✓ Cotización creada: $cotizacionId" -ForegroundColor Green
@@ -93,7 +93,7 @@ $convertirBorrador = @{
 
 try {
     $responseConvertirBorrador = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/convertir-oc" -Method Post -Body $convertirBorrador -ContentType "application/json"
-    
+
     if (-not $responseConvertirBorrador.success) {
         Write-Host "✓ Validación correcta: $($responseConvertirBorrador.error)" -ForegroundColor Green
     } else {
@@ -114,7 +114,7 @@ $updateCotizacion = @{
 
 try {
     $responseUpdate = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId" -Method Put -Body $updateCotizacion -ContentType "application/json"
-    
+
     if ($responseUpdate.success) {
         Write-Host "✓ Cotización actualizada a APROBADA" -ForegroundColor Green
     } else {
@@ -137,7 +137,7 @@ $convertirOC = @{
 
 try {
     $responseConvertir = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/convertir-oc" -Method Post -Body $convertirOC -ContentType "application/json"
-    
+
     if ($responseConvertir.success) {
         Write-Host "✓ Conversión exitosa" -ForegroundColor Green
         Write-Host ""
@@ -178,7 +178,7 @@ $convertirDuplicado = @{
 
 try {
     $responseConvertirDup = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId/convertir-oc" -Method Post -Body $convertirDuplicado -ContentType "application/json"
-    
+
     if (-not $responseConvertirDup.success) {
         Write-Host "✓ Validación correcta: $($responseConvertirDup.error)" -ForegroundColor Green
     } else {

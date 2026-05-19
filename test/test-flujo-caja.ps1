@@ -2,7 +2,7 @@
 # Descripción: Obtener proyección de flujo de caja
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsImtpZCI6IkR1cGxpY2F0ZSBvZiBlRzRKMGRhZGJCZGhqNGN3IiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2Rqb2Fxb3Fhb2Fhd2Nkb2Nod2RqZi5zdXBhYmFzZS5jby9hdXRoL3YxIiwic3ViIjoiNzJhNzU5YzAtNzBhYi00YzY5LWI5YzAtNzU5YzI5YjI5YjI5IiwiYXVkIjoiYXV0aGVudGljYXRlZCIsImV4cCI6MTc2MTQ5NTYwMCwiaWF0IjoxNzI5OTU5NjAwLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6e30sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3Mjk5NTk2MDB9XSwic2Vzc2lvbl9pZCI6IjEyM2U0NTY3LWU4OWItMTJkMy1hNDU2LTQyNjYxNDE3NDAwMCIsImlzX2Fub255bW91cyI6ZmFsc2V9.test-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440001"
 
 $headers = @{
@@ -22,7 +22,7 @@ try {
         -Method Get `
         -Headers $headers `
         -ErrorAction Stop
-    
+
     Write-Host "✅ Proyección obtenida exitosamente" -ForegroundColor Green
     Write-Host "Período: $($response.data.periodo.fecha_desde) a $($response.data.periodo.fecha_hasta)" -ForegroundColor White
     Write-Host "Días: $($response.data.periodo.dias)" -ForegroundColor White
@@ -46,7 +46,7 @@ try {
     Write-Host "  - CxP pendientes: $($response.data.estadisticas.total_cxp_pendientes)" -ForegroundColor White
     Write-Host "  - CxC pendientes: $($response.data.estadisticas.total_cxc_pendientes)" -ForegroundColor White
     Write-Host "  - Total movimientos: $($response.data.estadisticas.total_movimientos)" -ForegroundColor White
-    
+
     if ($response.data.proyeccion.Count -gt 0) {
         Write-Host "`nPrimeros 5 movimientos proyectados:" -ForegroundColor White
         $response.data.proyeccion | Select-Object -First 5 | ForEach-Object {
@@ -73,7 +73,7 @@ try {
         -Method Get `
         -Headers $headers `
         -ErrorAction Stop
-    
+
     Write-Host "✅ Proyección obtenida exitosamente" -ForegroundColor Green
     Write-Host "Período: $($response.data.periodo.fecha_desde) a $($response.data.periodo.fecha_hasta)" -ForegroundColor White
     Write-Host "Días: $($response.data.periodo.dias)" -ForegroundColor White
@@ -91,7 +91,7 @@ try {
         -Method Get `
         -Headers $headers `
         -ErrorAction Stop
-    
+
     Write-Host "✅ Proyección obtenida exitosamente" -ForegroundColor Green
     Write-Host "Período: $($response.data.periodo.fecha_desde) a $($response.data.periodo.fecha_hasta)" -ForegroundColor White
     Write-Host "Días: $($response.data.periodo.dias)" -ForegroundColor White

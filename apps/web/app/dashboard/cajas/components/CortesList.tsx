@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils'
 import { useApi } from '@/hooks/use-api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -168,7 +169,7 @@ export function CortesList({ className = '', id }: Props) {
 
   if (loading) {
     return (
-      <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary, #6b7280)' }}>
+      <div className="p-3 text-center text-[var(--text-secondary,_#6b7280)]">
         Cargando cortes recientes...
       </div>
     );
@@ -176,11 +177,10 @@ export function CortesList({ className = '', id }: Props) {
 
   if (error) {
     return (
-      <div style={{ padding: '12px', textAlign: 'center', color: '#b91c1c', background: '#fef2f2', borderRadius: '10px' }}>
+      <div className="p-3 text-center text-red-700 bg-[#fef2f2] rounded-2.5">
         {error}
         <button
-          onClick={cargarCortes}
-          style={{ ...buttonGhostStyle, display: 'block', margin: '8px auto 0' }}
+          onClick={cargarCortes} className="block"
         >
           Reintentar
         </button>
@@ -190,50 +190,48 @@ export function CortesList({ className = '', id }: Props) {
 
   if (cortes.length === 0) {
     return (
-      <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary, #6b7280)', background: 'var(--bg-card, #fff)', borderRadius: '10px', boxShadow: 'var(--shadow-sm, 0 2px 6px rgba(0,0,0,0.06))' }}>
+      <div className="p-3 text-center text-[var(--text-secondary,_#6b7280)] bg-[var(--bg-card,_#fff)] rounded-2.5 shadow">
         No hay cortes registrados aún.
       </div>
     );
   }
 
   return (
-    <div id={id} className={className} style={cardStyle}>
-      <div style={headerStyle}>
-        <h3 style={titleStyle}>Cortes (cierre diario/turno)</h3>
-        <button onClick={cargarCortes} style={buttonGhostStyle}>
+    <div id={id} className={cn(className, "bg-[var(--bg-card,_#fff)] border rounded-3 shadow mt-4 max-w-[1100px] ml-auto mr-auto overflow-hidden")}>
+      <div className="py-4 px-5 border-b flex justify-between items-center bg-[var(--bg-subtle,_#f8fafc)]">
+        <h3 className="text-4 font-semibold text-[var(--text-primary,_#1f2937)] m-0">Cortes (cierre diario/turno)</h3>
+        <button onClick={cargarCortes} className="bg-transparent border-0 text-[var(--primary,_#2563eb)] text-3.5 cursor-pointer">
           Actualizar
         </button>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={tableStyle}>
+      <div className="overflow-x-auto">
+        <table className="w-[100%]">
           <thead>
             <tr>
-              <th style={thStyle}>Fecha</th>
-              <th style={thStyle}>Caja</th>
-              <th style={thStyle}>Ventas</th>
-              <th style={thStyle}>IGV</th>
-              <th style={thStyle}>Docs</th>
-              <th style={thStyle}>Acciones</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Fecha</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Caja</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Ventas</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">IGV</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Docs</th>
+              <th className="text-left text-3 text-[var(--text-secondary,_#6b7280)] py-2.5 px-4 border-b bg-[var(--bg-subtle,_#f8fafc)]">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {cortes.map((corte) => (
-              <tr key={corte.id} style={{ background: 'var(--bg-card, #fff)' }}>
-                <td style={{ ...tdStyle, ...mutedStyle }}>{formatearFecha(corte.fecha_corte)}</td>
-                <td style={{ ...tdStyle, ...mutedStyle }}>{corte.caja_id ?? 'Caja'}</td>
-                <td style={tdStyle}>S/ {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
-                <td style={{ ...tdStyle, ...mutedStyle }}>S/ {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
-                <td style={{ ...tdStyle, ...mutedStyle }}>{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
-                <td style={{ ...tdStyle, display: 'flex', gap: '8px' }}>
+              <tr key={corte.id} className="bg-[var(--bg-card,_#fff)]">
+                <td>{formatearFecha(corte.fecha_corte)}</td>
+                <td>{corte.caja_id ?? 'Caja'}</td>
+                <td className="py-3 px-4 text-3.5 text-[var(--text-primary,_#111827)] border-b">S/ {(corte.total_ventas ?? corte.resumen_fiscal?.total ?? 0).toFixed(2)}</td>
+                <td>S/ {(corte.total_impuestos ?? corte.resumen_fiscal?.igv ?? 0).toFixed(2)}</td>
+                <td>{corte.total_documentos ?? corte.resumen_fiscal?.cantidad_boletas ?? 0}</td>
+                <td className="flex gap-2">
                   <button
-                    onClick={() => descargarArchivo(corte.id, 'pdf')}
-                    style={{ ...actionButtonStyle, color: 'var(--primary, #2563eb)' }}
+                    onClick={() => descargarArchivo(corte.id, 'pdf')} className="text-[var(--primary,_#2563eb)]"
                   >
                     PDF
                   </button>
                   <button
-                    onClick={() => descargarArchivo(corte.id, 'csv')}
-                    style={actionButtonStyle}
+                    onClick={() => descargarArchivo(corte.id, 'csv')} className="py-[6px] px-3 rounded-2 border bg-[var(--bg-card,_#fff)] cursor-pointer text-[0.8rem]"
                   >
                     CSV
                   </button>

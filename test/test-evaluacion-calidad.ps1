@@ -16,10 +16,10 @@ Write-Host "1. Verificando componente RecepcionWizard..." -ForegroundColor Green
 $wizardFile = "apps/web/components/compras/RecepcionWizard.tsx"
 if (Test-Path $wizardFile) {
     Write-Host "   ✓ Archivo encontrado: $wizardFile" -ForegroundColor Green
-    
+
     # Verificar que contiene la implementación de evaluación de calidad
     $content = Get-Content $wizardFile -Raw
-    
+
     $checks = @(
         @{ Pattern = "Evaluación de Calidad"; Description = "Título del paso de evaluación" },
         @{ Pattern = "updateItemCalidad"; Description = "Función para actualizar calidad" },
@@ -33,7 +33,7 @@ if (Test-Path $wizardFile) {
         @{ Pattern = "AlertCircle"; Description = "Icono para OBSERVADO" },
         @{ Pattern = "XCircle"; Description = "Icono para RECHAZADO" }
     )
-    
+
     foreach ($check in $checks) {
         if ($content -match [regex]::Escape($check.Pattern)) {
             Write-Host "   ✓ $($check.Description)" -ForegroundColor Green
@@ -51,13 +51,13 @@ Write-Host ""
 Write-Host "2. Verificando interfaz RecepcionItem..." -ForegroundColor Green
 if ($content -match "interface RecepcionItem") {
     Write-Host "   ✓ Interfaz RecepcionItem encontrada" -ForegroundColor Green
-    
+
     if ($content -match "calidad:\s*'OK'\s*\|\s*'OBSERVADO'\s*\|\s*'RECHAZADO'") {
         Write-Host "   ✓ Campo calidad con tipos correctos" -ForegroundColor Green
     } else {
         Write-Host "   ✗ Campo calidad no encontrado o tipos incorrectos" -ForegroundColor Red
     }
-    
+
     if ($content -match "observaciones\?:\s*string") {
         Write-Host "   ✓ Campo observaciones opcional" -ForegroundColor Green
     } else {
@@ -73,20 +73,20 @@ Write-Host ""
 Write-Host "3. Verificando paso 2 del wizard (Evaluación de Calidad)..." -ForegroundColor Green
 if ($content -match "\{currentStep === 2 &&") {
     Write-Host "   ✓ Paso 2 del wizard implementado" -ForegroundColor Green
-    
+
     # Verificar botones de calidad
     if ($content -match "onClick=\{\(\) => updateItemCalidad\(originalIndex, 'OK'\)\}") {
         Write-Host "   ✓ Botón OK implementado" -ForegroundColor Green
     }
-    
+
     if ($content -match "onClick=\{\(\) => updateItemCalidad\(originalIndex, 'OBSERVADO'\)\}") {
         Write-Host "   ✓ Botón OBSERVADO implementado" -ForegroundColor Green
     }
-    
+
     if ($content -match "onClick=\{\(\) => updateItemCalidad\(originalIndex, 'RECHAZADO'\)\}") {
         Write-Host "   ✓ Botón RECHAZADO implementado" -ForegroundColor Green
     }
-    
+
     # Verificar campo de observaciones condicional
     if ($content -match "\(item\.calidad === 'OBSERVADO' \|\| item\.calidad === 'RECHAZADO'\)") {
         Write-Host "   ✓ Campo de observaciones condicional implementado" -ForegroundColor Green

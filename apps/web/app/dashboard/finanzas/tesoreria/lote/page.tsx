@@ -116,6 +116,12 @@ export default function PagoLotePage() {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Pago Masivo</h1>
+            <p className="dashboard-subtitle">Cargando cuentas bancarias y CxP disponibles para procesar pagos por lote.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando información...</p>

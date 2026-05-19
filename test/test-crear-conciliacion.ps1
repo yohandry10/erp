@@ -1,7 +1,7 @@
 # Test script for POST /api/finanzas/conciliacion endpoint
 
 $baseUrl = "http://localhost:3002"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzY5YzI5Yy1hNzI5LTRhNzAtYjI5Ny1lNzI5YzI5YzI5YzIiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzMwMDAwMDAwfQ.fake-signature"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "550e8400-e29b-41d4-a716-446655440000"
 
 Write-Host "=== Test: Crear Conciliación Bancaria ===" -ForegroundColor Cyan
@@ -17,12 +17,12 @@ $headers = @{
 
 try {
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/api/api/finanzas/bancos/cuentas" -Method GET -Headers $headers
-    
+
     if ($cuentasResponse.data.Count -eq 0) {
         Write-Host "✗ No hay cuentas bancarias disponibles. Crea una primero." -ForegroundColor Red
         exit 1
     }
-    
+
     $cuentaId = $cuentasResponse.data[0].id
     $cuentaNombre = $cuentasResponse.data[0].nombre
     Write-Host "✓ Cuenta bancaria encontrada: $cuentaNombre (ID: $cuentaId)" -ForegroundColor Green
@@ -48,16 +48,16 @@ Write-Host ""
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/api/finanzas/conciliacion" -Method POST -Headers $headers -Body $conciliacionBody
-    
+
     Write-Host "✓ Conciliación creada exitosamente!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Response:" -ForegroundColor Cyan
     Write-Host ($response | ConvertTo-Json -Depth 10) -ForegroundColor White
-    
+
 } catch {
     Write-Host "✗ Error creando conciliación:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host ""
         Write-Host "Error details:" -ForegroundColor Yellow

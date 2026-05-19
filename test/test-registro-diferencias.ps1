@@ -2,7 +2,7 @@
 # Este script prueba que las diferencias se registran cuando hay discrepancias entre sistema y extracto
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4ZTU3ZGU2Yy1hOTBjLTRhMzItYjU5Zi1lMzJiMzE0YzQwNjgiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwidGVuYW50X2lkIjoiNzZhNjU0YTUtZTNiMy00YzU3LWI0YzYtMzk1YzJhMzY5YjU3IiwiaWF0IjoxNzMzMzQ1Mzk3LCJleHAiOjE3MzM0MzE3OTd9.Rl-tMYqvhBqOXqKEqLlZJjvPvXCqLlZJjvPvXCqLlZJjvPvXCqLlZJjvPvXCqLl"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "76a654a5-e3b3-4c57-b4c6-395c2a369b57"
 
 $headers = @{
@@ -108,16 +108,16 @@ Write-Host "PASO 4: Obteniendo movimiento del extracto..." -ForegroundColor Yell
 $movimientosUrl = "$baseUrl/api/finanzas/bancos/cuentas/$($cuentaBancaria.id)/movimientos"
 try {
     $movimientosResponse = Invoke-RestMethod -Uri $movimientosUrl -Method Get -Headers $headers
-    $movimientoExtracto = $movimientosResponse.data | Where-Object { 
-        $_.es_extracto -eq $true -and 
-        $_.conciliacion_id -eq $conciliacionId 
+    $movimientoExtracto = $movimientosResponse.data | Where-Object {
+        $_.es_extracto -eq $true -and
+        $_.conciliacion_id -eq $conciliacionId
     } | Select-Object -First 1
-    
+
     if (-not $movimientoExtracto) {
         Write-Host "ERROR: No se encontró el movimiento del extracto" -ForegroundColor Red
         exit 1
     }
-    
+
     $movimientoExtractoId = $movimientoExtracto.id
     Write-Host "✓ Movimiento extracto encontrado: $movimientoExtractoId" -ForegroundColor Green
     Write-Host "  - Tipo: $($movimientoExtracto.tipo)" -ForegroundColor Gray
@@ -150,7 +150,7 @@ try {
     Write-Host ""
     Write-Host "  Diferencia registrada: $($matchResponse.data.diferencia)" -ForegroundColor $(if ($matchResponse.data.diferencia -gt 0) { "Yellow" } else { "Green" })
     Write-Host "  Mensaje: $($matchResponse.data.mensaje)" -ForegroundColor Gray
-    
+
     $diferenciaRegistrada = $matchResponse.data.diferencia
 } catch {
     Write-Host "ERROR realizando match manual: $_" -ForegroundColor Red
@@ -166,10 +166,10 @@ Write-Host "PASO 6: Verificando registro de diferencia en BD..." -ForegroundColo
 
 try {
     $movimientosResponse = Invoke-RestMethod -Uri $movimientosUrl -Method Get -Headers $headers
-    
+
     $movSistemaActualizado = $movimientosResponse.data | Where-Object { $_.id -eq $movimientoSistemaId } | Select-Object -First 1
     $movExtractoActualizado = $movimientosResponse.data | Where-Object { $_.id -eq $movimientoExtractoId } | Select-Object -First 1
-    
+
     Write-Host ""
     Write-Host "Verificación de diferencias registradas:" -ForegroundColor Cyan
     Write-Host ""
@@ -183,10 +183,10 @@ try {
     Write-Host "  - Diferencia Conciliación: $($movExtractoActualizado.diferencia_conciliacion)" -ForegroundColor Yellow
     Write-Host "  - Movimiento Relacionado ID: $($movExtractoActualizado.movimiento_relacionado_id)" -ForegroundColor Gray
     Write-Host ""
-    
+
     # Validaciones
     $errores = @()
-    
+
     # 1. Verificar que ambos están conciliados
     if (-not $movSistemaActualizado.conciliado) {
         $errores += "Movimiento sistema NO está conciliado"
@@ -194,7 +194,7 @@ try {
     if (-not $movExtractoActualizado.conciliado) {
         $errores += "Movimiento extracto NO está conciliado"
     }
-    
+
     # 2. Verificar que la diferencia se registró
     if ($null -eq $movSistemaActualizado.diferencia_conciliacion) {
         $errores += "Diferencia NO registrada en movimiento sistema"
@@ -202,19 +202,19 @@ try {
     if ($null -eq $movExtractoActualizado.diferencia_conciliacion) {
         $errores += "Diferencia NO registrada en movimiento extracto"
     }
-    
+
     # 3. Verificar que la diferencia es correcta
     $diferenciaEsperada = [Math]::Round($diferencia, 2)
     $diferenciaRegistradaSistema = [Math]::Round($movSistemaActualizado.diferencia_conciliacion, 2)
     $diferenciaRegistradaExtracto = [Math]::Round($movExtractoActualizado.diferencia_conciliacion, 2)
-    
+
     if ($diferenciaRegistradaSistema -ne $diferenciaEsperada) {
         $errores += "Diferencia en sistema ($diferenciaRegistradaSistema) no coincide con esperada ($diferenciaEsperada)"
     }
     if ($diferenciaRegistradaExtracto -ne $diferenciaEsperada) {
         $errores += "Diferencia en extracto ($diferenciaRegistradaExtracto) no coincide con esperada ($diferenciaEsperada)"
     }
-    
+
     # 4. Verificar que los movimientos están vinculados
     if ($movSistemaActualizado.movimiento_relacionado_id -ne $movimientoExtractoId) {
         $errores += "Movimiento sistema NO está vinculado correctamente al extracto"
@@ -222,7 +222,7 @@ try {
     if ($movExtractoActualizado.movimiento_relacionado_id -ne $movimientoSistemaId) {
         $errores += "Movimiento extracto NO está vinculado correctamente al sistema"
     }
-    
+
     if ($errores.Count -gt 0) {
         Write-Host "✗✗✗ ERRORES ENCONTRADOS ✗✗✗" -ForegroundColor Red
         foreach ($error in $errores) {
@@ -250,7 +250,7 @@ Write-Host "PASO 7: Verificando reporte de diferencias..." -ForegroundColor Yell
 
 try {
     $diferenciasResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion/$conciliacionId/diferencias" -Method Get -Headers $headers
-    
+
     Write-Host ""
     Write-Host "Reporte de Diferencias:" -ForegroundColor Cyan
     Write-Host ""

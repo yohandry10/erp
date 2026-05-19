@@ -229,7 +229,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              <button type="submit" style={{ display: 'none' }} aria-hidden="true" />
+              <button type="submit" className="hidden" aria-hidden="true" />
             </form>
           </CardContent>
 

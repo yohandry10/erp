@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Package, Filter, Search, RefreshCcw } from 'lucide-react'
@@ -79,24 +79,19 @@ const formatDate = (value?: string | null) => {
   return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('es-PE')
 }
 
-const fallbackStyle: React.CSSProperties = {
-  border: '1px dashed rgba(220, 38, 38, 0.35)',
-  borderRadius: '12px',
-  background: 'rgba(254, 226, 226, 0.6)',
-  padding: '1.5rem',
-  color: '#b91c1c',
-  fontWeight: 600,
-}
-
 function NoPermission() {
   return (
-    <div style={fallbackStyle}>
-      No cuentas con el permiso <code>inventario.ingresos.write</code>. Solicítalo para administrar recepciones.
+    <div className="rounded-xl border border-cyan-400/25 bg-slate-950/70 p-6 font-semibold text-cyan-50 shadow-lg shadow-cyan-950/20">
+      No cuentas con el permiso{' '}
+      <code className="rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-cyan-100">
+        inventario.ingresos.write
+      </code>
+      . Solicítalo para administrar recepciones.
     </div>
   )
 }
 
-export default function RecepcionesPage() {
+function RecepcionesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { get } = useApi()
@@ -173,36 +168,28 @@ export default function RecepcionesPage() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: '#0f172a' }}>
+    <div className="grid gap-5 text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+      <header className="rounded-3xl border border-cyan-300/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:shadow-slate-300/30 md:p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-black tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-3xl">
             Recepciones de compra
           </h1>
-          <span
-            style={{
-              background: 'rgba(34, 197, 94, 0.12)',
-              color: '#15803d',
-              borderRadius: '999px',
-              padding: '0.25rem 0.75rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-            }}
-          >
+          <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
             Compras → Inventario
           </span>
         </div>
-        <p style={{ margin: 0, color: '#475569', maxWidth: '760px', lineHeight: 1.6 }}>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
           Gestiona recepciones totales o parciales, asigna ubicaciones y emite el evento{' '}
-          <code>RecepcionRegistradaEvent</code> para Kardex y Contabilidad. Se aplican controles multitenant y
-          permisos endurecidos.
+          <code className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-1.5 py-0.5 text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
+            RecepcionRegistradaEvent
+          </code>{' '}
+          para Kardex y Contabilidad. Se aplican controles multitenant y permisos endurecidos.
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link href="/dashboard/compras/ordenes" style={{ color: '#2563eb', fontWeight: 600 }}>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
+          <Link className="text-cyan-200 hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/compras/ordenes">
             Volver a Órdenes de Compra →
           </Link>
-          <Link href="/dashboard/inventario/kardex" style={{ color: '#0f766e', fontWeight: 600 }}>
+          <Link className="text-cyan-200 hover:text-white group-data-[erp-theme=light]/dashboard:text-blue-700" href="/dashboard/inventario/kardex">
             Revisar Kardex →
           </Link>
         </div>
@@ -214,43 +201,21 @@ export default function RecepcionesPage() {
         accion="write"
         fallback={<NoPermission />}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <section
-            style={{
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              borderRadius: '14px',
-              padding: '1.1rem',
-              background: '#ffffff',
-              display: 'flex',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#0f172a' }}>
-              <Package size={20} />
-              <span style={{ fontWeight: 600 }}>
+        <div className="grid gap-4">
+          <section className="flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-white">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <Package size={20} className="text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700" />
+              <span>
                 Recepciones cargadas: {recepciones.length.toLocaleString('es-PE')}
               </span>
             </div>
-            <div style={{ color: '#475569', fontSize: '0.85rem' }}>
-              Valor total filtrado: <strong>{formatCurrency(totalValorizado)}</strong>
+            <div className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+              Valor total filtrado: <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{formatCurrency(totalValorizado)}</strong>
             </div>
             <button
               type="button"
               onClick={loadRecepciones}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(148, 163, 184, 0.35)',
-                background: 'white',
-                color: '#1f2937',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-50 hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700"
             >
               <RefreshCcw size={16} />
               Refrescar
@@ -258,35 +223,15 @@ export default function RecepcionesPage() {
           </section>
 
           <form
-            style={{
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              borderRadius: '14px',
-              padding: '1.25rem',
-              background: 'rgba(248, 250, 252, 0.85)',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '1rem',
-              alignItems: 'flex-end',
-            }}
+            className="flex flex-wrap items-end gap-4 rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/15 group-data-[erp-theme=light]/dashboard:bg-white"
             onSubmit={(event) => {
               event.preventDefault()
               setPagination((prev) => ({ ...prev, page: 1 }))
               loadRecepciones()
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1 1 280px' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: '#e2e8f0',
-                  color: '#475569',
-                }}
-              >
+            <div className="flex min-w-[280px] flex-1 items-center gap-2">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-200 group-data-[erp-theme=light]/dashboard:text-blue-700">
                 <Search size={18} />
               </span>
               <input
@@ -297,41 +242,23 @@ export default function RecepcionesPage() {
                   setFilters((prev) => ({ ...prev, search: event.target.value }))
                   setPagination((prev) => ({ ...prev, page: 1 }))
                 }}
-                style={{
-                  flex: 1,
-                  padding: '0.6rem 0.75rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5f5',
-                  background: 'white',
-                }}
+                className="h-10 flex-1 rounded-xl border border-cyan-300/20 bg-slate-950/60 px-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
               />
             </div>
 
-            <div style={{ flex: '1 1 200px', minWidth: '200px' }}>
-              <label
-                style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}
-              >
+            <div className="min-w-[200px] flex-1">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
                 Estado
               </label>
-              <div style={{ position: 'relative' }}>
-                <Filter
-                  size={16}
-                  style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
-                />
+              <div className="relative">
+                <Filter size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <select
                   value={filters.estado}
-                  onChange={(event) => {
-                    setFilters((prev) => ({ ...prev, estado: event.target.value as RecepcionFilters['estado'] }))
-                    setPagination((prev) => ({ ...prev, page: 1 }))
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.75rem 0.6rem 2.2rem',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5f5',
-                    background: 'white',
-                    fontSize: '0.9rem',
-                  }}
+                onChange={(event) => {
+                  setFilters((prev) => ({ ...prev, estado: event.target.value as RecepcionFilters['estado'] }))
+                  setPagination((prev) => ({ ...prev, page: 1 }))
+                }}
+                  className="h-10 w-full rounded-xl border border-cyan-300/20 bg-slate-950/60 py-2 pl-9 pr-3 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-cyan-400/30 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
                 >
                   {ESTADOS.map((estado) => (
                     <option key={estado.value || 'all'} value={estado.value}>
@@ -342,33 +269,17 @@ export default function RecepcionesPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="flex gap-3">
               <button
                 type="submit"
-                style={{
-                  padding: '0.6rem 1.4rem',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: '#1d4ed8',
-                  color: 'white',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                className="rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/20 hover:bg-cyan-300"
               >
                 Filtrar
               </button>
               <button
                 type="button"
                 onClick={resetFilters}
-                style={{
-                  padding: '0.6rem 1.2rem',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  background: 'white',
-                  color: '#1d4ed8',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                className="rounded-xl border border-cyan-300/25 bg-transparent px-4 py-2.5 text-sm font-bold text-cyan-100 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:text-blue-700"
               >
                 Limpiar
               </button>
@@ -376,92 +287,48 @@ export default function RecepcionesPage() {
           </form>
 
           {loading ? (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: '3rem 0',
-                color: '#1d4ed8',
-                fontWeight: 600,
-              }}
-            >
+            <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/70 p-8 text-center font-semibold text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-blue-700">
               Cargando recepciones…
             </div>
           ) : error ? (
-            <div
-              style={{
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                background: 'rgba(254, 226, 226, 0.65)',
-                borderRadius: '12px',
-                padding: '1rem 1.2rem',
-                color: '#b91c1c',
-                fontWeight: 600,
-              }}
-            >
+            <div className="rounded-2xl border border-cyan-300/25 bg-slate-950/80 p-4 font-semibold text-cyan-50 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-blue-700">
               {error}
             </div>
           ) : recepciones.length === 0 ? (
-            <div
-              style={{
-                border: '1px dashed rgba(148, 163, 184, 0.4)',
-                borderRadius: '12px',
-                padding: '2rem',
-                textAlign: 'center',
-                color: '#94a3b8',
-              }}
-            >
+            <div className="rounded-2xl border border-dashed border-cyan-300/25 bg-slate-950/60 p-8 text-center text-slate-400 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-500">
               No encontramos recepciones con los filtros seleccionados.
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className="grid gap-4">
               {recepciones.map((recepcion) => (
                 <article
                   key={recepcion.id}
-                  style={{
-                    border: '1px solid rgba(226, 232, 240, 0.85)',
-                    borderRadius: '14px',
-                    background: 'rgba(248, 250, 252, 0.95)',
-                    padding: '1.1rem',
-                    display: 'grid',
-                    gap: '0.75rem',
-                  }}
+                  className="grid gap-4 rounded-2xl border border-cyan-300/15 bg-slate-950/70 p-4 shadow-xl shadow-blue-950/10 group-data-[erp-theme=light]/dashboard:bg-white"
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                  <div className="flex flex-wrap justify-between gap-4">
+                    <div className="grid gap-1">
+                      <span className="text-base font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                         Recepción #{recepcion.numero}
                       </span>
-                      <span style={{ fontSize: '0.85rem', color: '#475569' }}>
+                      <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
                         Fecha: {formatDate(recepcion.fechaRecepcion)} · Ítems: {recepcion.totalItems}
                       </span>
                       {recepcion.orden && (
-                        <span style={{ fontSize: '0.85rem', color: '#475569' }}>
+                        <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
                           Orden: {recepcion.orden.numero} ·{' '}
                           {formatCurrency(recepcion.orden.total, recepcion.orden.moneda)}
                         </span>
                       )}
                     </div>
-                    <span
-                      style={{
-                        alignSelf: 'flex-start',
-                        padding: '0.3rem 0.85rem',
-                        borderRadius: '999px',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        color: '#1d4ed8',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.05em',
-                      }}
-                    >
+                    <span className="self-start rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
                       {recepcion.estado}
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', color: '#475569', fontSize: '0.85rem' }}>
+                  <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
                     <span>
                       Cantidad recibida:{' '}
-                      <strong style={{ color: '#0f172a' }}>
+                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                         {recepcion.totalCantidad.toLocaleString('es-PE', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -470,7 +337,7 @@ export default function RecepcionesPage() {
                     </span>
                     <span>
                       Valor NI:{' '}
-                      <strong style={{ color: '#0f172a' }}>
+                      <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                         {formatCurrency(recepcion.totalValorizado, recepcion.orden?.moneda ?? 'PEN')}
                       </strong>
                     </span>
@@ -486,52 +353,28 @@ export default function RecepcionesPage() {
                   </div>
 
                   {recepcion.observaciones && (
-                    <div
-                      style={{
-                        borderLeft: '3px solid rgba(59, 130, 246, 0.35)',
-                        paddingLeft: '0.75rem',
-                        color: '#475569',
-                        fontSize: '0.85rem',
-                      }}
-                    >
+                    <div className="border-l-2 border-cyan-300/40 pl-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
                       {recepcion.observaciones}
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      border: '1px solid rgba(148, 163, 184, 0.35)',
-                      borderRadius: '10px',
-                      background: 'white',
-                      padding: '0.9rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.45rem',
-                    }}
-                  >
-                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                  <div className="grid gap-2 rounded-xl border border-cyan-300/15 bg-slate-900/70 p-3 group-data-[erp-theme=light]/dashboard:bg-slate-50">
+                    <strong className="text-sm text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                       Detalle ({recepcion.items.length})
                     </strong>
                     {recepcion.items.length === 0 ? (
-                      <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                      <span className="text-sm text-slate-500">
                         Esta recepción aún no tiene ítems valorizados.
                       </span>
                     ) : (
-                      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.5rem' }}>
+                      <ul className="grid gap-2">
                         {recepcion.items.map((item) => (
                           <li
                             key={item.id}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              gap: '1rem',
-                              flexWrap: 'wrap',
-                              fontSize: '0.85rem',
-                              color: '#475569',
-                            }}
+                            className="flex flex-wrap justify-between gap-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600"
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontWeight: 600, color: '#0f172a' }}>
+                            <div className="grid">
+                              <span className="font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                                 {item.producto.nombre ?? 'Producto'}
                               </span>
                               <span>
@@ -543,9 +386,9 @@ export default function RecepcionesPage() {
                                 {formatCurrency(item.costoUnitario, recepcion.orden?.moneda ?? 'PEN')}
                               </span>
                             </div>
-                            <div style={{ textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                            <div className="text-right font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
                               {formatCurrency(item.valorTotal, recepcion.orden?.moneda ?? 'PEN')}
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              <div className="text-xs text-slate-500">
                                 {item.almacen?.nombre ?? 'Sin almacén'}
                               </div>
                             </div>
@@ -558,24 +401,16 @@ export default function RecepcionesPage() {
               ))}
 
               {pagination.totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#475569' }}>
-                  <span style={{ fontSize: '0.85rem' }}>
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  <span>
                     Página {pagination.page} de {pagination.totalPages} · {pagination.total.toLocaleString('es-PE')} registros
                   </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(prev.page - 1, 1) }))}
                       disabled={pagination.page <= 1}
-                      style={{
-                        padding: '0.5rem 0.85rem',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.35)',
-                        background: 'white',
-                        color: pagination.page <= 1 ? '#cbd5f5' : '#1d4ed8',
-                        cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
-                        fontWeight: 600,
-                      }}
+                      className="rounded-xl border border-cyan-300/25 px-3 py-2 font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45 group-data-[erp-theme=light]/dashboard:text-blue-700"
                     >
                       Anterior
                     </button>
@@ -588,16 +423,7 @@ export default function RecepcionesPage() {
                         }))
                       }
                       disabled={pagination.page >= pagination.totalPages}
-                      style={{
-                        padding: '0.5rem 0.85rem',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.35)',
-                        background: '#1d4ed8',
-                        color: 'white',
-                        cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer',
-                        opacity: pagination.page >= pagination.totalPages ? 0.45 : 1,
-                        fontWeight: 600,
-                      }}
+                      className="rounded-xl bg-cyan-400 px-3 py-2 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       Siguiente
                     </button>
@@ -609,5 +435,13 @@ export default function RecepcionesPage() {
         </div>
       </ProtectedComponent>
     </div>
+  )
+}
+
+export default function RecepcionesPage() {
+  return (
+    <Suspense fallback={null}>
+      <RecepcionesContent />
+    </Suspense>
   )
 }

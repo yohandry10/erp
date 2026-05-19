@@ -6,6 +6,7 @@ import { InventarioService } from '../../inventario/inventario.service';
 import { EventBusService } from '../../../shared/events/event-bus.service';
 import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class DevolucionesProveedorService {
@@ -16,6 +17,7 @@ export class DevolucionesProveedorService {
     private readonly eventBus: EventBusService,
     private readonly eventEmitter: EventEmitterService,
     private readonly taxCalculator: TaxCalculatorService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -46,22 +48,27 @@ export class DevolucionesProveedorService {
         throw new BadRequestException('El proveedor no coincide con el de la orden de compra');
       }
 
-      // Si se especifica recepcion_id, validar que existe y pertenece a la orden
-      if (createDto.recepcion_id) {
-        const { data: recepcion, error: recepcionError } = await this.supabase.getClient()
-          .from('recepciones')
-          .select('id, orden_id')
-          .eq('id', createDto.recepcion_id)
-          .eq('tenant_id', tenantId)
-          .single();
+      if (!createDto.recepcion_id) {
+        throw new BadRequestException('Debe seleccionar una recepción cerrada para registrar la devolución');
+      }
 
-        if (recepcionError || !recepcion) {
-          throw new NotFoundException('Recepción no encontrada');
-        }
+      const { data: recepcion, error: recepcionError } = await this.supabase.getClient()
+        .from('recepciones')
+        .select('id, orden_id, estado')
+        .eq('id', createDto.recepcion_id)
+        .eq('tenant_id', tenantId)
+        .single();
 
-        if (recepcion.orden_id !== createDto.orden_id) {
-          throw new BadRequestException('La recepción no pertenece a la orden de compra especificada');
-        }
+      if (recepcionError || !recepcion) {
+        throw new NotFoundException('Recepción no encontrada');
+      }
+
+      if (recepcion.orden_id !== createDto.orden_id) {
+        throw new BadRequestException('La recepción no pertenece a la orden de compra especificada');
+      }
+
+      if (recepcion.estado !== 'CERRADA') {
+        throw new BadRequestException('Solo se pueden devolver items de recepciones cerradas');
       }
 
       // Validar que los items tienen cantidades válidas
@@ -69,9 +76,7 @@ export class DevolucionesProveedorService {
         throw new BadRequestException('Debe especificar al menos un item para devolver');
       }
 
-      if (createDto.recepcion_id) {
-        await this.validarItemsContraRecepcion(tenantId, createDto);
-      }
+      await this.validarItemsContraRecepcion(tenantId, createDto);
 
       // Calcular totales
       let subtotal = 0;
@@ -126,6 +131,32 @@ export class DevolucionesProveedorService {
       const items = await this.devolucionesRepository.crearItems(itemsData);
 
       console.log(`✅ Devolución creada: ${devolucion.numero} con ${items.length} items`);
+
+      if (userId) {
+        try {
+          await this.auditService.registrarCambio(
+            'devoluciones_proveedor',
+            'INSERT',
+            userId,
+            {
+              new: {
+                ...devolucion,
+                items,
+              },
+            },
+            tenantId,
+            devolucion.id,
+            {
+              accion: 'CREAR_DEVOLUCION_PROVEEDOR',
+              orden_id: createDto.orden_id,
+              recepcion_id: createDto.recepcion_id,
+              proveedor_id: createDto.proveedor_id,
+            },
+          );
+        } catch (auditError) {
+          console.warn('⚠️ No se pudo registrar auditoría de creación de devolución:', auditError);
+        }
+      }
 
       // Retornar la devolución completa con sus items
       return {
@@ -240,6 +271,30 @@ export class DevolucionesProveedorService {
 
       console.log(`✅ Devolución ${devolucion.numero} emitida exitosamente`);
 
+      if (userId) {
+        try {
+          await this.auditService.registrarCambio(
+            'devoluciones_proveedor',
+            'UPDATE',
+            userId,
+            {
+              old: { estado: devolucion.estado },
+              new: { estado: 'EMITIDA' },
+            },
+            tenantId,
+            devolucionId,
+            {
+              accion: 'EMITIR_DEVOLUCION_PROVEEDOR',
+              orden_id: devolucion.orden_id,
+              recepcion_id: devolucion.recepcion_id,
+              proveedor_id: devolucion.proveedor_id,
+            },
+          );
+        } catch (auditError) {
+          console.warn('⚠️ No se pudo registrar auditoría de emisión de devolución:', auditError);
+        }
+      }
+
       // 4. Emitir evento de dominio DevolucionProveedorEmitida
       try {
         await this.emitirEventoDevolucionEmitida(devolucion, tenantId, userId);
@@ -248,22 +303,8 @@ export class DevolucionesProveedorService {
         // No fallar la operación si el evento falla
       }
 
-      // TODO: Cuando el módulo de finanzas esté disponible:
-      // 5. Crear nota de crédito de proveedor (CxP negativo)
-      // await this.finanzasService.crearNotaCreditoProveedor({
-      //   proveedor_id: devolucion.proveedor_id,
-      //   monto: devolucion.total,
-      //   referencia_tipo: 'DEVOLUCION_PROVEEDOR',
-      //   referencia_id: devolucionId,
-      // });
-
-      // TODO: Implementar notificación al proveedor
-      // 6. Notificar a proveedor
-      // await this.notificationsService.notificarProveedor({
-      //   proveedor_id: devolucion.proveedor_id,
-      //   tipo: 'DEVOLUCION_EMITIDA',
-      //   mensaje: `Se ha emitido la devolución ${devolucion.numero}`,
-      // });
+      // Nota: El ajuste de CxP se realiza automáticamente a través del evento
+      // DevolucionProveedorEmitida → CxpEventsListener → cxpService.aplicarDevolucionProveedorEmitida()
 
       // Retornar la devolución actualizada con sus items
       return {
@@ -472,6 +513,7 @@ export class DevolucionesProveedorService {
           )
         `,
       )
+      .eq('tenant_id', tenantId)
       .in('recepcion_item_id', recepcionItemIds);
 
     if (devolucionesPreviasError) {

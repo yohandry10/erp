@@ -3,19 +3,22 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  FileText,
-  Plus,
-  Search,
-  Filter,
-  RefreshCw,
+import {
   AlertCircle,
-  CheckCircle,
-  XCircle,
   Calendar,
+  CheckCircle,
+  Edit3,
+  FileText,
+  Filter,
+  Plus,
+  RefreshCw,
+  Search,
+  XCircle,
   Zap,
-  Edit3
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface AsientoContable {
   id: string
@@ -33,41 +36,23 @@ interface AsientoContable {
 
 type EstadoAsiento = 'BORRADOR' | 'CONFIRMADO' | 'ANULADO'
 
-const ESTADOS_CONFIG: Record<EstadoAsiento, {
-  label: string
-  color: string
-  bgColor: string
-  icon: any
-}> = {
-  BORRADOR: {
-    label: 'Borrador',
-    color: '#6b7280',
-    bgColor: 'rgba(107, 114, 128, 0.1)',
-    icon: FileText
-  },
-  CONFIRMADO: {
-    label: 'Confirmado',
-    color: '#10b981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
-    icon: CheckCircle
-  },
-  ANULADO: {
-    label: 'Anulado',
-    color: '#ef4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    icon: XCircle
-  }
+const ESTADOS_CONFIG: Record<EstadoAsiento, { label: string; icon: typeof FileText }> = {
+  BORRADOR: { label: 'Borrador', icon: FileText },
+  CONFIRMADO: { label: 'Confirmado', icon: CheckCircle },
+  ANULADO: { label: 'Anulado', icon: XCircle },
 }
+
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/65 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
 export default function AsientosPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [asientos, setAsientos] = useState<AsientoContable[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Filtros
+
   const [searchTerm, setSearchTerm] = useState('')
   const [numeroAsientoSearch, setNumeroAsientoSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<string>('TODOS')
@@ -79,9 +64,9 @@ export default function AsientosPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get('/api/contabilidad/asientos')
-      
+
       if (response?.success && response.data) {
         setAsientos(response.data)
       } else {
@@ -99,40 +84,27 @@ export default function AsientosPage() {
     loadAsientos()
   }, [loadAsientos])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
     }).format(amount)
-  }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     })
-  }
 
   const getEstadoBadge = (estado: string) => {
     const config = ESTADOS_CONFIG[estado as EstadoAsiento]
     if (!config) return null
-    
     const Icon = config.icon
-    
+
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: config.color,
-        color: 'white'
-      }}>
-        <Icon size={12} />
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+        <Icon className="h-3 w-3" />
         {config.label}
       </span>
     )
@@ -140,630 +112,299 @@ export default function AsientosPage() {
 
   const getOrigenBadge = (asiento: AsientoContable) => {
     const isAutomatic = asiento.source_event_id || asiento.origen
-    
-    if (isAutomatic) {
-      return (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          padding: '0.375rem 0.75rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: '600',
-          background: '#8b5cf6',
-          color: 'white'
-        }}
-        title={asiento.origen || 'Generado automáticamente'}
-        >
-          <Zap size={12} />
-          Automático
-        </span>
-      )
-    }
-    
+    const Icon = isAutomatic ? Zap : Edit3
+
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: '#f59e0b',
-        color: 'white'
-      }}
-      title="Creado manualmente"
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-100"
+        title={isAutomatic ? asiento.origen || 'Generado automáticamente' : 'Creado manualmente'}
       >
-        <Edit3 size={12} />
-        Manual
+        <Icon className="h-3 w-3" />
+        {isAutomatic ? 'Automático' : 'Manual'}
       </span>
     )
   }
 
-  const isBalanced = (asiento: AsientoContable) => {
-    return Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
-  }
+  const isBalanced = (asiento: AsientoContable) => Math.abs(asiento.total_debe - asiento.total_haber) < 0.01
 
-  // Filtrar asientos
-  const filteredAsientos = asientos.filter(asiento => {
-    // Filtro de búsqueda por número de asiento
-    if (numeroAsientoSearch) {
-      const search = numeroAsientoSearch.toLowerCase()
-      if (!asiento.numero_asiento.toLowerCase().includes(search)) {
-        return false
-      }
-    }
-
-    // Filtro de búsqueda general (concepto y referencia)
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase()
-      const matchesSearch = 
-        asiento.concepto.toLowerCase().includes(search) ||
-        (asiento.referencia && asiento.referencia.toLowerCase().includes(search))
-      
-      if (!matchesSearch) return false
-    }
-
-    // Filtro de estado
-    if (estadoFilter !== 'TODOS' && asiento.estado !== estadoFilter) {
+  const filteredAsientos = asientos.filter((asiento) => {
+    if (numeroAsientoSearch && !asiento.numero_asiento.toLowerCase().includes(numeroAsientoSearch.toLowerCase())) {
       return false
     }
 
-    // Filtro de origen
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase()
+      const matchesSearch =
+        asiento.concepto.toLowerCase().includes(search) ||
+        (asiento.referencia && asiento.referencia.toLowerCase().includes(search))
+      if (!matchesSearch) return false
+    }
+
+    if (estadoFilter !== 'TODOS' && asiento.estado !== estadoFilter) return false
+
     if (origenFilter !== 'TODOS') {
       const isAutomatic = asiento.source_event_id || asiento.origen
       if (origenFilter === 'AUTOMATICO' && !isAutomatic) return false
       if (origenFilter === 'MANUAL' && isAutomatic) return false
     }
 
-    // Filtro de fecha desde
-    if (fechaDesde && asiento.fecha < fechaDesde) {
-      return false
-    }
-
-    // Filtro de fecha hasta
-    if (fechaHasta && asiento.fecha > fechaHasta) {
-      return false
-    }
+    if (fechaDesde && asiento.fecha < fechaDesde) return false
+    if (fechaHasta && asiento.fecha > fechaHasta) return false
 
     return true
   })
 
-  // Estadísticas
   const stats = {
     total: asientos.length,
-    automaticos: asientos.filter(a => a.source_event_id || a.origen).length,
-    manuales: asientos.filter(a => !a.source_event_id && !a.origen).length,
-    descuadrados: asientos.filter(a => !isBalanced(a)).length
+    automaticos: asientos.filter((a) => a.source_event_id || a.origen).length,
+    manuales: asientos.filter((a) => !a.source_event_id && !a.origen).length,
+    descuadrados: asientos.filter((a) => !isBalanced(a)).length,
+  }
+
+  const clearFilters = () => {
+    setNumeroAsientoSearch('')
+    setSearchTerm('')
+    setEstadoFilter('TODOS')
+    setOrigenFilter('TODOS')
+    setFechaDesde('')
+    setFechaHasta('')
   }
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando asientos contables...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <RefreshCw className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando asientos contables...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
-              <FileText size={24} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <FileText className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                  ERP Journal Center
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Asientos Contables</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  Gestione asientos manuales y trazabilidad de asientos generados por operaciones reales.
+                </p>
+              </div>
             </div>
-            <h1 className="dashboard-title">Asientos Contables</h1>
-          </div>
-          <p className="dashboard-subtitle">
-            Gestione y visualice todos los asientos contables del sistema
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            onClick={loadAsientos}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button
-            onClick={() => router.push('/dashboard/contabilidad/asientos/nuevo')}
-            className="primary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <Plus size={16} />
-            Nuevo Asiento Manual
-          </button>
-        </div>
-      </div>
-
-      {/* Estadísticas */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(4, 1fr)', 
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Asientos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-            {stats.total}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Automáticos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#8b5cf6' }}>
-            {stats.automaticos}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Manuales
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
-            {stats.manuales}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Descuadrados
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: stats.descuadrados > 0 ? '#ef4444' : '#10b981' }}>
-            {stats.descuadrados}
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.75rem',
-          marginBottom: '1rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid var(--primary-100)'
-        }}>
-          <Filter size={20} style={{ color: 'var(--primary-600)' }} />
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
-            Filtros
-          </h2>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem' }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Número de Asiento
-            </label>
-            <div style={{ position: 'relative' }}>
-              <FileText size={16} style={{ 
-                position: 'absolute', 
-                left: '0.75rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: 'var(--primary-400)'
-              }} />
-              <input
-                type="text"
-                value={numeroAsientoSearch}
-                onChange={(e) => setNumeroAsientoSearch(e.target.value)}
-                placeholder="Ej: ASI-2024-001"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Buscar en Concepto
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ 
-                position: 'absolute', 
-                left: '0.75rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: 'var(--primary-400)'
-              }} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Concepto, referencia..."
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Estado
-            </label>
-            <select
-              value={estadoFilter}
-              onChange={(e) => setEstadoFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="BORRADOR">Borrador</option>
-              <option value="CONFIRMADO">Confirmado</option>
-              <option value="ANULADO">Anulado</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Origen
-            </label>
-            <select
-              value={origenFilter}
-              onChange={(e) => setOrigenFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="AUTOMATICO">Automático</option>
-              <option value="MANUAL">Manual</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Fecha Desde
-            </label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Fecha Hasta
-            </label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
-            />
-          </div>
-        </div>
-
-        {(numeroAsientoSearch || searchTerm || estadoFilter !== 'TODOS' || origenFilter !== 'TODOS' || fechaDesde || fechaHasta) && (
-          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => {
-                setNumeroAsientoSearch('')
-                setSearchTerm('')
-                setEstadoFilter('TODOS')
-                setOrigenFilter('TODOS')
-                setFechaDesde('')
-                setFechaHasta('')
-              }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: 'var(--primary-100)',
-                color: 'var(--primary-700)',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Limpiar Filtros
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Lista de Asientos */}
-      <div className="activity-card">
-        {error && (
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--red-50)', 
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-            <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
-              {error}
-            </p>
-          </div>
-        )}
-
-        {filteredAsientos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-400)' }}>
-            <FileText size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--primary-600)' }}>
-              No hay asientos contables
-            </h3>
-            <p style={{ marginBottom: '1.5rem' }}>
-              {asientos.length === 0 
-                ? 'Aún no se han creado asientos contables'
-                : 'No se encontraron asientos con los filtros aplicados'
-              }
-            </p>
-            {asientos.length === 0 && (
-              <button
-                onClick={() => router.push('/dashboard/contabilidad/asientos/nuevo')}
-                className="primary-btn"
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={loadAsientos}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
               >
-                <Plus size={16} />
-                Crear Primer Asiento
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--primary-200)' }}>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Número
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Fecha
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Concepto
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Origen
-                  </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Total
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Estado
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Balance
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAsientos.map((asiento) => (
-                  <tr 
-                    key={asiento.id}
-                    onClick={() => router.push(`/dashboard/contabilidad/asientos/${asiento.id}`)}
-                    style={{ 
-                      borderBottom: '1px solid var(--primary-100)',
-                      cursor: 'pointer',
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-50)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {asiento.numero_asiento}
-                      </div>
-                      {asiento.referencia && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginTop: '0.25rem' }}>
-                          Ref: {asiento.referencia}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Calendar size={14} style={{ color: 'var(--primary-400)' }} />
-                        <span style={{ fontSize: '0.875rem', color: 'var(--primary-700)' }}>
-                          {formatDate(asiento.fecha)}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ 
-                        fontSize: '0.875rem', 
-                        color: 'var(--primary-700)',
-                        maxWidth: '300px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {asiento.concepto}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      {getOrigenBadge(asiento)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {formatCurrency(asiento.total_debe)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {getEstadoBadge(asiento.estado)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {isBalanced(asiento) ? (
-                        <CheckCircle size={20} style={{ color: 'var(--emerald-600)' }} />
-                      ) : (
-                        <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {filteredAsientos.length > 0 && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '1rem',
-            borderTop: '1px solid var(--primary-200)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-              Mostrando {filteredAsientos.length} de {asientos.length} asientos
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => router.push('/dashboard/contabilidad/asientos/nuevo')}
+                className="gap-2 bg-blue-600 text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500"
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo Asiento Manual
+              </Button>
             </div>
           </div>
-        )}
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['Total asientos', stats.total],
+            ['Automáticos', stats.automaticos],
+            ['Manuales', stats.manuales],
+            ['Descuadrados', stats.descuadrados],
+          ].map(([label, value]) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">{label}</div>
+                <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
+              <Filter className="h-5 w-5 text-cyan-200" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Número</span>
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                  <input
+                    type="text"
+                    value={numeroAsientoSearch}
+                    onChange={(e) => setNumeroAsientoSearch(e.target.value)}
+                    placeholder="Ej: ASI-2024-001"
+                    className={cn(inputClass, 'pl-10')}
+                  />
+                </div>
+              </label>
+
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Concepto</span>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Concepto, referencia..."
+                    className={cn(inputClass, 'pl-10')}
+                  />
+                </div>
+              </label>
+
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Estado</span>
+                <select value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)} className={inputClass}>
+                  <option value="TODOS">Todos</option>
+                  <option value="BORRADOR">Borrador</option>
+                  <option value="CONFIRMADO">Confirmado</option>
+                  <option value="ANULADO">Anulado</option>
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Origen</span>
+                <select value={origenFilter} onChange={(e) => setOrigenFilter(e.target.value)} className={inputClass}>
+                  <option value="TODOS">Todos</option>
+                  <option value="AUTOMATICO">Automático</option>
+                  <option value="MANUAL">Manual</option>
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Desde</span>
+                <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className={inputClass} />
+              </label>
+
+              <label className="space-y-2">
+                <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Hasta</span>
+                <input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className={inputClass} />
+              </label>
+            </div>
+
+            {(numeroAsientoSearch || searchTerm || estadoFilter !== 'TODOS' || origenFilter !== 'TODOS' || fechaDesde || fechaHasta) && (
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" onClick={clearFilters} className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                  Limpiar filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Lista de asientos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {error && (
+              <div className="m-4 flex items-center gap-3 rounded-xl border border-blue-300/20 bg-blue-400/10 p-4 text-sm text-blue-50">
+                <AlertCircle className="h-5 w-5" />
+                {error}
+              </div>
+            )}
+
+            {filteredAsientos.length === 0 ? (
+              <div className="flex min-h-[260px] flex-col items-center justify-center p-8 text-center text-slate-400">
+                <FileText className="mb-4 h-12 w-12 text-cyan-200/60" />
+                <h3 className="text-lg font-semibold text-white">No hay asientos contables</h3>
+                <p className="mt-2 max-w-md text-sm">
+                  {asientos.length === 0
+                    ? 'Aún no se han creado asientos contables.'
+                    : 'No se encontraron asientos con los filtros aplicados.'}
+                </p>
+                {asientos.length === 0 && (
+                  <Button
+                    type="button"
+                    onClick={() => router.push('/dashboard/contabilidad/asientos/nuevo')}
+                    className="mt-5 gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear primer asiento
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] border-collapse text-sm">
+                  <thead className="bg-white/[0.04] text-xs uppercase tracking-[0.14em] text-cyan-200/70">
+                    <tr>
+                      {['Número', 'Fecha', 'Concepto', 'Origen', 'Total', 'Estado', 'Balance'].map((header) => (
+                        <th key={header} className={cn('px-5 py-3 font-semibold', header === 'Total' ? 'text-right' : header === 'Estado' || header === 'Balance' ? 'text-center' : 'text-left')}>
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAsientos.map((asiento) => (
+                      <tr
+                        key={asiento.id}
+                        onClick={() => router.push(`/dashboard/contabilidad/asientos/${asiento.id}`)}
+                        className="cursor-pointer border-t border-cyan-400/10 transition hover:bg-cyan-400/10"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-white">{asiento.numero_asiento}</div>
+                          {asiento.referencia && <div className="mt-1 text-xs text-slate-500">Ref: {asiento.referencia}</div>}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2 text-slate-300">
+                            <Calendar className="h-4 w-4 text-cyan-200/60" />
+                            {formatDate(asiento.fecha)}
+                          </div>
+                        </td>
+                        <td className="max-w-[360px] px-5 py-4">
+                          <div className="truncate text-slate-300">{asiento.concepto}</div>
+                        </td>
+                        <td className="px-5 py-4">{getOrigenBadge(asiento)}</td>
+                        <td className="px-5 py-4 text-right font-semibold text-white">{formatCurrency(asiento.total_debe)}</td>
+                        <td className="px-5 py-4 text-center">{getEstadoBadge(asiento.estado)}</td>
+                        <td className="px-5 py-4 text-center">
+                          {isBalanced(asiento) ? (
+                            <CheckCircle className="mx-auto h-5 w-5 text-cyan-200" />
+                          ) : (
+                            <AlertCircle className="mx-auto h-5 w-5 text-blue-200" />
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {filteredAsientos.length > 0 && (
+              <div className="flex items-center justify-between border-t border-cyan-400/10 px-5 py-4 text-sm text-slate-400">
+                Mostrando {filteredAsientos.length} de {asientos.length} asientos
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

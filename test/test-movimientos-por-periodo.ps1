@@ -2,7 +2,7 @@
 # Endpoint: GET /api/finanzas/bancos/movimientos/periodo
 
 $baseUrl = "http://localhost:3000"
-$token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ZTBiMzBjYy1hNzBhLTRhNzAtYjU3Zi1lMzI5YzY5YzI3YjgiLCJlbWFpbCI6ImFkbWluQHZpZXJkZXMuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwidGVuYW50X2lkIjoiNjU0MzIxMDktYWJjZC0xMjM0LTU2NzgtOTBhYmNkZWYwMTIzIiwiaWF0IjoxNzMwMDcwMDAwLCJleHAiOjE3NjE2MDYwMDB9.test-signature-for-development"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "65432109-abcd-1234-5678-90abcdef0123"
 
 $headers = @{
@@ -21,11 +21,11 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Movimientos obtenidos exitosamente" -ForegroundColor Green
     Write-Host "Total de movimientos: $($response.pagination.total)" -ForegroundColor White
     Write-Host "Página: $($response.pagination.page) de $($response.pagination.totalPages)" -ForegroundColor White
-    
+
     if ($response.resumen.por_moneda) {
         Write-Host "`nResumen por moneda:" -ForegroundColor Cyan
         foreach ($moneda in $response.resumen.por_moneda) {
@@ -35,7 +35,7 @@ try {
             Write-Host "    - Flujo Neto: $($moneda.flujo_neto)" -ForegroundColor $(if ($moneda.flujo_neto -ge 0) { "Green" } else { "Red" })
         }
     }
-    
+
     if ($response.data -and $response.data.Count -gt 0) {
         Write-Host "`nPrimeros 3 movimientos:" -ForegroundColor Cyan
         $response.data | Select-Object -First 3 | ForEach-Object {
@@ -53,15 +53,15 @@ Write-Host "Test 2: Filtrar por rango de fechas (último mes)" -ForegroundColor 
 try {
     $fechaHasta = Get-Date -Format "yyyy-MM-dd"
     $fechaDesde = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
-    
+
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Movimientos filtrados exitosamente" -ForegroundColor Green
     Write-Host "Período: $fechaDesde a $fechaHasta" -ForegroundColor White
     Write-Host "Total de movimientos: $($response.pagination.total)" -ForegroundColor White
-    
+
     if ($response.resumen.por_moneda) {
         Write-Host "`nResumen del período:" -ForegroundColor Cyan
         foreach ($moneda in $response.resumen.por_moneda) {
@@ -79,10 +79,10 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?tipo=ABONO" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Abonos obtenidos exitosamente" -ForegroundColor Green
     Write-Host "Total de abonos: $($response.pagination.total)" -ForegroundColor White
-    
+
     if ($response.resumen.por_moneda) {
         Write-Host "`nTotal de ingresos por moneda:" -ForegroundColor Cyan
         foreach ($moneda in $response.resumen.por_moneda) {
@@ -100,10 +100,10 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?tipo=CARGO" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Cargos obtenidos exitosamente" -ForegroundColor Green
     Write-Host "Total de cargos: $($response.pagination.total)" -ForegroundColor White
-    
+
     if ($response.resumen.por_moneda) {
         Write-Host "`nTotal de egresos por moneda:" -ForegroundColor Cyan
         foreach ($moneda in $response.resumen.por_moneda) {
@@ -121,10 +121,10 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?conciliado=false" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Movimientos no conciliados obtenidos exitosamente" -ForegroundColor Green
     Write-Host "Total de movimientos pendientes de conciliar: $($response.pagination.total)" -ForegroundColor White
-    
+
     if ($response.data -and $response.data.Count -gt 0) {
         Write-Host "`nPrimeros 5 movimientos pendientes:" -ForegroundColor Cyan
         $response.data | Select-Object -First 5 | ForEach-Object {
@@ -142,7 +142,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?page=1&limit=10" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Paginación funcionando correctamente" -ForegroundColor Green
     Write-Host "Página: $($response.pagination.page)" -ForegroundColor White
     Write-Host "Límite: $($response.pagination.limit)" -ForegroundColor White
@@ -159,14 +159,14 @@ Write-Host "Test 7: Combinación de filtros (CARGO + último mes + no conciliado
 try {
     $fechaHasta = Get-Date -Format "yyyy-MM-dd"
     $fechaDesde = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
-    
+
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/movimientos/periodo?tipo=CARGO&fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta&conciliado=false" `
         -Method Get `
         -Headers $headers
-    
+
     Write-Host "✅ Filtros combinados aplicados exitosamente" -ForegroundColor Green
     Write-Host "Egresos no conciliados del último mes: $($response.pagination.total)" -ForegroundColor White
-    
+
     if ($response.resumen.por_moneda) {
         Write-Host "`nTotal por moneda:" -ForegroundColor Cyan
         foreach ($moneda in $response.resumen.por_moneda) {
