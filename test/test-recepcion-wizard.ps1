@@ -19,7 +19,7 @@ if ($ordersResponse.success -and $ordersResponse.data.Count -gt 0) {
     Write-Host "  Provider: $($orden.proveedores.razon_social)" -ForegroundColor Gray
     Write-Host "  Status: $($orden.estado)" -ForegroundColor Gray
     Write-Host "  Details count: $($orden.detalles.Count)" -ForegroundColor Gray
-    
+
     # Show pending items
     Write-Host "`n  Pending items:" -ForegroundColor Gray
     foreach ($detalle in $orden.detalles) {
@@ -78,7 +78,7 @@ try {
         "x-tenant-id" = "vierdes"
         "Content-Type" = "application/json"
     } -Body $createDto
-    
+
     if ($createResponse.success) {
         $recepcionId = $createResponse.data.id
         Write-Host "✓ Reception created: $recepcionId" -ForegroundColor Green
@@ -108,7 +108,7 @@ try {
         "x-tenant-id" = "vierdes"
         "Content-Type" = "application/json"
     } -Body $closeDto
-    
+
     if ($closeResponse.success) {
         Write-Host "✓ Reception closed successfully" -ForegroundColor Green
         Write-Host "  Status: $($closeResponse.data.estado)" -ForegroundColor Gray
@@ -130,7 +130,7 @@ $updatedOrderResponse = Invoke-RestMethod -Uri "$apiUrl/api/compras/ordenes/$($o
 if ($updatedOrderResponse.success) {
     $updatedOrden = $updatedOrderResponse.data
     Write-Host "✓ Order status: $($updatedOrden.estado)" -ForegroundColor Green
-    
+
     Write-Host "`n  Updated quantities:" -ForegroundColor Gray
     foreach ($detalle in $updatedOrden.detalles) {
         $recibida = if ($detalle.cantidad_recibida) { $detalle.cantidad_recibida } else { 0 }

@@ -7,11 +7,11 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - "3001:3001"
+      - "${WEB_HOST_PORT:-13001}:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - NEXT_PUBLIC_API_URL=http://localhost:3002
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:13002}
       - SERVER_API_URL=http://erp-api:3002
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
@@ -36,7 +36,7 @@ services:
       context: .
       dockerfile: apps/erp-api/Dockerfile
     ports:
-      - "3002:3002"
+      - "${API_HOST_PORT:-13002}:3002"
     environment:
       - NODE_ENV=production
       - PORT=3002
@@ -57,10 +57,12 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       - CSRF_SECRET=${CSRF_SECRET}
       - HEALTH_TOKEN=${HEALTH_TOKEN}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - REDIS_REQUIRED=${REDIS_REQUIRED:-true}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3001}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-erp_redis_s3cret}@redis:6379
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:13001}
       - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
       - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
       - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
@@ -76,7 +78,7 @@ services:
       - redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
+      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health/ready',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -86,13 +88,14 @@ services:
   # ============================================
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass "${REDIS_PASSWORD:-erp_redis_s3cret}"
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6381}:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-erp_redis_s3cret}", "ping"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -104,13 +107,15 @@ services:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
+    ports:
+      - "${WORKER_HOST_PORT:-3050}:3050"
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-erp_redis_s3cret}@redis:6379
       - FEATURE_POS_ENABLED=${FEATURE_POS_ENABLED:-true}
       - FEATURE_INVENTARIO_ENABLED=${FEATURE_INVENTARIO_ENABLED:-true}
       - FEATURE_RRHH_ENABLED=${FEATURE_RRHH_ENABLED:-true}
@@ -146,7 +151,7 @@ services:
     image: prom/prometheus:latest
     container_name: erp-prometheus
     ports:
-      - "9091:9090"
+      - "${PROMETHEUS_HOST_PORT:-9091}:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./monitoring/prometheus/alerts:/etc/prometheus/alerts
@@ -159,26 +164,33 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
     depends_on:
-      - erp-api
+      erp-api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+      redis-exporter:
+        condition: service_started
+      node-exporter:
+        condition: service_started
 
   # ============================================
   # Grafana (Visualización)
   # ============================================
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.1.1
     container_name: erp-grafana
     ports:
-      - "3300:3000"
+      - "${GRAFANA_HOST_PORT:-3300}:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-change_me_in_production}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=http://localhost:3300
-      - GF_INSTALL_PLUGINS=
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SERVER_ROOT_URL=http://localhost:${GRAFANA_HOST_PORT:-3300}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data_v12:/var/lib/grafana
     restart: unless-stopped
     depends_on:
       - prometheus
@@ -190,7 +202,7 @@ services:
     image: oliver006/redis_exporter:latest
     container_name: erp-redis-exporter
     ports:
-      - "9122:9121"
+      - "${REDIS_EXPORTER_HOST_PORT:-9122}:9121"
     environment:
       - REDIS_ADDR=redis://redis:6379
     restart: unless-stopped
@@ -204,7 +216,7 @@ services:
     image: prom/node-exporter:latest
     container_name: erp-node-exporter
     ports:
-      - "9101:9100"
+      - "${NODE_EXPORTER_HOST_PORT:-9101}:9100"
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
@@ -218,7 +230,7 @@ services:
 volumes:
   redis_data:
   prometheus_data:
-  grafana_data:
+  grafana_data_v12:
 
 networks:
   default:

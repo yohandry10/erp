@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { login } from './helpers/auth';
 
 const authenticatedRoutes = [
   '/dashboard',
@@ -249,6 +250,8 @@ test.describe('Full authenticated UI smoke', () => {
       page.on('pageerror', (error) => {
         consoleErrors.push(error.message);
       });
+
+      await login(page);
 
       const initialResponse = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 });
       if (initialResponse) {

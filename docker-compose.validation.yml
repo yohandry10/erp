@@ -47,6 +47,8 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       - CSRF_SECRET=${CSRF_SECRET}
       - HEALTH_TOKEN=${HEALTH_TOKEN}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - REDIS_REQUIRED=${REDIS_REQUIRED:-true}
       - POS_WORKER_JWT_SECRET=${POS_WORKER_JWT_SECRET}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -68,7 +70,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
+      test: ["CMD", "node", "-e", "const port=process.env.PORT||'3002'; const http=require('http'); const headers=process.env.HEALTH_TOKEN?{'x-health-token':process.env.HEALTH_TOKEN}:{}; const req=http.get({hostname:'localhost',port,path:'/api/health/ready',headers}, (res)=>process.exit(res.statusCode===200?0:1)); req.on('error', ()=>process.exit(1));"]
       interval: 30s
       timeout: 10s
       retries: 3

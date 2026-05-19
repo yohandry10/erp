@@ -3,6 +3,7 @@
 import { ExternalLink } from 'lucide-react'
 import { HelpBotMessage as MessageType } from './types'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 interface HelpBotMessageProps {
   message: MessageType
@@ -12,35 +13,25 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
   const isUser = message.type === 'user'
 
   return (
-    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
-        style={{
-          maxWidth: '85%',
-          borderRadius: '8px',
-          padding: '8px 12px',
-          backgroundColor: isUser ? '#2563eb' : '#f1f5f9',
-          color: isUser ? 'white' : '#1f2937',
-        }}
+        className={cn(
+          'max-w-[85%] rounded-lg px-3 py-2',
+          isUser ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800',
+        )}
       >
-        <p style={{ fontSize: '14px', whiteSpace: 'pre-wrap', margin: 0 }}>{message.content}</p>
+        <p className="m-0 whitespace-pre-wrap text-sm">{message.content}</p>
 
         {message.result && (
-          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="mt-3 flex flex-col gap-2">
             {message.result.pasos && message.result.pasos.length > 0 && (
-              <div
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: '6px',
-                  padding: '8px',
-                  color: '#374151',
-                }}
-              >
-                <p style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', margin: 0 }}>
+              <div className="rounded-md bg-white p-2 text-slate-700">
+                <p className="m-0 mb-1 text-xs font-semibold">
                   Pasos:
                 </p>
-                <ol style={{ fontSize: '12px', margin: 0, paddingLeft: '16px' }}>
+                <ol className="m-0 list-decimal pl-4 text-xs">
                   {message.result.pasos.map((paso) => (
-                    <li key={paso.paso} style={{ marginBottom: '4px' }}>
+                    <li key={paso.paso} className="mb-1">
                       {paso.texto}
                     </li>
                   ))}
@@ -51,16 +42,9 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
             {message.result.url_modulo && (
               <Link
                 href={message.result.url_modulo}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '12px',
-                  color: '#2563eb',
-                  textDecoration: 'none',
-                }}
+                className="flex items-center gap-1 text-xs text-blue-600 no-underline hover:text-blue-700"
               >
-                <ExternalLink style={{ width: '12px', height: '12px' }} />
+                <ExternalLink className="h-3 w-3" />
                 Ir al módulo
               </Link>
             )}
@@ -68,12 +52,7 @@ export function HelpBotMessage({ message }: HelpBotMessageProps) {
         )}
 
         <p
-          style={{
-            fontSize: '10px',
-            marginTop: '4px',
-            margin: 0,
-            color: isUser ? '#bfdbfe' : '#9ca3af',
-          }}
+          className={cn('m-0 mt-1 text-[10px]', isUser ? 'text-blue-100' : 'text-slate-400')}
         >
           {message.timestamp.toLocaleTimeString('es-PE', {
             hour: '2-digit',

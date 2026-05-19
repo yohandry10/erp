@@ -33,10 +33,10 @@ try {
         -Method GET `
         -Headers $headers `
         -ErrorAction Stop
-    
+
     if ($response.success) {
         Write-Host "✅ Productos listados: $($response.data.Count)" -ForegroundColor Green
-        
+
         if ($response.data.Count -gt 0) {
             Write-Host "`nPrimeros 3 productos:" -ForegroundColor Cyan
             $response.data | Select-Object -First 3 | ForEach-Object {
@@ -74,58 +74,58 @@ try {
         -Headers $headers `
         -Body $nuevoProducto `
         -ErrorAction Stop
-    
+
     if ($response.success) {
         $productoId = $response.data.id
         Write-Host "✅ Producto creado exitosamente" -ForegroundColor Green
         Write-Host "   ID: $productoId" -ForegroundColor White
         Write-Host "   Código: $($response.data.codigo)" -ForegroundColor White
         Write-Host "   Nombre: $($response.data.nombre)" -ForegroundColor White
-        
+
         # =====================================================
         # 3. OBTENER PRODUCTO POR ID
         # =====================================================
         Write-Host "`n3️⃣  Obteniendo producto por ID..." -ForegroundColor Yellow
-        
+
         try {
             $response = Invoke-RestMethod -Uri "$API_URL/inventario/productos/$productoId" `
                 -Method GET `
                 -Headers $headers `
                 -ErrorAction Stop
-            
+
             if ($response.success) {
                 Write-Host "✅ Producto obtenido correctamente" -ForegroundColor Green
                 Write-Host "   Nombre: $($response.data.nombre)" -ForegroundColor White
                 Write-Host "   Precio Venta: S/ $($response.data.precio_venta)" -ForegroundColor White
                 Write-Host "   Stock Actual: $($response.data.stock_actual)" -ForegroundColor White
                 Write-Host "   Stock Reservado: $($response.data.stock_reservado)" -ForegroundColor White
-                
+
                 $stockDisponible = $response.data.stock_actual - $response.data.stock_reservado
                 Write-Host "   Stock Disponible: $stockDisponible" -ForegroundColor Cyan
             }
         } catch {
             Write-Host "❌ Error obteniendo producto: $_" -ForegroundColor Red
         }
-        
+
         # =====================================================
         # 4. ACTUALIZAR PRODUCTO
         # =====================================================
         Write-Host "`n4️⃣  Actualizando producto..." -ForegroundColor Yellow
-        
+
         $actualizacion = @{
             nombre = "Producto Actualizado $(Get-Date -Format 'HH:mm:ss')"
             precioVenta = "149.99"
             stockMinimo = "20"
             descripcion = "Descripción actualizada en prueba"
         } | ConvertTo-Json
-        
+
         try {
             $response = Invoke-RestMethod -Uri "$API_URL/inventario/productos/$productoId" `
                 -Method PUT `
                 -Headers $headers `
                 -Body $actualizacion `
                 -ErrorAction Stop
-            
+
             if ($response.success) {
                 Write-Host "✅ Producto actualizado exitosamente" -ForegroundColor Green
                 Write-Host "   Nuevo nombre: $($response.data.nombre)" -ForegroundColor White
@@ -135,18 +135,18 @@ try {
         } catch {
             Write-Host "❌ Error actualizando producto: $_" -ForegroundColor Red
         }
-        
+
         # =====================================================
         # 5. VERIFICAR STOCK CRÍTICO
         # =====================================================
         Write-Host "`n5️⃣  Verificando alertas de stock crítico..." -ForegroundColor Yellow
-        
+
         try {
             $response = Invoke-RestMethod -Uri "$API_URL/inventario/stats" `
                 -Method GET `
                 -Headers $headers `
                 -ErrorAction Stop
-            
+
             if ($response.success) {
                 Write-Host "✅ Estadísticas obtenidas" -ForegroundColor Green
                 Write-Host "   Total productos: $($response.data.totalProductos)" -ForegroundColor White
@@ -156,18 +156,18 @@ try {
         } catch {
             Write-Host "❌ Error obteniendo estadísticas: $_" -ForegroundColor Red
         }
-        
+
         # =====================================================
         # 6. ELIMINAR PRODUCTO
         # =====================================================
         Write-Host "`n6️⃣  Eliminando producto de prueba..." -ForegroundColor Yellow
-        
+
         try {
             $response = Invoke-RestMethod -Uri "$API_URL/inventario/productos/$productoId" `
                 -Method DELETE `
                 -Headers $headers `
                 -ErrorAction Stop
-            
+
             if ($response.success) {
                 Write-Host "✅ Producto eliminado/desactivado exitosamente" -ForegroundColor Green
                 Write-Host "   Mensaje: $($response.message)" -ForegroundColor White
@@ -175,7 +175,7 @@ try {
         } catch {
             Write-Host "❌ Error eliminando producto: $_" -ForegroundColor Red
         }
-        
+
     } else {
         Write-Host "⚠️  No se pudo crear el producto: $($response.message)" -ForegroundColor Yellow
     }

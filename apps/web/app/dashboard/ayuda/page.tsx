@@ -1,127 +1,78 @@
 'use client'
 
 import { OnboardingSettings } from '@/components/onboarding'
-import { HelpCircle, BookOpen, MessageCircle, Keyboard } from 'lucide-react'
+import { BookOpen, HelpCircle, Keyboard, MessageCircle } from 'lucide-react'
+import { PageShell } from '@/components/erp/page-shell'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+
+const shortcuts = [
+  { label: 'Buscar producto POS', key: 'F2' },
+  { label: 'Nueva venta', key: 'F4' },
+  { label: 'Procesar pago', key: 'F12' },
+  { label: 'Abrir ayuda', key: 'F1' },
+]
 
 export default function AyudaPage() {
-  const cardStyle: React.CSSProperties = {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-    border: '1px solid #e2e8f0',
-    padding: '24px',
-  }
-
-  const sectionTitleStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '16px',
-  }
-
   return (
-    <div style={{ maxWidth: '896px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      {/* Header */}
-      <div>
-        <h1
-          style={{
-            fontSize: '24px',
-            fontWeight: 700,
-            color: '#111827',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            margin: 0,
-          }}
-        >
-          <HelpCircle style={{ width: '28px', height: '28px', color: '#2563eb' }} />
-          Centro de Ayuda
-        </h1>
-        <p style={{ color: '#64748b', marginTop: '4px' }}>
-          Aprende a usar el sistema con tours interactivos y documentación.
-        </p>
-      </div>
+    <PageShell
+      title="Centro de Ayuda"
+      description="Tours interactivos, asistente contextual y atajos operativos del ERP."
+    >
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <BookOpen className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+              Tours Interactivos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <OnboardingSettings />
+          </CardContent>
+        </Card>
 
-      {/* Tours de Onboarding */}
-      <div style={cardStyle}>
-        <div style={sectionTitleStyle}>
-          <BookOpen style={{ width: '20px', height: '20px', color: '#2563eb' }} />
-          <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Tours Interactivos</h2>
-        </div>
-        <OnboardingSettings />
-      </div>
+        <div className="grid gap-4">
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                <MessageCircle className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+                Asistente de Ayuda
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                Usa el botón de ayuda inferior para consultar funciones del sistema según tu rol y permisos.
+              </p>
+              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-100 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-800">
+                El asistente debe responder con contexto del módulo activo y sin exponer datos fuera del tenant.
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Bot de Ayuda Info */}
-      <div style={cardStyle}>
-        <div style={sectionTitleStyle}>
-          <MessageCircle style={{ width: '20px', height: '20px', color: '#16a34a' }} />
-          <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Asistente de Ayuda</h2>
-        </div>
-        <p style={{ color: '#4b5563', marginBottom: '16px' }}>
-          ¿Tienes dudas? Usa el botón de ayuda en la esquina inferior derecha para hacer preguntas
-          sobre cualquier función del sistema.
-        </p>
-        <div
-          style={{
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '8px',
-            padding: '16px',
-          }}
-        >
-          <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
-            <strong>💡 Tip:</strong> El asistente conoce tu rol y te dará respuestas personalizadas
-            según tus permisos.
-          </p>
-        </div>
-      </div>
-
-      {/* Atajos de Teclado */}
-      <div style={cardStyle}>
-        <div style={sectionTitleStyle}>
-          <Keyboard style={{ width: '20px', height: '20px', color: '#7c3aed' }} />
-          <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Atajos Útiles</h2>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-          }}
-        >
-          {[
-            { label: 'Buscar producto (POS)', key: 'F2' },
-            { label: 'Nueva venta', key: 'F4' },
-            { label: 'Procesar pago', key: 'F12' },
-            { label: 'Abrir ayuda', key: 'F1' },
-          ].map((shortcut) => (
-            <div
-              key={shortcut.key}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px',
-                backgroundColor: '#f8fafc',
-                borderRadius: '8px',
-              }}
-            >
-              <span style={{ color: '#374151' }}>{shortcut.label}</span>
-              <kbd
-                style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#e2e8f0',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontFamily: 'monospace',
-                }}
-              >
-                {shortcut.key}
-              </kbd>
-            </div>
-          ))}
+          <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+                <Keyboard className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+                Atajos Útiles
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {shortcuts.map((shortcut) => (
+                <div
+                  key={shortcut.key}
+                  className="flex items-center justify-between rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+                >
+                  <span className="text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">{shortcut.label}</span>
+                  <Badge className="border-blue-300/25 bg-blue-300/10 font-mono text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                    {shortcut.key}
+                  </Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -42,7 +42,7 @@ export function ActivosVsPasivosChart({ activos, pasivos, patrimonio }: ActivosV
   }
 
   return (
-    <div style={{ width: '100%', height: '300px' }}>
+    <div className="w-[100%] h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

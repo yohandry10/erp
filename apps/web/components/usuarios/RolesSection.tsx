@@ -4,102 +4,49 @@ interface RolesSectionProps {
   roles: any[]
 }
 
-const getRoleColor = (rol: string) => {
-  switch (rol) {
-    case 'ADMIN':
-      return { background: '#8b5cf6', color: 'white' }
-    case 'CONTADOR':
-      return { background: '#3b82f6', color: 'white' }
-    case 'VENDEDOR':
-      return { background: '#10b981', color: 'white' }
-    case 'ALMACENERO':
-      return { background: '#f59e0b', color: 'white' }
-    case 'CAJERO':
-      return { background: '#ec4899', color: 'white' }
-    case 'SUPERVISOR':
-      return { background: '#6366f1', color: 'white' }
-    default:
-      return { background: '#6b7280', color: 'white' }
-  }
-}
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 export default function RolesSection({ roles }: RolesSectionProps) {
   return (
-    <div className="activity-section">
-      <h2 className="activity-title">Roles y Permisos</h2>
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+    <section className="space-y-4">
+      <h2 className="text-xl font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Roles y Permisos</h2>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {roles.map((rol: any, index) => (
-          <div key={index} className="activity-card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <Card key={index} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
-                <h3 style={{ fontWeight: '600', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ 
-                    ...getRoleColor(rol.nombre), 
-                    padding: '0.25rem 0.75rem', 
-                    borderRadius: '20px', 
-                    fontSize: '0.8rem',
-                    fontWeight: '500'
-                  }}>
-                    {rol.nombre}
-                  </span>
-                </h3>
-                <p style={{ fontSize: '0.9rem', opacity: '0.8', marginBottom: '0.5rem' }}>
+                <CardTitle className="mb-2 text-base text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{rol.nombre}</CardTitle>
+                <p className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
                   {rol.descripcion}
                 </p>
               </div>
-              <div style={{ 
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: '#3b82f6',
-                padding: '0.5rem',
-                borderRadius: '50%',
-                minWidth: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: '600'
-              }}>
+              <div className="flex h-10 min-w-10 items-center justify-center rounded-full border border-blue-300/25 bg-blue-300/10 p-2 font-bold text-blue-100 group-data-[erp-theme=light]/dashboard:text-blue-700">
                 {rol.usuariosCount || 0}
               </div>
-            </div>
+            </CardHeader>
             
-            <div style={{ 
-              borderTop: '1px solid rgba(0,0,0,0.1)', 
-              paddingTop: '1rem'
-            }}>
-              <p style={{ fontSize: '0.8rem', opacity: '0.7', marginBottom: '0.5rem' }}>
+            <CardContent className="border-t border-cyan-400/10 pt-4 group-data-[erp-theme=light]/dashboard:border-slate-100">
+              <p className="mb-2 text-xs uppercase tracking-[0.12em] text-cyan-200/70 group-data-[erp-theme=light]/dashboard:text-slate-500">
                 Permisos:
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div className="flex flex-wrap gap-2 mb-4">
                 {Array.isArray(rol.permisos) && rol.permisos.length > 0 ? (
                   rol.permisos.map((permiso: string, pIndex: number) => (
-                    <span key={pIndex} style={{ 
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      color: '#10b981',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '12px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500'
-                    }}>
+                    <Badge key={pIndex} className="border-cyan-300/25 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">
                       {permiso}
-                    </span>
+                    </Badge>
                   ))
                 ) : (
-                  <span style={{ 
-                    background: 'rgba(107, 114, 128, 0.1)',
-                    color: '#6b7280',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem'
-                  }}>
+                  <Badge className="border-slate-300/25 bg-slate-300/10 text-slate-300 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-600">
                     Sin permisos definidos
-                  </span>
+                  </Badge>
                 )}
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
-    </div>
+    </section>
   )
 }

@@ -12,6 +12,7 @@ const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:13002';
 const api = (route: string) => `/api${route}`;
 
 for (const envPath of [
+  path.resolve(process.cwd(), '../../.env.local'),
   path.resolve(process.cwd(), '../../.env'),
   path.resolve(process.cwd(), '.env.local'),
   path.resolve(process.cwd(), '../erp-api/.env'),
@@ -151,7 +152,7 @@ test.describe('T17 Usuarios, permisos, auditoria y configuracion', () => {
     expect(updatedUser.nombre).toContain('Editado');
 
     const restrictedPage = await browser.newPage();
-    await login(restrictedPage, email, password);
+    await login(restrictedPage, email, password, true);
     const restrictedFailures = await collectBrowserFailures(restrictedPage);
     const restrictedAuth = await authContext(restrictedPage);
     const restrictedApi = await playwrightRequest.newContext({

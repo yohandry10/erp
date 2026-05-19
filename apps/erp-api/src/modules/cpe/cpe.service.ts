@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateFacturaDto, FacturaDto, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
@@ -20,6 +20,7 @@ import * as crypto from 'crypto';
 @Injectable()
 export class CpeService {
   private readonly logger = new Logger(CpeService.name);
+  private readonly estadosAnulables = new Set(['FIRMADO', 'ACEPTADO', 'ENVIADO']);
   private readonly sunatStatuses = {
     NOT_SENT: 'NOT_SENT',
     READY: 'READY',
@@ -652,7 +653,7 @@ export class CpeService {
         numero: createFacturaDto.numero,
         clienteId: (createFacturaDto as any).cliente_id ?? createFacturaDto.documento_receptor,
         total: createFacturaDto.total_venta,
-        esCredito: false, // Por ahora todas son contado, luego implementar lógica de crédito
+        esCredito: (createFacturaDto as any).condicion_pago === 'CREDITO' || (createFacturaDto as any).es_credito === true,
         ventaId: undefined, // Se puede agregar referencia si viene de POS
         requiereTransporte: requiereTransporte,
         moneda: createFacturaDto.moneda,
@@ -2015,25 +2016,36 @@ ${new Date().toLocaleString()}
       throw new NotFoundException('Comprobante electrónico no encontrado');
     }
 
+    const estadoCpe = String(cpe.estado || '').toUpperCase();
+
     // 2. Validar que el CPE puede ser anulado
-    if (cpe.estado === 'ANULADO') {
+    if (estadoCpe === 'ANULADO') {
       throw new BadRequestException('El comprobante ya está anulado');
     }
 
-    if (cpe.estado !== 'ACEPTADO' && cpe.estado !== 'ENVIADO') {
+    if (cpe.nota_credito_id) {
+      throw new BadRequestException('El comprobante ya tiene una nota de crédito asociada');
+    }
+
+    if (!this.estadosAnulables.has(estadoCpe)) {
       throw new BadRequestException(
         `No se puede anular un comprobante en estado ${cpe.estado}. ` +
-        `Solo se pueden anular comprobantes ACEPTADOS o ENVIADOS.`
+        `Solo se pueden anular comprobantes FIRMADOS, ACEPTADOS o ENVIADOS.`
       );
     }
 
+    await this.assertCpeOriginalAccountingReady(client, tenantId, cpe, userId, motivo);
+
+    const contextoOperacion = await this.resolveOperacionReversaContext(client, tenantId, cpe);
+
     // 3. Generar nota de crédito
     console.log(`📝 [CPE] Generando nota de crédito para CPE ${cpeId}...`);
+    const serieNotaCredito = this.resolveSerieNotaCredito(cpe.serie);
     
     const notaCreditoData = {
-      tipo_documento: 'NOTA_CREDITO',
-      serie: cpe.serie.replace('F', 'FC'), // FC001 para notas de crédito
-      numero: await this.obtenerSiguienteNumeroNotaCredito(tenantId, cpe.serie.replace('F', 'FC')),
+      tipo_documento: '07',
+      serie: serieNotaCredito,
+      numero: await this.obtenerSiguienteNumeroNotaCredito(tenantId, serieNotaCredito),
       documento_referencia_tipo: cpe.tipo_documento,
       documento_referencia_serie: cpe.serie,
       documento_referencia_numero: cpe.numero,
@@ -2083,6 +2095,8 @@ ${new Date().toLocaleString()}
       throw new BadRequestException('No se pudo anular el comprobante');
     }
 
+    await this.aplicarReversionOperativa(client, tenantId, cpe, notaCredito, contextoOperacion, motivo, userId);
+
     // 5. Emitir evento CPEAnulado para que otros módulos reviertan operaciones
     // Este evento será escuchado por:
     // - Contabilidad: Revertir asiento contable
@@ -2104,6 +2118,16 @@ ${new Date().toLocaleString()}
           motivo: motivo,
           anulado_por: userId,
           anulado_at: new Date().toISOString(),
+          source: contextoOperacion.source,
+          venta_pos_id: contextoOperacion.ventaPos?.id,
+          pedido_id: contextoOperacion.pedido?.id,
+          documento_id: contextoOperacion.documento?.id,
+          cxc_id: contextoOperacion.cxc?.id,
+          items: contextoOperacion.items.map((item) => ({
+            producto_id: item.producto_id,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio_unitario,
+          })),
         },
       });
 
@@ -2135,6 +2159,419 @@ ${new Date().toLocaleString()}
         estado: notaCredito.estado,
       },
     };
+  }
+
+  private resolveSerieNotaCredito(serie: string): string {
+    const normalized = String(serie || '').trim().toUpperCase();
+    if (normalized.startsWith('F')) return normalized.replace(/^F/, 'FC');
+    if (normalized.startsWith('B')) return normalized.replace(/^B/, 'BC');
+    return `NC${normalized}`.slice(0, 4);
+  }
+
+  private formatCpeNumero(cpe: any): string {
+    return `${cpe.serie}-${String(cpe.numero).padStart(8, '0')}`;
+  }
+
+  private async assertCpeOriginalAccountingReady(
+    client: any,
+    tenantId: string,
+    cpe: any,
+    userId: string | undefined,
+    motivo: string,
+  ): Promise<void> {
+    const sourceEventId = await this.resolveCpeOriginalSourceEventId(client, tenantId, cpe);
+
+    const block = async (reason: string): Promise<never> => {
+      await this.registrarIntentoAnulacionCpeBloqueado(client, tenantId, cpe, userId, motivo, reason);
+      throw new ConflictException(reason);
+    };
+
+    if (!sourceEventId) {
+      return block(
+        'No se puede anular el CPE porque no conserva el evento contable original. Revise la trazabilidad antes de emitir una nota de crédito.',
+      );
+    }
+
+    const { data: asientos, error: asientosError } = await client
+      .from('asientos_contables')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('source_event_id', sourceEventId)
+      .limit(2);
+
+    if (asientosError) {
+      throw new BadRequestException(`No se pudo validar el asiento contable original: ${asientosError.message}`);
+    }
+
+    if ((asientos?.length ?? 0) !== 1) {
+      return block(
+        `No se puede anular el CPE porque se esperaban 1 asiento contable original y se encontraron ${asientos?.length ?? 0}.`,
+      );
+    }
+
+    const { data: detalles, error: detallesError } = await client
+      .from('detalle_asientos')
+      .select('id')
+      .eq('asiento_id', asientos[0].id)
+      .limit(1);
+
+    if (detallesError) {
+      throw new BadRequestException(`No se pudo validar el detalle del asiento contable original: ${detallesError.message}`);
+    }
+
+    if (!detalles?.length) {
+      return block('No se puede anular el CPE porque el asiento contable original no tiene detalle.');
+    }
+  }
+
+  private async registrarIntentoAnulacionCpeBloqueado(
+    _client: any,
+    tenantId: string,
+    cpe: any,
+    userId: string | undefined,
+    motivo: string,
+    reason: string,
+  ): Promise<void> {
+    try {
+      await this.auditService.registrarCambio(
+        'comprobantes_electronicos',
+        'UPDATE',
+        userId ?? 'system',
+        {
+          old: { id: cpe.id, estado: cpe.estado, nota_credito_id: cpe.nota_credito_id ?? null },
+          new: { anulacion_bloqueada: true, motivo_anulacion: motivo, motivo_bloqueo: reason },
+        },
+        tenantId,
+        cpe.id,
+        {
+          accion: 'ANULACION_CPE_BLOQUEADA',
+          source_event_id: cpe.event_id || cpe.source_event_id || null,
+        },
+      );
+    } catch (auditError) {
+      this.logger.warn(`No se pudo auditar intento bloqueado de anulación CPE ${cpe.id}: ${(auditError as Error).message}`);
+    }
+  }
+
+  private async resolveCpeOriginalSourceEventId(client: any, tenantId: string, cpe: any): Promise<string | null> {
+    const direct = cpe.event_id || cpe.source_event_id;
+    if (direct) return direct;
+
+    const { data, error } = await client
+      .from('cpe')
+      .select('event_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', cpe.id)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(`No se pudo resolver el evento contable original del CPE: ${error.message}`);
+    }
+
+    return data?.event_id || null;
+  }
+
+  private async resolveOperacionReversaContext(client: any, tenantId: string, cpe: any): Promise<any> {
+    const numeroDocumento = this.formatCpeNumero(cpe);
+    const numeroVariants = Array.from(new Set([
+      String(cpe.numero),
+      String(cpe.numero).padStart(8, '0'),
+    ]));
+
+    const { data: ventaPos } = await client
+      .from('ventas_pos')
+      .select('id, numero_ticket, total, estado, sesion_caja_id')
+      .eq('tenant_id', tenantId)
+      .eq('cpe_id', cpe.id)
+      .maybeSingle();
+
+    const { data: pedido } = await client
+      .from('pedidos_venta')
+      .select('id, numero, estado, factura_id')
+      .eq('tenant_id', tenantId)
+      .eq('factura_id', cpe.id)
+      .maybeSingle();
+
+    let documento: any = null;
+    const { data: documentos } = await client
+      .from('documentos')
+      .select('id, serie, numero, estado, total, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('serie', cpe.serie)
+      .in('numero', numeroVariants)
+      .limit(20);
+    documento = this.pickOperationalDocument(documentos ?? [], cpe);
+
+    let cxc: any = null;
+    if (documento?.id) {
+      const { data } = await client
+        .from('cuentas_por_cobrar')
+        .select('id, documento_id, numero_documento, monto_total, monto_pendiente, estado')
+        .eq('tenant_id', tenantId)
+        .eq('documento_id', documento.id)
+        .maybeSingle();
+      cxc = data ?? null;
+    }
+    if (!cxc) {
+      const { data } = await client
+        .from('cuentas_por_cobrar')
+        .select('id, documento_id, numero_documento, monto_total, monto_pendiente, estado')
+        .eq('tenant_id', tenantId)
+        .eq('numero_documento', numeroDocumento)
+        .limit(20);
+      cxc = this.pickCuentaPorCobrar(data ?? [], cpe);
+    }
+
+    let items: Array<{ producto_id: string; cantidad: number; precio_unitario?: number }> = [];
+    if (ventaPos?.id) {
+      const { data } = await client
+        .from('detalle_ventas_pos')
+        .select('producto_id, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId)
+        .eq('venta_pos_id', ventaPos.id);
+      items = (data ?? []).map((item: any) => ({
+        producto_id: item.producto_id,
+        cantidad: Number(item.cantidad ?? 0),
+        precio_unitario: Number(item.precio_unitario ?? 0),
+      }));
+    } else if (pedido?.id) {
+      const { data } = await client
+        .from('pedidos_venta_detalle')
+        .select('producto_id, cantidad_despachada, cantidad, precio_unitario')
+        .eq('tenant_id', tenantId)
+        .eq('pedido_id', pedido.id);
+      items = (data ?? []).map((item: any) => ({
+        producto_id: item.producto_id,
+        cantidad: Number(item.cantidad_despachada ?? item.cantidad ?? 0),
+        precio_unitario: Number(item.precio_unitario ?? 0),
+      }));
+    }
+
+    return {
+      source: ventaPos?.id ? 'POS' : pedido?.id ? 'PEDIDO' : 'CPE',
+      ventaPos,
+      pedido,
+      documento,
+      cxc,
+      items: items.filter((item) => item.producto_id && item.cantidad > 0),
+    };
+  }
+
+  private pickOperationalDocument(documentos: any[], cpe: any): any | null {
+    if (!documentos.length) return null;
+    const totalCpe = Number(cpe.total_venta ?? 0);
+    return documentos
+      .map((documento) => ({
+        documento,
+        totalDiff: Math.abs(Number(documento.total ?? 0) - totalCpe),
+        createdAt: new Date(documento.created_at ?? 0).getTime(),
+      }))
+      .sort((a, b) => a.totalDiff - b.totalDiff || b.createdAt - a.createdAt)[0]?.documento ?? null;
+  }
+
+  private pickCuentaPorCobrar(cuentas: any[], cpe: any): any | null {
+    if (!cuentas.length) return null;
+    const totalCpe = Number(cpe.total_venta ?? 0);
+    return cuentas
+      .map((cuenta) => ({
+        cuenta,
+        totalDiff: Math.abs(Number(cuenta.monto_total ?? 0) - totalCpe),
+      }))
+      .sort((a, b) => a.totalDiff - b.totalDiff)[0]?.cuenta ?? null;
+  }
+
+  private async aplicarReversionOperativa(
+    client: any,
+    tenantId: string,
+    cpe: any,
+    notaCredito: any,
+    contexto: any,
+    motivo: string,
+    userId?: string,
+  ): Promise<void> {
+    if (contexto.documento?.id) {
+      const { error } = await client
+        .from('documentos')
+        .update({
+          estado: 'ANULADO',
+          motivo_anulacion: motivo,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', contexto.documento.id);
+      if (error) throw new BadRequestException(`No se pudo anular el documento operativo: ${error.message}`);
+    }
+
+    if (contexto.cxc?.id && !['ANULADA', 'REVERTIDA'].includes(String(contexto.cxc.estado || '').toUpperCase())) {
+      const { error } = await client
+        .from('cuentas_por_cobrar')
+        .update({
+          estado: 'ANULADA',
+          monto_pendiente: 0,
+          observaciones: `REVERTIDA: CPE ${cpe.serie}-${cpe.numero} anulado con NC ${notaCredito.serie}-${notaCredito.numero}. Motivo: ${motivo}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', contexto.cxc.id);
+      if (error) throw new BadRequestException(`No se pudo revertir CxC: ${error.message}`);
+    }
+
+    if (contexto.pedido?.id) {
+      const { error } = await client
+        .from('pedidos_venta')
+        .update({
+          estado: 'ANULADO',
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...(contexto.pedido.metadata ?? {}),
+            reverso_cpe_id: cpe.id,
+            nota_credito_id: notaCredito.id,
+            motivo_anulacion: motivo,
+          },
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', contexto.pedido.id);
+      if (error) throw new BadRequestException(`No se pudo marcar el pedido como anulado: ${error.message}`);
+    }
+
+    if (contexto.ventaPos?.id) {
+      const { error } = await client
+        .from('ventas_pos')
+        .update({
+          estado: 'ANULADA',
+          updated_at: new Date().toISOString(),
+          metadata: {
+            reverso_cpe_id: cpe.id,
+            nota_credito_id: notaCredito.id,
+            motivo_anulacion: motivo,
+          },
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', contexto.ventaPos.id);
+      if (error) throw new BadRequestException(`No se pudo marcar la venta POS como anulada: ${error.message}`);
+
+      await this.registrarReversionCajaPos(client, tenantId, contexto.ventaPos, cpe, notaCredito, motivo, userId);
+    }
+
+    await this.revertirStockVenta(client, tenantId, contexto, cpe, notaCredito, motivo, userId);
+  }
+
+  private async revertirStockVenta(
+    client: any,
+    tenantId: string,
+    contexto: any,
+    cpe: any,
+    notaCredito: any,
+    motivo: string,
+    userId?: string,
+  ): Promise<void> {
+    for (const item of contexto.items) {
+      const { data: movimientoExistente, error: lookupError } = await client
+        .from('movimientos_inventario')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('producto_id', item.producto_id)
+        .eq('referencia_id', notaCredito.id)
+        .eq('referencia_tipo', 'REVERSO_VENTA')
+        .maybeSingle();
+      if (lookupError && lookupError.code !== 'PGRST116') {
+        throw new BadRequestException(`No se pudo verificar reverso de inventario: ${lookupError.message}`);
+      }
+      if (movimientoExistente) continue;
+
+      const { data: producto, error: productoError } = await client
+        .from('productos')
+        .select('id, stock_actual, stock, stock_reservado, controla_stock, es_servicio')
+        .eq('tenant_id', tenantId)
+        .eq('id', item.producto_id)
+        .single();
+      if (productoError || !producto) {
+        throw new BadRequestException(`Producto ${item.producto_id} no encontrado para reverso`);
+      }
+
+      if (producto.es_servicio === true || producto.controla_stock === false) continue;
+
+      const stockActual = Number(producto.stock_actual ?? producto.stock ?? 0);
+      const nuevoStock = Number((stockActual + Number(item.cantidad)).toFixed(2));
+      const { error: updateStockError } = await client
+        .from('productos')
+        .update({
+          stock_actual: nuevoStock,
+          stock: String(nuevoStock),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', item.producto_id);
+      if (updateStockError) throw new BadRequestException(`No se pudo restaurar stock: ${updateStockError.message}`);
+
+      const { error: movimientoError } = await client.from('movimientos_inventario').insert({
+        tenant_id: tenantId,
+        producto_id: item.producto_id,
+        tipo: 'ENTRADA',
+        cantidad: item.cantidad,
+        referencia_tipo: 'REVERSO_VENTA',
+        referencia_id: notaCredito.id,
+        created_by: userId,
+        motivo: `Reverso de venta ${cpe.serie}-${cpe.numero}`,
+        notas: `Entrada por nota de crédito ${notaCredito.serie}-${notaCredito.numero}. Motivo: ${motivo}`,
+        stock_actual: String(nuevoStock),
+        stock_reservado: String(producto.stock_reservado ?? 0),
+        activo: true,
+        estado: 'ACTIVO',
+        metadata: {
+          source: contexto.source,
+          cpe_id: cpe.id,
+          nota_credito_id: notaCredito.id,
+        },
+      });
+      if (movimientoError) throw new BadRequestException(`No se pudo registrar Kardex de reverso: ${movimientoError.message}`);
+    }
+  }
+
+  private async registrarReversionCajaPos(
+    client: any,
+    tenantId: string,
+    ventaPos: any,
+    cpe: any,
+    notaCredito: any,
+    motivo: string,
+    userId?: string,
+  ): Promise<void> {
+    const { data: efectivo } = await client
+      .from('movimientos_caja')
+      .select('id, monto, sesion_caja_id')
+      .eq('tenant_id', tenantId)
+      .eq('referencia_tipo', 'venta_pos')
+      .eq('referencia_documento', ventaPos.id)
+      .eq('tipo_movimiento', 'VENTA')
+      .maybeSingle();
+
+    if (!efectivo?.id || Number(efectivo.monto ?? 0) <= 0) return;
+
+    const { data: reversoExistente } = await client
+      .from('movimientos_caja')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('referencia_tipo', 'reverso_venta_pos')
+      .eq('referencia_documento', notaCredito.id)
+      .maybeSingle();
+    if (reversoExistente) return;
+
+    const { error } = await client.rpc('registrar_movimiento_caja', {
+      p_sesion_caja_id: efectivo.sesion_caja_id,
+      p_tipo_movimiento: 'AJUSTE',
+      p_monto: -Math.abs(Number(efectivo.monto)),
+      p_referencia_documento: notaCredito.id,
+      p_referencia_tipo: 'reverso_venta_pos',
+      p_motivo: `Reverso POS ${cpe.serie}-${cpe.numero}: ${motivo}`,
+      p_usuario_id: userId ?? null,
+      p_metadata: {
+        cpe_id: cpe.id,
+        nota_credito_id: notaCredito.id,
+        venta_pos_id: ventaPos.id,
+      },
+    });
+    if (error) throw new BadRequestException(`No se pudo registrar reverso de caja POS: ${error.message}`);
   }
 
   /**

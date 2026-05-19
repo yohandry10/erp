@@ -94,71 +94,25 @@ interface ErrorFallbackProps {
 }
 
 export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps) {
-  const errorMessage = error?.message || 'Ha ocurrido un error inesperado'
+  const errorMessage = process.env.NODE_ENV === 'development'
+    ? (error?.message || 'Ha ocurrido un error inesperado')
+    : 'Ha ocurrido un error inesperado'
   const errorStack = error?.stack || errorInfo?.componentStack || 'No hay información adicional disponible'
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-      }}
+    <div className="flex items-center justify-center p-8"
     >
       <div
-        className="activity-card"
-        style={{
-          maxWidth: '800px',
-          width: '100%',
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          borderRadius: 'var(--border-radius-xl)',
-          padding: '3rem',
-          boxShadow: 'var(--shadow-2xl)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
+        className="activity-card max-w-[800px] w-[100%] p-12 shadow border relative overflow-hidden"
       >
         {/* Barra superior decorativa */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '4px',
-            background: 'var(--gradient-danger)',
-            borderRadius: 'var(--border-radius-xl) var(--border-radius-xl) 0 0',
-          }}
+        <div className="absolute top-0 left-0 right-0 h-[4px] bg-[var(--gradient-danger)]"
         />
 
         {/* Icono y título */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-            marginBottom: '2rem',
-          }}
+        <div className="flex flex-col items-center text-center mb-8"
         >
-          <div
-            style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              background: 'var(--gradient-danger)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1.5rem',
-              boxShadow: 'var(--shadow-xl)',
-              animation: 'glow-red 2s ease-in-out infinite alternate',
-            }}
+          <div className="w-[80px] h-[80px] rounded-full bg-[var(--gradient-danger)] flex items-center justify-center mb-6 shadow"
           >
             <svg
               width="40"
@@ -176,111 +130,40 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
             </svg>
           </div>
 
-          <h1
-            style={{
-              fontSize: '2rem',
-              fontWeight: '700',
-              color: 'var(--red-700)',
-              marginBottom: '0.5rem',
-              background: 'var(--gradient-danger)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
+          <h1 className="text-8 font-bold text-[var(--red-700)] mb-2 bg-[var(--gradient-danger)]"
           >
             Algo salió mal
           </h1>
 
-          <p
-            style={{
-              fontSize: '1rem',
-              color: 'var(--primary-600)',
-              fontWeight: '500',
-            }}
+          <p className="text-4 text-[var(--primary-600)] font-medium"
           >
             Lo sentimos, ha ocurrido un error inesperado en la aplicación
           </p>
         </div>
 
         {/* Mensaje de error */}
-        <div
-          style={{
-            background: 'var(--red-50)',
-            border: '1px solid var(--red-200)',
-            borderRadius: 'var(--border-radius)',
-            padding: '1.5rem',
-            marginBottom: '2rem',
-          }}
+        <div className="bg-[var(--red-50)] border p-6 mb-8"
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-            }}
+          <div className="flex items-start gap-3"
           >
-            <div
-              style={{
-                width: '20px',
-                height: '20px',
-                borderRadius: '50%',
-                background: 'var(--red-200)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                marginTop: '2px',
-              }}
+            <div className="w-5 h-5 rounded-full bg-[var(--red-200)] flex items-center justify-center shrink-0 mt-[2px]"
             >
-              <div
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: 'var(--red-600)',
-                }}
+              <div className="w-2 h-2 rounded-full bg-[var(--red-600)]"
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <p
-                style={{
-                  margin: 0,
-                  fontWeight: '600',
-                  color: 'var(--red-700)',
-                  fontSize: '0.95rem',
-                  marginBottom: '0.5rem',
-                }}
+            <div className="flex-[1]">
+              <p className="m-0 font-semibold text-[var(--red-700)] text-[0.95rem] mb-2"
               >
                 {errorMessage}
               </p>
               {process.env.NODE_ENV === 'development' && (
-                <details
-                  style={{
-                    marginTop: '1rem',
-                    fontSize: '0.875rem',
-                  }}
+                <details className="mt-4 text-[0.875rem]"
                 >
-                  <summary
-                    style={{
-                      cursor: 'pointer',
-                      color: 'var(--red-600)',
-                      fontWeight: '600',
-                      marginBottom: '0.5rem',
-                    }}
+                  <summary className="cursor-pointer text-[var(--red-600)] font-semibold mb-2"
                   >
                     Detalles técnicos (solo en desarrollo)
                   </summary>
-                  <pre
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.05)',
-                      padding: '1rem',
-                      borderRadius: 'var(--border-radius)',
-                      overflow: 'auto',
-                      fontSize: '0.75rem',
-                      color: 'var(--red-800)',
-                      marginTop: '0.5rem',
-                      maxHeight: '300px',
-                    }}
+                  <pre className="bg-[rgba(239,_68,_68,_0.05)] p-4 overflow-auto text-3 text-[var(--red-800)] mt-2 max-h-[300px]"
                   >
                     {errorStack}
                   </pre>
@@ -291,32 +174,11 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
         </div>
 
         {/* Botones de acción */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-          }}
+        <div className="flex gap-4 justify-center flex-wrap"
         >
           <button
             onClick={onReset}
-            className="btn-primary"
-            style={{
-              padding: '0.875rem 1.5rem',
-              borderRadius: 'var(--border-radius)',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              background: 'var(--gradient-primary)',
-              color: 'white',
-              boxShadow: 'var(--shadow-md)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
+            className="btn-primary py-[0.875rem] px-6 font-semibold text-[0.875rem] border-0 cursor-pointer transition bg-[var(--gradient-primary)] text-white shadow inline-flex items-center gap-2"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)'
               e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
@@ -344,21 +206,7 @@ export function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps)
 
           <button
             onClick={() => window.location.href = '/'}
-            className="btn-secondary"
-            style={{
-              padding: '0.875rem 1.5rem',
-              borderRadius: 'var(--border-radius)',
-              fontWeight: '600',
-              fontSize: '0.875rem',
-              border: '1px solid var(--primary-300)',
-              cursor: 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              background: 'var(--primary-100)',
-              color: 'var(--primary-700)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
+            className="btn-secondary py-[0.875rem] px-6 font-semibold text-[0.875rem] border cursor-pointer transition bg-[var(--primary-100)] text-[var(--primary-700)] inline-flex items-center gap-2"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--primary-200)'
               e.currentTarget.style.borderColor = 'var(--primary-400)'

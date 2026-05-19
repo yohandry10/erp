@@ -170,160 +170,157 @@ export function ConfigurationSummaryStep() {
 
   if (loading) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
+      <div className="p-8 text-center">
         <p>Cargando configuración...</p>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '1rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="p-4 max-w-[800px] my-0 mx-auto">
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-        <div style={{
-          width: '60px', height: '60px', borderRadius: '50%', backgroundColor: '#10b981',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem'
-        }}>
+      <div className="text-center mb-6">
+        <div className="w-[60px] h-[60px] rounded-full bg-[#10b981] flex items-center justify-center">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+        <h1 className="text-5 font-bold mb-1">
           Configuración Completada
         </h1>
-        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+        <p className="text-gray-500 text-[0.875rem]">
           Tu empresa está configurada y lista para operar. Aquí puedes ver y editar algunos ajustes.
         </p>
       </div>
 
       {/* Datos de la Empresa */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>📋 Datos de la Empresa</h2>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Tipo de Empresa:</span>
-          <span style={valueStyle}>{empresaConfig?.tipo_empresa || 'No especificado'}</span>
+      <div className="bg-[#f9fafb] rounded-2 p-5 mb-4">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">📋 Datos de la Empresa</h2>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Tipo de Empresa:</span>
+          <span className="text-gray-900">{empresaConfig?.tipo_empresa || 'No especificado'}</span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>País:</span>
-          <span style={valueStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">País:</span>
+          <span className="text-gray-900">
             {country.paisNombre || empresaConfig?.pais || 'No definido'}
           </span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>{country.documentoFiscal || 'RUC'}:</span>
-          <span style={empresaConfig?.ruc ? valueStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">{country.documentoFiscal || 'RUC'}:</span>
+          <span>
             {empresaConfig?.ruc || 'No configurado'}
           </span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Razón Social:</span>
-          <span style={empresaConfig?.razonSocial ? valueStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Razón Social:</span>
+          <span>
             {empresaConfig?.razonSocial || 'No configurado'}
           </span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Nombre Comercial:</span>
-          <span style={valueStyle}>{empresaConfig?.nombreComercial || '-'}</span>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Nombre Comercial:</span>
+          <span className="text-gray-900">{empresaConfig?.nombreComercial || '-'}</span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Dirección Fiscal:</span>
-          <span style={empresaConfig?.direccion ? valueStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Dirección Fiscal:</span>
+          <span>
             {empresaConfig?.direccion || 'No configurado'}
           </span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Teléfono:</span>
-          <span style={valueStyle}>{empresaConfig?.telefono || '-'}</span>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Teléfono:</span>
+          <span className="text-gray-900">{empresaConfig?.telefono || '-'}</span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Email:</span>
-          <span style={valueStyle}>{empresaConfig?.email || '-'}</span>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Email:</span>
+          <span className="text-gray-900">{empresaConfig?.email || '-'}</span>
         </div>
       </div>
 
       {/* Configuración Fiscal */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>💰 Configuración Fiscal</h2>
+      <div className="bg-[#f9fafb] rounded-2 p-5 mb-4">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">💰 Configuración Fiscal</h2>
         {isPeru && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>Régimen Tributario:</span>
-            <span style={empresaConfig?.regimen ? valueStyle : pendingStyle}>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">Régimen Tributario:</span>
+            <span>
               {empresaConfig?.regimen || 'No especificado'}
             </span>
           </div>
         )}
         {isColombia && (
           <>
-            <div style={rowStyle}>
-              <span style={labelStyle}>Régimen fiscal DIAN:</span>
-              <span style={empresaConfig?.dianRegimenFiscal ? valueStyle : pendingStyle}>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-gray-500">Régimen fiscal DIAN:</span>
+              <span>
                 {empresaConfig?.dianRegimenFiscal || 'No especificado'}
               </span>
             </div>
-            <div style={rowStyle}>
-              <span style={labelStyle}>Tipo contribuyente DIAN:</span>
-              <span style={empresaConfig?.dianTipoContribuyente ? valueStyle : pendingStyle}>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-gray-500">Tipo contribuyente DIAN:</span>
+              <span>
                 {dianTipoContribuyenteLabel}
               </span>
             </div>
           </>
         )}
-        <div style={rowStyle}>
-          <span style={labelStyle}>{country.impuesto || 'Impuesto'}:</span>
-          <span style={valueStyle}>{empresaConfig?.igvPorcentaje ?? 18}%</span>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">{country.impuesto || 'Impuesto'}:</span>
+          <span className="text-gray-900">{empresaConfig?.igvPorcentaje ?? 18}%</span>
         </div>
         {isPeru && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>Retención Renta:</span>
-            <span style={valueStyle}>{empresaConfig?.retencionRentaPorcentaje ?? 0}%</span>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">Retención Renta:</span>
+            <span className="text-gray-900">{empresaConfig?.retencionRentaPorcentaje ?? 0}%</span>
           </div>
         )}
       </div>
 
       {/* Series de Comprobantes */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>📄 Series de Comprobantes</h2>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Serie Factura:</span>
-          <span style={empresaConfig?.serieFactura ? valueStyle : pendingStyle}>
+      <div className="bg-[#f9fafb] rounded-2 p-5 mb-4">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">📄 Series de Comprobantes</h2>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Serie Factura:</span>
+          <span>
             {empresaConfig?.serieFactura || 'Pendiente'}
           </span>
         </div>
         {isPeru && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>Serie Boleta:</span>
-            <span style={empresaConfig?.serieBoleta ? valueStyle : pendingStyle}>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">Serie Boleta:</span>
+            <span>
               {empresaConfig?.serieBoleta || 'Pendiente'}
             </span>
           </div>
         )}
-        <div style={rowStyle}>
-          <span style={labelStyle}>Serie Nota Crédito:</span>
-          <span style={empresaConfig?.serieNotaCredito ? valueStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Serie Nota Crédito:</span>
+          <span>
             {empresaConfig?.serieNotaCredito || 'Pendiente'}
           </span>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Serie Guía Remisión:</span>
-          <span style={empresaConfig?.serieGuiaRemision ? valueStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Serie Guía Remisión:</span>
+          <span>
             {empresaConfig?.serieGuiaRemision || 'Pendiente'}
           </span>
         </div>
       </div>
 
       {/* Certificado Digital */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>🔐 Certificado Digital</h2>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Estado:</span>
-          <span style={state.validationResults.certificate?.isValid ? successStyle : pendingStyle}>
+      <div className="bg-[#f9fafb] rounded-2 p-5 mb-4">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">🔐 Certificado Digital</h2>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Estado:</span>
+          <span>
             {state.validationResults.certificate?.isValid ? '✓ Válido' : 'Pendiente'}
           </span>
         </div>
         {state.validationResults.certificate?.expiresAt && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>Vence:</span>
-            <span style={valueStyle}>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">Vence:</span>
+            <span className="text-gray-900">
               {new Date(state.validationResults.certificate.expiresAt).toLocaleDateString()}
             </span>
           </div>
@@ -331,122 +328,114 @@ export function ConfigurationSummaryStep() {
       </div>
 
       {/* Configuración Autoridad Fiscal */}
-      <div style={sectionStyle}>
-        <h2 style={sectionTitleStyle}>🏛️ Configuración {autoridadLabel}</h2>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Modo de emisión:</span>
-          <span style={empresaConfig?.emisionCpeModo ? valueStyle : pendingStyle}>
+      <div className="bg-[#f9fafb] rounded-2 p-5 mb-4">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">🏛️ Configuración {autoridadLabel}</h2>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">Modo de emisión:</span>
+          <span>
             {modoEmisionLabel}
           </span>
         </div>
         {isColombia && (
           <>
-            <div style={rowStyle}>
-              <span style={labelStyle}>DIAN Activo:</span>
-              <span style={empresaConfig?.dianActivo ? successStyle : pendingStyle}>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-gray-500">DIAN Activo:</span>
+              <span>
                 {empresaConfig?.dianActivo ? '✓ Sí' : 'No'}
               </span>
             </div>
-            <div style={rowStyle}>
-              <span style={labelStyle}>Ambiente DIAN:</span>
-              <span style={empresaConfig?.dianEnvironment ? valueStyle : pendingStyle}>
+            <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+              <span className="text-gray-500">Ambiente DIAN:</span>
+              <span>
                 {empresaConfig?.dianEnvironment || 'No definido'}
               </span>
             </div>
             {empresaConfig?.dianUrl && (
-              <div style={rowStyle}>
-                <span style={labelStyle}>URL DIAN:</span>
-                <span style={valueStyle}>{empresaConfig.dianUrl}</span>
+              <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+                <span className="text-gray-500">URL DIAN:</span>
+                <span className="text-gray-900">{empresaConfig.dianUrl}</span>
               </div>
             )}
             {empresaConfig?.dianSoftwareId && (
-              <div style={rowStyle}>
-                <span style={labelStyle}>Software ID:</span>
-                <span style={valueStyle}>{empresaConfig.dianSoftwareId}</span>
+              <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+                <span className="text-gray-500">Software ID:</span>
+                <span className="text-gray-900">{empresaConfig.dianSoftwareId}</span>
               </div>
             )}
             {empresaConfig?.dianTestSetId && (
-              <div style={rowStyle}>
-                <span style={labelStyle}>Test Set ID:</span>
-                <span style={valueStyle}>{empresaConfig.dianTestSetId}</span>
+              <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+                <span className="text-gray-500">Test Set ID:</span>
+                <span className="text-gray-900">{empresaConfig.dianTestSetId}</span>
               </div>
             )}
             {empresaConfig?.dianResolucionNumero && (
-              <div style={rowStyle}>
-                <span style={labelStyle}>Resolución DIAN:</span>
-                <span style={valueStyle}>{empresaConfig.dianResolucionNumero}</span>
+              <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+                <span className="text-gray-500">Resolución DIAN:</span>
+                <span className="text-gray-900">{empresaConfig.dianResolucionNumero}</span>
               </div>
             )}
           </>
         )}
-        <div style={rowStyle}>
-          <span style={labelStyle}>{oseLabel} Activo:</span>
-          <span style={empresaConfig?.oseActivo ? successStyle : pendingStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">{oseLabel} Activo:</span>
+          <span>
             {empresaConfig?.oseActivo ? '✓ Sí' : 'No'}
           </span>
         </div>
         {empresaConfig?.oseActivo && empresaConfig?.oseUrl && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>URL {oseLabel}:</span>
-            <span style={valueStyle}>{empresaConfig.oseUrl}</span>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">URL {oseLabel}:</span>
+            <span className="text-gray-900">{empresaConfig.oseUrl}</span>
           </div>
         )}
         {empresaConfig?.oseActivo && empresaConfig?.oseStatusUrl && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>URL Estado {oseLabel}:</span>
-            <span style={valueStyle}>{empresaConfig.oseStatusUrl}</span>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">URL Estado {oseLabel}:</span>
+            <span className="text-gray-900">{empresaConfig.oseStatusUrl}</span>
           </div>
         )}
         {empresaConfig?.oseActivo && empresaConfig?.oseAuthTipo && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>Auth {oseLabel}:</span>
-            <span style={valueStyle}>{empresaConfig.oseAuthTipo}</span>
+          <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+            <span className="text-gray-500">Auth {oseLabel}:</span>
+            <span className="text-gray-900">{empresaConfig.oseAuthTipo}</span>
           </div>
         )}
-        <div style={rowStyle}>
-          <span style={labelStyle}>GRE Automático:</span>
-          <span style={valueStyle}>
+        <div className="flex justify-between py-1.5 px-0 text-[0.875rem]">
+          <span className="text-gray-500">GRE Automático:</span>
+          <span className="text-gray-900">
             {empresaConfig?.gre_automatico_habilitado ? `Sí (umbral: S/ ${empresaConfig?.umbral_gre_automatico || 700})` : 'No'}
           </span>
         </div>
       </div>
 
       {/* Logo de la Empresa */}
-      <div style={{ ...sectionStyle, backgroundColor: '#fff', border: '1px solid #e5e7eb' }}>
-        <h2 style={sectionTitleStyle}>🖼️ Logo de la Empresa (para tickets y facturas)</h2>
+      <div className="bg-[#fff] border">
+        <h2 className="text-[0.875rem] mb-3 text-gray-700 border-b pb-2">🖼️ Logo de la Empresa (para tickets y facturas)</h2>
 
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.375rem', color: '#374151', fontSize: '0.8rem' }}>
+        <div className="mb-3">
+          <label className="block mb-1.5 text-gray-700 text-[0.8rem]">
             URL del Logo:
           </label>
           <input
             type="url"
             value={logoUrl}
             onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://ejemplo.com/mi-logo.png"
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.8rem'
-            }}
+            placeholder="https://ejemplo.com/mi-logo.png" className="w-[100%] p-2 rounded-[6px] border text-[0.8rem]"
           />
-          <p style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>
+          <p className="text-[0.7rem] text-gray-500 mt-1">
             Ingresa la URL de tu logo. Se mostrará en tickets y facturas impresas.
           </p>
         </div>
 
         {logoUrl && (
-          <div style={{ marginBottom: '0.75rem' }}>
-            <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: '0.375rem' }}>Vista previa:</p>
+          <div className="mb-3">
+            <p className="text-[0.8rem] text-gray-700 mb-1.5">Vista previa:</p>
             <Image
               src={logoUrl}
               alt="Logo preview"
               width={180}
               height={60}
-              unoptimized
-              style={{ maxHeight: '60px', maxWidth: '180px', objectFit: 'contain' }}
+              unoptimized className="max-h-[60px] max-w-[180px] object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
           </div>
@@ -454,44 +443,22 @@ export function ConfigurationSummaryStep() {
 
         <button
           onClick={handleSaveLogoUrl}
-          disabled={saving}
-          style={{
-            padding: '0.4rem 0.8rem',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            fontWeight: '500',
-            fontSize: '0.8rem',
-            opacity: saving ? 0.7 : 1
-          }}
+          disabled={saving} className="py-1.5 px-[0.8rem] rounded-[6px] border-0 bg-blue-500 text-white font-medium text-[0.8rem]"
         >
           {saving ? 'Guardando...' : 'Guardar Logo'}
         </button>
 
         {message && (
-          <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: message.type === 'success' ? '#10b981' : '#ef4444' }}>
+          <p className="mt-2 text-[0.8rem]">
             {message.text}
           </p>
         )}
       </div>
 
       {/* Botón de acción */}
-      <div style={{ marginTop: '1.5rem' }}>
+      <div className="mt-6">
         <button
-          onClick={handleGoToDashboard}
-          style={{
-            width: '100%',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: 'none',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            cursor: 'pointer',
-            fontWeight: '500',
-            fontSize: '1rem'
-          }}
+          onClick={handleGoToDashboard} className="w-[100%] py-3 px-6 rounded-2 border-0 bg-blue-500 text-white cursor-pointer font-medium text-4"
         >
           Ir al Dashboard
         </button>

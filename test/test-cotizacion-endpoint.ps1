@@ -42,7 +42,7 @@ try {
 
     Write-Host "`nResponse:" -ForegroundColor Green
     $response | ConvertTo-Json -Depth 10
-    
+
     if ($response.success) {
         Write-Host "`n✓ Cotización creada exitosamente!" -ForegroundColor Green
         Write-Host "ID: $($response.data.id)" -ForegroundColor Cyan
@@ -56,7 +56,7 @@ try {
 } catch {
     Write-Host "`n✗ Error al hacer la petición:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "`nDetalles del error:" -ForegroundColor Yellow
         Write-Host $_.ErrorDetails.Message

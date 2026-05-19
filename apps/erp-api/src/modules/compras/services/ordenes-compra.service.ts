@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { OrdenesCompraRepository } from '../repositories/ordenes-compra.repository';
 import { CreateOrdenCompraDto } from '../dto/create-orden-compra.dto';
 import { UpdateOrdenCompraDto } from '../dto/update-orden-compra.dto';
@@ -20,6 +20,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class OrdenesCompraService {
+  private readonly logger = new Logger(OrdenesCompraService.name);
+
   constructor(
     private readonly ordenesRepository: OrdenesCompraRepository,
     private readonly cotizacionesRepository: CotizacionesCompraRepository,
@@ -158,6 +160,22 @@ export class OrdenesCompraService {
       await this.cacheInvalidation.onOrdenCompraCreated(tenantId);
     } catch (error) {
       console.warn('⚠️ No se pudo invalidar cache después de crear orden de compra:', error);
+    }
+
+    if (userId) {
+      try {
+        await this.auditService.registrarCambio(
+          'ordenes_compra',
+          'INSERT',
+          userId,
+          { new: orden },
+          tenantId,
+          orden.id,
+          { accion: 'CREAR_ORDEN_COMPRA', proveedor_id: createDto.proveedor_id },
+        );
+      } catch (error) {
+        console.warn('⚠️ No se pudo registrar auditoría de creación de orden:', error);
+      }
     }
 
     return orden;
@@ -350,6 +368,14 @@ export class OrdenesCompraService {
 
     // Obtener información del aprobador
     const aprobadorId = aprobarDto.aprobador_id || userId;
+
+    // Bloquear auto-aprobación: el creador de la OC no puede aprobarla
+    if (aprobadorId && existingOrden.created_by && aprobadorId === existingOrden.created_by) {
+      throw new BadRequestException(
+        'El creador de la orden de compra no puede aprobar su propia orden. Se requiere aprobación de otro usuario autorizado.',
+      );
+    }
+
     let aprobadorNombre = aprobarDto.aprobador_nombre;
 
     // Si no se proporciona el nombre del aprobador, intentar obtenerlo
@@ -372,7 +398,7 @@ export class OrdenesCompraService {
     }
 
     // Obtener todas las aprobaciones existentes para esta orden
-    const aprobacionesExistentes = await this.ocAprobacionesRepository.findByOrdenId(id);
+    const aprobacionesExistentes = await this.ocAprobacionesRepository.findByOrdenId(id, tenantId);
 
     // Verificar si ya existe una aprobación para este aprobador
     const aprobacionExistente = aprobacionesExistentes.find(
@@ -392,7 +418,8 @@ export class OrdenesCompraService {
         await this.ocAprobacionesRepository.updateEstado(
           aprobacionExistente.id,
           'APROBADA',
-          aprobarDto.comentarios
+          aprobarDto.comentarios,
+          tenantId,
         );
       }
     } else {
@@ -405,7 +432,8 @@ export class OrdenesCompraService {
           aprobador_nombre: aprobadorNombre || 'Sistema',
           estado: 'APROBADA',
           fecha_aprobacion: new Date().toISOString(),
-          comentarios: aprobarDto.comentarios
+          comentarios: aprobarDto.comentarios,
+          tenant_id: tenantId,
         });
       } catch (error) {
         console.error('Error al crear registro de aprobación:', error);
@@ -414,16 +442,16 @@ export class OrdenesCompraService {
     }
 
     // Verificar si hay aprobaciones pendientes
-    const pendingCount = await this.ocAprobacionesRepository.countPendingByOrdenId(id);
+    const pendingCount = await this.ocAprobacionesRepository.countPendingByOrdenId(id, tenantId);
 
     // Obtener todas las aprobaciones actualizadas
-    const todasLasAprobaciones = await this.ocAprobacionesRepository.findByOrdenId(id);
+    const todasLasAprobaciones = await this.ocAprobacionesRepository.findByOrdenId(id, tenantId);
 
     // Contar aprobaciones aprobadas
     const aprobadasCount = todasLasAprobaciones.filter(a => a.estado === 'APROBADA').length;
 
     // Verificar si hay alguna aprobación rechazada
-    const tieneRechazadas = await this.ocAprobacionesRepository.hasRejectedApprovals(id);
+    const tieneRechazadas = await this.ocAprobacionesRepository.hasRejectedApprovals(id, tenantId);
 
     if (tieneRechazadas) {
       throw new BadRequestException(
@@ -545,7 +573,8 @@ export class OrdenesCompraService {
         aprobador_nombre: rechazadorNombre || 'Sistema',
         estado: 'RECHAZADA',
         fecha_aprobacion: new Date().toISOString(),
-        comentarios: rechazarDto.motivo_rechazo
+        comentarios: rechazarDto.motivo_rechazo,
+        tenant_id: tenantId,
       });
     } catch (error) {
       console.error('Error al crear registro de rechazo:', error);
@@ -899,7 +928,7 @@ export class OrdenesCompraService {
     }
 
     // Obtener aprobaciones asociadas a la orden
-    const aprobaciones = await this.ocAprobacionesRepository.findByOrdenId(id);
+    const aprobaciones = await this.ocAprobacionesRepository.findByOrdenId(id, tenantId);
 
     return aprobaciones;
   }
@@ -978,7 +1007,8 @@ export class OrdenesCompraService {
             nivel: 1,
             aprobador_id: usuario.id,
             aprobador_nombre: `${usuario.nombre} ${usuario.apellido}`.trim(),
-            estado: 'PENDIENTE'
+            estado: 'PENDIENTE',
+            tenant_id: tenantId,
           });
           console.log(`✅ Aprobación pendiente creada para ${usuario.nombre} ${usuario.apellido}`);
         } catch (error) {
@@ -1023,9 +1053,12 @@ export class OrdenesCompraService {
       // Requiere aprobación si el total excede el monto configurado
       return total > config.monto_aprobacion_compras;
     } catch (error) {
-      // En caso de error, no requerir aprobación para no bloquear el flujo
-      console.error('Error al evaluar si requiere aprobación:', error);
-      return false;
+      // Si falla la lectura de configuración, requerir aprobación como medida segura
+      // (fail-closed: no bypasear controles ante errores)
+      this.logger.error(
+        `APPROVAL_CONFIG_FAILURE tenant=${tenantId} total=${total}: ${error?.message ?? error}`,
+      );
+      return true;
     }
   }
 

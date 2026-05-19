@@ -55,88 +55,31 @@ export default function DemoPage() {
   // Si ya tenemos credenciales, mostrar pantalla de éxito
   if (credentials) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem'
-      }}>
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '3rem',
-          maxWidth: '500px',
-          width: '100%',
-          boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            background: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1.5rem',
-            fontSize: '2.5rem'
-          }}>
+      <div className="flex items-center justify-center p-8">
+        <div className="rounded-6 p-12 max-w-[500px] w-[100%] shadow text-center">
+          <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center text-10">
             ✓
           </div>
           
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 800,
-            color: '#1e293b',
-            marginBottom: '0.5rem'
-          }}>
+          <h1 className="text-8 font-extrabold text-slate-800 mb-2">
             ¡Demo Creada!
           </h1>
           
-          <p style={{
-            color: '#64748b',
-            marginBottom: '2rem'
-          }}>
+          <p className="text-slate-500 mb-8">
             Guarda estas credenciales para volver a ingresar
           </p>
 
-          <div style={{
-            background: '#eff6ff',
-            border: '1px solid #dbeafe',
-            borderRadius: '12px',
-            padding: '1.5rem',
-            marginBottom: '1.5rem',
-            textAlign: 'left'
-          }}>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div className="bg-[#eff6ff] border rounded-3 p-6 mb-6 text-left">
+            <div className="mb-4">
+              <label className="text-3 text-slate-500 font-semibold">
                 Email
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <code style={{
-                  flex: 1,
-                  background: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  color: '#1e293b'
-                }}>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-[1] bg-white p-2 rounded-[6px] text-[0.875rem] text-slate-800">
                   {credentials.email}
                 </code>
                 <button
-                  onClick={() => copyToClipboard(credentials.email)}
-                  style={{
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem'
-                  }}
+                  onClick={() => copyToClipboard(credentials.email)} className="bg-blue-500 text-white border-0 py-2 px-3 rounded-[6px] cursor-pointer text-3"
                 >
                   Copiar
                 </button>
@@ -144,31 +87,15 @@ export default function DemoPage() {
             </div>
             
             <div>
-              <label style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+              <label className="text-3 text-slate-500 font-semibold">
                 Contraseña
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <code style={{
-                  flex: 1,
-                  background: 'white',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  color: '#1e293b'
-                }}>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-[1] bg-white p-2 rounded-[6px] text-[0.875rem] text-slate-800">
                   {credentials.password}
                 </code>
                 <button
-                  onClick={() => copyToClipboard(credentials.password)}
-                  style={{
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem'
-                  }}
+                  onClick={() => copyToClipboard(credentials.password)} className="bg-blue-500 text-white border-0 py-2 px-3 rounded-[6px] cursor-pointer text-3"
                 >
                   Copiar
                 </button>
@@ -177,19 +104,7 @@ export default function DemoPage() {
           </div>
 
           <button
-            onClick={handleContinue}
-            style={{
-              width: '100%',
-              padding: '1rem 2rem',
-              background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '1rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-            }}
+            onClick={handleContinue} className="w-[100%] py-4 px-8 text-white border-0 rounded-3 text-4 font-semibold cursor-pointer shadow"
           >
             Continuar al Dashboard →
           </button>
@@ -199,53 +114,23 @@ export default function DemoPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem'
-    }}>
-      <div style={{ maxWidth: '900px', width: '100%' }}>
+    <div className="flex items-center justify-center p-8">
+      <div className="max-w-[900px] w-[100%]">
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 1.5rem',
-            fontSize: '2.5rem',
-            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-          }}>
+        <div className="text-center mb-10">
+          <div className="w-[80px] h-[80px] rounded-5 flex items-center justify-center text-10 shadow">
             ✨
           </div>
-          <h1 style={{
-            fontSize: '2.5rem',
-            fontWeight: 900,
-            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '0.5rem'
-          }}>
+          <h1 className="text-10 font-black mb-2">
             Prueba el ERP Completo
           </h1>
-          <p style={{ fontSize: '1.25rem', color: '#64748b' }}>
+          <p className="text-5 text-slate-500">
             14 días gratis • Sin tarjeta de crédito • Datos pre-cargados
           </p>
         </div>
 
         {/* Features Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1rem',
-          marginBottom: '2rem'
-        }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8">
           <FeatureCard icon="📊" title="Contabilidad Automatizada" description="Asientos contables generados automáticamente" />
           <FeatureCard icon="🧾" title="Facturación Electrónica" description="Facturas, boletas y notas con validación SUNAT" />
           <FeatureCard icon="📦" title="Control de Inventario" description="Kardex valorizado, múltiples almacenes" />
@@ -255,67 +140,27 @@ export default function DemoPage() {
         </div>
 
         {/* CTA Card */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '2.5rem',
-          boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-          border: '2px solid #dbeafe',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
+        <div className="rounded-6 p-10 shadow text-center">
+          <h2 className="text-6 font-bold text-slate-800 mb-2">
             ¿Listo para explorar?
           </h2>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+          <p className="text-slate-500 mb-6">
             Crearemos una empresa demo con datos realistas para que puedas probar todas las funcionalidades
           </p>
 
           {error && (
-            <div style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
-              padding: '1rem',
-              borderRadius: '12px',
-              marginBottom: '1rem'
-            }}>
+            <div className="bg-[#fef2f2] border text-red-600 p-4 rounded-3 mb-4">
               {error}
             </div>
           )}
 
           <button
             onClick={handleStartDemo}
-            disabled={loading}
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              padding: '1.25rem 2rem',
-              background: loading ? '#94a3b8' : 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #0ea5e9 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontSize: '1.125rem',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              margin: '0 auto'
-            }}
+            disabled={loading} className="w-[100%] max-w-[400px] py-5 px-8 text-white border-0 rounded-3 text-[1.125rem] font-semibold shadow flex items-center justify-center gap-2 my-0 mx-auto"
           >
             {loading ? (
               <>
-                <span style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid white',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
+                <span className="w-5 h-5 rounded-full" />
                 Creando tu empresa demo...
               </>
             ) : (
@@ -323,7 +168,7 @@ export default function DemoPage() {
             )}
           </button>
 
-          <div style={{ marginTop: '1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
+          <div className="mt-6 text-slate-500 text-[0.875rem]">
             <p>✓ No requiere registro</p>
             <p>✓ Acceso inmediato</p>
             <p>✓ Datos de ejemplo incluidos</p>
@@ -331,43 +176,26 @@ export default function DemoPage() {
         </div>
 
         {/* Footer */}
-        <div style={{ textAlign: 'center', marginTop: '2rem', color: '#64748b', fontSize: '0.875rem' }}>
+        <div className="text-center mt-8 text-slate-500 text-[0.875rem]">
           <p>
             ¿Ya tienes una cuenta?{' '}
-            <a href="/login" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+            <a href="/login" className="text-blue-500">
               Inicia sesión
             </a>
           </p>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
 
 function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '16px',
-      padding: '1.5rem',
-      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-      border: '1px solid rgba(255, 255, 255, 0.3)',
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '1rem'
-    }}>
-      <div style={{ fontSize: '2rem' }}>{icon}</div>
+    <div className="rounded-4 p-6 shadow border flex items-start gap-4">
+      <div className="text-8">{icon}</div>
       <div>
-        <h3 style={{ fontWeight: 600, color: '#1e293b', marginBottom: '0.25rem' }}>{title}</h3>
-        <p style={{ fontSize: '0.875rem', color: '#64748b' }}>{description}</p>
+        <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
+        <p className="text-[0.875rem] text-slate-500">{description}</p>
       </div>
     </div>
   );

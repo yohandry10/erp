@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { AlertCircle, Building2, Download, FileText, Landmark, Scale } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
-import { Download, AlertCircle, Building2, CreditCard, PiggyBank, FileText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActivosVsPasivosChart } from './ActivosVsPasivosChart'
 import { exportToExcel, formatCurrencyForExcel } from '@/lib/excel-export'
 import { exportBalanceGeneralToPDF } from '@/lib/pdf-export'
@@ -54,6 +56,13 @@ interface BalanceGeneralProps {
   showComparison?: boolean
 }
 
+type LineItem = {
+  label: string
+  value: number
+  previous?: number
+  subdued?: boolean
+}
+
 export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGeneralProps) {
   const { get } = useApi()
   const [loading, setLoading] = useState(true)
@@ -62,9 +71,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
   const [previousData, setPreviousData] = useState<BalanceGeneralData | null>(null)
 
   const getPreviousPeriod = useCallback(() => {
-    if (mes === 1) {
-      return { anio: anio - 1, mes: 12 }
-    }
+    if (mes === 1) return { anio: anio - 1, mes: 12 }
     return { anio, mes: mes - 1 }
   }, [anio, mes])
 
@@ -72,25 +79,19 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get(`/api/contabilidad/estados/balance-general?anio=${anio}&mes=${mes}`)
-      
+
       if (response?.success && response.data) {
         setData(response.data)
       } else {
         setError('No se pudieron cargar los datos')
       }
 
-      // Cargar datos del período anterior si showComparison está activado
       if (showComparison) {
         const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
         const prevResponse = await get(`/api/contabilidad/estados/balance-general?anio=${prevAnio}&mes=${prevMes}`)
-        
-        if (prevResponse?.success && prevResponse.data) {
-          setPreviousData(prevResponse.data)
-        } else {
-          setPreviousData(null)
-        }
+        setPreviousData(prevResponse?.success && prevResponse.data ? prevResponse.data : null)
       } else {
         setPreviousData(null)
       }
@@ -110,34 +111,24 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
-      minimumFractionDigits: 2
+      minimumFractionDigits: 2,
     }).format(amount)
   }
 
   const calculateVariation = (current: number, previous: number) => {
     if (previous === 0) return { absolute: current, percentage: current > 0 ? 100 : 0 }
     const absolute = current - previous
-    const percentage = ((absolute / Math.abs(previous)) * 100)
-    return { absolute, percentage }
+    return { absolute, percentage: (absolute / Math.abs(previous)) * 100 }
   }
 
-  const renderVariation = (current: number, previous: number) => {
+  const renderVariation = (current: number, previous?: number) => {
+    if (!showComparison || previous === undefined) return null
     const { absolute, percentage } = calculateVariation(current, previous)
-    const isPositive = absolute >= 0
-    
+
     return (
-      <div style={{ 
-        display: 'inline-flex', 
-        alignItems: 'center', 
-        gap: '0.25rem',
-        fontSize: '0.7rem',
-        color: isPositive ? 'var(--emerald-600)' : 'var(--red-600)',
-        fontWeight: '600',
-        marginLeft: '0.5rem'
-      }}>
-        {isPositive ? '↑' : '↓'}
-        {Math.abs(percentage).toFixed(1)}%
-      </div>
+      <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs font-semibold text-cyan-100">
+        {absolute >= 0 ? '+' : '-'}{Math.abs(percentage).toFixed(1)}%
+      </span>
     )
   }
 
@@ -190,7 +181,7 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
       { Concepto: '  Resultado del Ejercicio', Monto: formatCurrencyForExcel(data.patrimonio.resultado_ejercicio) },
       { Concepto: 'TOTAL PATRIMONIO', Monto: formatCurrencyForExcel(data.patrimonio.total_patrimonio) },
       { Concepto: '', Monto: '' },
-      { Concepto: 'TOTAL PASIVOS + PATRIMONIO', Monto: formatCurrencyForExcel(data.pasivos.total_pasivos + data.patrimonio.total_patrimonio) }
+      { Concepto: 'TOTAL PASIVOS + PATRIMONIO', Monto: formatCurrencyForExcel(data.pasivos.total_pasivos + data.patrimonio.total_patrimonio) },
     ]
 
     exportToExcel(
@@ -200,11 +191,11 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
           data: exportData,
           columns: [
             { header: 'Concepto', key: 'Concepto', width: 40 },
-            { header: 'Monto', key: 'Monto', width: 20 }
-          ]
-        }
+            { header: 'Monto', key: 'Monto', width: 20 },
+          ],
+        },
       ],
-      `Balance_General_${anio}_${String(mes).padStart(2, '0')}.xlsx`
+      `Balance_General_${anio}_${String(mes).padStart(2, '0')}.xlsx`,
     )
   }
 
@@ -217,541 +208,219 @@ export function BalanceGeneral({ anio, mes, showComparison = false }: BalanceGen
     exportBalanceGeneralToPDF(data, anio, mes)
   }
 
+  const renderLine = (item: LineItem) => (
+    <div key={item.label} className="flex items-center justify-between gap-4 border-b border-cyan-400/10 py-2 last:border-b-0">
+      <span className={`text-sm ${item.subdued ? 'text-slate-400' : 'text-slate-300'}`}>{item.label}</span>
+      <span className="text-right text-sm font-semibold text-white">
+        {formatCurrency(item.value)}
+        {renderVariation(item.value, item.previous)}
+      </span>
+    </div>
+  )
+
+  const renderSection = (
+    title: string,
+    icon: React.ReactNode,
+    groups: Array<{ title: string; items: LineItem[]; totalLabel: string; total: number; previousTotal?: number }>,
+    grandTotalLabel: string,
+    grandTotal: number,
+  ) => (
+    <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+      <CardHeader className="border-b border-cyan-400/10 bg-white/[0.03]">
+        <CardTitle className="flex items-center gap-3 text-lg text-white">
+          <span className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-2 text-cyan-100">{icon}</span>
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5 p-5">
+        {groups.map((group) => (
+          <div key={group.title} className="rounded-xl border border-cyan-400/10 bg-white/[0.03] p-4">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/70">{group.title}</div>
+            <div>{group.items.map(renderLine)}</div>
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-cyan-400/10 px-3 py-2 text-sm font-bold text-cyan-50">
+              <span>{group.totalLabel}</span>
+              <span>
+                {formatCurrency(group.total)}
+                {renderVariation(group.total, group.previousTotal)}
+              </span>
+            </div>
+          </div>
+        ))}
+        <div className="flex items-center justify-between rounded-xl border border-cyan-300/30 bg-cyan-400/15 px-4 py-3 text-base font-bold text-white">
+          <span>{grandTotalLabel}</span>
+          <span>{formatCurrency(grandTotal)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   if (loading) {
     return (
-      <div className="activity-card">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando Balance General...</p>
-        </div>
-      </div>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+        <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
+          <p className="text-sm font-medium text-slate-300">Cargando Balance General...</p>
+        </CardContent>
+      </Card>
     )
   }
 
   if (!data) {
     return (
-      <div className="activity-card">
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-400)' }}>
-          <p>No hay datos disponibles para el período seleccionado</p>
-        </div>
-      </div>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+        <CardContent className="flex min-h-[220px] items-center justify-center p-8 text-center text-slate-300">
+          No hay datos disponibles para el período seleccionado
+        </CardContent>
+      </Card>
     )
   }
 
   const isBalanced = Math.abs(data.activos.total_activos - (data.pasivos.total_pasivos + data.patrimonio.total_patrimonio)) < 0.01
   const { anio: prevAnio, mes: prevMes } = getPreviousPeriod()
+  const activosCorrientes = data.activos.corrientes
+  const activosNoCorrientes = data.activos.no_corrientes
+  const pasivosCorrientes = data.pasivos.corrientes
+  const pasivosNoCorrientes = data.pasivos.no_corrientes
 
   return (
-    <div className="activity-card">
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '2px solid var(--primary-100)'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
-            Balance General
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginTop: '0.25rem' }}>
-            Período: {anio} - {String(mes).padStart(2, '0')}
-            {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
-          </p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={handleExportExcel}
-            className="secondary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <Download size={16} />
-            Exportar a Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="secondary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <FileText size={16} />
-            Exportar a PDF
-          </button>
-        </div>
-      </div>
-
-      {/* Balance Status */}
-      {!isBalanced && (
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--red-50)', 
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-          <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
-            ⚠️ El balance no está cuadrado. Activos ≠ Pasivos + Patrimonio
-          </p>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--red-50)', 
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-          <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
-            {error}
-          </p>
-        </div>
-      )}
-
-      {/* Balance General Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        {/* ACTIVOS */}
-        <div>
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--emerald-100)', 
-            borderRadius: '8px 8px 0 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <Building2 size={20} style={{ color: 'var(--emerald-700)' }} />
-            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--emerald-800)', margin: 0 }}>
-              ACTIVOS
-            </h3>
-          </div>
-          
-          <div style={{ border: '1px solid var(--primary-200)', borderTop: 'none', padding: '1rem' }}>
-            {/* Activos Corrientes */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '700', 
-                color: 'var(--primary-700)',
-                marginBottom: '0.75rem',
-                paddingBottom: '0.5rem',
-                borderBottom: '1px solid var(--primary-200)'
-              }}>
-                Activos Corrientes
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Efectivo y Equivalentes</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.corrientes.efectivo)}
-                  {showComparison && previousData && renderVariation(data.activos.corrientes.efectivo, previousData.activos.corrientes.efectivo)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Cuentas por Cobrar</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.corrientes.cuentas_por_cobrar)}
-                  {showComparison && previousData && renderVariation(data.activos.corrientes.cuentas_por_cobrar, previousData.activos.corrientes.cuentas_por_cobrar)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Inventarios</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.corrientes.inventarios)}
-                  {showComparison && previousData && renderVariation(data.activos.corrientes.inventarios, previousData.activos.corrientes.inventarios)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Otros Activos</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.corrientes.otros_activos)}
-                  {showComparison && previousData && renderVariation(data.activos.corrientes.otros_activos, previousData.activos.corrientes.otros_activos)}
-                </span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                padding: '0.75rem 0',
-                marginTop: '0.5rem',
-                borderTop: '1px solid var(--primary-300)',
-                fontWeight: '700'
-              }}>
-                <span style={{ color: 'var(--emerald-700)' }}>Total Activos Corrientes</span>
-                <span style={{ color: 'var(--emerald-700)' }}>
-                  {formatCurrency(data.activos.corrientes.total_corrientes)}
-                  {showComparison && previousData && renderVariation(data.activos.corrientes.total_corrientes, previousData.activos.corrientes.total_corrientes)}
-                </span>
-              </div>
-            </div>
-
-            {/* Activos No Corrientes */}
+    <div className="space-y-6">
+      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+        <CardHeader className="border-b border-cyan-400/10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '700', 
-                color: 'var(--primary-700)',
-                marginBottom: '0.75rem',
-                paddingBottom: '0.5rem',
-                borderBottom: '1px solid var(--primary-200)'
-              }}>
-                Activos No Corrientes
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Activos Fijos</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.no_corrientes.activos_fijos)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>(-) Depreciación Acumulada</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--red-600)' }}>
-                  ({formatCurrency(data.activos.no_corrientes.depreciacion_acumulada)})
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Otros Activos</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.activos.no_corrientes.otros_activos)}
-                </span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                padding: '0.75rem 0',
-                marginTop: '0.5rem',
-                borderTop: '1px solid var(--primary-300)',
-                fontWeight: '700'
-              }}>
-                <span style={{ color: 'var(--emerald-700)' }}>Total Activos No Corrientes</span>
-                <span style={{ color: 'var(--emerald-700)' }}>
-                  {formatCurrency(data.activos.no_corrientes.total_no_corrientes)}
-                </span>
-              </div>
+              <CardTitle className="text-2xl text-white">Balance General</CardTitle>
+              <p className="mt-2 text-sm text-slate-300">
+                Período: {anio} - {String(mes).padStart(2, '0')}
+                {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
+              </p>
             </div>
-
-            {/* Total Activos */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '1rem',
-              marginTop: '1rem',
-              background: 'var(--emerald-100)',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '1.125rem'
-            }}>
-              <span style={{ color: 'var(--emerald-800)' }}>TOTAL ACTIVOS</span>
-              <span style={{ color: 'var(--emerald-800)' }}>
-                {formatCurrency(data.activos.total_activos)}
-              </span>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleExportExcel} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Download className="h-4 w-4" />
+                Exportar Excel
+              </Button>
+              <Button onClick={handleExportPDF} variant="outline" className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+                <FileText className="h-4 w-4" />
+                Exportar PDF
+              </Button>
             </div>
           </div>
-        </div>
+        </CardHeader>
+        {(error || !isBalanced) && (
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50">
+              <AlertCircle className="mt-0.5 h-5 w-5 text-cyan-200" />
+              <p className="m-0">
+                {error || 'El balance no está cuadrado. Activos no coincide con Pasivos + Patrimonio.'}
+              </p>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
-        {/* PASIVOS Y PATRIMONIO */}
-        <div>
-          {/* PASIVOS */}
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--red-100)', 
-            borderRadius: '8px 8px 0 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <CreditCard size={20} style={{ color: 'var(--red-700)' }} />
-            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--red-800)', margin: 0 }}>
-              PASIVOS
-            </h3>
-          </div>
-          
-          <div style={{ border: '1px solid var(--primary-200)', borderTop: 'none', padding: '1rem' }}>
-            {/* Pasivos Corrientes */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '700', 
-                color: 'var(--primary-700)',
-                marginBottom: '0.75rem',
-                paddingBottom: '0.5rem',
-                borderBottom: '1px solid var(--primary-200)'
-              }}>
-                Pasivos Corrientes
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Cuentas por Pagar</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.corrientes.cuentas_por_pagar)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Tributos por Pagar</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.corrientes.tributos_por_pagar)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Remuneraciones por Pagar</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.corrientes.remuneraciones_por_pagar)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Otros Pasivos</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.corrientes.otros_pasivos)}
-                </span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                padding: '0.75rem 0',
-                marginTop: '0.5rem',
-                borderTop: '1px solid var(--primary-300)',
-                fontWeight: '700'
-              }}>
-                <span style={{ color: 'var(--red-700)' }}>Total Pasivos Corrientes</span>
-                <span style={{ color: 'var(--red-700)' }}>
-                  {formatCurrency(data.pasivos.corrientes.total_corrientes)}
-                </span>
-              </div>
-            </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        {renderSection(
+          'Activos',
+          <Building2 className="h-5 w-5" />,
+          [
+            {
+              title: 'Activos corrientes',
+              items: [
+                { label: 'Efectivo y equivalentes', value: activosCorrientes.efectivo, previous: previousData?.activos.corrientes.efectivo },
+                { label: 'Cuentas por cobrar', value: activosCorrientes.cuentas_por_cobrar, previous: previousData?.activos.corrientes.cuentas_por_cobrar },
+                { label: 'Inventarios', value: activosCorrientes.inventarios, previous: previousData?.activos.corrientes.inventarios },
+                { label: 'Otros activos', value: activosCorrientes.otros_activos, previous: previousData?.activos.corrientes.otros_activos },
+              ],
+              totalLabel: 'Total corrientes',
+              total: activosCorrientes.total_corrientes,
+              previousTotal: previousData?.activos.corrientes.total_corrientes,
+            },
+            {
+              title: 'Activos no corrientes',
+              items: [
+                { label: 'Activos fijos', value: activosNoCorrientes.activos_fijos },
+                { label: 'Depreciación acumulada', value: -Math.abs(activosNoCorrientes.depreciacion_acumulada), subdued: true },
+                { label: 'Otros activos', value: activosNoCorrientes.otros_activos },
+              ],
+              totalLabel: 'Total no corrientes',
+              total: activosNoCorrientes.total_no_corrientes,
+            },
+          ],
+          'Total activos',
+          data.activos.total_activos,
+        )}
 
-            {/* Pasivos No Corrientes */}
-            <div>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '700', 
-                color: 'var(--primary-700)',
-                marginBottom: '0.75rem',
-                paddingBottom: '0.5rem',
-                borderBottom: '1px solid var(--primary-200)'
-              }}>
-                Pasivos No Corrientes
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Deudas a Largo Plazo</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.no_corrientes.deudas_largo_plazo)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Otros Pasivos</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                  {formatCurrency(data.pasivos.no_corrientes.otros_pasivos)}
-                </span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                padding: '0.75rem 0',
-                marginTop: '0.5rem',
-                borderTop: '1px solid var(--primary-300)',
-                fontWeight: '700'
-              }}>
-                <span style={{ color: 'var(--red-700)' }}>Total Pasivos No Corrientes</span>
-                <span style={{ color: 'var(--red-700)' }}>
-                  {formatCurrency(data.pasivos.no_corrientes.total_no_corrientes)}
-                </span>
-              </div>
-            </div>
-
-            {/* Total Pasivos */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '1rem',
-              marginTop: '1rem',
-              background: 'var(--red-100)',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '1.125rem'
-            }}>
-              <span style={{ color: 'var(--red-800)' }}>TOTAL PASIVOS</span>
-              <span style={{ color: 'var(--red-800)' }}>
-                {formatCurrency(data.pasivos.total_pasivos)}
-              </span>
-            </div>
-          </div>
-
-          {/* PATRIMONIO */}
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--blue-100)', 
-            borderRadius: '8px 8px 0 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            marginTop: '1.5rem'
-          }}>
-            <PiggyBank size={20} style={{ color: 'var(--blue-700)' }} />
-            <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--blue-800)', margin: 0 }}>
-              PATRIMONIO
-            </h3>
-          </div>
-          
-          <div style={{ border: '1px solid var(--primary-200)', borderTop: 'none', padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-              <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Capital</span>
-              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                {formatCurrency(data.patrimonio.capital)}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-              <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Resultados Acumulados</span>
-              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                {formatCurrency(data.patrimonio.resultados_acumulados)}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0 0.5rem 1rem' }}>
-              <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Resultado del Ejercicio</span>
-              <span style={{ fontSize: '0.875rem', fontWeight: '600', color: data.patrimonio.resultado_ejercicio >= 0 ? 'var(--emerald-600)' : 'var(--red-600)' }}>
-                {formatCurrency(data.patrimonio.resultado_ejercicio)}
-              </span>
-            </div>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '1rem',
-              marginTop: '1rem',
-              background: 'var(--blue-100)',
-              borderRadius: '8px',
-              fontWeight: '700',
-              fontSize: '1.125rem'
-            }}>
-              <span style={{ color: 'var(--blue-800)' }}>TOTAL PATRIMONIO</span>
-              <span style={{ color: 'var(--blue-800)' }}>
-                {formatCurrency(data.patrimonio.total_patrimonio)}
-              </span>
-            </div>
-          </div>
-
-          {/* Total Pasivos + Patrimonio */}
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--primary-100)', 
-            borderRadius: '8px',
-            marginTop: '1rem',
-            fontWeight: '700',
-            fontSize: '1.125rem'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between'
-            }}>
-              <span style={{ color: 'var(--primary-800)' }}>TOTAL PASIVOS + PATRIMONIO</span>
-              <span style={{ color: 'var(--primary-800)' }}>
-                {formatCurrency(data.pasivos.total_pasivos + data.patrimonio.total_patrimonio)}
-              </span>
-            </div>
-          </div>
-        </div>
+        {renderSection(
+          'Pasivos y patrimonio',
+          <Landmark className="h-5 w-5" />,
+          [
+            {
+              title: 'Pasivos corrientes',
+              items: [
+                { label: 'Cuentas por pagar', value: pasivosCorrientes.cuentas_por_pagar },
+                { label: 'Tributos por pagar', value: pasivosCorrientes.tributos_por_pagar },
+                { label: 'Remuneraciones por pagar', value: pasivosCorrientes.remuneraciones_por_pagar },
+                { label: 'Otros pasivos', value: pasivosCorrientes.otros_pasivos },
+              ],
+              totalLabel: 'Total corrientes',
+              total: pasivosCorrientes.total_corrientes,
+            },
+            {
+              title: 'Pasivos no corrientes',
+              items: [
+                { label: 'Deudas a largo plazo', value: pasivosNoCorrientes.deudas_largo_plazo },
+                { label: 'Otros pasivos', value: pasivosNoCorrientes.otros_pasivos },
+              ],
+              totalLabel: 'Total no corrientes',
+              total: pasivosNoCorrientes.total_no_corrientes,
+            },
+            {
+              title: 'Patrimonio',
+              items: [
+                { label: 'Capital', value: data.patrimonio.capital },
+                { label: 'Resultados acumulados', value: data.patrimonio.resultados_acumulados },
+                { label: 'Resultado del ejercicio', value: data.patrimonio.resultado_ejercicio },
+              ],
+              totalLabel: 'Total patrimonio',
+              total: data.patrimonio.total_patrimonio,
+            },
+          ],
+          'Total pasivos + patrimonio',
+          data.pasivos.total_pasivos + data.patrimonio.total_patrimonio,
+        )}
       </div>
 
-      {/* Gráfico: Activos vs Pasivos y Patrimonio */}
-      <div style={{ 
-        marginTop: '2rem',
-        padding: '1.5rem',
-        background: 'var(--primary-50)',
-        borderRadius: '8px'
-      }}>
-        <h3 style={{ 
-          fontSize: '1rem', 
-          fontWeight: '700', 
-          color: 'var(--primary-800)', 
-          marginBottom: '1rem',
-          textAlign: 'center'
-        }}>
-          Distribución: Activos, Pasivos y Patrimonio
-        </h3>
-        <ActivosVsPasivosChart 
-          activos={data.activos.total_activos}
-          pasivos={data.pasivos.total_pasivos}
-          patrimonio={data.patrimonio.total_patrimonio}
-        />
+      <div className="grid gap-4 md:grid-cols-4">
+        {[
+          ['Total activos', data.activos.total_activos],
+          ['Total pasivos', data.pasivos.total_pasivos],
+          ['Total patrimonio', data.patrimonio.total_patrimonio],
+          ['Estado', isBalanced ? 'Cuadrado' : 'Descuadrado'],
+        ].map(([label, value]) => (
+          <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+            <CardContent className="p-4 text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/70">{label}</div>
+              <div className="mt-2 text-xl font-bold text-white">{typeof value === 'number' ? formatCurrency(value) : value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Summary Cards */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(4, 1fr)', 
-        gap: '1rem',
-        marginTop: '2rem'
-      }}>
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--emerald-50)', 
-          borderRadius: '8px',
-          textAlign: 'center',
-          border: '2px solid var(--emerald-200)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--emerald-700)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Activos
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--emerald-800)' }}>
-            {formatCurrency(data.activos.total_activos)}
-          </div>
-        </div>
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--red-50)', 
-          borderRadius: '8px',
-          textAlign: 'center',
-          border: '2px solid var(--red-200)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--red-700)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Pasivos
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--red-800)' }}>
-            {formatCurrency(data.pasivos.total_pasivos)}
-          </div>
-        </div>
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--blue-50)', 
-          borderRadius: '8px',
-          textAlign: 'center',
-          border: '2px solid var(--blue-200)'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--blue-700)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Patrimonio
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--blue-800)' }}>
-            {formatCurrency(data.patrimonio.total_patrimonio)}
-          </div>
-        </div>
-        <div style={{ 
-          padding: '1rem', 
-          background: isBalanced ? 'var(--emerald-50)' : 'var(--red-50)', 
-          borderRadius: '8px',
-          textAlign: 'center',
-          border: `2px solid ${isBalanced ? 'var(--emerald-200)' : 'var(--red-200)'}`
-        }}>
-          <div style={{ 
-            fontSize: '0.75rem', 
-            color: isBalanced ? 'var(--emerald-700)' : 'var(--red-700)', 
-            marginBottom: '0.5rem', 
-            fontWeight: '600' 
-          }}>
-            Estado
-          </div>
-          <div style={{ 
-            fontSize: '1rem', 
-            fontWeight: '700', 
-            color: isBalanced ? 'var(--emerald-800)' : 'var(--red-800)' 
-          }}>
-            {isBalanced ? '✓ Cuadrado' : '✗ Descuadrado'}
-          </div>
-        </div>
-      </div>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-center gap-2 text-base text-white">
+            <Scale className="h-5 w-5 text-cyan-200" />
+            Distribución: Activos, Pasivos y Patrimonio
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ActivosVsPasivosChart
+            activos={data.activos.total_activos}
+            pasivos={data.pasivos.total_pasivos}
+            patrimonio={data.patrimonio.total_patrimonio}
+          />
+        </CardContent>
+      </Card>
     </div>
   )
 }

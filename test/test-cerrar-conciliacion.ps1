@@ -130,14 +130,14 @@ try {
         $reader = New-Object System.IO.StreamReader($errorResponse.GetResponseStream())
         $errorContent = $reader.ReadToEnd()
         $errorData = $errorContent | ConvertFrom-Json
-        
+
         Write-Host "❌ Error al cerrar conciliación:" -ForegroundColor Red
         Write-Host $errorData.message
         Write-Host ""
 
         if ($hayPendientes) {
             Write-Host "Intentando forzar el cierre..." -ForegroundColor Yellow
-            
+
             $forzarBody = @{
                 forzar_cierre = $true
             } | ConvertTo-Json

@@ -228,7 +228,66 @@ export class RecepcionesService {
       });
 
       this.logger.log(`✅ Recepción obtenida: ${(data as any).numero}`);
-      return data;
+      const items = Array.isArray((data as any).items) ? (data as any).items : [];
+      if (items.length === 0) {
+        return data;
+      }
+
+      const itemIds = items.map((item: any) => item.id).filter(Boolean);
+      const { data: devolucionesPrevias, error: devolucionesPreviasError } = await this.supabase
+        .getClient()
+        .from('devolucion_items')
+        .select(`
+          recepcion_item_id,
+          cantidad,
+          devolucion:devoluciones_proveedor!inner(
+            id,
+            estado,
+            tenant_id,
+            recepcion_id
+          )
+        `)
+        .in('recepcion_item_id', itemIds);
+
+      if (devolucionesPreviasError) {
+        this.logger.warn(
+          `⚠️ No se pudo calcular disponibilidad de devolución para recepción ${recepcionId}: ${devolucionesPreviasError.message}`,
+        );
+        return data;
+      }
+
+      const devueltoPorItem = new Map<string, number>();
+      for (const row of devolucionesPrevias || []) {
+        const devolucion = Array.isArray((row as any).devolucion)
+          ? (row as any).devolucion[0]
+          : (row as any).devolucion;
+
+        if (
+          devolucion?.tenant_id !== tenantId ||
+          devolucion?.recepcion_id !== recepcionId ||
+          devolucion?.estado === 'ANULADA'
+        ) {
+          continue;
+        }
+
+        const itemId = (row as any).recepcion_item_id;
+        devueltoPorItem.set(itemId, (devueltoPorItem.get(itemId) || 0) + Number((row as any).cantidad || 0));
+      }
+
+      return {
+        ...(data as any),
+        items: items.map((item: any) => {
+          const cantidadRecibida = Number(item.cantidad_recibida || 0);
+          const cantidadDevuelta = devueltoPorItem.get(item.id) || 0;
+          const cantidadDisponible = Math.max(cantidadRecibida - cantidadDevuelta, 0);
+
+          return {
+            ...item,
+            cantidad_devuelta: cantidadDevuelta,
+            cantidad_disponible_devolucion: cantidadDisponible,
+          };
+        }),
+      };
     } catch (error) {
       await this.registrarIntegrationLog({
         tenantId,
@@ -474,6 +533,8 @@ export class RecepcionesService {
           );
         }
 
+        // Optimistic concurrency: verify cantidad_recibida hasn't changed since we read it
+        const cantidadRecibidaAnterior = Number(detalle.cantidad_recibida || 0);
         const { error: updateDetalleError } = await this.supabase.getClient()
           .from('orden_compra_detalles')
           .update({
@@ -481,7 +542,8 @@ export class RecepcionesService {
             updated_at: new Date().toISOString(),
           })
           .eq('tenant_id', tenantId)
-          .eq('id', item.detalle_id);
+          .eq('id', item.detalle_id)
+          .eq('cantidad_recibida', cantidadRecibidaAnterior);
 
         if (updateDetalleError) {
           throw new BadRequestException(`Error al actualizar detalle de orden: ${updateDetalleError.message}`);
@@ -556,15 +618,9 @@ export class RecepcionesService {
         this.logger.warn('⚠️ [Recepciones] No se pudo registrar auditoría de cierre:', auditError);
       }
 
-      // Emitir evento RecepcionRegistrada para integración con CxP
+      // Emitir evento canónico de recepción. Este outbox alimenta CxP,
+      // inventario, SIRE y contabilidad; no se debe duplicar con CompraEntregada.
       await this.emitirEventoRecepcionRegistrada(recepcion, orden ?? null, tenantId);
-
-      // 🔴 CRÍTICO FIX: Emitir evento CompraEntregadaEvent para contabilidad
-      if (orden) {
-        await this.emitirEventoCompraEntregada(recepcion, orden, tenantId);
-      } else {
-        this.logger.warn('⚠️ No se pudo obtener orden para emitir evento CompraEntregadaEvent');
-      }
 
       await this.registrarIntegrationLog({
         tenantId,

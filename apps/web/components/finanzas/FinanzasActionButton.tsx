@@ -71,22 +71,7 @@ export default function FinanzasActionButton({
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      style={{
-        ...sizeStyle,
-        borderRadius: '8px',
-        border: variantStyle.border || 'none',
-        background: variantStyle.background,
-        color: variantStyle.color,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        fontWeight: '600',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        transition: 'all 0.2s ease',
-        opacity: disabled ? 0.5 : 1,
-        whiteSpace: 'nowrap'
-      }}
+      disabled={disabled} className="rounded-2 font-semibold inline-flex items-center gap-2 transition whitespace-nowrap"
       onMouseEnter={(e) => {
         if (!disabled) {
           e.currentTarget.style.background = variantStyle.hoverBackground

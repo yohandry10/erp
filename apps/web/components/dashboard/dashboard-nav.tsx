@@ -58,115 +58,6 @@ const navigation = [
   },
 ]
 
-const navStyles = {
-  nav: {
-    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    boxShadow: 'var(--shadow-lg)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
-  },
-  container: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '0 2rem',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    height: '4rem',
-  },
-  leftSection: {
-    display: 'flex',
-    alignItems: 'center',
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  logoText: {
-    marginLeft: '0.75rem',
-    fontSize: '1.25rem',
-    fontWeight: '800',
-    background: 'var(--gradient-primary)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-  },
-  navLinks: {
-    display: 'none',
-    marginLeft: '2rem',
-    gap: '0.5rem',
-  },
-  navLink: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '0.75rem 1.5rem',
-    borderBottom: '2px solid transparent',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    textDecoration: 'none',
-    transition: 'all 0.3s ease',
-    borderRadius: 'var(--border-radius) var(--border-radius) 0 0',
-  },
-  navLinkActive: {
-    borderBottomColor: 'var(--blue-600)',
-    color: 'var(--blue-600)',
-    background: 'rgba(59, 130, 246, 0.05)',
-  },
-  navLinkInactive: {
-    color: 'var(--primary-600)',
-  },
-  rightSection: {
-    display: 'none',
-    alignItems: 'center',
-    marginLeft: '2rem',
-  },
-  mobileButton: {
-    display: 'flex',
-    alignItems: 'center',
-  },
-  mobileMenu: {
-    display: 'block',
-    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-    backdropFilter: 'blur(20px)',
-    borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-  },
-  mobileMenuContainer: {
-    padding: '1rem 0',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.5rem',
-  },
-  mobileNavLink: {
-    display: 'block',
-    padding: '1rem 1.5rem',
-    borderLeft: '4px solid transparent',
-    fontSize: '1rem',
-    fontWeight: '600',
-    textDecoration: 'none',
-    transition: 'all 0.3s ease',
-  },
-  mobileNavLinkActive: {
-    background: 'rgba(59, 130, 246, 0.1)',
-    borderLeftColor: 'var(--blue-600)',
-    color: 'var(--blue-600)',
-  },
-  mobileNavLinkInactive: {
-    color: 'var(--primary-600)',
-  },
-  iconContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-  },
-}
-
-// Media queries para responsive design
-const mediaQueries = {
-  desktop: '@media (min-width: 640px)',
-}
-
 export function DashboardNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
@@ -204,20 +95,20 @@ export function DashboardNav() {
 
   return (
     <>
-      <nav style={navStyles.nav}>
-        <div style={navStyles.container}>
-          <div style={navStyles.header}>
-            <div style={navStyles.leftSection}>
+      <nav className="border-b border-white/30 bg-white/90 shadow-lg backdrop-blur-xl">
+        <div className="mx-auto max-w-[1400px] px-8">
+          <div className="flex h-16 justify-between">
+            <div className="flex items-center">
               {/* Logo */}
-              <div style={navStyles.logo}>
-                <Building2 style={{ height: '2rem', width: '2rem', color: 'var(--blue-600)' }} />
-                <span style={navStyles.logoText}>
+              <div className="flex shrink-0 items-center">
+                <Building2 className="h-8 w-8 text-[var(--blue-600)]" />
+                <span className="ml-3 text-xl font-extrabold text-[var(--blue-700)]">
                   ERP Suite
                 </span>
               </div>
 
               {/* Desktop Navigation */}
-              <div style={{ ...navStyles.navLinks, display: window.innerWidth >= 640 ? 'flex' : 'none' }}>
+              <div className="ml-8 hidden gap-2 sm:flex">
                 {visibleNavigation.map((item) => {
                   const isActive = pathname === item.href || 
                     (item.href !== '/dashboard' && pathname.startsWith(item.href))
@@ -226,12 +117,13 @@ export function DashboardNav() {
                     <Link
                       key={item.name}
                       href={item.href}
-                      style={{
-                        ...navStyles.navLink,
-                        ...(isActive ? navStyles.navLinkActive : navStyles.navLinkInactive),
-                      }}
+                      className={`inline-flex items-center rounded-t-md border-b-2 px-6 py-3 text-sm font-semibold transition ${
+                        isActive
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-blue-700'
+                      }`}
                     >
-                      <item.icon style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
+                      <item.icon className="w-4 h-4 mr-2" />
                       {item.name}
                     </Link>
                   )
@@ -240,29 +132,28 @@ export function DashboardNav() {
             </div>
 
             {/* Desktop Logout */}
-            <div style={{ ...navStyles.rightSection, display: window.innerWidth >= 640 ? 'flex' : 'none' }}>
+            <div className="ml-8 hidden items-center sm:flex">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleLogout}
-                style={{ display: 'inline-flex', alignItems: 'center' }}
+                onClick={handleLogout} className="inline-flex items-center"
               >
-                <LogOut style={{ width: '1rem', height: '1rem', marginRight: '0.5rem' }} />
+                <LogOut className="w-4 h-4 mr-2" />
                 Cerrar Sesión
               </Button>
             </div>
 
             {/* Mobile menu button */}
-            <div style={{ ...navStyles.mobileButton, display: window.innerWidth < 640 ? 'flex' : 'none' }}>
+            <div className="flex items-center sm:hidden">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? (
-                  <X style={{ height: '1.5rem', width: '1.5rem' }} />
+                  <X className="h-6 w-6" />
                 ) : (
-                  <Menu style={{ height: '1.5rem', width: '1.5rem' }} />
+                  <Menu className="h-6 w-6" />
                 )}
               </Button>
             </div>
@@ -271,8 +162,8 @@ export function DashboardNav() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div style={navStyles.mobileMenu}>
-            <div style={navStyles.mobileMenuContainer}>
+          <div className="border-t border-white/30 bg-white/95 backdrop-blur-xl sm:hidden">
+            <div className="flex flex-col gap-2 py-4">
               {visibleNavigation.map((item) => {
                 const isActive = pathname === item.href || 
                   (item.href !== '/dashboard' && pathname.startsWith(item.href))
@@ -281,14 +172,15 @@ export function DashboardNav() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    style={{
-                      ...navStyles.mobileNavLink,
-                      ...(isActive ? navStyles.mobileNavLinkActive : navStyles.mobileNavLinkInactive),
-                    }}
                     onClick={() => setMobileMenuOpen(false)}
+                    className={`block border-l-4 px-6 py-4 text-base font-semibold transition ${
+                      isActive
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-transparent text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
-                    <div style={navStyles.iconContainer}>
-                      <item.icon style={{ width: '1.25rem', height: '1.25rem' }} />
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5" />
                       {item.name}
                     </div>
                   </Link>
@@ -297,19 +189,10 @@ export function DashboardNav() {
               
               {/* Mobile Logout */}
               <button
-                onClick={handleLogout}
-                style={{
-                  ...navStyles.mobileNavLink,
-                  ...navStyles.mobileNavLinkInactive,
-                  width: '100%',
-                  textAlign: 'left',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                }}
+                onClick={handleLogout} className="w-full cursor-pointer border-0 bg-transparent px-6 py-4 text-left text-base font-semibold text-slate-600"
               >
-                <div style={navStyles.iconContainer}>
-                  <LogOut style={{ width: '1.25rem', height: '1.25rem' }} />
+                <div className="flex items-center gap-3">
+                  <LogOut className="w-5 h-5" />
                   Cerrar Sesión
                 </div>
               </button>
@@ -317,31 +200,6 @@ export function DashboardNav() {
           </div>
         )}
       </nav>
-
-      <style jsx>{`
-        @media (min-width: 640px) {
-          .desktop-nav {
-            display: flex !important;
-          }
-          .desktop-logout {
-            display: flex !important;
-          }
-          .mobile-button {
-            display: none !important;
-          }
-        }
-        @media (max-width: 639px) {
-          .desktop-nav {
-            display: none !important;
-          }
-          .desktop-logout {
-            display: none !important;
-          }
-          .mobile-button {
-            display: flex !important;
-          }
-        }
-      `}</style>
     </>
   )
 } 

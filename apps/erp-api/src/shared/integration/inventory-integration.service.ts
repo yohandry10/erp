@@ -15,6 +15,8 @@ export interface MovimientoStock {
   valorTotal: number;
   usuarioId: string;
   referencia?: string;
+  almacenId?: string;
+  almacen_id?: string;
   ventaId?: string;
 }
 
@@ -177,12 +179,19 @@ export class InventoryIntegrationService {
       if (!Number.isFinite(cantidadEntera)) {
         throw new BadRequestException('Cantidad de movimiento inválida');
       }
+      if (movimiento.tipoMovimiento !== 'AJUSTE' && cantidadEntera <= 0) {
+        throw new BadRequestException('La cantidad del movimiento debe ser mayor a cero');
+      }
+      if (movimiento.tipoMovimiento === 'AJUSTE' && cantidadEntera === 0) {
+        throw new BadRequestException('La cantidad de ajuste no puede ser cero');
+      }
       if (cantidadEntera !== movimiento.cantidad) {
         this.logger.warn(
           `⚠️ [Inventario] Ajustando cantidad de ${movimiento.cantidad} a entero ${cantidadEntera} para producto ${movimiento.productoId}`,
         );
       }
       movimiento.cantidad = cantidadEntera;
+      const almacenId = movimiento.almacenId ?? movimiento.almacen_id ?? null;
       
       this.logger.log(`📦 [Inventario] [Tenant: ${currentTenantId}] Movimiento ${movimiento.tipoMovimiento} - ${movimiento.cantidad} unidades de ${movimiento.productoId}`); // HARDENING.
 
@@ -241,6 +250,45 @@ export class InventoryIntegrationService {
         return null;
       }
 
+      if (almacenId) {
+        const { data: almacen, error: almacenError } = await this.supabase.getClient()
+          .from('almacenes')
+          .select('id, activo')
+          .eq('tenant_id', currentTenantId)
+          .eq('id', almacenId)
+          .maybeSingle();
+
+        if (almacenError) {
+          throw new BadRequestException(`No se pudo validar el almacén: ${almacenError.message}`);
+        }
+        if (!almacen || almacen.activo === false) {
+          throw new BadRequestException('Almacén inválido o inactivo para el movimiento de inventario');
+        }
+      }
+
+      if (movimiento.referencia) {
+        const { data: movimientoExistente, error: movimientoExistenteError } = await this.supabase.getClient()
+          .from('stock_movimientos')
+          .select('id')
+          .eq('tenant_id', currentTenantId)
+          .eq('producto_id', producto.id)
+          .eq('tipo_movimiento', movimiento.tipoMovimiento)
+          .eq('cantidad', movimiento.cantidad)
+          .eq('referencia', movimiento.referencia)
+          .limit(1)
+          .maybeSingle();
+
+        if (movimientoExistenteError) {
+          throw new BadRequestException(`No se pudo verificar duplicidad del movimiento: ${movimientoExistenteError.message}`);
+        }
+        if (movimientoExistente?.id) {
+          this.logger.warn(
+            `⚠️ [Inventario] Movimiento duplicado ignorado por referencia ${movimiento.referencia}: ${movimientoExistente.id}`,
+          );
+          return movimientoExistente.id;
+        }
+      }
+
       const stockActual = parseFloat((producto as any).stock_actual || 0);
       movimiento.stockAnterior = stockActual;
 
@@ -253,8 +301,9 @@ export class InventoryIntegrationService {
         case 'SALIDA':
           nuevoStock = stockActual - movimiento.cantidad;
           if (nuevoStock < 0) {
-            this.logger.warn(`⚠️ [Inventario] Stock negativo para ${movimiento.productoId}: ${nuevoStock}`);
-            // Permitir stock negativo pero generar alerta
+            throw new BadRequestException(
+              `Stock insuficiente para ${producto.nombre}. Disponible: ${stockActual}, solicitado: ${movimiento.cantidad}`,
+            );
           }
           break;
         case 'AJUSTE':
@@ -271,10 +320,11 @@ export class InventoryIntegrationService {
       
       const { data: updateData, error: updateError } = await this.supabase.getClient()
         .from('productos')
-        .update({ 
+        .update({
           stock_actual: nuevoStock
         })
         .eq('id', producto.id)
+        .eq('tenant_id', currentTenantId)
         .select();
 
       if (updateError) {
@@ -289,6 +339,7 @@ export class InventoryIntegrationService {
         .from('productos')
         .select('id, codigo, nombre, stock_actual')
         .eq('id', producto.id)
+        .eq('tenant_id', currentTenantId)
         .single();
       
       this.logger.debug(`🔍 [Inventario] Verificación post actualización: ${JSON.stringify(verificacion)}`);

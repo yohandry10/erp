@@ -43,7 +43,7 @@ const fallbackStyle: React.CSSProperties = {
 
 function NoPermission() {
   return (
-    <div style={fallbackStyle}>
+    <div className="border border-dashed rounded-3 bg-[rgba(191,_219,_254,_0.45)] p-6 text-blue-700 font-semibold">
       Necesitas el permiso <code>inventario.almacenes.read</code> para administrar los almacenes.
     </div>
   )
@@ -105,35 +105,26 @@ export default function AlmacenesPage() {
   }, [almacenes])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: '#0f172a' }}>
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-3 items-center">
+          <h1 className="m-0 text-7 font-bold text-slate-950">
             Almacenes & Ubicaciones
           </h1>
-          <span
-            style={{
-              background: 'rgba(59, 130, 246, 0.12)',
-              color: '#1d4ed8',
-              borderRadius: '999px',
-              padding: '0.25rem 0.75rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-            }}
+          <span className="bg-[rgba(59,_130,_246,_0.12)] text-blue-700 rounded-full py-1 px-3 text-3 font-semibold"
           >
             Inventario
           </span>
         </div>
-        <p style={{ margin: 0, color: '#475569', maxWidth: '720px', lineHeight: 1.6 }}>
+        <p className="m-0 text-slate-600 max-w-[720px] leading-7">
           Administra la estructura logística por tenant. Cada almacén y ubicación respeta la política de seguridad
           multitenant y se integra con recepciones, transferencias y kardex valorizado.
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link href="/dashboard/inventario/recepciones" style={{ color: '#2563eb', fontWeight: 600 }}>
+        <div className="flex gap-3 flex-wrap">
+          <Link href="/dashboard/inventario/recepciones" className="text-blue-600 font-semibold">
             Ir a Recepciones →
           </Link>
-          <Link href="/dashboard/inventario/kardex" style={{ color: '#0f766e', fontWeight: 600 }}>
+          <Link href="/dashboard/inventario/kardex" className="text-teal-700 font-semibold">
             Revisar Kardex →
           </Link>
         </div>
@@ -145,252 +136,136 @@ export default function AlmacenesPage() {
         accion="read"
         fallback={<NoPermission />}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="flex flex-col gap-5">
           {loading ? (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: '3rem 0',
-                color: '#2563eb',
-                fontWeight: 600,
-              }}
+            <div className="flex justify-center items-center py-12 px-0 text-blue-600 font-semibold"
             >
               Cargando almacenes…
             </div>
           ) : (
             <>
               {error && (
-                <div
-                  style={{
-                    border: '1px solid rgba(239, 68, 68, 0.35)',
-                    background: 'rgba(254, 226, 226, 0.65)',
-                    borderRadius: '12px',
-                    padding: '1rem 1.2rem',
-                    color: '#b91c1c',
-                    fontWeight: 600,
-                  }}
+                <div className="border bg-[rgba(254,_226,_226,_0.65)] rounded-3 py-4 px-5 text-red-700 font-semibold"
                 >
                   {error}
                 </div>
               )}
 
-              <section
-                style={{
-                  display: 'grid',
-                  gap: '0.75rem',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                }}
+              <section className="grid gap-3 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]"
               >
-                <div
-                  style={{
-                    borderRadius: '14px',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    background: 'rgba(191, 219, 254, 0.35)',
-                    padding: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                  }}
+                <div className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 flex items-center gap-3"
                 >
                   <Warehouse size={22} color="#1d4ed8" />
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#1d4ed8', textTransform: 'uppercase', fontWeight: 700 }}>
+                    <div className="text-3 text-blue-700 font-bold">
                       Almacenes
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
+                    <div className="text-6 font-bold text-slate-950">
                       {stats.total.toLocaleString('es-PE')}
                     </div>
                   </div>
                 </div>
-                <div
-                  style={{
-                    borderRadius: '14px',
-                    border: '1px solid rgba(34, 197, 94, 0.25)',
-                    background: 'rgba(187, 247, 208, 0.45)',
-                    padding: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                  }}
+                <div className="rounded-3.5 border bg-[rgba(187,_247,_208,_0.45)] p-4 flex items-center gap-3"
                 >
                   <Building2 size={22} color="#047857" />
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#047857', textTransform: 'uppercase', fontWeight: 700 }}>
+                    <div className="text-3 text-emerald-700 font-bold">
                       Activos
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#065f46' }}>
+                    <div className="text-6 font-bold text-[#065f46]">
                       {stats.activos.toLocaleString('es-PE')}
                     </div>
                   </div>
                 </div>
-                <div
-                  style={{
-                    borderRadius: '14px',
-                    border: '1px solid rgba(248, 113, 113, 0.25)',
-                    background: 'rgba(254, 226, 226, 0.55)',
-                    padding: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                  }}
+                <div className="rounded-3.5 border bg-[rgba(254,_226,_226,_0.55)] p-4 flex items-center gap-3"
                 >
                   <MapPin size={22} color="#b91c1c" />
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: '#b91c1c', textTransform: 'uppercase', fontWeight: 700 }}>
+                    <div className="text-3 text-red-700 font-bold">
                       Inactivos
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#991b1b' }}>
+                    <div className="text-6 font-bold text-red-800">
                       {stats.inactivos.toLocaleString('es-PE')}
                     </div>
                   </div>
                 </div>
               </section>
 
-              <section
-                style={{
-                  border: '1px solid rgba(148, 163, 184, 0.35)',
-                  borderRadius: '16px',
-                  padding: '1.2rem',
-                  background: '#ffffff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                }}
+              <section className="border rounded-4 p-5 bg-white flex flex-col gap-4"
               >
-                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">
                   Catálogo de almacenes
                 </h2>
 
                 {almacenes.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+                  <div className="text-slate-400 text-3.5">
                     No hay almacenes registrados. Crea uno desde el módulo de configuración o mediante Supabase Studio.
                   </div>
                 ) : (
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.75rem' }}>
+                  <ul className="list-none m-0 p-0 grid gap-3">
                     {almacenes.map((almacen) => {
                       const isExpanded = expanded === almacen.id
                       const ubicaciones = ubicacionesPorAlmacen[almacen.id] ?? []
                       return (
                         <li
-                          key={almacen.id}
-                          style={{
-                            border: '1px solid rgba(226, 232, 240, 0.75)',
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.85)',
-                            padding: '1rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.65rem',
-                          }}
+                          key={almacen.id} className="border rounded-3 bg-[rgba(248,_250,_252,_0.85)] p-4 flex flex-col gap-[0.65rem]"
                         >
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              gap: '1rem',
-                              flexWrap: 'wrap',
-                              alignItems: 'center',
-                            }}
+                          <div className="flex justify-between gap-4 flex-wrap items-center"
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{almacen.nombre}</span>
-                              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-4 font-bold text-slate-950">{almacen.nombre}</span>
+                              <span className="text-[0.8rem] text-slate-500">
                                 Código: {almacen.codigo ?? '—'} · Creado: {formatDate(almacen.created_at)}
                               </span>
                               {almacen.direccion && (
-                                <span style={{ fontSize: '0.85rem', color: '#475569' }}>{almacen.direccion}</span>
+                                <span className="text-3.5 text-slate-600">{almacen.direccion}</span>
                               )}
                               {almacen.descripcion && (
-                                <span style={{ fontSize: '0.85rem', color: '#475569' }}>{almacen.descripcion}</span>
+                                <span className="text-3.5 text-slate-600">{almacen.descripcion}</span>
                               )}
                             </div>
-                            <span
-                              style={{
-                                padding: '0.25rem 0.7rem',
-                                borderRadius: '999px',
-                                background: almacen.activo === false ? 'rgba(248, 113, 113, 0.2)' : 'rgba(34, 197, 94, 0.16)',
-                                color: almacen.activo === false ? '#b91c1c' : '#166534',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                textTransform: 'uppercase',
-                              }}
+                            <span className="py-1 px-[0.7rem] rounded-full text-3 font-semibold"
                             >
                               {almacen.activo === false ? 'Inactivo' : 'Activo'}
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <div className="flex gap-3 flex-wrap">
                             {almacen.telefono && (
-                              <span style={{ fontSize: '0.85rem', color: '#475569' }}>Teléfono: {almacen.telefono}</span>
+                              <span className="text-3.5 text-slate-600">Teléfono: {almacen.telefono}</span>
                             )}
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => toggleExpanded(almacen.id)}
-                            style={{
-                              alignSelf: 'flex-start',
-                              padding: '0.45rem 0.9rem',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(59, 130, 246, 0.35)',
-                              background: 'white',
-                              color: '#1d4ed8',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
+                            onClick={() => toggleExpanded(almacen.id)} className="py-2 px-3.5 rounded-2 border bg-white text-blue-700 font-semibold cursor-pointer"
                           >
                             {isExpanded ? 'Ocultar ubicaciones' : 'Ver ubicaciones'}
                           </button>
 
                           {isExpanded && (
-                            <div
-                              style={{
-                                border: '1px solid rgba(148, 163, 184, 0.35)',
-                                borderRadius: '10px',
-                                background: 'rgba(255, 255, 255, 0.65)',
-                                padding: '0.85rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.5rem',
-                              }}
+                            <div className="border rounded-2.5 bg-[rgba(255,_255,_255,_0.65)] p-3.5 flex flex-col gap-2"
                             >
-                              <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                              <strong className="text-3.5 text-slate-950">
                                 Ubicaciones ({ubicaciones.length})
                               </strong>
                               {ubicaciones.length === 0 ? (
-                                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                                <span className="text-3.5 text-slate-400">
                                   Este almacén aún no tiene ubicaciones registradas.
                                 </span>
                               ) : (
-                                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '0.4rem' }}>
+                                <ul className="list-none m-0 p-0 grid gap-1.5">
                                   {ubicaciones.map((ubicacion) => (
                                     <li
-                                      key={ubicacion.id}
-                                      style={{
-                                        border: '1px solid rgba(226, 232, 240, 0.85)',
-                                        borderRadius: '8px',
-                                        padding: '0.6rem 0.75rem',
-                                        background: 'rgba(248, 250, 252, 0.9)',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        gap: '0.75rem',
-                                        flexWrap: 'wrap',
-                                      }}
+                                      key={ubicacion.id} className="border rounded-2 py-2.5 px-3 bg-[rgba(248,_250,_252,_0.9)] flex justify-between gap-3 flex-wrap"
                                     >
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{ubicacion.codigo}</span>
+                                      <div className="flex flex-col gap-[0.15rem]">
+                                        <span className="font-semibold text-gray-800">{ubicacion.codigo}</span>
                                         {ubicacion.descripcion && (
-                                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{ubicacion.descripcion}</span>
+                                          <span className="text-[0.8rem] text-slate-500">{ubicacion.descripcion}</span>
                                         )}
                                       </div>
-                                      <span
-                                        style={{
-                                          fontSize: '0.75rem',
-                                          color: ubicacion.activo === false ? '#b91c1c' : '#166534',
-                                          fontWeight: 600,
-                                        }}
+                                      <span className="text-3 font-semibold"
                                       >
                                         {ubicacion.activo === false ? 'Inactiva' : 'Activa'}
                                       </span>

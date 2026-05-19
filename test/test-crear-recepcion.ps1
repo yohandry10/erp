@@ -15,7 +15,7 @@ $getOrdenesUrl = "$baseUrl/api/compras/ordenes?tenant_id=$tenantId&estado=APROBA
 
 try {
     $ordenesResponse = Invoke-RestMethod -Uri $getOrdenesUrl -Method Get -ContentType "application/json"
-    
+
     if ($ordenesResponse.success -and $ordenesResponse.data.Count -gt 0) {
         $orden = $ordenesResponse.data[0]
         $ordenId = $orden.id
@@ -23,17 +23,17 @@ try {
         Write-Host "  Proveedor: $($orden.proveedor.razon_social)" -ForegroundColor Gray
         Write-Host "  Total: $($orden.total)" -ForegroundColor Gray
         Write-Host ""
-        
+
         # Obtener detalles de la orden para construir los items de recepción
         Write-Host "2. Obteniendo detalles de la orden..." -ForegroundColor Yellow
         $getOrdenUrl = "$baseUrl/api/compras/ordenes/$ordenId`?tenant_id=$tenantId"
         $ordenDetalleResponse = Invoke-RestMethod -Uri $getOrdenUrl -Method Get -ContentType "application/json"
-        
+
         if ($ordenDetalleResponse.success) {
             $ordenDetalle = $ordenDetalleResponse.data
             Write-Host "✓ Detalles obtenidos: $($ordenDetalle.detalles.Count) items" -ForegroundColor Green
             Write-Host ""
-            
+
             # Construir items de recepción (recibir todo)
             $items = @()
             foreach ($detalle in $ordenDetalle.detalles) {
@@ -49,16 +49,16 @@ try {
                     Write-Host "  - $($detalle.descripcion): $cantidadPendiente unidades" -ForegroundColor Gray
                 }
             }
-            
+
             if ($items.Count -eq 0) {
                 Write-Host "⚠ No hay items pendientes de recibir en esta orden" -ForegroundColor Yellow
                 Write-Host "Buscando otra orden..." -ForegroundColor Yellow
                 exit
             }
-            
+
             Write-Host ""
             Write-Host "3. Creando recepción..." -ForegroundColor Yellow
-            
+
             # Crear el body de la recepción
             $recepcionBody = @{
                 tenant_id = $tenantId
@@ -67,15 +67,15 @@ try {
                 observaciones = "Recepción de prueba - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
                 lote = "LOTE-$(Get-Date -Format 'yyyyMMdd')"
             } | ConvertTo-Json -Depth 10
-            
+
             Write-Host "Body de la solicitud:" -ForegroundColor Gray
             Write-Host $recepcionBody -ForegroundColor DarkGray
             Write-Host ""
-            
+
             # Crear la recepción
             $createRecepcionUrl = "$baseUrl/api/compras/ordenes/$ordenId/recepciones?tenant_id=$tenantId"
             $response = Invoke-RestMethod -Uri $createRecepcionUrl -Method Post -Body $recepcionBody -ContentType "application/json"
-            
+
             if ($response.success) {
                 Write-Host "========================================" -ForegroundColor Green
                 Write-Host "✓ RECEPCIÓN CREADA EXITOSAMENTE" -ForegroundColor Green

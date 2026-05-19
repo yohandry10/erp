@@ -271,18 +271,11 @@ const hasStockShortage = stockAlerts.length > 0
   const { subtotal, igv, total } = calculateTotals()
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {hasStockShortage && (
-        <div style={{
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          background: 'rgba(254, 226, 226, 0.6)',
-          color: '#b91c1c',
-          padding: '0.75rem 1rem',
-          borderRadius: '0.75rem',
-          fontSize: '0.9rem'
-        }}>
+        <div className="border bg-[rgba(254,_226,_226,_0.6)] text-red-700 py-3 px-4 rounded-3 text-3.5">
           <strong>Stock insuficiente</strong>
-          <ul style={{ margin: '0.5rem 0 0 1.25rem', padding: 0, listStyle: 'disc' }}>
+          <ul className="mt-2 mr-0 mb-0 ml-5 p-0">
             {stockAlerts.map((a, idx) => (
               <li key={idx}>
                 {a.descripcion}: solicitado {a.solicitado}, disponible {a.disponible} (reservado {a.reservado})
@@ -292,20 +285,8 @@ const hasStockShortage = stockAlerts.length > 0
         </div>
       )}
       {/* Cliente Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{
-          fontSize: '1.125rem',
-          fontWeight: '600',
-          color: 'var(--primary-900)',
-          marginBottom: '1rem'
-        }}>Cliente</h3>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">Cliente</h3>
         <ClienteSelector
           value={clienteId}
           onChange={(id) => setClienteId(id)}
@@ -315,25 +296,11 @@ const hasStockShortage = stockAlerts.length > 0
       </div>
 
       {/* Productos Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
+      <div className="p-6 shadow border">
         {stockAlerts.length > 0 && (
-          <div style={{
-            background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            color: 'var(--red-700)',
-            borderRadius: 'var(--border-radius)',
-            padding: '0.75rem 1rem',
-            marginBottom: '0.75rem'
-          }}>
-            <strong style={{ display: 'block', marginBottom: '0.25rem' }}>⚠️ Stock insuficiente</strong>
-            <ul style={{ margin: 0, paddingLeft: '1rem', fontSize: '0.9rem' }}>
+          <div className="bg-[rgba(239,_68,_68,_0.08)] border text-[var(--red-700)] py-3 px-4 mb-3">
+            <strong className="block mb-1">⚠️ Stock insuficiente</strong>
+            <ul className="m-0 pl-4 text-3.5">
               {stockAlerts.map((s, i) => (
                 <li key={i}>
                   {s.descripcion}: solicitado {s.solicitado}, disponible {s.disponible} (reservado {s.reservado})
@@ -342,33 +309,12 @@ const hasStockShortage = stockAlerts.length > 0
             </ul>
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: 'var(--primary-900)',
-            margin: 0
-          }}>Productos</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] m-0">Productos</h3>
           <button
             type="button"
             onClick={handleAddItem}
-            disabled={disabled || loadingProductos}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.625rem 1.25rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: 'white',
-              background: 'var(--gradient-primary)',
-              border: 'none',
-              borderRadius: 'var(--border-radius)',
-              cursor: disabled || loadingProductos ? 'not-allowed' : 'pointer',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: 'var(--shadow-md)',
-              opacity: disabled || loadingProductos ? 0.6 : 1
-            }}
+            disabled={disabled || loadingProductos} className="inline-flex items-center gap-2 py-2.5 px-5 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 transition shadow"
             onMouseEnter={(e) => {
               if (!disabled && !loadingProductos) {
                 e.currentTarget.style.transform = 'translateY(-2px)'
@@ -380,60 +326,35 @@ const hasStockShortage = stockAlerts.length > 0
               e.currentTarget.style.boxShadow = 'var(--shadow-md)'
             }}
           >
-            <Plus style={{ width: '1rem', height: '1rem' }} />
+            <Plus className="w-4 h-4" />
             Agregar Producto
           </button>
         </div>
 
         {errors.detalle && (
-          <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', marginBottom: '1rem' }}>{errors.detalle}</p>
+          <p className="text-[0.875rem] text-[var(--red-600)] mb-4">{errors.detalle}</p>
         )}
 
         {detalle.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--primary-500)' }}>
-            <Package style={{ width: '3rem', height: '3rem', margin: '0 auto 0.5rem', color: 'var(--primary-400)' }} />
-            <p style={{ margin: '0.5rem 0' }}>No hay productos agregados</p>
-            <p style={{ fontSize: '0.875rem', margin: 0 }}>Haz clic en &quot;Agregar Producto&quot; para comenzar</p>
+          <div className="text-center p-8 text-[var(--primary-500)]">
+            <Package className="w-12 h-12 text-[var(--primary-400)]" />
+            <p className="my-2 mx-0">No hay productos agregados</p>
+            <p className="text-[0.875rem] m-0">Haz clic en &quot;Agregar Producto&quot; para comenzar</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="flex flex-col gap-4">
             {detalle.map((item, index) => (
-              <div key={index} style={{
-                border: '1px solid var(--primary-200)',
-                borderRadius: 'var(--border-radius)',
-                padding: '1rem',
-                background: 'rgba(255, 255, 255, 0.5)'
-              }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(12, 1fr)',
-                  gap: '1rem'
-                }}>
+              <div key={index} className="border p-4 bg-[rgba(255,_255,_255,_0.5)]">
+                <div className="grid grid-cols-[repeat(12,_1fr)] gap-4">
                   {/* Producto Selector */}
-                  <div style={{ gridColumn: 'span 12 / span 12' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div>
+                    <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Producto
                     </label>
                     <select
                       value={item.producto_id}
                       onChange={(e) => handleProductoChange(index, e.target.value)}
-                      disabled={disabled}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 1rem',
-                        border: errors[`producto_${index}`] ? '1px solid var(--red-500)' : '1px solid var(--primary-300)',
-                        borderRadius: 'var(--border-radius)',
-                        fontSize: '1rem',
-                        background: 'white',
-                        color: 'var(--primary-800)',
-                        cursor: 'pointer'
-                      }}
+                      disabled={disabled} className="w-[100%] py-3 px-4 text-4 bg-white text-[var(--primary-800)] cursor-pointer"
                     >
                       <option value="">Seleccionar producto...</option>
                       {productos.map(producto => {
@@ -449,21 +370,15 @@ const hasStockShortage = stockAlerts.length > 0
                       })}
                     </select>
                     {errors[`producto_${index}`] && (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                      <p className="text-3 text-[var(--red-600)] mt-1">
                         {errors[`producto_${index}`]}
                       </p>
                     )}
                   </div>
 
                   {/* Cantidad */}
-                  <div style={{ gridColumn: 'span 4 / span 4' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div>
+                    <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Cantidad
                     </label>
                     <Input
@@ -473,12 +388,9 @@ const hasStockShortage = stockAlerts.length > 0
                       value={item.cantidad}
                       onChange={(e) => handleCantidadChange(index, parseInt(e.target.value || '0', 10))}
                       disabled={disabled}
-                      style={{
-                        borderColor: errors[`cantidad_${index}`] ? 'var(--red-500)' : undefined
-                      }}
                     />
                     {errors[`cantidad_${index}`] && (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                      <p className="text-3 text-[var(--red-600)] mt-1">
                         {errors[`cantidad_${index}`]}
                       </p>
                     )}
@@ -488,7 +400,7 @@ const hasStockShortage = stockAlerts.length > 0
                         const disponible = (item.producto.stock ?? 0) - reservado
                         const warn = item.cantidad > disponible
                         return (
-                          <p style={{ fontSize: '0.75rem', color: warn ? 'var(--red-600)' : 'var(--primary-600)', marginTop: '0.15rem', fontWeight: warn ? 600 : 400 }}>
+                          <p className="text-3 mt-[0.15rem]">
                             {warn ? '⚠️ ' : ''}
                             Stock: {item.producto.stock ?? 0} • Reservado: {reservado} • Disponible: {disponible}
                           </p>
@@ -498,14 +410,8 @@ const hasStockShortage = stockAlerts.length > 0
                   </div>
 
                   {/* Precio Unitario */}
-                  <div style={{ gridColumn: 'span 4 / span 4' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div>
+                    <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Precio Unit.
                     </label>
                     <Input
@@ -515,55 +421,32 @@ const hasStockShortage = stockAlerts.length > 0
                       value={item.precio_unitario}
                       onChange={(e) => handlePrecioChange(index, parseFloat(e.target.value) || 0)}
                       disabled={disabled}
-                      style={{
-                        borderColor: errors[`precio_${index}`] ? 'var(--red-500)' : undefined
-                      }}
                     />
                     {errors[`precio_${index}`] && (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                      <p className="text-3 text-[var(--red-600)] mt-1">
                         {errors[`precio_${index}`]}
                       </p>
                     )}
                   </div>
 
                   {/* Subtotal */}
-                  <div style={{ gridColumn: 'span 3 / span 3' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      color: 'var(--primary-700)',
-                      marginBottom: '0.25rem'
-                    }}>
+                  <div>
+                    <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
                       Subtotal
                     </label>
                     <Input
                       type="text"
                       value={`S/ ${item.subtotal.toFixed(2)}`}
-                      disabled
-                      style={{ background: 'var(--primary-50)' }}
+                      disabled className="bg-[var(--primary-50)]"
                     />
                   </div>
 
                   {/* Remove Button */}
-                  <div style={{ gridColumn: 'span 1 / span 1', display: 'flex', alignItems: 'flex-end' }}>
+                  <div className="flex items-end">
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
-                      disabled={disabled}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '0.5rem',
-                        color: 'var(--red-600)',
-                        background: 'transparent',
-                        border: 'none',
-                        borderRadius: 'var(--border-radius)',
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s ease',
-                        opacity: disabled ? 0.5 : 1
-                      }}
+                      disabled={disabled} className="inline-flex items-center justify-center p-2 text-[var(--red-600)] bg-transparent border-0 transition"
                       onMouseEnter={(e) => {
                         if (!disabled) {
                           e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
@@ -575,7 +458,7 @@ const hasStockShortage = stockAlerts.length > 0
                         e.currentTarget.style.color = 'var(--red-600)'
                       }}
                     >
-                      <Trash2 style={{ width: '1.125rem', height: '1.125rem' }} />
+                      <Trash2 className="w-[1.125rem] h-[1.125rem]" />
                     </button>
                   </div>
                 </div>
@@ -586,43 +469,18 @@ const hasStockShortage = stockAlerts.length > 0
       </div>
 
       {/* Totales Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{
-          fontSize: '1.125rem',
-          fontWeight: '600',
-          color: 'var(--primary-900)',
-          marginBottom: '1rem'
-        }}>Totales</h3>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem',
-          maxWidth: '28rem',
-          marginLeft: 'auto'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-            <span style={{ color: 'var(--primary-600)' }}>Subtotal:</span>
-            <span style={{ fontWeight: '500' }}>S/ {subtotal.toFixed(2)}</span>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">Totales</h3>
+        <div className="flex flex-col gap-2 max-w-[28rem] ml-auto">
+          <div className="flex justify-between text-[0.875rem]">
+            <span className="text-[var(--primary-600)]">Subtotal:</span>
+            <span className="font-medium">S/ {subtotal.toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-            <span style={{ color: 'var(--primary-600)' }}>IGV (18%):</span>
-            <span style={{ fontWeight: '500' }}>S/ {igv.toFixed(2)}</span>
+          <div className="flex justify-between text-[0.875rem]">
+            <span className="text-[var(--primary-600)]">IGV (18%):</span>
+            <span className="font-medium">S/ {igv.toFixed(2)}</span>
           </div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '1.125rem',
-            fontWeight: '700',
-            borderTop: '1px solid var(--primary-200)',
-            paddingTop: '0.5rem'
-          }}>
+          <div className="flex justify-between text-[1.125rem] font-bold border-t pt-2">
             <span>Total:</span>
             <span>S/ {total.toFixed(2)}</span>
           </div>
@@ -630,28 +488,10 @@ const hasStockShortage = stockAlerts.length > 0
       </div>
 
       {/* Additional Info Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{
-          fontSize: '1.125rem',
-          fontWeight: '600',
-          color: 'var(--primary-900)',
-          marginBottom: '1rem'
-        }}>Información Adicional</h3>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">Información Adicional</h3>
         <div>
-          <label style={{
-            display: 'block',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: 'var(--primary-700)',
-            marginBottom: '0.25rem'
-          }}>
+          <label className="block text-[0.875rem] font-medium text-[var(--primary-700)] mb-1">
             Observaciones (Opcional)
           </label>
           <Textarea
@@ -665,7 +505,7 @@ const hasStockShortage = stockAlerts.length > 0
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', paddingTop: '1rem' }}>
+      <div className="flex justify-end gap-4 pt-4">
       <button
         type="button"
         onClick={onCancel}

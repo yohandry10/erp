@@ -16,7 +16,35 @@ import { TenantContextService } from '../../../shared/tenant/tenant-context.serv
 @Injectable()
 export class ContabilidadEventsListener implements OnModuleInit {
   private readonly logger = new Logger(ContabilidadEventsListener.name);
-  private isProcessing = false;
+  private static isProcessing = false;
+  private readonly accountingEventTypes = new Set([
+    'venta.procesada',
+    'VentaFacturada',
+    'pos.venta.registrada',
+    'cobro.registrado',
+    'CobroRegistrado',
+    'recepcion.registrada',
+    'RecepcionRegistrada',
+    'devolucion.proveedor.registrada',
+    'DevolucionProveedorEmitida',
+    'cxc.creada',
+    'CuentaPorCobrarCreada',
+    'pago.proveedor.registrado',
+    'PagoProveedorRegistrado',
+    'ajuste.inventario.aplicado',
+    'AjusteInventarioAplicado',
+    'planilla.liquidada',
+    'PlanillaLiquidada',
+    'depreciacion.generada',
+    'DepreciacionGenerada',
+    'cpe.anulado',
+    'CPEAnulado',
+    'producto.stock_bajo',
+    'producto.stock.bajo',
+    'ProductoStockBajo',
+    'stock.movimiento',
+    'StockMovimiento',
+  ]);
 
   constructor(
     private readonly asientosGenerator: AsientosGeneratorService,
@@ -113,6 +141,32 @@ export class ContabilidadEventsListener implements OnModuleInit {
         `💾 [ContabilidadEventsListener] Persistiendo evento ${eventType} en outbox`
       );
 
+      if (idempotencyKey) {
+        const { data: existingEvent, error: existingError } = await this.supabaseService
+          .getClient()
+          .from('outbox_events')
+          .select('event_id')
+          .eq('tenant_id', tenantId)
+          .eq('event_type', eventType)
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle();
+
+        if (existingError) {
+          this.logger.error(
+            `❌ [ContabilidadEventsListener] Error verificando idempotencia de ${eventType}:`,
+            existingError,
+          );
+          return;
+        }
+
+        if (existingEvent?.event_id) {
+          this.logger.log(
+            `ℹ️ [ContabilidadEventsListener] Evento ${eventType} ya existe para idempotency_key ${idempotencyKey}; se omite duplicado`,
+          );
+          return;
+        }
+      }
+
       // Usar el builder para garantizar estructura consistente
       const eventToInsert = OutboxEventBuilder.build({
         tenantId,
@@ -166,12 +220,12 @@ export class ContabilidadEventsListener implements OnModuleInit {
    */
   async procesarEventosPendientes(): Promise<void> {
     // Evitar procesamiento concurrente
-    if (this.isProcessing) {
+    if (ContabilidadEventsListener.isProcessing) {
       this.logger.debug('⏳ [ContabilidadEventsListener] Ya hay un procesamiento en curso, saltando...');
       return;
     }
 
-    this.isProcessing = true;
+    ContabilidadEventsListener.isProcessing = true;
 
     try {
       const backoffMs = this.supabaseService.getNetworkBackoffRemainingMs();
@@ -183,7 +237,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
 
       // Leer eventos pendientes con límite de reintentos
-      const eventos = await this.outboxEventsService.leerEventosPendientesConReintentos(3, 50);
+      const eventos = (await this.outboxEventsService.leerEventosPendientesConReintentos(3, 50))
+        .filter((evento) => this.accountingEventTypes.has(evento.event_type));
 
       if (eventos.length === 0) {
         this.logger.debug('ℹ️ [ContabilidadEventsListener] No hay eventos pendientes para procesar');
@@ -194,7 +249,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       // Procesar eventos en orden
       for (const evento of eventos) {
-        await this.procesarEvento(evento);
+        try {
+          await this.procesarEvento(evento);
+        } catch (error) {
+          this.logger.error(
+            `❌ [ContabilidadEventsListener] Evento ${evento.event_id} falló; se continúa con el siguiente evento del lote:`,
+            error,
+          );
+        }
       }
 
       this.logger.log(`✅ [ContabilidadEventsListener] Procesamiento completado: ${eventos.length} eventos`);
@@ -204,7 +266,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         this.logger.error('❌ [ContabilidadEventsListener] Error procesando eventos pendientes:', error);
       }
     } finally {
-      this.isProcessing = false;
+      ContabilidadEventsListener.isProcessing = false;
     }
   }
 
@@ -288,6 +350,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
    * Implementa lógica de reintentos con backoff exponencial
    */
   private async procesarEvento(evento: OutboxEvent): Promise<void> {
+    if (!this.accountingEventTypes.has(evento.event_type)) {
+      this.logger.debug(
+        `⏭️ [ContabilidadEventsListener] Evento no contable ${evento.event_type} (${evento.event_id}) completado sin asiento`,
+      );
+      await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
+      return;
+    }
+
     const maxRetries = 3;
     const retryCount = evento.retry_count || 0;
     let logId: string | null = null;
@@ -308,6 +378,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
     await this.tenantContext.run({ tenantId, isSuperAdmin: true }, async () => {
       try {
+        const claimed = await this.claimEventoParaProcesamiento(evento);
+        if (!claimed) {
+          this.logger.debug(
+            `⏭️ [ContabilidadEventsListener] Evento ${evento.event_id} ya fue reclamado o procesado por otro worker`
+          );
+          return;
+        }
+
         this.logger.log(
           `🎯 [ContabilidadEventsListener] Procesando evento: ${evento.event_type} (${evento.event_id}) - Intento ${retryCount + 1}/${maxRetries}`
         );
@@ -387,6 +465,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
         this.logger.log(`✅ [ContabilidadEventsListener] Evento procesado exitosamente: ${evento.event_id}`);
         
+        await this.asientosGenerator.marcarEventoComoProcesado(evento.event_id);
+
         // Registrar finalización exitosa
         await this.registrarFinalizacionExitosa(logId);
       } catch (error) {
@@ -432,6 +512,26 @@ export class ContabilidadEventsListener implements OnModuleInit {
     });
   }
 
+  private async claimEventoParaProcesamiento(evento: OutboxEvent): Promise<boolean> {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('outbox_events')
+      .update({
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('event_id', evento.event_id)
+      .in('status', ['pending', 'failed', 'PENDING', 'FAILED'])
+      .select('event_id')
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`No se pudo reclamar evento contable ${evento.event_id}: ${error.message}`);
+    }
+
+    return Boolean(data?.event_id);
+  }
+
   /**
    * Determina si un error es recuperable y se puede reintentar
    */
@@ -446,6 +546,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
       'el asiento no cuadra',
       'datos inválidos',
       'validación fallida',
+      'idempotencia contable corrupta',
+      'duplicidad contable detectada',
       'foreign key constraint',
       'unique constraint'
     ];
@@ -535,6 +637,20 @@ export class ContabilidadEventsListener implements OnModuleInit {
    */
   private async marcarEventoNoManejado(evento: OutboxEvent, motivo: string): Promise<void> {
     try {
+      const { data: current } = await this.supabaseService
+        .getClient()
+        .from('outbox_events')
+        .select('status')
+        .eq('event_id', evento.event_id)
+        .maybeSingle();
+
+      if (String(current?.status ?? '').toLowerCase() === 'completed') {
+        this.logger.warn(
+          `⚠️ [ContabilidadEventsListener] Evento ${evento.event_id} ya estaba completado; no se marca como no manejado`
+        );
+        return;
+      }
+
       const truncated = motivo.length > 500 ? `${motivo.slice(0, 497)}...` : motivo;
       await this.supabaseService
         .getClient()
@@ -545,7 +661,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
           error_message: truncated,
           updated_at: new Date().toISOString(),
         })
-        .eq('event_id', evento.event_id);
+        .eq('event_id', evento.event_id)
+        .neq('status', 'completed');
 
       this.logger.debug(
         `⚠️ [ContabilidadEventsListener] Evento ${evento.event_id} marcado como dead_letter por no ser manejado (${evento.event_type})`
@@ -577,6 +694,16 @@ export class ContabilidadEventsListener implements OnModuleInit {
         .maybeSingle();
 
       if (asientoError) {
+        if (this.isMultipleRowsSingleResultError(asientoError)) {
+          this.logger.error(
+            `❌ [ContabilidadEventsListener] Duplicidad contable detectada para tenant ${tenantId} y evento ${sourceEventId}:`,
+            asientoError
+          );
+          throw new Error(
+            `Idempotencia contable corrupta: existe mas de un asiento para tenant ${tenantId} y evento ${sourceEventId}`
+          );
+        }
+
         this.logger.error(
           `❌ [ContabilidadEventsListener] Error verificando asiento para evento ${sourceEventId}:`,
           asientoError
@@ -648,12 +775,24 @@ export class ContabilidadEventsListener implements OnModuleInit {
 
       return asiento;
     } catch (error) {
+      if (error?.message?.includes('Idempotencia contable corrupta')) {
+        throw error;
+      }
+
       this.logger.error(
         `❌ [ContabilidadEventsListener] Excepción verificando asiento para evento ${sourceEventId}:`,
         error
       );
       return null;
     }
+  }
+
+  private isMultipleRowsSingleResultError(error: any): boolean {
+    const text = `${error?.details ?? ''} ${error?.message ?? ''}`.toLowerCase();
+    return (
+      text.includes('multiple') ||
+      /contain[s]?\s+([2-9]|\d{2,})\s+rows/.test(text)
+    );
   }
 
   private ensureEventTenant(eventData: any, contexto: string): string {
@@ -682,18 +821,33 @@ export class ContabilidadEventsListener implements OnModuleInit {
         );
         return;
       }
+
+      const itemSubtotal = Array.isArray(eventData.items)
+        ? eventData.items.reduce((sum, item) => sum + Number(item?.subtotal ?? 0), 0)
+        : 0;
+      const total = Number(eventData.total ?? 0);
+      const baseImponible = Number(
+        eventData.subtotal ??
+        eventData.base_imponible ??
+        (itemSubtotal > 0 ? itemSubtotal : 0)
+      );
+      const igv = Number(
+        eventData.impuestos ??
+        eventData.igv ??
+        (baseImponible > 0 ? Math.max(total - baseImponible, 0) : 0)
+      );
       
       // Preparar datos para el generador de asientos
       const ventaData = {
         tenant_id: tenantId,
         fecha: eventData.fecha || eventData.timestamp || new Date().toISOString(),
-        total: eventData.total,
-        base_imponible: eventData.subtotal || eventData.base_imponible,
-        igv: eventData.impuestos || eventData.igv,
+        total,
+        base_imponible: baseImponible,
+        igv,
         costo_ventas: eventData.costo_ventas || 0,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroTicket || eventData.numeroFactura || eventData.cpeId,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = ventaData.event_id;
@@ -756,7 +910,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = cobroData.event_id;
@@ -813,7 +967,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
           costo_ventas: eventData.costoVentas ?? eventData.costo_ventas ?? 0,
           centro_costo_id: eventData.centro_costo_id,
           referencia,
-          event_id: eventData.eventId || evento.event_id,
+          event_id: evento.event_id || eventData.eventId,
           monto_pendiente: eventData.montoPendiente ?? eventData.monto_pendiente ?? undefined,
           ajustes,
         };
@@ -894,7 +1048,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         igv: igvRecepcion,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroRecepcion || eventData.numeroOrden,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = compraData.event_id;
@@ -922,6 +1076,14 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
 
+  private async handleFacturaProveedorRegistrada(evento: OutboxEvent): Promise<void> {
+    const eventData = evento.event_data;
+    const tenantId = this.ensureEventTenant(eventData, 'factura.proveedor.registrada');
+    this.logger.log(
+      `📄 [Contabilidad] Factura proveedor registrada recibida (evento ${evento.event_id}) tenant=${tenantId} documento=${eventData?.numeroDocumento ?? eventData?.facturaProvId ?? 'sin-documento'}`
+    );
+  }
+
   /**
    * Handler para eventos de pago a proveedor
    * Genera asiento: Dr 42 Proveedores / Cr 10 Bancos
@@ -937,7 +1099,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.numeroDocumento || eventData.referencia,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = pagoData.event_id;
@@ -1040,7 +1202,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         tipo: eventData.tipo || (eventData.diferencia > 0 ? 'SOBRANTE' : 'FALTANTE'),
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.referencia || `Ajuste ${eventData.productoId}`,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = ajusteData.event_id;
@@ -1081,12 +1243,13 @@ export class ContabilidadEventsListener implements OnModuleInit {
         tenant_id: tenantId,
         fecha: eventData.fecha || new Date().toISOString(),
         sueldos: eventData.totalIngresos || eventData.sueldos,
-        aportes: eventData.totalAportes || eventData.aportes,
         retenciones: eventData.totalDescuentos || eventData.retenciones || 0,
         neto: eventData.totalNeto || eventData.neto,
         centro_costo_id: eventData.centro_costo_id,
-        referencia: eventData.planillaId || eventData.periodo,
-        event_id: eventData.eventId || evento.event_id
+        planilla_id: eventData.planillaId,
+        referencia: eventData.planillaId ? `PLANILLA-${eventData.planillaId}` : eventData.periodo,
+        source_event_id: evento.event_id || eventData.eventId || eventData.planillaId || evento.aggregate_id,
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = planillaData.event_id;
@@ -1129,7 +1292,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         monto: eventData.monto,
         centro_costo_id: eventData.centro_costo_id,
         referencia: eventData.activoId || eventData.referencia,
-        event_id: eventData.eventId || evento.event_id
+        event_id: evento.event_id || eventData.eventId
       };
 
       const eventId = depreciacionData.event_id;
@@ -1176,39 +1339,37 @@ export class ContabilidadEventsListener implements OnModuleInit {
         ? `${eventData.serie}-${eventData.numero}`
         : eventData.cpe_id;
 
-      // Generar asiento de reversión (montos negativos)
-      // Este asiento revierte el asiento original de venta
-      // ✅ FIX H09: Usar TaxCalculatorService en lugar de hardcodear 1.18
-      const totalAnulado = -(eventData.total || 0);
+      // Generar asiento de nota de crédito con montos positivos y cuentas invertidas.
+      // El generador de ventas no acepta importes negativos porque rompe el cuadre.
+      const totalAnulado = Math.abs(Number(eventData.total || 0));
       let baseImponible = 0;
       let igvAnulado = 0;
 
       if (eventData.total) {
         const subtotalCalculado = await this.taxCalculator.calcularSubtotalDesdeTotal(
-          Math.abs(eventData.total),
+          totalAnulado,
           tenantId
         );
-        baseImponible = -subtotalCalculado;
+        baseImponible = subtotalCalculado;
         igvAnulado = totalAnulado - baseImponible;
       }
 
       const reversoData = {
         tenant_id: tenantId,
         fecha: eventData.anulado_at || new Date().toISOString(),
-        total: totalAnulado, // Negativo para revertir
-        base_imponible: baseImponible, // Negativo
-        igv: igvAnulado, // Negativo
+        total: totalAnulado,
+        base_imponible: baseImponible,
+        igv: igvAnulado,
         costo_ventas: 0, // No revertir costo si no hay información
         centro_costo_id: eventData.centro_costo_id,
         referencia: `REV-${referencia}`, // Prefijo REV para identificar reversiones
-        event_id: eventData.eventId || evento.event_id,
+        event_id: evento.event_id || eventData.eventId,
         motivo: `Reversión por anulación: ${eventData.motivo || 'Sin motivo especificado'}`
       };
 
       const eventId = reversoData.event_id;
 
-      // Usar generarAsientoVenta con montos negativos para revertir
-      const asientoCreado = await this.asientosGenerator.generarAsientoVenta(reversoData);
+      const asientoCreado = await this.asientosGenerator.generarAsientoNotaCredito(reversoData);
 
       // 🔴 CRÍTICO FIX: Validar que el asiento de reversión se haya creado correctamente
       if (eventId) {
@@ -1238,5 +1399,3 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
   }
 }
-
-

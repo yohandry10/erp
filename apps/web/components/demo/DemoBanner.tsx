@@ -90,70 +90,28 @@ export function DemoBanner() {
   };
 
   return (
-    <div style={{
-      background: getBannerColor(),
-      color: 'white',
-      padding: '0.75rem 1.5rem',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-      flexWrap: 'wrap',
-      gap: '0.75rem',
-      zIndex: 1000
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <span style={{ fontWeight: 500 }}>{getMessage()}</span>
+    <div className="text-white py-3 px-6 flex items-center justify-between shadow flex-wrap gap-3 z-[1000]">
+      <div className="flex items-center gap-3">
+        <span className="font-medium">{getMessage()}</span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="flex items-center gap-2">
         {status.can_extend && !status.is_expired && (
           <button
-            onClick={handleExtend}
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: 500
-            }}
+            onClick={handleExtend} className="bg-[rgba(255,_255,_255,_0.2)] text-white border py-2 px-4 rounded-2 cursor-pointer text-[0.875rem] font-medium"
           >
             Extender 7 días
           </button>
         )}
 
         <button
-          onClick={handleConvert}
-          style={{
-            background: 'white',
-            color: '#2563eb',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: 600
-          }}
+          onClick={handleConvert} className="bg-white text-blue-600 border-0 py-2 px-4 rounded-2 cursor-pointer text-[0.875rem] font-semibold"
         >
           Convertir a cuenta real
         </button>
 
         <button
-          onClick={() => setDismissed(true)}
-          style={{
-            background: 'transparent',
-            color: 'white',
-            border: 'none',
-            padding: '0.5rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
+          onClick={() => setDismissed(true)} className="bg-transparent text-white border-0 p-2 rounded-[6px] cursor-pointer flex items-center justify-center"
         >
           ✕
         </button>

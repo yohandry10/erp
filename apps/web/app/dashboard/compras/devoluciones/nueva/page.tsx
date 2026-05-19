@@ -26,6 +26,8 @@ interface RecepcionItem {
   id: string
   producto_id: string
   cantidad_recibida: number
+  cantidad_disponible_devolucion?: number
+  cantidad_devuelta?: number
   calidad: string
   almacen_id?: string
   lote?: string
@@ -34,9 +36,11 @@ interface RecepcionItem {
   precio_unitario?: number
   detalle?: {
     descripcion?: string
+    producto_id?: string
     precio_unitario?: number
   }
   producto?: {
+    id?: string
     codigo: string
     nombre: string
   }
@@ -54,6 +58,7 @@ interface DevolucionItem {
   motivo: string
   observaciones?: string
   producto?: {
+    id?: string
     codigo: string
     nombre: string
   }
@@ -71,6 +76,7 @@ export default function NuevaDevolucionPage() {
   const [items, setItems] = useState<DevolucionItem[]>([])
   const [motivoGeneral, setMotivoGeneral] = useState('')
   const [observacionesGenerales, setObservacionesGenerales] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
 
   const loadRecepciones = useCallback(async () => {
     try {
@@ -82,7 +88,7 @@ export default function NuevaDevolucionPage() {
       }
     } catch (error) {
       console.error('Error loading recepciones:', error)
-      alert('Error al cargar recepciones')
+      setFormError('Error al cargar recepciones')
     } finally {
       setLoading(false)
     }
@@ -104,27 +110,32 @@ export default function NuevaDevolucionPage() {
 
         // Una devolución debe poder iniciarse desde cualquier item recibido en una recepción cerrada.
         const itemsRecibidos = (recepcion.items || [])
-          .filter((item: RecepcionItem) => Number(item.cantidad_recibida || 0) > 0)
-          .map((item: RecepcionItem) => ({
-            recepcion_item_id: item.id,
-            producto_id: item.producto_id,
-            descripcion: item.producto?.nombre || item.detalle?.descripcion || 'Producto recibido',
-            cantidad: item.cantidad_recibida,
-            precio_unitario: Number(item.detalle?.precio_unitario ?? item.precio_unitario ?? 0),
-            almacen_id: item.almacen_id,
-            lote: item.lote,
-            serie: item.serie,
-            motivo: item.calidad === 'RECHAZADO' ? 'DEFECTUOSO' : 'OBSERVADO',
-            observaciones: item.observaciones || '',
-            producto: item.producto
-          }))
+          .map((item: RecepcionItem) => {
+            const cantidadRecibida = Number(item.cantidad_recibida || 0)
+            const cantidadDisponible = Number(item.cantidad_disponible_devolucion ?? cantidadRecibida)
+
+            return {
+              recepcion_item_id: item.id,
+              producto_id: item.producto_id || item.producto?.id || item.detalle?.producto_id || '',
+              descripcion: item.producto?.nombre || item.detalle?.descripcion || 'Producto recibido',
+              cantidad: Math.min(cantidadRecibida, cantidadDisponible),
+              precio_unitario: Number(item.detalle?.precio_unitario ?? item.precio_unitario ?? 0),
+              almacen_id: item.almacen_id,
+              lote: item.lote,
+              serie: item.serie,
+              motivo: item.calidad === 'RECHAZADO' ? 'DEFECTUOSO' : 'OBSERVADO',
+              observaciones: item.observaciones || '',
+              producto: item.producto
+            }
+          })
+          .filter((item: DevolucionItem) => item.cantidad > 0)
 
         setItems(itemsRecibidos)
         setStep(2)
       }
     } catch (error) {
       console.error('Error loading recepcion:', error)
-      alert('Error al cargar detalle de recepción')
+      setFormError('Error al cargar detalle de recepción')
     } finally {
       setLoading(false)
     }
@@ -155,23 +166,24 @@ export default function NuevaDevolucionPage() {
     if (!selectedRecepcion) return
 
     if (items.length === 0) {
-      alert('Debe agregar al menos un item')
+      setFormError('Debe agregar al menos un item')
       return
     }
 
     if (!motivoGeneral) {
-      alert('Debe especificar el motivo general de la devolución')
+      setFormError('Debe especificar el motivo general de la devolución')
       return
     }
 
     const invalidItems = items.filter(item => !item.producto_id || item.cantidad <= 0)
     if (invalidItems.length > 0) {
-      alert('Todos los items deben tener producto y cantidad válida')
+      setFormError('Todos los items deben tener producto y cantidad válida')
       return
     }
 
     try {
       setLoading(true)
+      setFormError(null)
 
       const payload = {
         recepcion_id: selectedRecepcion.id,
@@ -196,14 +208,13 @@ export default function NuevaDevolucionPage() {
       const devolucion = response?.data ?? response
 
       if (devolucion?.id || response?.success) {
-        alert('Devolución creada exitosamente')
         router.push(`/dashboard/compras/devoluciones/${devolucion.id}`)
       } else {
-        alert(response?.message || 'Error al crear devolución')
+        setFormError(response?.message || 'Error al crear devolución')
       }
     } catch (error) {
       console.error('Error creating devolucion:', error)
-      alert('Error al crear devolución')
+      setFormError('Error al crear devolución')
     } finally {
       setLoading(false)
     }
@@ -224,71 +235,42 @@ export default function NuevaDevolucionPage() {
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="p-6 max-w-[1200px] my-0 mx-auto">
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
+      <div className="mb-6">
         <button
-          onClick={() => step === 1 ? router.back() : setStep(1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            marginBottom: '16px'
-          }}
+          onClick={() => step === 1 ? router.back() : setStep(1)} className="flex items-center gap-2 py-2 px-4 bg-white border rounded-2 cursor-pointer text-3.5 font-medium mb-4"
         >
           <ArrowLeft size={18} />
           Volver
         </button>
 
-        <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>
+        <h1 className="text-6 font-bold mb-[4px]">
           Nueva Devolución a Proveedor
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+        <p className="text-[var(--text-secondary)] text-3.5">
           {step === 1 ? 'Seleccione la recepción' : 'Configure los items a devolver'}
         </p>
       </div>
 
       {/* Progress */}
-      <div style={{
-        display: 'flex',
-        gap: '16px',
-        marginBottom: '32px',
-        alignItems: 'center'
-      }}>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            height: '4px',
-            backgroundColor: 'var(--primary-600)',
-            borderRadius: '2px'
-          }} />
-          <p style={{
-            marginTop: '8px',
-            fontSize: '13px',
-            fontWeight: '600',
-            color: 'var(--primary-600)'
-          }}>
+      {formError && (
+        <div className="py-3 px-4 border bg-[var(--red-50)] text-[var(--red-700)] rounded-2 mb-5 text-3.5 font-medium">
+          {formError}
+        </div>
+      )}
+
+      {/* Progress */}
+      <div className="flex gap-4 mb-8 items-center">
+        <div className="flex-[1]">
+          <div className="h-[4px] bg-[var(--primary-600)] rounded-[2px]" />
+          <p className="mt-2 text-[13px] font-semibold text-[var(--primary-600)]">
             1. Seleccionar Recepción
           </p>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            height: '4px',
-            backgroundColor: step >= 2 ? 'var(--primary-600)' : 'var(--gray-200)',
-            borderRadius: '2px'
-          }} />
-          <p style={{
-            marginTop: '8px',
-            fontSize: '13px',
-            fontWeight: '600',
-            color: step >= 2 ? 'var(--primary-600)' : 'var(--text-tertiary)'
-          }}>
+        <div className="flex-[1]">
+          <div className="h-[4px] rounded-[2px]" />
+          <p className="mt-2 text-[13px] font-semibold">
             2. Items a Devolver
           </p>
         </div>
@@ -298,49 +280,30 @@ export default function NuevaDevolucionPage() {
       {step === 1 && (
         <div>
           {/* Search */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ position: 'relative' }}>
+          <div className="mb-5">
+            <div className="relative">
               <Search
-                size={18}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-tertiary)'
-                }}
+                size={18} className="absolute left-3 top-[50%] -translate-y-1/2 text-[var(--text-tertiary)]"
               />
               <input
                 type="text"
                 placeholder="Buscar por número de recepción, orden o proveedor..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 40px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-3 pb-3 pl-10 border rounded-2 text-3.5"
               />
             </div>
           </div>
 
           {/* Lista de Recepciones */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            overflow: 'hidden'
-          }}>
+          <div className="bg-white border rounded-3 overflow-hidden">
             {loading ? (
-              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <div className="p-[60px] text-center text-[var(--text-secondary)]">
                 Cargando recepciones...
               </div>
             ) : filteredRecepciones.length === 0 ? (
-              <div style={{ padding: '60px', textAlign: 'center' }}>
-                <PackageX size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
-                <p style={{ color: 'var(--text-secondary)' }}>
+              <div className="p-[60px] text-center">
+                <PackageX size={48} className="text-[var(--text-tertiary)]" />
+                <p className="text-[var(--text-secondary)]">
                   No se encontraron recepciones cerradas
                 </p>
               </div>
@@ -349,45 +312,32 @@ export default function NuevaDevolucionPage() {
                 {filteredRecepciones.map((recepcion) => (
                   <div
                     key={recepcion.id}
-                    onClick={() => loadRecepcionDetalle(recepcion.id)}
-                    style={{
-                      padding: '20px',
-                      borderBottom: '1px solid var(--border-color)',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s'
-                    }}
+                    onClick={() => loadRecepcionDetalle(recepcion.id)} className="p-5 border-b cursor-pointer transition"
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-50)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div className="flex justify-between">
                       <div>
-                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '16px', fontWeight: '600' }}>
+                        <div className="flex gap-3 items-center mb-2">
+                          <span className="text-4 font-semibold">
                             {recepcion.numero}
                           </span>
-                          <span style={{
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            backgroundColor: 'var(--emerald-100)',
-                            color: 'var(--emerald-800)'
-                          }}>
+                          <span className="py-[4px] px-2 rounded-[6px] text-[11px] font-semibold bg-[var(--emerald-100)] text-[var(--emerald-800)]">
                             {recepcion.estado}
                           </span>
                         </div>
-                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        <p className="text-3.5 text-[var(--text-secondary)] mb-[4px]">
                           Orden: {recepcion.orden?.numero}
                         </p>
-                        <p style={{ fontSize: '14px', fontWeight: '500' }}>
+                        <p className="text-3.5 font-medium">
                           {recepcion.orden?.proveedor?.razon_social}
                         </p>
-                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        <p className="text-[13px] text-[var(--text-secondary)]">
                           RUC: {recepcion.orden?.proveedor?.ruc}
                         </p>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      <div className="text-right">
+                        <p className="text-[13px] text-[var(--text-secondary)]">
                           {formatDate(recepcion.fecha_recepcion)}
                         </p>
                       </div>
@@ -404,20 +354,14 @@ export default function NuevaDevolucionPage() {
       {step === 2 && selectedRecepcion && (
         <div>
           {/* Info de Recepción */}
-          <div style={{
-            backgroundColor: 'var(--blue-50)',
-            border: '1px solid var(--blue-200)',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '24px'
-          }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'start', marginBottom: '12px' }}>
-              <AlertCircle size={20} style={{ color: 'var(--blue-600)', flexShrink: 0, marginTop: '2px' }} />
+          <div className="bg-[var(--blue-50)] border rounded-3 p-4 mb-6">
+            <div className="flex gap-2 mb-3">
+              <AlertCircle size={20} className="text-[var(--blue-600)] shrink-0 mt-[2px]" />
               <div>
-                <p style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--blue-900)' }}>
+                <p className="font-semibold mb-[4px] text-[var(--blue-900)]">
                   Recepción: {selectedRecepcion.numero}
                 </p>
-                <p style={{ fontSize: '14px', color: 'var(--blue-800)' }}>
+                <p className="text-3.5 text-[var(--blue-800)]">
                   Orden: {selectedRecepcion.orden?.numero} | Proveedor: {selectedRecepcion.orden?.proveedor?.razon_social}
                 </p>
               </div>
@@ -425,31 +369,18 @@ export default function NuevaDevolucionPage() {
           </div>
 
           {/* Motivo General */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '20px'
-          }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>
+          <div className="bg-white border rounded-3 p-5 mb-5">
+            <h3 className="text-4 font-semibold mb-4">
               Información General
             </h3>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
+            <div className="mb-4">
+              <label className="block mb-[6px] text-[13px] font-medium">
                 Motivo General *
               </label>
               <select
                 value={motivoGeneral}
-                onChange={(e) => setMotivoGeneral(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }}
+                onChange={(e) => setMotivoGeneral(e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-2 text-3.5"
               >
                 <option value="">Seleccione un motivo</option>
                 <option value="DEFECTUOSO">Producto Defectuoso</option>
@@ -461,52 +392,26 @@ export default function NuevaDevolucionPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500' }}>
+              <label className="block mb-[6px] text-[13px] font-medium">
                 Observaciones Generales
               </label>
               <textarea
                 value={observacionesGenerales}
                 onChange={(e) => setObservacionesGenerales(e.target.value)}
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  resize: 'vertical'
-                }}
+                rows={3} className="w-[100%] py-2.5 px-3 border rounded-2 text-3.5"
                 placeholder="Detalles adicionales sobre la devolución..."
               />
             </div>
           </div>
 
           {/* Items */}
-          <div style={{
-            backgroundColor: 'white',
-            border: '1px solid var(--border-color)',
-            borderRadius: '12px',
-            padding: '20px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>
+          <div className="bg-white border rounded-3 p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-4 font-semibold">
                 Items a Devolver ({items.length})
               </h3>
               <button
-                onClick={addItem}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 14px',
-                  backgroundColor: 'var(--primary-600)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: '500'
-                }}
+                onClick={addItem} className="flex items-center gap-[6px] py-2 px-3.5 bg-[var(--primary-600)] text-white border-0 rounded-[6px] cursor-pointer text-[13px] font-medium"
               >
                 <Plus size={16} />
                 Agregar Item
@@ -514,35 +419,24 @@ export default function NuevaDevolucionPage() {
             </div>
 
             {items.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <div className="p-10 text-center text-[var(--text-secondary)]">
                 No hay items agregados. Haga clic en &quot;Agregar Item&quot; para comenzar.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="flex flex-col gap-3">
                 {items.map((item, index) => (
                   <div
-                    key={index}
-                    style={{
-                      padding: '16px',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--gray-50)'
-                    }}
+                    key={index} className="p-4 border rounded-2 bg-[var(--gray-50)]"
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1.5fr 0.5fr', gap: '12px', alignItems: 'start' }}>
+                    <div className="grid grid-cols-[2fr_1fr_1.5fr_0.5fr] gap-3">
                       <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: '500' }}>
+                        <label className="block mb-[6px] text-3 font-medium">
                           Producto *
                         </label>
                         {item.producto ? (
-                          <div style={{
-                            padding: '10px 12px',
-                            backgroundColor: 'white',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px'
-                          }}>
-                            <div style={{ fontWeight: '500', fontSize: '14px' }}>{item.producto.nombre}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          <div className="py-2.5 px-3 bg-white border rounded-[6px]">
+                            <div className="font-medium text-3.5">{item.producto.nombre}</div>
+                            <div className="text-3 text-[var(--text-secondary)]">
                               Código: {item.producto.codigo}
                             </div>
                           </div>
@@ -551,20 +445,13 @@ export default function NuevaDevolucionPage() {
                             type="text"
                             placeholder="ID del producto"
                             value={item.producto_id}
-                            onChange={(e) => updateItem(index, 'producto_id', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '6px',
-                              fontSize: '14px'
-                            }}
+                            onChange={(e) => updateItem(index, 'producto_id', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
                           />
                         )}
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: '500' }}>
+                        <label className="block mb-[6px] text-3 font-medium">
                           Cantidad *
                         </label>
                         <input
@@ -572,31 +459,17 @@ export default function NuevaDevolucionPage() {
                           min="0"
                           step="1"
                           value={item.cantidad}
-                          onChange={(e) => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}
+                          onChange={(e) => updateItem(index, 'cantidad', parseFloat(e.target.value) || 0)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
                         />
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: '500' }}>
+                        <label className="block mb-[6px] text-3 font-medium">
                           Motivo *
                         </label>
                         <select
                           value={item.motivo}
-                          onChange={(e) => updateItem(index, 'motivo', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}
+                          onChange={(e) => updateItem(index, 'motivo', e.target.value)} className="w-[100%] py-2.5 px-3 border rounded-[6px] text-3.5"
                         >
                           <option value="DEFECTUOSO">Defectuoso</option>
                           <option value="INCORRECTO">Incorrecto</option>
@@ -606,39 +479,24 @@ export default function NuevaDevolucionPage() {
                         </select>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                      <div className="flex items-end h-[100%]">
                         <button
-                          onClick={() => removeItem(index)}
-                          style={{
-                            padding: '10px',
-                            backgroundColor: 'var(--red-50)',
-                            color: 'var(--red-600)',
-                            border: '1px solid var(--red-200)',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
+                          onClick={() => removeItem(index)} className="p-2.5 bg-[var(--red-50)] text-[var(--red-600)] border rounded-[6px] cursor-pointer"
                         >
                           <Trash2 size={18} />
                         </button>
                       </div>
                     </div>
 
-                    <div style={{ marginTop: '12px' }}>
-                      <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', fontWeight: '500' }}>
+                    <div className="mt-3">
+                      <label className="block mb-[6px] text-3 font-medium">
                         Observaciones del Item
                       </label>
                       <input
                         type="text"
                         placeholder="Detalles específicos de este item..."
                         value={item.observaciones || ''}
-                        onChange={(e) => updateItem(index, 'observaciones', e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          fontSize: '13px'
-                        }}
+                        onChange={(e) => updateItem(index, 'observaciones', e.target.value)} className="w-[100%] py-2 px-3 border rounded-[6px] text-[13px]"
                       />
                     </div>
                   </div>
@@ -648,43 +506,16 @@ export default function NuevaDevolucionPage() {
           </div>
 
           {/* Actions */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end',
-            marginTop: '24px'
-          }}>
+          <div className="flex gap-3 justify-end mt-6">
             <button
               onClick={() => setStep(1)}
-              disabled={loading}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                opacity: loading ? 0.6 : 1
-              }}
+              disabled={loading} className="py-3 px-6 bg-white text-[var(--text-primary)] border rounded-2 text-3.5 font-medium"
             >
               Volver
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || items.length === 0 || !motivoGeneral}
-              style={{
-                padding: '12px 32px',
-                backgroundColor: 'var(--primary-600)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: (loading || items.length === 0 || !motivoGeneral) ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '600',
-                opacity: (loading || items.length === 0 || !motivoGeneral) ? 0.6 : 1
-              }}
+              disabled={loading || items.length === 0 || !motivoGeneral} className="py-3 px-8 bg-[var(--primary-600)] text-white border-0 rounded-2 text-3.5 font-semibold"
             >
               {loading ? 'Creando...' : 'Crear Devolución'}
             </button>

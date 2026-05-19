@@ -139,10 +139,6 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(item.cantidad / maxCantidad) * 100}%`,
-                        backgroundColor: ESTADO_COLORS[item.estado]
-                      }}
                     />
                   </div>
                 </div>
@@ -178,7 +174,6 @@ export default function PedidosPorEstadoReport({ filters }: Props) {
                         <div className="flex items-center gap-2">
                           <div
                             className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: ESTADO_COLORS[item.estado] }}
                           />
                           <span className="text-sm font-medium text-gray-900">
                             {ESTADO_LABELS[item.estado]}

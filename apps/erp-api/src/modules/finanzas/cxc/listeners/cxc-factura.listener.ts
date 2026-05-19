@@ -35,10 +35,15 @@ export class CxcFacturaListener implements OnModuleInit {
       }
     });
 
-    // HARDENING E1: Suscribirse a procesamiento de eventos de outbox_events
-    // El evento cpe.anulado se procesa desde outbox_events por ContabilidadEventsListener
-    // pero también necesitamos procesarlo aquí para revertir CxC
-    this.logger.log('📡 [CXC] Listener de CPE anulado se procesará desde outbox_events');
+    this.eventBus.on('cpe.anulado', async (event: ERPEvent) => {
+      try {
+        await this.procesarEventoCpeAnulado(event?.data ?? event);
+      } catch (error) {
+        this.logger.error('❌ [CXC] Error procesando CPE anulado desde EventBus:', error);
+      }
+    });
+
+    this.logger.log('📡 [CXC] Listener de CPE anulado conectado al EventBus');
   }
 
   /**
@@ -89,42 +94,59 @@ export class CxcFacturaListener implements OnModuleInit {
       return;
     }
 
-    // Si hay saldo pendiente, marcar como anulada/revertida
-    if (cxc.monto_pendiente > 0) {
-      const { error: updateError } = await client
-        .from('cuentas_por_cobrar')
-        .update({
-          estado: 'ANULADA',
-          monto_pendiente: 0,
-          observaciones: `REVERTIDA: CPE anulado. Motivo: ${eventData.motivo || 'Sin motivo especificado'}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', cxc.id)
-        .eq('tenant_id', tenantId);
+    // Calcular si hubo cobros aplicados
+    const montoTotal = Number(cxc.monto_total || 0);
+    const montoPendiente = Number(cxc.monto_pendiente || 0);
+    const montoCobrado = montoTotal - montoPendiente;
 
-      if (updateError) {
-        this.logger.error(`❌ [CXC] Error revirtiendo CxC ${cxc.id}:`, updateError);
-        throw new Error(`Error revirtiendo CxC: ${updateError.message}`);
-      }
+    // Registrar cobro de reversa si hubo pagos parciales o totales
+    if (montoCobrado > 0) {
+      this.logger.warn(
+        `⚠️ [CXC] CxC ${cxc.id} tiene cobros por ${montoCobrado}. Se registra pago de reversa por anulación de CPE.`,
+      );
 
-      this.logger.log(`✅ [CXC] CxC ${cxc.id} revertida exitosamente por anulación de CPE ${cpeId}`);
-    } else {
-      this.logger.log(`ℹ️ [CXC] CxC ${cxc.id} ya está completamente cobrada, se marca como anulada`);
-      
-      const { error: updateError } = await client
-        .from('cuentas_por_cobrar')
-        .update({
-          estado: 'ANULADA',
-          observaciones: `REVERTIDA: CPE anulado (ya estaba cobrada). Motivo: ${eventData.motivo || 'Sin motivo especificado'}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', cxc.id)
-        .eq('tenant_id', tenantId);
-
-      if (updateError) {
-        this.logger.error(`❌ [CXC] Error actualizando CxC ${cxc.id}:`, updateError);
-        throw new Error(`Error actualizando CxC: ${updateError.message}`);
+      // Crear pago de reversa (negativo) para mantener audit trail
+      try {
+        await client.from('cxc_pagos').insert({
+          tenant_id: tenantId,
+          cuenta_id: cxc.id,
+          monto: -montoCobrado,
+          tipo: 'REVERSA_ANULACION',
+          referencia: `REVERSA-CPE-${cpeId}`,
+          observaciones: `Reversa automática por anulación de CPE ${cpeId}. Motivo: ${eventData.motivo || 'Sin motivo'}`,
+          fecha_pago: new Date().toISOString(),
+          idempotency_key: `cxc.reversa.anulacion:${tenantId}:${cxc.id}:${cpeId}`,
+        });
+      } catch (pagoError) {
+        this.logger.error(`❌ [CXC] Error creando pago de reversa para CxC ${cxc.id}:`, pagoError);
+        // No bloquear la anulación de la CxC
       }
     }
+
+    // Marcar CxC como anulada
+    const observaciones = montoCobrado > 0
+      ? `REVERTIDA: CPE anulado. Cobros revertidos: ${montoCobrado.toFixed(2)}. Motivo: ${eventData.motivo || 'Sin motivo especificado'}`
+      : `REVERTIDA: CPE anulado. Sin cobros que revertir. Motivo: ${eventData.motivo || 'Sin motivo especificado'}`;
+
+    const { error: updateError } = await client
+      .from('cuentas_por_cobrar')
+      .update({
+        estado: 'ANULADA',
+        monto_pendiente: 0,
+        observaciones,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', cxc.id)
+      .eq('tenant_id', tenantId);
+
+    if (updateError) {
+      this.logger.error(`❌ [CXC] Error revirtiendo CxC ${cxc.id}:`, updateError);
+      throw new Error(`Error revirtiendo CxC: ${updateError.message}`);
+    }
+
+    this.logger.log(
+      `✅ [CXC] CxC ${cxc.id} revertida exitosamente por anulación de CPE ${cpeId}` +
+        (montoCobrado > 0 ? ` (cobros revertidos: ${montoCobrado.toFixed(2)})` : ''),
+    );
   }
 }

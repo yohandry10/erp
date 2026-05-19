@@ -1,30 +1,13 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-const h2Styles = {
-  base: {
-    fontSize: "2rem",
-    fontWeight: "800",
-    color: "var(--primary-800)",
-    margin: "0",
-    position: "relative" as const,
-    display: "flex",
-    alignItems: "center",
-    gap: "0.75rem",
-  },
-}
-
 export interface H2Props extends React.HTMLAttributes<HTMLHeadingElement> {}
 
 const H2 = React.forwardRef<HTMLHeadingElement, H2Props>(
-  ({ className, style, ...props }, ref) => (
+  ({ className, ...props }, ref) => (
     <h2
       ref={ref}
-      className={className}
-      style={{
-        ...h2Styles.base,
-        ...style,
-      }}
+      className={cn("relative m-0 flex items-center gap-3 text-3xl font-extrabold text-slate-800", className)}
       {...props}
     />
   )

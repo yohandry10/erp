@@ -162,6 +162,95 @@ export class EstadosFinancierosService {
     return error?.code === '55000' || error?.code === 'PGRST116';
   }
 
+  private getPeriodoRange(anio: number, mes: number): { inicio: string; fin: string } {
+    const inicio = new Date(Date.UTC(anio, mes - 1, 1)).toISOString();
+    const fin = new Date(Date.UTC(anio, mes, 1)).toISOString();
+
+    return { inicio, fin };
+  }
+
+  private async calcularBalanceComprobacionDesdeAsientos(
+    tenantId: string,
+    anio: number,
+    mes: number,
+  ): Promise<BalanceComprobacionItem[]> {
+    const { inicio, fin } = this.getPeriodoRange(anio, mes);
+
+    const detalles: any[] = [];
+    const pageSize = 1000;
+
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await this.supabase
+        .getClient()
+        .from('detalle_asientos')
+        .select(`
+          debe,
+          haber,
+          plan_cuentas!fk_detalle_asientos_cuenta_id (
+            codigo,
+            nombre
+          ),
+          asientos_contables!fk_detalle_asientos_asiento_id_v2 (
+            tenant_id,
+            fecha,
+            estado
+          )
+        `)
+        .eq('asientos_contables.tenant_id', tenantId)
+        .gte('asientos_contables.fecha', inicio)
+        .lt('asientos_contables.fecha', fin)
+        .neq('asientos_contables.estado', 'ANULADO')
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        console.error('❌ Error calculando balance desde asientos:', error);
+        throw error;
+      }
+
+      detalles.push(...(data || []));
+
+      if (!data || data.length < pageSize) {
+        break;
+      }
+    }
+
+    const porCuenta = new Map<string, BalanceComprobacionItem>();
+
+    for (const detalle of detalles || []) {
+      const cuenta = Array.isArray((detalle as any).plan_cuentas)
+        ? (detalle as any).plan_cuentas[0]
+        : (detalle as any).plan_cuentas;
+      const codigo = cuenta?.codigo || 'SIN_CUENTA';
+      const nombre = cuenta?.nombre || 'Cuenta sin nombre';
+      const debe = Number((detalle as any).debe || 0);
+      const haber = Number((detalle as any).haber || 0);
+
+      const actual = porCuenta.get(codigo) || {
+        cuenta: codigo,
+        nombre,
+        saldo_inicial: 0,
+        debe: 0,
+        haber: 0,
+        saldo_final: 0,
+      };
+
+      actual.debe += debe;
+      actual.haber += haber;
+      actual.saldo_final = actual.debe - actual.haber;
+      porCuenta.set(codigo, actual);
+    }
+
+    return [...porCuenta.values()]
+      .map(item => ({
+        ...item,
+        debe: Number(item.debe.toFixed(2)),
+        haber: Number(item.haber.toFixed(2)),
+        saldo_final: Number(item.saldo_final.toFixed(2)),
+      }))
+      .filter(item => Math.abs(item.debe) > 0.01 || Math.abs(item.haber) > 0.01 || Math.abs(item.saldo_final) > 0.01)
+      .sort((a, b) => a.cuenta.localeCompare(b.cuenta, 'es'));
+  }
+
   private getEmptyEstadoResultados(): EstadoResultados {
     return {
       ingresos: {
@@ -317,9 +406,10 @@ export class EstadosFinancierosService {
 
       if (error) {
         if (this.isMaterializedViewUnavailable(error)) {
-          console.warn('⚠️ Balance de comprobación sin MV poblada o sin filas, retornando lista vacía');
-          this.setCache(cacheKey, []);
-          return [];
+          console.warn('⚠️ Balance de comprobación sin MV disponible; calculando desde asientos');
+          const fallbackBalance = await this.calcularBalanceComprobacionDesdeAsientos(tenantId, anio, mes);
+          this.setCache(cacheKey, fallbackBalance);
+          return fallbackBalance;
         }
         console.error('❌ Error consultando vista materializada:', error);
         throw error;
@@ -336,6 +426,13 @@ export class EstadosFinancierosService {
         haber: parseFloat(item.haber || 0),
         saldo_final: parseFloat(item.saldo_final || 0),
       }));
+
+      if (balanceItems.length === 0) {
+        console.warn('⚠️ Balance de comprobación con MV vacía; calculando desde asientos');
+        const fallbackBalance = await this.calcularBalanceComprobacionDesdeAsientos(tenantId, anio, mes);
+        this.setCache(cacheKey, fallbackBalance);
+        return fallbackBalance;
+      }
 
       // Guardar en cache
       this.setCache(cacheKey, balanceItems);
@@ -617,6 +714,12 @@ export class EstadosFinancierosService {
 
       if (!ecuacionBalanceada) {
         console.warn(`⚠️ ADVERTENCIA: La ecuación contable no está balanceada. Diferencia: ${diferencia.toFixed(2)}`);
+        // Incluir advertencia en el resultado para que el UI pueda alertar al usuario
+        (balanceGeneral as any).advertencia_balance = {
+          desbalanceado: true,
+          diferencia: Number(diferencia.toFixed(2)),
+          mensaje: `La ecuación contable no está balanceada. Diferencia: ${diferencia.toFixed(2)}`,
+        };
       }
 
       // Guardar en cache

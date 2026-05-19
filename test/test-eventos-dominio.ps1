@@ -114,7 +114,7 @@ Write-Host "4️⃣ Creando recepción de mercancía..." -ForegroundColor Cyan
 try {
     $ordenDetalle = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId" -Method Get -Headers $headers
     $detalleId = $ordenDetalle.detalles[0].id
-    
+
     $recepcionBody = @{
         orden_id = $ordenId
         almacen_id = "00000000-0000-0000-0000-000000000001"

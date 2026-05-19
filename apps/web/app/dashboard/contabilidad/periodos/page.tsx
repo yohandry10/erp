@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Lock, Unlock, CheckCircle, AlertCircle, PlusCircle } from 'lucide-react'
+import { AlertCircle, Calendar, Lock, Loader2, PlusCircle, RefreshCw, Unlock } from 'lucide-react'
 import PeriodoCierreWizard from '@/components/contabilidad/PeriodoCierreWizard'
 import { useApi } from '@/hooks/use-api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Periodo {
   id: string
@@ -17,6 +19,8 @@ interface Periodo {
   created_at: string
   updated_at: string
 }
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
 export default function PeriodosPage() {
   const router = useRouter()
@@ -31,20 +35,18 @@ export default function PeriodosPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const result = await apiCall('/contabilidad/periodos')
       const periodosData = result?.data || []
-      
-      // Ordenar por año y mes descendente
       const sorted = [...periodosData].sort((a: Periodo, b: Periodo) => {
         if (a.anio !== b.anio) return b.anio - a.anio
         return b.mes - a.mes
       })
-      
+
       setPeriodos(sorted)
     } catch (err) {
-      console.error('Error fetching períodos:', err)
-      setError('Error al cargar los períodos contables')
+      console.error('Error fetching periodos:', err)
+      setError('Error al cargar los periodos contables')
     } finally {
       setLoading(false)
     }
@@ -56,547 +58,255 @@ export default function PeriodosPage() {
 
   const formatPeriodo = (anio: number, mes: number) => {
     const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
     ]
     return `${meses[mes - 1]} ${anio}`
   }
 
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'ABIERTO':
-        return { bg: '#dcfce7', text: '#166534', icon: Unlock }
-      case 'CERRADO':
-        return { bg: '#fee2e2', text: '#991b1b', icon: Lock }
-      case 'BLOQUEADO':
-        return { bg: '#fef3c7', text: '#92400e', icon: AlertCircle }
-      default:
-        return { bg: '#f3f4f6', text: '#6b7280', icon: Calendar }
-    }
-  }
-
   const getEstadoIcon = (estado: string) => {
-    const { icon: Icon } = getEstadoColor(estado)
-    return <Icon size={16} />
+    if (estado === 'ABIERTO') return Unlock
+    if (estado === 'CERRADO') return Lock
+    return AlertCircle
   }
 
-  if (loading) {
+  const getEstadoBadge = (estado: string) => {
+    const Icon = getEstadoIcon(estado)
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h1 className="dashboard-title">Períodos Contables</h1>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '3rem',
-          background: 'white',
-          borderRadius: '12px'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '4px solid #e5e7eb',
-              borderTopColor: '#3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 1rem'
-            }} />
-            <p style={{ color: '#6b7280' }}>Cargando períodos...</p>
-          </div>
-        </div>
-      </div>
+      <span className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+        <Icon className="h-4 w-4" />
+        {estado}
+      </span>
     )
   }
 
-  if (error) {
+  const stats = [
+    ['Total periodos', periodos.length],
+    ['Abiertos', periodos.filter((p) => p.estado === 'ABIERTO').length],
+    ['Cerrados', periodos.filter((p) => p.estado === 'CERRADO').length],
+    ['Bloqueados', periodos.filter((p) => p.estado === 'BLOQUEADO').length],
+  ]
+
+  if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h1 className="dashboard-title">Períodos Contables</h1>
-        </div>
-        <div style={{
-          padding: '2rem',
-          background: '#fee2e2',
-          border: '1px solid #fecaca',
-          borderRadius: '12px',
-          color: '#991b1b'
-        }}>
-          <p style={{ margin: 0, fontWeight: '600' }}>⚠️ {error}</p>
-          <button
-            onClick={fetchPeriodos}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1rem',
-              background: '#dc2626',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-          >
-            Reintentar
-          </button>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando periodos contables...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Períodos Contables</h1>
-          <p className="dashboard-subtitle">
-            Gestión de períodos contables por año y mes
-          </p>
-        </div>
-        <button
-          onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.875rem',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#2563eb'
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#3b82f6'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}
-        >
-          <PlusCircle size={20} />
-          Crear Período
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          padding: '1.5rem',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              padding: '0.5rem',
-              background: '#dbeafe',
-              borderRadius: '8px',
-              display: 'flex'
-            }}>
-              <Calendar size={20} style={{ color: '#3b82f6' }} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <Calendar className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                  ERP Period Control
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Periodos Contables</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  Control de apertura, cierre y bloqueo por mes fiscal.
+                </p>
+              </div>
             </div>
-            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>
-              TOTAL PERÍODOS
-            </h3>
-          </div>
-          <p style={{ margin: 0, fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
-            {periodos.length}
-          </p>
-        </div>
-
-        <div style={{
-          padding: '1.5rem',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              padding: '0.5rem',
-              background: '#dcfce7',
-              borderRadius: '8px',
-              display: 'flex'
-            }}>
-              <Unlock size={20} style={{ color: '#059669' }} />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={fetchPeriodos}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
+                className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Crear periodo
+              </Button>
             </div>
-            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>
-              ABIERTOS
-            </h3>
           </div>
-          <p style={{ margin: 0, fontSize: '2rem', fontWeight: '700', color: '#059669' }}>
-            {periodos.filter(p => p.estado === 'ABIERTO').length}
-          </p>
-        </div>
+        </section>
 
-        <div style={{
-          padding: '1.5rem',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              padding: '0.5rem',
-              background: '#fee2e2',
-              borderRadius: '8px',
-              display: 'flex'
-            }}>
-              <Lock size={20} style={{ color: '#dc2626' }} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>
-              CERRADOS
-            </h3>
-          </div>
-          <p style={{ margin: 0, fontSize: '2rem', fontWeight: '700', color: '#dc2626' }}>
-            {periodos.filter(p => p.estado === 'CERRADO').length}
-          </p>
-        </div>
+        {error && (
+          <Card className="border-cyan-400/20 bg-cyan-400/10 text-cyan-50">
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <AlertCircle className="h-5 w-5" />
+                {error}
+              </div>
+              <Button type="button" onClick={fetchPeriodos} className="bg-blue-600 text-white hover:bg-blue-500">
+                Reintentar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-        <div style={{
-          padding: '1.5rem',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              padding: '0.5rem',
-              background: '#fef3c7',
-              borderRadius: '8px',
-              display: 'flex'
-            }}>
-              <AlertCircle size={20} style={{ color: '#d97706' }} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#6b7280' }}>
-              BLOQUEADOS
-            </h3>
-          </div>
-          <p style={{ margin: 0, fontSize: '2rem', fontWeight: '700', color: '#d97706' }}>
-            {periodos.filter(p => p.estado === 'BLOQUEADO').length}
-          </p>
-        </div>
-      </div>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {stats.map(([label, value]) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="p-4">
+                <div className={labelClass}>{label}</div>
+                <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
-      {/* Períodos List */}
-      {periodos.length === 0 ? (
-        <div style={{
-          padding: '3rem',
-          background: 'white',
-          borderRadius: '12px',
-          textAlign: 'center',
-          border: '2px dashed #d1d5db'
-        }}>
-          <Calendar size={48} style={{ color: '#9ca3af', margin: '0 auto 1rem' }} />
-          <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.125rem', fontWeight: '600', color: '#1f2937' }}>
-            No hay períodos contables
-          </p>
-          <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
-            Crea tu primer período contable para comenzar
-          </p>
-          <button
-            onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '0.875rem'
-            }}
-          >
-            <PlusCircle size={20} />
-            Crear Período
-          </button>
-        </div>
-      ) : (
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Período
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Año
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Mes
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Estado
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Fecha Cierre
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'right',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodos.map((periodo) => {
-                  const estadoColor = getEstadoColor(periodo.estado)
-                  
-                  return (
-                    <tr
-                      key={periodo.id}
-                      style={{
-                        borderBottom: '1px solid #f3f4f6',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f9fafb'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'white'
-                      }}
-                    >
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{
-                            padding: '0.5rem',
-                            background: '#f3f4f6',
-                            borderRadius: '8px',
-                            display: 'flex'
-                          }}>
-                            <Calendar size={20} style={{ color: '#6b7280' }} />
-                          </div>
-                          <div>
-                            <p style={{ margin: 0, fontWeight: '600', color: '#1f2937' }}>
-                              {formatPeriodo(periodo.anio, periodo.mes)}
-                            </p>
-                            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                              ID: {periodo.id.substring(0, 8)}...
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '500' }}>
-                        {periodo.anio}
-                      </td>
-                      <td style={{ padding: '1rem', color: '#1f2937', fontWeight: '500' }}>
-                        {String(periodo.mes).padStart(2, '0')}
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.375rem 0.75rem',
-                          background: estadoColor.bg,
-                          color: estadoColor.text,
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em'
-                        }}>
-                          {getEstadoIcon(periodo.estado)}
-                          {periodo.estado}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                        {periodo.fecha_cierre 
-                          ? new Date(periodo.fecha_cierre).toLocaleDateString('es-PE', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })
-                          : '-'
-                        }
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          {periodo.estado === 'ABIERTO' && (
-                            <button
-                              onClick={() => {
-                                setSelectedPeriodo(periodo)
-                                setShowWizard(true)
-                              }}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '0.875rem',
-                                fontWeight: '600',
-                                transition: 'all 0.2s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.375rem'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-1px)'
-                                e.currentTarget.style.boxShadow = '0 4px 6px rgba(217, 119, 6, 0.3)'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = 'none'
-                              }}
-                            >
-                              <Lock size={14} />
-                              Cerrar
-                            </button>
-                          )}
-                          <button
-                            onClick={() => router.push(`/dashboard/contabilidad/periodos/${periodo.id}`)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#f3f4f6',
-                              color: '#374151',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              fontWeight: '600',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#f3f4f6'
-                            }}
-                          >
-                            Ver Detalle
-                          </button>
-                        </div>
-                      </td>
+        <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Calendario contable</CardTitle>
+            <p className="text-xs text-slate-400">Periodos ordenados por ano y mes descendente.</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {periodos.length === 0 ? (
+              <div className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                  <Calendar className="h-10 w-10 text-cyan-100" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">No hay periodos contables</h3>
+                  <p className="mt-2 text-sm text-slate-400">Crea el primer periodo para habilitar control de cierre.</p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => router.push('/dashboard/contabilidad/periodos/nuevo')}
+                  className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Crear periodo
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] border-collapse">
+                  <thead className="bg-cyan-400/10">
+                    <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                      <th className="px-4 py-3">Periodo</th>
+                      <th className="px-4 py-3">Ano</th>
+                      <th className="px-4 py-3">Mes</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Fecha cierre</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                  </thead>
+                  <tbody>
+                    {periodos.map((periodo) => (
+                      <tr key={periodo.id} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/10 p-2 text-cyan-100">
+                              <Calendar className="h-4 w-4" />
+                            </span>
+                            <span>
+                              <span className="block font-semibold text-white">{formatPeriodo(periodo.anio, periodo.mes)}</span>
+                              <span className="font-mono text-xs text-slate-500">{periodo.id.substring(0, 8)}</span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-white">{periodo.anio}</td>
+                        <td className="px-4 py-3 font-semibold text-white">{String(periodo.mes).padStart(2, '0')}</td>
+                        <td className="px-4 py-3">{getEstadoBadge(periodo.estado)}</td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {periodo.fecha_cierre
+                            ? new Date(periodo.fecha_cierre).toLocaleDateString('es-PE', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            {periodo.estado === 'ABIERTO' && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPeriodo(periodo)
+                                  setShowWizard(true)
+                                }}
+                                className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                              >
+                                <Lock className="h-4 w-4" />
+                                Cerrar
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => router.push(`/dashboard/contabilidad/periodos/${periodo.id}`)}
+                              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                            >
+                              Ver detalle
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Info Box */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1.5rem',
-        background: '#eff6ff',
-        border: '1px solid #bfdbfe',
-        borderRadius: '12px'
-      }}>
-        <h4 style={{
-          margin: '0 0 0.5rem 0',
-          fontSize: '1rem',
-          fontWeight: '600',
-          color: '#1e40af'
-        }}>
-          💡 Acerca de los Períodos Contables
-        </h4>
-        <p style={{
-          margin: 0,
-          fontSize: '0.875rem',
-          color: '#1e40af',
-          lineHeight: '1.6'
-        }}>
-          Los períodos contables permiten organizar y controlar las operaciones contables por mes y año.
-          Un período <strong>ABIERTO</strong> permite registrar asientos, un período <strong>CERRADO</strong> no permite
-          nuevos movimientos, y un período <strong>BLOQUEADO</strong> está completamente restringido.
-        </p>
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="grid gap-3 p-5 md:grid-cols-3">
+            {[
+              ['Abierto', 'Permite registrar asientos y operaciones del mes.'],
+              ['Cerrado', 'Impide nuevos movimientos contables ordinarios.'],
+              ['Bloqueado', 'Restringe el periodo para revisión o auditoria.'],
+            ].map(([title, description]) => (
+              <div key={title} className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4">
+                <div className="text-sm font-bold text-white">{title}</div>
+                <p className="mt-2 text-xs leading-5 text-slate-400">{description}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {showWizard && selectedPeriodo && (
+          <PeriodoCierreWizard
+            periodoId={selectedPeriodo.id}
+            anio={selectedPeriodo.anio}
+            mes={selectedPeriodo.mes}
+            onClose={() => {
+              setShowWizard(false)
+              setSelectedPeriodo(null)
+            }}
+            onSuccess={() => {
+              setShowWizard(false)
+              setSelectedPeriodo(null)
+              fetchPeriodos()
+            }}
+          />
+        )}
       </div>
-
-      {/* Wizard Modal */}
-      {showWizard && selectedPeriodo && (
-        <PeriodoCierreWizard
-          periodoId={selectedPeriodo.id}
-          anio={selectedPeriodo.anio}
-          mes={selectedPeriodo.mes}
-          onClose={() => {
-            setShowWizard(false)
-            setSelectedPeriodo(null)
-          }}
-          onSuccess={() => {
-            setShowWizard(false)
-            setSelectedPeriodo(null)
-            fetchPeriodos()
-          }}
-        />
-      )}
-
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

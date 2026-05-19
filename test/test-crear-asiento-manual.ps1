@@ -49,7 +49,7 @@ $mes = (Get-Date).Month
 try {
     $periodos = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
     $periodoActual = $periodos.data | Where-Object { $_.anio -eq $anio -and $_.mes -eq $mes }
-    
+
     if (-not $periodoActual) {
         Write-Host "📅 Creando período $anio-$mes..." -ForegroundColor Yellow
         $nuevoPeriodo = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Post -Headers $headers -Body (@{
@@ -92,7 +92,7 @@ Write-Host ($asientoData | ConvertTo-Json -Depth 10)
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asiento-contable" -Method Post -Headers $headers -Body ($asientoData | ConvertTo-Json -Depth 10)
-    
+
     Write-Host "`n✅ ASIENTO CREADO EXITOSAMENTE" -ForegroundColor Green
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
     Write-Host "ID: $($response.data.id)" -ForegroundColor Cyan
@@ -103,44 +103,44 @@ try {
     Write-Host "Total Debe: S/ $($response.data.total_debe)" -ForegroundColor Cyan
     Write-Host "Total Haber: S/ $($response.data.total_haber)" -ForegroundColor Cyan
     Write-Host "Estado: $($response.data.estado)" -ForegroundColor Cyan
-    
+
     Write-Host "`nDetalles del asiento:" -ForegroundColor Yellow
     foreach ($detalle in $response.data.detalles) {
         Write-Host "  • $($detalle.cuenta_codigo) - $($detalle.cuenta_nombre)" -ForegroundColor White
         Write-Host "    Debe: S/ $($detalle.debe) | Haber: S/ $($detalle.haber)" -ForegroundColor Gray
         Write-Host "    Concepto: $($detalle.concepto)" -ForegroundColor Gray
     }
-    
+
     Write-Host "`n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-    
+
     # 5. Verificar que el asiento se puede consultar
     Write-Host "`n🔍 Verificando asiento creado..." -ForegroundColor Cyan
     $asientoCreado = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos-contables/$($response.data.id)" -Method Get -Headers $headers
-    
+
     if ($asientoCreado.success) {
         Write-Host "✅ Asiento verificado correctamente" -ForegroundColor Green
     }
-    
+
     # 6. Listar asientos recientes
     Write-Host "`n📋 Listando asientos recientes..." -ForegroundColor Cyan
     $asientosRecientes = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos-contables?limit=5" -Method Get -Headers $headers
-    
+
     Write-Host "Total de asientos: $($asientosRecientes.total)" -ForegroundColor Cyan
     Write-Host "Últimos 5 asientos:" -ForegroundColor Yellow
     foreach ($asiento in $asientosRecientes.data) {
         Write-Host "  • $($asiento.numero_asiento) - $($asiento.concepto) (S/ $($asiento.total_debe))" -ForegroundColor White
     }
-    
+
 } catch {
     Write-Host "`n❌ ERROR CREANDO ASIENTO" -ForegroundColor Red
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     Write-Host "Mensaje: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.ErrorDetails.Message) {
         Write-Host "`nDetalles del error:" -ForegroundColor Yellow
         Write-Host $_.ErrorDetails.Message -ForegroundColor Red
     }
-    
+
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Red
     exit 1
 }

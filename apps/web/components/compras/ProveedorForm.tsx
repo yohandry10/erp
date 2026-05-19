@@ -96,45 +96,24 @@ export function ProveedorForm({
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6" noValidate>
       {/* Información Básica */}
       <div className="activity-card">
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+        <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <Building2 size={20} />
           Información Básica
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* RUC */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
-              RUC <span style={{ color: '#ef4444' }}>*</span>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+              RUC <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               {...register('ruc')}
-              placeholder="20123456789"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.ruc ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                fontFamily: 'monospace'
-              }}
+              placeholder="20123456789" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
             />
             {errors.ruc && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.ruc.message}
               </p>
             )}
@@ -142,29 +121,16 @@ export function ProveedorForm({
 
           {/* Razón Social */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
-              Razón Social <span style={{ color: '#ef4444' }}>*</span>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+              Razón Social <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               {...register('razon_social')}
-              placeholder="DISTRIBUIDORA ABC S.A.C."
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.razon_social ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              placeholder="DISTRIBUIDORA ABC S.A.C." className="w-[100%] p-3 rounded-2 text-[0.875rem]"
             />
             {errors.razon_social && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.razon_social.message}
               </p>
             )}
@@ -172,29 +138,16 @@ export function ProveedorForm({
 
           {/* Nombre Comercial */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Nombre Comercial
             </label>
             <input
               type="text"
               {...register('nombre_comercial')}
-              placeholder="ABC Distribuidora"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.nombre_comercial ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              placeholder="ABC Distribuidora" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
             />
             {errors.nombre_comercial && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.nombre_comercial.message}
               </p>
             )}
@@ -202,41 +155,21 @@ export function ProveedorForm({
 
           {/* Email */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
-              Email <span style={{ color: '#ef4444' }}>*</span>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
+              Email <span className="text-red-500">*</span>
             </label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <Mail 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '0.75rem', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)', 
-                  color: '#9ca3af' 
-                }} 
+                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400" 
               />
               <input
                 type="email"
                 {...register('email')}
-                placeholder="contacto@abc.com"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  borderRadius: '8px',
-                  border: errors.email ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                placeholder="contacto@abc.com" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
               />
             </div>
             {errors.email && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.email.message}
               </p>
             )}
@@ -246,44 +179,24 @@ export function ProveedorForm({
 
       {/* Información de Contacto */}
       <div className="activity-card">
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+        <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <User size={20} />
           Información de Contacto
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Contacto */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Nombre del Contacto
             </label>
             <input
               type="text"
               {...register('contacto')}
-              placeholder="Juan Pérez"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.contacto ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              placeholder="Juan Pérez" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
             />
             {errors.contacto && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.contacto.message}
               </p>
             )}
@@ -291,83 +204,43 @@ export function ProveedorForm({
 
           {/* Teléfono */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Teléfono
             </label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <Phone 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '0.75rem', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)', 
-                  color: '#9ca3af' 
-                }} 
+                size={16} className="absolute left-3 top-[50%] -translate-y-1/2 text-gray-400" 
               />
               <input
                 type="text"
                 {...register('telefono')}
-                placeholder="+51 999 888 777"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  borderRadius: '8px',
-                  border: errors.telefono ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                placeholder="+51 999 888 777" className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
               />
             </div>
             {errors.telefono && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.telefono.message}
               </p>
             )}
           </div>
 
           {/* Dirección */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+          <div>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Dirección
             </label>
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <MapPin 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '0.75rem', 
-                  top: '0.75rem', 
-                  color: '#9ca3af' 
-                }} 
+                size={16} className="absolute left-3 top-3 text-gray-400" 
               />
               <textarea
                 {...register('direccion')}
                 placeholder="Av. Principal 123, Lima"
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  borderRadius: '8px',
-                  border: errors.direccion ? '1px solid #ef4444' : '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  resize: 'vertical'
-                }}
+                rows={2} className="w-[100%] pt-3 pr-3 pb-3 pl-10 rounded-2 text-[0.875rem]"
               />
             </div>
             {errors.direccion && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.direccion.message}
               </p>
             )}
@@ -377,40 +250,19 @@ export function ProveedorForm({
 
       {/* Condiciones Comerciales */}
       <div className="activity-card">
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+        <h3 className="text-[1.125rem] font-semibold mb-6 flex items-center gap-2">
           <CreditCard size={20} />
           Condiciones Comerciales
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-6">
           {/* Condiciones de Pago */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Condiciones de Pago
             </label>
             <select
-              {...register('condiciones_pago')}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.condiciones_pago ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
+              {...register('condiciones_pago')} className="w-[100%] p-3 rounded-2 text-[0.875rem] bg-white"
             >
               <option value="CONTADO">Contado</option>
               <option value="CREDITO_15">Crédito 15 días</option>
@@ -420,7 +272,7 @@ export function ProveedorForm({
               <option value="CREDITO_90">Crédito 90 días</option>
             </select>
             {errors.condiciones_pago && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.condiciones_pago.message}
               </p>
             )}
@@ -428,36 +280,23 @@ export function ProveedorForm({
 
           {/* Límite de Crédito */}
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '500', 
-              marginBottom: '0.5rem',
-              color: '#374151'
-            }}>
+            <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
               Límite de Crédito (PEN)
             </label>
             <input
               type="number"
               step="0.01"
               {...register('limite_credito', { valueAsNumber: true })}
-              placeholder="0.00"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: errors.limite_credito ? '1px solid #ef4444' : '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              placeholder="0.00" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
               disabled={condicionesPago === 'CONTADO'}
             />
             {errors.limite_credito && (
-              <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-red-500 text-3 mt-1">
                 {errors.limite_credito.message}
               </p>
             )}
             {condicionesPago === 'CONTADO' && (
-              <p style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p className="text-gray-500 text-3 mt-1">
                 No aplica para pagos al contado
               </p>
             )}
@@ -466,40 +305,18 @@ export function ProveedorForm({
       </div>
 
       {/* Actions */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'flex-end', 
-        gap: '1rem',
-        paddingTop: '1rem',
-        borderTop: '1px solid rgba(0,0,0,0.1)'
-      }}>
+      <div className="flex justify-end gap-4 pt-4 border-t">
         <button
           type="button"
           onClick={onCancel}
-          disabled={isLoading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            color: '#374151',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            opacity: isLoading ? 0.5 : 1
-          }}
+          disabled={isLoading} className="py-3 px-6 rounded-2 border bg-white text-gray-700 text-[0.875rem] font-medium"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isLoading}
-          className="refresh-btn"
-          style={{
-            padding: '0.75rem 1.5rem',
-            opacity: isLoading ? 0.7 : 1,
-            cursor: isLoading ? 'not-allowed' : 'pointer'
-          }}
+          className="refresh-btn py-3 px-6"
         >
           {isLoading ? 'Guardando...' : submitLabel}
         </button>

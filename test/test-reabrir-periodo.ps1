@@ -19,10 +19,10 @@ Write-Host "📋 Step 1: Getting list of periods..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
     Write-Host "✅ Periods retrieved successfully" -ForegroundColor Green
-    
+
     # Find a closed period
     $closedPeriod = $response.data | Where-Object { $_.estado -eq "CERRADO" } | Select-Object -First 1
-    
+
     if ($closedPeriod) {
         Write-Host "Found closed period: $($closedPeriod.anio)-$($closedPeriod.mes) (ID: $($closedPeriod.id))" -ForegroundColor Cyan
         $periodoId = $closedPeriod.id
@@ -50,7 +50,7 @@ try {
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
     $errorBody = $_.ErrorDetails.Message | ConvertFrom-Json
-    
+
     if ($statusCode -eq 403) {
         Write-Host "❌ Access denied: Superadmin privileges required" -ForegroundColor Red
         Write-Host "Error: $($errorBody.message)" -ForegroundColor Red
@@ -68,7 +68,7 @@ Write-Host "✅ Step 3: Verifying period status..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos/$periodoId" -Method Get -Headers $headers
     Write-Host "Period status: $($response.data.estado)" -ForegroundColor Cyan
-    
+
     if ($response.data.estado -eq "ABIERTO") {
         Write-Host "✅ Period successfully reopened!" -ForegroundColor Green
     } else {

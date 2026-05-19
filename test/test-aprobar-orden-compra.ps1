@@ -89,7 +89,7 @@ $aprobarBody = @{
 
 try {
     $aprobarResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/aprobar" -Method Post -Body $aprobarBody -ContentType "application/json"
-    
+
     if ($aprobarResponse.success) {
         Write-Host "✓ Orden aprobada exitosamente" -ForegroundColor Green
         Write-Host "  ID: $($aprobarResponse.data.id)" -ForegroundColor Gray
@@ -115,7 +115,7 @@ Write-Host ""
 Write-Host "Step 4: Verifying orden estado..." -ForegroundColor Yellow
 try {
     $verifyResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($verifyResponse.data.estado -eq "APROBADA") {
         Write-Host "✓ Estado verified: APROBADA" -ForegroundColor Green
         Write-Host "  Aprobado por: $($verifyResponse.data.aprobado_by)" -ForegroundColor Gray
@@ -135,7 +135,7 @@ Write-Host ""
 Write-Host "Step 5: Testing error case - approving already approved orden..." -ForegroundColor Yellow
 try {
     $errorResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/aprobar" -Method Post -Body $aprobarBody -ContentType "application/json"
-    
+
     if (-not $errorResponse.success) {
         Write-Host "✓ Error case handled correctly" -ForegroundColor Green
         Write-Host "  Error message: $($errorResponse.error)" -ForegroundColor Gray

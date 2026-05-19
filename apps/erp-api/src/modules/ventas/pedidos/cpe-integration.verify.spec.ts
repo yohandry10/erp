@@ -184,20 +184,31 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 3. Update correlativo (update)
-        mockSupabaseClient.update.mockReturnThis();
-        mockSupabaseClient.eq.mockReturnThis();
+        // 3. ObtenerSerieYNumero -> empresa_config
+        mockSupabaseClient.single.mockResolvedValueOnce({
+            data: {
+                serie_factura: 'F001',
+                ultimo_numero_factura: 100,
+            },
+            error: null,
+        });
 
-        // 4. CpeService: getXmlSigner -> empresa_config (certificado)
+        // 4. Update correlativo (optimistic concurrency → .select().single())
+        mockSupabaseClient.single.mockResolvedValueOnce({
+            data: { ultimo_numero_factura: 101 },
+            error: null,
+        });
+
+        // 5. CpeService: getXmlSigner -> empresa_config (certificado)
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { certificado_pfx: null }, // Use demo certificate
             error: null,
         });
 
-        // 5. CpeService: check idempotency
+        // 6. CpeService: check idempotency
         mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 
-        // 6. CpeService: insert CPE
+        // 7. CpeService: insert CPE
         const mockCreatedCpe = {
             id: 'cpe-123',
             serie: 'F001',
@@ -214,39 +225,48 @@ describe('CPE Integration Verification', () => {
             error: null,
         });
 
-        // 7. CpeService: ensureDocumentoParaCpe -> rpc
-        mockSupabaseClient.rpc.mockResolvedValueOnce({ data: 'doc-123', error: null });
+        // 8. CpeService: ensureDocumentoParaCpe -> insert documento operativo
+        mockSupabaseClient.single.mockResolvedValueOnce({
+            data: { id: 'doc-123' },
+            error: null,
+        });
 
-        // 8. CpeService: update CPE with document_id
+        // 9. CpeService: update CPE with document_id
         mockSupabaseClient.update.mockReturnThis();
 
-        // 9. CpeService: getXmlSigner (again for prepareXmlForSunat)
+        // 10. CpeService: getXmlSigner (again for prepareXmlForSunat)
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { certificado_pfx: null },
             error: null,
         });
 
-        // 10. CpeService: update CPE (FIRMADO)
+        // 11. CpeService: update CPE (FIRMADO)
         mockSupabaseClient.update.mockReturnThis();
 
-        // 11. FiscalAdapter: obtenerPaisTenant
+        // 12. CpeService: refresh CPE persisted after events
+        mockSupabaseClient.single.mockResolvedValueOnce({
+            data: { ...mockCreatedCpe, documento_id: 'doc-123' },
+            error: null,
+        });
+
+        // 13. FiscalAdapter: obtenerPaisTenant
         mockSupabaseClient.single.mockResolvedValueOnce({ data: { pais_id: 1 }, error: null });
 
-        // 12. FiscalAdapter: obtenerPaisTenant (again inside sendToOse if needed, or cached)
+        // 14. FiscalAdapter: obtenerPaisTenant (again inside sendToOse if needed, or cached)
         // Note: sendToOse does a select first
         mockSupabaseClient.single.mockResolvedValueOnce({
             data: { ...mockCreatedCpe, tenant_id: tenantId, ruc_emisor: '20987654321', tipo_documento: '01' },
             error: null
         });
 
-        // 13. FiscalAdapter: obtenerPaisTenant (inside sendToOse -> obtenerNombreServicioFiscal)
+        // 15. FiscalAdapter: obtenerPaisTenant (inside sendToOse -> obtenerNombreServicioFiscal)
         // It might be cached, but let's mock just in case
         // mockSupabaseClient.single.mockResolvedValueOnce({ data: { pais_id: 1 }, error: null });
 
-        // 14. CpeService: update CPE (ENVIADO)
+        // 16. CpeService: update CPE (ENVIADO)
         mockSupabaseClient.update.mockReturnThis();
 
-        // 15. CpeService: update CPE (ACEPTADO)
+        // 17. CpeService: update CPE (ACEPTADO)
         mockSupabaseClient.update.mockReturnThis();
 
         // Execute
@@ -259,6 +279,7 @@ describe('CPE Integration Verification', () => {
         // Assertions for Creation
         expect(result).toBeDefined();
         expect(result.estado).toBe('FIRMADO');
+        expect(result.documento_id).toBe('doc-123');
 
         console.log('Result State (Creation):', result.estado);
 
@@ -288,4 +309,5 @@ describe('CPE Integration Verification', () => {
         // If no error thrown, it means success (since sendToOseManual returns void but logs success)
         console.log('Manual Send Executed Successfully');
     });
+
 });

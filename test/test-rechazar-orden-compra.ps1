@@ -31,7 +31,7 @@ $createOrdenBody = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes" -Method Post -Body $createOrdenBody -ContentType "application/json"
-    
+
     if ($createResponse.success) {
         $ordenId = $createResponse.data.id
         Write-Host "✓ Orden created successfully" -ForegroundColor Green
@@ -59,7 +59,7 @@ $rechazarBody = @{
 
 try {
     $rechazarResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/rechazar" -Method Post -Body $rechazarBody -ContentType "application/json"
-    
+
     if ($rechazarResponse.success) {
         Write-Host "✓ Orden rejected successfully" -ForegroundColor Green
         Write-Host "  Estado: $($rechazarResponse.data.estado)" -ForegroundColor Gray
@@ -79,17 +79,17 @@ try {
 Write-Host "Step 3: Verifying orden state..." -ForegroundColor Yellow
 try {
     $getResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($getResponse.success) {
         Write-Host "✓ Orden retrieved successfully" -ForegroundColor Green
         Write-Host "  Estado actual: $($getResponse.data.estado)" -ForegroundColor Gray
-        
+
         if ($getResponse.data.estado -eq "RECHAZADA") {
             Write-Host "  ✓ Estado correcto: RECHAZADA" -ForegroundColor Green
         } else {
             Write-Host "  ✗ Estado incorrecto: Expected RECHAZADA, got $($getResponse.data.estado)" -ForegroundColor Red
         }
-        
+
         if ($getResponse.data.motivo_rechazo) {
             Write-Host "  ✓ Motivo de rechazo registrado: $($getResponse.data.motivo_rechazo)" -ForegroundColor Green
         } else {
@@ -109,7 +109,7 @@ try {
 Write-Host "Step 4: Testing rejection of already rejected orden (should fail)..." -ForegroundColor Yellow
 try {
     $rechazarAgainResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/rechazar" -Method Post -Body $rechazarBody -ContentType "application/json"
-    
+
     if (-not $rechazarAgainResponse.success) {
         Write-Host "✓ Correctly rejected re-rejection attempt" -ForegroundColor Green
         Write-Host "  Error message: $($rechazarAgainResponse.error)" -ForegroundColor Gray
@@ -146,15 +146,15 @@ $createOrdenBody2 = @{
 try {
     $createResponse2 = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes" -Method Post -Body $createOrdenBody2 -ContentType "application/json"
     $ordenId2 = $createResponse2.data.id
-    
+
     # Try to reject without motivo
     $rechazarSinMotivoBody = @{
         tenant_id = $tenantId
         rechazado_por_id = "550e8400-e29b-41d4-a716-446655440001"
     } | ConvertTo-Json
-    
+
     $rechazarSinMotivoResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId2/rechazar" -Method Post -Body $rechazarSinMotivoBody -ContentType "application/json"
-    
+
     if (-not $rechazarSinMotivoResponse.success) {
         Write-Host "✓ Correctly rejected rejection without motivo" -ForegroundColor Green
         Write-Host "  Error message: $($rechazarSinMotivoResponse.error)" -ForegroundColor Gray

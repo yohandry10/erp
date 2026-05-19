@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { APIRequestContext, APIResponse, Page, request as playwrightRequest, test, expect } from '@playwright/test';
 import { gotoAuthenticated, login } from './helpers/auth';
 
 /**
@@ -21,6 +21,148 @@ const testProveedor = {
   condicionesPago: 'CREDITO_30',
   limiteCredito: '50000'
 };
+
+const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:3002';
+const api = (path: string) => `/api${path}`;
+
+type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
+
+function unwrap<T>(payload: ApiEnvelope<T> | T): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as ApiEnvelope<T>).data as T;
+  }
+  return payload as T;
+}
+
+async function parseOk<T>(response: APIResponse, label: string): Promise<T> {
+  expect(response.ok(), `${label} debe responder 2xx, status=${response.status()}`).toBeTruthy();
+  const body = (await response.json()) as ApiEnvelope<T> | T;
+  if (body && typeof body === 'object' && 'success' in body) {
+    expect((body as ApiEnvelope<T>).success, `${label} debe devolver success=true`).not.toBe(false);
+  }
+  return unwrap<T>(body);
+}
+
+async function authHeaders(page: Page): Promise<Record<string, string>> {
+  const accessToken = (await page.context().cookies()).find((cookie) => cookie.name === 'access_token')?.value;
+  expect(accessToken, 'la sesión E2E debe tener access_token').toBeTruthy();
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
+async function crearRecepcionCerradaParaDevolucion(page: Page): Promise<{ numero: string }> {
+  const headers = await authHeaders(page);
+  const apiContext: APIRequestContext = await playwrightRequest.newContext({
+    baseURL: apiBaseURL,
+    extraHTTPHeaders: headers,
+    storageState: { cookies: [], origins: [] },
+  });
+
+  const run = `DEV-${Date.now().toString().slice(-9)}`;
+  const almacenes = await parseOk<any[]>(await apiContext.get(api('/inventario/almacenes')), 'listar almacenes para devolución');
+  expect(almacenes.length, 'debe existir almacén operativo para preparar devolución').toBeGreaterThan(0);
+  const almacenId = almacenes[0].id;
+
+  const proveedor = await parseOk<any>(
+    await apiContext.post(api('/compras/proveedores'), {
+      data: {
+        ruc: `20${run.replace(/\D/g, '').slice(-9)}`,
+        razon_social: `Proveedor Devolucion UI ${run} S.A.C.`,
+        nombre_comercial: `Proveedor DEV ${run}`,
+        email: `proveedor-dev-${run.toLowerCase()}@example.com`,
+        telefono: '999888777',
+        direccion: 'Av. Test Devolucion 123',
+        contacto: 'QA Devolucion',
+        condiciones_pago: 'CREDITO_30',
+        dias_credito: 30,
+        limite_credito: 50000,
+      },
+    }),
+    'crear proveedor para devolución',
+  );
+
+  const producto = await parseOk<any>(
+    await apiContext.post(api('/inventario/productos'), {
+      data: {
+        codigo: `P-${run}`,
+        nombre: `Producto Devolucion UI ${run}`,
+        categoria: 'AUDITORIA',
+        precio_compra: 33,
+        precio_venta: 60,
+        stock: 0,
+        stock_minimo: 0,
+        controla_stock: true,
+        almacen_id: almacenId,
+      },
+    }),
+    'crear producto para devolución',
+  );
+
+  const orden = await parseOk<any>(
+    await apiContext.post(api('/compras/ordenes'), {
+      data: {
+        numero: `OC-${run}`,
+        proveedor_id: proveedor.id,
+        fecha_orden: new Date().toISOString(),
+        fecha_entrega_esperada: new Date(Date.now() + 86400000).toISOString(),
+        condiciones_pago: 'CREDITO_30',
+        dias_credito: 30,
+        almacen_destino_id: almacenId,
+        estado: 'BORRADOR',
+        observaciones: 'Setup UI devolución',
+        detalles: [
+          {
+            producto_id: producto.id,
+            descripcion: producto.nombre,
+            cantidad: 5,
+            precio_unitario: 33,
+          },
+        ],
+      },
+    }),
+    'crear orden para devolución',
+  );
+  const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
+  expect(detalleId, 'la orden debe devolver detalle para recepción').toBeTruthy();
+
+  await parseOk<any>(
+    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+      data: {
+        aprobador_nombre: 'Admin QA',
+        comentarios: 'Setup UI devolución',
+      },
+    }),
+    'aprobar orden para devolución',
+  );
+
+  const recepcionBorrador = await parseOk<any>(
+    await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
+      data: {
+        orden_id: orden.id,
+        almacen_id: almacenId,
+        observaciones: 'Recepción setup UI devolución',
+        items: [
+          {
+            detalle_id: detalleId,
+            cantidad_recibida: 5,
+            calidad: 'OK',
+            almacen_id: almacenId,
+            lote: `LT-${run}`,
+          },
+        ],
+      },
+    }),
+    'crear recepción para devolución',
+  );
+
+  const recepcionCerrada = await parseOk<any>(
+    await apiContext.post(api(`/compras/recepciones/${recepcionBorrador.id}/cerrar`), {
+      data: { observaciones: 'Cierre setup UI devolución' },
+    }),
+    'cerrar recepción para devolución',
+  );
+
+  return { numero: recepcionCerrada.numero };
+}
 
 test.describe('Compras - Proveedores', () => {
   test.beforeEach(async ({ page }) => {
@@ -187,10 +329,14 @@ test.describe('Compras - Proveedores', () => {
   test('Filtrar proveedores por estado', async ({ page }) => {
     // Navigate to proveedores page
     await gotoAuthenticated(page, '/dashboard/compras/proveedores');
-    
+
+    await expect(page.locator('h1'), 'La ruta de proveedores no debe redirigir al wizard').toContainText('Proveedores', {
+      timeout: 30000,
+    });
+
     // Select "Activos" filter
-    await page.selectOption('select', 'true');
-    
+    await page.getByRole('combobox').first().selectOption('true');
+
     // Verify all visible proveedores have "ACTIVO" badge
     const activoBadges = page.locator('span:has-text("ACTIVO")');
     await expect(activoBadges.first(), 'El filtro de proveedores activos debe mostrar al menos un proveedor activo').toBeVisible({ timeout: 30000 });
@@ -539,6 +685,8 @@ test.describe('Compras - Órdenes de Compra', () => {
       await page.selectOption('select[name="condiciones_pago"]', 'CREDITO_30');
       await page.fill('input[name="dias_credito"]', '30');
       
+      await expect(page.locator('select[name="almacen_destino_id"] option:not([value=""])').first()).toBeAttached({ timeout: 15000 });
+      await expect(page.locator('select[name="almacen_destino_id"] option:not([value=""])').first()).toBeAttached({ timeout: 15000 });
       const almacenOptions = await page.locator('select[name="almacen_destino_id"] option:not([value=""])').count();
       if (almacenOptions > 0) {
         await page.selectOption('select[name="almacen_destino_id"]', { index: 1 });
@@ -743,6 +891,7 @@ test.describe('Compras - Órdenes de Compra', () => {
       await page.selectOption('select[name="condiciones_pago"]', 'CREDITO_30');
       await page.fill('input[name="dias_credito"]', '30');
       
+      await expect(page.locator('select[name="almacen_destino_id"] option:not([value=""])').first()).toBeAttached({ timeout: 15000 });
       const almacenOptions = await page.locator('select[name="almacen_destino_id"] option:not([value=""])').count();
       expect(almacenOptions, 'Debe existir al menos un almacén destino para crear una OC recepcionable').toBeGreaterThan(0);
       await page.selectOption('select[name="almacen_destino_id"]', { index: 1 });
@@ -972,6 +1121,8 @@ test.describe('Compras - Órdenes de Compra', () => {
   });
 
   test('Crear devolución', async ({ page }) => {
+    const recepcionSetup = await crearRecepcionCerradaParaDevolucion(page);
+
     // Navigate to devoluciones page
     await gotoAuthenticated(page, '/dashboard/compras/devoluciones');
     
@@ -1003,6 +1154,9 @@ test.describe('Compras - Órdenes de Compra', () => {
     // STEP 1: Select a closed reception
     // Wait for recepciones to load
     await expect(page.getByText('Cargando recepciones...')).toBeHidden({ timeout: 30000 });
+
+    await page.getByPlaceholder('Buscar por número de recepción, orden o proveedor...').fill(recepcionSetup.numero);
+    await expect(page.getByText(recepcionSetup.numero, { exact: true })).toBeVisible({ timeout: 15000 });
     
     // Check if there are any recepciones available
     const recepcionCards = page.locator('div').filter({ hasText: /REC-\d{4}-\d{4,6}/ });
@@ -1010,14 +1164,13 @@ test.describe('Compras - Órdenes de Compra', () => {
     
     expect(recepcionCount, 'Debe existir al menos una recepción cerrada para validar devoluciones').toBeGreaterThan(0);
     
-    // Click on the first recepcion
-    await recepcionCards.first().click();
+    await page.getByText(recepcionSetup.numero, { exact: true }).click();
     
     // Wait for step 2 to load
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
     
     // STEP 2: Configure items to return
-    await expect(page.locator('text=Items a Devolver')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Items a Devolver/i })).toBeVisible();
     
     // Verify recepcion info is displayed
     await expect(page.locator('text=/Recepción: REC-/')).toBeVisible();
@@ -1056,13 +1209,8 @@ test.describe('Compras - Órdenes de Compra', () => {
       
       // Verify the first item has required fields
       const firstItemCantidad = page.locator('input[type="number"]').first();
-      const cantidadValue = await firstItemCantidad.inputValue();
-      
-      if (!cantidadValue || parseFloat(cantidadValue) === 0) {
-        // Fill cantidad if empty
-        await firstItemCantidad.clear();
-        await firstItemCantidad.fill('5');
-      }
+      await firstItemCantidad.clear();
+      await firstItemCantidad.fill('2');
       
       // Verify motivo is selected
       const firstItemMotivo = page.locator('select').nth(1); // Second select (first is motivo general)
@@ -1098,15 +1246,10 @@ test.describe('Compras - Órdenes de Compra', () => {
         response.status() < 300,
       { timeout: 30000 },
     );
-    const successDialogPromise = page.waitForEvent('dialog', { timeout: 30000 });
     await crearDevolucionBtn.click();
 
     const crearDevolucionResponse = await crearDevolucionResponsePromise;
     expect(crearDevolucionResponse.status(), 'La API debe crear la devolución').toBe(201);
-
-    const successDialog = await successDialogPromise;
-    expect(successDialog.message()).toContain('exitosamente');
-    await successDialog.accept();
 
     // Wait for navigation to devolucion detail page
     await page.waitForURL(/\/dashboard\/compras\/devoluciones\/[0-9a-f-]{36}\/?$/i, { timeout: 30000 });

@@ -34,7 +34,7 @@ try {
         -Body $nuevaCotizacion `
         -ContentType "application/json" `
         -ErrorAction Stop
-    
+
     if ($response.success) {
         $cotizacionId = $response.data.id
         Write-Host "✓ Cotización creada exitosamente" -ForegroundColor Green
@@ -69,14 +69,14 @@ try {
         -Body $enviarBody `
         -ContentType "application/json" `
         -ErrorAction Stop
-    
+
     if ($response.success) {
         Write-Host "✓ Cotización enviada exitosamente" -ForegroundColor Green
         Write-Host "  Estado anterior: BORRADOR" -ForegroundColor Cyan
         Write-Host "  Estado actual: $($response.data.estado)" -ForegroundColor Cyan
         Write-Host "  Fecha vencimiento: $($response.data.fecha_vencimiento)" -ForegroundColor Cyan
         Write-Host ""
-        
+
         # Verify state is ENVIADA
         if ($response.data.estado -eq "ENVIADA") {
             Write-Host "✓ Estado verificado correctamente: ENVIADA" -ForegroundColor Green
@@ -106,7 +106,7 @@ try {
         -Body $enviarBody `
         -ContentType "application/json" `
         -ErrorAction Stop
-    
+
     if (-not $response.success) {
         Write-Host "✓ Validación correcta: No se puede enviar desde estado ENVIADA" -ForegroundColor Green
         Write-Host "  Error esperado: $($response.error)" -ForegroundColor Cyan
@@ -127,7 +127,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/compras/cotizaciones/$cotizacionId`?tenant_id=$tenantId" `
         -Method Get `
         -ErrorAction Stop
-    
+
     if ($response.success -and $response.data.estado -eq "ENVIADA") {
         Write-Host "✓ Estado final verificado correctamente" -ForegroundColor Green
         Write-Host "  ID: $($response.data.id)" -ForegroundColor Cyan

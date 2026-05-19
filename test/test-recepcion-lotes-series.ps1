@@ -38,7 +38,7 @@ Write-Host ""
 Write-Host "2. Buscando orden de compra con pendientes..." -ForegroundColor Yellow
 try {
     $ordenesResponse = Invoke-RestMethod -Uri "$API_URL/compras/ordenes?estado=APROBADA" -Method GET -Headers $headers
-    
+
     if ($ordenesResponse.success -and $ordenesResponse.data.length -gt 0) {
         $orden = $ordenesResponse.data[0]
         $ordenId = $orden.id
@@ -61,11 +61,11 @@ Write-Host ""
 Write-Host "3. Obteniendo detalles de la orden..." -ForegroundColor Yellow
 try {
     $ordenDetalleResponse = Invoke-RestMethod -Uri "$API_URL/compras/ordenes/$ordenId" -Method GET -Headers $headers
-    
+
     if ($ordenDetalleResponse.success) {
         $detalles = $ordenDetalleResponse.data.detalles
         Write-Host "✓ Detalles obtenidos: $($detalles.length) productos" -ForegroundColor Green
-        
+
         # Mostrar productos
         foreach ($detalle in $detalles) {
             $pendiente = $detalle.cantidad - $detalle.cantidad_recibida
@@ -87,7 +87,7 @@ foreach ($detalle in $detalles) {
     $pendiente = $detalle.cantidad - $detalle.cantidad_recibida
     if ($pendiente -gt 0) {
         $cantidadRecibir = [Math]::Min(2, $pendiente)
-        
+
         $item = @{
             detalle_id = $detalle.id
             cantidad_recibida = $cantidadRecibir
@@ -109,13 +109,13 @@ $recepcionBody = @{
 
 try {
     $recepcionResponse = Invoke-RestMethod -Uri "$API_URL/compras/recepciones/ordenes/$ordenId" -Method POST -Body $recepcionBody -Headers $headers
-    
+
     if ($recepcionResponse.success) {
         $recepcionId = $recepcionResponse.data.id
         Write-Host "✓ Recepción creada: $($recepcionResponse.data.numero)" -ForegroundColor Green
         Write-Host "  ID: $recepcionId" -ForegroundColor Gray
         Write-Host "  Estado: $($recepcionResponse.data.estado)" -ForegroundColor Gray
-        
+
         # Mostrar items con lotes/series
         Write-Host ""
         Write-Host "  Items recibidos:" -ForegroundColor Cyan
@@ -142,7 +142,7 @@ $cerrarBody = @{
 
 try {
     $cerrarResponse = Invoke-RestMethod -Uri "$API_URL/compras/recepciones/$recepcionId/cerrar" -Method POST -Body $cerrarBody -Headers $headers
-    
+
     if ($cerrarResponse.success) {
         Write-Host "✓ Recepción cerrada exitosamente" -ForegroundColor Green
         Write-Host "  Estado: $($cerrarResponse.data.estado)" -ForegroundColor Gray
@@ -157,12 +157,12 @@ Write-Host ""
 Write-Host "6. Verificando recepción con lotes/series..." -ForegroundColor Yellow
 try {
     $verificarResponse = Invoke-RestMethod -Uri "$API_URL/compras/recepciones/$recepcionId" -Method GET -Headers $headers
-    
+
     if ($verificarResponse.success) {
         Write-Host "✓ Recepción verificada" -ForegroundColor Green
         Write-Host "  Número: $($verificarResponse.data.numero)" -ForegroundColor Gray
         Write-Host "  Estado: $($verificarResponse.data.estado)" -ForegroundColor Gray
-        
+
         # Verificar items con lotes/series
         if ($verificarResponse.data.items) {
             Write-Host ""

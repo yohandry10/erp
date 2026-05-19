@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { EventBusService, PagoProveedorRegistradoEvent } from '../../../shared/events/event-bus.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,6 +11,8 @@ import { TesoreriaService } from '../tesoreria/tesoreria.service';
 
 @Injectable()
 export class CxpService {
+  private readonly logger = new Logger(CxpService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly eventBus: EventBusService,
@@ -68,12 +70,19 @@ export class CxpService {
         .maybeSingle();
 
       if (error) {
-        return false;
+        this.logger.error(
+          `IDEMPOTENCY_CHECK_FAILURE op=${operacion} key=${idempotencyKey}: ${error.message}`,
+        );
+        // Fail-closed: if we can't verify, assume already processed to prevent duplicates
+        return true;
       }
 
       return Boolean(data?.id);
-    } catch {
-      return false;
+    } catch (err) {
+      this.logger.error(
+        `IDEMPOTENCY_CHECK_FAILURE op=${operacion} key=${idempotencyKey}: ${err?.message ?? err}`,
+      );
+      return true;
     }
   }
 
@@ -702,6 +711,13 @@ export class CxpService {
     dto: AplicarPagoCxpDto,
     userId?: string,
   ): Promise<{ success: boolean; data: any }> {
+    dto = {
+      ...dto,
+      monto: this.normalizarMontoPago(dto.monto),
+      fecha_pago: this.normalizarFechaPago(dto.fecha_pago),
+      idempotency_key: dto.idempotency_key?.trim() || undefined,
+    };
+
     if (this.tesoreriaService) {
       return this.tesoreriaService.registrarPago(
         tenantId,
@@ -834,7 +850,8 @@ export class CxpService {
       nuevoEstado = cxp.estado;
     }
 
-    // Actualizar la CxP con el nuevo saldo y estado
+    // HARDENING: Optimistic concurrency — si otro pago ya cambio el saldo, este falla
+    const saldoAnterior = cxp.saldo;
     const { data: cxpActualizada, error: errorActualizar } = await client
       .from('cuentas_por_pagar')
       .update({
@@ -845,10 +862,17 @@ export class CxpService {
       })
       .eq('tenant_id', tenantId)
       .eq('id', cxpId)
+      .eq('saldo', saldoAnterior)
       .select()
       .single();
 
     if (errorActualizar) {
+      // PGRST116 = no rows returned — means another payment already changed the saldo
+      if (errorActualizar.code === 'PGRST116') {
+        throw new BadRequestException(
+          'Conflicto de concurrencia: el saldo de la CxP fue modificado por otro pago simultáneo. Intente de nuevo.'
+        );
+      }
       console.error('Error actualizando cuenta por pagar:', errorActualizar);
       throw new BadRequestException('No se pudo aplicar el pago a la cuenta por pagar');
     }
@@ -1373,6 +1397,33 @@ export class CxpService {
    */
   private round2(value: number): number {
     return new Decimal(value).toDecimalPlaces(2).toNumber();
+  }
+
+  private normalizarMontoPago(value: number): number {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+      throw new BadRequestException('El monto del pago debe ser un número válido');
+    }
+
+    const cents = amount * 100;
+    if (Math.abs(cents - Math.round(cents)) > 1e-9) {
+      throw new BadRequestException('El monto del pago debe tener máximo 2 decimales');
+    }
+
+    return this.round2(amount);
+  }
+
+  private normalizarFechaPago(value: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException('La fecha de pago debe tener formato YYYY-MM-DD');
+    }
+
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException('La fecha de pago debe ser una fecha válida');
+    }
+
+    return value;
   }
 
   /**

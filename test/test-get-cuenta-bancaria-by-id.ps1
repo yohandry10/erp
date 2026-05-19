@@ -1,7 +1,7 @@
 # Test GET /api/finanzas/bancos/cuentas/:id
 
 $BASE_URL = "http://localhost:3000"
-$TOKEN = "[REMOVED]"
+$TOKEN = "REPLACE_WITH_TEST_JWT"
 $TENANT_ID = "vierdes"
 
 Write-Host "=== TEST: GET Cuenta Bancaria por ID ===" -ForegroundColor Cyan
@@ -17,17 +17,17 @@ $headers = @{
 try {
     $response = Invoke-RestMethod -Uri "$BASE_URL/api/finanzas/bancos/cuentas" -Method Get -Headers $headers
     Write-Host "✓ Lista obtenida exitosamente" -ForegroundColor Green
-    
+
     if ($response.data -and $response.data.Count -gt 0) {
         $cuentaId = $response.data[0].id
         Write-Host "  ID de cuenta a consultar: $cuentaId" -ForegroundColor Gray
-        
+
         # Ahora obtener cuenta específica
         Write-Host "`n2. Obteniendo cuenta bancaria por ID..." -ForegroundColor Yellow
         $response2 = Invoke-RestMethod -Uri "$BASE_URL/api/finanzas/bancos/cuentas/$cuentaId" -Method Get -Headers $headers
         Write-Host "✓ Cuenta obtenida exitosamente" -ForegroundColor Green
         Write-Host ($response2 | ConvertTo-Json -Depth 10)
-        
+
         # Test con ID inexistente
         Write-Host "`n3. Probando con ID inexistente..." -ForegroundColor Yellow
         try {

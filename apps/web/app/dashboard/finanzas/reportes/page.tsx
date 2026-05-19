@@ -77,21 +77,7 @@ export default function ReportesFinanzasPage() {
           <p className="dashboard-subtitle">Análisis y reportes del módulo de finanzas</p>
         </div>
         <button
-          onClick={handleExport}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: '#374151',
-            transition: 'all 0.2s ease'
-          }}
+          onClick={handleExport} className="py-3 px-6 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-semibold text-gray-700 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f9fafb'
           }}
@@ -105,12 +91,7 @@ export default function ReportesFinanzasPage() {
       </div>
 
       {/* Report Selection Grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8">
         {reports.map((report) => {
           const Icon = report.icon
           const isSelected = selectedReport === report.id
@@ -119,21 +100,7 @@ export default function ReportesFinanzasPage() {
             <button
               key={report.id}
               onClick={() => report.available && setSelectedReport(report.id)}
-              disabled={!report.available}
-              style={{
-                padding: '1.5rem',
-                borderRadius: '12px',
-                border: isSelected ? `2px solid ${report.color}` : '2px solid transparent',
-                background: isSelected ? `${report.color}10` : 'white',
-                cursor: report.available ? 'pointer' : 'not-allowed',
-                textAlign: 'left',
-                transition: 'all 0.2s ease',
-                opacity: report.available ? 1 : 0.5,
-                boxShadow: isSelected 
-                  ? `0 4px 12px ${report.color}30` 
-                  : '0 1px 3px rgba(0,0,0,0.1)',
-                position: 'relative'
-              }}
+              disabled={!report.available} className="p-6 rounded-3 text-left transition relative"
               onMouseEnter={(e) => {
                 if (report.available && !isSelected) {
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
@@ -148,54 +115,21 @@ export default function ReportesFinanzasPage() {
               }}
             >
               {!report.available && (
-                <div style={{
-                  position: 'absolute',
-                  top: '0.75rem',
-                  right: '0.75rem',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '4px',
-                  background: '#6b7280',
-                  color: 'white',
-                  fontSize: '0.625rem',
-                  fontWeight: '600',
-                  textTransform: 'uppercase'
-                }}>
+                <div className="absolute top-3 right-3 py-1 px-2 rounded-[4px] bg-gray-500 text-white text-2.5 font-semibold">
                   Próximamente
                 </div>
               )}
               
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.75rem',
-                marginBottom: '0.75rem'
-              }}>
-                <div style={{
-                  padding: '0.75rem',
-                  borderRadius: '8px',
-                  background: `${report.color}20`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Icon size={24} style={{ color: report.color }} />
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-3 rounded-2 flex items-center justify-center">
+                  <Icon size={24} />
                 </div>
-                <h3 style={{ 
-                  fontSize: '1rem', 
-                  fontWeight: '600', 
-                  color: '#111827',
-                  margin: 0
-                }}>
+                <h3 className="text-4 font-semibold text-gray-900 m-0">
                   {report.title}
                 </h3>
               </div>
               
-              <p style={{ 
-                fontSize: '0.875rem', 
-                color: '#6b7280',
-                margin: 0,
-                lineHeight: '1.5'
-              }}>
+              <p className="text-[0.875rem] text-gray-500 m-0 leading-6">
                 {report.description}
               </p>
             </button>

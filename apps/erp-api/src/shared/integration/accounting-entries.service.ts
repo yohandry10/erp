@@ -38,9 +38,7 @@ export class AccountingEntriesService {
     private readonly eventBus: EventBusService,
     private readonly periodosService: PeriodosService,
     private readonly tenantContext: TenantContextService,
-  ) {
-    this.initializeEventListeners();
-  }
+  ) {}
 
   // 🔓 Inicializa cache por tenant solo si no está cargado
   private async initializeCuentasCache(tenantId: string): Promise<void> {
@@ -145,55 +143,6 @@ export class AccountingEntriesService {
     );
   }
 
-  private initializeEventListeners() {
-    this.logger.log('🎧 [AccountingEntriesService] Registrando listeners de eventos...');
-
-    this.eventBus.onVentaProcessed(async (event: ERPEvent) => {
-      const data = event.data as VentaProcessedEvent;
-      await this.runInTenantContext(data.tenantId, async () => {
-        this.logger.log(`📊 [Contabilidad] Procesando asiento de venta: ${data.ventaId}`);
-        const asientoId = await this.procesarAsientoVenta(data);
-        if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de venta creado: ${asientoId}`);
-      });
-    });
-
-    this.eventBus.onCompraEntregada(async (event: ERPEvent) => {
-      const data = event.data as CompraEntregadaEvent;
-      await this.runInTenantContext(data.tenantId, async () => {
-        this.logger.log(`📊 [Contabilidad] Procesando asiento de compra: ${data.ordenId}`);
-        const asientoId = await this.procesarAsientoCompra(data);
-        if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de compra creado: ${asientoId}`);
-      });
-    });
-
-    this.eventBus.onMovimientoStock(async (event: ERPEvent) => {
-      const data = event.data as MovimientoStockEvent;
-      await this.runInTenantContext((data as any)?.tenantId, async () => {
-        this.logger.log(`📊 [Contabilidad] Procesando asiento de movimiento stock: ${data.productoId}`);
-        const asientoId = await this.procesarAsientoMovimientoStock(data);
-        if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de movimiento stock creado: ${asientoId}`);
-      });
-    });
-
-    this.eventBus.onGastoRegistrado(async (event: ERPEvent) => {
-      const data = event.data as GastoRegistradoEvent;
-      await this.runInTenantContext((data as any)?.tenantId, async () => {
-        this.logger.log(`📊 [Contabilidad] Procesando asiento de gasto: ${data.gastoId}`);
-        const asientoId = await this.procesarAsientoGasto(data);
-        if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de gasto creado: ${asientoId}`);
-      });
-    });
-
-    this.eventBus.onPagoFactura(async (event: ERPEvent) => {
-      const data = event.data as PagoFacturaEvent;
-      await this.runInTenantContext(data.tenantId, async () => {
-        this.logger.log(`📊 [Contabilidad] Procesando asiento de pago factura: ${data.facturaId}`);
-        const asientoId = await this.procesarAsientoPagoFactura(data);
-        if (asientoId) this.logger.log(`✅ [Contabilidad] Asiento de pago factura creado: ${asientoId}`);
-      });
-    });
-  }
-
   async procesarAsientoVenta(venta: VentaProcessedEvent): Promise<string | null> {
     try {
       const costoVentas = await this.calcularCostoVentas(venta.items);
@@ -258,6 +207,10 @@ export class AccountingEntriesService {
 
   async procesarAsientoCompra(compra: CompraEntregadaEvent): Promise<string | null> {
     try {
+      // Separar base gravada e IGV crédito fiscal (cuenta 401)
+      const baseGravada = compra.subtotal || (compra.total / 1.18);
+      const igvCredito = compra.igv || (compra.total - baseGravada);
+
       const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],
         concepto: `Compra Orden ${compra.numeroOrden}`,
@@ -265,12 +218,20 @@ export class AccountingEntriesService {
         sourceEventId: compra.eventId,
         detalles: [
           {
-            cuentaId: await this.getCuentaId('201'),
-            cuentaCodigo: '201',
-            cuentaNombre: 'Mercaderías Manufacturadas',
-            debe: compra.total,
+            cuentaId: await this.getCuentaId('601'),
+            cuentaCodigo: '601',
+            cuentaNombre: 'Compra de Mercaderías',
+            debe: Number(baseGravada.toFixed(2)),
             haber: 0,
             descripcion: `Compra mercaderías ${compra.numeroOrden}`,
+          },
+          {
+            cuentaId: await this.getCuentaId('401'),
+            cuentaCodigo: '401',
+            cuentaNombre: 'IGV - Crédito Fiscal',
+            debe: Number(igvCredito.toFixed(2)),
+            haber: 0,
+            descripcion: `IGV crédito fiscal compra ${compra.numeroOrden}`,
           },
           {
             cuentaId: await this.getCuentaId('421'),
@@ -532,13 +493,22 @@ export class AccountingEntriesService {
           .eq('id', item.productoId)
           .single();
 
-        if (!error && producto) {
-          costoTotal += (producto.precio_compra || 0) * item.cantidad;
+        if (!error && producto && producto.precio_compra) {
+          costoTotal += producto.precio_compra * item.cantidad;
         } else {
-          costoTotal += item.precio * 0.7 * item.cantidad; // fallback 70%
+          const estimado = item.precio * 0.7 * item.cantidad;
+          costoTotal += estimado;
+          this.logger.warn(
+            `COGS_ESTIMATED producto=${item.productoId} usando 70% precio venta (${estimado.toFixed(2)}). ` +
+            `Actualice precio_compra del producto para cálculo real.`,
+          );
         }
       } catch {
-        costoTotal += item.precio * 0.7 * item.cantidad;
+        const estimado = item.precio * 0.7 * item.cantidad;
+        costoTotal += estimado;
+        this.logger.warn(
+          `COGS_ESTIMATED producto=${item.productoId} usando 70% precio venta (${estimado.toFixed(2)}) por error de consulta.`,
+        );
       }
     }
 
@@ -565,17 +535,19 @@ export class AccountingEntriesService {
     const client = this.supabase.getClient();
 
     if (asiento.sourceEventId) {
-      const { data: asientoExistente, error: errorExistente } = await client
+      const { data: asientosExistentes, error: errorExistente } = await client
         .from('asientos_contables')
         .select('id')
         .eq('tenant_id', tenantId)
         .eq('source_event_id', asiento.sourceEventId)
-        .maybeSingle();
+        .order('created_at', { ascending: true })
+        .limit(1);
 
       if (errorExistente) {
         throw errorExistente;
       }
 
+      const asientoExistente = Array.isArray(asientosExistentes) ? asientosExistentes[0] : asientosExistentes;
       if (asientoExistente?.id) {
         this.logger.warn(
           `⚠️ [AccountingEntries] Asiento ya registrado para evento ${asiento.sourceEventId} (tenant ${tenantId}).`,

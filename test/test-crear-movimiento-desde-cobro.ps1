@@ -17,16 +17,16 @@ $headers = @{
 Write-Host "1. Obteniendo CxC pendiente..." -ForegroundColor Yellow
 try {
     $cxcResponse = Invoke-RestMethod -Uri "$baseUrl/finanzas/cxc?estado=PENDIENTE&limit=1" -Method Get -Headers $headers
-    
+
     if ($cxcResponse.data.Count -eq 0) {
         Write-Host "❌ No hay CxC pendientes para probar" -ForegroundColor Red
         Write-Host "   Crea una CxC primero o usa una existente" -ForegroundColor Yellow
         exit 1
     }
-    
+
     $cxc = $cxcResponse.data[0]
     $cxcId = $cxc.id
-    
+
     Write-Host "✅ CxC encontrada:" -ForegroundColor Green
     Write-Host "   ID: $($cxc.id)"
     Write-Host "   Cliente: $($cxc.clientes.razon_social)"
@@ -41,24 +41,24 @@ try {
 Write-Host "2. Obteniendo cuenta bancaria activa..." -ForegroundColor Yellow
 try {
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/finanzas/bancos/cuentas" -Method Get -Headers $headers
-    
+
     if ($cuentasResponse.data.Count -eq 0) {
         Write-Host "❌ No hay cuentas bancarias disponibles" -ForegroundColor Red
         Write-Host "   Crea una cuenta bancaria primero" -ForegroundColor Yellow
         exit 1
     }
-    
+
     # Buscar cuenta con la misma moneda que la CxC
     $cuentaBancaria = $cuentasResponse.data | Where-Object { $_.activa -eq $true -and $_.moneda -eq $cxc.moneda } | Select-Object -First 1
-    
+
     if (-not $cuentaBancaria) {
         Write-Host "❌ No hay cuenta bancaria activa con moneda $($cxc.moneda)" -ForegroundColor Red
         exit 1
     }
-    
+
     $cuentaBancariaId = $cuentaBancaria.id
     $saldoAnterior = $cuentaBancaria.saldo
-    
+
     Write-Host "✅ Cuenta bancaria encontrada:" -ForegroundColor Green
     Write-Host "   ID: $($cuentaBancaria.id)"
     Write-Host "   Nombre: $($cuentaBancaria.nombre)"
@@ -91,7 +91,7 @@ Write-Host ""
 
 try {
     $cobroResponse = Invoke-RestMethod -Uri "$baseUrl/finanzas/cxc/$cxcId/pago" -Method Post -Headers $headers -Body $cobroData
-    
+
     Write-Host "✅ Cobro registrado exitosamente" -ForegroundColor Green
     Write-Host "   Monto cobrado: $montoCobro"
     Write-Host "   Nuevo saldo CxC: $($cobroResponse.data.monto_pendiente)"
@@ -108,14 +108,14 @@ Start-Sleep -Seconds 1
 
 try {
     $movimientosResponse = Invoke-RestMethod -Uri "$baseUrl/finanzas/bancos/cuentas/$cuentaBancariaId/movimientos?limit=1" -Method Get -Headers $headers
-    
+
     if ($movimientosResponse.data.Count -eq 0) {
         Write-Host "❌ No se encontró el movimiento bancario" -ForegroundColor Red
         exit 1
     }
-    
+
     $movimiento = $movimientosResponse.data[0]
-    
+
     Write-Host "✅ Movimiento bancario creado:" -ForegroundColor Green
     Write-Host "   ID: $($movimiento.id)"
     Write-Host "   Tipo: $($movimiento.tipo) (debe ser ABONO)"
@@ -125,26 +125,26 @@ try {
     Write-Host "   Cliente ID: $($movimiento.cliente_id)"
     Write-Host "   CxC ID: $($movimiento.cxc_id)"
     Write-Host ""
-    
+
     # Validaciones
     $errores = @()
-    
+
     if ($movimiento.tipo -ne "ABONO") {
         $errores += "El tipo de movimiento debe ser ABONO, pero es $($movimiento.tipo)"
     }
-    
+
     if ([Math]::Abs($movimiento.monto - $montoCobro) -gt 0.01) {
         $errores += "El monto del movimiento ($($movimiento.monto)) no coincide con el cobro ($montoCobro)"
     }
-    
+
     if ($movimiento.cxc_id -ne $cxcId) {
         $errores += "El CxC ID del movimiento no coincide"
     }
-    
+
     if ($movimiento.cliente_id -ne $cxc.cliente_id) {
         $errores += "El cliente ID del movimiento no coincide"
     }
-    
+
     if ($errores.Count -gt 0) {
         Write-Host "❌ Errores de validación:" -ForegroundColor Red
         foreach ($error in $errores) {
@@ -152,7 +152,7 @@ try {
         }
         exit 1
     }
-    
+
 } catch {
     Write-Host "❌ Error verificando movimiento bancario: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
@@ -163,23 +163,23 @@ Write-Host "5. Verificando actualización de saldo bancario..." -ForegroundColor
 
 try {
     $cuentaActualizada = Invoke-RestMethod -Uri "$baseUrl/finanzas/bancos/cuentas/$cuentaBancariaId" -Method Get -Headers $headers
-    
+
     $saldoNuevo = $cuentaActualizada.data.saldo
     $saldoEsperado = $saldoAnterior + $montoCobro
-    
+
     Write-Host "✅ Saldo de cuenta bancaria:" -ForegroundColor Green
     Write-Host "   Saldo anterior: $saldoAnterior"
     Write-Host "   Cobro: +$montoCobro"
     Write-Host "   Saldo esperado: $saldoEsperado"
     Write-Host "   Saldo actual: $saldoNuevo"
     Write-Host ""
-    
+
     if ([Math]::Abs($saldoNuevo - $saldoEsperado) -gt 0.01) {
         Write-Host "❌ El saldo no se actualizó correctamente" -ForegroundColor Red
         Write-Host "   Diferencia: $([Math]::Abs($saldoNuevo - $saldoEsperado))" -ForegroundColor Red
         exit 1
     }
-    
+
 } catch {
     Write-Host "❌ Error verificando saldo: $($_.Exception.Message)" -ForegroundColor Red
     exit 1

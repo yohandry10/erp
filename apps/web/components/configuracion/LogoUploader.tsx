@@ -103,99 +103,49 @@ export function LogoUploader({
   }
 
   return (
-    <div style={{ width: '100%' }}>
+    <div className="w-[100%]">
       <input
         ref={fileInputRef}
         type="file"
         accept={acceptedFormats.join(',')}
-        onChange={handleFileSelect}
-        style={{ display: 'none' }}
+        onChange={handleFileSelect} className="hidden"
         disabled={disabled}
       />
 
       {previewUrl ? (
         // Vista con logo cargado
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            padding: '1rem',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-          }}
+        <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2 border"
         >
-          <div
-            style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              backgroundColor: 'white',
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+          <div className="w-[80px] h-[80px] rounded-2 overflow-hidden bg-white border flex items-center justify-center"
           >
             <Image
               src={previewUrl}
               alt="Logo de la empresa"
               width={80}
               height={80}
-              unoptimized
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-              }}
+              unoptimized className="max-w-[100%] max-h-[100%] object-contain"
             />
           </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1e293b' }}>
+          <div className="flex-[1]">
+            <p className="m-0 text-[0.875rem] font-medium text-slate-800">
               Logo cargado
             </p>
-            <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+            <p className="text-3 text-slate-500">
               Este logo aparecerá en facturas, boletas y tickets
             </p>
           </div>
           {!disabled && (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={handleClick}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.75rem',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                }}
+                onClick={handleClick} className="py-2 px-3 text-3 bg-blue-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
               >
                 <Upload size={14} />
                 Cambiar
               </button>
               <button
                 type="button"
-                onClick={handleRemoveLogo}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.75rem',
-                  backgroundColor: '#fee2e2',
-                  color: '#dc2626',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                }}
+                onClick={handleRemoveLogo} className="py-2 px-3 text-3 bg-[#fee2e2] text-red-600 border-0 rounded-[6px] cursor-pointer flex items-center gap-1"
               >
                 <X size={14} />
                 Quitar
@@ -209,40 +159,21 @@ export function LogoUploader({
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          style={{
-            padding: '2rem',
-            border: `2px dashed ${isDragging ? '#3b82f6' : '#cbd5e1'}`,
-            borderRadius: '8px',
-            backgroundColor: isDragging ? 'rgba(59, 130, 246, 0.05)' : '#f8fafc',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s ease',
-            opacity: disabled ? 0.6 : 1,
-          }}
+          onDrop={handleDrop} className="p-8 rounded-2 transition"
         >
-          <div style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                margin: '0 auto 0.75rem',
-                backgroundColor: isDragging ? '#dbeafe' : '#e2e8f0',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center"
             >
               {isDragging ? (
-                <ImageIcon size={24} style={{ color: '#3b82f6' }} />
+                <ImageIcon size={24} className="text-blue-500" />
               ) : (
-                <Building2 size={24} style={{ color: '#64748b' }} />
+                <Building2 size={24} className="text-slate-500" />
               )}
             </div>
-            <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 500, color: '#1e293b' }}>
+            <p className="m-0 text-[0.875rem] font-medium text-slate-800">
               {isDragging ? 'Suelta la imagen aquí' : 'Arrastra tu logo o haz clic para seleccionar'}
             </p>
-            <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+            <p className="text-3 text-slate-500">
               PNG, JPG, WebP o SVG • Máximo {maxSizeMB}MB
             </p>
           </div>
@@ -250,27 +181,13 @@ export function LogoUploader({
       )}
 
       {error && (
-        <div
-          style={{
-            marginTop: '0.5rem',
-            padding: '0.5rem 0.75rem',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            fontSize: '0.75rem',
-            color: '#dc2626',
-          }}
+        <div className="mt-2 py-2 px-3 bg-[#fef2f2] border rounded-[6px] text-3 text-red-600"
         >
           ⚠️ {error}
         </div>
       )}
 
-      <p
-        style={{
-          marginTop: '0.5rem',
-          fontSize: '0.75rem',
-          color: '#94a3b8',
-        }}
+      <p className="mt-2 text-3 text-slate-400"
       >
         💡 Recomendación: Usa un logo cuadrado o con fondo transparente para mejor visualización
       </p>

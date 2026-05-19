@@ -100,7 +100,7 @@ export class RrhhController {
     @Param('id') planillaId: string
   ) {
     console.log(`📊 [RRHH] Obteniendo detalle planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.getDetallePlanilla(planillaId);
+    return this.planillasService.getDetallePlanilla(planillaId, tenantId);
   }
 
   @Get('boleta/:empleadoPlanillaId')
@@ -109,7 +109,7 @@ export class RrhhController {
     @Param('empleadoPlanillaId') empleadoPlanillaId: string
   ) {
     console.log(`📄 [RRHH] Obteniendo boleta ${empleadoPlanillaId} para tenant: ${tenantId}`);
-    return this.planillasService.getBoleta(empleadoPlanillaId);
+    return this.planillasService.getBoleta(empleadoPlanillaId, tenantId);
   }
 
   @Put('planillas/:id')
@@ -119,7 +119,7 @@ export class RrhhController {
     @Body() updateData: any
   ) {
     console.log(`✏️ [RRHH] Actualizando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.updatePlanilla(planillaId, updateData);
+    return this.planillasService.updatePlanilla(planillaId, updateData, tenantId);
   }
 
   @Delete('planillas/:id')
@@ -128,7 +128,7 @@ export class RrhhController {
     @Param('id') planillaId: string
   ) {
     console.log(`🗑️ [RRHH] Eliminando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.deletePlanilla(planillaId);
+    return this.planillasService.deletePlanilla(planillaId, tenantId);
   }
 
   @Get('conceptos')
@@ -144,7 +144,7 @@ export class RrhhController {
     @Body() empleadosData: any
   ) {
     console.log('🧮 Calculando planilla personalizada:', planillaId);
-    return this.planillasService.calcularPlanillaPersonalizada(planillaId, empleadosData.empleados);
+    return this.planillasService.calcularPlanillaPersonalizada(planillaId, empleadosData.empleados, tenantId);
   }
 
   // ===== PAGOS Y COMPROBANTES =====
@@ -174,7 +174,7 @@ export class RrhhController {
     @Body() pagoData: { metodo_pago: 'efectivo' | 'transferencia' }
   ) {
     console.log(`💰 [RRHH] Pagando planilla ${planillaId} para tenant: ${tenantId}`);
-    return this.planillasService.pagarPlanillaCompleta(planillaId, pagoData.metodo_pago);
+    return this.planillasService.pagarPlanillaCompleta(planillaId, pagoData.metodo_pago, tenantId);
   }
 
   @Post('planillas/:id/pagar-empleados')
@@ -202,7 +202,7 @@ export class RrhhController {
     @Param('id') planillaId: string
   ) {
     console.log(`📋 [RRHH] Obteniendo historial de pagos planilla ${planillaId}, tenant: ${tenantId}`);
-    return this.planillasService.getHistorialPagos(planillaId);
+    return this.planillasService.getHistorialPagos(planillaId, tenantId);
   }
 
   @Get('pagos/:id/comprobante')

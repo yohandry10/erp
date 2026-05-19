@@ -42,7 +42,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/proveedores/buscar-ruc/20123456789?tenant_id=$tenantId" -Method Get -ContentType "application/json"
     Write-Host "Response:" -ForegroundColor Green
     $response | ConvertTo-Json -Depth 5
-    
+
     if ($response.success -eq $true -and $response.data) {
         Write-Host "✓ Test 1 PASSED: Provider found successfully" -ForegroundColor Green
     } else {
@@ -62,7 +62,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/proveedores/buscar-ruc/99999999999?tenant_id=$tenantId" -Method Get -ContentType "application/json"
     Write-Host "Response:" -ForegroundColor Green
     $response | ConvertTo-Json -Depth 5
-    
+
     if ($response.success -eq $false -and $response.data -eq $null) {
         Write-Host "✓ Test 2 PASSED: Correctly returned not found" -ForegroundColor Green
     } else {
@@ -83,7 +83,7 @@ try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/compras/proveedores/buscar-ruc/20123456789?tenant_id=$differentTenant" -Method Get -ContentType "application/json"
     Write-Host "Response:" -ForegroundColor Green
     $response | ConvertTo-Json -Depth 5
-    
+
     if ($response.success -eq $false -and $response.data -eq $null) {
         Write-Host "✓ Test 3 PASSED: Correctly isolated by tenant" -ForegroundColor Green
     } else {

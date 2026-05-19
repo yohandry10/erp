@@ -187,6 +187,12 @@ const PagosPage = () => {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Pagos & Comprobantes</h1>
+            <p className="dashboard-subtitle">Cargando pagos de empleados, planillas y comprobantes asociados.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando pagos...</p>
@@ -203,7 +209,7 @@ const PagosPage = () => {
           <h1 className="dashboard-title">Pagos & Comprobantes</h1>
           <p className="dashboard-subtitle">Control de pagos mensuales a empleados</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className="flex gap-4">
           <button className="refresh-btn" onClick={loadData}>
             🔄 Actualizar
           </button>
@@ -250,23 +256,15 @@ const PagosPage = () => {
       </div>
 
       {/* Filtros */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px'
-      }}>
+      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Estado:
           </label>
           <select 
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
+            className="form-control w-[150px]"
           >
             <option value="todos">Todos</option>
             <option value="pendiente">Pendiente</option>
@@ -276,14 +274,13 @@ const PagosPage = () => {
         </div>
 
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Período:
           </label>
           <select 
             value={filtroPeriodo}
             onChange={(e) => setFiltroPeriodo(e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
+            className="form-control w-[150px]"
           >
             <option value="todos">Todos</option>
             {getPeriodosUnicos().map(periodo => (
@@ -333,7 +330,7 @@ const PagosPage = () => {
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="flex gap-2">
                       {pago.estado === 'pendiente' && (
                         <button
                           onClick={() => procesarPago(pago.id)}
@@ -380,11 +377,7 @@ MONTO NETO: S/ ${(pago.monto_neto || 0).toLocaleString()}
           </table>
 
           {filtrarPagos().length === 0 && (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '2rem',
-              color: '#6b7280'
-            }}>
+            <div className="text-center p-8 text-gray-500">
               No hay pagos que coincidan con los filtros seleccionados.
             </div>
           )}

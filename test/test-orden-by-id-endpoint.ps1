@@ -9,12 +9,12 @@ Write-Host ""
 Write-Host "Step 1: Getting list of orders to find a valid ID..." -ForegroundColor Yellow
 try {
     $listResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes?tenant_id=$tenantId&limit=1" -Method Get -ContentType "application/json"
-    
+
     if ($listResponse.success -and $listResponse.data -and $listResponse.data.Count -gt 0) {
         $ordenId = $listResponse.data[0].id
         Write-Host "Found order ID: $ordenId" -ForegroundColor Green
         Write-Host ""
-        
+
         # Test 1: Get order by ID
         Write-Host "Test 1: Get order by ID" -ForegroundColor Yellow
         Write-Host "GET $baseUrl/compras/ordenes/${ordenId}?tenant_id=$tenantId" -ForegroundColor Gray
@@ -22,7 +22,7 @@ try {
         Write-Host "Response:" -ForegroundColor Green
         $response1 | ConvertTo-Json -Depth 10
         Write-Host ""
-        
+
         # Verify response structure
         Write-Host "Verifying response structure..." -ForegroundColor Yellow
         if ($response1.success) {
@@ -30,10 +30,10 @@ try {
         } else {
             Write-Host "✗ success field is false or missing" -ForegroundColor Red
         }
-        
+
         if ($response1.data) {
             Write-Host "✓ data field exists" -ForegroundColor Green
-            
+
             # Check main fields
             $requiredFields = @('id', 'numero', 'proveedor_id', 'fecha_orden', 'estado', 'subtotal', 'igv', 'total', 'detalles')
             foreach ($field in $requiredFields) {
@@ -43,7 +43,7 @@ try {
                     Write-Host "  ✗ $field is missing" -ForegroundColor Red
                 }
             }
-            
+
             # Check proveedor nested object
             if ($response1.data.proveedor) {
                 Write-Host "  ✓ proveedor object exists" -ForegroundColor Green
@@ -53,7 +53,7 @@ try {
             } else {
                 Write-Host "  ✗ proveedor object is missing" -ForegroundColor Red
             }
-            
+
             # Check detalles array
             if ($response1.data.detalles -is [Array]) {
                 Write-Host "  ✓ detalles is an array with $($response1.data.detalles.Count) items" -ForegroundColor Green
@@ -75,7 +75,7 @@ try {
             Write-Host "✗ data field is missing" -ForegroundColor Red
         }
         Write-Host ""
-        
+
         # Test 2: Get non-existent order
         Write-Host "Test 2: Get non-existent order (should return error)" -ForegroundColor Yellow
         $fakeId = "00000000-0000-0000-0000-000000000000"
@@ -84,7 +84,7 @@ try {
             $response2 = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/${fakeId}?tenant_id=$tenantId" -Method Get -ContentType "application/json"
             Write-Host "Response:" -ForegroundColor Green
             $response2 | ConvertTo-Json -Depth 5
-            
+
             if (-not $response2.success) {
                 Write-Host "✓ Correctly returned error for non-existent order" -ForegroundColor Green
             } else {
@@ -96,7 +96,7 @@ try {
             Write-Host "✓ Correctly returned error for non-existent order" -ForegroundColor Green
         }
         Write-Host ""
-        
+
     } else {
         Write-Host "No orders found in database. Please create an order first." -ForegroundColor Red
         Write-Host "You can use test-crear-orden-compra.ps1 to create a test order." -ForegroundColor Yellow

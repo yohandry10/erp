@@ -92,193 +92,76 @@ export function OnboardingTooltip({
   }, [step, isModal])
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        zIndex: 10000,
-        width: '320px',
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-        animation: 'fadeSlideIn 0.3s ease-out',
-        top: position.top,
-        left: position.left,
-        transform: isModal ? 'translate(-50%, -50%)' : 'none',
-      }}
+    <div className="fixed z-[10000] w-[320px] bg-white rounded-3 shadow"
       role="dialog"
       aria-label={step.titulo}
     >
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 16px',
-          borderBottom: '1px solid #e2e8f0',
-        }}
+      <div className="flex items-center justify-between py-3 px-4 border-b"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '8px',
-              height: '8px',
-              backgroundColor: '#3b82f6',
-              borderRadius: '50%',
-            }}
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-blue-500 rounded-full"
           />
-          <span style={{ fontSize: '12px', color: '#64748b' }}>
+          <span className="text-3 text-slate-500">
             Paso {currentIndex + 1} de {totalSteps}
           </span>
         </div>
         <button
-          onClick={onClose}
-          style={{
-            color: '#9ca3af',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px',
-          }}
+          onClick={onClose} className="text-gray-400 border-0 cursor-pointer p-[4px] flex items-center justify-center rounded-[4px]"
           aria-label="Cerrar tour"
         >
-          <X style={{ width: '16px', height: '16px' }} />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Content */}
-      <div style={{ padding: '16px' }}>
-        <h3
-          style={{
-            fontSize: '18px',
-            fontWeight: 600,
-            color: '#111827',
-            marginBottom: '8px',
-            margin: 0,
-          }}
+      <div className="p-4">
+        <h3 className="text-[18px] font-semibold text-gray-900 mb-2 m-0"
         >
           {step.titulo}
         </h3>
-        <p
-          style={{
-            fontSize: '14px',
-            color: '#4b5563',
-            lineHeight: 1.5,
-            margin: '8px 0 0 0',
-          }}
+        <p className="text-3.5 text-[#4b5563] leading-6 mt-2 mr-0 mb-0 ml-0"
         >
           {step.descripcion}
         </p>
       </div>
 
       {/* Progress bar */}
-      <div style={{ padding: '0 16px 8px' }}>
-        <div
-          style={{
-            height: '4px',
-            backgroundColor: '#f1f5f9',
-            borderRadius: '9999px',
-            overflow: 'hidden',
-          }}
+      <div>
+        <div className="h-[4px] bg-slate-100 rounded-full overflow-hidden"
         >
-          <div
-            style={{
-              height: '100%',
-              backgroundColor: '#3b82f6',
-              transition: 'width 0.3s ease',
-              width: `${((currentIndex + 1) / totalSteps) * 100}%`,
-            }}
+          <div className="h-[100%] bg-blue-500 transition"
           />
         </div>
       </div>
 
       {/* Actions */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 16px',
-          borderTop: '1px solid #e2e8f0',
-          backgroundColor: '#f8fafc',
-          borderRadius: '0 0 12px 12px',
-        }}
+      <div className="flex items-center justify-between py-3 px-4 border-t bg-slate-50"
       >
         <button
-          onClick={onSkip}
-          style={{
-            fontSize: '14px',
-            color: '#64748b',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
+          onClick={onSkip} className="text-3.5 text-slate-500 border-0 cursor-pointer flex items-center gap-[4px]"
         >
-          <SkipForward style={{ width: '12px', height: '12px' }} />
+          <SkipForward className="w-3 h-3" />
           Saltar
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex items-center gap-2">
           {!isFirst && (
             <button
-              onClick={onPrev}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                color: '#4b5563',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
+              onClick={onPrev} className="flex items-center gap-[4px] py-[6px] px-3 rounded-2 text-3.5 text-[#4b5563] border-0 cursor-pointer"
             >
-              <ChevronLeft style={{ width: '16px', height: '16px' }} />
+              <ChevronLeft className="w-4 h-4" />
               Anterior
             </button>
           )}
           <button
-            onClick={onNext}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '6px 16px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              backgroundColor: '#2563eb',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-            }}
+            onClick={onNext} className="flex items-center gap-[4px] py-[6px] px-4 rounded-2 text-3.5 bg-blue-600 text-white border-0 cursor-pointer"
           >
             {isLast ? 'Finalizar' : 'Siguiente'}
-            {!isLast && <ChevronRight style={{ width: '16px', height: '16px' }} />}
+            {!isLast && <ChevronRight className="w-4 h-4" />}
           </button>
         </div>
       </div>
-
-      <style jsx global>{`
-        @keyframes fadeSlideIn {
-          from {
-            opacity: 0;
-            transform: ${isModal ? 'translate(-50%, -45%)' : 'translateY(-10px)'};
-          }
-          to {
-            opacity: 1;
-            transform: ${isModal ? 'translate(-50%, -50%)' : 'translateY(0)'};
-          }
-        }
-      `}</style>
     </div>
   )
 }

@@ -108,11 +108,11 @@ export default function PedidoDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem 0' }}>
-          <div style={{ textAlign: 'center' }}>
-            <Loader2 style={{ width: '3rem', height: '3rem', color: 'var(--primary-400)', margin: '0 auto 1rem', animation: 'spin 1s linear infinite' }} />
-            <p style={{ color: 'var(--primary-600)' }}>Cargando pedido...</p>
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12 px-0">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-[var(--primary-400)]" />
+            <p className="text-[var(--primary-600)]">Cargando pedido...</p>
           </div>
         </div>
       </div>
@@ -124,6 +124,9 @@ export default function PedidoDetailPage() {
   }
 
   const clienteInfo = (pedido as any).cliente ?? (pedido as any).clientes ?? null
+  const clienteDocumento = clienteInfo
+    ? (clienteInfo.numero_documento ?? clienteInfo.documento_numero ?? clienteInfo.ruc ?? clienteInfo.codigo ?? null)
+    : null
 
   const facturaButtonConfig = {
     usar_flujo_logistica: empresaConfig?.usar_flujo_logistica ?? false,
@@ -145,24 +148,12 @@ export default function PedidoDetailPage() {
     estadoPedido !== EstadoPedido.COMPLETADO_CON_GRE
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="p-6 flex flex-col gap-6">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
           <button
-            onClick={() => router.back()}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '0.5rem',
-              color: 'var(--primary-700)',
-              background: 'rgba(255, 255, 255, 0.8)',
-              border: '1px solid var(--primary-200)',
-              borderRadius: 'var(--border-radius)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
+            onClick={() => router.back()} className="inline-flex items-center justify-center p-2 text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--primary-50)'
               e.currentTarget.style.borderColor = 'var(--primary-300)'
@@ -172,27 +163,18 @@ export default function PedidoDetailPage() {
               e.currentTarget.style.borderColor = 'var(--primary-200)'
             }}
           >
-            <ArrowLeft style={{ width: '1.125rem', height: '1.125rem' }} />
+            <ArrowLeft className="w-[1.125rem] h-[1.125rem]" />
           </button>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: '900', color: 'var(--primary-900)', margin: 0 }}>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-8 font-black text-[var(--primary-900)] m-0">
                 Pedido {pedido.numero}
               </h1>
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '0.5rem 1rem',
-                borderRadius: '9999px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                background: ESTADO_COLORS[pedido.estado].bg,
-                color: ESTADO_COLORS[pedido.estado].text
-              }}>
+              <span className="inline-flex items-center py-2 px-4 rounded-full text-[0.875rem] font-semibold">
                 {pedido.estado}
               </span>
             </div>
-            <p style={{ fontSize: '1rem', color: 'var(--primary-600)', margin: 0 }}>
+            <p className="text-4 text-[var(--primary-600)] m-0">
               Creado el {formatDate(pedido.created_at)}
             </p>
           </div>
@@ -201,7 +183,7 @@ export default function PedidoDetailPage() {
 
       {/* Botones de Acción */}
       {pedido.estado === EstadoPedido.PENDIENTE && (
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={async () => {
               try {
@@ -228,22 +210,7 @@ export default function PedidoDetailPage() {
                   variant: 'destructive'
                 })
               }
-            }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              color: 'white',
-              background: 'var(--gradient-primary)',
-              border: 'none',
-              borderRadius: 'var(--border-radius)',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: 'var(--shadow-md)'
-            }}
+            }} className="inline-flex items-center gap-2 py-3 px-6 text-[0.875rem] font-semibold text-white bg-[var(--gradient-primary)] border-0 cursor-pointer transition shadow"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)'
               e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
@@ -260,41 +227,31 @@ export default function PedidoDetailPage() {
 
       {/* Guía breve del flujo logístico */}
       {!empresaConfigLoading && (
-        <div
-          style={{
-            border: '1px solid var(--primary-100)',
-            background: 'rgba(59,130,246,0.05)',
-            borderRadius: 'var(--border-radius)',
-            padding: '1rem 1.25rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.35rem',
-            color: 'var(--primary-700)',
-          }}
+        <div className="border bg-[rgba(59,130,246,0.05)] py-4 px-5 flex flex-col gap-1.5 text-[var(--primary-700)]"
         >
-          <strong style={{ color: 'var(--primary-800)' }}>¿Qué sigue?</strong>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.95rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.6rem', background: 'white', borderRadius: '999px', border: '1px solid var(--primary-100)' }}>
+          <strong className="text-[var(--primary-800)]">¿Qué sigue?</strong>
+          <div className="flex gap-3 flex-wrap text-[0.95rem]">
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
               1) Confirmar pedido
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.6rem', background: 'white', borderRadius: '999px', border: '1px solid var(--primary-100)' }}>
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
               2) Preparar en Logística
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.6rem', background: 'white', borderRadius: '999px', border: '1px solid var(--primary-100)' }}>
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
               3) Despachar (si aplica)
             </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.6rem', background: 'white', borderRadius: '999px', border: '1px solid var(--primary-100)' }}>
+            <span className="inline-flex items-center gap-1.5 py-1.5 px-2.5 bg-white rounded-full border">
               4) Facturar
             </span>
           </div>
-          <span style={{ fontSize: '0.9rem' }}>
+          <span className="text-3.5">
             Usa el botón “Ir a Logística” para preparar y despachar. Luego regresa aquí para facturar cuando el pedido esté listo.
           </span>
         </div>
       )}
 
       {!empresaConfigLoading && puedeGenerarFactura && (
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-3 flex-wrap">
           <GenerarFacturaButton
             pedidoId={pedidoId}
             onSuccess={loadPedido}
@@ -305,23 +262,11 @@ export default function PedidoDetailPage() {
       )}
 
       {requierePasosLogisticaPrevios && (
-        <div
-          style={{
-            border: '1px dashed var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            padding: '1rem',
-            background: 'var(--primary-50)',
-            color: 'var(--primary-700)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '1rem',
-            flexWrap: 'wrap'
-          }}
+        <div className="border border-dashed p-4 bg-[var(--primary-50)] text-[var(--primary-700)] flex justify-between items-center gap-4 flex-wrap"
         >
           <div>
             <strong>Flujo logístico activo</strong>
-            <p style={{ margin: '0.25rem 0 0 0', color: 'var(--primary-600)' }}>
+            <p className="mt-1 mr-0 mb-0 ml-0 text-[var(--primary-600)]">
               Completa la preparación y despacho en Inventario → Logística para avanzar el pedido a
               LISTO_FACTURAR y habilitar la emisión de la factura.
             </p>
@@ -333,16 +278,7 @@ export default function PedidoDetailPage() {
                   ? '/dashboard/inventario/logistica/listo-despacho'
                   : '/dashboard/inventario/logistica/ordenes-pendientes'
               router.push(target)
-            }}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: 'var(--border-radius)',
-              border: 'none',
-              background: 'var(--primary-600)',
-              color: 'white',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
+            }} className="py-2 px-4 border-0 bg-[var(--primary-600)] text-white font-semibold cursor-pointer"
           >
             {pedido.estado === EstadoPedido.EN_PREPARACION ? 'Ir a Despachos' : 'Ir a Logística'}
           </button>
@@ -350,80 +286,66 @@ export default function PedidoDetailPage() {
       )}
 
       {/* Cliente Info */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">
           Información del Cliente
         </h3>
         {clienteInfo ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+          <div className="grid grid-cols-[repeat(2,_1fr)] gap-4">
             <div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Razón Social</p>
-              <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
+              <p className="text-[0.875rem] text-[var(--primary-600)] mb-1">Razón Social</p>
+              <p className="text-4 font-semibold text-[var(--primary-900)] m-0">
                 {clienteInfo.razon_social || clienteInfo.nombre_comercial || 'N/D'}
               </p>
             </div>
             <div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginBottom: '0.25rem' }}>Documento</p>
-              <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', margin: 0 }}>
-                {clienteInfo.documento_tipo || 'N/A'}: {clienteInfo.numero_documento || clienteInfo.documento_numero || 'N/A'}
+              <p className="text-[0.875rem] text-[var(--primary-600)] mb-1">Documento</p>
+              <p className="text-4 font-semibold text-[var(--primary-900)] m-0">
+                {clienteInfo.documento_tipo || clienteInfo.tipo_documento || 'N/A'}: {clienteDocumento || 'N/A'}
               </p>
             </div>
           </div>
         ) : (
-          <p style={{ color: 'var(--primary-500)' }}>Cliente no disponible</p>
+          <p className="text-[var(--primary-500)]">Cliente no disponible</p>
         )}
       </div>
 
       {/* Productos */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">
           Productos
         </h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto">
+          <table className="w-[100%]">
             <thead>
-              <tr style={{ background: 'var(--primary-50)', borderBottom: '2px solid var(--primary-200)' }}>
-                <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+              <tr className="bg-[var(--primary-50)]">
+                <th className="p-4 text-left text-3 font-semibold text-[var(--primary-700)]">
                   Descripción
                 </th>
-                <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
                   Cantidad
                 </th>
-                <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
                   Precio Unit.
                 </th>
-                <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+                <th className="p-4 text-right text-3 font-semibold text-[var(--primary-700)]">
                   Subtotal
                 </th>
               </tr>
             </thead>
             <tbody>
               {pedido.detalle?.map((item, index) => (
-                <tr key={index} style={{ borderBottom: '1px solid var(--primary-100)' }}>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem', color: 'var(--primary-900)' }}>
+                <tr key={index} className="border-b">
+                  <td className="p-4 text-[0.875rem] text-[var(--primary-900)]">
                     {item.descripcion}
                   </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: 'var(--primary-900)' }}>
+                  <td className="p-4 text-[0.875rem] text-right text-[var(--primary-900)]">
                     {item.cantidad}
                   </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: 'var(--primary-900)' }}>
+                  <td className="p-4 text-[0.875rem] text-right text-[var(--primary-900)]">
                     {formatCurrency(item.precio_unitario)}
                   </td>
-                  <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', fontWeight: '600', color: 'var(--primary-900)' }}>
+                  <td className="p-4 text-[0.875rem] text-right font-semibold text-[var(--primary-900)]">
                     {formatCurrency(item.subtotal)}
                   </td>
                 </tr>
@@ -434,36 +356,20 @@ export default function PedidoDetailPage() {
       </div>
 
       {/* Totales */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: 'var(--border-radius-lg)',
-        padding: '1.5rem',
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid rgba(255, 255, 255, 0.3)'
-      }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+      <div className="p-6 shadow border">
+        <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">
           Totales
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxWidth: '28rem', marginLeft: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-            <span style={{ color: 'var(--primary-600)' }}>Subtotal:</span>
-            <span style={{ fontWeight: '500', color: 'var(--primary-900)' }}>{formatCurrency(pedido.subtotal)}</span>
+        <div className="flex flex-col gap-2 max-w-[28rem] ml-auto">
+          <div className="flex justify-between text-[0.875rem]">
+            <span className="text-[var(--primary-600)]">Subtotal:</span>
+            <span className="font-medium text-[var(--primary-900)]">{formatCurrency(pedido.subtotal)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-            <span style={{ color: 'var(--primary-600)' }}>IGV (18%):</span>
-            <span style={{ fontWeight: '500', color: 'var(--primary-900)' }}>{formatCurrency(pedido.igv)}</span>
+          <div className="flex justify-between text-[0.875rem]">
+            <span className="text-[var(--primary-600)]">IGV (18%):</span>
+            <span className="font-medium text-[var(--primary-900)]">{formatCurrency(pedido.igv)}</span>
           </div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '1.125rem',
-            fontWeight: '700',
-            borderTop: '2px solid var(--primary-200)',
-            paddingTop: '0.5rem',
-            marginTop: '0.5rem',
-            color: 'var(--primary-900)'
-          }}>
+          <div className="flex justify-between text-[1.125rem] font-bold pt-2 mt-2 text-[var(--primary-900)]">
             <span>Total:</span>
             <span>{formatCurrency(pedido.total)}</span>
           </div>
@@ -472,18 +378,11 @@ export default function PedidoDetailPage() {
 
       {/* Observaciones */}
       {pedido.observaciones && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          borderRadius: 'var(--border-radius-lg)',
-          padding: '1.5rem',
-          boxShadow: 'var(--shadow-md)',
-          border: '1px solid rgba(255, 255, 255, 0.3)'
-        }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+        <div className="p-6 shadow border">
+          <h3 className="text-[1.125rem] font-semibold text-[var(--primary-900)] mb-4">
             Observaciones
           </h3>
-          <p style={{ fontSize: '0.875rem', color: 'var(--primary-700)', margin: 0, whiteSpace: 'pre-wrap' }}>
+          <p className="text-[0.875rem] text-[var(--primary-700)] m-0">
             {pedido.observaciones}
           </p>
         </div>

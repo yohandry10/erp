@@ -283,79 +283,25 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
   console.log('🔥 Modal SÍ ESTÁ ABIERTO - renderizando contenido')
   
   const modalContent = (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        zIndex: 99999
-      }}
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] flex items-center justify-center p-4 z-[99999]"
     >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          width: '100%',
-          maxWidth: '1280px',
-          maxHeight: '95vh',
-          overflow: 'hidden',
-          zIndex: 100000
-        }}
+      <div className="bg-white rounded-3 shadow w-[100%] max-w-[1280px] overflow-hidden z-[100000]"
       >
         
         {/* Header */}
-        <div style={{
-          padding: '24px',
-          borderBottom: '1px solid #e5e7eb',
-          background: 'linear-gradient(to right, #eff6ff, #e0e7ff)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="p-6 border-b">
+          <div className="flex justify-between items-center">
             <div>
-              <h2 style={{
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: '#1f2937',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                margin: 0
-              }}>
+              <h2 className="text-6 font-bold text-gray-800 flex items-center gap-2 m-0">
                 💰 Nueva Planilla de Sueldos
               </h2>
-              <p style={{
-                fontSize: '14px',
-                color: '#6b7280',
-                marginTop: '4px',
-                margin: 0
-              }}>
+              <p className="text-3.5 text-gray-500 mt-[4px] m-0">
                 Configure el período y seleccione empleados para generar la planilla
               </p>
             </div>
 
             <button
-              onClick={handleClose}
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: '#ef4444',
-                color: 'white',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold',
-                fontSize: '16px'
-              }}
+              onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-4"
             >
               ✕
             </button>
@@ -363,138 +309,54 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Content */}
-        <div style={{
-          padding: '24px',
-          overflowY: 'auto',
-          maxHeight: 'calc(95vh - 140px)'
-        }}>
-          <form id="planilla-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="p-6 overflow-y-auto">
+          <form id="planilla-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
             {/* Configuración de Planilla */}
-            <div style={{
-              backgroundColor: '#f9fafb',
-              padding: '16px',
-              borderRadius: '8px'
-            }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '500',
-                color: '#1f2937',
-                marginBottom: '16px',
-                margin: 0
-              }}>⚙️ Configuración</h3>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px'
-              }}>
+            <div className="bg-[#f9fafb] p-4 rounded-2">
+              <h3 className="text-[18px] font-medium text-gray-800 mb-4 m-0">⚙️ Configuración</h3>
+              <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '4px'
-                  }}>Período</label>
+                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Período</label>
                   <input
                     type="text"
                     value={formData.periodo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
+                    onChange={(e) => setFormData(prev => ({ ...prev, periodo: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
                     placeholder="2025-06"
                     required
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '4px'
-                  }}>Fecha Inicio</label>
+                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Inicio</label>
                   <input
                     type="date"
                     value={formData.fecha_inicio}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
                     required
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '4px'
-                  }}>Fecha Fin</label>
+                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Fin</label>
                   <input
                     type="date"
                     value={formData.fecha_fin}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_fin: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
                     required
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '4px'
-                  }}>Fecha Pago</label>
+                  <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Fecha Pago</label>
                   <input
                     type="date"
                     value={formData.fecha_pago}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '14px'
-                    }}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fecha_pago: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
                   />
                 </div>
               </div>
-              <div style={{ marginTop: '16px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '4px'
-                }}>Observaciones</label>
+              <div className="mt-4">
+                <label className="block text-3.5 font-medium text-gray-700 mb-[4px]">Observaciones</label>
                 <textarea
                   value={formData.observaciones}
-                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    resize: 'vertical'
-                  }}
+                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))} className="w-[100%] p-2 border rounded-[6px] text-3.5"
                   rows={2}
                 />
               </div>
@@ -502,242 +364,148 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
 
             {/* Gestión de Empleados */}
             <div>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '500',
-                color: '#1f2937',
-                marginBottom: '16px',
-                margin: 0
-              }}>👥 Empleados para Planilla</h3>
+              <h3 className="text-[18px] font-medium text-gray-800 mb-4 m-0">👥 Empleados para Planilla</h3>
               
-              <div style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                overflow: 'hidden'
-              }}>
+              <div className="border rounded-2 overflow-hidden">
                 {/* Header con explicaciones claras */}
-                <div style={{
-                  backgroundColor: '#f9fafb',
-                  padding: '12px 16px',
-                  display: 'grid',
-                  gridTemplateColumns: '40px 200px 120px 80px 80px 80px 80px 80px 120px',
-                  gap: '8px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  borderBottom: '1px solid #e5e7eb'
-                }}>
+                <div className="bg-[#f9fafb] py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-3 font-semibold text-gray-700 border-b">
                   <div>✓</div>
                   <div>👤 EMPLEADO</div>
-                  <div>💰 SUELDO BASE<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Mensual S/</span></div>
-                  <div>📅 DÍAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Trabajados</span></div>
-                  <div>⏰ HE 25%<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Primeras 2h</span></div>
-                  <div>⏰ HE 35%<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Siguientes</span></div>
-                  <div>⏱️ TARDANZAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Minutos</span></div>
-                  <div>❌ FALTAS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Días</span></div>
-                  <div>💵 BONOS<br/><span style={{fontSize: '10px', color: '#6b7280'}}>Adicionales S/</span></div>
+                  <div>💰 SUELDO BASE<br/><span className="text-2.5 text-gray-500">Mensual S/</span></div>
+                  <div>📅 DÍAS<br/><span className="text-2.5 text-gray-500">Trabajados</span></div>
+                  <div>⏰ HE 25%<br/><span className="text-2.5 text-gray-500">Primeras 2h</span></div>
+                  <div>⏰ HE 35%<br/><span className="text-2.5 text-gray-500">Siguientes</span></div>
+                  <div>⏱️ TARDANZAS<br/><span className="text-2.5 text-gray-500">Minutos</span></div>
+                  <div>❌ FALTAS<br/><span className="text-2.5 text-gray-500">Días</span></div>
+                  <div>💵 BONOS<br/><span className="text-2.5 text-gray-500">Adicionales S/</span></div>
                 </div>
 
                 {/* Filas de empleados con explicaciones */}
-                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                <div className="max-h-[320px] overflow-y-auto">
                   {empleados.map((empleado) => {
                     const valores = calcularValoresEmpleado(empleado)
                     return (
                     <div 
-                      key={empleado.id} 
-                      style={{
-                        padding: '12px 16px',
-                        display: 'grid',
-                        gridTemplateColumns: '40px 200px 120px 80px 80px 80px 80px 80px 120px',
-                        gap: '8px',
-                        fontSize: '13px',
-                        borderBottom: '1px solid #f3f4f6',
-                        backgroundColor: empleado.incluir ? 'white' : '#f9fafb',
-                        opacity: empleado.incluir ? 1 : 0.6
-                      }}
+                      key={empleado.id} className="py-3 px-4 grid grid-cols-[40px_200px_120px_80px_80px_80px_80px_80px_120px] gap-2 text-[13px] border-b"
                     >
                       {/* Checkbox selección */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div className="flex items-center justify-center">
                         <input
                           type="checkbox"
                           checked={empleado.incluir}
-                          onChange={(e) => actualizarEmpleado(empleado.id, 'incluir', e.target.checked)}
-                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                          onChange={(e) => actualizarEmpleado(empleado.id, 'incluir', e.target.checked)} className="w-4 h-4 cursor-pointer"
                         />
                       </div>
                       
                       {/* Datos del empleado */}
                       <div>
-                        <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '2px' }}>
+                        <div className="font-semibold text-gray-800 mb-[2px]">
                           {empleado.nombres} {empleado.apellidos}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                        <div className="text-[11px] text-gray-500">
                           {empleado.puesto} • DNI: {empleado.numero_documento}
                         </div>
                       </div>
                       {/* Sueldo Base */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.sueldo_base}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'sueldo_base', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                           step="0.01"
                           placeholder="0.00"
                         />
-                        <div style={{ fontSize: '10px', color: '#059669', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-emerald-600 font-semibold mt-[2px]">
                           S/ {empleado.sueldo_base.toFixed(0)}
                         </div>
                       </div>
                       
                       {/* Días Trabajados */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.dias_trabajados}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'dias_trabajados', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                           max="31"
                         />
-                        <div style={{ fontSize: '10px', color: '#2563eb', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-blue-600 font-semibold mt-[2px]">
                           de 30 días
                         </div>
                       </div>
                       
                       {/* Horas Extras 25% */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.horas_extras_25}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_25', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                           step="0.5"
                         />
-                        <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-red-600 font-semibold mt-[2px]">
                           +25%
                         </div>
                       </div>
                       
                       {/* Horas Extras 35% */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.horas_extras_35}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'horas_extras_35', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                           step="0.5"
                         />
-                        <div style={{ fontSize: '10px', color: '#dc2626', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-red-600 font-semibold mt-[2px]">
                           +35%
                         </div>
                       </div>
                       
                       {/* Tardanzas */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.tardanzas_minutos}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'tardanzas_minutos', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                         />
-                        <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-amber-500 font-semibold mt-[2px]">
                           -S/ {(empleado.tardanzas_minutos * (empleado.sueldo_base / 30 / 8) / 60).toFixed(0)}
                         </div>
                       </div>
                       
                       {/* Faltas */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.faltas}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'faltas', parseInt(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                         />
-                        <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-red-500 font-semibold mt-[2px]">
                           -S/ {(empleado.faltas * (empleado.sueldo_base / 30)).toFixed(0)}
                         </div>
                       </div>
                       
                       {/* Bonos Adicionales */}
-                      <div style={{ textAlign: 'center' }}>
+                      <div className="text-center">
                         <input
                           type="number"
                           value={empleado.bonos_adicionales}
                           onChange={(e) => actualizarEmpleado(empleado.id, 'bonos_adicionales', parseFloat(e.target.value) || 0)}
-                          disabled={!empleado.incluir}
-                          style={{
-                            width: '100%',
-                            padding: '4px',
-                            fontSize: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            textAlign: 'center',
-                            backgroundColor: empleado.incluir ? 'white' : '#f3f4f6'
-                          }}
+                          disabled={!empleado.incluir} className="w-[100%] p-[4px] text-3 border rounded-[4px] text-center"
                           min="0"
                           step="0.01"
                         />
-                        <div style={{ fontSize: '10px', color: '#059669', fontWeight: '600', marginTop: '2px' }}>
+                        <div className="text-2.5 text-emerald-600 font-semibold mt-[2px]">
                           Total: S/ {valores.sueldo_bruto_total.toFixed(0)}
                         </div>
                       </div>
@@ -748,67 +516,47 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
               </div>
 
               {/* Resumen Empresarial Claro */}
-              <div style={{
-                marginTop: '16px',
-                padding: '16px',
-                backgroundColor: '#eff6ff',
-                borderRadius: '8px',
-                border: '1px solid #3b82f6'
-              }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '16px',
-                  textAlign: 'center'
-                }}>
+              <div className="mt-4 p-4 bg-[#eff6ff] rounded-2 border">
+                <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 text-center">
                   <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1d4ed8' }}>
+                    <div className="text-6 font-bold text-blue-700">
                       {empleadosSeleccionados.length}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '500' }}>
+                    <div className="text-3 text-[#1e40af] font-medium">
                       EMPLEADOS INCLUIDOS
                     </div>
                   </div>
                   
                   <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
+                    <div className="text-6 font-bold text-emerald-600">
                       S/ {totalPlanilla.toFixed(0)}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#047857', fontWeight: '500' }}>
+                    <div className="text-3 text-emerald-700 font-medium">
                       TOTAL BRUTO PLANILLA
                     </div>
                   </div>
                   
                   <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7c3aed' }}>
+                    <div className="text-6 font-bold text-violet-600">
                       S/ {empleadosSeleccionados.length > 0 ? (totalPlanilla / empleadosSeleccionados.length).toFixed(0) : '0'}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6d28d9', fontWeight: '500' }}>
+                    <div className="text-3 text-violet-700 font-medium">
                       PROMEDIO POR EMPLEADO
                     </div>
                   </div>
                   
                   <div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#dc2626' }}>
+                    <div className="text-6 font-bold text-red-600">
                       {formData.periodo}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#b91c1c', fontWeight: '500' }}>
+                    <div className="text-3 text-red-700 font-medium">
                       PERÍODO PLANILLA
                     </div>
                   </div>
                 </div>
                 
                 {empleadosSeleccionados.length > 0 && (
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '8px 12px',
-                    backgroundColor: '#dcfce7',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    color: '#166534',
-                    textAlign: 'center',
-                    fontWeight: '500'
-                  }}>
+                  <div className="mt-3 py-2 px-3 bg-[#dcfce7] rounded-[6px] text-[13px] text-[#166534] text-center font-medium">
                     ✅ Planilla lista para procesar con {empleadosSeleccionados.length} empleados
                     • Se calcularán automáticamente: AFP/ONP, ESSALUD, Impuesto 5ta categoría
                   </div>
@@ -819,29 +567,11 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px 24px',
-          borderTop: '1px solid #e5e7eb',
-          backgroundColor: '#f9fafb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
+        <div className="py-4 px-6 border-t bg-[#f9fafb] flex justify-end items-center gap-3">
           <button
             type="button"
             onClick={handleClose}
-            disabled={loading}
-            style={{
-              padding: '8px 24px',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              backgroundColor: 'white',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1,
-              fontSize: '14px'
-            }}
+            disabled={loading} className="py-2 px-6 text-gray-500 border rounded-2 bg-white text-3.5"
           >
             Cancelar
           </button>
@@ -849,42 +579,17 @@ export default function PlanillaModal({ isOpen, onClose, onSuccess }: PlanillaMo
           <button
             type="submit"
             form="planilla-form"
-            disabled={loading || empleadosSeleccionados.length === 0 || !formData.periodo}
-            style={{
-              padding: '8px 32px',
-              backgroundColor: loading || empleadosSeleccionados.length === 0 || !formData.periodo ? '#9ca3af' : '#2563eb',
-              color: 'white',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: loading || empleadosSeleccionados.length === 0 || !formData.periodo ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
+            disabled={loading || empleadosSeleccionados.length === 0 || !formData.periodo} className="py-2 px-8 text-white rounded-2 border-0 flex items-center gap-2 text-3.5 font-medium"
           >
             {loading ? (
               <>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid white',
-                  borderTop: '2px solid transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></div>
+                <div className="w-4 h-4 rounded-full"></div>
                 Procesando...
               </>
             ) : (
               <>
                 ✅ Crear Planilla
-                <span style={{
-                  backgroundColor: '#1d4ed8',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '12px'
-                }}>
+                <span className="bg-blue-700 py-[2px] px-2 rounded-[4px] text-3">
                   {empleadosSeleccionados.length} empleados
                 </span>
               </>

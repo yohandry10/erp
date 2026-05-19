@@ -2,64 +2,151 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PageShell } from '@/components/erp/page-shell'
+
+const ANALYTICS_CACHE_KEY = 'erp-analytics-dashboard-snapshot'
+const CHART_PALETTE = ['#38bdf8', '#22d3ee', '#2563eb', '#1e40af', '#64748b']
+const CHART_SWATCH_CLASSES = ['bg-sky-400', 'bg-cyan-300', 'bg-blue-600', 'bg-blue-800', 'bg-slate-500']
+const GAUGE_COLORS = {
+  high: '#22d3ee',
+  medium: '#2563eb',
+  low: '#64748b',
+}
+
+const analyticsCard =
+  'overflow-hidden rounded-[1.15rem] border border-cyan-400/20 bg-slate-950/75 text-slate-100 shadow-2xl shadow-cyan-950/25 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70'
+const mutedPanel =
+  'rounded-2xl border border-cyan-400/15 bg-slate-900/60 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50'
+const analyticsInputClass =
+  'border-cyan-400/20 bg-slate-950/60 text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+const chartSkeletonClass =
+  'h-full min-h-[260px] rounded-2xl border border-cyan-400/10 bg-slate-900/45 p-6 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50'
+
+type AnalyticsData = {
+  ventasTiempo: any
+  deudasClientes: any
+  deudasProveedores: any
+  ventasCategoria: any
+  kpisVisuales: any
+}
+
+const EMPTY_ANALYTICS_DATA: AnalyticsData = {
+  ventasTiempo: null,
+  deudasClientes: null,
+  deudasProveedores: null,
+  ventasCategoria: null,
+  kpisVisuales: null,
+}
+
+const hasAnalyticsData = (data: AnalyticsData) =>
+  Boolean(data.ventasTiempo || data.deudasClientes || data.deudasProveedores || data.ventasCategoria || data.kpisVisuales)
+
+const getCachedAnalytics = (): AnalyticsData => {
+  if (typeof window === 'undefined') {
+    return EMPTY_ANALYTICS_DATA
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ANALYTICS_CACHE_KEY)
+    if (!raw) {
+      return EMPTY_ANALYTICS_DATA
+    }
+
+    return { ...EMPTY_ANALYTICS_DATA, ...JSON.parse(raw) }
+  } catch {
+    return EMPTY_ANALYTICS_DATA
+  }
+}
+
+const cacheAnalytics = (data: AnalyticsData) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify(data))
+  } catch {
+    /* ignore storage failures */
+  }
+}
+
+function ChartLoadingState({ label }: { label: string }) {
+  return (
+    <div className={chartSkeletonClass}>
+      <p className="mb-6 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
+        {label}
+      </p>
+      <div className="flex h-44 items-end gap-3">
+        <Skeleton className="h-20 flex-1 bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+        <Skeleton className="h-28 flex-1 bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+        <Skeleton className="h-36 flex-1 bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+        <Skeleton className="h-24 flex-1 bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+      </div>
+    </div>
+  )
+}
+
+function KpiLoadingState() {
+  return (
+    <Card className={analyticsCard}>
+      <CardHeader>
+        <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          Indicadores clave de rendimiento
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {['Liquidez', 'Rentabilidad', 'Crecimiento', 'Eficiencia'].map((label) => (
+            <div key={label} className={`${mutedPanel} p-6 text-center`}>
+              <p className="mb-4 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
+                {label}
+              </p>
+              <Skeleton className="mx-auto h-16 w-32 rounded-full bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+              <Skeleton className="mx-auto mt-4 h-4 w-24 bg-cyan-400/15 group-data-[erp-theme=light]/dashboard:bg-slate-200" />
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 // Componente simple para gráfico de barras
-const BarChart = ({ data, title, color = '#3b82f6' }: { data: any, title: string, color?: string }) => {
-  if (!data?.labels?.length) {
+const BarChart = ({ data, title, color = '#2563eb' }: { data: any, title: string, color?: string }) => {
+  const values = Array.isArray(data?.data) ? data.data.map((value: number) => Number(value) || 0) : []
+  const maxValue = values.length ? Math.max(...values) : 0
+
+  if (!data?.labels?.length || maxValue <= 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+      <div className="p-8 text-center text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
         Sin datos para mostrar
       </div>
     )
   }
 
-  const maxValue = Math.max(...data.data)
-
   return (
     <div>
-      <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>{title}</h3>
-      <div style={{ display: 'flex', alignItems: 'end', gap: '8px', height: '200px', padding: '1rem' }}>
+      {title ? <h3 className="mb-6 text-center text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h3> : null}
+      <div className="flex h-[200px] items-end gap-2 p-4">
         {data.labels.map((label: string, index: number) => {
-          const height = (data.data[index] / maxValue) * 160
+          const value = values[index] || 0
+          const height = Math.max((value / maxValue) * 160, value > 0 ? 4 : 0)
           return (
-            <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div
-                style={{
-                  width: '100%',
-                  height: `${height}px`,
-                  backgroundColor: color,
-                  borderRadius: '4px 4px 0 0',
-                  display: 'flex',
-                  alignItems: 'end',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  paddingBottom: '4px',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.05)'
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-                title={`${label}: ${data.data[index].toLocaleString()}`}
-              >
-                {height > 30 ? data.data[index].toLocaleString() : ''}
-              </div>
-              <div style={{
-                fontSize: '0.7rem',
-                color: '#6b7280',
-                marginTop: '8px',
-                textAlign: 'center',
-                transform: 'rotate(-45deg)',
-                transformOrigin: 'center',
-                whiteSpace: 'nowrap'
-              }}>
+            <div key={index} className="flex flex-1 flex-col items-center">
+              <svg className="h-40 w-full cursor-pointer overflow-visible transition-transform hover:scale-105" viewBox="0 0 32 160" preserveAspectRatio="none" aria-label={`${label}: ${value.toLocaleString()}`}>
+                <rect x="2" y={160 - height} width="28" height={height} rx="4" fill={color} />
+              </svg>
+              {height > 30 ? (
+                <div className="-mt-8 text-center text-xs font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-800">
+                  {value.toLocaleString()}
+                </div>
+              ) : null}
+              <div className="mt-2 origin-center -rotate-45 whitespace-nowrap text-center text-[0.7rem] text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
                 {label}
               </div>
             </div>
@@ -72,23 +159,26 @@ const BarChart = ({ data, title, color = '#3b82f6' }: { data: any, title: string
 
 // Componente simple para gráfico de pastel
 const PieChart = ({ data, title }: { data: any, title: string }) => {
-  if (!data?.labels?.length) {
+  const total = Array.isArray(data?.data)
+    ? data.data.reduce((sum: number, value: number) => sum + (Number(value) || 0), 0)
+    : 0
+
+  if (!data?.labels?.length || total <= 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+      <div className="p-8 text-center text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
         Sin datos para mostrar
       </div>
     )
   }
 
-  const total = data.data.reduce((sum: number, value: number) => sum + value, 0)
   let currentAngle = 0
 
   return (
     <div>
-      <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>{title}</h3>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-        <div style={{ position: 'relative', width: '200px', height: '200px' }}>
-          <svg width="200" height="200" style={{ transform: 'rotate(-90deg)' }}>
+      <h3 className="mb-6 text-center text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h3>
+      <div className="flex flex-col items-center gap-6 md:flex-row">
+        <div className="relative h-[200px] w-[200px] shrink-0">
+          <svg width="200" height="200" className="-rotate-90">
             {data.labels.map((label: string, index: number) => {
               const percentage = (data.data[index] / total) * 100
               const angle = (data.data[index] / total) * 360
@@ -110,7 +200,7 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
                 'Z'
               ].join(' ')
 
-              const color = data.backgroundColor[index] || `hsl(${(index * 137.5) % 360}, 70%, 60%)`
+              const color = CHART_PALETTE[index % CHART_PALETTE.length]
 
               currentAngle += angle
 
@@ -119,9 +209,9 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
                   key={index}
                   d={pathData}
                   fill={color}
-                  stroke="white"
+                  stroke="rgba(15,23,42,0.7)"
                   strokeWidth="2"
-                  style={{ cursor: 'pointer' }}
+                  className="cursor-pointer"
                 >
                   <title>{`${label}: ${percentage.toFixed(1)}%`}</title>
                 </path>
@@ -130,23 +220,15 @@ const PieChart = ({ data, title }: { data: any, title: string }) => {
           </svg>
         </div>
 
-        <div style={{ flex: 1 }}>
+        <div className="min-w-0 flex-1">
           {data.labels.map((label: string, index: number) => {
             const percentage = ((data.data[index] / total) * 100).toFixed(1)
-            const color = data.backgroundColor[index] || `hsl(${(index * 137.5) % 360}, 70%, 60%)`
+            const swatchClass = CHART_SWATCH_CLASSES[index % CHART_SWATCH_CLASSES.length]
 
             return (
-              <div key={index} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <div
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    backgroundColor: color,
-                    marginRight: '0.75rem',
-                    borderRadius: '2px'
-                  }}
-                />
-                <span style={{ fontSize: '0.9rem', color: '#374151' }}>
+              <div key={index} className="mb-2 flex items-center">
+                <div className={`mr-3 h-4 w-4 rounded-sm ${swatchClass}`} />
+                <span className="text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
                   {label}: {percentage}%
                 </span>
               </div>
@@ -163,15 +245,9 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
   // Verificación de seguridad para datos
   if (!data || typeof data.valor === 'undefined' || typeof data.objetivo === 'undefined') {
     return (
-      <div style={{
-        textAlign: 'center',
-        padding: '1.5rem',
-        backgroundColor: '#f8fafc',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0'
-      }}>
-        <h4 style={{ marginBottom: '1rem', color: '#1f2937' }}>{title}</h4>
-        <div style={{ color: '#6b7280', fontSize: '0.9rem' }}>
+      <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/60 p-6 text-center group-data-[erp-theme=light]/dashboard:bg-slate-50">
+        <h4 className="mb-4 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h4>
+        <div className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
           Sin datos disponibles
         </div>
       </div>
@@ -179,19 +255,14 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
   }
 
   const percentage = Math.min((data.valor / data.objetivo) * 100, 100)
-  const color = percentage >= 80 ? '#10b981' : percentage >= 60 ? '#f59e0b' : '#ef4444'
+  const color = percentage >= 80 ? GAUGE_COLORS.high : percentage >= 60 ? GAUGE_COLORS.medium : GAUGE_COLORS.low
+  const valueClass = percentage >= 80 ? 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700' : percentage >= 60 ? 'text-blue-300 group-data-[erp-theme=light]/dashboard:text-blue-700' : 'text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600'
 
   return (
-    <div style={{
-      textAlign: 'center',
-      padding: '1.5rem',
-      backgroundColor: '#f8fafc',
-      borderRadius: '8px',
-      border: '1px solid #e2e8f0'
-    }}>
-      <h4 style={{ marginBottom: '1rem', color: '#1f2937' }}>{title}</h4>
-      <div style={{ position: 'relative', width: '120px', height: '60px', margin: '0 auto 1rem' }}>
-        <svg width="120" height="60" style={{ overflow: 'visible' }}>
+    <div className={`${mutedPanel} p-6 text-center`}>
+      <h4 className="mb-4 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">{title}</h4>
+      <div className="relative mx-auto mb-4 h-[60px] w-[120px]">
+        <svg width="120" height="60" className="overflow-visible">
           {/* Fondo del gauge */}
           <path
             d="M 10 50 A 50 50 0 0 1 110 50"
@@ -206,22 +277,14 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
             stroke={color}
             strokeWidth="8"
             strokeDasharray={`${(percentage / 100) * 157} 157`}
-            style={{ transition: 'stroke-dasharray 1s ease' }}
+            className="transition-all duration-1000"
           />
         </svg>
-        <div style={{
-          position: 'absolute',
-          bottom: '10px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: '1.2rem',
-          fontWeight: '700',
-          color: color
-        }}>
+        <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 text-lg font-bold ${valueClass}`}>
           {data.valor.toFixed(1)}
         </div>
       </div>
-      <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+      <div className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
         Objetivo: {data.objetivo} | Estado: {data.estado || 'N/A'}
       </div>
     </div>
@@ -229,18 +292,26 @@ const KPIGauge = ({ data, title }: { data: any, title: string }) => {
 }
 
 export default function AnalyticsPage() {
-  const [ventasTiempo, setVentasTiempo] = useState<any>(null)
-  const [deudasClientes, setDeudasClientes] = useState<any>(null)
-  const [deudasProveedores, setDeudasProveedores] = useState<any>(null)
-  const [ventasCategoria, setVentasCategoria] = useState<any>(null)
-  const [kpisVisuales, setKpisVisuales] = useState<any>(null)
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(() => getCachedAnalytics())
+  const [hasLoaded, setHasLoaded] = useState(() => hasAnalyticsData(getCachedAnalytics()))
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [periodo, setPeriodo] = useState('mensual')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [fechaDesdeAplicada, setFechaDesdeAplicada] = useState('')
+  const [fechaHastaAplicada, setFechaHastaAplicada] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
-  const { get } = useApiCall()
+  const { get } = useApiCall({ throwOnError: true, showErrorToast: false, retries: 1, timeoutMs: 15000 })
+  const { ventasTiempo, deudasClientes, deudasProveedores, ventasCategoria, kpisVisuales } = analyticsData
 
   const cargarDatos = useCallback(async () => {
+    setIsRefreshing(true)
     try {
-      console.log('📊 Cargando datos de analytics...')
+      setError(null)
+      const fechaQuery = fechaDesdeAplicada || fechaHastaAplicada
+        ? `fecha_desde=${encodeURIComponent(fechaDesdeAplicada)}&fecha_hasta=${encodeURIComponent(fechaHastaAplicada)}`
+        : `periodo=${encodeURIComponent(periodo)}`
 
       const [
         ventasResponse,
@@ -248,255 +319,336 @@ export default function AnalyticsPage() {
         deudasProveedoresResponse,
         ventasCategoriaResponse,
         kpisResponse
-      ] = await Promise.all([
-        get(`/api/analytics/ventas-tiempo?periodo=${periodo}`),
+      ] = await Promise.allSettled([
+        get(`/api/analytics/ventas-tiempo?${fechaQuery}`),
         get('/api/analytics/deudas-clientes'),
         get('/api/analytics/deudas-proveedores'),
         get('/api/analytics/ventas-categoria'),
         get('/api/analytics/kpis-visuales')
       ])
 
-      // Procesar respuestas con verificación de éxito
-      if (ventasResponse && ventasResponse.success && ventasResponse.data) {
-        console.log('📈 Datos de ventas cargados:', ventasResponse.data)
-        setVentasTiempo(ventasResponse.data)
-      } else {
-        console.log('❌ No se pudieron cargar datos de ventas')
-        setVentasTiempo(null)
+      const unwrap = (result: PromiseSettledResult<any>) =>
+        result.status === 'fulfilled' && result.value?.success ? result.value.data ?? null : null
+
+      const nextData: AnalyticsData = {
+        ventasTiempo: unwrap(ventasResponse),
+        deudasClientes: unwrap(deudasClientesResponse),
+        deudasProveedores: unwrap(deudasProveedoresResponse),
+        ventasCategoria: unwrap(ventasCategoriaResponse),
+        kpisVisuales: unwrap(kpisResponse),
       }
 
-      if (deudasClientesResponse && deudasClientesResponse.success && deudasClientesResponse.data) {
-        console.log('👥 Datos de deudas clientes cargados:', deudasClientesResponse.data)
-        setDeudasClientes(deudasClientesResponse.data)
-      } else {
-        console.log('❌ No se pudieron cargar datos de deudas clientes')
-        setDeudasClientes(null)
-      }
-
-      if (deudasProveedoresResponse && deudasProveedoresResponse.success && deudasProveedoresResponse.data) {
-        console.log('🏪 Datos de deudas proveedores cargados:', deudasProveedoresResponse.data)
-        setDeudasProveedores(deudasProveedoresResponse.data)
-      } else {
-        console.log('❌ No se pudieron cargar datos de deudas proveedores')
-        setDeudasProveedores(null)
-      }
-
-      if (ventasCategoriaResponse && ventasCategoriaResponse.success && ventasCategoriaResponse.data) {
-        console.log('🏷️ Datos de ventas por categoría cargados:', ventasCategoriaResponse.data)
-        setVentasCategoria(ventasCategoriaResponse.data)
-      } else {
-        console.log('❌ No se pudieron cargar datos de ventas por categoría')
-        setVentasCategoria(null)
-      }
-
-      if (kpisResponse && kpisResponse.success && kpisResponse.data) {
-        console.log('🎯 Datos de KPIs cargados:', kpisResponse.data)
-        setKpisVisuales(kpisResponse.data)
-      } else {
-        console.log('❌ No se pudieron cargar datos de KPIs')
-        setKpisVisuales(null)
-      }
-
+      setAnalyticsData(nextData)
+      setHasLoaded(true)
+      cacheAnalytics(nextData)
     } catch (error) {
-      console.error('💥 Error cargando datos de analytics:', error)
+      setError(error instanceof Error ? error.message : 'Error cargando analytics')
+      setHasLoaded(true)
+    } finally {
+      setIsRefreshing(false)
     }
-  }, [get, periodo])
+  }, [get, periodo, fechaDesdeAplicada, fechaHastaAplicada])
 
   useEffect(() => {
     cargarDatos()
   }, [cargarDatos])
 
+  const exportarCsv = () => {
+    const filas = [
+      ['metrica', 'valor'],
+      ['ventas_actuales', analyticsData.ventasTiempo?.totales?.ventasActuales ?? 0],
+      ['ventas_periodo_anterior', ventasTiempo?.totales?.ventasAnterior ?? 0],
+      ['cxc_total', deudasClientes?.totales?.totalPorCobrar ?? 0],
+      ['cxc_vencido', deudasClientes?.totales?.vencido ?? 0],
+      ['cxp_total', deudasProveedores?.totales?.totalPorPagar ?? 0],
+      ['cxp_vencido', deudasProveedores?.totales?.vencido ?? 0],
+      ['liquidez', kpisVisuales?.liquidez?.valor ?? 0],
+      ['rentabilidad', kpisVisuales?.rentabilidad?.valor ?? 0],
+    ]
+    const csv = filas.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `analytics_${fechaDesdeAplicada || periodo}_${fechaHastaAplicada || 'actual'}.csv`
+    link.className = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  const aplicarFiltrosFecha = () => {
+    const desde = fechaDesde.trim()
+    const hasta = fechaHasta.trim()
+    const fechaValida = (value: string) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value)
+
+    if (!fechaValida(desde) || !fechaValida(hasta)) {
+      setError('Fecha inválida. Usa el formato YYYY-MM-DD.')
+      return
+    }
+
+    setError(null)
+    setFechaDesdeAplicada(desde)
+    setFechaHastaAplicada(hasta)
+  }
+
+  const limpiarFiltrosFecha = () => {
+    setFechaDesde('')
+    setFechaHasta('')
+    setFechaDesdeAplicada('')
+    setFechaHastaAplicada('')
+  }
+
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">📈 Analytics Financiero</h1>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+    <PageShell
+      title="Analytics Financiero"
+      description="Indicadores gerenciales, cuentas por cobrar, cuentas por pagar y tendencias del periodo."
+      actions={
+        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
           <select
             value={periodo}
-            onChange={(e) => setPeriodo(e.target.value)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db'
+            onChange={(e) => {
+              setPeriodo(e.target.value)
+              setFechaDesdeAplicada('')
+              setFechaHastaAplicada('')
             }}
+            className="h-10 rounded-md border border-cyan-400/20 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
           >
             <option value="semanal">Semanal</option>
             <option value="mensual">Mensual</option>
             <option value="trimestral">Trimestral</option>
             <option value="anual">Anual</option>
           </select>
+          <Input
+            type="text"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            maxLength={10}
+            aria-label="Fecha desde"
+            className={`md:w-32 ${analyticsInputClass}`}
+          />
+          <Input
+            type="text"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            maxLength={10}
+            aria-label="Fecha hasta"
+            className={`md:w-32 ${analyticsInputClass}`}
+          />
+          <Button onClick={aplicarFiltrosFecha}>
+            Aplicar
+          </Button>
+          <Button variant="secondary" onClick={limpiarFiltrosFecha}>
+            Limpiar
+          </Button>
+          <Button onClick={exportarCsv}>
+            Exportar CSV
+          </Button>
         </div>
-      </div>
+      }
+    >
 
-      {/* KPIs Visuales */}
-      {kpisVisuales && (
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
-          <h2 style={{ marginBottom: '2rem' }}>🎯 Indicadores Clave de Rendimiento</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-            <KPIGauge data={kpisVisuales?.liquidez} title="💧 Liquidez" />
-            <KPIGauge data={kpisVisuales?.rentabilidad} title="📈 Rentabilidad" />
-            <KPIGauge data={kpisVisuales?.crecimiento} title="🚀 Crecimiento" />
-            <div style={{
-              textAlign: 'center',
-              padding: '1.5rem',
-              backgroundColor: '#f8fafc',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0'
-            }}>
-              <h4 style={{ marginBottom: '1rem', color: '#1f2937' }}>⚡ Eficiencia</h4>
-              {kpisVisuales?.eficiencia?.rotacionInventario !== undefined ? (
-                <>
-                  <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#3b82f6', marginBottom: '0.5rem' }}>
-                    {kpisVisuales.eficiencia.rotacionInventario.toFixed(1)}x
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Rotación de Inventario
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1rem' }}>
-                  Sin datos de rotación
-                </div>
-              )}
-
-              {kpisVisuales?.eficiencia?.cicloEfectivo !== undefined ? (
-                <>
-                  <div style={{ fontSize: '1rem', fontWeight: '600', color: '#10b981', marginTop: '0.5rem' }}>
-                    {kpisVisuales.eficiencia.cicloEfectivo.toFixed(0)} días
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                    Ciclo de Efectivo
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                  Sin datos de ciclo
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+      {!hasLoaded && !kpisVisuales ? (
+        <KpiLoadingState />
+      ) : kpisVisuales ? (
+        <Card className={analyticsCard}>
+          <CardHeader>
+            <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              Indicadores clave de rendimiento
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <KPIGauge data={kpisVisuales?.liquidez} title="Liquidez" />
+              <KPIGauge data={kpisVisuales?.rentabilidad} title="Rentabilidad" />
+              <KPIGauge data={kpisVisuales?.crecimiento} title="Crecimiento" />
+              <div className={`${mutedPanel} p-6 text-center`}>
+                <h4 className="mb-4 text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Eficiencia</h4>
+                {kpisVisuales?.eficiencia?.rotacionInventario !== undefined ? (
+                  <>
+                    <div className="mb-2 text-xl font-bold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-700">
+                      {kpisVisuales.eficiencia.rotacionInventario.toFixed(1)}x
+                    </div>
+                    <div className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                      Rotación de Inventario
+                    </div>
+                  </>
+                ) : (
+                  <div className="mb-4 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                    Sin datos de rotación
+                  </div>
+                )}
+
+                {kpisVisuales?.eficiencia?.cicloEfectivo !== undefined ? (
+                  <>
+                    <div className="mt-2 text-base font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700">
+                      {kpisVisuales.eficiencia.cicloEfectivo.toFixed(0)} días
+                    </div>
+                    <div className="text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                      Ciclo de Efectivo
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-2 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                    Sin datos de ciclo
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
         {/* Ventas en el Tiempo */}
-        <div className="activity-card">
-          <BarChart
-            data={ventasTiempo ? {
-              labels: ventasTiempo.labels,
-              data: ventasTiempo.datasets?.[0]?.data || []
-            } : null}
-            title="📊 Evolución de Ventas"
-            color="#3b82f6"
-          />
+        <Card className={analyticsCard}>
+          <CardContent className="p-6">
+          {!hasLoaded ? (
+            <ChartLoadingState label="Evolución de ventas" />
+          ) : (
+            <BarChart
+              data={ventasTiempo ? {
+                labels: ventasTiempo.labels,
+                data: ventasTiempo.datasets?.[0]?.data || []
+              } : null}
+              title="Evolución de ventas"
+              color="#38bdf8"
+            />
+          )}
           {ventasTiempo?.totales && (
-            <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+            <div className="mt-4 rounded-2xl border border-cyan-400/10 bg-slate-900/60 p-4 text-sm group-data-[erp-theme=light]/dashboard:bg-slate-50">
+              <div className="flex justify-between">
                 <span>Ventas Actuales:</span>
-                <span style={{ fontWeight: '600', color: '#3b82f6' }}>
+                <span className="font-semibold text-blue-600">
                   S/ {ventasTiempo.totales.ventasActuales.toLocaleString()}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+              <div className="mt-2 flex justify-between">
                 <span>Crecimiento:</span>
-                <span style={{
-                  fontWeight: '600',
-                  color: ventasTiempo.totales.crecimiento.includes('-') ? '#ef4444' : '#10b981'
-                }}>
+                <span className="font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700">
                   {ventasTiempo.totales.crecimiento}
                 </span>
               </div>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Ventas por Categoría */}
-        <div className="activity-card">
-          <PieChart
-            data={ventasCategoria?.graficoPie}
-            title="🏷️ Ventas por Categoría"
-          />
-        </div>
+        <Card className={analyticsCard}>
+          <CardContent className="p-6">
+          {!hasLoaded ? (
+            <ChartLoadingState label="Ventas por categoría" />
+          ) : (
+            <PieChart
+              data={ventasCategoria?.graficoPie}
+              title="Ventas por categoría"
+            />
+          )}
+          </CardContent>
+        </Card>
 
         {/* Deudas de Clientes */}
-        <div className="activity-card">
-          <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>
-            👥 Análisis de Cuentas por Cobrar
+        <Card className={analyticsCard}>
+          <CardContent className="p-6">
+          <h3 className="mb-6 text-center text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            Análisis de cuentas por cobrar
           </h3>
-          {deudasClientes?.graficoEdadSaldos && (
+          {!hasLoaded ? (
+            <ChartLoadingState label="Cuentas por cobrar" />
+          ) : deudasClientes?.graficoEdadSaldos ? (
             <BarChart
               data={{
                 labels: deudasClientes.graficoEdadSaldos.labels || [],
                 data: deudasClientes.graficoEdadSaldos.data || []
               }}
               title=""
-              color="#10b981"
+              color="#22d3ee"
             />
-          )}
+          ) : null}
           {deudasClientes?.totales && (
-            <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#ecfdf5', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+            <div className="mt-4 rounded-2xl border border-cyan-400/10 bg-slate-900/60 p-4 text-sm group-data-[erp-theme=light]/dashboard:bg-slate-50">
+              <div className="flex justify-between">
                 <span>Total por Cobrar:</span>
-                <span style={{ fontWeight: '600', color: '#10b981' }}>
+                <span className="font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700">
                   S/ {deudasClientes.totales.totalPorCobrar.toLocaleString()}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+              <div className="mt-2 flex justify-between">
                 <span>Vencido:</span>
-                <span style={{ fontWeight: '600', color: '#ef4444' }}>
+                <span className="font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-700">
                   S/ {deudasClientes.totales.vencido.toLocaleString()}
                   ({deudasClientes.totales.porcentajeVencido.toFixed(1)}%)
                 </span>
               </div>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Deudas a Proveedores */}
-        <div className="activity-card">
-          <h3 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>
-            🏪 Análisis de Cuentas por Pagar
+        <Card className={analyticsCard}>
+          <CardContent className="p-6">
+          <h3 className="mb-6 text-center text-sm font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            Análisis de cuentas por pagar
           </h3>
-          {deudasProveedores?.graficoEdadSaldos && (
+          {!hasLoaded ? (
+            <ChartLoadingState label="Cuentas por pagar" />
+          ) : deudasProveedores?.graficoEdadSaldos ? (
             <BarChart
               data={{
                 labels: deudasProveedores.graficoEdadSaldos.labels || [],
                 data: deudasProveedores.graficoEdadSaldos.data || []
               }}
               title=""
-              color="#ef4444"
+              color="#2563eb"
             />
-          )}
+          ) : null}
           {deudasProveedores?.totales && (
-            <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
+            <div className="mt-4 rounded-2xl border border-cyan-400/10 bg-slate-900/60 p-4 text-sm group-data-[erp-theme=light]/dashboard:bg-slate-50">
+              <div className="flex justify-between">
                 <span>Total por Pagar:</span>
-                <span style={{ fontWeight: '600', color: '#ef4444' }}>
+                <span className="font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700">
                   S/ {deudasProveedores.totales.totalPorPagar.toLocaleString()}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+              <div className="mt-2 flex justify-between">
                 <span>Vencido:</span>
-                <span style={{ fontWeight: '600', color: '#7f1d1d' }}>
+                <span className="font-semibold text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-700">
                   S/ {deudasProveedores.totales.vencido.toLocaleString()}
                   ({deudasProveedores.totales.porcentajeVencido.toFixed(1)}%)
                 </span>
               </div>
             </div>
           )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Análisis Explicativo */}
-      <div className="activity-card" style={{ marginTop: '2rem' }}>
-        <h2 style={{ marginBottom: '2rem' }}>🧠 Análisis Inteligente para Empresarios</h2>
+      <Card className={analyticsCard}>
+        <CardHeader>
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+            Análisis inteligente para empresarios
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          <div style={{ padding: '1.5rem', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #0ea5e9' }}>
-            <h3 style={{ color: '#0c4a6e', marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
-              💡 ¿Qué significan estos números?
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className={`${mutedPanel} p-6`}>
+            <h3 className="mb-4 flex items-center text-base font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              Lectura ejecutiva
             </h3>
-            <ul style={{ color: '#075985', fontSize: '0.9rem', lineHeight: '1.6' }}>
+            <ul className="space-y-2 text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
               <li><strong>Liquidez:</strong> Tu capacidad de pagar deudas inmediatas</li>
               <li><strong>Cuentas por Cobrar:</strong> Dinero que te deben los clientes</li>
               <li><strong>Cuentas por Pagar:</strong> Dinero que debes a proveedores</li>
@@ -504,11 +656,11 @@ export default function AnalyticsPage() {
             </ul>
           </div>
 
-          <div style={{ padding: '1.5rem', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #10b981' }}>
-            <h3 style={{ color: '#065f46', marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
-              📈 Recomendaciones de Mejora
+          <div className={`${mutedPanel} p-6`}>
+            <h3 className="mb-4 flex items-center text-base font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              Recomendaciones
             </h3>
-            <ul style={{ color: '#047857', fontSize: '0.9rem', lineHeight: '1.6' }}>
+            <ul className="space-y-2 text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
               <li>Mantén al menos 3 meses de gastos en efectivo</li>
               <li>Cobra a clientes en máximo 30 días</li>
               <li>Rota inventario al menos 6 veces al año</li>
@@ -516,11 +668,11 @@ export default function AnalyticsPage() {
             </ul>
           </div>
 
-          <div style={{ padding: '1.5rem', backgroundColor: '#fef3c7', borderRadius: '8px', border: '1px solid #f59e0b' }}>
-            <h3 style={{ color: '#92400e', marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
-              ⚠️ Señales de Alerta
+          <div className={`${mutedPanel} p-6`}>
+            <h3 className="mb-4 flex items-center text-base font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              Senales de alerta
             </h3>
-            <ul style={{ color: '#b45309', fontSize: '0.9rem', lineHeight: '1.6' }}>
+            <ul className="space-y-2 text-sm leading-6 text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
               <li>Liquidez por debajo de 1.0 (crítico)</li>
               <li>Más del 20% de cuentas vencidas</li>
               <li>Inventario sin movimiento mayor a 90 días</li>
@@ -528,7 +680,8 @@ export default function AnalyticsPage() {
             </ul>
           </div>
         </div>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageShell>
   )
 }

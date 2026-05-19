@@ -56,25 +56,11 @@ export default function ClienteDetallePage() {
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="flex items-center gap-4 mb-4">
           <button
-            onClick={() => router.push('/dashboard/ventas/clientes')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.625rem 1rem',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              color: 'var(--primary-700)',
-              background: 'rgba(255, 255, 255, 0.8)',
-              border: '1px solid var(--primary-200)',
-              borderRadius: 'var(--border-radius)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
+            onClick={() => router.push('/dashboard/ventas/clientes')} className="inline-flex items-center gap-2 py-2.5 px-4 text-[0.875rem] font-medium text-[var(--primary-700)] bg-[rgba(255,_255,_255,_0.8)] border cursor-pointer transition"
           >
-            <ArrowLeft style={{ width: '1rem', height: '1rem' }} />
+            <ArrowLeft className="w-4 h-4" />
             Volver
           </button>
           <button
@@ -94,72 +80,64 @@ export default function ClienteDetallePage() {
       </div>
 
       {/* Information Card */}
-      <div className="activity-card" style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: 'var(--primary-900)' }}>
+      <div className="activity-card mb-8">
+        <h2 className="text-6 font-semibold mb-6 text-[var(--primary-900)]">
           Información General
         </h2>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] gap-6">
           <div>
-            <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'block', marginBottom: '0.5rem' }}>
+            <label className="text-[0.875rem] font-medium text-[var(--primary-600)] block mb-2">
               Tipo de Cliente
             </label>
-            <span style={{
-              display: 'inline-block',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '9999px',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              background: cliente.tipo === 'EMPRESA' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-              color: cliente.tipo === 'EMPRESA' ? '#2563eb' : '#059669'
-            }}>
+            <span className="inline-block py-1 px-3 rounded-full text-[0.875rem] font-medium">
               {cliente.tipo}
             </span>
           </div>
 
           <div>
-            <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'block', marginBottom: '0.5rem' }}>
+            <label className="text-[0.875rem] font-medium text-[var(--primary-600)] block mb-2">
               Tipo de Documento
             </label>
-            <p style={{ fontSize: '1rem', color: 'var(--primary-900)' }}>{cliente.documento_tipo}</p>
+            <p className="text-4 text-[var(--primary-900)]">{cliente.documento_tipo}</p>
           </div>
 
           <div>
-            <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'block', marginBottom: '0.5rem' }}>
+            <label className="text-[0.875rem] font-medium text-[var(--primary-600)] block mb-2">
               Número de Documento
             </label>
-            <p style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--primary-900)', fontFamily: 'monospace' }}>
+            <p className="text-4 font-semibold text-[var(--primary-900)]">
               {cliente.numero_documento}
             </p>
           </div>
 
           {cliente.direccion && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <div>
+              <label className="text-[0.875rem] font-medium text-[var(--primary-600)] flex items-center gap-2 mb-2">
                 <MapPin size={16} />
                 Dirección
               </label>
-              <p style={{ fontSize: '1rem', color: 'var(--primary-900)' }}>{cliente.direccion}</p>
+              <p className="text-4 text-[var(--primary-900)]">{cliente.direccion}</p>
             </div>
           )}
 
           {cliente.email && (
             <div>
-              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <label className="text-[0.875rem] font-medium text-[var(--primary-600)] flex items-center gap-2 mb-2">
                 <Mail size={16} />
                 Email
               </label>
-              <p style={{ fontSize: '1rem', color: 'var(--primary-900)' }}>{cliente.email}</p>
+              <p className="text-4 text-[var(--primary-900)]">{cliente.email}</p>
             </div>
           )}
 
           {cliente.telefono && (
             <div>
-              <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--primary-600)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <label className="text-[0.875rem] font-medium text-[var(--primary-600)] flex items-center gap-2 mb-2">
                 <Phone size={16} />
                 Teléfono
               </label>
-              <p style={{ fontSize: '1rem', color: 'var(--primary-900)' }}>{cliente.telefono}</p>
+              <p className="text-4 text-[var(--primary-900)]">{cliente.telefono}</p>
             </div>
           )}
         </div>

@@ -18,7 +18,7 @@ try {
     $loginResponse = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method Post -Body $loginBody -ContentType "application/json"
     $token = $loginResponse.access_token
     $tenantId = $loginResponse.user.tenant_id
-    
+
     Write-Host "✅ Login exitoso" -ForegroundColor Green
     Write-Host "   Token: $($token.Substring(0, 20))..." -ForegroundColor Gray
     Write-Host "   Tenant ID: $tenantId" -ForegroundColor Gray
@@ -38,7 +38,7 @@ $headers = @{
 Write-Host "2️⃣ Listando todos los asientos (página 1, límite 10)..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?page=1&limit=10" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Asientos obtenidos exitosamente" -ForegroundColor Green
     Write-Host "   Total de asientos: $($response.total)" -ForegroundColor Gray
     Write-Host "   Página actual: $($response.page)" -ForegroundColor Gray
@@ -46,7 +46,7 @@ try {
     Write-Host "   Total de páginas: $($response.totalPages)" -ForegroundColor Gray
     Write-Host "   Asientos en esta página: $($response.data.Count)" -ForegroundColor Gray
     Write-Host ""
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "   📋 Primeros asientos:" -ForegroundColor Cyan
         $response.data | Select-Object -First 3 | ForEach-Object {
@@ -71,7 +71,7 @@ $fechaHasta = (Get-Date).ToString("yyyy-MM-dd")
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta&limit=5" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Asientos filtrados por fecha obtenidos" -ForegroundColor Green
     Write-Host "   Fecha desde: $fechaDesde" -ForegroundColor Gray
     Write-Host "   Fecha hasta: $fechaHasta" -ForegroundColor Gray
@@ -85,7 +85,7 @@ try {
 Write-Host "4️⃣ Filtrando asientos por estado (CONFIRMADO)..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?estado=CONFIRMADO&limit=5" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Asientos confirmados obtenidos" -ForegroundColor Green
     Write-Host "   Total confirmados: $($response.total)" -ForegroundColor Gray
     Write-Host ""
@@ -97,7 +97,7 @@ try {
 Write-Host "5️⃣ Buscando asientos por número..." -ForegroundColor Yellow
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?numero_asiento=A-&limit=5" -Method Get -Headers $headers
-    
+
     Write-Host "✅ Búsqueda por número completada" -ForegroundColor Green
     Write-Host "   Total encontrados: $($response.total)" -ForegroundColor Gray
     Write-Host ""
@@ -109,11 +109,11 @@ try {
 Write-Host "6️⃣ Obteniendo un asiento específico por ID..." -ForegroundColor Yellow
 try {
     $listResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos?limit=1" -Method Get -Headers $headers
-    
+
     if ($listResponse.data.Count -gt 0) {
         $asientoId = $listResponse.data[0].id
         $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/asientos/$asientoId" -Method Get -Headers $headers
-        
+
         Write-Host "✅ Asiento obtenido exitosamente" -ForegroundColor Green
         Write-Host "   ID: $($response.data.id)" -ForegroundColor Gray
         Write-Host "   Número: $($response.data.numero_asiento)" -ForegroundColor Gray
@@ -122,7 +122,7 @@ try {
         Write-Host "   Estado: $($response.data.estado)" -ForegroundColor Gray
         Write-Host "   Total Debe: $($response.data.total_debe)" -ForegroundColor Gray
         Write-Host "   Total Haber: $($response.data.total_haber)" -ForegroundColor Gray
-        
+
         if ($response.data.detalles) {
             Write-Host ""
             Write-Host "   📋 Detalles del asiento:" -ForegroundColor Cyan

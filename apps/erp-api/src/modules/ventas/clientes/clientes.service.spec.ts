@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { AuditService } from '../../audit/audit.service';
 import { CreateClienteDto, UpdateClienteDto } from './dto';
 
 describe('ClientesService', () => {
@@ -37,6 +38,12 @@ describe('ClientesService', () => {
           provide: SupabaseService,
           useValue: {
             getClient: jest.fn().mockReturnValue(mockSupabaseClient),
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            registrarCambio: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -179,6 +186,48 @@ describe('ClientesService', () => {
       await expect(service.update('cliente-cross', dto, tenantA)).rejects.toThrow(NotFoundException);
       expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', tenantA);
       expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', tenantB);
+    });
+
+    it('update debe usar solo columnas runtime y no enviar telefono inexistente', async () => {
+      const tenantA = 'tenant-a';
+      const dto: UpdateClienteDto = {
+        razon_social: 'Cliente editado',
+        direccion: 'Av. Runtime 123',
+        telefono: '+51999990000',
+      };
+
+      mockSupabaseClient.single
+        .mockResolvedValueOnce({
+          data: {
+            id: 'cliente-1',
+            tenant_id: tenantA,
+            razon_social: 'Cliente original',
+            documento_tipo: 'DNI',
+            codigo: '12345678',
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            id: 'cliente-1',
+            tenant_id: tenantA,
+            razon_social: 'Cliente editado',
+            nombre: 'Cliente editado',
+            direccion: 'Av. Runtime 123',
+          },
+          error: null,
+        });
+
+      await service.update('cliente-1', dto, tenantA, 'user-1');
+      const updatePayload = mockSupabaseClient.update.mock.calls[0][0];
+
+      expect(updatePayload).toMatchObject({
+        razon_social: 'Cliente editado',
+        nombre: 'Cliente editado',
+        direccion: 'Av. Runtime 123',
+      });
+      expect(updatePayload).not.toHaveProperty('telefono');
+      expect(updatePayload).not.toHaveProperty('nombre_comercial');
     });
   });
 });

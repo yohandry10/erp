@@ -1,5 +1,9 @@
 # Estado de Reconstruccion de BD (Post-Reset)
 
+> Aviso vigente 2026-05-16: este documento queda como registro historico de la reconstruccion base. El estado de readiness actual, migraciones remotas aplicadas y decision de alta se mantiene en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
+>
+> Las migraciones nuevas `312..321` fueron aplicadas manualmente en Supabase remoto el 2026-05-16 con `psql`. No usar este archivo como unica fuente para declarar produccion real.
+
 Fecha de corte: 2026-05-08 (actualizado)
 
 ## Estado ejecutivo 2026-05-07
@@ -1555,3 +1559,25 @@ Interpretacion:
 - Identificadores de la ultima corrida: documento `5e876637-4a9f-442b-8c27-eb6dae94d246`, CPE `4acdbe79-f0f7-4e53-a152-9243e34967d8`, GRE `9d05dc18-d614-4e1c-a0a0-5fa455a98f0f`, POS `8e42a650-75d7-476a-90e9-574206b28db4`.
 - Browser in-app valido contra la imagen Docker final que el wizard y rutas criticas cargan sin `Failed to fetch`, sin pantallas fatales y sin errores nuevos de consola.
 - Estado DB operativo: los contratos internos de BD/API/UI quedan validados para homologacion con certificado demo; para produccion fiscal real solo falta reemplazar el certificado y secretos por valores productivos y ejecutar certificacion externa SUNAT/OSE.
+
+## 12) Micro-gate Supabase remoto post-Gate21 2026-05-16
+
+- Migraciones `312..326` aplicadas directamente con `psql --set=ON_ERROR_STOP=1` contra el pooler Supabase remoto documentado en `docs/ops/supabase-connection.md`.
+- `325__tenant_creation_rbac_rpc_execute_hardening.sql` deja `public.seed_operational_rbac_for_tenant(uuid, uuid)` sin `EXECUTE` para `PUBLIC`, `anon` ni `authenticated`; `service_role` conserva ejecucion para el backend.
+- `326__outbox_accounting_event_id_reconciliation.sql` reconcilia historicos del outbox creados por el listener contable anterior:
+  - `336` eventos operativos mal clasificados como `dead_letter` fueron completados.
+  - `1` CxC con asiento balanceado fue alineada al `event_id` canonico del outbox.
+  - `1` planilla fue reencolada y procesada por el cron contable con el contrato corregido.
+- Estado remoto final de `outbox_events`: `2722 completed`, `0 dead_letter`, `0 failed`, `0 pending`, `0 processing`.
+- Gate API/Web posterior: type-check/build OK, API Jest `104/104` suites y `934/934` tests OK, paquete Playwright critico post-Gate21 `7/7` OK.
+
+## 13) Gate infraestructura Docker/observabilidad 2026-05-16
+
+- Compose local canonico actualizado para levantar Web, API, Worker, Redis, Prometheus, Grafana, Redis exporter y Node exporter sin depender de imagenes Docker por cada cambio funcional.
+- Puertos host por defecto: Web `13001`, API `13002`, Worker `3050`, Redis `6381`, Prometheus `9091`, Grafana `3300`, Redis exporter `9122`, Node exporter `9101`.
+- Prometheus usa solo targets reales del Compose network: `erp-api:3002/api/metrics`, `worker:3050/metrics`, `redis-exporter:9121`, `node-exporter:9100` y `localhost:9090`.
+- Worker expone `/metrics` con `erp_worker_up`, contadores POS CPE retry y contadores POS invoicing.
+- Grafana provisiona dashboards desde `monitoring/grafana/dashboards` y datasource Prometheus desde `monitoring/grafana/provisioning/datasources`.
+- Build Docker de Web optimizado: `.dockerignore` excluye `target`, `.next`, `dist`, logs y artefactos locales; contexto Web medido en `10.82 MB`.
+- Validaciones: Compose config OK, promtool OK, dashboards JSON OK, API/Web/Worker Docker build OK, stack Docker up, API/Web/Worker/Redis healthy, Prometheus targets UP, Grafana dashboard API OK y datasource query `up{job=~"erp-api|erp-worker|redis|node|prometheus"}` con todos los valores en `1`.
+- GPT Pro acepto `Infra Gate 22` como infraestructura local/sandbox lista. Pendiente no bloqueante: primera corrida remota de GitHub Actions para confirmar runner real.

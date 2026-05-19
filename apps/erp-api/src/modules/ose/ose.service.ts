@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { XmlSigner } from '@erp-suite/crypto';
 import * as https from 'https';
 import * as fs from 'fs';
+import * as path from 'path';
 import { CircuitBreakerService, CircuitBreakerOpenError, CircuitStats } from '../../shared/resilience/circuit-breaker.service';
 
 export interface OseConfig {
@@ -93,12 +94,12 @@ export class OseService implements OnModuleInit {
     const requireRealCertificate = this.oseConfig.environment === 'produccion'
       || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === true
       || this.configService.get<string | boolean>('REQUIRE_REAL_FISCAL_CERTIFICATE') === 'true';
+    const resolvedCertificatePath = this.resolveCertificatePath(this.oseConfig.certificatePath);
 
     try {
-      // Verificar si existe el certificado real
-      if (fs.existsSync(this.oseConfig.certificatePath)) {
+      if (resolvedCertificatePath) {
         this.xmlSigner = new XmlSigner({
-          pfxPath: this.oseConfig.certificatePath,
+          pfxPath: resolvedCertificatePath,
           pfxPassword: this.oseConfig.certificatePassword,
           allowDemoFallback: !requireRealCertificate,
         });
@@ -125,6 +126,24 @@ export class OseService implements OnModuleInit {
         useDemoMode: true
       });
     }
+  }
+
+  private resolveCertificatePath(configuredPath: string): string | null {
+    if (!configuredPath) {
+      return null;
+    }
+
+    if (path.isAbsolute(configuredPath) && fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
+
+    const candidates = [
+      path.resolve(process.cwd(), configuredPath),
+      path.resolve(process.cwd(), '..', '..', configuredPath),
+      path.resolve(__dirname, '..', '..', '..', configuredPath),
+    ];
+
+    return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
   }
 
   /**
@@ -554,7 +573,7 @@ export class OseService implements OnModuleInit {
     if (!this.oseConfig.usuario) errors.push('Usuario OSE no configurado');
     if (!this.oseConfig.password) errors.push('Password OSE no configurado');
     if (!this.oseConfig.ruc) errors.push('RUC de empresa no configurado');
-    if (!fs.existsSync(this.oseConfig.certificatePath)) errors.push('Certificado digital no encontrado');
+    if (!this.resolveCertificatePath(this.oseConfig.certificatePath)) errors.push('Certificado digital no encontrado');
 
     return {
       valid: errors.length === 0,
@@ -570,7 +589,7 @@ export class OseService implements OnModuleInit {
       environment: this.oseConfig.environment,
       url: this.oseConfig.url,
       ruc: this.oseConfig.ruc,
-      certificateExists: fs.existsSync(this.oseConfig.certificatePath),
+      certificateExists: !!this.resolveCertificatePath(this.oseConfig.certificatePath),
       usuario: this.oseConfig.usuario ? '***configurado***' : 'no configurado',
       password: this.oseConfig.password ? '***configurado***' : 'no configurado'
     };

@@ -1,12 +1,45 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AlertCircle, Building2, PlugZap } from 'lucide-react'
+
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertCircle } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+const fieldGridClass = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
+const labelClass = 'mb-2 block text-sm font-semibold text-cyan-100'
+const requiredClass = 'text-cyan-200'
+const inputClass = 'border-cyan-400/20 bg-slate-950/70 text-slate-100 placeholder:text-slate-500 focus:border-cyan-300 focus:ring-cyan-400/10'
+
+function InfoPanel({
+  tone = 'cyan',
+  title,
+  description,
+}: {
+  tone?: 'cyan' | 'blue' | 'slate'
+  title: string
+  description: string
+}) {
+  const toneClass = {
+    cyan: 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100',
+    blue: 'border-blue-400/20 bg-blue-500/10 text-blue-100',
+    slate: 'border-slate-400/20 bg-slate-500/10 text-slate-100',
+  }[tone]
+
+  return (
+    <div className={`flex items-start gap-3 rounded-xl border p-4 ${toneClass}`}>
+      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-sm opacity-80">{description}</p>
+      </div>
+    </div>
+  )
+}
 
 export function SunatConfigStep() {
   const { state, updateConfiguration } = useWizardContext()
@@ -44,552 +77,291 @@ export function SunatConfigStep() {
   }, [isColombia, state.configuration.dian_activo, updateConfiguration])
 
   return (
-    <div style={{ padding: '1rem 0' }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderRadius: '8px',
-      }}>
-        <span style={{ fontSize: '1.5rem' }}>🏛️</span>
-        <p style={{
-          fontSize: '0.875rem',
-          color: 'var(--primary-700)',
-          margin: 0,
-        }}>
-          Define como se enviaran los comprobantes: {country.servicioFiscal} directo (SOAP) o API externa ({oseLabel} o propia).
-        </p>
-      </div>
+    <div className="space-y-5 py-2 text-slate-100">
+      <InfoPanel
+        title="Autoridad fiscal"
+        description={`Define como se enviaran los comprobantes: ${country.servicioFiscal} directo (SOAP) o API externa (${oseLabel} o propia).`}
+      />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div style={{
-          padding: '1.5rem',
-          backgroundColor: '#ffffff',
-          borderRadius: '8px',
-          border: '1px solid #e5e7eb',
-        }}>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: '#111827',
-            marginBottom: '1rem',
-          }}>
-            🧭 Modo de emision
-          </h3>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <Label htmlFor="emision_modo" style={{ marginBottom: '0.5rem', display: 'block' }}>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+        <CardHeader className="border-b border-cyan-400/10">
+          <CardTitle className="flex items-center gap-2 text-lg text-white">
+            <Building2 className="h-5 w-5 text-cyan-200" />
+            Modo de emision
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-5">
+          <div>
+            <Label htmlFor="emision_modo" className={labelClass}>
               Selecciona el modo de envio
             </Label>
             <Select value={emisionModo} onValueChange={(value) => handleEmisionModoChange(value as 'SUNAT_DIRECTO' | 'OSE_API')}>
-              <SelectTrigger id="emision_modo">
-              <SelectValue placeholder="Selecciona un modo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="SUNAT_DIRECTO">{country.servicioFiscal} directo (SOAP)</SelectItem>
-              <SelectItem value="OSE_API">{oseLabel} API (REST)</SelectItem>
-            </SelectContent>
-          </Select>
+              <SelectTrigger id="emision_modo" className={inputClass}>
+                <SelectValue placeholder="Selecciona un modo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SUNAT_DIRECTO">{country.servicioFiscal} directo (SOAP)</SelectItem>
+                <SelectItem value="OSE_API">{oseLabel} API (REST)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {!isOseApi && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              padding: '1rem',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
-              borderRadius: '8px',
-            }}>
-              <AlertCircle size={20} style={{ color: '#0f766e', marginTop: '2px', flexShrink: 0 }} />
-              <div>
-                <p style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#134e4a',
-                  margin: 0,
-                }}>
-                  {country.servicioFiscal} directo activo
-                </p>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#0f766e',
-                  margin: '0.25rem 0 0 0',
-                }}>
-                  Puedes cambiar a {oseLabel} API cuando tengas un endpoint (proveedor o API propia).
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+          {!isOseApi ? (
+            <InfoPanel
+              title={`${country.servicioFiscal} directo activo`}
+              description={`Puedes cambiar a ${oseLabel} API cuando tengas un endpoint de proveedor o API propia.`}
+            />
+          ) : null}
+        </CardContent>
+      </Card>
 
-        {isColombia && (
-          <div style={{
-            padding: '1.5rem',
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb',
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: '600',
-              color: '#111827',
-              marginBottom: '1rem',
-            }}>
-              🇨🇴 Configuración DIAN
-            </h3>
+      {isColombia ? (
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10">
+            <CardTitle className="text-lg text-white">Configuracion DIAN</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-5">
+            <InfoPanel
+              tone="blue"
+              title="Datos requeridos por DIAN"
+              description="Esta informacion la entrega la DIAN o tu proveedor tecnologico autorizado."
+            />
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              padding: '1rem',
-              backgroundColor: 'rgba(59, 130, 246, 0.08)',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-            }}>
-              <AlertCircle size={20} style={{ color: '#2563eb', marginTop: '2px', flexShrink: 0 }} />
-              <div>
-                <p style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#1e3a8a',
-                  margin: 0,
-                }}>
-                  Datos requeridos por DIAN
-                </p>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#1d4ed8',
-                  margin: '0.25rem 0 0 0',
-                }}>
-                  Esta información la entrega la DIAN o tu proveedor tecnológico autorizado.
-                </p>
-              </div>
+            <div>
+              <Label htmlFor="dian_environment" className={labelClass}>
+                Ambiente DIAN
+              </Label>
+              <Select
+                value={dianEnvironment}
+                onValueChange={(value) => updateConfiguration({ dian_environment: value as 'HOMOLOGACION' | 'PRODUCCION' })}
+              >
+                <SelectTrigger id="dian_environment" className={inputClass}>
+                  <SelectValue placeholder="Selecciona ambiente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HOMOLOGACION">Homologacion</SelectItem>
+                  <SelectItem value="PRODUCCION">Produccion</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <Label htmlFor="dian_environment" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  Ambiente DIAN
-                </Label>
-                <Select
-                  value={dianEnvironment}
-                  onValueChange={(value) => updateConfiguration({ dian_environment: value as 'HOMOLOGACION' | 'PRODUCCION' })}
-                >
-                  <SelectTrigger id="dian_environment">
-                    <SelectValue placeholder="Selecciona ambiente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="HOMOLOGACION">Homologación</SelectItem>
-                    <SelectItem value="PRODUCCION">Producción</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label htmlFor="dian_url" className={labelClass}>
+                URL DIAN <span className={requiredClass}>*</span>
+              </Label>
+              <Input
+                id="dian_url"
+                type="url"
+                value={state.configuration.dian_url || ''}
+                onChange={(e) => updateConfiguration({ dian_url: e.target.value })}
+                placeholder="https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc"
+                className={inputClass}
+              />
+            </div>
 
+            <div className={fieldGridClass}>
               <div>
-                <Label htmlFor="dian_url" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  URL DIAN <span style={{ color: '#ef4444' }}>*</span>
+                <Label htmlFor="dian_usuario" className={labelClass}>
+                  Usuario DIAN <span className={requiredClass}>*</span>
                 </Label>
-                <Input
-                  id="dian_url"
-                  type="url"
-                  value={state.configuration.dian_url || ''}
-                  onChange={(e) => updateConfiguration({ dian_url: e.target.value })}
-                  placeholder="https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc"
-                  style={{ fontSize: '1rem' }}
-                />
+                <Input id="dian_usuario" value={state.configuration.dian_usuario || ''} onChange={(e) => updateConfiguration({ dian_usuario: e.target.value })} placeholder="usuario" className={inputClass} />
               </div>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1rem',
-              }}>
+              <div>
+                <Label htmlFor="dian_password" className={labelClass}>
+                  Password DIAN <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_password" type="password" value={state.configuration.dian_password || ''} onChange={(e) => updateConfiguration({ dian_password: e.target.value })} placeholder="••••••••" className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_software_id" className={labelClass}>
+                  Software ID <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_software_id" value={state.configuration.dian_software_id || ''} onChange={(e) => updateConfiguration({ dian_software_id: e.target.value })} placeholder="SoftwareId" className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_software_pin" className={labelClass}>
+                  Software PIN <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_software_pin" type="password" value={state.configuration.dian_software_pin || ''} onChange={(e) => updateConfiguration({ dian_software_pin: e.target.value })} placeholder="PIN" className={inputClass} />
+              </div>
+              {dianEnvironment === 'HOMOLOGACION' ? (
                 <div>
-                  <Label htmlFor="dian_usuario" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Usuario DIAN <span style={{ color: '#ef4444' }}>*</span>
+                  <Label htmlFor="dian_test_set_id" className={labelClass}>
+                    Test Set ID <span className={requiredClass}>*</span>
+                  </Label>
+                  <Input id="dian_test_set_id" value={state.configuration.dian_test_set_id || ''} onChange={(e) => updateConfiguration({ dian_test_set_id: e.target.value })} placeholder="TestSetId" className={inputClass} />
+                </div>
+              ) : null}
+            </div>
+
+            <div className={fieldGridClass}>
+              <div>
+                <Label htmlFor="dian_resolucion_numero" className={labelClass}>
+                  Resolucion DIAN <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_numero" value={state.configuration.dian_resolucion_numero || ''} onChange={(e) => updateConfiguration({ dian_resolucion_numero: e.target.value })} placeholder="18760000001" className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_resolucion_prefijo" className={labelClass}>
+                  Prefijo <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_prefijo" value={state.configuration.dian_resolucion_prefijo || ''} onChange={(e) => updateConfiguration({ dian_resolucion_prefijo: e.target.value.toUpperCase() })} placeholder="FE" maxLength={4} className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_resolucion_desde" className={labelClass}>
+                  Desde <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_desde" type="number" value={state.configuration.dian_resolucion_desde ?? ''} onChange={(e) => updateConfiguration({ dian_resolucion_desde: e.target.value ? parseInt(e.target.value, 10) : undefined })} placeholder="1" className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_resolucion_hasta" className={labelClass}>
+                  Hasta <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_hasta" type="number" value={state.configuration.dian_resolucion_hasta ?? ''} onChange={(e) => updateConfiguration({ dian_resolucion_hasta: e.target.value ? parseInt(e.target.value, 10) : undefined })} placeholder="50000" className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_resolucion_fecha_inicio" className={labelClass}>
+                  Vigencia inicio <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_fecha_inicio" type="date" value={state.configuration.dian_resolucion_fecha_inicio || ''} onChange={(e) => updateConfiguration({ dian_resolucion_fecha_inicio: e.target.value })} className={inputClass} />
+              </div>
+              <div>
+                <Label htmlFor="dian_resolucion_fecha_fin" className={labelClass}>
+                  Vigencia fin <span className={requiredClass}>*</span>
+                </Label>
+                <Input id="dian_resolucion_fecha_fin" type="date" value={state.configuration.dian_resolucion_fecha_fin || ''} onChange={(e) => updateConfiguration({ dian_resolucion_fecha_fin: e.target.value })} className={inputClass} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isOseApi ? (
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10">
+            <CardTitle className="flex items-center gap-2 text-lg text-white">
+              <PlugZap className="h-5 w-5 text-cyan-200" />
+              Configuracion {oseLabel} API
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-5">
+            <InfoPanel
+              tone="slate"
+              title={`${oseLabel} API lista para configurar`}
+              description="La URL debe ser el endpoint exacto que indique tu proveedor o tu propia API."
+            />
+
+            <div>
+              <Label htmlFor="ose_url" className={labelClass}>
+                URL {oseLabel} API <span className={requiredClass}>*</span>
+              </Label>
+              <Input
+                id="ose_url"
+                type="url"
+                value={state.configuration.ose_url || ''}
+                onChange={(e) => {
+                  updateConfiguration({ ose_url: e.target.value })
+                  setErrors({ ...errors, ose_url: '' })
+                }}
+                placeholder="https://ose.ejemplo.com/api/enviar"
+                className={inputClass}
+              />
+              {errors.ose_url ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_url}</p> : null}
+            </div>
+
+            <div>
+              <Label htmlFor="ose_status_url" className={labelClass}>
+                URL estado opcional
+              </Label>
+              <Input id="ose_status_url" type="url" value={state.configuration.ose_status_url || ''} onChange={(e) => updateConfiguration({ ose_status_url: e.target.value })} placeholder="https://ose.ejemplo.com/api/estado" className={inputClass} />
+              <p className="mt-1 text-xs text-slate-400">Si no se define, se reutiliza la URL principal.</p>
+            </div>
+
+            <div>
+              <Label htmlFor="ose_auth_tipo" className={labelClass}>
+                Tipo de autenticacion
+              </Label>
+              <Select value={authTipo} onValueChange={(value) => handleAuthTipoChange(value as 'BASIC' | 'BEARER' | 'API_KEY' | 'NONE')}>
+                <SelectTrigger id="ose_auth_tipo" className={inputClass}>
+                  <SelectValue placeholder="Selecciona el tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BASIC">Basic</SelectItem>
+                  <SelectItem value="BEARER">Bearer token</SelectItem>
+                  <SelectItem value="API_KEY">API Key</SelectItem>
+                  <SelectItem value="NONE">Sin autenticacion</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {authTipo === 'BASIC' ? (
+              <div className={fieldGridClass}>
+                <div>
+                  <Label htmlFor="ose_username" className={labelClass}>
+                    Usuario {oseLabel} <span className={requiredClass}>*</span>
                   </Label>
                   <Input
-                    id="dian_usuario"
-                    value={state.configuration.dian_usuario || ''}
-                    onChange={(e) => updateConfiguration({ dian_usuario: e.target.value })}
+                    id="ose_username"
+                    value={state.configuration.ose_username || ''}
+                    onChange={(e) => {
+                      updateConfiguration({ ose_username: e.target.value })
+                      setErrors({ ...errors, ose_username: '' })
+                    }}
                     placeholder="usuario"
-                    style={{ fontSize: '1rem' }}
+                    className={inputClass}
                   />
+                  {errors.ose_username ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_username}</p> : null}
                 </div>
-
                 <div>
-                  <Label htmlFor="dian_password" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Password DIAN <span style={{ color: '#ef4444' }}>*</span>
+                  <Label htmlFor="ose_password" className={labelClass}>
+                    Password {oseLabel} <span className={requiredClass}>*</span>
                   </Label>
                   <Input
-                    id="dian_password"
+                    id="ose_password"
                     type="password"
-                    value={state.configuration.dian_password || ''}
-                    onChange={(e) => updateConfiguration({ dian_password: e.target.value })}
+                    value={state.configuration.ose_password || ''}
+                    onChange={(e) => {
+                      updateConfiguration({ ose_password: e.target.value })
+                      setErrors({ ...errors, ose_password: '' })
+                    }}
                     placeholder="••••••••"
-                    style={{ fontSize: '1rem' }}
+                    className={inputClass}
                   />
+                  {errors.ose_password ? <p className="mt-1 text-xs text-cyan-200">{errors.ose_password}</p> : null}
                 </div>
               </div>
+            ) : null}
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '1rem',
-              }}>
-                <div>
-                  <Label htmlFor="dian_software_id" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Software ID <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_software_id"
-                    value={state.configuration.dian_software_id || ''}
-                    onChange={(e) => updateConfiguration({ dian_software_id: e.target.value })}
-                    placeholder="SoftwareId"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_software_pin" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Software PIN <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_software_pin"
-                    type="password"
-                    value={state.configuration.dian_software_pin || ''}
-                    onChange={(e) => updateConfiguration({ dian_software_pin: e.target.value })}
-                    placeholder="PIN"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-              </div>
-
-              {dianEnvironment === 'HOMOLOGACION' && (
-                <div>
-                  <Label htmlFor="dian_test_set_id" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Test Set ID <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_test_set_id"
-                    value={state.configuration.dian_test_set_id || ''}
-                    onChange={(e) => updateConfiguration({ dian_test_set_id: e.target.value })}
-                    placeholder="TestSetId"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-              )}
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '1rem',
-              }}>
-                <div>
-                  <Label htmlFor="dian_resolucion_numero" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Resolución DIAN <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_numero"
-                    value={state.configuration.dian_resolucion_numero || ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_numero: e.target.value })}
-                    placeholder="18760000001"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_resolucion_prefijo" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Prefijo <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_prefijo"
-                    value={state.configuration.dian_resolucion_prefijo || ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_prefijo: e.target.value.toUpperCase() })}
-                    placeholder="FE"
-                    maxLength={4}
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_resolucion_desde" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Desde <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_desde"
-                    type="number"
-                    value={state.configuration.dian_resolucion_desde ?? ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_desde: e.target.value ? parseInt(e.target.value, 10) : undefined })}
-                    placeholder="1"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_resolucion_hasta" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Hasta <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_hasta"
-                    type="number"
-                    value={state.configuration.dian_resolucion_hasta ?? ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_hasta: e.target.value ? parseInt(e.target.value, 10) : undefined })}
-                    placeholder="50000"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_resolucion_fecha_inicio" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Vigencia inicio <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_fecha_inicio"
-                    type="date"
-                    value={state.configuration.dian_resolucion_fecha_inicio || ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_fecha_inicio: e.target.value })}
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="dian_resolucion_fecha_fin" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Vigencia fin <span style={{ color: '#ef4444' }}>*</span>
-                  </Label>
-                  <Input
-                    id="dian_resolucion_fecha_fin"
-                    type="date"
-                    value={state.configuration.dian_resolucion_fecha_fin || ''}
-                    onChange={(e) => updateConfiguration({ dian_resolucion_fecha_fin: e.target.value })}
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isOseApi && (
-          <div style={{
-            padding: '1.5rem',
-            backgroundColor: '#ffffff',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb',
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: '600',
-              color: '#111827',
-              marginBottom: '1rem',
-            }}>
-              🔌 Configuracion {oseLabel} API
-            </h3>
-
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              padding: '1rem',
-              backgroundColor: 'rgba(251, 191, 36, 0.1)',
-              border: '1px solid rgba(251, 191, 36, 0.2)',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-            }}>
-              <AlertCircle size={20} style={{ color: '#d97706', marginTop: '2px', flexShrink: 0 }} />
+            {authTipo === 'BEARER' ? (
               <div>
-                <p style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#78350f',
-                  margin: 0,
-                }}>
-                  {oseLabel} API lista para configurar
-                </p>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#92400e',
-                  margin: '0.25rem 0 0 0',
-                }}>
-                  La URL debe ser el endpoint exacto que indique tu proveedor o tu propia API.
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <Label htmlFor="ose_url" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  URL {oseLabel} API <span style={{ color: '#ef4444' }}>*</span>
+                <Label htmlFor="ose_bearer_token" className={labelClass}>
+                  Bearer token <span className={requiredClass}>*</span>
                 </Label>
-                <Input
-                  id="ose_url"
-                  type="url"
-                  value={state.configuration.ose_url || ''}
-                  onChange={(e) => {
-                    updateConfiguration({ ose_url: e.target.value })
-                    setErrors({ ...errors, ose_url: '' })
-                  }}
-                  placeholder="https://ose.ejemplo.com/api/enviar"
-                  style={{ fontSize: '1rem' }}
-                />
-                {errors.ose_url && (
-                  <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                    {errors.ose_url}
-                  </p>
-                )}
+                <Input id="ose_bearer_token" type="password" value={state.configuration.ose_bearer_token || ''} onChange={(e) => updateConfiguration({ ose_bearer_token: e.target.value })} placeholder="token" className={inputClass} />
               </div>
+            ) : null}
 
-              <div>
-                <Label htmlFor="ose_status_url" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  URL estado (opcional)
-                </Label>
-                <Input
-                  id="ose_status_url"
-                  type="url"
-                  value={state.configuration.ose_status_url || ''}
-                  onChange={(e) => updateConfiguration({ ose_status_url: e.target.value })}
-                  placeholder="https://ose.ejemplo.com/api/estado"
-                  style={{ fontSize: '1rem' }}
-                />
-                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                  Si no se define, se reutiliza la URL principal.
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="ose_auth_tipo" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                  Tipo de autenticacion
-                </Label>
-                <Select value={authTipo} onValueChange={(value) => handleAuthTipoChange(value as 'BASIC' | 'BEARER' | 'API_KEY' | 'NONE')}>
-                  <SelectTrigger id="ose_auth_tipo">
-                    <SelectValue placeholder="Selecciona el tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BASIC">Basic</SelectItem>
-                    <SelectItem value="BEARER">Bearer token</SelectItem>
-                    <SelectItem value="API_KEY">API Key</SelectItem>
-                    <SelectItem value="NONE">Sin autenticacion</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {authTipo === 'BASIC' && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '1rem',
-                }}>
-                  <div>
-                    <Label htmlFor="ose_username" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      Usuario {oseLabel} <span style={{ color: '#ef4444' }}>*</span>
-                    </Label>
-                    <Input
-                      id="ose_username"
-                      value={state.configuration.ose_username || ''}
-                      onChange={(e) => {
-                        updateConfiguration({ ose_username: e.target.value })
-                        setErrors({ ...errors, ose_username: '' })
-                      }}
-                      placeholder="usuario"
-                      style={{ fontSize: '1rem' }}
-                    />
-                    {errors.ose_username && (
-                      <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                        {errors.ose_username}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="ose_password" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      Password {oseLabel} <span style={{ color: '#ef4444' }}>*</span>
-                    </Label>
-                    <Input
-                      id="ose_password"
-                      type="password"
-                      value={state.configuration.ose_password || ''}
-                      onChange={(e) => {
-                        updateConfiguration({ ose_password: e.target.value })
-                        setErrors({ ...errors, ose_password: '' })
-                      }}
-                      placeholder="••••••••"
-                      style={{ fontSize: '1rem' }}
-                    />
-                    {errors.ose_password && (
-                      <p style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
-                        {errors.ose_password}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {authTipo === 'BEARER' && (
+            {authTipo === 'API_KEY' ? (
+              <div className={fieldGridClass}>
                 <div>
-                  <Label htmlFor="ose_bearer_token" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Bearer token <span style={{ color: '#ef4444' }}>*</span>
+                  <Label htmlFor="ose_api_header" className={labelClass}>
+                    Header API Key <span className={requiredClass}>*</span>
                   </Label>
-                  <Input
-                    id="ose_bearer_token"
-                    type="password"
-                    value={state.configuration.ose_bearer_token || ''}
-                    onChange={(e) => updateConfiguration({ ose_bearer_token: e.target.value })}
-                    placeholder="token"
-                    style={{ fontSize: '1rem' }}
-                  />
+                  <Input id="ose_api_header" value={state.configuration.ose_api_header || ''} onChange={(e) => updateConfiguration({ ose_api_header: e.target.value })} placeholder="x-api-key" className={inputClass} />
                 </div>
-              )}
-
-              {authTipo === 'API_KEY' && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '1rem',
-                }}>
-                  <div>
-                    <Label htmlFor="ose_api_header" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      Header API Key <span style={{ color: '#ef4444' }}>*</span>
-                    </Label>
-                    <Input
-                      id="ose_api_header"
-                      value={state.configuration.ose_api_header || ''}
-                      onChange={(e) => updateConfiguration({ ose_api_header: e.target.value })}
-                      placeholder="x-api-key"
-                      style={{ fontSize: '1rem' }}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="ose_api_key" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                      API Key <span style={{ color: '#ef4444' }}>*</span>
-                    </Label>
-                    <Input
-                      id="ose_api_key"
-                      type="password"
-                      value={state.configuration.ose_api_key || ''}
-                      onChange={(e) => updateConfiguration({ ose_api_key: e.target.value })}
-                      placeholder="clave"
-                      style={{ fontSize: '1rem' }}
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="ose_api_key" className={labelClass}>
+                    API Key <span className={requiredClass}>*</span>
+                  </Label>
+                  <Input id="ose_api_key" type="password" value={state.configuration.ose_api_key || ''} onChange={(e) => updateConfiguration({ ose_api_key: e.target.value })} placeholder="clave" className={inputClass} />
                 </div>
-              )}
+              </div>
+            ) : null}
 
-              {authTipo === 'NONE' && (
-                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
-                  El {oseLabel} no requiere autenticacion adicional.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+            {authTipo === 'NONE' ? <p className="text-sm text-slate-400">El {oseLabel} no requiere autenticacion adicional.</p> : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

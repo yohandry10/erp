@@ -23,6 +23,8 @@ describe('ContabilidadEventsListener', () => {
       generarAsientoPlanilla: jest.fn(),
       generarAsientoDepreciacion: jest.fn(),
       generarAsientoDevolucionProveedor: jest.fn(),
+      generarAsientoNotaCredito: jest.fn(),
+      marcarEventoComoProcesado: jest.fn(),
       marcarEventoComoFallido: jest.fn()
     };
 
@@ -61,12 +63,14 @@ describe('ContabilidadEventsListener', () => {
               select: jest.fn().mockReturnThis(),
               update: jest.fn().mockReturnThis(),
               eq: jest.fn().mockReturnThis(),
+              in: jest.fn().mockReturnThis(),
               order: jest.fn().mockReturnThis(),
               limit: jest.fn().mockResolvedValue({ data: [{ id: 'detalle-1' }], error: null }),
               single: jest.fn().mockResolvedValue({ data: { id: 'test-id' }, error: null }),
               maybeSingle: jest.fn().mockResolvedValue({
                 data: {
                   id: 'asiento-1',
+                  event_id: 'evt-claimed',
                   numero_asiento: 'A-001',
                   total_debe: 100,
                   total_haber: 100,
@@ -217,6 +221,73 @@ describe('ContabilidadEventsListener', () => {
       );
     });
 
+    it('continúa con el siguiente evento contable cuando uno falla', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-fails',
+          correlation_id: 'corr-fails',
+          aggregate_type: 'venta',
+          aggregate_id: 'venta-fails',
+          event_type: 'venta.procesada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fecha: '2025-01-15',
+            total: 118
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        },
+        {
+          id: '2',
+          event_id: 'evt-continues',
+          correlation_id: 'corr-continues',
+          aggregate_type: 'venta',
+          aggregate_id: 'venta-continues',
+          event_type: 'venta.procesada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fecha: '2025-01-15',
+            total: 118
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:01:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoVenta
+        .mockRejectedValueOnce(new Error('Lock temporal'))
+        .mockResolvedValueOnce({
+          id: 'asiento-continues',
+          tenant_id: 'tenant-001',
+          numero_asiento: 2,
+          codigo: 'A-202501-000002',
+          fecha: '2025-01-15',
+          concepto: 'Venta de mercadería',
+          total_debe: 118,
+          total_haber: 118,
+          estado: 'CONFIRMADO'
+        } as any);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith(
+        'evt-fails',
+        'Lock temporal - Se reintentará'
+      );
+      expect(asientosGenerator.generarAsientoVenta).toHaveBeenCalledTimes(2);
+      expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith('evt-continues');
+    });
+
     it('should mark event as permanently failed after max retries', async () => {
       const mockEventos: OutboxEvent[] = [
         {
@@ -283,6 +354,64 @@ describe('ContabilidadEventsListener', () => {
         'evt-008',
         'Período contable cerrado - Error no recuperable'
       );
+    });
+
+    it('should leave non-accounting operational events to the general outbox worker', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-pos-operational',
+          correlation_id: 'corr-operational',
+          aggregate_type: 'operational',
+          aggregate_id: 'op-001',
+          event_type: 'venta_pos.registrada',
+          event_data: {
+            tenantId: 'tenant-001',
+            total: 59
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
+    });
+
+    it('should complete non-accounting events defensively if they reach the accounting processor', async () => {
+      const operationalEvent: OutboxEvent = {
+        id: '1',
+        event_id: 'evt-operational-cxp',
+        correlation_id: 'corr-operational-cxp',
+        aggregate_type: 'compras',
+        aggregate_id: 'oc-001',
+        event_type: 'factura.proveedor.registrada',
+        event_data: {
+          tenantId: 'tenant-001',
+          numeroDocumento: 'REC-2026-0999'
+        },
+        event_version: 1,
+        created_at: '2026-05-14T10:00:00Z',
+        processed_at: null,
+        retry_count: 0,
+        status: 'PENDING',
+        error_message: null
+      };
+
+      await (listener as any).procesarEvento(operationalEvent);
+
+      expect(asientosGenerator.marcarEventoComoProcesado).toHaveBeenCalledWith('evt-operational-cxp');
+      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoCompra).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoPago).not.toHaveBeenCalled();
     });
   });
 
@@ -440,6 +569,65 @@ describe('ContabilidadEventsListener', () => {
       );
     });
 
+    it('should fail a reception event when accounting idempotency is corrupted by duplicate entries', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-004-duplicado',
+          correlation_id: 'corr-004-duplicado',
+          aggregate_type: 'recepcion',
+          aggregate_id: 'recepcion-001',
+          event_type: 'recepcion.registrada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fechaRecepcion: '2025-01-15',
+            total: 118,
+            subtotal: 100,
+            igv: 18,
+            numeroRecepcion: 'REC-001'
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        }
+      ];
+
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+      asientosGenerator.generarAsientoCompra.mockResolvedValue({
+        id: 'asiento-003',
+        tenant_id: 'tenant-001',
+        numero_asiento: 3,
+        codigo: 'A-202501-000003',
+        fecha: '2025-01-15',
+        concepto: 'Compra de mercadería',
+        total_debe: 118,
+        total_haber: 118,
+        estado: 'CONFIRMADO'
+      });
+
+      const supabaseClient = (testingModule.get(SupabaseService).getClient as jest.Mock)();
+      supabaseClient.maybeSingle
+        .mockResolvedValueOnce({ data: { event_id: 'evt-004-duplicado' }, error: null })
+        .mockResolvedValueOnce({
+          data: null,
+          error: {
+            code: 'PGRST116',
+            details: 'Results contain 3 rows, application/vnd.pgrst.object+json requires 1 row',
+            message: 'JSON object requested, multiple (or no) rows returned',
+          },
+        });
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith(
+        'evt-004-duplicado',
+        expect.stringContaining('Idempotencia contable corrupta')
+      );
+    });
+
     it('should handle pago proveedor event', async () => {
       const mockEventos: OutboxEvent[] = [
         {
@@ -588,6 +776,8 @@ describe('ContabilidadEventsListener', () => {
           event_type: 'planilla.liquidada',
           event_data: {
             tenantId: 'tenant-001',
+            planillaId: 'plan-001',
+            eventId: 'payload-event-should-not-own-accounting-id',
             fecha: '2025-01-31',
             sueldos: 1000,
             aportes: 200,
@@ -615,9 +805,10 @@ describe('ContabilidadEventsListener', () => {
         expect.objectContaining({
           tenant_id: 'tenant-001',
           sueldos: 1000,
-          aportes: 200,
           retenciones: 150,
           neto: 850,
+          referencia: 'PLANILLA-plan-001',
+          source_event_id: 'evt-008',
           event_id: 'evt-008'
         })
       );
@@ -692,17 +883,17 @@ describe('ContabilidadEventsListener', () => {
       ];
 
       outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
-      asientosGenerator.generarAsientoVenta.mockResolvedValue({
+      asientosGenerator.generarAsientoNotaCredito.mockResolvedValue({
         id: 'asiento-009',
         numero_asiento: 'A-202502-0002'
       } as any);
 
       await listener.procesarEventosPendientes();
 
-      expect(asientosGenerator.generarAsientoVenta).toHaveBeenCalledWith(
+      expect(asientosGenerator.generarAsientoNotaCredito).toHaveBeenCalledWith(
         expect.objectContaining({
           tenant_id: 'tenant-001',
-          total: -118,
+          total: 118,
           referencia: 'REV-F001-000123',
           event_id: 'evt-010'
         })
@@ -734,10 +925,45 @@ describe('ContabilidadEventsListener', () => {
 
       expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
       expect(asientosGenerator.generarAsientoCobro).not.toHaveBeenCalled();
-      expect(asientosGenerator.marcarEventoComoFallido).toHaveBeenCalledWith(
-        'evt-012',
-        'Evento sin tenantId'
-      );
+      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
+    });
+
+    it('should not process an accounting event when another worker already claimed it', async () => {
+      const mockEventos: OutboxEvent[] = [
+        {
+          id: '1',
+          event_id: 'evt-claimed-by-other',
+          correlation_id: 'corr-claimed-by-other',
+          aggregate_type: 'cxc',
+          aggregate_id: 'cxc-001',
+          event_type: 'cxc.creada',
+          event_data: {
+            tenantId: 'tenant-001',
+            fechaEmision: '2025-01-15',
+            montoTotal: 118,
+            subtotal: 100,
+            impuestos: 18,
+            serie: 'F001',
+            numero: '000001'
+          },
+          event_version: 1,
+          created_at: '2025-01-15T10:00:00Z',
+          processed_at: null,
+          retry_count: 0,
+          status: 'PENDING',
+          error_message: null
+        }
+      ];
+
+      const supabaseClient = (testingModule.get(SupabaseService).getClient as jest.Mock)();
+      supabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      outboxEventsService.leerEventosPendientesConReintentos.mockResolvedValue(mockEventos);
+
+      await listener.procesarEventosPendientes();
+
+      expect(asientosGenerator.generarAsientoVenta).not.toHaveBeenCalled();
+      expect(asientosGenerator.generarAsientoNotaCredito).not.toHaveBeenCalled();
+      expect(asientosGenerator.marcarEventoComoFallido).not.toHaveBeenCalled();
     });
   });
 });

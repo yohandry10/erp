@@ -83,15 +83,7 @@ const formatDateTime = (value?: string | null) => {
 
 function NoPermissionBanner() {
   return (
-    <div
-      style={{
-        padding: '1.75rem',
-        borderRadius: '16px',
-        border: '1px solid rgba(59, 130, 246, 0.35)',
-        background: 'rgba(191, 219, 254, 0.45)',
-        color: '#1d4ed8',
-        fontWeight: 600,
-      }}
+    <div className="p-7 rounded-4 border bg-[rgba(191,_219,_254,_0.45)] text-blue-700 font-semibold"
     >
       Necesitas el permiso <code>inventario.kardex.read</code> para consultar el kardex valorizado.
     </div>
@@ -257,38 +249,27 @@ export default function KardexPage() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <header style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: '#0f172a' }}>Kardex valorizado</h1>
-          <span
-            style={{
-              background: 'rgba(96, 165, 250, 0.18)',
-              color: '#1d4ed8',
-              borderRadius: '999px',
-              padding: '0.25rem 0.75rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-            }}
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="m-0 text-7 font-bold text-slate-950">Kardex valorizado</h1>
+          <span className="bg-[rgba(96,_165,_250,_0.18)] text-blue-700 rounded-full py-1 px-3 text-3 font-semibold"
           >
             Inventario → Contabilidad
           </span>
         </div>
-        <p style={{ margin: 0, color: '#475569', maxWidth: '760px', lineHeight: 1.6 }}>
+        <p className="m-0 text-slate-600 max-w-[760px] leading-7">
           Consulta las entradas de inventario con costo valorizado, filtrando por producto, almacén y rango de
           fechas. Los datos respetan el tenant activo y exponen el total por moneda para conciliación contable.
         </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-3 flex-wrap">
           <Link
-            href="/dashboard/inventario/recepciones"
-            style={{ color: '#166534', fontWeight: 600, textDecoration: 'none' }}
+            href="/dashboard/inventario/recepciones" className="text-[#166534] font-semibold"
           >
             Ir a Recepciones →
           </Link>
           <Link
-            href="/dashboard/inventario/almacenes"
-            style={{ color: '#1e3a8a', fontWeight: 600, textDecoration: 'none' }}
+            href="/dashboard/inventario/almacenes" className="text-[#1e3a8a] font-semibold"
           >
             Gestionar Almacenes →
           </Link>
@@ -296,36 +277,18 @@ export default function KardexPage() {
       </header>
 
       <ProtectedComponent modulo="inventario" recurso="kardex" accion="read" fallback={<NoPermissionBanner />}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="flex flex-col gap-6">
           <form
-            onSubmit={applyFilters}
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '1rem',
-              alignItems: 'flex-end',
-              border: '1px solid rgba(148, 163, 184, 0.35)',
-              borderRadius: '14px',
-              padding: '1.25rem',
-              background: 'rgba(248, 250, 252, 0.85)',
-            }}
+            onSubmit={applyFilters} className="flex flex-wrap gap-4 items-end border rounded-3.5 p-5 bg-[rgba(248,_250,_252,_0.85)]"
           >
-            <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+            <div className="flex-[1_1_220px] min-w-[200px]">
+              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
                 Producto
               </label>
               <select
                 value={pendingFilters.productoId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, productoId: event.target.value }))}
-                disabled={catalogLoading}
-                style={{
-                  width: '100%',
-                  padding: '0.7rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5f5',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                }}
+                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
               >
                 <option value="">Todos los productos</option>
                 {productos.map((producto) => (
@@ -336,22 +299,14 @@ export default function KardexPage() {
               </select>
             </div>
 
-            <div style={{ flex: '1 1 220px', minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+            <div className="flex-[1_1_220px] min-w-[200px]">
+              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
                 Almacén
               </label>
               <select
                 value={pendingFilters.almacenId}
                 onChange={(event) => setPendingFilters((prev) => ({ ...prev, almacenId: event.target.value }))}
-                disabled={catalogLoading}
-                style={{
-                  width: '100%',
-                  padding: '0.7rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5f5',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                }}
+                disabled={catalogLoading} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
               >
                 <option value="">Todos los almacenes</option>
                 {almacenes.map((almacen) => (
@@ -362,71 +317,37 @@ export default function KardexPage() {
               </select>
             </div>
 
-            <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+            <div className="flex-[1_1_180px] min-w-[180px]">
+              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
                 Desde
               </label>
               <input
                 type="date"
                 value={pendingFilters.desde}
-                onChange={(event) => setPendingFilters((prev) => ({ ...prev, desde: event.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '0.7rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5f5',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                }}
+                onChange={(event) => setPendingFilters((prev) => ({ ...prev, desde: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
               />
             </div>
 
-            <div style={{ flex: '1 1 180px', minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+            <div className="flex-[1_1_180px] min-w-[180px]">
+              <label className="block text-[0.8rem] font-semibold text-slate-700 mb-1.5">
                 Hasta
               </label>
               <input
                 type="date"
                 value={pendingFilters.hasta}
-                onChange={(event) => setPendingFilters((prev) => ({ ...prev, hasta: event.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '0.7rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5f5',
-                  fontSize: '0.875rem',
-                  background: 'white',
-                }}
+                onChange={(event) => setPendingFilters((prev) => ({ ...prev, hasta: event.target.value }))} className="w-[100%] py-[0.7rem] px-4 rounded-2.5 border text-[0.875rem] bg-white"
               />
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div className="flex gap-3 items-center">
               <button
-                type='submit'
-                style={{
-                  padding: '0.7rem 1.4rem',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: '#1d4ed8',
-                  color: 'white',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                type='submit' className="py-[0.7rem] px-6 rounded-2.5 border-0 bg-blue-700 text-white font-semibold cursor-pointer"
               >
                 Aplicar filtros
               </button>
               <button
                 type='button'
-                onClick={resetFilters}
-                style={{
-                  padding: '0.7rem 1.2rem',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  background: 'white',
-                  color: '#1d4ed8',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                onClick={resetFilters} className="py-[0.7rem] px-5 rounded-2.5 border bg-white text-blue-700 font-semibold cursor-pointer"
               >
                 Limpiar
               </button>
@@ -434,79 +355,38 @@ export default function KardexPage() {
           </form>
 
           {loading ? (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                padding: '3rem 0',
-                color: '#1d4ed8',
-                fontWeight: 600,
-              }}
+            <div className="flex justify-center items-center py-12 px-0 text-blue-700 font-semibold"
             >
               Cargando kardex…
             </div>
           ) : (
             <>
               {error && (
-                <div
-                  style={{
-                    padding: '1rem 1.25rem',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(239, 68, 68, 0.35)',
-                    background: 'rgba(254, 226, 226, 0.65)',
-                    color: '#b91c1c',
-                    fontWeight: 600,
-                  }}
+                <div className="py-4 px-5 rounded-3 border bg-[rgba(254,_226,_226,_0.65)] text-red-700 font-semibold"
                 >
                   {error}
                 </div>
               )}
 
-              <section
-                style={{
-                  display: 'grid',
-                  gap: '1rem',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                }}
+              <section className="grid gap-4 grid-cols-[repeat(auto-fit,_minmax(220px,_1fr))]"
               >
                 {resumenCards.map((card) => (
                   <div
-                    key={card.label}
-                    style={{
-                      borderRadius: '16px',
-                      border: '1px solid rgba(148, 163, 184, 0.3)',
-                      background: 'white',
-                      padding: '1.1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.4rem',
-                    }}
+                    key={card.label} className="rounded-4 border bg-white p-4 flex flex-col gap-1.5"
                   >
-                    <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>
+                    <span className="text-3 text-slate-500 font-bold">
                       {card.label}
                     </span>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f172a' }}>
+                    <span className="text-6 font-bold text-slate-950">
                       {'formatted' in card ? card.formatted : formatNumber(card.value)}
                     </span>
-                    <span style={{ fontSize: '0.85rem', color: '#475569' }}>{card.note}</span>
+                    <span className="text-3.5 text-slate-600">{card.note}</span>
                   </div>
                 ))}
               </section>
 
               {Object.keys(resumen.valorPorMoneda ?? {}).length > 0 && (
-                <section
-                  style={{
-                    borderRadius: '14px',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    background: 'rgba(191, 219, 254, 0.35)',
-                    padding: '1rem',
-                    color: '#1e3a8a',
-                    fontSize: '0.9rem',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '1rem',
-                  }}
+                <section className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 text-[#1e3a8a] text-3.5 flex flex-wrap gap-4"
                 >
                   <strong>Valor por moneda:</strong>
                   {Object.entries(resumen.valorPorMoneda).map(([moneda, valor]) => (
@@ -517,66 +397,57 @@ export default function KardexPage() {
                 </section>
               )}
 
-              <section
-                style={{
-                  borderRadius: '16px',
-                  border: '1px solid rgba(148, 163, 184, 0.35)',
-                  background: '#ffffff',
-                  padding: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                }}
+              <section className="rounded-4 border bg-white p-5 flex flex-col gap-4"
               >
-                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>Detalle de entradas</h2>
+                <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">Detalle de entradas</h2>
                 {movimientos.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No se encontraron movimientos para los filtros seleccionados.</div>
+                  <div className="text-slate-400 text-3.5">No se encontraron movimientos para los filtros seleccionados.</div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '880px' }}>
+                  <div className="overflow-x-auto">
+                    <table className="w-[100%] min-w-[880px]">
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: '0.75rem' }}>
-                          <th style={{ padding: '0.65rem 0.5rem' }}>Fecha</th>
-                          <th style={{ padding: '0.65rem 0.5rem' }}>Documento</th>
-                          <th style={{ padding: '0.65rem 0.5rem' }}>Producto</th>
-                          <th style={{ padding: '0.65rem 0.5rem' }}>Almacén</th>
-                          <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>Cantidad</th>
-                          <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>Costo Unit.</th>
-                          <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>Valor total</th>
-                          <th style={{ padding: '0.65rem 0.5rem' }}>Lote / Serie</th>
+                        <tr className="border-b text-left text-slate-600 text-3">
+                          <th className="py-[0.65rem] px-2">Fecha</th>
+                          <th className="py-[0.65rem] px-2">Documento</th>
+                          <th className="py-[0.65rem] px-2">Producto</th>
+                          <th className="py-[0.65rem] px-2">Almacén</th>
+                          <th className="py-[0.65rem] px-2 text-right">Cantidad</th>
+                          <th className="py-[0.65rem] px-2 text-right">Costo Unit.</th>
+                          <th className="py-[0.65rem] px-2 text-right">Valor total</th>
+                          <th className="py-[0.65rem] px-2">Lote / Serie</th>
                         </tr>
                       </thead>
                       <tbody>
                         {movimientos.map((mov) => (
-                          <tr key={mov.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#0f172a', fontWeight: 600 }}>{formatDateTime(mov.fecha)}</td>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#475569' }}>{mov.documento ?? '—'}</td>
-                            <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontWeight: 600, color: '#0f172a' }}>{mov.producto.nombre}</span>
-                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <tr key={mov.id} className="border-b">
+                            <td className="py-3 px-2 text-slate-950 font-semibold">{formatDateTime(mov.fecha)}</td>
+                            <td className="py-3 px-2 text-slate-600">{mov.documento ?? '—'}</td>
+                            <td className="py-3 px-2">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-slate-950">{mov.producto.nombre}</span>
+                                <span className="text-3 text-slate-400">
                                   {mov.producto.codigo ?? mov.producto.sku ?? '—'}
                                 </span>
                               </div>
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#475569' }}>
+                            <td className="py-3 px-2 text-slate-600">
                               {mov.almacen?.nombre ?? '—'}
                               {mov.ubicacion?.codigo ? (
-                                <span style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8' }}>
+                                <span className="block text-3 text-slate-400">
                                   Ubicación: {mov.ubicacion.codigo}
                                 </span>
                               ) : null}
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 600 }}>
+                            <td className="py-3 px-2 text-right text-slate-950 font-semibold">
                               {formatNumber(mov.cantidad)}
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', color: '#475569' }}>
+                            <td className="py-3 px-2 text-right text-slate-600">
                               {formatCurrency(mov.costoUnitario, mov.moneda)}
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 600 }}>
+                            <td className="py-3 px-2 text-right text-slate-950 font-semibold">
                               {formatCurrency(mov.valorTotal, mov.moneda)}
                             </td>
-                            <td style={{ padding: '0.75rem 0.5rem', color: '#475569' }}>
+                            <td className="py-3 px-2 text-slate-600">
                               {mov.lote ?? '—'} {mov.serie ? ` / ${mov.serie}` : ''}
                             </td>
                           </tr>

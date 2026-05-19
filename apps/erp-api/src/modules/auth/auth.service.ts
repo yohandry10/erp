@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger, InternalServerErrorException, Inject, forwardRef, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
@@ -99,17 +99,21 @@ export class AuthService {
     try {
       // Usar cliente público porque el login NO tiene tenant context
       const client = this.supabaseService.getPublicClient();
-      await client
+      const { error } = await client
         .from('auth_login_attempts')
         .insert({
           user_email: data.email,
           ip_address: data.ipAddress,
           user_agent: data.userAgent,
           success: data.success,
+          estado: data.success ? 'EXITOSO' : 'FALLIDO',
           failed_reason: data.failedReason || null,
           tenant_id: data.tenantId || null,
           created_at: new Date().toISOString(),
         });
+      if (error) {
+        this.logger.error('Error registrando intento de login:', error);
+      }
     } catch (error) {
       // No bloquear el flujo si falla el registro de intentos
       this.logger.error('Error registrando intento de login:', error);
@@ -117,13 +121,20 @@ export class AuthService {
   }
 
   // ✅ A5: Verificar si hay demasiados intentos fallidos recientes
-  private async checkFailedAttemptsLimit(email: string, minutesWindow: number = 15, maxAttempts: number = 5): Promise<boolean> {
+  private async checkFailedAttemptsLimit(
+    email: string,
+    ipAddress: string,
+    userAgent: string,
+    minutesWindow: number = 15,
+    maxAttempts: number = 5,
+  ): Promise<boolean> {
     try {
       // Usar cliente público porque el login NO tiene tenant context
       const client = this.supabaseService.getPublicClient();
       const cutoffTime = new Date();
       cutoffTime.setMinutes(cutoffTime.getMinutes() - minutesWindow);
 
+      // Check by email only (not IP or user-agent) to prevent bypass via rotation
       const { data: attempts, error } = await client
         .from('auth_login_attempts')
         .select('id')
@@ -144,28 +155,32 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string) {
+    const requestIpAddress = ipAddress || 'unknown';
+    const requestUserAgent = userAgent || 'unknown';
+
     // ✅ A5: Verificar límite de intentos fallidos antes de procesar
-    const hasTooManyAttempts = await this.checkFailedAttemptsLimit(loginDto.email);
-    if (hasTooManyAttempts) {
-      await this.logLoginAttempt({
-        email: loginDto.email,
-        ipAddress: ipAddress || 'unknown',
-        userAgent: userAgent || 'unknown',
-        success: false,
-        failedReason: 'Demasiados intentos fallidos recientes',
-        tenantId: null,
-      });
-      throw new UnauthorizedException('Demasiados intentos fallidos. Intente más tarde.');
-    }
+    const hasTooManyAttempts = await this.checkFailedAttemptsLimit(loginDto.email, requestIpAddress, requestUserAgent);
 
     try {
       const user = await this.validateUser(loginDto.email, loginDto.password);
       if (!user) {
+        if (hasTooManyAttempts) {
+          await this.logLoginAttempt({
+            email: loginDto.email,
+            ipAddress: requestIpAddress,
+            userAgent: requestUserAgent,
+            success: false,
+            failedReason: 'Demasiados intentos fallidos recientes',
+            tenantId: null,
+          });
+          throw new HttpException('Demasiados intentos fallidos. Intente más tarde.', HttpStatus.TOO_MANY_REQUESTS);
+        }
+
         // ✅ A5: Registrar intento fallido
         await this.logLoginAttempt({
           email: loginDto.email,
-          ipAddress: ipAddress || 'unknown',
-          userAgent: userAgent || 'unknown',
+          ipAddress: requestIpAddress,
+          userAgent: requestUserAgent,
           success: false,
           failedReason: 'Credenciales inválidas',
           tenantId: null, // No sabemos el tenant si el usuario no existe
@@ -205,8 +220,8 @@ export class AuthService {
       // ✅ A5: Registrar intento exitoso
       await this.logLoginAttempt({
         email: loginDto.email,
-        ipAddress: ipAddress || 'unknown',
-        userAgent: userAgent || 'unknown',
+        ipAddress: requestIpAddress,
+        userAgent: requestUserAgent,
         success: true,
         tenantId: user.tenant_id,
       });
@@ -243,11 +258,11 @@ export class AuthService {
 
         const failedReason = error.message || 'Error de autenticación';
         await this.logLoginAttempt({
-          email: loginDto.email,
-          ipAddress: ipAddress || 'unknown',
-          userAgent: userAgent || 'unknown',
-          success: false,
-          failedReason,
+        email: loginDto.email,
+        ipAddress: requestIpAddress,
+        userAgent: requestUserAgent,
+        success: false,
+        failedReason,
           tenantId: tenantIdForLogging,
         });
       }
@@ -463,11 +478,12 @@ export class AuthService {
 
       const user = await this.findUserByEmail(email);
       if (!user) {
-        // ✅ SEGURIDAD: Log de intento de reset para usuario inexistente
+        // SEGURIDAD: Log de intento pero NO revelar que el email no existe (prevenir enumeración)
         this.logger.warn(
           `Password reset attempt for non-existent user: ${email} from IP: ${clientIp || 'unknown'}`
         );
-        throw new UnauthorizedException('Usuario no encontrado');
+        // Retornar token ficticio para que la respuesta sea indistinguible
+        return 'reset-requested';
       }
 
       // Generate secure reset token (32 bytes = 64 hex characters)

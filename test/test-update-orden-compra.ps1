@@ -31,7 +31,7 @@ $createPayload = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes" -Method Post -Body $createPayload -ContentType "application/json"
-    
+
     if ($createResponse.success) {
         Write-Host "✓ Orden created successfully" -ForegroundColor Green
         $ordenId = $createResponse.data.id
@@ -75,7 +75,7 @@ $updatePayload = @{
 
 try {
     $updateResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId" -Method Put -Body $updatePayload -ContentType "application/json"
-    
+
     if ($updateResponse.success) {
         Write-Host "✓ Orden updated successfully" -ForegroundColor Green
         Write-Host "  Número: $($updateResponse.data.numero)" -ForegroundColor Gray
@@ -100,7 +100,7 @@ Write-Host "Step 3: Verifying the update..." -ForegroundColor Yellow
 
 try {
     $getResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($getResponse.success) {
         Write-Host "✓ Orden fetched successfully" -ForegroundColor Green
         Write-Host "  Número: $($getResponse.data.numero)" -ForegroundColor Gray
@@ -129,20 +129,20 @@ $changeEstadoPayload = @{
 
 try {
     $changeEstadoResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId" -Method Put -Body $changeEstadoPayload -ContentType "application/json"
-    
+
     if ($changeEstadoResponse.success) {
         Write-Host "✓ Estado changed to APROBADA" -ForegroundColor Green
         Write-Host ""
-        
+
         # Now try to update again (should fail)
         $failUpdatePayload = @{
             tenant_id = $tenantId
             observaciones = "This should fail"
         } | ConvertTo-Json
-        
+
         try {
             $failResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId" -Method Put -Body $failUpdatePayload -ContentType "application/json"
-            
+
             if ($failResponse.success) {
                 Write-Host "✗ Update should have failed but succeeded" -ForegroundColor Red
             } else {

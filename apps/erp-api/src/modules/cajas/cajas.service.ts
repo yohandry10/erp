@@ -541,11 +541,12 @@ export class CajasService {
     const { data: sesion, error: findError } = await query.single();
     if (findError || !sesion) throw new NotFoundException('Sesión de caja no encontrada o ya cerrada');
 
-    const esperado = sesion.monto_esperado ?? sesion.monto_inicial ?? 0;
+    const esperado = await this.resolveMontoEsperadoCierre(tenantId, sesion);
     const contado = dto.monto_cierre ?? dto.monto_contado ?? sesion.monto_contado ?? 0;
     const cierre: any = {
       estado: 'CERRADA',
       fecha_cierre: new Date().toISOString(),
+      monto_esperado: esperado,
       monto_contado: contado,
       diferencia: contado - esperado,
       usuario_cierre: userId ?? sesion.usuario_id ?? null,
@@ -575,6 +576,33 @@ export class CajasService {
     }
 
     return data;
+  }
+
+  private async resolveMontoEsperadoCierre(tenantId: string, sesion: any): Promise<number> {
+    const montoEsperado = Number(sesion.monto_esperado ?? 0);
+    if (montoEsperado > 0) {
+      return montoEsperado;
+    }
+
+    const { data: ultimoMovimiento, error } = await this.supabase.getClient()
+      .from('movimientos_caja')
+      .select('saldo_nuevo')
+      .eq('tenant_id', tenantId)
+      .eq('sesion_caja_id', sesion.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      this.logger.warn(`No se pudo calcular monto esperado desde movimientos de caja: ${error.message}`);
+    }
+
+    const saldoNuevo = Number(ultimoMovimiento?.saldo_nuevo ?? 0);
+    if (saldoNuevo > 0) {
+      return saldoNuevo;
+    }
+
+    return Number(sesion.monto_inicial ?? sesion.monto_inicio ?? 0);
   }
 
   async listarSesiones(tenantId: string, filters: { fecha_desde?: string; fecha_hasta?: string; estado?: string; cajero_id?: string }) {
@@ -825,13 +853,14 @@ export class CajasService {
       );
     }
 
-    // Verificar que el usuario es el cajero original o tiene permisos de supervisor
-    // TODO: Agregar validación de rol supervisor
+    // Verificar que el usuario es el cajero original
     if (sesion.cajero_id && sesion.cajero_id !== userId) {
       this.logger.warn(
         `Usuario ${userId} intentando reanudar sesión de otro cajero ${sesion.cajero_id}`,
       );
-      // Por ahora permitimos, pero logueamos para auditoría
+      throw new BadRequestException(
+        'Solo el cajero que abrió la sesión puede reanudarla.',
+      );
     }
 
     // Obtener último movimiento para contexto

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { formatDate } from '@/lib/format-utils'
 
 interface ConciliacionPendiente {
   id: string
@@ -58,14 +59,6 @@ export default function ConciliacionesPendientesReport() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    })
-  }
-
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'ABIERTA':
@@ -87,21 +80,21 @@ export default function ConciliacionesPendientesReport() {
 
   if (loading) {
     return (
-      <div className="activity-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-        <p style={{ color: '#6b7280' }}>Cargando conciliaciones pendientes...</p>
+      <div className="activity-card p-8 text-center">
+        <div className="loading-spinner"></div>
+        <p className="text-gray-500">Cargando conciliaciones pendientes...</p>
       </div>
     )
   }
 
   if (conciliaciones.length === 0) {
     return (
-      <div className="activity-card" style={{ padding: '3rem', textAlign: 'center' }}>
-        <CheckCircle2 size={48} style={{ margin: '0 auto 1rem', color: '#10b981' }} />
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+      <div className="activity-card p-12 text-center">
+        <CheckCircle2 size={48} className="text-[#10b981]" />
+        <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
           No hay conciliaciones pendientes
         </h3>
-        <p style={{ color: '#6b7280' }}>
+        <p className="text-gray-500">
           Todas las conciliaciones están cerradas
         </p>
       </div>
@@ -111,39 +104,20 @@ export default function ConciliacionesPendientesReport() {
   return (
     <div className="activity-card">
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Calendar size={24} style={{ color: '#8b5cf6' }} />
+      <div className="flex justify-between items-center mb-6 pb-4 border-b">
+        <div className="flex items-center gap-3">
+          <Calendar size={24} className="text-[#8b5cf6]" />
           <div>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>
+            <h3 className="text-[1.125rem] font-semibold text-gray-900">
               Conciliaciones Pendientes
             </h3>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            <p className="text-[0.875rem] text-gray-500 mt-1">
               {conciliaciones.length} conciliación{conciliaciones.length !== 1 ? 'es' : ''} en proceso
             </p>
           </div>
         </div>
         <button
-          onClick={loadConciliaciones}
-          style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500'
-          }}
+          onClick={loadConciliaciones} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
         >
           <RefreshCw size={16} />
           Actualizar
@@ -151,49 +125,34 @@ export default function ConciliacionesPendientesReport() {
       </div>
 
       {/* Summary Stats */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          padding: '1rem',
-          borderRadius: '8px',
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-          color: 'white'
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', opacity: 0.9 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
+        <div className="p-4 rounded-2 text-white">
+          <div className="text-3 font-semibold opacity-[0.9]">
             Total Pendientes
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: '700', marginTop: '0.5rem' }}>
+          <div className="text-7 font-bold mt-2">
             {conciliaciones.length}
           </div>
-          <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', opacity: 0.9 }}>
+          <div className="text-[0.875rem] mt-1 opacity-[0.9]">
             Conciliaciones abiertas
           </div>
         </div>
 
-        <div style={{
-          padding: '1rem',
-          borderRadius: '8px',
-          background: 'rgba(245, 158, 11, 0.1)',
-          border: '1px solid rgba(245, 158, 11, 0.2)'
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#92400e' }}>
+        <div className="p-4 rounded-2 bg-[rgba(245,_158,_11,_0.1)] border">
+          <div className="text-3 font-semibold text-[#92400e]">
             Avance Promedio
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', marginTop: '0.5rem', color: '#d97706' }}>
+          <div className="text-6 font-bold mt-2 text-[#d97706]">
             {Math.round(conciliaciones.reduce((sum, c) => sum + c.porcentaje_avance, 0) / conciliaciones.length)}%
           </div>
-          <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', color: '#92400e' }}>
+          <div className="text-[0.875rem] mt-1 text-[#92400e]">
             De conciliación
           </div>
         </div>
       </div>
 
       {/* Conciliaciones List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="flex flex-col gap-4">
         {conciliaciones.map((conciliacion) => {
           const estadoStyle = getEstadoColor(conciliacion.estado)
           const avanceColor = getAvanceColor(conciliacion.porcentaje_avance)
@@ -201,15 +160,7 @@ export default function ConciliacionesPendientesReport() {
           return (
             <div
               key={conciliacion.id}
-              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacion.id}`)}
-              style={{
-                padding: '1.5rem',
-                borderRadius: '12px',
-                border: '1px solid rgba(0,0,0,0.1)',
-                background: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
+              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacion.id}`)} className="p-6 rounded-3 border bg-white cursor-pointer transition"
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
                 e.currentTarget.style.transform = 'translateY(-2px)'
@@ -219,58 +170,42 @@ export default function ConciliacionesPendientesReport() {
                 e.currentTarget.style.transform = 'translateY(0)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+              <div className="flex justify-between mb-4">
                 <div>
-                  <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#111827', marginBottom: '0.25rem' }}>
+                  <h4 className="text-4 font-semibold text-gray-900 mb-1">
                     {conciliacion.cuenta_nombre}
                   </h4>
-                  <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  <p className="text-[0.875rem] text-gray-500">
                     {conciliacion.banco} • {conciliacion.numero_cuenta}
                   </p>
                 </div>
-                <span style={{
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  background: estadoStyle.bg,
-                  color: estadoStyle.color
-                }}>
+                <span className="py-1 px-3 rounded-full text-3 font-semibold">
                   {conciliacion.estado}
                 </span>
               </div>
 
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: '1rem',
-                marginBottom: '1rem'
-              }}>
+              <div className="grid grid-cols-[repeat(auto-fit,_minmax(150px,_1fr))] gap-4 mb-4">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Período
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {formatDate(conciliacion.fecha_desde)} - {formatDate(conciliacion.fecha_hasta)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Diferencia
                   </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: '600',
-                    color: Math.abs(conciliacion.diferencia) > 0.01 ? '#ef4444' : '#10b981'
-                  }}>
+                  <div className="text-[0.875rem] font-semibold">
                     {formatCurrency(conciliacion.diferencia, conciliacion.moneda)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                  <div className="text-3 text-gray-500 mb-1">
                     Items Conciliados
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <div className="text-[0.875rem] font-medium">
                     {conciliacion.items_conciliados} de {conciliacion.items_sistema + conciliacion.items_extracto}
                   </div>
                 </div>
@@ -278,47 +213,23 @@ export default function ConciliacionesPendientesReport() {
 
               {/* Progress Bar */}
               <div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: '0.5rem'
-                }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280' }}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-3 font-semibold text-gray-500">
                     Avance de Conciliación
                   </span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '700', color: avanceColor }}>
+                  <span className="text-[0.875rem] font-bold">
                     {conciliacion.porcentaje_avance.toFixed(0)}%
                   </span>
                 </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  background: 'rgba(0,0,0,0.05)',
-                  borderRadius: '9999px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${conciliacion.porcentaje_avance}%`,
-                    height: '100%',
-                    background: avanceColor,
-                    transition: 'width 0.5s ease'
-                  }} />
+                <div className="w-[100%] h-2 bg-[rgba(0,0,0,0.05)] rounded-full overflow-hidden">
+                  <div className="h-[100%] transition" />
                 </div>
               </div>
 
               {Math.abs(conciliacion.diferencia) > 0.01 && (
-                <div style={{
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <AlertCircle size={16} style={{ color: '#dc2626' }} />
-                  <span style={{ fontSize: '0.75rem', color: '#991b1b' }}>
+                <div className="mt-4 p-3 rounded-[6px] bg-[rgba(239,_68,_68,_0.1)] flex items-center gap-2">
+                  <AlertCircle size={16} className="text-red-600" />
+                  <span className="text-3 text-red-800">
                     Hay diferencias sin resolver
                   </span>
                 </div>

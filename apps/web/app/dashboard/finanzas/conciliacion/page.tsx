@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
+import { formatDate as formatDateOnly } from '@/lib/format-utils'
+import {
   Plus, 
   RefreshCw,
   FileCheck,
@@ -128,14 +129,6 @@ export default function ConciliacionPage() {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
-  }
-
   const isFilterActive = estadoFilter || cuentaFilter
 
   const getEstadoBadge = (estado: string) => {
@@ -145,17 +138,7 @@ export default function ConciliacionPage() {
     const Icon = config.icon
     
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: config.color,
-        color: 'white'
-      }}>
+      <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
         <Icon size={14} />
         {config.label}
       </span>
@@ -175,7 +158,7 @@ export default function ConciliacionPage() {
           <h1 className="dashboard-title">Conciliación Bancaria</h1>
           <p className="dashboard-subtitle">Concilia los movimientos bancarios con el sistema</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           <button
             onClick={loadConciliaciones}
             className="refresh-btn"
@@ -198,7 +181,7 @@ export default function ConciliacionPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL</h3>
-            <FileCheck className="stat-icon" style={{ color: '#3b82f6' }} />
+            <FileCheck className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{totalConciliaciones}</div>
           <div className="stat-subtitle">Conciliaciones</div>
@@ -207,7 +190,7 @@ export default function ConciliacionPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>ABIERTAS</h3>
-            <Clock className="stat-icon" style={{ color: '#3b82f6' }} />
+            <Clock className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{abiertas}</div>
           <div className="stat-subtitle">Por procesar</div>
@@ -216,7 +199,7 @@ export default function ConciliacionPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>EN PROCESO</h3>
-            <AlertCircle className="stat-icon" style={{ color: '#f59e0b' }} />
+            <AlertCircle className="stat-icon text-amber-500" />
           </div>
           <div className="stat-value">{enProceso}</div>
           <div className="stat-subtitle">En revisión</div>
@@ -225,7 +208,7 @@ export default function ConciliacionPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>CERRADAS</h3>
-            <CheckCircle className="stat-icon" style={{ color: '#10b981' }} />
+            <CheckCircle className="stat-icon text-[#10b981]" />
           </div>
           <div className="stat-value">{cerradas}</div>
           <div className="stat-subtitle">Completadas</div>
@@ -233,9 +216,9 @@ export default function ConciliacionPage() {
       </div>
 
       {/* Filters */}
-      <div className="activity-section" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
+      <div className="activity-section mb-8">
+        <div className="flex gap-4 flex-wrap items-end">
+          <div className="flex-[1] min-w-[200px]">
             <label>Estado</label>
             <select
               value={estadoFilter}
@@ -248,7 +231,7 @@ export default function ConciliacionPage() {
             </select>
           </div>
 
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div className="flex-[1] min-w-[200px]">
             <label>Cuenta Bancaria</label>
             <select
               value={cuentaFilter}
@@ -266,8 +249,7 @@ export default function ConciliacionPage() {
           {isFilterActive && (
             <button
               onClick={handleClearFilters}
-              className="btn btn-secondary"
-              style={{ color: '#ef4444' }}
+              className="btn btn-secondary text-red-500"
             >
               <XCircle size={16} />
               Limpiar Filtros
@@ -286,12 +268,12 @@ export default function ConciliacionPage() {
         ) : (
           <div className="activity-card">
             {conciliaciones.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <FileCheck size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+              <div className="text-center p-12 text-gray-500">
+                <FileCheck size={48} className="text-gray-400" />
+                <h3 className="text-[1.125rem] font-semibold mb-2">
                   No hay conciliaciones bancarias
                 </h3>
-                <p style={{ marginBottom: '1.5rem' }}>
+                <p className="mb-6">
                   {isFilterActive
                     ? 'No se encontraron conciliaciones con los filtros aplicados'
                     : 'Crea una nueva conciliación para comenzar'}
@@ -313,12 +295,12 @@ export default function ConciliacionPage() {
                     <th>Período</th>
                     <th>Cuenta Bancaria</th>
                     <th>Fechas</th>
-                    <th style={{ textAlign: 'right' }}>Saldo Libro</th>
-                    <th style={{ textAlign: 'right' }}>Saldo Banco</th>
-                    <th style={{ textAlign: 'right' }}>Diferencia</th>
-                    <th style={{ textAlign: 'center' }}>Progreso</th>
-                    <th style={{ textAlign: 'center' }}>Estado</th>
-                    <th style={{ textAlign: 'right' }}>Acciones</th>
+                    <th className="text-right">Saldo Libro</th>
+                    <th className="text-right">Saldo Banco</th>
+                    <th className="text-right">Diferencia</th>
+                    <th className="text-center">Progreso</th>
+                    <th className="text-center">Estado</th>
+                    <th className="text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -332,71 +314,55 @@ export default function ConciliacionPage() {
                     return (
                       <tr key={conciliacion.id}>
                         <td>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                          <div className="text-[0.875rem] font-semibold">
                             {conciliacion.periodo}
                           </div>
                         </td>
                         <td>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                          <div className="text-[0.875rem] font-medium">
                             {conciliacion.cuentas_bancarias?.banco || 'N/A'}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280', fontFamily: 'monospace' }}>
+                          <div className="text-3 text-gray-500">
                             {conciliacion.cuentas_bancarias?.numero_cuenta || 'N/A'}
                           </div>
                         </td>
                         <td>
-                          <div style={{ fontSize: '0.875rem' }}>
-                            {formatDate(conciliacion.fecha_desde)}
+                          <div className="text-[0.875rem]">
+                            {formatDateOnly(conciliacion.fecha_desde)}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                            al {formatDate(conciliacion.fecha_hasta)}
+                          <div className="text-3 text-gray-500">
+                            al {formatDateOnly(conciliacion.fecha_hasta)}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'right', fontSize: '0.875rem', fontWeight: '600' }}>
+                        <td className="text-right text-[0.875rem] font-semibold">
                           {formatCurrency(conciliacion.saldo_libro, moneda)}
                         </td>
-                        <td style={{ textAlign: 'right', fontSize: '0.875rem', fontWeight: '600' }}>
+                        <td className="text-right text-[0.875rem] font-semibold">
                           {formatCurrency(conciliacion.saldo_banco, moneda)}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ 
-                            fontSize: '0.875rem', 
-                            fontWeight: '700',
-                            color: Math.abs(conciliacion.diferencia || 0) < 0.01 ? '#10b981' : '#ef4444'
-                          }}>
+                        <td className="text-right">
+                          <div className="text-[0.875rem] font-bold">
                             {formatCurrency(conciliacion.diferencia, moneda)}
                           </div>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
-                            <div style={{ 
-                              width: '100%', 
-                              height: '6px', 
-                              background: '#e5e7eb', 
-                              borderRadius: '3px',
-                              overflow: 'hidden'
-                            }}>
-                              <div style={{
-                                width: `${progreso}%`,
-                                height: '100%',
-                                background: progreso === 100 ? '#10b981' : '#3b82f6',
-                                transition: 'width 0.3s ease'
-                              }} />
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-[100%] h-[6px] bg-[#e5e7eb] rounded-[3px] overflow-hidden">
+                              <div className="h-[100%] transition" />
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>
+                            <div className="text-3 text-gray-500 font-medium">
                               {conciliacion.items_conciliados || 0}/{totalItems}
                             </div>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td className="text-center">
                           {getEstadoBadge(conciliacion.estado)}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <td className="text-right">
+                          <div className="flex gap-2 justify-end">
                             <button
                               onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacion.id}`)}
-                              className="btn btn-primary"
-                              style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}
+                              className="btn btn-primary text-3 py-2 px-4"
                             >
                               <Eye size={14} />
                               {conciliacion.estado === 'CERRADA' ? 'Ver' : 'Procesar'}
@@ -494,7 +460,7 @@ function NewConciliacionForm({
 
   return (
     <form onSubmit={handleSubmit}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div className="flex flex-col gap-4">
         <div>
           <label>Cuenta Bancaria *</label>
           <select

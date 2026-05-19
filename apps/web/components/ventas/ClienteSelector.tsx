@@ -183,55 +183,22 @@ export default function ClienteSelector({
   }
 
   return (
-    <div style={{ position: 'relative' }} ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef}>
       {/* Selected Cliente Display */}
       {selectedCliente ? (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '1rem',
-          border: error ? '2px solid var(--red-500)' : '2px solid var(--primary-200)',
-          borderRadius: 'var(--border-radius)',
-          background: 'rgba(255, 255, 255, 0.9)',
-          opacity: disabled ? 0.6 : 1,
-          cursor: disabled ? 'not-allowed' : 'default',
-          transition: 'all 0.3s ease'
-        }}>
-          <div style={{ flex: 1 }}>
-            <p style={{
-              fontSize: '0.95rem',
-              fontWeight: '600',
-              color: 'var(--primary-800)',
-              margin: '0 0 0.25rem 0'
-            }}>
+        <div className="flex items-center justify-between p-4 bg-[rgba(255,_255,_255,_0.9)] transition">
+          <div className="flex-[1]">
+            <p className="text-[0.95rem] font-semibold text-[var(--primary-800)] mt-0 mr-0 mb-1 ml-0">
               {selectedCliente.razon_social}
             </p>
-            <p style={{
-              fontSize: '0.8rem',
-              color: 'var(--primary-500)',
-              margin: 0
-            }}>
+            <p className="text-[0.8rem] text-[var(--primary-500)] m-0">
               {selectedCliente.documento_tipo}: {selectedCliente.documento_numero}
             </p>
           </div>
           {!disabled && (
             <button
               type="button"
-              onClick={handleClearSelection}
-              style={{
-                marginLeft: '0.75rem',
-                padding: '0.5rem',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: 'var(--border-radius)',
-                cursor: 'pointer',
-                color: 'var(--primary-500)',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              onClick={handleClearSelection} className="ml-3 p-2 bg-transparent border-0 cursor-pointer text-[var(--primary-500)] transition flex items-center justify-center"
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'var(--primary-100)'
                 e.currentTarget.style.color = 'var(--primary-700)'
@@ -241,40 +208,21 @@ export default function ClienteSelector({
                 e.currentTarget.style.color = 'var(--primary-500)'
               }}
             >
-              <X style={{ width: '1.125rem', height: '1.125rem' }} />
+              <X className="w-[1.125rem] h-[1.125rem]" />
             </button>
           )}
         </div>
       ) : (
         <>
           {/* Search Input */}
-          <div style={{ position: 'relative' }}>
-            <Search style={{
-              position: 'absolute',
-              left: '1rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--primary-400)',
-              width: '1.25rem',
-              height: '1.25rem',
-              pointerEvents: 'none'
-            }} />
+          <div className="relative">
+            <Search className="absolute left-4 top-[50%] -translate-y-1/2 text-[var(--primary-400)] w-5 h-5" />
             <input
               type="text"
               placeholder="Buscar por RUC, DNI o nombre..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-              disabled={disabled}
-              style={{
-                width: '100%',
-                padding: '1rem 3rem 1rem 3rem',
-                border: error ? '2px solid var(--red-500)' : '2px solid var(--primary-200)',
-                borderRadius: 'var(--border-radius)',
-                fontSize: '1rem',
-                transition: 'all 0.3s ease',
-                background: 'rgba(255, 255, 255, 0.9)',
-                color: 'var(--primary-800)'
-              }}
+              disabled={disabled} className="w-[100%] pt-4 pr-12 pb-4 pl-12 text-4 transition bg-[rgba(255,_255,_255,_0.9)] text-[var(--primary-800)]"
               onFocus={(e) => {
                 if (!error) {
                   e.currentTarget.style.borderColor = 'var(--blue-500)'
@@ -292,64 +240,23 @@ export default function ClienteSelector({
               }}
             />
             {loading && (
-              <div style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}>
-                <div className="loading-spinner" style={{
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  border: '2px solid var(--primary-200)',
-                  borderTop: '2px solid var(--blue-600)',
-                  borderRadius: '50%'
-                }}></div>
+              <div className="absolute right-4 top-[50%] -translate-y-1/2">
+                <div className="loading-spinner w-5 h-5 rounded-full"></div>
               </div>
             )}
             {!loading && searchTerm && (
-              <ChevronDown style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--primary-400)',
-                width: '1.25rem',
-                height: '1.25rem',
-                pointerEvents: 'none'
-              }} />
+              <ChevronDown className="absolute right-4 top-[50%] -translate-y-1/2 text-[var(--primary-400)] w-5 h-5" />
             )}
           </div>
 
           {/* Dropdown */}
           {isOpen && clientes.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              zIndex: 50,
-              width: '100%',
-              marginTop: '0.5rem',
-              background: 'white',
-              border: '1px solid var(--primary-200)',
-              borderRadius: 'var(--border-radius)',
-              boxShadow: 'var(--shadow-xl)',
-              maxHeight: '20rem',
-              overflowY: 'auto'
-            }}>
+            <div className="absolute z-[50] w-[100%] mt-2 bg-white border shadow max-h-[20rem] overflow-y-auto">
               {clientes.map((cliente) => (
                 <button
                   key={cliente.id}
                   type="button"
-                  onClick={() => handleSelectCliente(cliente)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '1rem',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid var(--primary-100)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
+                  onClick={() => handleSelectCliente(cliente)} className="w-[100%] text-left p-4 bg-transparent border-0 border-b cursor-pointer transition"
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'var(--primary-50)'
                   }}
@@ -357,19 +264,10 @@ export default function ClienteSelector({
                     e.currentTarget.style.background = 'transparent'
                   }}
                 >
-                  <p style={{
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    color: 'var(--primary-800)',
-                    margin: '0 0 0.25rem 0'
-                  }}>
+                  <p className="text-[0.95rem] font-semibold text-[var(--primary-800)] mt-0 mr-0 mb-1 ml-0">
                     {cliente.razon_social}
                   </p>
-                  <p style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--primary-500)',
-                    margin: 0
-                  }}>
+                  <p className="text-[0.8rem] text-[var(--primary-500)] m-0">
                     {cliente.documento_tipo}: {cliente.documento_numero}
                     {cliente.nombre_comercial && ` • ${cliente.nombre_comercial}`}
                   </p>
@@ -380,23 +278,8 @@ export default function ClienteSelector({
 
           {/* No Results */}
           {isOpen && !loading && searchTerm.length >= 2 && clientes.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              zIndex: 50,
-              width: '100%',
-              marginTop: '0.5rem',
-              background: 'white',
-              border: '1px solid var(--primary-200)',
-              borderRadius: 'var(--border-radius)',
-              boxShadow: 'var(--shadow-lg)',
-              padding: '1.5rem',
-              textAlign: 'center'
-            }}>
-              <p style={{
-                fontSize: '0.875rem',
-                color: 'var(--primary-600)',
-                margin: 0
-              }}>
+            <div className="absolute z-[50] w-[100%] mt-2 bg-white border shadow p-6 text-center">
+              <p className="text-[0.875rem] text-[var(--primary-600)] m-0">
                 No se encontraron clientes
               </p>
             </div>
@@ -409,25 +292,7 @@ export default function ClienteSelector({
         <button
           type="button"
           onClick={handleCreateNew}
-          disabled={disabled}
-          style={{
-            marginTop: '0.75rem',
-            width: '100%',
-            padding: '0.75rem 1rem',
-            background: 'white',
-            color: 'var(--primary-700)',
-            border: '2px solid var(--primary-200)',
-            borderRadius: 'var(--border-radius)',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            transition: 'all 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            opacity: disabled ? 0.6 : 1
-          }}
+          disabled={disabled} className="mt-3 w-[100%] py-3 px-4 bg-white text-[var(--primary-700)] text-[0.875rem] font-semibold transition flex items-center justify-center gap-2"
           onMouseEnter={(e) => {
             if (!disabled) {
               e.currentTarget.style.background = 'var(--primary-50)'
@@ -441,29 +306,19 @@ export default function ClienteSelector({
             e.currentTarget.style.transform = 'translateY(0)'
           }}
         >
-          <Plus style={{ width: '1rem', height: '1rem' }} />
+          <Plus className="w-4 h-4" />
           Nuevo Cliente (rápido)
         </button>
       )}
 
       {/* Error Message */}
       {error && (
-        <p style={{
-          marginTop: '0.5rem',
-          fontSize: '0.875rem',
-          color: 'var(--red-600)',
-          fontWeight: '500'
-        }}>{error}</p>
+        <p className="mt-2 text-[0.875rem] text-[var(--red-600)] font-medium">{error}</p>
       )}
 
       {/* Helper Text */}
       {!selectedCliente && !error && (
-        <p style={{
-          marginTop: '0.5rem',
-          fontSize: '0.8rem',
-          color: 'var(--primary-500)',
-          fontWeight: '500'
-        }}>
+        <p className="mt-2 text-[0.8rem] text-[var(--primary-500)] font-medium">
           Haz clic para ver todos los clientes o escribe para buscar
         </p>
       )}

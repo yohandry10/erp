@@ -21,11 +21,11 @@ export const QuickActions: React.FC<Props> = ({ mensaje, emailDestino }) => {
   }
 
   return (
-    <div className="stat-card" style={{ padding: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-      <button className="btn btn-primary" style={{ flex: '1 1 auto', minWidth: '140px' }} onClick={enviarWhatsApp}>
+    <div className="stat-card p-4 flex gap-3 flex-wrap">
+      <button className="btn btn-primary flex-[1_1_auto] min-w-[140px]" onClick={enviarWhatsApp}>
         📲 WhatsApp
       </button>
-      <button className="btn btn-secondary" style={{ flex: '1 1 auto', minWidth: '140px' }} onClick={enviarEmail}>
+      <button className="btn btn-secondary flex-[1_1_auto] min-w-[140px]" onClick={enviarEmail}>
         📧 Email
       </button>
     </div>

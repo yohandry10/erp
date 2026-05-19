@@ -49,6 +49,8 @@ apps/web/tests/e2e/artifacts/
 
 # Local validation databases and tool caches
 .codex_pg_rebuild/
+.codex-local-logs/
+.codex_run_logs/
 .deepsec/data/
 .deepsec/node_modules/
 

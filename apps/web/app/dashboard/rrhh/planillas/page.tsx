@@ -37,8 +37,6 @@ const PlanillasPage = () => {
     variant: 'default'
   });
   
-  console.log('🔥 COMPONENTE RENDERIZADO - showPlanillaModal:', showPlanillaModal);
-
   const loadPlanillas = useCallback(async () => {
     if (!rrhhEnabled) {
       setPlanillas([]);
@@ -66,9 +64,7 @@ const PlanillasPage = () => {
   }, [loadPlanillas]);
 
   const abrirModalPlanilla = () => {
-    console.log('🔥 ABRIENDO MODAL PLANILLA - llamando setShowPlanillaModal(true)');
     setShowPlanillaModal(true);
-    console.log('🔥 showPlanillaModal después de setState:', true);
   };
 
   const editarPlanilla = (planilla: any) => {
@@ -132,7 +128,6 @@ const PlanillasPage = () => {
   };
 
   const handlePlanillaSuccess = () => {
-    console.log('🔥 handlePlanillaSuccess ejecutado - cerrando modal y recargando planillas');
     setShowPlanillaModal(false);
     loadPlanillas();
   };
@@ -187,7 +182,7 @@ const PlanillasPage = () => {
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
         link.setAttribute("download", `reporte_planilla_${periodo}.html`);
-        link.style.visibility = 'hidden';
+        link.className = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -213,18 +208,6 @@ const PlanillasPage = () => {
     <head>
         <meta charset="UTF-8">
         <title>Reporte de Planilla ${periodo}</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .company { font-size: 24px; font-weight: bold; color: #2563eb; }
-            .title { font-size: 18px; margin: 10px 0; }
-            .summary { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #2563eb; color: white; }
-            .number { text-align: right; }
-            .total-row { font-weight: bold; background-color: #f9fafb; }
-        </style>
     </head>
     <body>
         <div class="header">
@@ -324,7 +307,7 @@ const PlanillasPage = () => {
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
         link.setAttribute("download", `boleta_${data?.empleados?.nombres}_${data?.empleados?.apellidos}.html`);
-        link.style.visibility = 'hidden';
+        link.className = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -346,21 +329,6 @@ const PlanillasPage = () => {
     <head>
         <meta charset="UTF-8">
         <title>Boleta de Pago</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
-            .boleta { background: white; padding: 30px; margin: 0 auto; max-width: 600px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
-            .company { font-size: 24px; font-weight: bold; color: #2563eb; margin-bottom: 5px; }
-            .title { font-size: 18px; color: #666; }
-            .empleado { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-            .section { margin-bottom: 20px; }
-            .section-title { font-size: 16px; font-weight: bold; color: #2563eb; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
-            .item { display: flex; justify-content: space-between; padding: 5px 0; }
-            .item.total { font-weight: bold; background: #e7f3ff; padding: 10px; border-radius: 5px; }
-            .amount { font-weight: bold; }
-            .positive { color: #059669; }
-            .negative { color: #dc2626; }
-        </style>
     </head>
     <body>
         <div class="boleta">
@@ -425,12 +393,12 @@ const PlanillasPage = () => {
                 </div>
             </div>
 
-            <div class="item total" style="background: #2563eb; color: white; font-size: 18px;">
+            <div class="item total">
                 <span>NETO A PAGAR</span>
                 <span class="amount">S/ ${(parseFloat(data?.neto_pagar) || 0).toFixed(2)}</span>
             </div>
 
-            <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #666;">
+            <div>
                 <p>Este documento es generado automáticamente por NEON SYSTEM</p>
                 <p>Fecha de generación: ${new Date().toLocaleDateString('es-PE')} ${new Date().toLocaleTimeString('es-PE')}</p>
             </div>
@@ -473,6 +441,12 @@ const PlanillasPage = () => {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Planillas</h1>
+            <p className="dashboard-subtitle">Cargando nómina, periodos, cálculos y estado de pagos de RRHH.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando planillas...</p>
@@ -565,7 +539,7 @@ const PlanillasPage = () => {
         <div className="activity-card">
           {planillasArray.length === 0 ? (
             <div className="activity-empty">
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚀</div>
+              <div className="text-16 mb-4">🚀</div>
               <h3>¡Comienza con tu Primera Planilla!</h3>
               <p>Usa el botón &quot;Crear Nueva Planilla&quot; para configurar y generar tu primera planilla</p>
               <button 
@@ -576,7 +550,7 @@ const PlanillasPage = () => {
               </button>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="overflow-x-auto">
               <table>
                 <thead>
                   <tr>
@@ -595,7 +569,7 @@ const PlanillasPage = () => {
                       <td>
                         <div>
                           <strong>{planilla?.periodo || 'N/A'}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                          <div className="text-3 text-[var(--primary-500)]">
                             {formatDate(planilla?.fecha_inicio)} - {formatDate(planilla?.fecha_fin)}
                           </div>
                         </div>
@@ -604,23 +578,17 @@ const PlanillasPage = () => {
                         <span className={
                           planilla?.estado === 'borrador' ? 'status-warning' :
                           planilla?.estado === 'calculada' ? 'status-info' :
-                          planilla?.estado === 'aprobada' ? 'status-success' : 'status-error'
+                          planilla?.estado === 'aprobada' || planilla?.estado === 'pagada' ? 'status-success' : 'status-error'
                         }>
                           {planilla?.estado === 'borrador' && '📝 Borrador'}
                           {planilla?.estado === 'calculada' && '🧮 Calculada'}
                           {planilla?.estado === 'aprobada' && '✅ Aprobada'}
+                          {planilla?.estado === 'pagada' && '💰 Pagada'}
                           {!planilla?.estado && '❓ Sin estado'}
                         </span>
                       </td>
                       <td>
-                        <span style={{ 
-                          background: 'var(--blue-100)', 
-                          color: 'var(--blue-800)', 
-                          padding: '0.25rem 0.5rem', 
-                          borderRadius: '12px', 
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold'
-                        }}>
+                        <span className="bg-[var(--blue-100)] text-[var(--blue-800)] py-1 px-2 rounded-3 text-3 font-bold">
                           👥 Ver detalle
                         </span>
                       </td>
@@ -634,28 +602,12 @@ const PlanillasPage = () => {
                         <strong>{formatCurrency(parseFloat(planilla?.total_neto) || 0)}</strong>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div className="flex gap-2 items-center flex-wrap">
                           {/* Botón Calcular - Solo para borradores */}
                           {planilla?.estado === 'borrador' && (
-                            <button 
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                backgroundColor: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
+                            <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-600"
                               onClick={() => abrirCalcularPlanilla(planilla)}
                               title="Calcular planilla detallada"
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
                             >
                               🧮 Calcular
                             </button>
@@ -663,99 +615,35 @@ const PlanillasPage = () => {
 
                           {/* Botón Pagar - Para calculadas y aprobadas */}
                           {(planilla?.estado === 'calculada' || planilla?.estado === 'aprobada') && (
-                            <button 
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                backgroundColor: '#059669',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
+                            <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-emerald-600 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-emerald-700"
                               onClick={() => abrirPagarPlanilla(planilla)}
                               title="Pagar planilla"
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                             >
                               💰 Pagar
                             </button>
                           )}
                           
                           {/* Botón Ver Detalle */}
-                          <button 
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '0.7rem',
-                              fontWeight: '600',
-                              backgroundColor: '#6b7280',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              transition: 'all 0.2s'
-                            }}
+                          <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-gray-500 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-gray-600"
                             onClick={() => verDetallePlanilla(planilla?.id)}
                             title="Ver detalle completo"
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4b5563'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6b7280'}
                           >
                             👁️ Ver
                           </button>
                           
                           {/* Botón Reporte */}
-                          <button 
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '0.7rem',
-                              fontWeight: '600',
-                              backgroundColor: '#7c3aed',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              transition: 'all 0.2s'
-                            }}
+                          <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
                             onClick={() => generarReporteProfesional(planilla?.id, planilla?.periodo)}
                             title="Generar reporte profesional"
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6d28d9'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
                           >
                             📊 Reporte
                           </button>
                           
                           {/* Botón Generar Asientos - Solo para calculadas */}
                           {planilla?.estado === 'calculada' && (
-                            <button 
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                backgroundColor: '#7c3aed',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
+                            <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-blue-700 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-blue-800"
                               onClick={() => generarAsientosContables(planilla?.id)}
                               title="Generar asientos contables"
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#6d28d9'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
                             >
                               📊 Asientos
                             </button>
@@ -763,25 +651,9 @@ const PlanillasPage = () => {
 
                           {/* Botón Aprobar - Solo para calculadas */}
                           {planilla?.estado === 'calculada' && (
-                            <button 
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '0.7rem',
-                                fontWeight: '600',
-                                backgroundColor: '#059669',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
+                            <button className="py-[4px] px-2 text-[0.7rem] font-semibold bg-emerald-600 text-white border-0 rounded-[6px] cursor-pointer flex items-center gap-[4px] transition hover:bg-emerald-700"
                               onClick={() => aprobarPlanilla(planilla?.id)}
                               title="Aprobar planilla"
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                             >
                               ✅ Aprobar
                             </button>
@@ -789,14 +661,7 @@ const PlanillasPage = () => {
                           
                           {/* Estado Aprobada - Informativo */}
                           {planilla?.estado === 'aprobada' && (
-                            <span style={{ 
-                              background: 'var(--green-100)', 
-                              color: 'var(--green-800)', 
-                              padding: '4px 8px', 
-                              borderRadius: '6px', 
-                              fontSize: '0.7rem',
-                              fontWeight: '600'
-                            }}>
+                            <span className="bg-[var(--green-100)] text-[var(--green-800)] py-[4px] px-2 rounded-[6px] text-[0.7rem] font-semibold">
                               ✅ Oficial
                             </span>
                           )}
@@ -813,100 +678,61 @@ const PlanillasPage = () => {
 
       {/* Modal para ver detalle de planilla */}
       {showDetalle && Array.isArray(detallePlanilla) && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.8)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-            backdropFilter: 'blur(20px) saturate(180%)',
-            borderRadius: 'var(--border-radius-xl)',
-            padding: '2.5rem',
-            width: '95%',
-            maxWidth: '1200px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: 'var(--shadow-2xl)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{
-                fontSize: '1.75rem',
-                fontWeight: '800',
-                background: 'var(--gradient-primary)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                margin: 0
-              }}>
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(15,_23,_42,_0.8)] flex items-center justify-center p-4 z-[1000]">
+          <div className="p-10 w-[95%] max-w-[1200px] overflow-auto shadow border">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-7 font-extrabold bg-[var(--gradient-primary)] m-0">
                 👁️ Detalle de Planilla
               </h2>
               <button
-                onClick={() => setShowDetalle(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: 'var(--primary-500)'
-                }}
+                onClick={() => setShowDetalle(false)} className="border-0 text-6 cursor-pointer text-[var(--primary-500)]"
               >
                 ✕
               </button>
             </div>
             
             {detallePlanilla.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📝</div>
+              <div className="text-center p-8">
+                <div className="text-12 mb-4">📝</div>
                 <h3>Planilla sin calcular</h3>
                 <p>Esta planilla aún no tiene empleados calculados. Use el proceso automático para calcularla.</p>
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', marginBottom: '2rem' }}>
+              <div className="overflow-x-auto">
+                <table className="w-[100%] mb-8">
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Empleado</th>
-                      <th style={{ textAlign: 'left', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Documento</th>
-                      <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Días</th>
-                      <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Ingresos</th>
-                      <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Descuentos</th>
-                      <th style={{ textAlign: 'right', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Neto</th>
-                      <th style={{ textAlign: 'center', padding: '0.75rem', borderBottom: '2px solid var(--primary-200)' }}>Boleta</th>
+                      <th className="text-left p-3">Empleado</th>
+                      <th className="text-left p-3">Documento</th>
+                      <th className="text-right p-3">Días</th>
+                      <th className="text-right p-3">Ingresos</th>
+                      <th className="text-right p-3">Descuentos</th>
+                      <th className="text-right p-3">Neto</th>
+                      <th className="text-center p-3">Boleta</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detallePlanilla.map((empleado: any) => (
                       <tr key={empleado?.id || 'unknown'}>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)' }}>
+                        <td className="p-3 border-b">
                           <strong>{empleado?.empleados?.nombres || 'N/A'} {empleado?.empleados?.apellidos || ''}</strong>
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)' }}>
+                        <td className="p-3 border-b">
                           {empleado?.empleados?.numero_documento || 'N/A'}
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)', textAlign: 'right' }}>
+                        <td className="p-3 border-b text-right">
                           {empleado?.dias_trabajados || 0}
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)', textAlign: 'right', color: 'var(--green-600)' }}>
+                        <td className="p-3 border-b text-right text-[var(--green-600)]">
                           <strong>{formatCurrency(parseFloat(empleado?.total_ingresos) || 0)}</strong>
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)', textAlign: 'right', color: 'var(--red-600)' }}>
+                        <td className="p-3 border-b text-right text-[var(--red-600)]">
                           <strong>{formatCurrency(parseFloat(empleado?.total_descuentos) || 0)}</strong>
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)', textAlign: 'right', color: 'var(--blue-600)' }}>
+                        <td className="p-3 border-b text-right text-[var(--blue-600)]">
                           <strong>{formatCurrency(parseFloat(empleado?.neto_pagar) || 0)}</strong>
                         </td>
-                        <td style={{ padding: '0.75rem', borderBottom: '1px solid var(--primary-100)', textAlign: 'center' }}>
+                        <td className="p-3 border-b text-center">
                           <button 
                             className="btn-icon"
                             onClick={() => descargarBoleta(empleado?.id)}
@@ -922,11 +748,7 @@ const PlanillasPage = () => {
               </div>
             )}
 
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '1rem'
-            }}>
+            <div className="flex justify-end gap-4">
               <button
                 onClick={() => setShowDetalle(false)}
                 className="btn btn-secondary"
@@ -942,7 +764,6 @@ const PlanillasPage = () => {
       <PlanillaModal
         isOpen={showPlanillaModal}
         onClose={() => {
-          console.log('🔥 onClose llamado - cerrando modal')
           setShowPlanillaModal(false)
         }}
         onSuccess={handlePlanillaSuccess}

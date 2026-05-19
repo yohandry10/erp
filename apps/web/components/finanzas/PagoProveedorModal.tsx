@@ -12,6 +12,7 @@ import {
 import { ProtectedComponent } from '@/components/auth/ProtectedComponent';
 import { Button } from '@/components/ui/button';
 import { DollarSign, Calendar, CreditCard, Building2, FileText } from 'lucide-react';
+import { useApi } from '@/hooks/use-api';
 
 interface CuentaBancaria {
   id: string;
@@ -19,7 +20,8 @@ interface CuentaBancaria {
   numero_cuenta: string;
   tipo_cuenta: string;
   moneda: string;
-  saldo_actual: number;
+  saldo?: number;
+  saldo_actual?: number;
   activo: boolean;
 }
 
@@ -42,6 +44,7 @@ export default function PagoProveedorModal({
   moneda,
   onPagoSuccess,
 }: PagoProveedorModalProps) {
+  const { get, post } = useApi({ showSuccessToast: true, throwOnError: true, retries: 1, timeoutMs: 12000 });
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -57,24 +60,13 @@ export default function PagoProveedorModal({
   const [referencia, setReferencia] = useState<string>('');
   const [observaciones, setObservaciones] = useState<string>('');
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const getSaldoCuenta = (cuenta: CuentaBancaria) => Number(cuenta.saldo ?? cuenta.saldo_actual ?? 0);
 
   const loadCuentasBancarias = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/finanzas/bancos/cuentas`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al cargar las cuentas bancarias');
-      }
-
-      const data = await response.json();
+      const data = await get('/api/finanzas/bancos/cuentas');
       const cuentas = (data.data || []).filter(
         (cuenta: CuentaBancaria) => cuenta.activo && cuenta.moneda === moneda
       );
@@ -88,7 +80,7 @@ export default function PagoProveedorModal({
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL, moneda]);
+  }, [get, moneda]);
 
   useEffect(() => {
     if (isOpen) {
@@ -125,9 +117,10 @@ export default function PagoProveedorModal({
 
     // Check if selected account has sufficient balance for TRANSFERENCIA or CHEQUE
     if ((metodoPago === 'TRANSFERENCIA' || metodoPago === 'CHEQUE') && cuentaBancariaId) {
-      const cuentaSeleccionada = cuentasBancarias.find(c => c.id === cuentaBancariaId);
-      if (cuentaSeleccionada && cuentaSeleccionada.saldo_actual < montoNum) {
-        setError(`La cuenta seleccionada no tiene saldo suficiente (Saldo: ${formatCurrency(cuentaSeleccionada.saldo_actual)})`);
+      const cuentaSeleccionada = cuentasBancarias.find((cuenta) => cuenta.id === cuentaBancariaId);
+      const saldoCuenta = cuentaSeleccionada ? getSaldoCuenta(cuentaSeleccionada) : 0;
+      if (cuentaSeleccionada && saldoCuenta < montoNum) {
+        setError(`La cuenta seleccionada no tiene saldo suficiente (Saldo: ${formatCurrency(saldoCuenta)})`);
         return;
       }
     }
@@ -139,6 +132,7 @@ export default function PagoProveedorModal({
         monto: montoNum,
         fecha_pago: fechaPago,
         metodo_pago: metodoPago,
+        idempotency_key: `cxp-pago:${cxpId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`,
       };
 
       if (cuentaBancariaId) {
@@ -153,22 +147,7 @@ export default function PagoProveedorModal({
         payload.observaciones = observaciones.trim();
       }
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/finanzas/cxp/${cxpId}/aplicar-pago`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(payload),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al aplicar el pago');
-      }
+      await post(`/api/finanzas/cxp/${cxpId}/aplicar-pago`, payload);
 
       // Success
       onPagoSuccess();
@@ -201,7 +180,7 @@ export default function PagoProveedorModal({
 
   const handleMontoChange = (value: string) => {
     // Allow only numbers and decimal point
-    const regex = /^\d*\.?\d*$/;
+    const regex = /^\d*(?:\.\d{0,2})?$/;
     if (regex.test(value) || value === '') {
       setMonto(value);
     }
@@ -214,7 +193,9 @@ export default function PagoProveedorModal({
   const requiresCuentaBancaria = metodoPago === 'TRANSFERENCIA' || metodoPago === 'CHEQUE';
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !submitting) handleClose();
+    }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -245,12 +226,13 @@ export default function PagoProveedorModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Monto */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-monto" className="block text-sm font-medium text-gray-700 mb-2">
               <DollarSign className="inline h-4 w-4 mr-1" />
               Monto del Pago *
             </label>
             <div className="flex gap-2">
               <input
+                id="cxp-pago-monto"
                 type="text"
                 value={monto}
                 onChange={(e) => handleMontoChange(e.target.value)}
@@ -274,11 +256,12 @@ export default function PagoProveedorModal({
 
           {/* Fecha Pago */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-fecha" className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar className="inline h-4 w-4 mr-1" />
               Fecha de Pago *
             </label>
             <input
+              id="cxp-pago-fecha"
               type="date"
               value={fechaPago}
               onChange={(e) => setFechaPago(e.target.value)}
@@ -290,11 +273,12 @@ export default function PagoProveedorModal({
 
           {/* Método de Pago */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-metodo" className="block text-sm font-medium text-gray-700 mb-2">
               <CreditCard className="inline h-4 w-4 mr-1" />
               Método de Pago *
             </label>
             <select
+              id="cxp-pago-metodo"
               value={metodoPago}
               onChange={(e) => setMetodoPago(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -310,7 +294,7 @@ export default function PagoProveedorModal({
           {/* Cuenta Bancaria */}
           {requiresCuentaBancaria && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="cxp-pago-cuenta" className="block text-sm font-medium text-gray-700 mb-2">
                 <Building2 className="inline h-4 w-4 mr-1" />
                 Cuenta Bancaria {requiresCuentaBancaria && '*'}
               </label>
@@ -325,6 +309,7 @@ export default function PagoProveedorModal({
                 </div>
               ) : (
                 <select
+                  id="cxp-pago-cuenta"
                   value={cuentaBancariaId}
                   onChange={(e) => setCuentaBancariaId(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -333,7 +318,7 @@ export default function PagoProveedorModal({
                   <option value="">Seleccione una cuenta</option>
                   {cuentasBancarias.map((cuenta) => (
                     <option key={cuenta.id} value={cuenta.id}>
-                      {cuenta.banco} - {cuenta.numero_cuenta} ({cuenta.tipo_cuenta}) - Saldo: {formatCurrency(cuenta.saldo_actual)}
+                      {cuenta.banco} - {cuenta.numero_cuenta} ({cuenta.tipo_cuenta}) - Saldo: {formatCurrency(getSaldoCuenta(cuenta))}
                     </option>
                   ))}
                 </select>
@@ -343,11 +328,12 @@ export default function PagoProveedorModal({
 
           {/* Referencia */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-referencia" className="block text-sm font-medium text-gray-700 mb-2">
               <FileText className="inline h-4 w-4 mr-1" />
               Número de Referencia
             </label>
             <input
+              id="cxp-pago-referencia"
               type="text"
               value={referencia}
               onChange={(e) => setReferencia(e.target.value)}
@@ -361,10 +347,11 @@ export default function PagoProveedorModal({
 
           {/* Observaciones */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="cxp-pago-observaciones" className="block text-sm font-medium text-gray-700 mb-2">
               Observaciones
             </label>
             <textarea
+              id="cxp-pago-observaciones"
               value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}
               placeholder="Observaciones adicionales sobre el pago..."

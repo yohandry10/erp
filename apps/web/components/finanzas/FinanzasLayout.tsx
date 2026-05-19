@@ -34,7 +34,7 @@ export default function FinanzasLayout({
           <p className="dashboard-subtitle">{subtitle}</p>
         </div>
         {actions && (
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="flex gap-4 items-center flex-wrap">
             {actions}
           </div>
         )}
@@ -42,21 +42,21 @@ export default function FinanzasLayout({
 
       {/* Stats section si se proporciona */}
       {stats && (
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
+        <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
           {stats}
         </div>
       )}
 
       {/* Alerts section si se proporciona */}
       {alerts && (
-        <div style={{ marginBottom: '2rem' }}>
+        <div className="mb-8">
           {alerts}
         </div>
       )}
 
       {/* Filters section si se proporciona */}
       {filters && (
-        <div className="activity-section" style={{ marginBottom: '2rem' }}>
+        <div className="activity-section mb-8">
           {filters}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SupabaseService } from '../shared/supabase/supabase.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -178,33 +178,7 @@ export class DashboardController {
       };
     } catch (error) {
       console.error('❌ [Dashboard Controller] Error obteniendo estadísticas:', error);
-      
-      // Devolver estructura por defecto en caso de error
-      return {
-        success: false,
-        data: {
-          totalCpe: 0,
-          totalGre: 0,
-          totalSire: 0,
-          totalUsers: 0,
-          totalInventario: 0,
-          totalCompras: 0,
-          totalCotizaciones: 0,
-          ventasMes: 0,
-          ventasHoy: 0,
-          comprasMes: 0,
-          valorInventario: 0,
-          productosConStockBajo: 0,
-          cotizacionesPendientes: 0,
-          ordenesCompraPendientes: 0,
-          movimientosHoy: 0,
-          tasaConversionCotizaciones: 0,
-          crecimientoVentas: 0,
-          ultimaActualizacion: new Date().toISOString(),
-          error: error.message
-        },
-        message: 'Error al obtener estadísticas, mostrando valores por defecto'
-      };
+      throw new InternalServerErrorException('No se pudieron calcular las estadísticas del dashboard');
     }
   }
 

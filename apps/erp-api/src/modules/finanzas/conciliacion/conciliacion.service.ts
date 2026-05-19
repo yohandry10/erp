@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CrearConciliacionDto, ListarConciliacionesDto, ImportarCsvDto, MatchAutomaticoDto, MarcarItemDto } from './dto';
 import { CsvParserService } from './csv-parser.service';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class ConciliacionService {
@@ -161,13 +162,11 @@ export class ConciliacionService {
 
     let saldoLibro = 0;
     if (movimientosHasta && movimientosHasta.length > 0) {
-      saldoLibro = movimientosHasta.reduce((acc, mov) => {
-        if (mov.tipo === 'ABONO') {
-          return acc + parseFloat(mov.monto);
-        } else {
-          return acc - parseFloat(mov.monto);
-        }
-      }, 0);
+      const saldoDecimal = movimientosHasta.reduce((acc, mov) => {
+        const monto = new Decimal(mov.monto || '0');
+        return mov.tipo === 'ABONO' ? acc.plus(monto) : acc.minus(monto);
+      }, new Decimal(0));
+      saldoLibro = saldoDecimal.toNumber();
     }
 
     // Preparar datos de la conciliación
@@ -446,7 +445,8 @@ export class ConciliacionService {
             (fechaExtracto.getTime() - fechaSistema.getTime()) / (1000 * 60 * 60 * 24),
           );
 
-          return diferenciaDias <= toleranciaDias;
+          // Reducir tolerancia a 1 día para monto+fecha (evitar colisiones entre proveedores)
+          return diferenciaDias <= Math.min(toleranciaDias, 1);
         });
 
         if (matchPorMontoFecha) {
@@ -612,10 +612,28 @@ export class ConciliacionService {
       );
     }
 
-    // Calcular diferencia si no se proporcionó
     const montoSistema = this.round2(parseFloat(movimientoSistema.monto));
     const montoExtracto = this.round2(parseFloat(movimientoExtracto.monto));
-    const diferencia = dto.diferencia ?? this.round2(Math.abs(montoSistema - montoExtracto));
+    const diferenciaCalculada = this.round2(Math.abs(montoSistema - montoExtracto));
+
+    if (diferenciaCalculada > 0 && dto.aceptar_diferencia !== true) {
+      throw new BadRequestException(
+        `Los montos no coinciden: Sistema=${montoSistema.toFixed(2)}, Extracto=${montoExtracto.toFixed(2)}. Para conciliar con diferencia debe autorizarlo explícitamente.`,
+      );
+    }
+
+    if (
+      dto.diferencia !== undefined &&
+      this.round2(Number(dto.diferencia)) !== diferenciaCalculada
+    ) {
+      throw new BadRequestException(
+        `La diferencia informada (${this.round2(Number(dto.diferencia)).toFixed(2)}) no coincide con la diferencia real (${diferenciaCalculada.toFixed(2)})`,
+      );
+    }
+
+    const diferencia = dto.diferencia !== undefined
+      ? this.round2(Number(dto.diferencia))
+      : diferenciaCalculada;
 
     // Marcar ambos movimientos como conciliados y registrar diferencia si existe
     const { error: errorUpdateSistema } = await client

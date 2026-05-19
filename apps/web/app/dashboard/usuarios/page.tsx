@@ -8,6 +8,10 @@ import { useApi } from '@/hooks/use-api'
 import { useTenant } from '@/contexts/TenantContext'
 import { usePermission } from '@/hooks/use-permission'
 import { UsersStats, UsersFilters, UsersTable, RolesSection } from '@/components/usuarios'
+import { PageShell } from '@/components/erp/page-shell'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ShieldAlert, Users } from 'lucide-react'
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -122,50 +126,44 @@ export default function UsuariosPage() {
 
   if (loading || permissionLoading) {
     return (
-      <div className="dashboard-container">
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-            <span style={{ marginLeft: '0.75rem', fontSize: '1.125rem', color: 'var(--primary-700)' }}>
-              Cargando usuarios...
-            </span>
+      <PageShell title="Gestión de Usuarios" description="Cargando usuarios, roles, permisos y métricas de acceso.">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
+            <span className="text-sm font-semibold">Cargando usuarios...</span>
           </div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
   if (!canViewUsers) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <h1 className="dashboard-title">Acceso denegado</h1>
-          <p className="dashboard-subtitle">No tienes permisos para gestionar usuarios.</p>
-        </div>
-      </div>
+      <PageShell title="Acceso denegado" description="No tienes permisos para gestionar usuarios.">
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-center text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <CardContent className="p-12">
+            <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <p className="text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">El rol actual no puede administrar usuarios.</p>
+          </CardContent>
+        </Card>
+      </PageShell>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Gestión de Usuarios</h1>
-        <p className="dashboard-subtitle">Administra usuarios, roles y permisos del sistema</p>
-        {canCreateUsers && (
-          <button className="refresh-btn" onClick={handleNuevoUsuario}>
-            + Nuevo Usuario
-          </button>
-        )}
-      </div>
+    <PageShell
+      title="Gestión de Usuarios"
+      description="Administra usuarios, roles operativos y permisos del sistema con trazabilidad por tenant."
+      actions={canCreateUsers ? <Button className="gap-2" onClick={handleNuevoUsuario}><Users className="h-4 w-4" /> Nuevo usuario</Button> : null}
+    >
 
       {/* Stats */}
       <UsersStats stats={stats} />
 
       {/* Users Section */}
-      <div className="activity-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className="activity-title">Usuarios del Sistema</h2>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Usuarios del Sistema</CardTitle>
           <UsersFilters
             filtroRol={filtroRol}
             filtroEstado={filtroEstado}
@@ -173,9 +171,9 @@ export default function UsuariosPage() {
             onRolChange={setFiltroRol}
             onEstadoChange={setFiltroEstado}
           />
-        </div>
+        </CardHeader>
 
-        <div className="activity-card">
+        <CardContent>
           <UsersTable
             usuarios={usuarios}
             currentUserId={currentUser?.id}
@@ -183,8 +181,8 @@ export default function UsuariosPage() {
             onChangeStatus={handleCambiarEstado}
             onCreateFirst={handleNuevoUsuario}
           />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Roles Section */}
       <RolesSection roles={roles} />
@@ -206,6 +204,6 @@ export default function UsuariosPage() {
         message={confirmDialog.message}
         variant={confirmDialog.variant}
       />
-    </div>
+    </PageShell>
   )
 }

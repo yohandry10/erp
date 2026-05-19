@@ -3,18 +3,10 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
-import { 
-  Building2,
-  Plus,
-  Search,
-  Filter,
-  RefreshCw,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Edit,
-  BarChart3
-} from 'lucide-react'
+import { AlertCircle, BarChart3, Building2, CheckCircle, Edit, Filter, Loader2, Plus, RefreshCw, Search, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface CentroCosto {
   id: string
@@ -27,15 +19,18 @@ interface CentroCosto {
   updated_at: string
 }
 
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
 export default function CentrosCostoPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [centros, setCentros] = useState<CentroCosto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [estadoFilter, setEstadoFilter] = useState<string>('TODOS')
 
@@ -43,9 +38,9 @@ export default function CentrosCostoPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const response = await get('/api/contabilidad/centros-costo')
-      
+
       if (response?.success && response.data) {
         setCentros(response.data)
       } else {
@@ -63,66 +58,27 @@ export default function CentrosCostoPage() {
     loadCentrosCosto()
   }, [loadCentrosCosto])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
-  }
-
   const getEstadoBadge = (activo: boolean) => {
-    if (activo) {
-      return (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          padding: '0.375rem 0.75rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: '600',
-          background: '#10b981',
-          color: 'white'
-        }}>
-          <CheckCircle size={12} />
-          Activo
-        </span>
-      )
-    }
-    
+    const Icon = activo ? CheckCircle : XCircle
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: '#ef4444',
-        color: 'white'
-      }}>
-        <XCircle size={12} />
-        Inactivo
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+        <Icon className="h-3 w-3" />
+        {activo ? 'Activo' : 'Inactivo'}
       </span>
     )
   }
 
-  // Filtrar centros de costo
-  const filteredCentros = centros.filter(centro => {
-    // Filtro de búsqueda
+  const filteredCentros = centros.filter((centro) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
-      const matchesSearch = 
+      const matchesSearch =
         centro.codigo.toLowerCase().includes(search) ||
         centro.nombre.toLowerCase().includes(search) ||
         (centro.descripcion && centro.descripcion.toLowerCase().includes(search))
-      
+
       if (!matchesSearch) return false
     }
 
-    // Filtro de estado
     if (estadoFilter !== 'TODOS') {
       if (estadoFilter === 'ACTIVO' && !centro.activo) return false
       if (estadoFilter === 'INACTIVO' && centro.activo) return false
@@ -131,413 +87,224 @@ export default function CentrosCostoPage() {
     return true
   })
 
-  // Estadísticas
   const stats = {
     total: centros.length,
-    activos: centros.filter(c => c.activo).length,
-    inactivos: centros.filter(c => !c.activo).length
+    activos: centros.filter((c) => c.activo).length,
+    inactivos: centros.filter((c) => !c.activo).length,
   }
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando centros de costo...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <Loader2 className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando centros de costo...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
-              <Building2 size={24} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <Building2 className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                  ERP Cost Center
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Centros de Costo</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  Control presupuestal y análisis de gastos por unidad operativa.
+                </p>
+              </div>
             </div>
-            <h1 className="dashboard-title">Centros de Costo</h1>
-          </div>
-          <p className="dashboard-subtitle">
-            Gestione los centros de costo para el control presupuestal y análisis de gastos
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            onClick={loadCentrosCosto}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button
-            onClick={() => router.push('/dashboard/contabilidad/centros-costo/nuevo')}
-            className="primary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <Plus size={16} />
-            Nuevo Centro de Costo
-          </button>
-        </div>
-      </div>
-
-      {/* Estadísticas */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Centros
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-            {stats.total}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Activos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
-            {stats.activos}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Inactivos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#ef4444' }}>
-            {stats.inactivos}
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.75rem',
-          marginBottom: '1rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid var(--primary-100)'
-        }}>
-          <Filter size={20} style={{ color: 'var(--primary-600)' }} />
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
-            Filtros
-          </h2>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Buscar
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ 
-                position: 'absolute', 
-                left: '0.75rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: 'var(--primary-400)'
-              }} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Código, nombre o descripción..."
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
-              />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={loadCentrosCosto}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => router.push('/dashboard/contabilidad/centros-costo/nuevo')}
+                className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+              >
+                <Plus className="h-4 w-4" />
+                Nuevo centro
+              </Button>
             </div>
           </div>
+        </section>
 
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Estado
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            ['Total centros', stats.total],
+            ['Activos', stats.activos],
+            ['Inactivos', stats.inactivos],
+          ].map(([label, value]) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="p-4">
+                <div className={labelClass}>{label}</div>
+                <div className="mt-3 text-3xl font-bold text-white">{value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="flex items-center gap-2 text-base text-white">
+              <Filter className="h-5 w-5 text-cyan-200" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_240px_auto] md:items-end">
+            <label className="space-y-2">
+              <span className={labelClass}>Buscar</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/60" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Codigo, nombre o descripcion..."
+                  className={cn(inputClass, 'pl-10')}
+                />
+              </div>
             </label>
-            <select
-              value={estadoFilter}
-              onChange={(e) => setEstadoFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="ACTIVO">Activos</option>
-              <option value="INACTIVO">Inactivos</option>
-            </select>
-          </div>
-        </div>
 
-        {(searchTerm || estadoFilter !== 'TODOS') && (
-          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
+            <label className="space-y-2">
+              <span className={labelClass}>Estado</span>
+              <select value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)} className={inputClass}>
+                <option value="TODOS">Todos</option>
+                <option value="ACTIVO">Activos</option>
+                <option value="INACTIVO">Inactivos</option>
+              </select>
+            </label>
+
+            <Button
+              type="button"
               onClick={() => {
                 setSearchTerm('')
                 setEstadoFilter('TODOS')
               }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: 'var(--primary-100)',
-                color: 'var(--primary-700)',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
+              variant="outline"
+              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
             >
-              Limpiar Filtros
-            </button>
-          </div>
-        )}
-      </div>
+              Limpiar
+            </Button>
+          </CardContent>
+        </Card>
 
-      {/* Lista de Centros de Costo */}
-      <div className="activity-card">
-        {error && (
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--red-50)', 
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-            <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
-              {error}
+        <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Lista de centros</CardTitle>
+            <p className="text-xs text-slate-400">
+              Mostrando {filteredCentros.length} de {centros.length} centros de costo.
             </p>
-          </div>
-        )}
-
-        {filteredCentros.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-400)' }}>
-            <Building2 size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--primary-600)' }}>
-              No hay centros de costo
-            </h3>
-            <p style={{ marginBottom: '1.5rem' }}>
-              {centros.length === 0 
-                ? 'Aún no se han creado centros de costo'
-                : 'No se encontraron centros de costo con los filtros aplicados'
-              }
-            </p>
-            {centros.length === 0 && (
-              <button
-                onClick={() => router.push('/dashboard/contabilidad/centros-costo/nuevo')}
-                className="primary-btn"
-              >
-                <Plus size={16} />
-                Crear Primer Centro de Costo
-              </button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {error && (
+              <div className="m-4 flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
+                <AlertCircle className="h-5 w-5" />
+                {error}
+              </div>
             )}
-          </div>
-        ) : (
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--primary-200)' }}>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Código
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Nombre
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Descripción
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Estado
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCentros.map((centro) => (
-                  <tr 
-                    key={centro.id}
-                    style={{ 
-                      borderBottom: '1px solid var(--primary-100)',
-                      cursor: 'pointer',
-                      transition: 'background 0.2s'
-                    }}
-                    onClick={() => router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-50)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {centro.codigo}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {centro.nombre}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ 
-                        fontSize: '0.875rem', 
-                        color: 'var(--primary-600)',
-                        maxWidth: '300px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {centro.descripcion || '-'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {getEstadoBadge(centro.activo)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)
-                          }}
-                          style={{
-                            padding: '0.5rem',
-                            background: 'var(--primary-100)',
-                            color: 'var(--primary-700)',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                          title="Ver detalles"
-                        >
-                          <BarChart3 size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/dashboard/contabilidad/centros-costo/${centro.id}/editar`)
-                          }}
-                          style={{
-                            padding: '0.5rem',
-                            background: 'var(--primary-100)',
-                            color: 'var(--primary-700)',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                          title="Editar"
-                        >
-                          <Edit size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {filteredCentros.length > 0 && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '1rem',
-            borderTop: '1px solid var(--primary-200)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-              Mostrando {filteredCentros.length} de {centros.length} centros de costo
-            </div>
-          </div>
-        )}
+            {filteredCentros.length === 0 ? (
+              <div className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                  <Building2 className="h-10 w-10 text-cyan-100" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">No hay centros de costo</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {centros.length === 0 ? 'Aun no se han creado centros de costo.' : 'Los filtros actuales no devuelven resultados.'}
+                  </p>
+                </div>
+                {centros.length === 0 && (
+                  <Button
+                    type="button"
+                    onClick={() => router.push('/dashboard/contabilidad/centros-costo/nuevo')}
+                    className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Crear primer centro
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] border-collapse">
+                  <thead className="bg-cyan-400/10">
+                    <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                      <th className="px-4 py-3">Codigo</th>
+                      <th className="px-4 py-3">Nombre</th>
+                      <th className="px-4 py-3">Descripcion</th>
+                      <th className="px-4 py-3 text-center">Estado</th>
+                      <th className="px-4 py-3 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCentros.map((centro) => (
+                      <tr
+                        key={centro.id}
+                        className="cursor-pointer border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10"
+                        onClick={() => router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)}
+                      >
+                        <td className="px-4 py-3 font-semibold text-white">{centro.codigo}</td>
+                        <td className="px-4 py-3 font-semibold text-white">{centro.nombre}</td>
+                        <td className="max-w-[360px] truncate px-4 py-3 text-slate-300">{centro.descripcion || '-'}</td>
+                        <td className="px-4 py-3 text-center">{getEstadoBadge(centro.activo)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/dashboard/contabilidad/centros-costo/${centro.id}`)
+                              }}
+                              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                              title="Ver detalles"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/dashboard/contabilidad/centros-costo/${centro.id}/editar`)
+                              }}
+                              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                              title="Editar"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

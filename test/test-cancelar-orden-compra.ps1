@@ -30,7 +30,7 @@ $createOrderBody = @{
 
 try {
     $createResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes" -Method Post -Body $createOrderBody -ContentType "application/json"
-    
+
     if ($createResponse.success) {
         $ordenId = $createResponse.data.id
         Write-Host "✓ Order created successfully" -ForegroundColor Green
@@ -58,7 +58,7 @@ $cancelBody = @{
 
 try {
     $cancelResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/cancelar" -Method Post -Body $cancelBody -ContentType "application/json"
-    
+
     if ($cancelResponse.success) {
         Write-Host "✓ Order canceled successfully" -ForegroundColor Green
         Write-Host "  Order ID: $($cancelResponse.data.id)" -ForegroundColor Gray
@@ -81,11 +81,11 @@ try {
 Write-Host "Step 3: Verifying order status..." -ForegroundColor Yellow
 try {
     $verifyResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId`?tenant_id=$tenantId" -Method Get
-    
+
     if ($verifyResponse.success) {
         Write-Host "✓ Order status verified" -ForegroundColor Green
         Write-Host "  Current Status: $($verifyResponse.data.estado)" -ForegroundColor Gray
-        
+
         if ($verifyResponse.data.estado -eq "ANULADA") {
             Write-Host "  ✓ Status is correctly set to ANULADA" -ForegroundColor Green
         } else {
@@ -103,7 +103,7 @@ try {
 Write-Host "Step 4: Testing validation - trying to cancel already canceled order..." -ForegroundColor Yellow
 try {
     $invalidCancelResponse = Invoke-RestMethod -Uri "$baseUrl/compras/ordenes/$ordenId/cancelar" -Method Post -Body $cancelBody -ContentType "application/json"
-    
+
     if ($invalidCancelResponse.success) {
         Write-Host "✗ Should not allow canceling an already canceled order" -ForegroundColor Red
     } else {

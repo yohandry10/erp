@@ -26,31 +26,17 @@ export default function FinanzasEmptyState({
   const ActionIcon = action?.icon
 
   return (
-    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-      <Icon size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+    <div className="text-center p-12 text-gray-500">
+      <Icon size={48} className="text-gray-400" />
+      <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
         {title}
       </h3>
-      <p style={{ marginBottom: action ? '1.5rem' : '0', color: '#6b7280' }}>
+      <p className="text-gray-500">
         {description}
       </p>
       {action && (
         <button
-          onClick={action.onClick}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: '#3b82f6',
-            color: 'white',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s ease'
-          }}
+          onClick={action.onClick} className="py-3 px-6 rounded-2 border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold inline-flex items-center gap-2 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#2563eb'
             e.currentTarget.style.transform = 'translateY(-2px)'

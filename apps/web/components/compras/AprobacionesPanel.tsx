@@ -94,18 +94,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
     const Icon = config.icon
 
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: config.bgColor,
-        color: config.color,
-        border: `1px solid ${config.color}40`
-      }}>
+      <span className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-full text-3 font-semibold">
         <Icon size={14} />
         {config.label}
       </span>
@@ -120,33 +109,17 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   if (loading) {
     return (
       <div className="activity-card">
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '1.5rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid var(--primary-100)'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '10px',
-            background: 'var(--blue-100)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--blue-600)'
-          }}>
+        <div className="flex items-center gap-3 mb-6 pb-4">
+          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <CheckCircle size={20} />
           </div>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
+          <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
             Aprobaciones
           </h2>
         </div>
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--primary-400)' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-          <p style={{ fontSize: '0.875rem' }}>Cargando aprobaciones...</p>
+        <div className="text-center p-8 text-[var(--primary-400)]">
+          <div className="loading-spinner"></div>
+          <p className="text-[0.875rem]">Cargando aprobaciones...</p>
         </div>
       </div>
     )
@@ -155,33 +128,17 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
   if (error) {
     return (
       <div className="activity-card">
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '1.5rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid var(--primary-100)'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '10px',
-            background: 'var(--blue-100)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--blue-600)'
-          }}>
+        <div className="flex items-center gap-3 mb-6 pb-4">
+          <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
             <CheckCircle size={20} />
           </div>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
+          <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
             Aprobaciones
           </h2>
         </div>
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--red-500)' }}>
-          <AlertCircle size={32} style={{ margin: '0 auto 0.5rem' }} />
-          <p style={{ fontSize: '0.875rem' }}>{error}</p>
+        <div className="text-center p-8 text-[var(--red-500)]">
+          <AlertCircle size={32} />
+          <p className="text-[0.875rem]">{error}</p>
         </div>
       </div>
     )
@@ -193,81 +150,45 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
   return (
     <div className="activity-card">
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '2px solid var(--primary-100)'
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '10px',
-          background: 'var(--blue-100)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--blue-600)'
-        }}>
+      <div className="flex items-center gap-3 mb-6 pb-4">
+        <div className="w-10 h-10 rounded-2.5 bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)]">
           <CheckCircle size={20} />
         </div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
+        <div className="flex-[1]">
+          <h2 className="text-[1.125rem] font-bold text-[var(--primary-800)] m-0">
             Aprobaciones
           </h2>
-          <p style={{ fontSize: '0.75rem', color: 'var(--primary-500)', margin: 0 }}>
+          <p className="text-3 text-[var(--primary-500)] m-0">
             {aprobadas} de {aprobaciones.length} aprobadas
           </p>
         </div>
       </div>
 
       {/* Summary Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '0.75rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div style={{
-          padding: '0.75rem',
-          borderRadius: '8px',
-          background: 'var(--amber-50)',
-          border: '1px solid var(--amber-500)40'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--amber-600)', marginBottom: '0.25rem' }}>
+      <div className="grid grid-cols-[repeat(3,_1fr)] gap-3 mb-6">
+        <div className="p-3 rounded-2 bg-[var(--amber-50)] border">
+          <div className="text-3 text-[var(--amber-600)] mb-1">
             Pendientes
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--amber-600)' }}>
+          <div className="text-6 font-bold text-[var(--amber-600)]">
             {pendientes}
           </div>
         </div>
 
-        <div style={{
-          padding: '0.75rem',
-          borderRadius: '8px',
-          background: 'var(--emerald-50)',
-          border: '1px solid var(--emerald-500)40'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--emerald-600)', marginBottom: '0.25rem' }}>
+        <div className="p-3 rounded-2 bg-[var(--emerald-50)] border">
+          <div className="text-3 text-[var(--emerald-600)] mb-1">
             Aprobadas
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--emerald-600)' }}>
+          <div className="text-6 font-bold text-[var(--emerald-600)]">
             {aprobadas}
           </div>
         </div>
 
-        <div style={{
-          padding: '0.75rem',
-          borderRadius: '8px',
-          background: 'var(--red-500)10',
-          border: '1px solid var(--red-500)40'
-        }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--red-500)', marginBottom: '0.25rem' }}>
+        <div className="p-3 rounded-2 bg-[var(--red-500)10] border">
+          <div className="text-3 text-[var(--red-500)] mb-1">
             Rechazadas
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--red-500)' }}>
+          <div className="text-6 font-bold text-[var(--red-500)]">
             {rechazadas}
           </div>
         </div>
@@ -275,78 +196,37 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
 
       {/* Progress Bar */}
       {aprobaciones.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '0.5rem'
-          }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--primary-600)' }}>
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-3 font-semibold text-[var(--primary-600)]">
               Progreso de Aprobación
             </span>
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--emerald-600)' }}>
+            <span className="text-3 font-bold text-[var(--emerald-600)]">
               {((aprobadas / aprobaciones.length) * 100).toFixed(0)}%
             </span>
           </div>
-          <div style={{
-            width: '100%',
-            height: '8px',
-            background: 'var(--primary-100)',
-            borderRadius: '9999px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${(aprobadas / aprobaciones.length) * 100}%`,
-              height: '100%',
-              background: rechazadas > 0
-                ? 'linear-gradient(90deg, var(--red-500), var(--red-600))'
-                : 'linear-gradient(90deg, var(--emerald-500), var(--emerald-600))',
-              transition: 'width 0.3s ease'
-            }} />
+          <div className="w-[100%] h-2 bg-[var(--primary-100)] rounded-full overflow-hidden">
+            <div className="h-[100%] transition" />
           </div>
         </div>
       )}
 
       {/* Approvals List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="flex flex-col gap-3">
         {aprobaciones.map((aprobacion) => (
           <div
-            key={aprobacion.id}
-            style={{
-              padding: '1rem',
-              borderRadius: '8px',
-              background: 'var(--primary-50)',
-              border: '1px solid var(--primary-200)',
-              transition: 'all 0.2s ease'
-            }}
+            key={aprobacion.id} className="p-4 rounded-2 bg-[var(--primary-50)] border transition"
           >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              marginBottom: '0.75rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--blue-100)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--blue-600)',
-                  fontSize: '0.75rem',
-                  fontWeight: '600'
-                }}>
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-2 flex-[1]">
+                <div className="w-8 h-8 rounded-full bg-[var(--blue-100)] flex items-center justify-center text-[var(--blue-600)] text-3 font-semibold">
                   <User size={16} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
+                <div className="flex-[1]">
+                  <div className="text-[0.875rem] font-semibold text-[var(--primary-800)]">
                     {aprobacion.aprobador_nombre}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                  <div className="text-3 text-[var(--primary-500)]">
                     Nivel {aprobacion.nivel}
                   </div>
                 </div>
@@ -355,45 +235,19 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
             </div>
 
             {aprobacion.fecha_aprobacion && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.375rem',
-                marginBottom: '0.5rem',
-                fontSize: '0.75rem',
-                color: 'var(--primary-600)'
-              }}>
+              <div className="flex items-center gap-1.5 mb-2 text-3 text-[var(--primary-600)]">
                 <Calendar size={12} />
                 {formatDate(aprobacion.fecha_aprobacion)}
               </div>
             )}
 
             {aprobacion.comentarios && (
-              <div style={{
-                marginTop: '0.75rem',
-                padding: '0.75rem',
-                borderRadius: '6px',
-                background: 'white',
-                border: '1px solid var(--primary-200)'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.375rem',
-                  marginBottom: '0.375rem',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  color: 'var(--primary-600)'
-                }}>
+              <div className="mt-3 p-3 rounded-[6px] bg-white border">
+                <div className="flex items-center gap-1.5 mb-1.5 text-3 font-semibold text-[var(--primary-600)]">
                   <MessageSquare size={12} />
                   Comentarios
                 </div>
-                <p style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--primary-700)',
-                  margin: 0,
-                  lineHeight: '1.5'
-                }}>
+                <p className="text-3 text-[var(--primary-700)] m-0 leading-6">
                   {aprobacion.comentarios}
                 </p>
               </div>
@@ -403,12 +257,7 @@ export default function AprobacionesPanel({ ordenId, estadoOrden }: Aprobaciones
       </div>
 
       {aprobaciones.length === 0 && (
-        <div style={{
-          textAlign: 'center',
-          padding: '2rem',
-          color: 'var(--primary-400)',
-          fontSize: '0.875rem'
-        }}>
+        <div className="text-center p-8 text-[var(--primary-400)] text-[0.875rem]">
           No hay registros de aprobación para esta orden
         </div>
       )}

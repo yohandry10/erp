@@ -58,36 +58,68 @@ Estandarizar la salida a producción con validación técnica, trazabilidad y pl
 
 Esta lista no reemplaza políticas corporativas; complementa controles de CI, operaciones y seguridad.
 
-## Estado de cierre del plan técnico (resumen ejecutivo)
+## Estado vigente 2026-05-16
 
-- [x] P1.1 Config/env formal
-- [x] P1.2 Auth global + `@Public`
-- [x] P1.3 Matriz de permisos por módulo
-- [x] P1.4 Eliminar tokens en `localStorage`
-- [x] P1.5 Docker Node 20 consistente
-- [x] P1.6 Frontend sin bypass de build
-- [x] P2.1 CI real
-- [x] P2.2 Tests multi-tenant
-- [x] P2.3 Tests de permisos
-- [x] P2.4 Rate limiting global
-- [x] P2.5 Auditoría de service role
-- [x] P2.6 Branch protection checklist
-- [x] P2.7 Health/observabilidad
-- [x] P2.8 Limpieza de logs sensibles
-- [x] P2.9 Release/checklist final y hardening operativo local
+El entorno local/sandbox quedo validado funcionalmente. El documento fuente vigente es:
 
-### Riesgos abiertos (pendientes de cierre operativo)
-- CI local ya ejecutada: `lint`, `type-check`, `test`, `build`, `audit --audit-level=low`; falta confirmar el mismo set en branch de integración remoto.
-- Consolidar una corrida de e2e integrada (`apps/erp-api` + `apps/web`) para validar auth/session/rate-limit/health de extremo a extremo.
-- Completar revisión de logs sensibles en módulos legacy/módulos no tocados directamente en P2.8.
-- Ejecutar validacion DB runtime `000..301` cuando Docker Desktop/Supabase CLI esten disponibles.
+- `docs/production-readiness/ERP_PRODUCTION_READINESS.md`
 
-### Comandos mínimos de validación para cierre de operación
-- `pnpm --filter @erp-suite/erp-api test`
-- `pnpm --filter @erp-suite/erp-api type-check`
-- `pnpm --filter @erp-suite/erp-api build`
-- `pnpm --filter @erp-suite/web lint`
-- `pnpm --filter @erp-suite/web type-check`
-- `pnpm --filter @erp-suite/web build`
-- `pnpm audit --audit-level=low`
-- `docker compose --env-file .env.example config --quiet`
+Resumen:
+
+- API local productiva `http://localhost:3002`: type-check/build/API tests OK.
+- Web local productiva `http://localhost:3003`: type-check/build OK.
+- E2E por verticales criticos OK.
+- Smoke global UI por tramos OK, `146/146`.
+- RBAC operativo por roles diarios OK con usuarios reales y `403` reales.
+- Gate superadmin/tenants/RBAC/RLS OK: tenants nuevos nacen con 10 roles, 195 permisos, admin inicial logueable, usuario operativo validado y aislamiento A/B por API.
+- Micro-gate final post-Gate21 OK:
+  - wrapper `public.seed_operational_rbac_for_tenant` no ejecutable por `anon`/`authenticated`.
+  - seed RBAC idempotente.
+  - tenant C fresco operable.
+  - paquete E2E critico `7/7`.
+  - `outbox_events` sin `dead_letter`, `failed`, `pending` ni `processing`.
+  - Redis real responde `PONG`.
+- Checks administrativos finales OK:
+  - `git diff --check`.
+  - migraciones `312..326` sin prefijos duplicados.
+  - `.env.local` ignorado por Git.
+- Migraciones remotas pendientes aplicadas manualmente con `psql` el 2026-05-16.
+- Pendientes reales antes de produccion: certificado SUNAT/OSE productivo, secretos productivos y email real si aplica.
+
+### Riesgos abiertos reales
+
+- Confirmar que el entorno productivo objetivo contiene las migraciones aplicadas manualmente el 2026-05-16.
+- Confirmar que el entorno productivo contiene `322..326` para onboarding multi-tenant, seed RBAC operativo, hardening del wrapper RPC y reconciliacion outbox.
+- Cargar certificado digital SUNAT/OSE productivo.
+- Cargar secretos productivos finales.
+- Configurar proveedor real de email si se usara correo en produccion.
+- Ejecutar smoke final contra credenciales productivas reales.
+- Confirmar CI verde en branch de integracion remoto; las validaciones locales ya estan documentadas.
+
+### Infraestructura Docker/observabilidad 2026-05-16
+
+- Compose local canonico validado con Web `13001`, API `13002`, Worker `3050`, Redis `6381`, Prometheus `9091`, Grafana `3300`.
+- `docker compose --env-file .env -f docker-compose.yml up --build -d redis erp-api worker web redis-exporter node-exporter prometheus grafana`: OK.
+- API/Web/Worker Docker build: OK.
+- API, Web, Worker y Redis: `healthy`.
+- Prometheus targets `erp-api`, `erp-worker`, `redis`, `node`, `prometheus`: `UP`.
+- Grafana datasource/dashboard `ERP Infra Readiness`: API `200`.
+- Grafana datasource query `up{job=~"erp-api|erp-worker|redis|node|prometheus"}`: todos `1`.
+- `.dockerignore` endurecido; contexto Web medido en `10.82 MB`.
+- Workflow `.github/workflows/infra.yml` agregado para Compose, Prometheus, dashboards JSON y build de imagenes.
+- Riesgo menor documentado: Grafana `12.1.1` registra internamente plugin `table` duplicado al arrancar; no bloquea dashboards ni datasource.
+- GPT Pro acepto `Infra Gate 22` como infraestructura local/sandbox lista.
+- Pendiente no bloqueante: primera ejecucion remota de GitHub Actions o `workflow_dispatch` para confirmar runner real.
+
+### Comandos mínimos para repetir antes de release real
+
+- `pnpm --filter @erp-suite/erp-api run type-check`
+- `pnpm --filter @erp-suite/web run type-check`
+- `pnpm --filter @erp-suite/erp-api run build`
+- `pnpm --filter @erp-suite/web run build`
+- `pnpm --filter @erp-suite/erp-api run test -- --runInBand`
+- `pnpm --filter @erp-suite/web exec playwright test tests/e2e/roles-operativos.spec.ts --project=chromium --workers=1`
+- `PLAYWRIGHT_SKIP_WEBSERVER=1 BASE_URL=http://localhost:3003 E2E_API_ORIGIN=http://localhost:3002 pnpm --dir apps/web exec playwright test tests/e2e/superadmin-tenant-rbac-rls.spec.ts --project=chromium --workers=1`
+- `PLAYWRIGHT_SKIP_WEBSERVER=1 BASE_URL=http://localhost:3003 E2E_API_ORIGIN=http://localhost:3002 pnpm --dir apps/web exec playwright test tests/e2e/superadmin-tenant-rbac-rls.spec.ts tests/e2e/roles-operativos.spec.ts tests/e2e/usuarios-permisos-auditoria-config.spec.ts tests/e2e/auth-session-country-wizard.spec.ts --workers=1`
+- Ejecutar el manifest E2E critico documentado en `ERP_PRODUCTION_READINESS.md`.
+- Ejecutar smoke global UI por tramos para evitar timeouts falsamente verdes.

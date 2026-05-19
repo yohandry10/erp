@@ -165,6 +165,12 @@ export class PosService {
     ].filter(Boolean).join(':');
   }
 
+  private deferPosSideEffect(label: string, operation: () => Promise<unknown>): void {
+    void operation().catch((error) => {
+      this.logger.warn(`⚠️ [POS] Side effect diferido falló (${label}):`, error);
+    });
+  }
+
   private parseCorrelativo(value: any): number {
     const raw = String(value ?? '').trim();
     const numeric = raw.includes('-') ? raw.split('-').pop() : raw;
@@ -750,6 +756,7 @@ export class PosService {
 
   private async procesarVentaInternal(ventaData: any, user: any) {
     const productLocks: string[] = [];
+    let ventaLockAcquired = false;
     const items = Array.isArray(ventaData?.items) ? ventaData.items : [];
     try {
       this.logger.log(
@@ -774,54 +781,26 @@ export class PosService {
       // Lock por tenant + idempotency y, si existe, sesión de caja para evitar colisiones concurrentes
       const lockKey = this.buildVentaLockKey(ventaData, user);
 
-      // Acquire advisory lock principal (tenant + sesion + idempotency)
-      await this.supabase.getClient().rpc('acquire_pos_lock', {
-        p_tenant_id: user.tenant_id,
-        p_lock_key: lockKey,
-      });
+      const acquireLegacyLocks = async () => {
+        if (ventaLockAcquired) return;
 
-      // Acquire per-product locks (ordenados para evitar deadlocks)
-      const productIds = Array.from(new Set(items.map((i: any) => i.producto_id).filter(Boolean))).sort();
-      for (const pid of productIds) {
-        const key = `product:${pid}`;
         await this.supabase.getClient().rpc('acquire_pos_lock', {
           p_tenant_id: user.tenant_id,
-          p_lock_key: key,
+          p_lock_key: lockKey,
         });
-        productLocks.push(key);
-      }
 
-      // Idempotencia: si ya existe evento/venta, retornar
-      if (ventaData.idempotency_key) {
-        const { data: existingEvent } = await this.supabase.getClient()
-          .from('outbox_events')
-          .select('aggregate_id')
-          .eq('idempotency_key', ventaIdempotencyKey)
-          .eq('aggregate_type', 'venta_pos')
-          .maybeSingle();
-
-        if (existingEvent?.aggregate_id) {
-          const { data: ventaExistente } = await this.supabase.getClient()
-            .from('ventas_pos')
-            .select('id, numero_ticket, estado, total, subtotal, impuestos')
-            .eq('id', existingEvent.aggregate_id)
-            .maybeSingle();
-
-            if (ventaExistente) {
-            this.logger.log(`♻️ [POS] Venta ya procesada por idempotency_key ${ventaIdempotencyKey}`);
-              return {
-                success: true,
-                venta_id: ventaExistente.id,
-                numero_ticket: ventaExistente.numero_ticket,
-              estado: ventaExistente.estado,
-              total: ventaExistente.total,
-              subtotal: ventaExistente.subtotal,
-              impuestos: ventaExistente.impuestos,
-              message: 'Venta ya procesada (idempotente)',
-            };
-          }
+        const productIds = Array.from(new Set(items.map((i: any) => i.producto_id).filter(Boolean))).sort();
+        for (const pid of productIds) {
+          const key = `product:${pid}`;
+          await this.supabase.getClient().rpc('acquire_pos_lock', {
+            p_tenant_id: user.tenant_id,
+            p_lock_key: key,
+          });
+          productLocks.push(key);
         }
-      }
+
+        ventaLockAcquired = true;
+      };
 
       // Validaciones mínimas de entrada antes de tocar la BD
       if (!items.length) {
@@ -847,7 +826,7 @@ export class PosService {
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('ruc, razon_social')
+        .select('ruc, razon_social, moneda_defecto, igv_porcentaje')
         .eq('tenant_id', user.tenant_id)
         .single();
       if (empresaCfgErr) {
@@ -867,7 +846,10 @@ export class PosService {
       }
 
       // Recalcular totales server-side para evitar manipulación de cliente
-      const tasaIgv = await this.taxCalculator.getTasaIgv(user.tenant_id);
+      const tasaIgvEmpresa = Number(empresaCfg?.igv_porcentaje);
+      const tasaIgv = Number.isFinite(tasaIgvEmpresa) && tasaIgvEmpresa >= 0
+        ? tasaIgvEmpresa / 100
+        : await this.taxCalculator.getTasaIgv(user.tenant_id);
       const recomputed = items.map((item: any) => {
         const cantidad = Number(item.cantidad ?? 0);
         const precioBase = Number(item.precio_unitario ?? item.precio_original ?? 0);
@@ -971,73 +953,29 @@ export class PosService {
         numero: numeroComprobante,
       };
 
-      // 1. Validate certificate
-      const certificateValidation = await this.validationService.validateCertificate(user.tenant_id);
-      if (!certificateValidation.isValid) {
-        this.logger.error(`Certificate validation failed: ${certificateValidation.errors.join(', ')}`);
+      if (tipoDocumento === '01' && !/^\d{11}$/.test(String(ventaData.cliente_documento || '').trim())) {
         return {
           success: false,
-          message: 'No se puede completar la venta: Certificado digital inválido',
+          message: 'Factura requiere RUC válido de 11 dígitos',
           error: {
             tipo: 'VALIDATION_ERROR',
-            codigo: 'CERT_VALIDATION_FAILED',
-            mensaje: certificateValidation.errors.join('. '),
-            errores: certificateValidation.errors,
-          }
+            codigo: 'FACTURA_REQUIERE_RUC',
+            mensaje: 'Proporcione un RUC válido (11 dígitos) para emitir factura',
+          },
         };
       }
 
-      // Log certificate warnings (expiring soon)
-      if (certificateValidation.warnings.length > 0) {
-        this.logger.warn(`Certificate warnings: ${certificateValidation.warnings.join(', ')}`);
-      }
-
-      // 2. Validate RUC configuration
-      const rucValidation = await this.validationService.validateRucConfiguration(user.tenant_id);
-      if (!rucValidation.isValid) {
-        this.logger.error(`RUC validation failed: ${rucValidation.errors.join(', ')}`);
+      const totalItemsDocumento = recomputed.reduce((sum, item) => sum + Number(item.cantidad ?? 0), 0);
+      if (totalItemsDocumento > 999) {
         return {
           success: false,
-          message: 'No se puede completar la venta: Configuración de RUC incompleta',
+          message: 'No se puede completar la venta: el comprobante supera 999 items',
           error: {
             tipo: 'VALIDATION_ERROR',
-            codigo: 'RUC_VALIDATION_FAILED',
-            mensaje: rucValidation.errors.join('. '),
-            errores: rucValidation.errors,
-            camposFaltantes: rucValidation.missingFields,
+            codigo: 'DOCUMENT_ITEM_LIMIT',
+            mensaje: 'SUNAT permite como máximo 999 items por comprobante',
           }
         };
-      }
-
-      // 3. Validate sale document (items count, amounts, etc.) - multi-country
-      const documentValidation = await this.validationService.validateDocumentBeforeEmission(
-        {
-          items: recomputed,
-          total: totalCalculado,
-          serie: ventaData.comprobante?.serie,
-          correlativo: ventaData.comprobante?.correlativo?.toString(),
-          tipoDocumento: ventaData.comprobante?.tipo,
-        },
-        user.tenant_id // 🌍 Pasar tenantId para validaciones por país
-      );
-
-      if (!documentValidation.isValid) {
-        this.logger.error(`Document validation failed: ${documentValidation.errors.length} errors`);
-        return {
-          success: false,
-          message: 'No se puede completar la venta: El documento no cumple con las validaciones SUNAT',
-          error: {
-            tipo: 'VALIDATION_ERROR',
-            codigo: 'DOCUMENT_VALIDATION_FAILED',
-            mensaje: documentValidation.errors.map(e => e.message).join('. '),
-            errores: documentValidation.errors,
-          }
-        };
-      }
-
-      // Log document warnings
-      if (documentValidation.warnings.length > 0) {
-        this.logger.warn(`Document warnings: ${documentValidation.warnings.map(w => w.message).join(', ')}`);
       }
 
       const productosMap = await this.validarProductosVentaPOS(
@@ -1049,9 +987,13 @@ export class PosService {
       this.logger.log('✅ All pre-sale validations passed');
       // ===== END PRE-SALE VALIDATIONS =====
 
-      // Sesión de caja actual (si existe)
-    const sesionActual = await this.getSesionCajaActual(user);
-      let sesionCajaId = sesionActual?.success ? sesionActual.data?.id ?? null : null;
+      // Sesión de caja actual. La UI POS envía sesion_caja_id; evitar una consulta extra
+      // mantiene el flujo rápido y la RPC full_tx valida que siga abierta dentro de la transacción.
+      let sesionCajaId = ventaData.sesion_caja_id ? String(ventaData.sesion_caja_id) : null;
+      if (!sesionCajaId) {
+        const sesionActual = await this.getSesionCajaActual(user);
+        sesionCajaId = sesionActual?.success ? sesionActual.data?.id ?? null : null;
+      }
 
       // Permitir que el frontend envíe la sesión explícita (por ejemplo, recién abierta) y validarla
       if (!sesionCajaId && ventaData.sesion_caja_id) {
@@ -1085,14 +1027,16 @@ export class PosService {
         };
       }
 
-      const cajaIdActual = await this.resolveCajaIdForSesion(user.tenant_id, sesionCajaId);
-      await this.syncPosNumeracionConDocumentos(
-        user.tenant_id,
-        ventaData.comprobante?.serie || 'B001',
-        cajaIdActual,
-      );
+      this.deferPosSideEffect('sync-pos-numeracion', async () => {
+        const cajaIdActual = await this.resolveCajaIdForSesion(user.tenant_id, sesionCajaId);
+        await this.syncPosNumeracionConDocumentos(
+          user.tenant_id,
+          ventaData.comprobante?.serie || 'B001',
+          cajaIdActual,
+        );
+      });
 
-      await this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
+      this.deferPosSideEffect('audit-inicio-venta', () => this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
         tipo_evento: TipoEventoPOS.INICIO_VENTA,
         datos: {
           idempotency_key: ventaIdempotencyKey,
@@ -1101,7 +1045,7 @@ export class PosService {
           metodo_pago: ventaData.metodo_pago_id,
           pagos: pagosNormalizados || null,
         },
-      });
+      }));
 
       // RPC transaccional: venta + detalles + stock + caja + outbox
       const maxDescuentoPct = (() => {
@@ -1156,15 +1100,30 @@ export class PosService {
       let legacyRpc = false;
 
       ({ data: txData, error: txError } = await this.supabase.getClient()
-        .rpc('pos_registrar_venta_tx', rpcPayload));
+        .rpc('pos_registrar_venta_full_tx', rpcPayload));
+
+      let fullTransactionRpc = !txError;
 
       if (
+        txError?.code === 'PGRST202' &&
+        String(txError?.details || txError?.message || '').includes('pos_registrar_venta_full_tx')
+      ) {
+        this.logger.warn('⚠️ RPC POS full_tx no disponible. Usando contrato transaccional anterior.');
+        fullTransactionRpc = false;
+        await acquireLegacyLocks();
+        ({ data: txData, error: txError } = await this.supabase.getClient()
+          .rpc('pos_registrar_venta_tx', rpcPayload));
+      }
+
+      if (
+        !fullTransactionRpc &&
         txError?.code === 'PGRST202' &&
         ['p_idempotency_key', 'p_pagos'].some((p) =>
           String(txError?.details || txError?.message || '').includes(p),
         )
       ) {
         this.logger.warn('⚠️ RPC POS legacy detectado (firma antigua). Reintentando con payload reducido.');
+        await acquireLegacyLocks();
         const legacyPayload = { ...rpcPayload };
         delete legacyPayload.p_idempotency_key;
         delete legacyPayload.p_pagos;
@@ -1188,8 +1147,9 @@ export class PosService {
         estado: 'PAGADA',
         tenant_id: user.tenant_id,
       };
+      const impactosAplicadosPorRpc = Boolean(ventaTx.impactos_aplicados);
 
-      await this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
+      this.deferPosSideEffect('audit-venta-completada', () => this.posAuditService.registrarEvento(user.tenant_id, sesionCajaId, user.id, {
         tipo_evento: TipoEventoPOS.VENTA_COMPLETADA,
         venta_id: String(ventaResult.id),
         datos: {
@@ -1199,7 +1159,7 @@ export class PosService {
           total: ventaResult.total,
           idempotency_key: ventaIdempotencyKey,
         },
-      });
+      }));
 
       if (legacyRpc && ventaIdempotencyKey) {
         try {
@@ -1217,28 +1177,33 @@ export class PosService {
 
       this.logger.log('✅ Venta procesada exitosamente:', ventaResult.id);
 
-      try {
-        await this.persistirImpactosVentaPOS({
-          ventaId: ventaResult.id,
-          tenantId: user.tenant_id,
-          userId: user.id,
-          items: recomputed,
-          productos: productosMap,
-          pagos: pagosNormalizados,
-          ventaData: {
-            ...ventaData,
-            total: totalCalculado,
-            numero_ticket: ventaResult.numero_ticket,
-          },
-        });
-      } catch (impactoError) {
-        this.logger.error('❌ Error persistiendo impactos POS; revirtiendo venta:', impactoError);
-        await this.rollbackVenta(ventaResult.id, user.tenant_id);
-        throw impactoError;
+      if (!impactosAplicadosPorRpc) {
+        try {
+          await this.persistirImpactosVentaPOS({
+            ventaId: ventaResult.id,
+            tenantId: user.tenant_id,
+            userId: user.id,
+            items: recomputed,
+            productos: productosMap,
+            pagos: pagosNormalizados,
+            ventaData: {
+              ...ventaData,
+              total: totalCalculado,
+              numero_ticket: ventaResult.numero_ticket,
+            },
+          });
+        } catch (impactoError) {
+          this.logger.error('❌ Error persistiendo impactos POS; revirtiendo venta:', impactoError);
+          await this.rollbackVenta(ventaResult.id, user.tenant_id);
+          throw impactoError;
+        }
       }
 
       // Registrar movimiento de caja (solo efectivo) para calcular saldo esperado correctamente
       try {
+        if (impactosAplicadosPorRpc) {
+          this.logger.log(`✅ Impactos POS aplicados por RPC full_tx: ${ventaResult.id}`);
+        } else {
         let montoEfectivo = 0;
         if (pagosNormalizados && pagosNormalizados.length > 0) {
           montoEfectivo = pagosNormalizados
@@ -1279,49 +1244,20 @@ export class PosService {
             });
           }
         }
+        }
       } catch (movError) {
         this.logger.warn('⚠️ No se pudo registrar movimiento de caja POS:', movError);
       }
 
-      // Emitir CPE automáticamente
+      // En POS la venta no debe esperar firma/XML/eventos fiscales. Se deja una cola durable
+      // para que el worker de facturación procese el CPE sin bloquear al cajero.
       let cpeEmitido = false;
       let cpeId = null;
-      let cpeData = null;
+      let cpeData: any = null;
+      let cpePendiente = false;
 
       try {
-        this.logger.log('📄 Emitiendo CPE para venta:', ventaResult.id);
-
-        // Obtener configuración de empresa para datos del emisor
-        const { data: empresaData, error: empresaError } = await this.supabase.getClient()
-          .from('empresa_config')
-          .select('ruc, razon_social, moneda_defecto')
-          .eq('tenant_id', user.tenant_id)
-          .single();
-
-        if (empresaError) {
-          this.logger.error('❌ Error obteniendo empresa_config:', empresaError);
-        }
-
-        if (!empresaData?.ruc || !empresaData?.razon_social) {
-          throw new Error('Configuración de empresa incompleta: falta RUC o razón social');
-        }
-
-        this.logger.log('✅ Empresa encontrada:', empresaData.razon_social);
-
-        // ✅ FIX: Obtener tasa de IGV una sola vez antes del map
-        const tasaIgv = await this.taxCalculator.getTasaIgv(user.tenant_id);
-
-        // Enriquecer datos del cliente si existe en base
-        let clienteInfo: any = null;
-        if (ventaData.cliente_id) {
-          const { data: clienteData } = await this.supabase.getClient()
-            .from('clientes')
-            .select('numero_documento, documento_numero, ruc, codigo, tipo_documento, razon_social, nombres, apellidos, direccion')
-            .eq('id', ventaData.cliente_id)
-            .eq('tenant_id', user.tenant_id)
-            .maybeSingle();
-          clienteInfo = clienteData;
-        }
+        this.logger.log('📄 Programando CPE POS para worker:', ventaResult.id);
 
         // Tomar tipo/serie/moneda/UOM reales
         const tipoComprobante = ventaData?.comprobante?.tipo || '03';
@@ -1329,28 +1265,15 @@ export class PosService {
           ventaData?.comprobante?.serie ||
           ventaResult.numero_ticket?.split('-')[0] ||
           (tipoComprobante === '01' ? 'F001' : 'B001');
-        const monedaCpe = (ventaData?.moneda || empresaData.moneda_defecto || 'PEN').toString();
+        const monedaCpe = (ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toString();
 
         // Sanitizar documento del receptor y validar contra tipo de comprobante
         const docReceptor = (
-          ventaData.cliente_documento ||
-          clienteInfo?.numero_documento ||
-          clienteInfo?.documento_numero ||
-          clienteInfo?.ruc ||
-          clienteInfo?.codigo ||
-          ''
+          ventaData.cliente_documento || ''
         ).toString().trim();
-        const tipoDocReceptor = this.inferirTipoDocumento(docReceptor, ventaData.cliente_tipo_documento || clienteInfo?.tipo_documento);
+        const tipoDocReceptor = this.inferirTipoDocumento(docReceptor, ventaData.cliente_tipo_documento);
         if (tipoComprobante === '01' && tipoDocReceptor !== '6') {
-          return {
-            success: false,
-            message: 'Factura requiere RUC válido de 11 dígitos',
-            error: {
-              tipo: 'VALIDATION_ERROR',
-              codigo: 'FACTURA_REQUIERE_RUC',
-              mensaje: 'Proporcione un RUC válido (11 dígitos) para emitir factura',
-            },
-          };
+          throw new Error('Factura requiere RUC válido de 11 dígitos');
         }
 
         // Numero CPE seguro
@@ -1366,21 +1289,20 @@ export class PosService {
           numero: numeroCpe,
           // Dedupe de reintentos POS→CPE (mismo idempotency_key de venta, namespaced)
           idempotency_key: `pos.cpe:${user.tenant_id}:${ventaIdempotencyKey}`,
-          ruc_emisor: empresaData.ruc,
-          razon_social_emisor: empresaData.razon_social,
+          ruc_emisor: empresaCfg.ruc,
+          razon_social_emisor: empresaCfg.razon_social,
           tipo_documento_receptor: tipoDocReceptor,
           documento_receptor: docReceptor,
           razon_social_receptor:
             ventaData.cliente_nombre ||
-            clienteInfo?.razon_social ||
-            `${(clienteInfo?.nombres || '').trim()} ${(clienteInfo?.apellidos || '').trim()}`.trim() ||
             'Cliente',
-          direccion_receptor: ventaData.cliente_direccion || clienteInfo?.direccion || '',
+          direccion_receptor: ventaData.cliente_direccion || '',
           moneda: monedaCpe,
           total_gravadas: parseFloat(subtotalCalculado.toFixed(2)),
           total_igv: parseFloat(impuestosCalculados.toFixed(2)),
           total_venta: parseFloat(totalCalculado.toFixed(2)),
           items: (recomputed || []).map((item: any) => {
+            const producto = productosMap.get(item.producto_id) || {};
             const cantidad = parseFloat(item.cantidad) || 1;
             const baseUnit = parseFloat(item.precio_unitario) || 0; // asumido sin IGV
             const baseItem = parseFloat(item.subtotal) || 0; // base total
@@ -1391,11 +1313,13 @@ export class PosService {
               item.unidad_medida_sunat ||
               item.producto?.unidad_medida ||
               item.unidad_medida ||
+              producto.unidad_medida_sunat ||
+              producto.unidad_medida ||
               (item.producto?.es_servicio ? 'ZZ' : 'NIU');
             return {
               cantidad,
-              codigo_producto: item.producto?.codigo || item.codigo || item.sku || 'PROD',
-              descripcion: item.producto?.nombre || item.nombre || item.descripcion || 'Producto',
+              codigo_producto: item.producto?.codigo || item.codigo || item.sku || producto.codigo || 'PROD',
+              descripcion: item.producto?.nombre || item.nombre || item.descripcion || producto.nombre || 'Producto',
               unidad_medida: uom,
               precio_unitario: parseFloat((baseUnit * (1 + tasaIgv)).toFixed(6)), // con IGV
               valor_unitario: parseFloat(baseUnit.toFixed(6)), // sin IGV
@@ -1409,32 +1333,28 @@ export class PosService {
         };
 
         this.logger.log(
-          `Datos CPE POS preparados tenant=${user.tenant_id} tipo=${cpeData.tipo_documento} serie=${cpeData.serie} total=${cpeData.total}`
+          `Datos CPE POS en cola tenant=${user.tenant_id} tipo=${cpeData.tipo_documento} serie=${cpeData.serie} total=${cpeData.total_venta}`
         );
 
-        // Retry/backoff simple para CPE
-        let ultimoError: any = null;
-        for (let intento = 1; intento <= 3; intento++) {
-          try {
-            const cpe = await this.cpeService.create(cpeData, user.tenant_id);
-            cpeEmitido = true;
-            cpeId = cpe.id;
-            this.logger.log(`✅ CPE emitido exitosamente en intento ${intento}:`, cpe.id);
-            break;
-          } catch (err) {
-            ultimoError = err;
-            this.logger.warn(`⚠️ Error emitiendo CPE (intento ${intento}/3): ${err?.message || err}`);
-            if (intento < 3) {
-              const delay = 500 * Math.pow(2, intento - 1); // backoff exponencial simple
-              await new Promise(res => setTimeout(res, delay));
-            }
-          }
+        const { error: cpeQueueError } = await this.supabase.getClient()
+          .from('ventas_pos')
+          .update({
+            cpe_id: null,
+            cpe_pendiente: true,
+            intentos_facturacion: 0,
+            error_facturacion: null,
+            cpe_data: cpeData,
+            ultimo_intento_facturacion: new Date().toISOString(),
+          })
+          .eq('id', ventaResult.id)
+          .eq('tenant_id', user.tenant_id);
+
+        if (cpeQueueError) {
+          throw cpeQueueError;
         }
-        if (!cpeEmitido && ultimoError) {
-          throw ultimoError;
-        }
+        cpePendiente = true;
       } catch (cpeError) {
-        this.logger.error('❌ Error completo emitiendo CPE:', cpeError);
+        this.logger.error('❌ Error programando CPE POS:', cpeError);
         this.logger.error('❌ Stack trace:', cpeError.stack);
 
         // 🔴 TAREA 12: Registrar venta como pendiente de facturación para reintentos
@@ -1587,7 +1507,7 @@ export class PosService {
       }
 
       if (this.eventBus) {
-        await this.eventBus.emitVentaProcessed({
+        this.deferPosSideEffect('event-bus-venta-procesada', () => this.eventBus.emitVentaProcessed({
           eventId: uuidv4(),
           tenantId: user.tenant_id,
           idempotencyKey: `pos.venta:${user.tenant_id}:${ventaIdempotencyKey}`,
@@ -1608,7 +1528,7 @@ export class PosService {
           })),
           cpeId: cpeId || undefined,
           inventarioAplicado: true,
-        });
+        }));
       }
 
       return {
@@ -1616,13 +1536,23 @@ export class PosService {
         venta_id: ventaResult.id,
         numero_ticket: ventaResult.numero_ticket,
         estado: ventaResult.estado,
+        subtotal: subtotalCalculado,
+        impuestos: impuestosCalculados,
+        total: totalCalculado,
         factura_electronica: cpeEmitido,
         cpe_id: cpeId,
+        cpe_pendiente: cpePendiente,
+        facturacion_pendiente: cpePendiente,
         cuenta_por_cobrar_id: cuentaPorCobrarId,
         items_actualizados: recomputed.map((item: any) => {
           const producto = productosMap.get(item.producto_id);
-          const stockActual = producto ? Number(producto.stock_actual ?? producto.stock ?? 0) : null;
+          const stockActualOriginal = producto ? Number(producto.stock_actual ?? producto.stock ?? 0) : null;
           const stockReservado = producto ? Number(producto.stock_reservado ?? 0) : 0;
+          const stockActual = stockActualOriginal == null
+            ? null
+            : impactosAplicadosPorRpc
+              ? Math.max(stockActualOriginal - Number(item.cantidad ?? 0), 0)
+              : stockActualOriginal;
           return {
             producto_id: item.producto_id,
             stock_actual: stockActual,
@@ -1633,7 +1563,7 @@ export class PosService {
           ? esVentaCredito
             ? 'Venta procesada, CPE emitido y cuenta por cobrar creada'
             : 'Venta procesada y CPE emitido exitosamente'
-          : 'Venta procesada (CPE pendiente)'
+          : 'Venta procesada; CPE en cola de facturación'
       };
     } catch (error) {
       this.logger.error('❌ Error procesando venta:', error);
@@ -1649,20 +1579,20 @@ export class PosService {
       };
     } finally {
       try {
-        const lockKey = this.buildVentaLockKey(ventaData, user);
-        await this.supabase.getClient().rpc('release_pos_lock', {
-          p_tenant_id: user.tenant_id,
-          p_lock_key: lockKey,
-        });
-        // Liberar locks por producto (solo los adquiridos)
-        const productIds = productLocks.length
-          ? productLocks.map((key) => key.replace(/^product:/, ''))
-          : Array.from(new Set(items.map((i: any) => i.producto_id).filter(Boolean))).sort();
-        for (const pid of productIds) {
+        if (ventaLockAcquired) {
+          const lockKey = this.buildVentaLockKey(ventaData, user);
           await this.supabase.getClient().rpc('release_pos_lock', {
             p_tenant_id: user.tenant_id,
-            p_lock_key: `product:${pid}`,
+            p_lock_key: lockKey,
           });
+          // Liberar locks por producto (solo los adquiridos)
+          const productIds = productLocks.map((key) => key.replace(/^product:/, ''));
+          for (const pid of productIds) {
+            await this.supabase.getClient().rpc('release_pos_lock', {
+              p_tenant_id: user.tenant_id,
+              p_lock_key: `product:${pid}`,
+            });
+          }
         }
       } catch (unlockErr) {
         this.logger.warn('⚠️ No se pudo liberar el advisory lock POS:', unlockErr);
@@ -1979,6 +1909,41 @@ export class PosService {
     return this.runWithTenantContext(user, () => this.reintentarFacturacionVentaInternal(ventaId, user));
   }
 
+  async obtenerEstadoFacturacionVenta(ventaId: string, user: any): Promise<{
+    venta_id: string;
+    numero_ticket?: string;
+    cpe_id: string | null;
+    cpe_pendiente: boolean;
+    factura_electronica: boolean;
+    intentos_facturacion: number;
+    error_facturacion: string | null;
+    ultimo_intento_facturacion: string | null;
+  }> {
+    return this.runWithTenantContext(user, async () => {
+      const { data: venta, error } = await this.supabase.getClient()
+        .from('ventas_pos')
+        .select('id, numero_ticket, cpe_id, cpe_pendiente, intentos_facturacion, error_facturacion, ultimo_intento_facturacion')
+        .eq('id', ventaId)
+        .eq('tenant_id', user.tenant_id)
+        .single();
+
+      if (error || !venta) {
+        throw new Error('Venta no encontrada para el tenant activo');
+      }
+
+      return {
+        venta_id: venta.id,
+        numero_ticket: venta.numero_ticket,
+        cpe_id: venta.cpe_id || null,
+        cpe_pendiente: Boolean(venta.cpe_pendiente),
+        factura_electronica: Boolean(venta.cpe_id),
+        intentos_facturacion: Number(venta.intentos_facturacion || 0),
+        error_facturacion: venta.error_facturacion || null,
+        ultimo_intento_facturacion: venta.ultimo_intento_facturacion || null,
+      };
+    });
+  }
+
   private async reintentarFacturacionVentaInternal(ventaId: string, user: any): Promise<{ success: boolean; cpe_id?: string; message: string }> {
     try {
       // Obtener venta pendiente
@@ -1987,15 +1952,22 @@ export class PosService {
         .select('*')
         .eq('id', ventaId)
         .eq('tenant_id', user.tenant_id)
-        .eq('cpe_pendiente', true)
         .single();
 
       if (ventaError || !venta) {
-        throw new Error('Venta no encontrada o ya facturada');
+        throw new Error('Venta no encontrada para el tenant activo');
+      }
+
+      if (venta.cpe_id) {
+        return {
+          success: true,
+          cpe_id: venta.cpe_id,
+          message: 'La venta ya tiene CPE asociado',
+        };
       }
 
       // Verificar máximo de intentos (5 intentos)
-      if (venta.intentos_facturacion >= 5) {
+      if (Number(venta.intentos_facturacion || 0) >= 5) {
         throw new Error('Máximo de reintentos alcanzado (5 intentos). Contacte al administrador.');
       }
 
@@ -2011,12 +1983,13 @@ export class PosService {
         (cpeData as any).idempotency_key || `pos.cpe:${user.tenant_id}:${fallbackVentaKey}`;
 
       // Intentar crear CPE nuevamente
-      const cpe = await this.cpeService.create(cpeData, user.tenant_id);
+      const cpe = await this.cpeService.create(cpeData, user.tenant_id, user.id);
 
       // Actualizar venta como facturada
       await this.supabase.getClient()
         .from('ventas_pos')
         .update({
+          cpe_id: cpe.id,
           cpe_pendiente: false,
           error_facturacion: null,
           ultimo_intento_facturacion: new Date().toISOString()
@@ -2072,9 +2045,9 @@ export class PosService {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('ventas_pos')
-        .select('id, numero_venta, numero_ticket, cliente_nombre, total, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha')
+        .select('id, numero_venta, numero_ticket, cliente_nombre, total, cpe_id, cpe_pendiente, intentos_facturacion, ultimo_intento_facturacion, error_facturacion, fecha')
         .eq('tenant_id', user.tenant_id)
-        .eq('cpe_pendiente', true)
+        .or('cpe_pendiente.eq.true,cpe_id.is.null')
         .order('ultimo_intento_facturacion', { ascending: false })
         .limit(limit);
 
@@ -2118,8 +2091,8 @@ export class PosService {
       let query = this.supabase.getClient()
         .from('ventas_pos')
         .select('*')
-        .eq('cpe_pendiente', true)
-        .lt('intentos_facturacion', 5) // Solo ventas con menos de 5 intentos
+        .or('cpe_pendiente.eq.true,cpe_id.is.null')
+        .not('cpe_data', 'is', null)
         .order('ultimo_intento_facturacion', { ascending: true })
         .limit(limit);
 
@@ -2143,6 +2116,16 @@ export class PosService {
 
       for (const venta of ventasPendientes) {
         try {
+          if (venta.cpe_id) {
+            continue;
+          }
+
+          if (Number(venta.intentos_facturacion || 0) >= 5) {
+            errores++;
+            this.logger.warn(`Venta ${venta.id} alcanzó el máximo de reintentos de facturación`);
+            continue;
+          }
+
           // Reintentar facturación
           const cpeData = venta.cpe_data;
           if (!cpeData) {
@@ -2155,12 +2138,14 @@ export class PosService {
           (cpeData as any).idempotency_key =
             (cpeData as any).idempotency_key || `pos.cpe:${venta.tenant_id}:${fallbackVentaKey}`;
 
-          const cpe = await this.cpeService.create(cpeData, venta.tenant_id);
+          const cpeActorId = (venta as any).created_by || (venta as any).usuario_id || undefined;
+          const cpe = await this.cpeService.create(cpeData, venta.tenant_id, cpeActorId);
 
           // Marcar como procesada
           await this.supabase.getClient()
             .from('ventas_pos')
             .update({
+              cpe_id: cpe.id,
               cpe_pendiente: false,
               error_facturacion: null,
               ultimo_intento_facturacion: new Date().toISOString()

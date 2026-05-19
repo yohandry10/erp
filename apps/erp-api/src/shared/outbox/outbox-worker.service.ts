@@ -13,6 +13,34 @@ import { TenantContextService } from '../tenant/tenant-context.service';
 export class OutboxWorker implements OnModuleInit {
   private readonly logger = new Logger(OutboxWorker.name);
   private isProcessing = false;
+  private readonly accountingOwnedEvents = new Set([
+    'venta.procesada',
+    'VentaFacturada',
+    'pos.venta.registrada',
+    'cobro.registrado',
+    'CobroRegistrado',
+    'recepcion.registrada',
+    'RecepcionRegistrada',
+    'devolucion.proveedor.registrada',
+    'DevolucionProveedorEmitida',
+    'cxc.creada',
+    'CuentaPorCobrarCreada',
+    'pago.proveedor.registrado',
+    'PagoProveedorRegistrado',
+    'ajuste.inventario.aplicado',
+    'AjusteInventarioAplicado',
+    'planilla.liquidada',
+    'PlanillaLiquidada',
+    'depreciacion.generada',
+    'DepreciacionGenerada',
+    'cpe.anulado',
+    'CPEAnulado',
+    'producto.stock_bajo',
+    'producto.stock.bajo',
+    'ProductoStockBajo',
+    'stock.movimiento',
+    'StockMovimiento',
+  ]);
 
   constructor(
     private readonly supabase: SupabaseService,
@@ -52,8 +80,8 @@ export class OutboxWorker implements OnModuleInit {
       await this.tenantContext.run({ tenantId: null, userId: 'outbox-worker', isSuperAdmin: true }, async () => {
         this.logger.log('🔄 [OutboxWorker] Procesando eventos pendientes...');
 
-        // Evitar eventos atascados en PROCESSING por ejecuciones previas (TTL 10 min)
-        await this.resetStuckEvents(5);
+        // Evitar eventos atascados en PROCESSING por ejecuciones previas (TTL 15 min)
+        await this.resetStuckEvents(15);
 
         // Obtener eventos pendientes (máximo 100 por ejecución) usando superadmin para poder traer de todos los tenants
         const pendingEvents = await this.outboxService.getPendingEvents(100);
@@ -66,6 +94,19 @@ export class OutboxWorker implements OnModuleInit {
         this.logger.log(`📦 [OutboxWorker] Procesando ${pendingEvents.length} eventos pendientes`);
 
         for (const event of pendingEvents) {
+          if (this.accountingOwnedEvents.has(event.event_type)) {
+            // Check if the event has been pending for too long (>30 minutes)
+            const eventAge = Date.now() - new Date(event.created_at).getTime();
+            const staleThresholdMs = 30 * 60 * 1000; // 30 minutes
+            if (eventAge > staleThresholdMs) {
+              this.logger.warn(
+                `STALE_ACCOUNTING_EVENT ${event.event_type} (ID: ${event.id}) tenant=${event.tenant_id} ` +
+                `pending for ${Math.round(eventAge / 60000)}min. ContabilidadEventsListener may not be processing it.`,
+              );
+            }
+            continue;
+          }
+
           // Procesar cada evento con el tenant real para cumplir RLS
           await this.tenantContext.run(
             { tenantId: event.tenant_id, userId: 'outbox-worker', isSuperAdmin: false },
@@ -92,8 +133,8 @@ export class OutboxWorker implements OnModuleInit {
                   // Para emails, solo emitir - el EmailOutboxWorker manejará el estado
                   this.eventBus.emit(event.event_type, erpEvent.data, 'outbox-worker');
                 } else {
-                  // Para otros eventos, procesar normalmente
-                  this.eventBus.emit(event.event_type, erpEvent.data, 'outbox-worker');
+                  // Emitir y ESPERAR a que todos los listeners terminen antes de marcar completado
+                  await this.eventBus.emitAndAwait(event.event_type, erpEvent.data, 'outbox-worker');
                   await this.outboxService.markEventCompleted(event.id);
                   this.logger.log(
                     `✅ [OutboxWorker] Evento ${event.event_type} (ID: ${event.id}) procesado exitosamente`,

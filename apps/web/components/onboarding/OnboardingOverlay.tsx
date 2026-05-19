@@ -8,16 +8,7 @@ export function OnboardingOverlay({ isVisible }: OnboardingOverlayProps) {
   if (!isVisible) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9998,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        transition: 'opacity 0.3s ease',
-        opacity: isVisible ? 1 : 0,
-        pointerEvents: isVisible ? 'auto' : 'none',
-      }}
+    <div className="fixed inset-0 z-[9998] bg-[rgba(0,_0,_0,_0.5)] transition"
       aria-hidden="true"
     />
   )

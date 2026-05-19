@@ -1,24 +1,46 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
-import { 
-  DollarSign,
-  Plus,
-  Search,
-  Filter,
-  RefreshCw,
+import {
   AlertCircle,
-  CheckCircle,
-  XCircle,
-  Edit,
-  Trash2,
   AlertTriangle,
-  TrendingUp,
-  Calendar
+  Calendar,
+  CheckCircle,
+  DollarSign,
+  Edit,
+  Filter,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  XCircle,
 } from 'lucide-react'
+
 import PresupuestoEjecucionIndicator from '@/components/contabilidad/PresupuestoEjecucionIndicator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useApi } from '@/hooks/use-api'
+import { cn } from '@/lib/utils'
 
 interface Presupuesto {
   id: string
@@ -46,55 +68,97 @@ interface CentroCosto {
   nombre: string
 }
 
-interface Cuenta {
-  id: string
-  codigo: string
-  nombre: string
-}
-
 interface Periodo {
   id: string
   anio: number
   mes: number
 }
 
+const fieldClass =
+  'border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-inner shadow-cyan-950/20 placeholder:text-slate-500 focus-visible:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+
+const selectContentClass =
+  'border-cyan-400/20 bg-slate-950 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
+
+function BudgetStatusBadge({ estado }: { estado: string }) {
+  const status = {
+    ACTIVO: { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' },
+    BLOQUEADO: { icon: AlertTriangle, label: 'Bloqueado', className: 'border-amber-300/35 bg-amber-300/10 text-amber-100' },
+    CERRADO: { icon: XCircle, label: 'Cerrado', className: 'border-slate-400/30 bg-slate-400/10 text-slate-200' },
+  }[estado] ?? { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' }
+
+  const Icon = status.icon
+
+  return (
+    <Badge variant="outline" className={cn('gap-1.5 whitespace-nowrap', status.className)}>
+      <Icon className="h-3 w-3" />
+      {status.label}
+    </Badge>
+  )
+}
+
+function AlertBadge({ porcentaje }: { porcentaje: number }) {
+  if (porcentaje >= 100) {
+    return (
+      <Badge variant="outline" className="gap-1.5 border-amber-300/35 bg-amber-300/10 text-amber-100">
+        <AlertCircle className="h-3 w-3" />
+        Sobregiro
+      </Badge>
+    )
+  }
+
+  if (porcentaje >= 90) {
+    return (
+      <Badge variant="outline" className="gap-1.5 border-sky-300/35 bg-sky-300/10 text-sky-100">
+        <AlertTriangle className="h-3 w-3" />
+        Advertencia
+      </Badge>
+    )
+  }
+
+  return (
+    <Badge variant="outline" className="gap-1.5 border-cyan-300/35 bg-cyan-300/10 text-cyan-100">
+      <CheckCircle className="h-3 w-3" />
+      Normal
+    </Badge>
+  )
+}
+
 export default function PresupuestosListaPage() {
   const router = useRouter()
   const { get, del } = useApi()
-  
+
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [centrosCosto, setCentrosCosto] = useState<CentroCosto[]>([])
   const [periodos, setPeriodos] = useState<Periodo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  // Filtros
+
   const [searchTerm, setSearchTerm] = useState('')
-  const [centroCostoFilter, setCentroCostoFilter] = useState<string>('TODOS')
-  const [periodoFilter, setPeriodoFilter] = useState<string>('TODOS')
-  const [estadoFilter, setEstadoFilter] = useState<string>('TODOS')
-  const [alertaFilter, setAlertaFilter] = useState<string>('TODOS')
+  const [centroCostoFilter, setCentroCostoFilter] = useState('TODOS')
+  const [periodoFilter, setPeriodoFilter] = useState('TODOS')
+  const [estadoFilter, setEstadoFilter] = useState('TODOS')
+  const [alertaFilter, setAlertaFilter] = useState('TODOS')
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      
-      // Cargar presupuestos, centros de costo y períodos en paralelo
+
       const [presupuestosRes, centrosRes, periodosRes] = await Promise.all([
         get('/api/contabilidad/presupuestos'),
         get('/api/contabilidad/centros-costo'),
-        get('/api/contabilidad/periodos')
+        get('/api/contabilidad/periodos'),
       ])
-      
+
       if (presupuestosRes?.success && presupuestosRes.data) {
         setPresupuestos(presupuestosRes.data)
       }
-      
+
       if (centrosRes?.success && centrosRes.data) {
         setCentrosCosto(centrosRes.data)
       }
-      
+
       if (periodosRes?.success && periodosRes.data) {
         setPeriodos(periodosRes.data)
       }
@@ -112,12 +176,12 @@ export default function PresupuestosListaPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Está seguro de eliminar este presupuesto?')) return
-    
+
     try {
       const response = await del(`/api/contabilidad/presupuestos/${id}`)
-      
+
       if (response?.success) {
-        setPresupuestos(prev => prev.filter(p => p.id !== id))
+        setPresupuestos((prev) => prev.filter((p) => p.id !== id))
       }
     } catch (err: any) {
       console.error('Error deleting presupuesto:', err)
@@ -125,12 +189,11 @@ export default function PresupuestosListaPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: 'PEN',
     }).format(amount)
-  }
 
   const formatPeriodo = (periodo?: { anio: number; mes: number }) => {
     if (!periodo) return '-'
@@ -138,122 +201,23 @@ export default function PresupuestosListaPage() {
     return `${meses[periodo.mes - 1]} ${periodo.anio}`
   }
 
-  const getEstadoBadge = (estado: string) => {
-    const configs = {
-      ACTIVO: { color: '#10b981', icon: CheckCircle, label: 'Activo' },
-      BLOQUEADO: { color: '#f59e0b', icon: AlertTriangle, label: 'Bloqueado' },
-      CERRADO: { color: '#ef4444', icon: XCircle, label: 'Cerrado' }
-    }
-    
-    const config = configs[estado as keyof typeof configs] || configs.ACTIVO
-    const Icon = config.icon
-    
-    return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: config.color,
-        color: 'white'
-      }}>
-        <Icon size={12} />
-        {config.label}
-      </span>
-    )
-  }
-
-  const getAlertaBadge = (porcentaje: number) => {
-    if (porcentaje >= 100) {
-      return (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          padding: '0.375rem 0.75rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: '600',
-          background: '#ef4444',
-          color: 'white'
-        }}>
-          <AlertCircle size={12} />
-          Sobregiro
-        </span>
-      )
-    }
-    
-    if (porcentaje >= 90) {
-      return (
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.375rem',
-          padding: '0.375rem 0.75rem',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: '600',
-          background: '#f59e0b',
-          color: 'white'
-        }}>
-          <AlertTriangle size={12} />
-          Advertencia
-        </span>
-      )
-    }
-    
-    return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        padding: '0.375rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        background: '#10b981',
-        color: 'white'
-      }}>
-        <CheckCircle size={12} />
-        Normal
-      </span>
-    )
-  }
-
-  // Filtrar presupuestos
-  const filteredPresupuestos = presupuestos.filter(presupuesto => {
-    // Filtro de búsqueda
+  const filteredPresupuestos = presupuestos.filter((presupuesto) => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
-      const matchesSearch = 
+      const matchesSearch =
         presupuesto.centro_costo?.nombre.toLowerCase().includes(search) ||
         presupuesto.centro_costo?.codigo.toLowerCase().includes(search) ||
         presupuesto.cuenta?.nombre.toLowerCase().includes(search) ||
         presupuesto.cuenta?.codigo.toLowerCase().includes(search) ||
         (presupuesto.notas && presupuesto.notas.toLowerCase().includes(search))
-      
+
       if (!matchesSearch) return false
     }
 
-    // Filtro de centro de costo
-    if (centroCostoFilter !== 'TODOS' && presupuesto.centro_costo_id !== centroCostoFilter) {
-      return false
-    }
+    if (centroCostoFilter !== 'TODOS' && presupuesto.centro_costo_id !== centroCostoFilter) return false
+    if (periodoFilter !== 'TODOS' && presupuesto.periodo_contable_id !== periodoFilter) return false
+    if (estadoFilter !== 'TODOS' && presupuesto.estado !== estadoFilter) return false
 
-    // Filtro de período
-    if (periodoFilter !== 'TODOS' && presupuesto.periodo_contable_id !== periodoFilter) {
-      return false
-    }
-
-    // Filtro de estado
-    if (estadoFilter !== 'TODOS' && presupuesto.estado !== estadoFilter) {
-      return false
-    }
-
-    // Filtro de alerta
     if (alertaFilter !== 'TODOS') {
       const porcentaje = presupuesto.porcentaje_ejecutado
       if (alertaFilter === 'SOBREGIRO' && porcentaje < 100) return false
@@ -264,638 +228,334 @@ export default function PresupuestosListaPage() {
     return true
   })
 
-  // Estadísticas
   const stats = {
     total: presupuestos.length,
-    activos: presupuestos.filter(p => p.estado === 'ACTIVO').length,
-    sobregiros: presupuestos.filter(p => p.porcentaje_ejecutado >= 100).length,
-    advertencias: presupuestos.filter(p => p.porcentaje_ejecutado >= 90 && p.porcentaje_ejecutado < 100).length,
+    activos: presupuestos.filter((p) => p.estado === 'ACTIVO').length,
+    sobregiros: presupuestos.filter((p) => p.porcentaje_ejecutado >= 100).length,
+    advertencias: presupuestos.filter((p) => p.porcentaje_ejecutado >= 90 && p.porcentaje_ejecutado < 100).length,
     totalPresupuestado: presupuestos.reduce((sum, p) => sum + p.monto_presupuestado, 0),
-    totalEjecutado: presupuestos.reduce((sum, p) => sum + p.monto_ejecutado, 0)
+    totalEjecutado: presupuestos.reduce((sum, p) => sum + p.monto_ejecutado, 0),
   }
+
+  const hasFilters =
+    searchTerm ||
+    centroCostoFilter !== 'TODOS' ||
+    periodoFilter !== 'TODOS' ||
+    estadoFilter !== 'TODOS' ||
+    alertaFilter !== 'TODOS'
 
   if (loading) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando presupuestos...</p>
-        </div>
+      <div className="min-h-full bg-slate-950 p-6 text-slate-100">
+        <Card className="border-cyan-400/20 bg-slate-950/70">
+          <CardContent className="flex min-h-80 flex-col items-center justify-center gap-4">
+            <RefreshCw className="h-8 w-8 animate-spin text-cyan-300" />
+            <p className="text-sm text-slate-300">Cargando presupuestos...</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
-              <DollarSign size={24} />
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.20),transparent_34%),linear-gradient(135deg,#020617_0%,#061a2f_58%,#020617_100%)] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:p-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+        <Card className="border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-cyan-950/20 group-data-[erp-theme=light]/dashboard:bg-white">
+          <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-200">
+                <DollarSign className="h-6 w-6" />
+              </div>
+              <div>
+                <Badge variant="outline" className="mb-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100">
+                  ERP Budget Control
+                </Badge>
+                <h1 className="text-2xl font-semibold tracking-normal text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 lg:text-3xl">
+                  Gestión de Presupuestos
+                </h1>
+                <p className="mt-1 text-sm text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                  Presupuestos por centro de costo, cuenta contable y periodo operativo.
+                </p>
+              </div>
             </div>
-            <h1 className="dashboard-title">Gestión de Presupuestos</h1>
-          </div>
-          <p className="dashboard-subtitle">
-            Administre presupuestos por centro de costo y cuenta contable
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <button
-            onClick={loadData}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button
-            onClick={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}
-            className="primary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <Plus size={16} />
-            Nuevo Presupuesto
-          </button>
-        </div>
-      </div>
 
-      {/* Estadísticas */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Presupuestos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-            {stats.total}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Activos
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
-            {stats.activos}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Sobregiros
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#ef4444' }}>
-            {stats.sobregiros}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Advertencias
-          </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f59e0b' }}>
-            {stats.advertencias}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Presupuestado
-          </div>
-          <div style={{ fontSize: '1.125rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-            {formatCurrency(stats.totalPresupuestado)}
-          </div>
-        </div>
-
-        <div className="activity-card" style={{ padding: '1rem' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Total Ejecutado
-          </div>
-          <div style={{ fontSize: '1.125rem', fontWeight: '700', color: '#3b82f6' }}>
-            {formatCurrency(stats.totalEjecutado)}
-          </div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.75rem',
-          marginBottom: '1rem',
-          paddingBottom: '1rem',
-          borderBottom: '2px solid var(--primary-100)'
-        }}>
-          <Filter size={20} style={{ color: 'var(--primary-600)' }} />
-          <h2 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
-            Filtros
-          </h2>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Buscar
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ 
-                position: 'absolute', 
-                left: '0.75rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: 'var(--primary-400)'
-              }} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Centro, cuenta o notas..."
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
-              />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10" onClick={loadData}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-950/30 hover:from-blue-500 hover:to-cyan-400" onClick={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Presupuesto
+              </Button>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Centro de Costo
-            </label>
-            <select
-              value={centroCostoFilter}
-              onChange={(e) => setCentroCostoFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              {centrosCosto.map(centro => (
-                <option key={centro.id} value={centro.id}>
-                  {centro.codigo} - {centro.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Período
-            </label>
-            <select
-              value={periodoFilter}
-              onChange={(e) => setPeriodoFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              {periodos.map(periodo => (
-                <option key={periodo.id} value={periodo.id}>
-                  {formatPeriodo(periodo)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Estado
-            </label>
-            <select
-              value={estadoFilter}
-              onChange={(e) => setEstadoFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="BLOQUEADO">Bloqueado</option>
-              <option value="CERRADO">Cerrado</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.75rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Alerta
-            </label>
-            <select
-              value={alertaFilter}
-              onChange={(e) => setAlertaFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                background: 'white'
-              }}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="NORMAL">Normal</option>
-              <option value="ADVERTENCIA">Advertencia (≥90%)</option>
-              <option value="SOBREGIRO">Sobregiro (≥100%)</option>
-            </select>
-          </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <StatCard label="Total presupuestos" value={stats.total.toString()} />
+          <StatCard label="Activos" value={stats.activos.toString()} />
+          <StatCard label="Sobregiros" value={stats.sobregiros.toString()} />
+          <StatCard label="Advertencias" value={stats.advertencias.toString()} />
+          <StatCard label="Presupuestado" value={formatCurrency(stats.totalPresupuestado)} compact />
+          <StatCard label="Ejecutado" value={formatCurrency(stats.totalEjecutado)} compact />
         </div>
 
-        {(searchTerm || centroCostoFilter !== 'TODOS' || periodoFilter !== 'TODOS' || estadoFilter !== 'TODOS' || alertaFilter !== 'TODOS') && (
-          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => {
-                setSearchTerm('')
-                setCentroCostoFilter('TODOS')
-                setPeriodoFilter('TODOS')
-                setEstadoFilter('TODOS')
-                setAlertaFilter('TODOS')
-              }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: 'var(--primary-100)',
-                color: 'var(--primary-700)',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              Limpiar Filtros
-            </button>
-          </div>
-        )}
-      </div>
+        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+          <CardHeader className="border-b border-cyan-400/10 p-4">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <Filter className="h-4 w-4 text-cyan-300" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-slate-400">Buscar</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/70" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Centro, cuenta o notas..."
+                    className={cn(fieldClass, 'pl-9')}
+                  />
+                </div>
+              </div>
 
-      {/* Lista de Presupuestos */}
-      <div className="activity-card">
-        {error && (
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--red-50)', 
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-          }}>
-            <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-            <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
-              {error}
-            </p>
-          </div>
-        )}
-
-        {filteredPresupuestos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-400)' }}>
-            <DollarSign size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--primary-600)' }}>
-              No hay presupuestos
-            </h3>
-            <p style={{ marginBottom: '1.5rem' }}>
-              {presupuestos.length === 0 
-                ? 'Aún no se han creado presupuestos'
-                : 'No se encontraron presupuestos con los filtros aplicados'
-              }
-            </p>
-            {presupuestos.length === 0 && (
-              <button
-                onClick={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}
-                className="primary-btn"
-              >
-                <Plus size={16} />
-                Crear Primer Presupuesto
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--primary-200)' }}>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Centro de Costo
-                  </th>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Cuenta
-                  </th>
-
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Período
-                  </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Presupuestado
-                  </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Ejecutado
-                  </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Disponible
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    % Ejecución
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Alerta
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Estado
-                  </th>
-                  <th style={{ 
-                    textAlign: 'center', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: 'var(--primary-600)',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-
-                {filteredPresupuestos.map((presupuesto) => (
-                  <tr 
-                    key={presupuesto.id}
-                    style={{ 
-                      borderBottom: '1px solid var(--primary-100)',
-                      cursor: 'pointer',
-                      transition: 'background 0.2s'
-                    }}
-                    onClick={() => router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-50)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {presupuesto.centro_costo?.nombre || '-'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
-                        {presupuesto.centro_costo?.codigo || '-'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-800)' }}>
-                        {presupuesto.cuenta?.nombre || '-'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
-                        {presupuesto.cuenta?.codigo || '-'}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ 
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        background: 'var(--primary-100)',
-                        color: 'var(--primary-700)'
-                      }}>
-                        <Calendar size={12} />
-                        {formatPeriodo(presupuesto.periodo)}
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: 'var(--primary-800)' }}>
-                      {formatCurrency(presupuesto.monto_presupuestado)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#3b82f6' }}>
-                      {formatCurrency(presupuesto.monto_ejecutado)}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem', 
-                      textAlign: 'right', 
-                      fontWeight: '600', 
-                      color: presupuesto.monto_disponible < 0 ? '#ef4444' : '#10b981'
-                    }}>
-                      {formatCurrency(presupuesto.monto_disponible)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <PresupuestoEjecucionIndicator
-                        porcentajeEjecutado={presupuesto.porcentaje_ejecutado}
-                        size="md"
-                        showLabel={false}
-                        showPercentage={true}
-                        showProgressBar={true}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <PresupuestoEjecucionIndicator
-                        porcentajeEjecutado={presupuesto.porcentaje_ejecutado}
-                        size="md"
-                        showLabel={true}
-                        showPercentage={false}
-                        showProgressBar={false}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {getEstadoBadge(presupuesto.estado)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)
-                          }}
-                          style={{
-                            padding: '0.5rem',
-                            background: 'var(--primary-100)',
-                            color: 'var(--primary-700)',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                          title="Editar"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(presupuesto.id)
-                          }}
-                          style={{
-                            padding: '0.5rem',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}
-                          title="Eliminar"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+              <FilterSelect label="Centro de costo" value={centroCostoFilter} onChange={setCentroCostoFilter}>
+                <SelectItem value="TODOS">Todos</SelectItem>
+                {centrosCosto.map((centro) => (
+                  <SelectItem key={centro.id} value={centro.id}>
+                    {centro.codigo} - {centro.nombre}
+                  </SelectItem>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </FilterSelect>
 
-        {filteredPresupuestos.length > 0 && (
-          <div style={{ 
-            marginTop: '1rem', 
-            padding: '1rem',
-            borderTop: '1px solid var(--primary-200)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <div style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>
-              Mostrando {filteredPresupuestos.length} de {presupuestos.length} presupuestos
+              <FilterSelect label="Periodo" value={periodoFilter} onChange={setPeriodoFilter}>
+                <SelectItem value="TODOS">Todos</SelectItem>
+                {periodos.map((periodo) => (
+                  <SelectItem key={periodo.id} value={periodo.id}>
+                    {formatPeriodo(periodo)}
+                  </SelectItem>
+                ))}
+              </FilterSelect>
+
+              <FilterSelect label="Estado" value={estadoFilter} onChange={setEstadoFilter}>
+                <SelectItem value="TODOS">Todos</SelectItem>
+                <SelectItem value="ACTIVO">Activo</SelectItem>
+                <SelectItem value="BLOQUEADO">Bloqueado</SelectItem>
+                <SelectItem value="CERRADO">Cerrado</SelectItem>
+              </FilterSelect>
+
+              <FilterSelect label="Alerta" value={alertaFilter} onChange={setAlertaFilter}>
+                <SelectItem value="TODOS">Todos</SelectItem>
+                <SelectItem value="NORMAL">Normal</SelectItem>
+                <SelectItem value="ADVERTENCIA">Advertencia (&gt;=90%)</SelectItem>
+                <SelectItem value="SOBREGIRO">Sobregiro (&gt;=100%)</SelectItem>
+              </FilterSelect>
             </div>
-          </div>
-        )}
+
+            {hasFilters && (
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="outline"
+                  className="border-cyan-400/30 bg-slate-950/50 text-cyan-100 hover:bg-cyan-400/10"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCentroCostoFilter('TODOS')
+                    setPeriodoFilter('TODOS')
+                    setEstadoFilter('TODOS')
+                    setAlertaFilter('TODOS')
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+          <CardContent className="p-0">
+            {error && (
+              <div className="p-4">
+                <Alert className="border-amber-300/30 bg-amber-300/10 text-amber-100">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {filteredPresupuestos.length === 0 ? (
+              <div className="flex min-h-80 flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                  <DollarSign className="h-7 w-7" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950">No hay presupuestos</h2>
+                  <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                    {presupuestos.length === 0
+                      ? 'Aún no se han creado presupuestos.'
+                      : 'No se encontraron presupuestos con los filtros aplicados.'}
+                  </p>
+                </div>
+                {presupuestos.length === 0 && (
+                  <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white" onClick={() => router.push('/dashboard/contabilidad/presupuestos/nuevo')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear primer presupuesto
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-cyan-400/10 hover:bg-transparent">
+                      <TableHead>Centro de costo</TableHead>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead className="text-center">Periodo</TableHead>
+                      <TableHead className="text-right">Presupuestado</TableHead>
+                      <TableHead className="text-right">Ejecutado</TableHead>
+                      <TableHead className="text-right">Disponible</TableHead>
+                      <TableHead className="text-center">% Ejecución</TableHead>
+                      <TableHead className="text-center">Alerta</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
+                      <TableHead className="text-center">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPresupuestos.map((presupuesto) => (
+                      <TableRow
+                        key={presupuesto.id}
+                        className="cursor-pointer border-cyan-400/10 hover:bg-cyan-400/5"
+                        onClick={() => router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)}
+                      >
+                        <TableCell>
+                          <div className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                            {presupuesto.centro_costo?.nombre || '-'}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">{presupuesto.centro_costo?.codigo || '-'}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                            {presupuesto.cuenta?.nombre || '-'}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">{presupuesto.cuenta?.codigo || '-'}</div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="gap-1.5 border-cyan-400/25 bg-cyan-400/10 text-cyan-100">
+                            <Calendar className="h-3 w-3" />
+                            {formatPeriodo(presupuesto.periodo)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950">
+                          {formatCurrency(presupuesto.monto_presupuestado)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-cyan-200">
+                          {formatCurrency(presupuesto.monto_ejecutado)}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            'text-right font-semibold',
+                            presupuesto.monto_disponible < 0 ? 'text-amber-200' : 'text-cyan-200',
+                          )}
+                        >
+                          {formatCurrency(presupuesto.monto_disponible)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <PresupuestoEjecucionIndicator
+                            porcentajeEjecutado={presupuesto.porcentaje_ejecutado}
+                            size="md"
+                            showLabel={false}
+                            showPercentage={true}
+                            showProgressBar={true}
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <AlertBadge porcentaje={presupuesto.porcentaje_ejecutado} />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <BudgetStatusBadge estado={presupuesto.estado} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-cyan-400/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/20"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                router.push(`/dashboard/contabilidad/presupuestos/${presupuesto.id}`)
+                              }}
+                              title="Editar"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-amber-300/25 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleDelete(presupuesto.id)
+                              }}
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <div className="border-t border-cyan-400/10 px-4 py-3 text-sm text-slate-400">
+                  Mostrando {filteredPresupuestos.length} de {presupuestos.length} presupuestos
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
+  return (
+    <Card className="border-cyan-400/20 bg-slate-950/70 group-data-[erp-theme=light]/dashboard:bg-white">
+      <CardContent className="p-4">
+        <p className="text-xs font-semibold uppercase text-cyan-200/75 group-data-[erp-theme=light]/dashboard:text-slate-500">{label}</p>
+        <p className={cn('mt-2 font-semibold text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950', compact ? 'text-lg' : 'text-2xl')}>
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold uppercase text-slate-400">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className={fieldClass}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className={selectContentClass}>{children}</SelectContent>
+      </Select>
     </div>
   )
 }

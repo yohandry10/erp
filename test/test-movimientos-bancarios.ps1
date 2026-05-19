@@ -1,7 +1,7 @@
 # Test GET /api/finanzas/bancos/cuentas/:id/movimientos
 
 $baseUrl = "http://localhost:3000"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 
 $headers = @{
     "Authorization" = "Bearer $token"
@@ -16,10 +16,10 @@ Write-Host "`n1. Obteniendo cuentas bancarias..." -ForegroundColor Yellow
 try {
     $cuentasResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas" -Method Get -Headers $headers
     Write-Host "Cuentas obtenidas: $($cuentasResponse.data.Count)" -ForegroundColor Green
-    
+
     if ($cuentasResponse.data.Count -eq 0) {
         Write-Host "No hay cuentas bancarias. Creando una cuenta de prueba..." -ForegroundColor Yellow
-        
+
         $nuevaCuenta = @{
             nombre = "Cuenta Test Movimientos"
             banco = "BCP"
@@ -30,7 +30,7 @@ try {
             permite_sobregiro = $false
             activa = $true
         } | ConvertTo-Json
-        
+
         $cuentaResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas" -Method Post -Headers $headers -Body $nuevaCuenta
         $cuentaId = $cuentaResponse.data.id
         Write-Host "Cuenta creada: $cuentaId" -ForegroundColor Green
@@ -50,7 +50,7 @@ try {
     Write-Host "✓ Movimientos obtenidos: $($response.data.Count)" -ForegroundColor Green
     Write-Host "  Total: $($response.pagination.total)" -ForegroundColor Gray
     Write-Host "  Página: $($response.pagination.page) de $($response.pagination.totalPages)" -ForegroundColor Gray
-    
+
     if ($response.data.Count -gt 0) {
         $mov = $response.data[0]
         Write-Host "`n  Ejemplo de movimiento:" -ForegroundColor Gray

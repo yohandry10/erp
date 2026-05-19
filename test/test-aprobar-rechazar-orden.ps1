@@ -28,7 +28,7 @@ try {
         -Method Post `
         -Body $proveedorBody `
         -ContentType "application/json"
-    
+
     $proveedorId = $proveedorResponse.data.id
     Write-Host "✅ Proveedor created: $proveedorId" -ForegroundColor Green
 } catch {
@@ -71,7 +71,7 @@ try {
         -Method Post `
         -Body $ordenBody `
         -ContentType "application/json"
-    
+
     $ordenId = $ordenResponse.data.id
     $ordenNumero = $ordenResponse.data.numero
     Write-Host "✅ Orden created: $ordenNumero (ID: $ordenId)" -ForegroundColor Green
@@ -89,7 +89,7 @@ Write-Host "Step 3: Getting orden details before approval..." -ForegroundColor Y
 try {
     $ordenDetails = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/${ordenId}?tenant_id=$tenantId" `
         -Method Get
-    
+
     Write-Host "✅ Orden details retrieved" -ForegroundColor Green
     Write-Host "   Número: $($ordenDetails.data.numero)" -ForegroundColor Cyan
     Write-Host "   Estado: $($ordenDetails.data.estado)" -ForegroundColor Cyan
@@ -111,7 +111,7 @@ try {
         -Method Post `
         -Body $aprobarBody `
         -ContentType "application/json"
-    
+
     Write-Host "✅ Orden APROBADA successfully" -ForegroundColor Green
     Write-Host "   Nuevo estado: $($aprobarResponse.data.estado)" -ForegroundColor Cyan
     Write-Host "   Mensaje: $($aprobarResponse.message)" -ForegroundColor Cyan
@@ -127,10 +127,10 @@ Write-Host "Step 5: Getting orden details after approval..." -ForegroundColor Ye
 try {
     $ordenDetailsAfter = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/${ordenId}?tenant_id=$tenantId" `
         -Method Get
-    
+
     Write-Host "✅ Orden details retrieved" -ForegroundColor Green
     Write-Host "   Estado: $($ordenDetailsAfter.data.estado)" -ForegroundColor Cyan
-    
+
     if ($ordenDetailsAfter.data.estado -eq "APROBADA") {
         Write-Host "   ✅ Estado changed to APROBADA correctly" -ForegroundColor Green
     } else {
@@ -169,7 +169,7 @@ try {
         -Method Post `
         -Body $ordenBody2 `
         -ContentType "application/json"
-    
+
     $ordenId2 = $ordenResponse2.data.id
     $ordenNumero2 = $ordenResponse2.data.numero
     Write-Host "✅ Orden created: $ordenNumero2 (ID: $ordenId2)" -ForegroundColor Green
@@ -192,7 +192,7 @@ try {
         -Method Post `
         -Body $rechazarBody `
         -ContentType "application/json"
-    
+
     Write-Host "✅ Orden RECHAZADA successfully" -ForegroundColor Green
     Write-Host "   Nuevo estado: $($rechazarResponse.data.estado)" -ForegroundColor Cyan
     Write-Host "   Mensaje: $($rechazarResponse.message)" -ForegroundColor Cyan
@@ -208,10 +208,10 @@ Write-Host "Step 8: Getting orden details after rejection..." -ForegroundColor Y
 try {
     $ordenDetailsRejected = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/${ordenId2}?tenant_id=$tenantId" `
         -Method Get
-    
+
     Write-Host "✅ Orden details retrieved" -ForegroundColor Green
     Write-Host "   Estado: $($ordenDetailsRejected.data.estado)" -ForegroundColor Cyan
-    
+
     if ($ordenDetailsRejected.data.estado -eq "ANULADA") {
         Write-Host "   ✅ Estado changed to ANULADA correctly" -ForegroundColor Green
     } else {
@@ -230,7 +230,7 @@ try {
         -Method Post `
         -Body $aprobarBody `
         -ContentType "application/json"
-    
+
     Write-Host "⚠️  Unexpected: Orden was approved again (should fail)" -ForegroundColor Yellow
 } catch {
     Write-Host "✅ Validation working: Cannot approve already approved orden" -ForegroundColor Green
@@ -246,7 +246,7 @@ try {
         -Method Post `
         -Body $rechazarBody `
         -ContentType "application/json"
-    
+
     Write-Host "⚠️  Unexpected: Orden was rejected again (should fail)" -ForegroundColor Yellow
 } catch {
     Write-Host "✅ Validation working: Cannot reject already rejected orden" -ForegroundColor Green

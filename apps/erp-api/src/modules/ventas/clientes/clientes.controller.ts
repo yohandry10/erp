@@ -121,8 +121,9 @@ export class ClientesController {
     @Param('id') id: string,
     @Body() updateClienteDto: UpdateClienteDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.clientesService.update(id, updateClienteDto, tenantId);
+    return this.clientesService.update(id, updateClienteDto, tenantId, user?.id);
   }
 
   /**

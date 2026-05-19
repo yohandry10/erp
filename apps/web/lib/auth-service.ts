@@ -38,7 +38,7 @@ class AuthService {
       nombre_usuario: raw?.nombre_usuario || raw?.username,
       roles: raw?.roles || [],
       tenant_id: raw?.tenant_id,
-      is_super_admin: !!raw?.is_super_admin,
+      is_super_admin: raw?.is_super_admin === true || raw?.isSuperAdmin === true || raw?.super_admin === true,
     };
   }
 
@@ -209,7 +209,9 @@ class AuthService {
     };
 
     this.listeners.push(listener);
-    listener(this.session);
+    if (this.session) {
+      listener(this.session);
+    }
 
     return {
       data: {

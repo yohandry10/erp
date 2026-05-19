@@ -106,6 +106,71 @@ describe('TesoreriaService', () => {
       );
     });
 
+    it('should throw BadRequestException if monto has more than two decimals', async () => {
+      const dto = {
+        cxp_id: 'cxp-123',
+        monto: 100.123,
+        fecha_pago: '2024-01-15',
+        metodo_pago: 'TRANSFERENCIA',
+      };
+
+      await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
+        'El monto del pago debe tener máximo 2 decimales',
+      );
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException if fecha_pago is not a valid YYYY-MM-DD date', async () => {
+      const dto = {
+        cxp_id: 'cxp-123',
+        monto: 100,
+        fecha_pago: '2024-02-31',
+        metodo_pago: 'TRANSFERENCIA',
+      };
+
+      await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
+        'La fecha de pago debe ser una fecha válida',
+      );
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
+    it('should return existing movement without applying a duplicate payment when idempotency_key already exists', async () => {
+      const existingMovement = {
+        id: 'mov-existing',
+        monto: 250,
+        fecha: '2024-01-15',
+        metodo_pago: 'TRANSFERENCIA',
+        referencia: 'OP-EXISTING',
+        cuenta_bancaria_id: 'cuenta-123',
+      };
+      const currentCxp = { ...mockCxp, saldo: 750, estado: 'PARCIAL' };
+
+      mockQueryBuilder.maybeSingle
+        .mockResolvedValueOnce({ data: existingMovement, error: null })
+        .mockResolvedValueOnce({ data: currentCxp, error: null });
+
+      const result = await service.registrarPago(
+        tenantId,
+        {
+          cxp_id: 'cxp-123',
+          monto: 250,
+          fecha_pago: '2024-01-15',
+          metodo_pago: 'TRANSFERENCIA',
+          cuenta_bancaria_id: 'cuenta-123',
+          idempotency_key: 'idem-cxp-payment-1',
+        },
+        userId,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data.cxp).toEqual(currentCxp);
+      expect(result.data.pago.idempotent_replay).toBe(true);
+      expect(result.data.movimiento_bancario).toEqual(existingMovement);
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.update).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.insert).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException if CxP does not exist', async () => {
       mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
 

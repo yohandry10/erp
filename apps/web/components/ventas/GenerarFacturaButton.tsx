@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useApi } from '@/hooks/use-api'
 import { Button } from '@/components/ui/button'
-import { FileText } from 'lucide-react'
+import { FileText, Loader2, X } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import SugerenciaGREModal from './SugerenciaGREModal'
 import { useRouter } from 'next/navigation'
@@ -38,6 +38,7 @@ export default function GenerarFacturaButton({
   const router = useRouter()
   
   const [showGREModal, setShowGREModal] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [facturaId, setFacturaId] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
 
@@ -79,6 +80,7 @@ export default function GenerarFacturaButton({
   const handleGenerate = async () => {
     try {
       setGenerating(true)
+      setShowConfirmation(false)
       console.debug('[GenerarFacturaButton] Generando factura...', { pedidoId })
 
       const response: GenerarFacturaResponse = await post(
@@ -144,15 +146,7 @@ export default function GenerarFacturaButton({
   }
 
   const handleButtonClick = () => {
-    const proceed = window.confirm(
-      config.usar_flujo_logistica
-        ? '¿Desea generar la factura para este pedido?'
-        : '¿Desea generar la factura? Se descontará el stock inmediatamente.'
-    )
-    if (!proceed) {
-      return
-    }
-    handleGenerate()
+    setShowConfirmation(true)
   }
 
   return (
@@ -165,6 +159,70 @@ export default function GenerarFacturaButton({
         <FileText className="w-4 h-4 mr-2" />
         {generating ? 'Generando...' : 'Generar Factura'}
       </Button>
+
+      {showConfirmation && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">
+                <FileText className="w-5 h-5" />
+                Confirmar factura
+              </h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setShowConfirmation(false)}
+                disabled={generating}
+                aria-label="Cerrar confirmación de factura"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <p className="text-gray-700 mb-4">
+                ¿Desea generar la factura para este pedido?
+              </p>
+              <div className="modal-info">
+                <p>
+                  {config.usar_flujo_logistica
+                    ? 'Se emitirá el documento fiscal usando el despacho confirmado.'
+                    : 'Se emitirá el documento fiscal y se descontará el stock inmediatamente.'}
+                </p>
+              </div>
+              <p className="text-sm text-gray-500">
+                La operación queda vinculada a CPE, cuentas por cobrar y contabilidad.
+              </p>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn modal-btn-secondary"
+                onClick={() => setShowConfirmation(false)}
+                disabled={generating}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="modal-btn modal-btn-success"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GRE Suggestion Modal */}
       {showGREModal && (

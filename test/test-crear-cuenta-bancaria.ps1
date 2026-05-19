@@ -2,7 +2,7 @@
 # Descripción: Crear una nueva cuenta bancaria
 
 $baseUrl = "http://localhost:3000"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 
 $headers = @{
     "Authorization" = "Bearer $token"

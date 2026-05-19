@@ -4,6 +4,7 @@ import { ProveedoresService } from './proveedores.service';
 import { ProveedoresRepository } from '../repositories/proveedores.repository';
 import { CreateProveedorDto, CondicionesPago } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
+import { AuditService } from '../../audit/audit.service';
 
 describe('ProveedoresService', () => {
   let service: ProveedoresService;
@@ -12,7 +13,7 @@ describe('ProveedoresService', () => {
   const mockProveedor = {
     id: 'test-id-123',
     tenant_id: 'tenant-123',
-    ruc: '20123456789',
+    ruc: '20100070970',
     razon_social: 'Test Company SAC',
     nombre_comercial: 'Test Company',
     direccion: 'Av. Test 123',
@@ -44,7 +45,13 @@ describe('ProveedoresService', () => {
         {
           provide: ProveedoresRepository,
           useValue: mockRepository
-        }
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            registrarCambio: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ]
     }).compile();
 
@@ -99,16 +106,16 @@ describe('ProveedoresService', () => {
     it('should return a proveedor by RUC', async () => {
       repository.findByRuc.mockResolvedValue(mockProveedor);
 
-      const result = await service.findByRuc('20123456789', 'tenant-123');
+      const result = await service.findByRuc('20100070970', 'tenant-123');
 
       expect(result).toEqual(mockProveedor);
-      expect(repository.findByRuc).toHaveBeenCalledWith('20123456789', 'tenant-123');
+      expect(repository.findByRuc).toHaveBeenCalledWith('20100070970', 'tenant-123');
     });
   });
 
   describe('create', () => {
     const validDto: CreateProveedorDto = {
-      ruc: '20123456789',
+      ruc: '20100070970',
       razon_social: 'Test Company SAC',
       email: 'contacto@testcompany.com',
       condiciones_pago: CondicionesPago.CONTADO,
@@ -123,7 +130,7 @@ describe('ProveedoresService', () => {
       const result = await service.create(validDto, 'tenant-123');
 
       expect(result).toEqual(mockProveedor);
-      expect(repository.findByRuc).toHaveBeenCalledWith('20123456789', 'tenant-123');
+      expect(repository.findByRuc).toHaveBeenCalledWith('20100070970', 'tenant-123');
       expect(repository.create).toHaveBeenCalledWith(validDto, 'tenant-123', undefined);
     });
 
@@ -225,7 +232,7 @@ describe('ProveedoresService', () => {
     });
 
     it('should throw ConflictException when updating to existing RUC', async () => {
-      const dtoWithRuc = { ruc: '20987654321' };
+      const dtoWithRuc = { ruc: '20987654326' };
       repository.findById.mockResolvedValue(mockProveedor);
       repository.findByRuc.mockResolvedValue({ ...mockProveedor, id: 'different-id' });
 
@@ -234,7 +241,7 @@ describe('ProveedoresService', () => {
     });
 
     it('should allow updating to same RUC', async () => {
-      const dtoWithSameRuc = { ruc: '20123456789' };
+      const dtoWithSameRuc = { ruc: '20100070970' };
       repository.findById.mockResolvedValue(mockProveedor);
       repository.findByRuc.mockResolvedValue(mockProveedor);
       repository.update.mockResolvedValue(mockProveedor);
@@ -295,7 +302,7 @@ describe('ProveedoresService', () => {
 
       for (const email of validEmails) {
         const dto: CreateProveedorDto = {
-          ruc: '20123456789',
+          ruc: '20100070970',
           razon_social: 'Test',
           email,
           condiciones_pago: CondicionesPago.CONTADO,
@@ -319,7 +326,7 @@ describe('ProveedoresService', () => {
 
       for (const email of invalidEmails) {
         const dto: CreateProveedorDto = {
-          ruc: '20123456789',
+          ruc: '20100070970',
           razon_social: 'Test',
           email,
           condiciones_pago: CondicionesPago.CONTADO,
@@ -336,7 +343,7 @@ describe('ProveedoresService', () => {
   describe('RUC validation', () => {
     it('should accept valid RUC formats', async () => {
       const validRucs = [
-        '20123456789', // Peru (11 digits)
+        '20100070970', // Peru (11 digits)
         '123456789'    // Colombia (9 digits)
       ];
 

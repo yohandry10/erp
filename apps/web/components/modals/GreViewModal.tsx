@@ -92,33 +92,6 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       <html>
       <head>
         <title>GRE ${greData.numero}</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          @media print { 
-            html, body { width: 80mm; margin: 0; padding: 0; }
-          }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            width: 80mm;
-            max-width: 80mm;
-            padding: 3mm;
-            background: white;
-            color: black;
-            line-height: 1.3;
-          }
-          .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
-          .empresa { font-size: 14px; font-weight: bold; }
-          .ruc { font-size: 10px; }
-          .tipo-doc { font-size: 11px; font-weight: bold; margin: 6px 0 2px; border: 1px solid #000; padding: 4px; }
-          .numero { font-size: 12px; font-weight: bold; }
-          .fecha { font-size: 9px; color: #333; margin-top: 4px; }
-          .seccion { border-bottom: 1px dashed #000; padding: 6px 0; margin-bottom: 6px; }
-          .label { font-size: 9px; color: #666; font-weight: bold; }
-          .valor { font-size: 10px; margin-left: 4px; }
-          .footer { text-align: center; margin-top: 10px; font-size: 8px; border-top: 1px dashed #000; padding-top: 6px; }
-        </style>
       </head>
       <body>
         <div class="header">
@@ -215,106 +188,40 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
   if (!isOpen) return null
 
   return (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 999999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px'
-      }}
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.5)] z-[999999] flex items-center justify-center p-5"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
         }
       }}
     >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '95%',
-          maxWidth: '1200px',
-          maxHeight: '95vh',
-          overflow: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          position: 'relative'
-        }}
+      <div className="bg-white rounded-2 w-[95%] max-w-[1200px] overflow-auto shadow relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ 
-          backgroundColor: getStatusColor(), 
-          color: 'white', 
-          padding: '16px', 
-          borderRadius: '8px 8px 0 0' 
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="text-white p-4">
+          <div className="flex justify-between items-center">
             <div>
-              <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>
+              <h2 className="text-5 font-semibold m-0">
                 GUÍA DE REMISIÓN ELECTRÓNICA
               </h2>
-              <p style={{ fontSize: '14px', margin: '4px 0 0 0', opacity: 0.9 }}>
+              <p className="text-3.5 mt-[4px] mr-0 mb-0 ml-0 opacity-[0.9]">
                 {greData?.numero}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div className="flex gap-2 items-center">
               <button
-                onClick={handleDownloadPdf}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                onClick={handleDownloadPdf} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-3.5 cursor-pointer flex items-center gap-[4px]"
               >
                 💾 Descargar
               </button>
               <button
-                onClick={handlePrint}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 12px',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                onClick={handlePrint} className="bg-[rgba(255,_255,_255,_0.2)] text-white border-0 py-2 px-3 rounded-[4px] text-3.5 cursor-pointer flex items-center gap-[4px]"
               >
                 🖨️ Imprimir
               </button>
               <button
-                onClick={onClose}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'white',
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  padding: '0',
-                  width: '30px',
-                  height: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
+                onClick={onClose} className="border-0 text-white text-6 font-bold cursor-pointer p-0 w-[30px] h-[30px] flex items-center justify-center"
               >
                 ×
               </button>
@@ -323,107 +230,57 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
         </div>
 
         {/* Body */}
-        <div style={{ padding: '24px' }}>
+        <div className="p-6">
           {loading ? (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              height: '400px',
-              flexDirection: 'column',
-              gap: '16px'
-            }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                border: '4px solid #f3f4f6',
-                borderTop: '4px solid #3b82f6',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <p style={{ color: '#6b7280', fontSize: '16px' }}>Cargando guía de remisión...</p>
+            <div className="flex justify-center items-center h-[400px] flex-col gap-4">
+              <div className="w-10 h-10 rounded-full"></div>
+              <p className="text-gray-500 text-4">Cargando guía de remisión...</p>
             </div>
           ) : greData ? (
-            <div style={{ 
-              fontFamily: 'Arial, sans-serif', 
-              fontSize: '14px', 
-              lineHeight: '1.5', 
-              color: '#000',
-              backgroundColor: 'white'
-            }}>
+            <div className="text-3.5 leading-6 text-[#000] bg-white">
               
               {/* ENCABEZADO EMPRESARIAL */}
-              <div style={{ marginBottom: '24px' }}>
-                <table style={{ 
-                  width: '100%', 
-                  borderCollapse: 'collapse', 
-                  border: '2px solid #000'
-                }}>
+              <div className="mb-6">
+                <table className="w-[100%]">
                   <tbody>
                     <tr>
-                      <td style={{ 
-                        border: '1px solid #000', 
-                        padding: '16px', 
-                        width: '65%' 
-                      }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <h1 style={{ 
-                            fontSize: '24px', 
-                            fontWeight: 'bold', 
-                            marginBottom: '8px',
-                            margin: '0 0 8px 0'
-                          }}>
+                      <td className="border p-4 w-[65%]">
+                        <div className="text-center">
+                          <h1 className="text-6 font-bold mb-2 mt-0 mr-0 ml-0">
                             NEON SYSTEM
                           </h1>
-                          <p style={{ fontSize: '14px', marginBottom: '4px', margin: '4px 0' }}>
+                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
                             Sistema Empresarial Integrado
                           </p>
-                          <p style={{ fontSize: '14px', marginBottom: '4px', margin: '4px 0' }}>
+                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
                             <strong>RUC:</strong> 12345678901
                           </p>
-                          <p style={{ fontSize: '14px', marginBottom: '4px', margin: '4px 0' }}>
+                          <p className="text-3.5 mb-[4px] my-[4px] mx-0">
                             <strong>Razón Social:</strong> NEON SYSTEM SAC
                           </p>
-                          <p style={{ fontSize: '14px', margin: '4px 0' }}>
+                          <p className="text-3.5 my-[4px] mx-0">
                             Dirección: Lima, Perú
                           </p>
                         </div>
                       </td>
-                      <td style={{ 
-                        border: '1px solid #000', 
-                        padding: '16px', 
-                        width: '35%' 
-                      }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ 
-                            border: '2px solid #000', 
-                            padding: '12px', 
-                            marginBottom: '12px' 
-                          }}>
-                            <h2 style={{ 
-                              fontSize: '16px', 
-                              fontWeight: 'bold', 
-                              marginBottom: '8px',
-                              margin: '0 0 8px 0'
-                            }}>
+                      <td className="border p-4 w-[35%]">
+                        <div className="text-center">
+                          <div className="p-3 mb-3">
+                            <h2 className="text-4 font-bold mb-2 mt-0 mr-0 ml-0">
                               GUÍA DE REMISIÓN ELECTRÓNICA
                             </h2>
-                            <p style={{ 
-                              fontSize: '18px', 
-                              fontWeight: 'bold',
-                              margin: 0
-                            }}>
+                            <p className="text-[18px] font-bold m-0">
                               {greData.numero}
                             </p>
                           </div>
-                          <div style={{ fontSize: '14px' }}>
-                            <p style={{ marginBottom: '4px', margin: '4px 0' }}>
+                          <div className="text-3.5">
+                            <p className="mb-[4px] my-[4px] mx-0">
                               <strong>Fecha Emisión:</strong> {new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}
                             </p>
-                            <p style={{ marginBottom: '4px', margin: '4px 0' }}>
+                            <p className="mb-[4px] my-[4px] mx-0">
                               <strong>Fecha Traslado:</strong> {new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}
                             </p>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Estado:</strong> {greData.estado}
                             </p>
                           </div>
@@ -435,56 +292,38 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               </div>
 
               {/* DATOS DEL DESTINATARIO */}
-              <div style={{ marginBottom: '24px' }}>
-                <table style={{ 
-                  width: '100%', 
-                  borderCollapse: 'collapse', 
-                  border: '1px solid #000'
-                }}>
+              <div className="mb-6">
+                <table className="w-[100%] border">
                   <thead>
                     <tr>
-                      <th style={{ 
-                        border: '1px solid #000', 
-                        backgroundColor: '#f3f4f6', 
-                        padding: '8px', 
-                        textAlign: 'left', 
-                        fontWeight: 'bold' 
-                      }}>
+                      <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
                         DATOS DEL DESTINATARIO Y TRASLADO
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td style={{ 
-                        border: '1px solid #000', 
-                        padding: '12px' 
-                      }}>
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: '1fr 1fr', 
-                          gap: '16px', 
-                          fontSize: '14px' 
-                        }}>
+                      <td className="border p-3">
+                        <div className="grid grid-cols-[1fr_1fr] gap-4 text-3.5">
                           <div>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Destinatario:</strong> {greData.destinatario}
                             </p>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Dirección Destino:</strong> {greData.direccionDestino}
                             </p>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Motivo:</strong> {getMotivoText(greData.motivo)}
                             </p>
                           </div>
                           <div>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Modalidad:</strong> {getModalidadText(greData.modalidad)}
                             </p>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Peso Total:</strong> {greData.pesoTotal} Kg
                             </p>
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Fecha Traslado:</strong> {new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}
                             </p>
                           </div>
@@ -496,62 +335,44 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               </div>
 
               {/* DATOS DEL TRANSPORTE */}
-              <div style={{ marginBottom: '24px' }}>
-                <table style={{ 
-                  width: '100%', 
-                  borderCollapse: 'collapse', 
-                  border: '1px solid #000',
-                  fontSize: '14px'
-                }}>
+              <div className="mb-6">
+                <table className="w-[100%] border text-3.5">
                   <thead>
                     <tr>
-                      <th style={{ 
-                        border: '1px solid #000', 
-                        backgroundColor: '#f3f4f6', 
-                        padding: '8px', 
-                        textAlign: 'left', 
-                        fontWeight: 'bold' 
-                      }}>
+                      <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
                         INFORMACIÓN DEL TRANSPORTE
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td style={{ 
-                        border: '1px solid #000', 
-                        padding: '12px' 
-                      }}>
-                        <div style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: '1fr 1fr', 
-                          gap: '16px'
-                        }}>
+                      <td className="border p-3">
+                        <div className="grid grid-cols-[1fr_1fr] gap-4">
                           <div>
                             {greData.transportista && (
-                              <p style={{ margin: '4px 0' }}>
+                              <p className="my-[4px] mx-0">
                                 <strong>Transportista:</strong> {greData.transportista}
                               </p>
                             )}
                             {greData.placaVehiculo && (
-                              <p style={{ margin: '4px 0' }}>
+                              <p className="my-[4px] mx-0">
                                 <strong>Placa del Vehículo:</strong> {greData.placaVehiculo}
                               </p>
                             )}
                           </div>
                           <div>
                             {greData.licenciaConducir && (
-                              <p style={{ margin: '4px 0' }}>
+                              <p className="my-[4px] mx-0">
                                 <strong>Licencia de Conducir:</strong> {greData.licenciaConducir}
                               </p>
                             )}
-                            <p style={{ margin: '4px 0' }}>
+                            <p className="my-[4px] mx-0">
                               <strong>Modalidad:</strong> {getModalidadText(greData.modalidad)}
                             </p>
                           </div>
                         </div>
                         {!greData.transportista && !greData.placaVehiculo && !greData.licenciaConducir && (
-                          <p style={{ margin: 0, color: '#6b7280', fontStyle: 'italic' }}>
+                          <p className="m-0 text-gray-500">
                             No se registraron datos adicionales de transporte
                           </p>
                         )}
@@ -563,32 +384,18 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
               {/* OBSERVACIONES */}
               {greData.observaciones && (
-                <div style={{ marginBottom: '24px' }}>
-                  <table style={{ 
-                    width: '100%', 
-                    borderCollapse: 'collapse', 
-                    border: '1px solid #000',
-                    fontSize: '14px'
-                  }}>
+                <div className="mb-6">
+                  <table className="w-[100%] border text-3.5">
                     <thead>
                       <tr>
-                        <th style={{ 
-                          border: '1px solid #000', 
-                          backgroundColor: '#f3f4f6', 
-                          padding: '8px', 
-                          textAlign: 'left', 
-                          fontWeight: 'bold' 
-                        }}>
+                        <th className="border bg-[#f3f4f6] p-2 text-left font-bold">
                           OBSERVACIONES
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ 
-                          border: '1px solid #000', 
-                          padding: '12px' 
-                        }}>
+                        <td className="border p-3">
                           {greData.observaciones}
                         </td>
                       </tr>
@@ -598,43 +405,27 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
               )}
 
               {/* FOOTER */}
-              <div style={{ 
-                textAlign: 'center', 
-                fontSize: '12px', 
-                color: '#374151',
-                borderTop: '1px solid #d1d5db',
-                paddingTop: '16px'
-              }}>
-                <p style={{ fontWeight: 'bold', margin: '0 0 4px 0' }}>
+              <div className="text-center text-3 text-gray-700 border-t pt-4">
+                <p className="font-bold mt-0 mr-0 mb-[4px] ml-0">
                   NEON SYSTEM - Sistema Empresarial Integrado
                 </p>
-                <p style={{ margin: '0 0 4px 0' }}>
+                <p className="mt-0 mr-0 mb-[4px] ml-0">
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>
-                <p style={{ margin: 0 }}>
+                <p className="m-0">
                   Para consultas sobre este documento, contacte al emisor • Sistema certificado por SUNAT
                 </p>
               </div>
             </div>
           ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '48px',
-              color: '#6b7280'
-            }}>
-              <p style={{ fontSize: '16px' }}>No se pudo cargar la guía de remisión</p>
+            <div className="text-center p-12 text-gray-500">
+              <p className="text-4">No se pudo cargar la guía de remisión</p>
             </div>
           )}
         </div>
       </div>
 
       {/* CSS para animación */}
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

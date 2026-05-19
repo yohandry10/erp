@@ -99,85 +99,53 @@ export default function ReportesPage() {
       <div className="activity-section">
         <div className="activity-header">
           <h2 className="activity-title">
-            <Calendar size={20} style={{ marginRight: '0.5rem' }} />
+            <Calendar size={20} className="mr-2" />
             Filtros Globales
           </h2>
         </div>
         <div className="activity-card">
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '1rem' 
-          }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha Desde
               </label>
               <input
                 type="date"
                 value={filters.fechaDesde}
-                onChange={(e) => handleFilterChange('fechaDesde', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => handleFilterChange('fechaDesde', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha Hasta
               </label>
               <input
                 type="date"
                 value={filters.fechaHasta}
-                onChange={(e) => handleFilterChange('fechaHasta', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => handleFilterChange('fechaHasta', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Cliente (opcional)
               </label>
               <input
                 type="text"
                 placeholder="Filtrar por cliente..."
                 value={filters.cliente || ''}
-                onChange={(e) => handleFilterChange('cliente', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => handleFilterChange('cliente', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Estado (opcional)
               </label>
               <select
                 value={filters.estado || ''}
-                onChange={(e) => handleFilterChange('estado', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => handleFilterChange('estado', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               >
                 <option value="">Todos</option>
                 <option value="PENDIENTE">Pendiente</option>
@@ -194,35 +162,13 @@ export default function ReportesPage() {
       {/* Reports Tabs */}
       <div className="activity-section">
         {/* Tab Navigation */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '0.5rem', 
-          marginBottom: '1.5rem', 
-          overflowX: 'auto',
-          borderBottom: '2px solid #e5e7eb',
-          paddingBottom: '0.5rem'
-        }}>
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {tabs.map(tab => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px 8px 0 0',
-                  border: 'none',
-                  background: activeTab === tab.id ? '#3b82f6' : 'transparent',
-                  color: activeTab === tab.id ? 'white' : '#6b7280',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
-                }}
+                onClick={() => setActiveTab(tab.id)} className="py-3 px-4 border-0 cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium whitespace-nowrap transition"
               >
                 <Icon size={16} />
                 {tab.label}

@@ -248,9 +248,26 @@ test.describe('T08 POS vertical completo', () => {
     expect(tenantId, 'auth/me debe devolver tenant_id').toBeTruthy();
 
     const data = await prepararDatos(supabase, tenantId);
-    const sesionId = await abrirCaja(apiContext, data.caja.id);
+    let sesionId = await abrirCaja(apiContext, data.caja.id);
 
     await gotoAuthenticated(page, '/dashboard/pos');
+    const abrirCajaButton = page.getByRole('button', { name: /Abrir Caja Registradora/i });
+    const debeAbrirCaja = await abrirCajaButton.waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (debeAbrirCaja) {
+      await abrirCajaButton.click();
+      await page.getByLabel(/Monto inicial/i).fill('100');
+      await page.getByRole('button', { name: /Confirmar/i }).click();
+
+      const sesionAbierta = await parseOk<any>(
+        await apiContext.get(api('/pos/sesion-caja')),
+        'consultar sesión POS abierta desde UI',
+      );
+      expect(sesionAbierta?.id, 'la apertura de caja desde UI debe crear una sesión activa').toBeTruthy();
+      sesionId = sesionAbierta.id;
+    }
+
     await expect(page.getByText('Sistema POS Empresarial', { exact: false })).toBeVisible({ timeout: 20000 });
     await expect(page.getByText(data.producto.codigo, { exact: false })).toBeVisible({ timeout: 20000 });
     await expect(page.locator('body')).not.toContainText(/Cargando|Application error|Unhandled|Error fatal/i);

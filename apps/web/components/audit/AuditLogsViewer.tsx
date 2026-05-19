@@ -1,22 +1,26 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { useApi } from '@/hooks/use-api'
+import { useCallback, useEffect, useState } from 'react'
 import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Database,
   FileText,
   Filter,
   RefreshCw,
-  ChevronDown,
-  ChevronRight,
   Search,
-  Clock,
-  Database,
   Shield,
-  AlertCircle,
-  User
+  User,
 } from 'lucide-react'
-import './audit-logs.css'
+import { useApi } from '@/hooks/use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
+import { PageShell } from '@/components/erp/page-shell'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 
 interface AuditLog {
   id: string
@@ -51,6 +55,22 @@ interface Pagination {
   totalPages: number
 }
 
+const operationClass = (operation: string) => {
+  switch (operation) {
+    case 'INSERT':
+      return 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+    case 'UPDATE':
+      return 'border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+    case 'DELETE':
+      return 'border-slate-300/25 bg-slate-300/10 text-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-700'
+    default:
+      return 'border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700'
+  }
+}
+
+const fieldBlockClass = 'rounded-2xl border border-cyan-400/15 bg-slate-950/60 p-3 text-xs text-slate-200 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700'
+const inputClass = 'h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950 group-data-[erp-theme=light]/dashboard:focus:border-blue-400'
+
 export default function AuditLogsViewer() {
   const { get } = useApi()
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -58,9 +78,7 @@ export default function AuditLogsViewer() {
   const [error, setError] = useState<string | null>(null)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<AuditFilters>({ page: 1, limit: 50 })
-  const [pagination, setPagination] = useState<Pagination>({
-    page: 1, limit: 50, total: 0, totalPages: 0
-  })
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 })
   const [searchTerm, setSearchTerm] = useState('')
   const [users, setUsers] = useState<Array<{ id: string; nombre: string; email: string }>>([])
 
@@ -111,35 +129,24 @@ export default function AuditLogsViewer() {
     }
   }, [filters, get])
 
-  useEffect(() => {
-    loadLogs()
-  }, [loadLogs])
+  useEffect(() => { loadLogs() }, [loadLogs])
 
   const toggleExpand = (logId: string) => {
-    const newExpanded = new Set(expandedLogs)
-    if (newExpanded.has(logId)) {
-      newExpanded.delete(logId)
-    } else {
-      newExpanded.add(logId)
-    }
-    setExpandedLogs(newExpanded)
+    const next = new Set(expandedLogs)
+    if (next.has(logId)) next.delete(logId)
+    else next.add(logId)
+    setExpandedLogs(next)
   }
 
-  const getOperationClass = (operation: string) => {
-    switch (operation) {
-      case 'INSERT': return 'status-success'
-      case 'UPDATE': return 'audit-badge-update'
-      case 'DELETE': return 'status-error'
-      default: return 'audit-badge-update'
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-PE', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleString('es-PE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     })
-  }
 
   const filteredLogs = logs.filter(log => {
     if (!searchTerm) return true
@@ -156,283 +163,174 @@ export default function AuditLogsViewer() {
 
   if (loading && logs.length === 0) {
     return (
-      <div className="dashboard-container">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando logs de auditoría...</p>
+      <PageShell title="Logs de Auditoría" description="Cargando trazabilidad completa del sistema.">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
+            <p className="text-sm font-semibold">Cargando logs de auditoría...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">
-            <Shield size={32} className="audit-header-icon" />
-            Logs de Auditoría
-          </h1>
-          <p className="dashboard-subtitle">
-            Trazabilidad completa de cambios en el sistema
-          </p>
-        </div>
-        <button onClick={loadLogs} className="refresh-btn" disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Actualizar
-        </button>
-      </div>
+    <PageShell
+      title={<span className="inline-flex items-center gap-3"><Shield className="h-7 w-7 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Logs de Auditoría</span>}
+      description="Trazabilidad completa de cambios críticos, usuarios, documentos y operaciones."
+      actions={<Button onClick={loadLogs} disabled={loading} className="gap-2"><RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Actualizar</Button>}
+    >
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr]">
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950"><Filter className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" /> Filtros</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Buscar</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-500" />
+                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar en logs..." className={`${inputClass} pl-9`} />
+              </div>
+            </label>
 
-      {/* Filters */}
-      <div className="activity-card audit-filters-card">
-        <div className="audit-filters-header">
-          <Filter size={20} className="text-blue-600" />
-          <h2 className="audit-filters-title">Filtros</h2>
-        </div>
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Tabla</span>
+              <select value={filters.table_name || ''} onChange={(e) => setFilters({ ...filters, table_name: e.target.value || undefined, page: 1 })} className={inputClass}>
+                <option value="">Todas las tablas</option>
+                <option value="auth_login_attempts">Logins</option>
+                <option value="eventos_pos">Eventos POS</option>
+                <option value="caja_audit_log">Auditoría de Caja</option>
+                <option value="integration_logs">Integraciones</option>
+                <option value="clientes">Clientes</option>
+                <option value="proveedores">Proveedores</option>
+                <option value="ordenes_compra">Órdenes de Compra</option>
+                <option value="recepciones">Recepciones</option>
+                <option value="pedidos_venta">Pedidos de Venta</option>
+                <option value="cpe">Comprobantes Electrónicos</option>
+                <option value="gre_guias">Guías de Remisión</option>
+                <option value="asientos_contables">Asientos Contables</option>
+                <option value="movimientos_bancarios">Movimientos Bancarios</option>
+                <option value="cuentas_por_cobrar">Cuentas por Cobrar</option>
+                <option value="cuentas_por_pagar">Cuentas por Pagar</option>
+                <option value="usuarios_sistema">Usuarios</option>
+                <option value="roles">Roles</option>
+              </select>
+            </label>
 
-        <div className="audit-filters-grid">
-          {/* Search */}
-          <div className="form-group">
-            <label className="form-label">Buscar</label>
-            <div className="audit-search-wrapper">
-              <Search size={16} className="audit-search-icon" />
-              <input
-                type="text"
-                placeholder="Buscar en logs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-input audit-search-input"
-              />
-            </div>
-          </div>
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Operación</span>
+              <select value={filters.operation || ''} onChange={(e) => setFilters({ ...filters, operation: e.target.value as any || undefined, page: 1 })} className={inputClass}>
+                <option value="">Todas las operaciones</option>
+                <option value="INSERT">INSERT</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+            </label>
 
-          {/* Table Filter */}
-          <div className="form-group">
-            <label className="form-label">Tabla</label>
-            <select
-              value={filters.table_name || ''}
-              onChange={(e) => setFilters({ ...filters, table_name: e.target.value || undefined, page: 1 })}
-              className="form-input"
-            >
-              <option value="">Todas las tablas</option>
-              <option value="ordenes_compra">Órdenes de Compra</option>
-              <option value="pedidos_venta">Pedidos de Venta</option>
-              <option value="cpe">Comprobantes Electrónicos</option>
-              <option value="gre_guias">Guías de Remisión</option>
-              <option value="asientos_contables">Asientos Contables</option>
-              <option value="movimientos_bancarios">Movimientos Bancarios</option>
-              <option value="cuentas_por_cobrar">Cuentas por Cobrar</option>
-              <option value="cuentas_por_pagar">Cuentas por Pagar</option>
-              <option value="usuarios_sistema">Usuarios</option>
-              <option value="roles">Roles</option>
-            </select>
-          </div>
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Usuario</span>
+              <select value={filters.user_id || ''} onChange={(e) => setFilters({ ...filters, user_id: e.target.value || undefined, page: 1 })} className={inputClass}>
+                <option value="">Todos los usuarios</option>
+                {users.map((user) => <option key={user.id} value={user.id}>{user.nombre} ({user.email})</option>)}
+              </select>
+            </label>
 
-          {/* Operation Filter */}
-          <div className="form-group">
-            <label className="form-label">Operación</label>
-            <select
-              value={filters.operation || ''}
-              onChange={(e) => setFilters({ ...filters, operation: e.target.value as any || undefined, page: 1 })}
-              className="form-input"
-            >
-              <option value="">Todas las operaciones</option>
-              <option value="INSERT">INSERT</option>
-              <option value="UPDATE">UPDATE</option>
-              <option value="DELETE">DELETE</option>
-            </select>
-          </div>
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Desde</span>
+              <input type="datetime-local" value={filters.start_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, start_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
+            </label>
 
-          {/* User Filter */}
-          <div className="form-group">
-            <label className="form-label">Usuario</label>
-            <select
-              value={filters.user_id || ''}
-              onChange={(e) => setFilters({ ...filters, user_id: e.target.value || undefined, page: 1 })}
-              className="form-input"
-            >
-              <option value="">Todos los usuarios</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.nombre} ({user.email})
-                </option>
-              ))}
-            </select>
-          </div>
+            <label className="space-y-2 text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+              <span>Hasta</span>
+              <input type="datetime-local" value={filters.end_date?.substring(0, 16) || ''} onChange={(e) => setFilters({ ...filters, end_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })} className={inputClass} />
+            </label>
 
-          {/* Date Range */}
-          <div className="form-group">
-            <label className="form-label">Desde</label>
-            <input
-              type="datetime-local"
-              value={filters.start_date?.substring(0, 16) || ''}
-              onChange={(e) => setFilters({ ...filters, start_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })}
-              className="form-input"
-            />
-          </div>
+            {(filters.table_name || filters.operation || filters.user_id || filters.start_date || filters.end_date) && (
+              <Button variant="secondary" onClick={() => setFilters({ page: 1, limit: 50 })}>Limpiar filtros</Button>
+            )}
+          </CardContent>
+        </Card>
 
-          <div className="form-group">
-            <label className="form-label">Hasta</label>
-            <input
-              type="datetime-local"
-              value={filters.end_date?.substring(0, 16) || ''}
-              onChange={(e) => setFilters({ ...filters, end_date: e.target.value ? `${e.target.value}:00` : undefined, page: 1 })}
-              className="form-input"
-            />
-          </div>
-        </div>
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+              <FileText className="h-5 w-5 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+              Registros ({pagination.total})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
+                <AlertCircle className="h-5 w-5" />
+                {error}
+              </div>
+            )}
 
-        {/* Clear Filters */}
-        {(filters.table_name || filters.operation || filters.user_id || filters.start_date || filters.end_date) && (
-          <button onClick={() => setFilters({ page: 1, limit: 50 })} className="btn btn-secondary btn-sm">
-            Limpiar Filtros
-          </button>
-        )}
-      </div>
-
-      {/* Error State */}
-      {error && (
-        <div className="activity-card audit-error-card">
-          <AlertCircle size={20} />
-          <p>{error}</p>
-        </div>
-      )}
-
-      {/* Logs List */}
-      <div className="activity-section">
-        <div className="activity-title">
-          <FileText size={24} />
-          Registros ({pagination.total})
-        </div>
-
-        {filteredLogs.length === 0 ? (
-          <div className="activity-card">
-            <div className="activity-empty">
-              <Database size={48} className="audit-empty-icon" />
-              <h3>No hay logs de auditoría</h3>
-              <p>No se encontraron registros que coincidan con los filtros seleccionados.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="activity-card">
-            <div className="activity-list">
-              {filteredLogs.map((log) => (
-                <div key={log.id} className="activity-item audit-log-item">
-                  <div className="audit-log-content">
-                    <div className="audit-log-header">
-                      <span className={getOperationClass(log.operation)}>{log.operation}</span>
-                      <strong className="audit-table-name">{log.table_name}</strong>
-                      {log.record_id && (
-                        <span className="audit-record-id">ID: {log.record_id.substring(0, 8)}...</span>
-                      )}
+            {filteredLogs.length === 0 ? (
+              <div className="rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-10 text-center group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50">
+                <Database className="mx-auto mb-4 h-10 w-10 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-500" />
+                <h3 className="font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">No hay logs de auditoría</h3>
+                <p className="mt-1 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">No se encontraron registros con los filtros seleccionados.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-cyan-400/10 overflow-hidden rounded-2xl border border-cyan-400/15 group-data-[erp-theme=light]/dashboard:divide-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200">
+                {filteredLogs.map((log) => (
+                  <div key={log.id} className="p-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Badge className={operationClass(log.operation)}>{log.operation}</Badge>
+                      <strong className="text-blue-100 group-data-[erp-theme=light]/dashboard:text-slate-950">{log.table_name}</strong>
+                      {log.record_id && <span className="font-mono text-xs text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">ID: {log.record_id.substring(0, 8)}...</span>}
                     </div>
-
-                    <div className="audit-log-meta">
-                      <span className="audit-meta-item">
-                        <Clock size={14} />
-                        {formatDate(log.timestamp)}
-                      </span>
-                      {log.user_id && (
-                        <span className="audit-meta-item">
-                          <User size={14} />
-                          {log.user_id.substring(0, 8)}...
-                        </span>
-                      )}
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+                      <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDate(log.timestamp)}</span>
+                      {log.user_id && <span className="flex items-center gap-1"><User className="h-4 w-4" />{log.user_id.substring(0, 8)}...</span>}
                       {log.ip_address && <span>{log.ip_address}</span>}
-                      {log.changed_fields && log.changed_fields.length > 0 && (
-                        <span className="audit-changed-badge">
-                          {log.changed_fields.length} campo(s) cambiado(s)
-                        </span>
-                      )}
+                      {log.changed_fields?.length ? <Badge className="border-blue-300/25 bg-blue-300/10 text-blue-100 group-data-[erp-theme=light]/dashboard:bg-blue-50 group-data-[erp-theme=light]/dashboard:text-blue-700">{log.changed_fields.length} campo(s)</Badge> : null}
                     </div>
 
-                    {/* Expanded Details */}
                     {expandedLogs.has(log.id) && (
-                      <div className="audit-details">
+                      <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         {log.old_values && Object.keys(log.old_values).length > 0 && (
-                          <div className="audit-detail-section">
-                            <h4 className="audit-detail-title audit-detail-title-old">Valores Anteriores</h4>
-                            <pre className="audit-json audit-json-old">
-                              {JSON.stringify(log.old_values, null, 2)}
-                            </pre>
+                          <div>
+                            <h4 className="mb-2 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">Valores anteriores</h4>
+                            <pre className={fieldBlockClass}>{JSON.stringify(log.old_values, null, 2)}</pre>
                           </div>
                         )}
-
                         {log.new_values && Object.keys(log.new_values).length > 0 && (
-                          <div className="audit-detail-section">
-                            <h4 className="audit-detail-title audit-detail-title-new">Valores Nuevos</h4>
-                            <pre className="audit-json audit-json-new">
-                              {JSON.stringify(log.new_values, null, 2)}
-                            </pre>
+                          <div>
+                            <h4 className="mb-2 text-sm font-semibold text-cyan-100 group-data-[erp-theme=light]/dashboard:text-blue-700">Valores nuevos</h4>
+                            <pre className={fieldBlockClass}>{JSON.stringify(log.new_values, null, 2)}</pre>
                           </div>
                         )}
-
-                        {log.changed_fields && log.changed_fields.length > 0 && (
-                          <div className="audit-detail-section">
-                            <h4 className="audit-detail-title">Campos Modificados</h4>
-                            <div className="audit-fields-list">
-                              {log.changed_fields.map((field) => (
-                                <span key={field} className="audit-field-badge">{field}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {log.metadata && Object.keys(log.metadata).length > 0 && (
-                          <div className="audit-detail-section">
-                            <h4 className="audit-detail-title">Metadatos</h4>
-                            <pre className="audit-json">
-                              {JSON.stringify(log.metadata, null, 2)}
-                            </pre>
+                          <div>
+                            <h4 className="mb-2 text-sm font-semibold text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">Metadatos</h4>
+                            <pre className={fieldBlockClass}>{JSON.stringify(log.metadata, null, 2)}</pre>
                           </div>
-                        )}
-
-                        {log.user_agent && (
-                          <p className="audit-user-agent">
-                            <strong>User Agent:</strong> {log.user_agent}
-                          </p>
                         )}
                       </div>
                     )}
 
-                    <button onClick={() => toggleExpand(log.id)} className="audit-expand-btn">
-                      {expandedLogs.has(log.id) ? (
-                        <><ChevronDown size={16} /> Ocultar detalles</>
-                      ) : (
-                        <><ChevronRight size={16} /> Ver detalles</>
-                      )}
-                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => toggleExpand(log.id)} className="mt-3 gap-2 text-slate-300 hover:text-cyan-100 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:text-blue-700">
+                      {expandedLogs.has(log.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      {expandedLogs.has(log.id) ? 'Ocultar detalles' : 'Ver detalles'}
+                    </Button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                ))}
+              </div>
+            )}
 
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="audit-pagination">
-            <button
-              onClick={() => setFilters({ ...filters, page: Math.max(1, pagination.page - 1) })}
-              disabled={pagination.page === 1}
-              className="btn btn-secondary"
-            >
-              Anterior
-            </button>
-            <span className="audit-pagination-info">
-              Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)
-            </span>
-            <button
-              onClick={() => setFilters({ ...filters, page: Math.min(pagination.totalPages, pagination.page + 1) })}
-              disabled={pagination.page >= pagination.totalPages}
-              className="btn btn-secondary"
-            >
-              Siguiente
-            </button>
-          </div>
-        )}
+            {pagination.totalPages > 1 && (
+              <div className="mt-5 flex flex-col items-center justify-center gap-3 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 sm:flex-row">
+                <Button variant="secondary" onClick={() => setFilters({ ...filters, page: Math.max(1, pagination.page - 1) })} disabled={pagination.page === 1}>Anterior</Button>
+                <span className="text-sm font-semibold text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">Página {pagination.page} de {pagination.totalPages} ({pagination.total} registros)</span>
+                <Button variant="secondary" onClick={() => setFilters({ ...filters, page: Math.min(pagination.totalPages, pagination.page + 1) })} disabled={pagination.page >= pagination.totalPages}>Siguiente</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </PageShell>
   )
 }

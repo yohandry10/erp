@@ -21,18 +21,18 @@ function Invoke-ApiRequest {
         [string]$Method = "GET",
         [object]$Body = $null
     )
-    
+
     try {
         $params = @{
             Uri = $Uri
             Method = $Method
             ContentType = "application/json"
         }
-        
+
         if ($Body) {
             $params.Body = ($Body | ConvertTo-Json -Depth 10)
         }
-        
+
         $response = Invoke-RestMethod @params
         return $response
     } catch {
@@ -148,7 +148,7 @@ Write-Host ""
 # 6. Rechazar cotización (ENVIADA → RECHAZADA)
 Write-Host "6. Rechazando cotización (ENVIADA → RECHAZADA)..." -ForegroundColor Yellow
 
-$response = Invoke-ApiRequest -Uri "$baseUrl/compras/cotizaciones/$cotizacionId2/rechazar" -Method Post -Body @{ 
+$response = Invoke-ApiRequest -Uri "$baseUrl/compras/cotizaciones/$cotizacionId2/rechazar" -Method Post -Body @{
     tenant_id = $tenantId
     motivo = "Precio muy alto, no se ajusta al presupuesto"
 }

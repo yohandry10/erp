@@ -92,7 +92,7 @@ Write-Host "POST $baseUrl/api/compras/devoluciones/${devolucionId}/emitir?tenant
 
 try {
     $emitResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/devoluciones/${devolucionId}/emitir?tenant_id=$tenantId" -Method Post -ContentType "application/json"
-    
+
     Write-Host "✅ Devolution emitted successfully!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Response:" -ForegroundColor Cyan
@@ -100,21 +100,21 @@ try {
     $emitResponse | ConvertTo-Json -Depth 10 | Write-Host
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
-    
+
     # Verify estado changed to EMITIDA
     if ($emitResponse.estado -eq "EMITIDA") {
         Write-Host "✅ Estado changed to EMITIDA" -ForegroundColor Green
     } else {
         Write-Host "❌ Estado is not EMITIDA: $($emitResponse.estado)" -ForegroundColor Red
     }
-    
+
     # Verify emitido_at is set
     if ($emitResponse.emitido_at) {
         Write-Host "✅ emitido_at is set: $($emitResponse.emitido_at)" -ForegroundColor Green
     } else {
         Write-Host "⚠️  emitido_at is not set" -ForegroundColor Yellow
     }
-    
+
 } catch {
     Write-Host "❌ Error emitting devolution: $($_.Exception.Message)" -ForegroundColor Red
     if ($_.Exception.Response) {
@@ -157,13 +157,13 @@ Write-Host ""
 Write-Host "Step 6: Verifying devolution details..." -ForegroundColor Yellow
 try {
     $devolucionFinal = Invoke-RestMethod -Uri "$baseUrl/api/compras/devoluciones/${devolucionId}?tenant_id=$tenantId" -Method Get
-    
+
     Write-Host "✅ Devolution retrieved successfully" -ForegroundColor Green
     Write-Host "   Número: $($devolucionFinal.numero)" -ForegroundColor Gray
     Write-Host "   Estado: $($devolucionFinal.estado)" -ForegroundColor Gray
     Write-Host "   Total: $($devolucionFinal.total)" -ForegroundColor Gray
     Write-Host "   Items: $($devolucionFinal.items.Count)" -ForegroundColor Gray
-    
+
     if ($devolucionFinal.estado -eq "EMITIDA") {
         Write-Host "✅ Final estado is EMITIDA" -ForegroundColor Green
     }

@@ -87,6 +87,12 @@ export default function ReportesRrhhPage() {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Reportes RRHH</h1>
+            <p className="dashboard-subtitle">Cargando indicadores de personal, ingresos recientes y distribución por área.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner" />
           <p>Cargando reportes de RRHH...</p>
@@ -121,7 +127,7 @@ export default function ReportesRrhhPage() {
       </div>
 
       {error && (
-        <div className="activity-card" style={{ borderColor: 'var(--red-200)', color: 'var(--red-700)' }}>
+        <div className="activity-card text-[var(--red-700)]">
           {error}
         </div>
       )}

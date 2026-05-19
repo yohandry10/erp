@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditLogDto, AuditFiltersDto } from './dto';
 
@@ -14,12 +14,15 @@ export interface AuditLog {
   tenant_id: string;
   ip_address?: string;
   user_agent?: string;
-  timestamp?: Date;
+  timestamp?: Date | string;
   metadata?: Record<string, any>;
 }
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+  private auditFailureCount = 0;
+
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
@@ -65,11 +68,15 @@ export class AuditService {
       });
 
     if (error) {
-      console.error('Error logging audit action:', error);
-      // Don't throw error to avoid breaking the main operation
-      // Audit logging should be non-blocking
+      this.auditFailureCount++;
+      this.logger.error(
+        `AUDIT_WRITE_FAILURE [count=${this.auditFailureCount}] ${auditLog.operation} on ${auditLog.table_name} ` +
+        `tenant=${auditLog.tenant_id} record=${auditLog.record_id || 'N/A'}: ${error.message}`,
+      );
+      // Non-blocking: don't throw to avoid breaking the main operation.
+      // The structured log above allows monitoring tools to alert on audit failures.
     } else {
-      console.log('📝 [AUDIT] Action logged -', auditLog.operation, 'on', auditLog.table_name);
+      this.logger.log(`Action logged - ${auditLog.operation} on ${auditLog.table_name}`);
     }
   }
 
@@ -124,10 +131,10 @@ export class AuditService {
    */
   async getAuditLogs(tenantId: string, filters?: AuditFiltersDto) {
     const client = this.supabase.getClient();
-    
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
     const offset = (page - 1) * limit;
+    const fetchLimit = offset + limit;
 
     // Query audit_log filtered by tenant_id
     let query = client
@@ -162,7 +169,7 @@ export class AuditService {
     // Order by timestamp DESC and apply pagination
     query = query
       .order('timestamp', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .range(0, fetchLimit - 1);
 
     const { data, error, count } = await query;
 
@@ -171,14 +178,248 @@ export class AuditService {
       throw new BadRequestException('Error al obtener logs de auditoría');
     }
 
+    const baseLogs = data || [];
+    const supplemental = await this.getSupplementalAuditLogs(tenantId, filters, fetchLimit);
+    const allLogs = [...baseLogs, ...supplemental.data]
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+    const pagedLogs = allLogs.slice(offset, offset + limit);
+    const total = (count || 0) + supplemental.count;
+
     return {
-      data: data || [],
+      data: pagedLogs,
       pagination: {
         page,
         limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+        total,
+        totalPages: Math.ceil(total / limit)
       }
+    };
+  }
+
+  private shouldIncludeSupplemental(filters: AuditFiltersDto | undefined, tableName: string): boolean {
+    return !filters?.table_name || filters.table_name === tableName;
+  }
+
+  private applyDateFilters(query: any, filters?: AuditFiltersDto, column = 'timestamp') {
+    if (filters?.start_date) query = query.gte(column, filters.start_date);
+    if (filters?.end_date) query = query.lte(column, filters.end_date);
+    return query;
+  }
+
+  private async getSupplementalAuditLogs(
+    tenantId: string,
+    filters: AuditFiltersDto | undefined,
+    fetchLimit: number,
+  ): Promise<{ data: AuditLog[]; count: number }> {
+    const data: AuditLog[] = [];
+    let count = 0;
+
+    if (filters?.operation && filters.operation !== 'INSERT') {
+      return { data, count };
+    }
+
+    const client = this.supabase.getClient();
+
+    if (this.shouldIncludeSupplemental(filters, 'auth_login_attempts')) {
+      try {
+        let query = client
+          .from('auth_login_attempts')
+          .select('*', { count: 'exact' })
+          .eq('tenant_id', tenantId);
+        query = this.applyDateFilters(query, filters, 'created_at');
+        query = query.order('created_at', { ascending: false }).range(0, fetchLimit - 1);
+        const { data: attempts, error, count: attemptsCount } = await query;
+        if (error) throw error;
+
+        const usersByEmail = await this.getUsersByEmail(tenantId, attempts || []);
+        const mapped = (attempts || [])
+          .map((attempt: any) => this.mapLoginAttempt(attempt, tenantId, usersByEmail))
+          .filter((log: AuditLog) => !filters?.user_id || log.user_id === filters.user_id);
+        data.push(...mapped);
+        count += filters?.user_id ? mapped.length : attemptsCount || mapped.length;
+      } catch (error) {
+        console.warn('⚠️ [AUDIT] No se pudieron cargar intentos de login en auditoría unificada:', error);
+      }
+    }
+
+    if (this.shouldIncludeSupplemental(filters, 'caja_audit_log')) {
+      try {
+        let query = client
+          .from('caja_audit_log')
+          .select('*', { count: 'exact' })
+          .eq('tenant_id', tenantId);
+        if (filters?.user_id) query = query.eq('usuario_id', filters.user_id);
+        query = this.applyDateFilters(query, filters, 'timestamp');
+        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
+        const { data: cashLogs, error, count: cashCount } = await query;
+        if (error) throw error;
+        const mapped = (cashLogs || []).map((item: any) => this.mapCashAuditLog(item, tenantId));
+        data.push(...mapped);
+        count += cashCount || mapped.length;
+      } catch (error) {
+        console.warn('⚠️ [AUDIT] No se pudieron cargar eventos de caja/POS en auditoría unificada:', error);
+      }
+    }
+
+    if (this.shouldIncludeSupplemental(filters, 'eventos_pos')) {
+      try {
+        let query = client
+          .from('eventos_pos')
+          .select('*', { count: 'exact' })
+          .eq('tenant_id', tenantId);
+        if (filters?.user_id) query = query.eq('usuario_id', filters.user_id);
+        query = this.applyDateFilters(query, filters, 'timestamp');
+        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
+        const { data: posLogs, error, count: posCount } = await query;
+        if (error) throw error;
+        const mapped = (posLogs || []).map((item: any) => this.mapPosEvent(item, tenantId));
+        data.push(...mapped);
+        count += posCount || mapped.length;
+      } catch (error) {
+        console.warn('⚠️ [AUDIT] No se pudieron cargar eventos POS en auditoría unificada:', error);
+      }
+    }
+
+    if (this.shouldIncludeSupplemental(filters, 'integration_logs')) {
+      try {
+        if (filters?.user_id) {
+          return { data, count };
+        }
+        let query = client
+          .from('integration_logs')
+          .select('*', { count: 'exact' })
+          .eq('tenant_id', tenantId);
+        query = this.applyDateFilters(query, filters, 'timestamp');
+        query = query.order('timestamp', { ascending: false }).range(0, fetchLimit - 1);
+        const { data: integrations, error, count: integrationsCount } = await query;
+        if (error) throw error;
+        const mapped = (integrations || []).map((item: any) => this.mapIntegrationLog(item, tenantId));
+        data.push(...mapped);
+        count += integrationsCount || mapped.length;
+      } catch (error) {
+        console.warn('⚠️ [AUDIT] No se pudieron cargar integraciones en auditoría unificada:', error);
+      }
+    }
+
+    return { data, count };
+  }
+
+  private async getUsersByEmail(tenantId: string, loginAttempts: any[]): Promise<Map<string, string>> {
+    const emails = Array.from(new Set(loginAttempts.map((attempt) => String(attempt.user_email || '').toLowerCase()).filter(Boolean)));
+    if (emails.length === 0) return new Map();
+
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('usuarios_sistema')
+      .select('id,email')
+      .eq('tenant_id', tenantId)
+      .in('email', emails);
+
+    if (error) {
+      console.warn('⚠️ [AUDIT] No se pudieron resolver usuarios de intentos de login:', error);
+      return new Map();
+    }
+
+    return new Map((data || []).map((user: any) => [String(user.email || '').toLowerCase(), user.id]));
+  }
+
+  private mapLoginAttempt(attempt: any, tenantId: string, usersByEmail: Map<string, string>): AuditLog {
+    const email = String(attempt.user_email || '').toLowerCase();
+    return {
+      id: attempt.id,
+      table_name: 'auth_login_attempts',
+      operation: 'INSERT',
+      record_id: attempt.id,
+      new_values: {
+        email: attempt.user_email,
+        success: attempt.success,
+        failed_reason: attempt.failed_reason,
+      },
+      user_id: usersByEmail.get(email),
+      tenant_id: tenantId,
+      ip_address: attempt.ip_address,
+      user_agent: attempt.user_agent,
+      timestamp: attempt.created_at,
+      metadata: {
+        source: 'auth_login_attempts',
+        accion: attempt.success ? 'LOGIN_OK' : 'LOGIN_FALLIDO',
+      },
+    };
+  }
+
+  private mapCashAuditLog(item: any, tenantId: string): AuditLog {
+    return {
+      id: item.id,
+      table_name: 'caja_audit_log',
+      operation: 'INSERT',
+      record_id: item.id,
+      new_values: {
+        evento: item.evento,
+        sesion_caja_id: item.sesion_caja_id,
+        resultado: item.resultado,
+        parametros: item.parametros,
+      },
+      user_id: item.usuario_id,
+      tenant_id: tenantId,
+      ip_address: item.ip_address,
+      user_agent: item.user_agent,
+      timestamp: item.timestamp || item.created_at,
+      metadata: {
+        source: 'caja_audit_log',
+        accion: item.evento,
+        riesgo: item.riesgo,
+      },
+    };
+  }
+
+  private mapPosEvent(item: any, tenantId: string): AuditLog {
+    return {
+      id: item.id,
+      table_name: 'eventos_pos',
+      operation: 'INSERT',
+      record_id: item.venta_id || item.id,
+      new_values: {
+        tipo_evento: item.tipo_evento,
+        subtipo: item.subtipo,
+        venta_id: item.venta_id,
+        producto_id: item.producto_id,
+        datos: item.datos,
+      },
+      user_id: item.usuario_id,
+      tenant_id: tenantId,
+      ip_address: item.ip_address,
+      user_agent: item.user_agent,
+      timestamp: item.timestamp || item.created_at,
+      metadata: {
+        source: 'eventos_pos',
+        accion: item.tipo_evento,
+        riesgo_nivel: item.riesgo_nivel,
+        sesion_caja_id: item.sesion_caja_id,
+      },
+    };
+  }
+
+  private mapIntegrationLog(item: any, tenantId: string): AuditLog {
+    return {
+      id: item.id,
+      table_name: 'integration_logs',
+      operation: 'INSERT',
+      record_id: item.correlacion_id || item.id,
+      new_values: {
+        servicio: item.servicio,
+        operacion: item.operacion || item.action,
+        status: item.status,
+        status_code: item.status_code,
+        correlacion_id: item.correlacion_id,
+        correlacion_tipo: item.correlacion_tipo,
+      },
+      tenant_id: tenantId,
+      timestamp: item.timestamp || item.created_at,
+      metadata: {
+        source: 'integration_logs',
+        error_message: item.error_message,
+        duration_ms: item.duration_ms,
+      },
     };
   }
 

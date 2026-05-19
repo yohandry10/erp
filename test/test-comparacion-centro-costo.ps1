@@ -38,7 +38,7 @@ Write-Host "📊 PASO 2: Obteniendo centros de costo..." -ForegroundColor Yellow
 
 try {
     $centrosResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Get -Headers $headers
-    
+
     if ($centrosResponse.success -and $centrosResponse.data.Count -gt 0) {
         $centroCosto = $centrosResponse.data[0]
         Write-Host "✅ Centro de costo obtenido: $($centroCosto.codigo) - $($centroCosto.nombre)" -ForegroundColor Green
@@ -46,13 +46,13 @@ try {
     } else {
         Write-Host "⚠️  No hay centros de costo disponibles" -ForegroundColor Yellow
         Write-Host "   Creando centro de costo de prueba..." -ForegroundColor Gray
-        
+
         $createCentroBody = @{
             codigo = "CC-TEST-001"
             nombre = "Centro de Costo Test"
             descripcion = "Centro de costo para pruebas"
         } | ConvertTo-Json
-        
+
         $createResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/centros-costo" -Method Post -Body $createCentroBody -Headers $headers
         $centroCosto = $createResponse.data
         Write-Host "✅ Centro de costo creado: $($centroCosto.codigo)" -ForegroundColor Green
@@ -70,10 +70,10 @@ Write-Host "📅 PASO 3: Obteniendo períodos contables..." -ForegroundColor Yel
 
 try {
     $periodosResponse = Invoke-RestMethod -Uri "$baseUrl/contabilidad/periodos" -Method Get -Headers $headers
-    
+
     if ($periodosResponse.success -and $periodosResponse.data.Count -gt 0) {
         $periodo = $periodosResponse.data | Where-Object { $_.estado -eq "ABIERTO" } | Select-Object -First 1
-        
+
         if ($periodo) {
             Write-Host "✅ Período obtenido: $($periodo.anio)-$($periodo.mes)" -ForegroundColor Green
             Write-Host "   ID: $($periodo.id)" -ForegroundColor Gray
@@ -100,22 +100,22 @@ Write-Host "💰 PASO 4: Obteniendo presupuestos vs real..." -ForegroundColor Ye
 try {
     $presupuestosUrl = "$baseUrl/contabilidad/presupuestos/centro/$($centroCosto.id)/periodo/$($periodo.id)"
     $presupuestosResponse = Invoke-RestMethod -Uri $presupuestosUrl -Method Get -Headers $headers
-    
+
     if ($presupuestosResponse.success) {
         Write-Host "✅ Presupuestos obtenidos exitosamente" -ForegroundColor Green
-        
+
         if ($presupuestosResponse.data.Count -gt 0) {
             Write-Host ""
             Write-Host "📋 Presupuestos encontrados: $($presupuestosResponse.data.Count)" -ForegroundColor Cyan
             Write-Host ""
-            
+
             foreach ($presupuesto in $presupuestosResponse.data) {
                 Write-Host "   Cuenta: $($presupuesto.cuenta_codigo) - $($presupuesto.cuenta_nombre)" -ForegroundColor White
                 Write-Host "   Presupuestado: S/ $($presupuesto.monto_presupuestado)" -ForegroundColor Gray
                 Write-Host "   Ejecutado: S/ $($presupuesto.monto_ejecutado)" -ForegroundColor Gray
                 Write-Host "   Disponible: S/ $($presupuesto.monto_disponible)" -ForegroundColor Gray
                 Write-Host "   % Ejecutado: $($presupuesto.porcentaje_ejecutado)%" -ForegroundColor Gray
-                
+
                 $alertColor = switch ($presupuesto.alerta) {
                     "SOBREGIRO" { "Red" }
                     "ADVERTENCIA" { "Yellow" }
@@ -144,33 +144,33 @@ try {
     $fechaDesde = "$($periodo.anio)-$($periodo.mes.ToString().PadLeft(2, '0'))-01"
     $lastDay = [DateTime]::DaysInMonth($periodo.anio, $periodo.mes)
     $fechaHasta = "$($periodo.anio)-$($periodo.mes.ToString().PadLeft(2, '0'))-$($lastDay.ToString().PadLeft(2, '0'))"
-    
+
     $reporteUrl = "$baseUrl/contabilidad/centros-costo/$($centroCosto.id)/reporte-gastos?fecha_desde=$fechaDesde&fecha_hasta=$fechaHasta"
     $reporteResponse = Invoke-RestMethod -Uri $reporteUrl -Method Get -Headers $headers
-    
+
     if ($reporteResponse.success) {
         Write-Host "✅ Reporte de gastos obtenido exitosamente" -ForegroundColor Green
         Write-Host ""
-        
+
         $reporte = $reporteResponse.data
-        
+
         Write-Host "📈 Resumen:" -ForegroundColor Cyan
         Write-Host "   Total Gastos: S/ $($reporte.resumen.total_gastos)" -ForegroundColor White
         Write-Host "   Total Movimientos: $($reporte.resumen.total_movimientos)" -ForegroundColor White
-        
+
         if ($reporte.resumen.cuenta_mayor_gasto) {
             Write-Host "   Mayor Gasto: $($reporte.resumen.cuenta_mayor_gasto.codigo) - $($reporte.resumen.cuenta_mayor_gasto.nombre)" -ForegroundColor White
             Write-Host "   Monto: S/ $($reporte.resumen.cuenta_mayor_gasto.monto)" -ForegroundColor White
         }
-        
+
         Write-Host ""
-        
+
         if ($reporte.gastos_por_cuenta.Count -gt 0) {
             Write-Host "📋 Gastos por cuenta (Top 5):" -ForegroundColor Cyan
             Write-Host ""
-            
+
             $topGastos = $reporte.gastos_por_cuenta | Select-Object -First 5
-            
+
             foreach ($gasto in $topGastos) {
                 Write-Host "   Cuenta: $($gasto.cuenta_codigo) - $($gasto.cuenta_nombre)" -ForegroundColor White
                 Write-Host "   Debe: S/ $($gasto.total_debe)" -ForegroundColor Gray

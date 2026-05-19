@@ -76,8 +76,8 @@ export const QuickClient: React.FC<Props> = ({ onCreated }) => {
   }
 
   return (
-    <div className="stat-card" style={{ padding: '1rem', gap: '0.5rem', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+    <div className="stat-card p-4 gap-2 flex flex-col">
+      <div className="flex gap-2">
         <input
           type="text"
           placeholder="Nombre/Razón Social"
@@ -88,22 +88,20 @@ export const QuickClient: React.FC<Props> = ({ onCreated }) => {
         <select
           value={form.tipo_documento}
           onChange={(e) => handleChange('tipo_documento', e.target.value)}
-          className="input"
-          style={{ maxWidth: '110px' }}
+          className="input max-w-[110px]"
         >
           <option value="DNI">DNI</option>
           <option value="RUC">RUC</option>
           <option value="CE">CE</option>
         </select>
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="flex gap-2">
         <input
           type="text"
           placeholder="Documento"
           value={form.numero_documento}
           onChange={(e) => handleChange('numero_documento', e.target.value)}
-          className="input"
-          style={{ flex: 1 }}
+          className="input flex-[1]"
         />
       </div>
       <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>

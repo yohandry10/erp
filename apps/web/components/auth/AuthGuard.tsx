@@ -51,36 +51,8 @@ export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
     })
   }, [session, loading, requireAuth, router, pathname])
 
-  // Mostrar loading mientras se verifica la sesión
   if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          border: '4px solid #f3f4f6',
-          borderTop: '4px solid #3b82f6',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
-        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-          Verificando sesión...
-        </p>
-        <style jsx>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    )
+    return <>{children}</>
   }
 
   // Si requiere auth y no hay sesión, no renderizar nada (se redirigirá)

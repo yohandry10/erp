@@ -25,76 +25,46 @@ export function ConfigurationModal({ isOpen, onClose, missingItems }: Configurat
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent style={{ maxWidth: '500px' }}>
+      <DialogContent className="max-w-[500px]">
         <DialogHeader>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            margin: '0 auto 1rem',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(251, 191, 36, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <AlertTriangle size={32} style={{ color: 'var(--warning-600)' }} />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+            <AlertTriangle className="h-8 w-8 text-blue-600" />
           </div>
-          <DialogTitle style={{ textAlign: 'center', fontSize: '1.5rem' }}>
+          <DialogTitle className="text-center text-2xl">
             Configuración Incompleta
           </DialogTitle>
-          <DialogDescription style={{ textAlign: 'center', fontSize: '1rem' }}>
+          <DialogDescription className="text-center text-base">
             Para comenzar a emitir comprobantes electrónicos, necesitas completar la configuración inicial.
           </DialogDescription>
         </DialogHeader>
 
-        <div style={{
-          padding: '1rem',
-          backgroundColor: 'rgba(251, 191, 36, 0.05)',
-          borderRadius: '8px',
-          border: '1px solid rgba(251, 191, 36, 0.2)',
-        }}>
-          <p style={{
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: 'var(--warning-900)',
-            marginBottom: '0.5rem',
-          }}>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-blue-950">
             Elementos faltantes:
           </p>
-          <ul style={{
-            margin: 0,
-            paddingLeft: '1.5rem',
-            fontSize: '0.875rem',
-            color: 'var(--warning-700)',
-          }}>
+          <ul className="m-0 list-disc pl-6 text-sm text-blue-800">
             {missingItems.map((item, index) => (
-              <li key={index} style={{ marginBottom: '0.25rem' }}>
+              <li key={index} className="mb-1">
                 {item}
               </li>
             ))}
           </ul>
         </div>
 
-        <DialogFooter style={{ gap: '0.5rem', marginTop: '1rem' }}>
+        <DialogFooter className="mt-4 gap-2">
           <Button
             variant="outline"
             onClick={handleCompleteLater}
-            style={{ flex: 1 }}
+            className="flex-1"
           >
             Completar Después
           </Button>
           <Button
             onClick={handleCompleteNow}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              justifyContent: 'center',
-            }}
+            className="flex flex-1 items-center justify-center gap-2"
           >
             Completar Ahora
-            <ArrowRight size={18} />
+            <ArrowRight className="h-[18px] w-[18px]" />
           </Button>
         </DialogFooter>
       </DialogContent>

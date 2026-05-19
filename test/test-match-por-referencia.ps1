@@ -154,14 +154,14 @@ try {
     Write-Host "  Movimientos extracto pendientes: $($responseMatch.data.movimientos_extracto_pendientes)" -ForegroundColor $(if ($responseMatch.data.movimientos_extracto_pendientes -eq 0) { "Green" } else { "Yellow" })
     Write-Host "  Porcentaje de match: $($responseMatch.data.porcentaje_match)%" -ForegroundColor $(if ($responseMatch.data.porcentaje_match -ge 80) { "Green" } else { "Yellow" })
     Write-Host ""
-    
+
     # Validar que todos los matches fueron por referencia
     if ($responseMatch.data.matches_por_referencia -eq 3) {
         Write-Host "✓ ÉXITO: Todos los movimientos fueron conciliados por referencia" -ForegroundColor Green
     } else {
         Write-Host "⚠ ADVERTENCIA: No todos los movimientos fueron conciliados por referencia" -ForegroundColor Yellow
     }
-    
+
     if ($responseMatch.data.porcentaje_match -eq 100) {
         Write-Host "✓ ÉXITO: 100% de los movimientos fueron conciliados" -ForegroundColor Green
     } else {

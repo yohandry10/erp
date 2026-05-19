@@ -13,6 +13,7 @@ import {
 } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { Upload, FileText, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { formatDate } from '@/lib/format-utils';
 
 interface MovimientoCSV {
   fecha: string;
@@ -51,7 +52,7 @@ const BANCO_TEMPLATES: Record<BancoTemplate, { name: string; description: string
   },
   GENERICO: {
     name: 'Genérico',
-    description: 'Formato: Fecha, Tipo, Monto, Descripción, Referencia',
+    description: 'Formato: Fecha, Descripción, Referencia, Tipo, Monto',
   },
 };
 
@@ -264,17 +265,17 @@ export function ImportarExtractoCSV({
   };
 
   const parseGenerico = (columns: string[], lineNumber: number): MovimientoCSV | null => {
-    // Formato Genérico: Fecha, Tipo, Monto, Descripción, Referencia
+    // Formato Genérico: Fecha, Descripción, Referencia, Tipo, Monto
     if (columns.length < 4) {
       throw new Error('Formato genérico inválido - columnas insuficientes');
     }
 
     const fecha = parseDate(columns[0]);
-    const tipoStr = columns[1].toUpperCase();
+    const descripcion = columns[1] || 'Sin descripción';
+    const referencia = columns[2] || `REF-${lineNumber}`;
+    const tipoStr = columns[3].toUpperCase();
     const tipo = tipoStr.includes('ABONO') || tipoStr.includes('CREDITO') || tipoStr.includes('INGRESO') ? 'ABONO' : 'CARGO';
-    const monto = Math.abs(parseFloat(columns[2]) || 0);
-    const descripcion = columns[3] || 'Sin descripción';
-    const referencia = columns[4] || `REF-${lineNumber}`;
+    const monto = Math.abs(parseFloat(columns[4]) || 0);
 
     if (monto === 0) {
       return null;
@@ -374,14 +375,6 @@ export function ImportarExtractoCSV({
       style: 'currency',
       currency: 'PEN',
     }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   const totalAbonos = previewData

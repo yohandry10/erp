@@ -16,25 +16,20 @@ export default function PresupuestoEjecucionDemo() {
   ]
 
   return (
-    <div style={{ padding: '2rem', background: '#f9fafb' }}>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '2rem', color: '#111827' }}>
+    <div className="p-8 bg-[#f9fafb]">
+      <h2 className="text-6 font-bold mb-8 text-gray-900">
         Indicadores de Ejecución Presupuestal
       </h2>
 
       {/* Badge Indicators */}
-      <div style={{ marginBottom: '3rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="mb-12">
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           1. Badges (Etiquetas)
         </h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 flex-wrap">
           {ejemplos.map((ejemplo, idx) => (
-            <div key={idx} style={{ 
-              background: 'white', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+            <div key={idx} className="bg-white p-4 rounded-2 shadow">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-[0.875rem] text-gray-500">
                 {ejemplo.label}
               </p>
               <PresupuestoEjecucionIndicator
@@ -50,20 +45,14 @@ export default function PresupuestoEjecucionDemo() {
       </div>
 
       {/* Progress Bars with Percentage */}
-      <div style={{ marginBottom: '3rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="mb-12">
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           2. Barras de Progreso con Porcentaje
         </h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 flex-wrap">
           {ejemplos.map((ejemplo, idx) => (
-            <div key={idx} style={{ 
-              background: 'white', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              minWidth: '150px'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+            <div key={idx} className="bg-white p-4 rounded-2 shadow min-w-[150px]">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-[0.875rem] text-gray-500">
                 {ejemplo.label}
               </p>
               <PresupuestoEjecucionIndicator
@@ -79,20 +68,14 @@ export default function PresupuestoEjecucionDemo() {
       </div>
 
       {/* Complete Indicators */}
-      <div style={{ marginBottom: '3rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="mb-12">
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           3. Indicadores Completos (Badge + Porcentaje + Barra)
         </h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 flex-wrap">
           {ejemplos.map((ejemplo, idx) => (
-            <div key={idx} style={{ 
-              background: 'white', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              minWidth: '150px'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+            <div key={idx} className="bg-white p-4 rounded-2 shadow min-w-[150px]">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-[0.875rem] text-gray-500">
                 {ejemplo.label}
               </p>
               <PresupuestoEjecucionIndicator
@@ -108,19 +91,14 @@ export default function PresupuestoEjecucionDemo() {
       </div>
 
       {/* Size Variations */}
-      <div style={{ marginBottom: '3rem' }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="mb-12">
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           4. Variaciones de Tamaño
         </h3>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 items-start flex-wrap">
           {['sm', 'md', 'lg'].map((size) => (
-            <div key={size} style={{ 
-              background: 'white', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
+            <div key={size} className="bg-white p-4 rounded-2 shadow">
+              <p className="mt-0 mr-0 mb-2 ml-0 text-[0.875rem] text-gray-500">
                 Tamaño: {size}
               </p>
               <PresupuestoEjecucionIndicator
@@ -137,10 +115,10 @@ export default function PresupuestoEjecucionDemo() {
 
       {/* Card Examples */}
       <div>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           5. Tarjetas de Presupuesto
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-4">
           <PresupuestoEjecucionCard
             titulo="Administración"
             subtitulo="CC-001"
@@ -169,61 +147,40 @@ export default function PresupuestoEjecucionDemo() {
       </div>
 
       {/* Color Legend */}
-      <div style={{ 
-        marginTop: '3rem', 
-        padding: '1.5rem', 
-        background: 'white', 
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#374151' }}>
+      <div className="mt-12 p-6 bg-white rounded-2 shadow">
+        <h3 className="text-[1.125rem] font-semibold mb-4 text-gray-700">
           Leyenda de Colores
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ 
-              width: '24px', 
-              height: '24px', 
-              borderRadius: '4px', 
-              background: '#10b981' 
-            }} />
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-[4px] bg-[#10b981]" />
             <div>
-              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+              <p className="m-0 text-[0.875rem] font-semibold text-gray-900">
                 Verde - Normal
               </p>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>
+              <p className="m-0 text-3 text-gray-500">
                 0% - 89.9% ejecutado
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ 
-              width: '24px', 
-              height: '24px', 
-              borderRadius: '4px', 
-              background: '#f59e0b' 
-            }} />
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-[4px] bg-amber-500" />
             <div>
-              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+              <p className="m-0 text-[0.875rem] font-semibold text-gray-900">
                 Amarillo - Advertencia
               </p>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>
+              <p className="m-0 text-3 text-gray-500">
                 90% - 99.9% ejecutado
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ 
-              width: '24px', 
-              height: '24px', 
-              borderRadius: '4px', 
-              background: '#ef4444' 
-            }} />
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-[4px] bg-red-500" />
             <div>
-              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+              <p className="m-0 text-[0.875rem] font-semibold text-gray-900">
                 Rojo - Sobregiro
               </p>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>
+              <p className="m-0 text-3 text-gray-500">
                 100% o más ejecutado
               </p>
             </div>

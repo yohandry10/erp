@@ -32,6 +32,7 @@ export interface DetalleAsiento {
 @Injectable()
 export class AsientosGeneratorService {
   private readonly logger = new Logger(AsientosGeneratorService.name);
+  private static readonly activeSourceEventIds = new Set<string>();
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -70,88 +71,136 @@ export class AsientosGeneratorService {
       );
     }
 
-    // Verificar idempotencia si se proporciona sourceEventId
-    if (sourceEventId) {
-      const asientoExistente = await this.buscarAsientoPorEvento(
-        tenantId,
-        sourceEventId
-      );
-      if (asientoExistente) {
-        console.log(
-          `⚠️ [Asientos] Asiento ya existe para evento ${sourceEventId}, retornando existente`
+    const localLockKey = sourceEventId ? `${tenantId}:${sourceEventId}` : null;
+    if (localLockKey) {
+      if (AsientosGeneratorService.activeSourceEventIds.has(localLockKey)) {
+        const asientoCreadoPorOtroFlujo = await this.waitForLocalSourceEventTurn(
+          tenantId,
+          sourceEventId,
+          localLockKey
         );
-        // Si el asiento ya existe, el evento igualmente debe salir del outbox
-        // para evitar que quede en pending indefinidamente.
-        await this.marcarEventoComoProcesado(sourceEventId);
-        return asientoExistente;
+        if (asientoCreadoPorOtroFlujo) {
+          await this.marcarEventoComoProcesado(sourceEventId);
+          return asientoCreadoPorOtroFlujo;
+        }
+
+        throw new Error(
+          `No se pudo verificar el asiento contable para evento concurrente ${sourceEventId}; se reintentara el procesamiento`
+        );
       }
+
+      AsientosGeneratorService.activeSourceEventIds.add(localLockKey);
     }
 
-    // Generar número de asiento
-    const asientoNumbering = await this.generarNumeroAsiento(tenantId, fecha);
+    try {
+      // Verificar idempotencia si se proporciona sourceEventId. La exclusión fuerte
+      // se delega a la constraint única en BD; el lock local solo evita carreras
+      // dentro del mismo proceso Node. No usamos advisory locks de sesión porque en
+      // PostgREST/Supabase pueden quedar atados a conexiones del pool.
+      if (sourceEventId) {
+        const asientoExistente = await this.buscarAsientoPorEvento(
+          tenantId,
+          sourceEventId
+        );
+        if (asientoExistente) {
+          console.log(
+            `⚠️ [Asientos] Asiento ya existe para evento ${sourceEventId}, retornando existente`
+          );
+          // Si el asiento ya existe, el evento igualmente debe salir del outbox
+          // para evitar que quede en pending indefinidamente.
+          await this.marcarEventoComoProcesado(sourceEventId);
+          return asientoExistente;
+        }
+      }
 
-    // Crear asiento contable
-    const { data: asiento, error: asientoError } = await this.supabaseService
-      .getClient()
-      .from('asientos_contables')
-      .insert({
-        tenant_id: tenantId,
-        numero_asiento: asientoNumbering.numero,
-        codigo: asientoNumbering.codigo,
-        fecha: fecha.toISOString(),
-        concepto,
-        descripcion: concepto,
-        referencia,
-        total_debe: totalDebe,
-        total_haber: totalHaber,
-        estado: 'CONFIRMADO',
-        source_event_id: sourceEventId
-      })
-      .select()
-      .single();
+      // La numeración se reserva con RPC transaccional en BD.
+      const asientoNumbering = await this.generarNumeroAsiento(tenantId, fecha);
 
-    if (asientoError) {
-      console.error('❌ [Asientos] Error creando asiento:', asientoError);
-      throw new Error(`Error creando asiento contable: ${asientoError.message}`);
-    }
-
-    // Crear detalles del asiento
-    const detallesConAsientoId = detalles.map(detalle => ({
-      tenant_id: tenantId,
-      asiento_id: asiento.id,
-      cuenta_id: detalle.cuenta_id,
-      debe: detalle.debe,
-      haber: detalle.haber,
-      nombre: detalle.concepto,
-      centro_costo_id: detalle.centro_costo_id
-    }));
-
-    const { error: detallesError } = await this.supabaseService
-      .getClient()
-      .from('detalle_asientos')
-      .insert(detallesConAsientoId);
-
-    if (detallesError) {
-      console.error('❌ [Asientos] Error creando detalles:', detallesError);
-      // Rollback: eliminar asiento
-      await this.supabaseService
+      // Crear asiento contable
+      const { data: asiento, error: asientoError } = await this.supabaseService
         .getClient()
         .from('asientos_contables')
-        .delete()
-        .eq('id', asiento.id);
-      throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
+        .insert({
+          tenant_id: tenantId,
+          numero_asiento: asientoNumbering.numero,
+          codigo: asientoNumbering.codigo,
+          fecha: fecha.toISOString(),
+          concepto,
+          descripcion: concepto,
+          referencia,
+          total_debe: totalDebe,
+          total_haber: totalHaber,
+          estado: 'CONFIRMADO',
+          source_event_id: sourceEventId
+        })
+        .select()
+        .single();
+
+      if (asientoError) {
+        if (sourceEventId && this.isSourceEventUniqueViolation(asientoError)) {
+          const asientoExistente = await this.waitForExistingAsiento(
+            tenantId,
+            sourceEventId
+          );
+          if (asientoExistente) {
+            this.logger.warn(
+              `⚠️ [Asientos] Inserción idempotente detectó asiento existente para evento ${sourceEventId}; retornando ${asientoExistente.id}`
+            );
+            await this.marcarEventoComoProcesado(sourceEventId);
+            return asientoExistente;
+          }
+        }
+
+        console.error('❌ [Asientos] Error creando asiento:', asientoError);
+        throw new Error(`Error creando asiento contable: ${asientoError.message}`);
+      }
+
+      // Crear detalles del asiento
+      const detallesConAsientoId = detalles.map(detalle => ({
+        tenant_id: tenantId,
+        asiento_id: asiento.id,
+        cuenta_id: detalle.cuenta_id,
+        debe: detalle.debe,
+        haber: detalle.haber,
+        nombre: detalle.concepto,
+        centro_costo_id: detalle.centro_costo_id
+      }));
+
+      const { error: detallesError } = await this.supabaseService
+        .getClient()
+        .from('detalle_asientos')
+        .insert(detallesConAsientoId);
+
+      if (detallesError) {
+        console.error('❌ [Asientos] Error creando detalles:', detallesError);
+        // Rollback: eliminar asiento
+        await this.supabaseService
+          .getClient()
+          .from('asientos_contables')
+          .delete()
+          .eq('id', asiento.id);
+        throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
+      }
+
+      console.log(
+        `✅ [Asientos] Asiento ${asientoNumbering.codigo} creado exitosamente para tenant ${tenantId}`
+      );
+
+      const asientoFinal = sourceEventId
+        ? await this.consolidarAsientoUnicoPorEvento(tenantId, sourceEventId, asiento as AsientoContable)
+        : asiento;
+
+      // Marcar evento como procesado en outbox si existe sourceEventId
+      if (sourceEventId) {
+        await this.marcarEventoComoProcesado(sourceEventId);
+      }
+
+      return asientoFinal as AsientoContable;
+    } finally {
+      if (localLockKey) {
+        AsientosGeneratorService.activeSourceEventIds.delete(localLockKey);
+      }
     }
-
-    console.log(
-      `✅ [Asientos] Asiento ${asientoNumbering.codigo} creado exitosamente para tenant ${tenantId}`
-    );
-
-    // Marcar evento como procesado en outbox si existe sourceEventId
-    if (sourceEventId) {
-      await this.marcarEventoComoProcesado(sourceEventId);
-    }
-
-    return asiento as AsientoContable;
   }
 
   @OnEvent('documento.fiscal.generado')
@@ -276,6 +325,13 @@ export class AsientosGeneratorService {
         return;
       }
 
+      if (String(evento.status).toLowerCase() === 'completed') {
+        this.logger.warn(
+          `⚠️ [Asientos] Evento ${eventId} ya estaba completado; no se degrada a fallido`
+        );
+        return;
+      }
+
       const retryCount = (evento?.retry_count || 0) + 1;
       const isPermanentFailure = retryCount >= maxRetries;
 
@@ -295,7 +351,8 @@ export class AsientosGeneratorService {
         .getClient()
         .from('outbox_events')
         .update(updateData)
-        .eq('event_id', eventId);
+        .eq('event_id', eventId)
+        .neq('status', 'completed');
 
       if (error) {
         this.logger.error(
@@ -435,6 +492,11 @@ export class AsientosGeneratorService {
 
     if (error) {
       if (error.code === 'PGRST116') {
+        if (this.isMultipleRowsSingleResultError(error)) {
+          throw new Error(
+            `Idempotencia contable corrupta: existe mas de un asiento para tenant ${tenantId} y evento ${sourceEventId}`
+          );
+        }
         return null;
       }
       console.error('❌ [Asientos] Error buscando asiento por evento:', error);
@@ -444,6 +506,111 @@ export class AsientosGeneratorService {
     return data as AsientoContable;
   }
 
+  private async waitForExistingAsiento(
+    tenantId: string,
+    sourceEventId: string
+  ): Promise<AsientoContable | null> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      const asiento = await this.buscarAsientoPorEvento(tenantId, sourceEventId);
+      if (asiento) {
+        return asiento;
+      }
+    }
+
+    return null;
+  }
+
+  private async waitForLocalSourceEventTurn(
+    tenantId: string,
+    sourceEventId: string,
+    localLockKey: string
+  ): Promise<AsientoContable | null> {
+    let waited = false;
+    const deadline = Date.now() + 10000;
+    while (AsientosGeneratorService.activeSourceEventIds.has(localLockKey)) {
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Timeout esperando lock local contable para evento concurrente ${sourceEventId}`
+        );
+      }
+      waited = true;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    return waited ? this.buscarAsientoPorEvento(tenantId, sourceEventId) : null;
+  }
+
+  private async consolidarAsientoUnicoPorEvento(
+    tenantId: string,
+    sourceEventId: string,
+    currentAsiento: AsientoContable
+  ): Promise<AsientoContable> {
+    const { data: asientos, error } = await this.supabaseService
+      .getClient()
+      .from('asientos_contables')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('source_event_id', sourceEventId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(
+        `No se pudo verificar idempotencia contable para evento ${sourceEventId}: ${error.message}`
+      );
+    }
+
+    const rows = Array.isArray(asientos) ? asientos : [];
+    if (rows.length <= 1) {
+      const onlyRow = rows[0] as AsientoContable | undefined;
+      return onlyRow?.source_event_id ? onlyRow : currentAsiento;
+    }
+
+    const keeper = rows[0] as AsientoContable;
+    const duplicates = rows.slice(1);
+
+    for (const duplicate of duplicates) {
+      // Soft-delete: marcar como ANULADO en vez de hard-delete para mantener audit trail contable
+      const { error: anularError } = await this.supabaseService
+        .getClient()
+        .from('asientos_contables')
+        .update({
+          estado: 'ANULADO',
+          observaciones: `Duplicado consolidado. Asiento conservado: ${keeper.id}. Evento: ${sourceEventId}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', duplicate.id);
+
+      if (anularError) {
+        throw new Error(
+          `No se pudo anular duplicado contable ${duplicate.id} para evento ${sourceEventId}: ${anularError.message}`
+        );
+      }
+    }
+
+    this.logger.warn(
+      `⚠️ [Asientos] Se consolidaron ${duplicates.length} asientos duplicados para evento ${sourceEventId}; se conserva ${keeper.id}`
+    );
+
+    return keeper;
+  }
+
+  private isMultipleRowsSingleResultError(error: any): boolean {
+    const text = `${error?.details ?? ''} ${error?.message ?? ''}`.toLowerCase();
+    return (
+      text.includes('multiple') ||
+      /contain[s]?\s+([2-9]|\d{2,})\s+rows/.test(text)
+    );
+  }
+
+  private isSourceEventUniqueViolation(error: any): boolean {
+    const text = `${error?.details ?? ''} ${error?.message ?? ''}`.toLowerCase();
+    return (
+      error?.code === '23505' &&
+      text.includes('source_event_id')
+    );
+  }
+
   /**
    * Genera un número de asiento único para el período
    */
@@ -451,44 +618,25 @@ export class AsientosGeneratorService {
     tenantId: string,
     fecha: Date
   ): Promise<{ numero: number; codigo: string }> {
-    const anio = fecha.getFullYear();
-    const mes = fecha.getMonth() + 1;
-    const periodo = `${anio}${String(mes).padStart(2, '0')}`;
-
-    // Obtener números existentes del período (solo el campo para evitar payload grande)
     const { data, error } = await this.supabaseService
       .getClient()
-      .from('asientos_contables')
-      .select('numero_asiento')
-      .eq('tenant_id', tenantId)
-      .gte('fecha', `${anio}-${String(mes).padStart(2, '0')}-01`)
-      .lt(
-        'fecha',
-        mes === 12
-          ? `${anio + 1}-01-01`
-          : `${anio}-${String(mes + 1).padStart(2, '0')}-01`
-      );
+      .rpc('obtener_siguiente_numero_asiento', {
+        p_tenant_id: tenantId,
+        p_fecha: fecha.toISOString(),
+      });
 
     if (error) {
-      console.error('❌ [Asientos] Error obteniendo último número:', error);
+      throw new Error(`Error reservando número de asiento: ${error.message}`);
     }
 
-    let siguienteNumero = 1;
-    if (data && data.length > 0) {
-      const numerosValidos = data
-        .map((d) => Number(d.numero_asiento))
-        .filter((n) => Number.isInteger(n) && n > 0);
-
-      if (numerosValidos.length > 0) {
-        const maxNumero = Math.max(...numerosValidos);
-        siguienteNumero = maxNumero + 1;
-      }
+    const row = Array.isArray(data) ? data[0] : data;
+    const numero = Number(row?.numero);
+    const codigo = row?.codigo;
+    if (!Number.isInteger(numero) || numero <= 0 || !codigo) {
+      throw new Error('La numeración contable no devolvió un número válido');
     }
 
-    return {
-      numero: siguienteNumero,
-      codigo: `A-${periodo}-${String(siguienteNumero).padStart(6, '0')}`,
-    };
+    return { numero, codigo };
   }
 
   /**
@@ -975,38 +1123,53 @@ export class AsientosGeneratorService {
 
   /**
    * Genera asiento de planilla
-   * Dr 62 Gastos Personal [sueldos + aportes]
-   *   Cr 40 Tributos [aportes + retenciones]
-   *   Cr 41 Remuneraciones [neto a pagar]
+   * Dr 621 Remuneraciones [total bruto]
+   *   Cr 403 Instituciones publicas [descuentos/retenciones]
+   *   Cr 411 Remuneraciones por pagar [neto a pagar]
    */
   async generarAsientoPlanilla(evento: any): Promise<AsientoContable> {
     try {
-      const { tenant_id, fecha, sueldos, aportes, retenciones, neto, centro_costo_id } = evento;
+      const { tenant_id, fecha, sueldos, retenciones, neto, centro_costo_id } = evento;
+      const totalIngresos = Number(sueldos ?? 0);
+      const totalDescuentos = Number(retenciones ?? 0);
+      const totalNeto = Number(neto ?? 0);
+      const sourceEventId = evento.source_event_id || evento.planilla_id || evento.event_id;
+
+      // Validar ecuación: sueldos = retenciones + neto (tolerancia 0.01)
+      const diferencia = Math.abs(totalIngresos - (totalDescuentos + totalNeto));
+      if (diferencia > 0.01) {
+        this.logger.error(
+          `PLANILLA_IMBALANCE sueldos=${totalIngresos} != retenciones(${totalDescuentos}) + neto(${totalNeto}), diff=${diferencia.toFixed(2)}`,
+        );
+        throw new Error(
+          `Asiento de planilla desbalanceado: sueldos (${totalIngresos}) != retenciones (${totalDescuentos}) + neto (${totalNeto}). Diferencia: ${diferencia.toFixed(2)}`,
+        );
+      }
 
       // Obtener cuentas del plan
       const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
         tenant_id,
-        ['62', '40', '41']
+        ['621', '403', '411']
       );
 
       const detalles: DetalleAsiento[] = [
         {
-          cuenta_id: cuentas.get('62')!.id,
-          debe: sueldos + aportes,
+          cuenta_id: cuentas.get('621')!.id,
+          debe: totalIngresos,
           haber: 0,
-          concepto: 'Gastos de Personal',
+          concepto: 'Gastos de Personal - Remuneraciones',
           centro_costo_id
         },
         {
-          cuenta_id: cuentas.get('40')!.id,
+          cuenta_id: cuentas.get('403')!.id,
           debe: 0,
-          haber: aportes + retenciones,
-          concepto: 'Tributos por Pagar'
+          haber: totalDescuentos,
+          concepto: 'Instituciones publicas por pagar'
         },
         {
-          cuenta_id: cuentas.get('41')!.id,
+          cuenta_id: cuentas.get('411')!.id,
           debe: 0,
-          haber: neto,
+          haber: totalNeto,
           concepto: 'Remuneraciones por Pagar'
         }
       ];
@@ -1017,7 +1180,7 @@ export class AsientosGeneratorService {
         'Planilla de sueldos',
         detalles,
         evento.referencia,
-        evento.event_id
+        sourceEventId
       );
     } catch (error) {
       if (evento.event_id) {

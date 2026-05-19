@@ -6,7 +6,7 @@ Write-Host ""
 
 # Configuración
 $baseUrl = "http://localhost:3002"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
 $headers = @{

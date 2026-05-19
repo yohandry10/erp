@@ -8,6 +8,7 @@ import { EventBusService } from '../../../shared/events/event-bus.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
 import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { CreateDevolucionProveedorDto } from '../dto/create-devolucion-proveedor.dto';
+import { AuditService } from '../../audit/audit.service';
 
 describe('DevolucionesProveedorService', () => {
   let service: DevolucionesProveedorService;
@@ -16,6 +17,7 @@ describe('DevolucionesProveedorService', () => {
   let inventarioService: jest.Mocked<InventarioService>;
   let eventBusService: jest.Mocked<EventBusService>;
   let eventEmitter: jest.Mocked<EventEmitterService>;
+  let auditService: jest.Mocked<Pick<AuditService, 'registrarCambio'>>;
   let awaitedQueryResults: Array<{ data: any; error: any }>;
 
   const mockDevolucion = {
@@ -95,6 +97,9 @@ describe('DevolucionesProveedorService', () => {
     const mockEventEmitterService = {
       emit: jest.fn(),
     };
+    const mockAuditService = {
+      registrarCambio: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -128,6 +133,10 @@ describe('DevolucionesProveedorService', () => {
               return Promise.resolve({ igv, total });
             })
           }
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         }
       ]
     }).compile();
@@ -138,6 +147,7 @@ describe('DevolucionesProveedorService', () => {
     inventarioService = module.get(InventarioService);
     eventBusService = module.get(EventBusService);
     eventEmitter = module.get(EventEmitterService) as jest.Mocked<EventEmitterService>;
+    auditService = module.get(AuditService) as jest.Mocked<Pick<AuditService, 'registrarCambio'>>;
     awaitedQueryResults = [];
 
     // Default resolve to avoid undefined in tests that don't override
@@ -183,7 +193,8 @@ describe('DevolucionesProveedorService', () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: {
           id: 'recepcion-123',
-          orden_id: 'orden-123'
+          orden_id: 'orden-123',
+          estado: 'CERRADA',
         },
         error: null
       });
@@ -216,6 +227,26 @@ describe('DevolucionesProveedorService', () => {
       expect(repository.generarNumeroDevolucion).toHaveBeenCalledWith('tenant-123');
       expect(repository.crear).toHaveBeenCalled();
       expect(repository.crearItems).toHaveBeenCalled();
+      expect(auditService.registrarCambio).toHaveBeenCalledWith(
+        'devoluciones_proveedor',
+        'INSERT',
+        'user-123',
+        {
+          new: expect.objectContaining({
+            id: 'devolucion-123',
+            numero: 'DEV-2024-0001',
+            items: mockDevolucion.items,
+          }),
+        },
+        'tenant-123',
+        'devolucion-123',
+        expect.objectContaining({
+          accion: 'CREAR_DEVOLUCION_PROVEEDOR',
+          orden_id: 'orden-123',
+          recepcion_id: 'recepcion-123',
+          proveedor_id: 'proveedor-123',
+        }),
+      );
     });
 
     it('should throw NotFoundException when orden not found', async () => {
@@ -277,7 +308,8 @@ describe('DevolucionesProveedorService', () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: {
           id: 'recepcion-123',
-          orden_id: 'different-orden'
+          orden_id: 'different-orden',
+          estado: 'CERRADA',
         },
         error: null
       });
@@ -317,7 +349,8 @@ describe('DevolucionesProveedorService', () => {
       mockSupabaseClient.single.mockResolvedValueOnce({
         data: {
           id: 'recepcion-123',
-          orden_id: 'orden-123'
+          orden_id: 'orden-123',
+          estado: 'CERRADA',
         },
         error: null
       });
@@ -369,6 +402,7 @@ describe('DevolucionesProveedorService', () => {
         data: {
           id: 'recepcion-123',
           orden_id: 'orden-123',
+          estado: 'CERRADA',
         },
         error: null,
       });
@@ -408,6 +442,7 @@ describe('DevolucionesProveedorService', () => {
         data: {
           id: 'recepcion-123',
           orden_id: 'orden-123',
+          estado: 'CERRADA',
         },
         error: null,
       });
@@ -446,8 +481,8 @@ describe('DevolucionesProveedorService', () => {
       expect(repository.crear).not.toHaveBeenCalled();
     });
 
-    it('should create devolucion without recepcion_id', async () => {
-      const dtoWithoutRecepcion = { ...validDto };
+    it('should reject devolucion without recepcion_id', async () => {
+      const dtoWithoutRecepcion: Partial<CreateDevolucionProveedorDto> = { ...validDto };
       delete dtoWithoutRecepcion.recepcion_id;
 
       mockSupabaseClient.single.mockResolvedValue({
@@ -460,20 +495,34 @@ describe('DevolucionesProveedorService', () => {
         error: null
       });
 
-      repository.generarNumeroDevolucion.mockResolvedValue('DEV-2024-0001');
-      repository.crear.mockResolvedValue({ ...mockDevolucion, recepcion_id: null });
-      repository.crearItems.mockResolvedValue(mockDevolucion.items);
+      await expect(service.crearDevolucion('tenant-123', dtoWithoutRecepcion as any, 'user-123'))
+        .rejects.toThrow('Debe seleccionar una recepción cerrada');
+      expect(repository.crear).not.toHaveBeenCalled();
+    });
 
-      const result = await service.crearDevolucion('tenant-123', dtoWithoutRecepcion, 'user-123');
+    it('should reject devolucion when recepcion is not closed', async () => {
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'orden-123',
+          numero: 'OC-2024-001',
+          proveedor_id: 'proveedor-123',
+          estado: 'RECIBIDA'
+        },
+        error: null
+      });
 
-      expect(result).toBeDefined();
-      expect(repository.crear).toHaveBeenCalledWith(
-        'tenant-123',
-        expect.objectContaining({
-          recepcion_id: null
-        }),
-        'user-123'
-      );
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: {
+          id: 'recepcion-123',
+          orden_id: 'orden-123',
+          estado: 'BORRADOR',
+        },
+        error: null,
+      });
+
+      await expect(service.crearDevolucion('tenant-123', validDto, 'user-123'))
+        .rejects.toThrow('Solo se pueden devolver items de recepciones cerradas');
+      expect(repository.crear).not.toHaveBeenCalled();
     });
   });
 
@@ -548,6 +597,23 @@ describe('DevolucionesProveedorService', () => {
         'tenant-123',
         'EMITIDA',
         'user-123'
+      );
+      expect(auditService.registrarCambio).toHaveBeenCalledWith(
+        'devoluciones_proveedor',
+        'UPDATE',
+        'user-123',
+        {
+          old: { estado: 'PENDIENTE' },
+          new: { estado: 'EMITIDA' },
+        },
+        'tenant-123',
+        'devolucion-123',
+        expect.objectContaining({
+          accion: 'EMITIR_DEVOLUCION_PROVEEDOR',
+          orden_id: 'orden-123',
+          recepcion_id: 'recepcion-123',
+          proveedor_id: 'proveedor-123',
+        }),
       );
       expect(eventBusService.emitDevolucionProveedorEmitida).toHaveBeenCalledWith(
         expect.objectContaining({

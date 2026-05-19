@@ -60,7 +60,7 @@ $ordenBody = @{
 
 try {
     $ordenResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes" -Method Post -Body $ordenBody -ContentType "application/json"
-    
+
     if ($ordenResponse.success) {
         $ordenId = $ordenResponse.data.id
         Write-Host "✅ Orden created successfully: $($ordenResponse.data.numero)" -ForegroundColor Green
@@ -99,7 +99,7 @@ $recepcion1Body = @{
 
 try {
     $recepcion1Response = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/recepciones" -Method Post -Body $recepcion1Body -ContentType "application/json"
-    
+
     if ($recepcion1Response.success) {
         $recepcion1Id = $recepcion1Response.data.id
         Write-Host "✅ First recepcion created: $($recepcion1Response.data.numero)" -ForegroundColor Green
@@ -146,7 +146,7 @@ $recepcion2Body = @{
 
 try {
     $recepcion2Response = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/recepciones" -Method Post -Body $recepcion2Body -ContentType "application/json"
-    
+
     if ($recepcion2Response.success) {
         $recepcion2Id = $recepcion2Response.data.id
         Write-Host "✅ Second recepcion created: $($recepcion2Response.data.numero)" -ForegroundColor Green
@@ -163,15 +163,15 @@ try {
 Write-Host "Step 4: Getting recepciones for orden..." -ForegroundColor Yellow
 try {
     $recepcionesResponse = Invoke-RestMethod -Uri "$baseUrl/api/compras/ordenes/$ordenId/recepciones?tenant_id=$tenantId" -Method Get
-    
+
     if ($recepcionesResponse.success) {
         Write-Host "✅ Recepciones retrieved successfully" -ForegroundColor Green
         Write-Host "   Total recepciones: $($recepcionesResponse.count)" -ForegroundColor Gray
         Write-Host ""
-        
+
         Write-Host "Recepciones Details:" -ForegroundColor Cyan
         Write-Host "===================" -ForegroundColor Cyan
-        
+
         foreach ($recepcion in $recepcionesResponse.data) {
             Write-Host ""
             Write-Host "Recepcion: $($recepcion.numero)" -ForegroundColor White
@@ -179,11 +179,11 @@ try {
             Write-Host "  Estado: $($recepcion.estado)" -ForegroundColor Gray
             Write-Host "  Fecha: $($recepcion.fecha_recepcion)" -ForegroundColor Gray
             Write-Host "  Recibido por: $($recepcion.recibido_por)" -ForegroundColor Gray
-            
+
             if ($recepcion.observaciones) {
                 Write-Host "  Observaciones: $($recepcion.observaciones)" -ForegroundColor Gray
             }
-            
+
             if ($recepcion.recepcion_items -and $recepcion.recepcion_items.Count -gt 0) {
                 Write-Host "  Items ($($recepcion.recepcion_items.Count)):" -ForegroundColor Gray
                 foreach ($item in $recepcion.recepcion_items) {
@@ -199,7 +199,7 @@ try {
                 }
             }
         }
-        
+
         Write-Host ""
         Write-Host "========================================" -ForegroundColor Cyan
         Write-Host "✅ ALL TESTS PASSED" -ForegroundColor Green
@@ -208,7 +208,7 @@ try {
         Write-Host "Frontend Test:" -ForegroundColor Yellow
         Write-Host "Visit: $baseUrl/dashboard/compras/ordenes/$ordenId" -ForegroundColor Cyan
         Write-Host "The recepciones panel should display the 2 recepciones created above." -ForegroundColor Gray
-        
+
     } else {
         Write-Host "❌ Failed to get recepciones: $($recepcionesResponse.error)" -ForegroundColor Red
         exit 1

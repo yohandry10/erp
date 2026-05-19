@@ -148,17 +148,7 @@ export default function ProgramacionPagosPage() {
     if (!config) return null
     
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: config.color,
-        color: 'white'
-      }}>
+      <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-medium text-white">
         {config.label}
       </span>
     )
@@ -226,18 +216,7 @@ export default function ProgramacionPagosPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.back()}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              marginBottom: '1rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            onClick={() => router.back()} className="p-2 rounded-[6px] border bg-white cursor-pointer mb-4 inline-flex items-center gap-2"
           >
             <ChevronLeft size={16} />
             Volver
@@ -245,23 +224,10 @@ export default function ProgramacionPagosPage() {
           <h1 className="dashboard-title">Programación de Pagos</h1>
           <p className="dashboard-subtitle">Planifica los pagos a proveedores por fecha de vencimiento</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           {selectedPagos.size > 0 && (
             <button
-              onClick={handlePagoMasivo}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: '#3b82f6',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
+              onClick={handlePagoMasivo} className="py-3 px-6 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2"
             >
               <CreditCard size={16} />
               Pagar Seleccionados ({selectedPagos.size})
@@ -269,8 +235,7 @@ export default function ProgramacionPagosPage() {
           )}
           <button
             onClick={loadProgramacion}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+            className="refresh-btn py-3 px-6"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -279,12 +244,12 @@ export default function ProgramacionPagosPage() {
       </div>
 
       {/* Estadísticas */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL POR PAGAR (PEN)</h3>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem', color: '#ef4444' }}>
+          <div className="stat-value text-6 text-red-500">
             {formatCurrency(totalPorPagarPEN, 'PEN')}
           </div>
           <div className="stat-subtitle">
@@ -296,7 +261,7 @@ export default function ProgramacionPagosPage() {
           <div className="stat-header">
             <h3>TOTAL POR PAGAR (USD)</h3>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.5rem', color: '#ef4444' }}>
+          <div className="stat-value text-6 text-red-500">
             {formatCurrency(totalPorPagarUSD, 'USD')}
           </div>
           <div className="stat-subtitle">
@@ -307,9 +272,9 @@ export default function ProgramacionPagosPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>VENCIDOS</h3>
-            <AlertCircle className="stat-icon" style={{ color: '#ef4444' }} />
+            <AlertCircle className="stat-icon text-red-500" />
           </div>
-          <div className="stat-value" style={{ color: '#ef4444' }}>
+          <div className="stat-value text-red-500">
             {pagosPorUrgencia.VENCIDA}
           </div>
           <div className="stat-subtitle">
@@ -320,9 +285,9 @@ export default function ProgramacionPagosPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>URGENTES</h3>
-            <AlertCircle className="stat-icon" style={{ color: '#f59e0b' }} />
+            <AlertCircle className="stat-icon text-amber-500" />
           </div>
-          <div className="stat-value" style={{ color: '#f59e0b' }}>
+          <div className="stat-value text-amber-500">
             {pagosPorUrgencia.HOY + pagosPorUrgencia.URGENTE}
           </div>
           <div className="stat-subtitle">
@@ -333,86 +298,48 @@ export default function ProgramacionPagosPage() {
 
       {/* Filtros */}
       <div className="activity-section">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1rem'
-        }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-[1.125rem] font-semibold flex items-center gap-2">
             <Filter size={20} />
             Filtros
           </h2>
           <button
-            onClick={clearFilters}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
+            onClick={clearFilters} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer text-[0.875rem]"
           >
             Limpiar Filtros
           </button>
         </div>
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '1rem' 
-        }}>
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-medium mb-2">
               Fecha Desde
             </label>
             <input
               type="date"
               value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setFechaDesde(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-medium mb-2">
               Fecha Hasta
             </label>
             <input
               type="date"
               value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setFechaHasta(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-medium mb-2">
               Estado
             </label>
             <select
               value={estado}
-              onChange={(e) => setEstado(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setEstado(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
               <option value="">Todos</option>
               <option value="PENDIENTE">Pendiente</option>
@@ -422,19 +349,12 @@ export default function ProgramacionPagosPage() {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-medium mb-2">
               Urgencia
             </label>
             <select
               value={urgenciaFilter}
-              onChange={(e) => setUrgenciaFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setUrgenciaFilter(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
             >
               <option value="">Todas</option>
               <option value="VENCIDA">Vencida</option>
@@ -456,52 +376,51 @@ export default function ProgramacionPagosPage() {
               <p>Cargando programación de pagos...</p>
             </div>
           ) : pagos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <Calendar size={48} style={{ margin: '0 auto 1rem', color: '#d1d5db' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <div className="text-center p-12 text-gray-500">
+              <Calendar size={48} className="text-[#d1d5db]" />
+              <h3 className="text-[1.125rem] font-semibold mb-2">
                 No hay pagos programados
               </h3>
               <p>No se encontraron cuentas por pagar con los filtros seleccionados</p>
             </div>
           ) : (
             <>
-              <div style={{ overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="overflow-auto">
+                <table className="w-[100%]">
                   <thead>
-                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                      <th style={{ padding: '1rem', width: '40px' }}>
+                    <tr>
+                      <th className="p-4 w-10">
                         <input
                           type="checkbox"
                           checked={selectedPagos.size === pagos.length && pagos.length > 0}
-                          onChange={handleSelectAll}
-                          style={{ cursor: 'pointer' }}
+                          onChange={handleSelectAll} className="cursor-pointer"
                         />
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Urgencia
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Proveedor
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         N° Documento
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Emisión
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Vencimiento
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Total
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Saldo
                       </th>
-                      <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-center p-4 font-semibold text-3 text-gray-500">
                         Estado
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Acciones
                       </th>
                     </tr>
@@ -509,49 +428,41 @@ export default function ProgramacionPagosPage() {
                   <tbody>
                     {pagos.map((pago) => (
                       <tr 
-                        key={pago.id} 
-                        style={{ 
-                          borderBottom: '1px solid rgba(0,0,0,0.05)',
-                          background: selectedPagos.has(pago.id) ? 'rgba(59, 130, 246, 0.05)' : 'transparent'
-                        }}
+                        key={pago.id} className="border-b"
                       >
-                        <td style={{ padding: '1rem' }}>
+                        <td className="p-4">
                           <input
                             type="checkbox"
                             checked={selectedPagos.has(pago.id)}
-                            onChange={() => handleSelectPago(pago.id)}
-                            style={{ cursor: 'pointer' }}
+                            onChange={() => handleSelectPago(pago.id)} className="cursor-pointer"
                           />
                         </td>
-                        <td style={{ padding: '1rem' }}>
+                        <td className="p-4">
                           {getUrgenciaBadge(pago.urgencia)}
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-medium">
                             {pago.proveedor?.razon_social || 'N/A'}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                          <div className="text-3 text-gray-500">
                             RUC: {pago.proveedor?.ruc || 'N/A'}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-semibold">
                             {pago.numero_documento}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem]">
                             {formatDate(pago.fecha_emision)}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-medium">
                             {formatDate(pago.fecha_vencimiento)}
                           </div>
-                          <div style={{ 
-                            fontSize: '0.75rem', 
-                            color: pago.dias_hasta_vencimiento < 0 ? '#ef4444' : '#6b7280'
-                          }}>
+                          <div className="text-3">
                             {pago.dias_hasta_vencimiento < 0 
                               ? `Vencido hace ${Math.abs(pago.dias_hasta_vencimiento)} días`
                               : pago.dias_hasta_vencimiento === 0
@@ -560,41 +471,24 @@ export default function ProgramacionPagosPage() {
                             }
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                        <td className="p-4 text-right">
+                          <div className="text-[0.875rem] font-semibold">
                             {formatCurrency(pago.total, pago.moneda)}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#ef4444' }}>
+                        <td className="p-4 text-right">
+                          <div className="text-[0.875rem] font-bold text-red-500">
                             {formatCurrency(pago.saldo, pago.moneda)}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            background: pago.estado === 'PENDIENTE' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            color: pago.estado === 'PENDIENTE' ? '#f59e0b' : '#ef4444'
-                          }}>
+                        <td className="p-4 text-center">
+                          <span className="py-1 px-3 rounded-full text-3 font-medium">
                             {pago.estado}
                           </span>
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                        <td className="p-4 text-right">
                           <button
-                            onClick={() => router.push(`/dashboard/finanzas/cxp/${pago.id}`)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: '#3b82f6',
-                              color: 'white',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                              fontWeight: '600'
-                            }}
+                            onClick={() => router.push(`/dashboard/finanzas/cxp/${pago.id}`)} className="py-2 px-4 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer text-3 font-semibold"
                           >
                             Ver Detalle
                           </button>
@@ -607,48 +501,21 @@ export default function ProgramacionPagosPage() {
 
               {/* Paginación */}
               {totalPages > 1 && (
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginTop: '1.5rem',
-                  paddingTop: '1.5rem',
-                  borderTop: '1px solid rgba(0,0,0,0.1)'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                <div className="flex justify-between items-center mt-6 pt-6 border-t">
+                  <div className="text-[0.875rem] text-gray-500">
                     Mostrando {((page - 1) * limit) + 1} - {Math.min(page * limit, total)} de {total} pagos
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: page === 1 ? '#f3f4f6' : 'white',
-                        cursor: page === 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}
+                      disabled={page === 1} className="py-2 px-4 rounded-[6px] border flex items-center gap-2"
                     >
                       <ChevronLeft size={16} />
                       Anterior
                     </button>
                     <button
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: page === totalPages ? '#f3f4f6' : 'white',
-                        cursor: page === totalPages ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}
+                      disabled={page === totalPages} className="py-2 px-4 rounded-[6px] border flex items-center gap-2"
                     >
                       Siguiente
                       <ChevronRight size={16} />

@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  CheckCircle, 
-  Circle, 
-  Upload, 
-  RefreshCw, 
-  Eye, 
-  FileCheck,
+import {
   AlertCircle,
+  CheckCircle,
+  ChevronLeft,
   ChevronRight,
-  ChevronLeft
+  Eye,
+  FileCheck,
+  RefreshCw,
+  Upload,
 } from 'lucide-react'
 
 interface WizardStep {
@@ -27,51 +26,62 @@ interface ConciliacionWizardProps {
   onComplete: () => void
 }
 
-export default function ConciliacionWizard({ 
-  conciliacionId, 
+const panelClass = 'overflow-hidden rounded-2xl border border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20'
+const stepPanelClass = 'p-6 text-center md:p-8'
+const metricClass = 'rounded-xl border border-cyan-400/15 bg-slate-950/45 p-5'
+const metricLabelClass = 'text-sm font-semibold text-cyan-200/70'
+const metricValueClass = 'mt-2 text-2xl font-black text-white'
+const primaryButtonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50'
+const outlineButtonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-2.5 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-45'
+
+function StepIntro({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof Upload
+  title: string
+  description: string
+}) {
+  return (
+    <div className="mb-6 text-center">
+      <Icon className="mx-auto mb-4 h-14 w-14 text-cyan-200" />
+      <h3 className="text-2xl font-black text-white">{title}</h3>
+      <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-400">{description}</p>
+    </div>
+  )
+}
+
+function StatCard({ label, value, helper }: { label: string; value: string | number; helper?: string }) {
+  return (
+    <div className={metricClass}>
+      <div className={metricLabelClass}>{label}</div>
+      <div className={metricValueClass}>{value}</div>
+      {helper ? <div className="mt-2 text-sm text-cyan-100/60">{helper}</div> : null}
+    </div>
+  )
+}
+
+export default function ConciliacionWizard({
+  conciliacionId,
   conciliacion,
-  onComplete 
+  onComplete,
 }: ConciliacionWizardProps) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [extractoImportado, setExtractoImportado] = useState(false)
+  const [extractoImportado] = useState(false)
   const [matchAutomaticoEjecutado, setMatchAutomaticoEjecutado] = useState(false)
   const [estadisticas, setEstadisticas] = useState<any>(null)
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
   const steps: WizardStep[] = [
-    {
-      id: 1,
-      title: 'Importar Extracto',
-      description: 'Sube el archivo CSV del banco',
-      status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending'
-    },
-    {
-      id: 2,
-      title: 'Match Automático',
-      description: 'Ejecuta la conciliación automática',
-      status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending'
-    },
-    {
-      id: 3,
-      title: 'Ajustes Manuales',
-      description: 'Revisa y ajusta los matches',
-      status: currentStep > 3 ? 'completed' : currentStep === 3 ? 'current' : 'pending'
-    },
-    {
-      id: 4,
-      title: 'Revisar Diferencias',
-      description: 'Verifica el resultado final',
-      status: currentStep > 4 ? 'completed' : currentStep === 4 ? 'current' : 'pending'
-    },
-    {
-      id: 5,
-      title: 'Cerrar Conciliación',
-      description: 'Finaliza el proceso',
-      status: currentStep === 5 ? 'current' : 'pending'
-    }
+    { id: 1, title: 'Importar Extracto', description: 'Sube el archivo CSV del banco', status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending' },
+    { id: 2, title: 'Match Automatico', description: 'Ejecuta la conciliacion automatica', status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending' },
+    { id: 3, title: 'Ajustes Manuales', description: 'Revisa y ajusta los matches', status: currentStep > 3 ? 'completed' : currentStep === 3 ? 'current' : 'pending' },
+    { id: 4, title: 'Revisar Diferencias', description: 'Verifica el resultado final', status: currentStep > 4 ? 'completed' : currentStep === 4 ? 'current' : 'pending' },
+    { id: 5, title: 'Cerrar Conciliacion', description: 'Finaliza el proceso', status: currentStep === 5 ? 'current' : 'pending' },
   ]
 
   const loadEstadisticas = useCallback(async () => {
@@ -81,7 +91,7 @@ export default function ConciliacionWizard({
         {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-        }
+        },
       )
       if (response.ok) {
         const data = await response.json()
@@ -105,158 +115,70 @@ export default function ConciliacionWizard({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-        }
+        },
       )
-      
+
       if (response.ok) {
         setMatchAutomaticoEjecutado(true)
         await loadEstadisticas()
-        alert('✅ Match automático ejecutado exitosamente')
+        alert('Match automatico ejecutado exitosamente')
       } else {
         const error = await response.json()
-        alert('Error: ' + (error.message || 'No se pudo ejecutar el match automático'))
+        alert('Error: ' + (error.message || 'No se pudo ejecutar el match automatico'))
       }
     } catch (error) {
       console.error('Error executing match automatico:', error)
-      alert('Error: No se pudo ejecutar el match automático')
+      alert('Error: No se pudo ejecutar el match automatico')
     } finally {
       setLoading(false)
     }
   }
 
   const handleNextStep = () => {
-    if (currentStep < 5) {
-      setCurrentStep(currentStep + 1)
-    }
+    if (currentStep < 5) setCurrentStep(currentStep + 1)
   }
 
   const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1)
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: conciliacion?.cuentas_bancarias?.moneda || 'PEN',
     }).format(amount)
-  }
+
+  const pendingSystem = estadisticas?.movimientos_sistema?.pendientes || 0
+  const pendingBank = estadisticas?.movimientos_extracto?.pendientes || 0
+  const netDifference = estadisticas?.saldos?.diferencia_neta || 0
+  const isBalanced = Math.abs(netDifference) < 0.01
 
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <Upload size={64} style={{ margin: '0 auto 1rem', color: '#3b82f6' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              Importar Extracto Bancario
-            </h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              Sube el archivo CSV del extracto bancario para comenzar la conciliación
-            </p>
-            <button
-              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)}
-              style={{
-                padding: '0.75rem 2rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
+          <div className={stepPanelClass}>
+            <StepIntro icon={Upload} title="Importar Extracto Bancario" description="Sube el archivo CSV del extracto bancario para comenzar la conciliacion." />
+            <button type="button" onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)} className={primaryButtonClass}>
               Ir a Importar CSV
             </button>
-            {extractoImportado && (
-              <div style={{ 
-                marginTop: '1.5rem', 
-                padding: '1rem', 
-                background: '#d1fae5', 
-                borderRadius: '0.5rem',
-                color: '#065f46'
-              }}>
-                ✓ Extracto importado correctamente
-              </div>
-            )}
+            {extractoImportado ? <div className="mx-auto mt-6 max-w-md rounded-xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-cyan-100">Extracto importado correctamente</div> : null}
           </div>
         )
 
       case 2:
         return (
-          <div style={{ padding: '2rem' }}>
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <RefreshCw size={64} style={{ margin: '0 auto 1rem', color: '#3b82f6' }} />
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                Match Automático
-              </h3>
-              <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-                El sistema intentará conciliar automáticamente los movimientos por monto y fecha
-              </p>
-            </div>
-
-            {estadisticas && (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: '1rem',
-                marginBottom: '2rem'
-              }}>
-                <div style={{ 
-                  padding: '1.5rem', 
-                  background: 'white', 
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                    Movimientos Sistema
-                  </div>
-                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
-                    {estadisticas.movimientos_sistema.total}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#10b981', marginTop: '0.5rem' }}>
-                    {estadisticas.movimientos_sistema.conciliados} conciliados
-                  </div>
-                </div>
-
-                <div style={{ 
-                  padding: '1.5rem', 
-                  background: 'white', 
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e5e7eb'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                    Movimientos Extracto
-                  </div>
-                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1f2937' }}>
-                    {estadisticas.movimientos_extracto.total}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#10b981', marginTop: '0.5rem' }}>
-                    {estadisticas.movimientos_extracto.conciliados} conciliados
-                  </div>
-                </div>
+          <div className="p-6 md:p-8">
+            <StepIntro icon={RefreshCw} title="Match Automatico" description="El sistema intentara conciliar automaticamente los movimientos por monto y fecha." />
+            {estadisticas ? (
+              <div className="mb-6 grid gap-4 md:grid-cols-2">
+                <StatCard label="Movimientos Sistema" value={estadisticas.movimientos_sistema.total} helper={`${estadisticas.movimientos_sistema.conciliados} conciliados`} />
+                <StatCard label="Movimientos Extracto" value={estadisticas.movimientos_extracto.total} helper={`${estadisticas.movimientos_extracto.conciliados} conciliados`} />
               </div>
-            )}
-
-            <div style={{ textAlign: 'center' }}>
-              <button
-                onClick={handleMatchAutomatico}
-                disabled={loading || matchAutomaticoEjecutado}
-                style={{
-                  padding: '0.75rem 2rem',
-                  background: matchAutomaticoEjecutado ? '#10b981' : '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  cursor: loading || matchAutomaticoEjecutado ? 'not-allowed' : 'pointer',
-                  opacity: loading || matchAutomaticoEjecutado ? 0.6 : 1
-                }}
-              >
-                {loading ? 'Ejecutando...' : matchAutomaticoEjecutado ? '✓ Ejecutado' : 'Ejecutar Match Automático'}
+            ) : null}
+            <div className="text-center">
+              <button type="button" onClick={handleMatchAutomatico} disabled={loading || matchAutomaticoEjecutado} className={primaryButtonClass}>
+                {loading ? 'Ejecutando...' : matchAutomaticoEjecutado ? 'Ejecutado' : 'Ejecutar Match Automatico'}
               </button>
             </div>
           </div>
@@ -264,282 +186,66 @@ export default function ConciliacionWizard({
 
       case 3:
         return (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <Eye size={64} style={{ margin: '0 auto 1rem', color: '#3b82f6' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              Ajustes Manuales
-            </h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              Revisa los movimientos y realiza ajustes manuales si es necesario
-            </p>
-
-            {estadisticas && (
-              <div style={{ 
-                padding: '1.5rem', 
-                background: '#fef3c7', 
-                borderRadius: '0.5rem',
-                marginBottom: '2rem',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#92400e' }}>
-                  Pendientes de Conciliar:
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span>Sistema:</span>
-                  <span style={{ fontWeight: '600' }}>{estadisticas.movimientos_sistema.pendientes}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Extracto:</span>
-                  <span style={{ fontWeight: '600' }}>{estadisticas.movimientos_extracto.pendientes}</span>
-                </div>
+          <div className={stepPanelClass}>
+            <StepIntro icon={Eye} title="Ajustes Manuales" description="Revisa los movimientos y realiza ajustes manuales si es necesario." />
+            {estadisticas ? (
+              <div className="mx-auto mb-6 max-w-lg rounded-xl border border-cyan-400/20 bg-slate-950/45 p-5 text-left">
+                <div className="mb-3 font-semibold text-cyan-100">Pendientes de conciliar</div>
+                <div className="flex justify-between text-sm text-slate-300"><span>Sistema</span><strong className="text-white">{pendingSystem}</strong></div>
+                <div className="mt-2 flex justify-between text-sm text-slate-300"><span>Extracto</span><strong className="text-white">{pendingBank}</strong></div>
               </div>
-            )}
-
-            <button
-              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)}
-              style={{
-                padding: '0.75rem 2rem',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              Ir a Tabla de Conciliación
+            ) : null}
+            <button type="button" onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)} className={primaryButtonClass}>
+              Ir a Tabla de Conciliacion
             </button>
           </div>
         )
 
       case 4:
         return (
-          <div style={{ padding: '2rem' }}>
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <AlertCircle size={64} style={{ margin: '0 auto 1rem', color: '#3b82f6' }} />
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                Revisar Diferencias
-              </h3>
-              <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-                Verifica los saldos y diferencias antes de cerrar
-              </p>
-            </div>
-
-            {estadisticas && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(3, 1fr)', 
-                  gap: '1rem'
-                }}>
-                  <div style={{ 
-                    padding: '1.5rem', 
-                    background: 'white', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                      Saldo Libro
-                    </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {formatCurrency(estadisticas.saldos.saldo_libro)}
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    padding: '1.5rem', 
-                    background: 'white', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                      Saldo Banco
-                    </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                      {formatCurrency(estadisticas.saldos.saldo_banco)}
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    padding: '1.5rem', 
-                    background: 'white', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
-                      Diferencia
-                    </div>
-                    <div style={{ 
-                      fontSize: '1.5rem', 
-                      fontWeight: '700', 
-                      color: Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 ? '#10b981' : '#ef4444'
-                    }}>
-                      {formatCurrency(estadisticas.saldos.diferencia_neta)}
-                    </div>
-                  </div>
+          <div className="p-6 md:p-8">
+            <StepIntro icon={AlertCircle} title="Revisar Diferencias" description="Verifica los saldos y diferencias antes de cerrar." />
+            {estadisticas ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <StatCard label="Saldo Libro" value={formatCurrency(estadisticas.saldos.saldo_libro)} />
+                  <StatCard label="Saldo Banco" value={formatCurrency(estadisticas.saldos.saldo_banco)} />
+                  <StatCard label="Diferencia" value={formatCurrency(netDifference)} />
                 </div>
-
-                <div style={{ 
-                  padding: '1.5rem', 
-                  background: Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 ? '#d1fae5' : '#fee2e2', 
-                  borderRadius: '0.5rem',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ 
-                    fontSize: '1.125rem', 
-                    fontWeight: '600',
-                    color: Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 ? '#065f46' : '#991b1b'
-                  }}>
-                    {Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 
-                      ? '✓ Conciliación Cuadrada' 
-                      : '⚠ Hay Diferencias'}
-                  </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    marginTop: '0.5rem',
-                    color: Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 ? '#065f46' : '#991b1b'
-                  }}>
-                    {Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 
-                      ? 'Los saldos coinciden perfectamente' 
-                      : 'Revisa los movimientos pendientes antes de cerrar'}
-                  </div>
+                <div className={`rounded-xl border p-5 text-center ${isBalanced ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100' : 'border-slate-400/30 bg-slate-400/10 text-slate-100'}`}>
+                  <div className="text-lg font-bold">{isBalanced ? 'Conciliacion cuadrada' : 'Hay diferencias'}</div>
+                  <div className="mt-1 text-sm opacity-80">{isBalanced ? 'Los saldos coinciden.' : 'Revisa los movimientos pendientes antes de cerrar.'}</div>
                 </div>
-
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(2, 1fr)', 
-                  gap: '1rem'
-                }}>
-                  <div style={{ 
-                    padding: '1.5rem', 
-                    background: 'white', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>
-                      Progreso Sistema
-                    </div>
-                    <div style={{ 
-                      width: '100%', 
-                      height: '8px', 
-                      background: '#e5e7eb', 
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <div style={{
-                        width: `${estadisticas.metricas.porcentaje_conciliado_sistema}%`,
-                        height: '100%',
-                        background: '#3b82f6',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      {estadisticas.metricas.porcentaje_conciliado_sistema.toFixed(1)}% conciliado
-                    </div>
-                  </div>
-
-                  <div style={{ 
-                    padding: '1.5rem', 
-                    background: 'white', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>
-                      Progreso Extracto
-                    </div>
-                    <div style={{ 
-                      width: '100%', 
-                      height: '8px', 
-                      background: '#e5e7eb', 
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      marginBottom: '0.5rem'
-                    }}>
-                      <div style={{
-                        width: `${estadisticas.metricas.porcentaje_conciliado_extracto}%`,
-                        height: '100%',
-                        background: '#3b82f6',
-                        transition: 'width 0.3s ease'
-                      }} />
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                      {estadisticas.metricas.porcentaje_conciliado_extracto.toFixed(1)}% conciliado
-                    </div>
-                  </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <StatCard label="Progreso Sistema" value={`${estadisticas.metricas.porcentaje_conciliado_sistema.toFixed(1)}%`} />
+                  <StatCard label="Progreso Extracto" value={`${estadisticas.metricas.porcentaje_conciliado_extracto.toFixed(1)}%`} />
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )
 
       case 5:
         return (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <FileCheck size={64} style={{ margin: '0 auto 1rem', color: '#10b981' }} />
-            <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              Cerrar Conciliación
-            </h3>
-            <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-              Finaliza el proceso de conciliación y marca los movimientos como conciliados
-            </p>
-
-            {estadisticas && (
-              <div style={{ 
-                padding: '1.5rem', 
-                background: estadisticas.movimientos_sistema.pendientes === 0 && 
-                           estadisticas.movimientos_extracto.pendientes === 0 
-                  ? '#d1fae5' 
-                  : '#fef3c7', 
-                borderRadius: '0.5rem',
-                marginBottom: '2rem',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '1rem' }}>
-                  Estado Final:
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>Movimientos Sistema Pendientes:</span>
-                  <span style={{ fontWeight: '600', color: estadisticas.movimientos_sistema.pendientes === 0 ? '#10b981' : '#f59e0b' }}>
-                    {estadisticas.movimientos_sistema.pendientes}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>Movimientos Extracto Pendientes:</span>
-                  <span style={{ fontWeight: '600', color: estadisticas.movimientos_extracto.pendientes === 0 ? '#10b981' : '#f59e0b' }}>
-                    {estadisticas.movimientos_extracto.pendientes}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
-                  <span>Diferencia Final:</span>
-                  <span style={{ 
-                    fontWeight: '700', 
-                    color: Math.abs(estadisticas.saldos.diferencia_neta) < 0.01 ? '#10b981' : '#ef4444'
-                  }}>
-                    {formatCurrency(estadisticas.saldos.diferencia_neta)}
-                  </span>
-                </div>
+          <div className={stepPanelClass}>
+            <StepIntro icon={FileCheck} title="Cerrar Conciliacion" description="Finaliza el proceso de conciliacion y marca los movimientos como conciliados." />
+            {estadisticas ? (
+              <div className={`mx-auto mb-6 max-w-xl rounded-xl border p-5 text-left ${pendingSystem === 0 && pendingBank === 0 ? 'border-cyan-300/30 bg-cyan-300/10' : 'border-slate-400/30 bg-slate-400/10'}`}>
+                <div className="mb-3 font-semibold text-white">Estado final</div>
+                <div className="flex justify-between text-sm text-slate-300"><span>Sistema pendientes</span><strong className="text-white">{pendingSystem}</strong></div>
+                <div className="mt-2 flex justify-between text-sm text-slate-300"><span>Extracto pendientes</span><strong className="text-white">{pendingBank}</strong></div>
+                <div className="mt-3 flex justify-between border-t border-cyan-400/10 pt-3 text-sm text-slate-300"><span>Diferencia final</span><strong className="text-white">{formatCurrency(netDifference)}</strong></div>
               </div>
-            )}
-
+            ) : null}
             <button
-              onClick={() => router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)}
-              style={{
-                padding: '0.75rem 2rem',
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: 'pointer'
+              type="button"
+              onClick={() => {
+                onComplete()
+                router.push(`/dashboard/finanzas/conciliacion/${conciliacionId}`)
               }}
+              className={primaryButtonClass}
             >
-              Ir a Cerrar Conciliación
+              Ir a Cerrar Conciliacion
             </button>
           </div>
         )
@@ -550,132 +256,32 @@ export default function ConciliacionWizard({
   }
 
   return (
-    <div style={{ 
-      background: 'white', 
-      borderRadius: '0.5rem', 
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      overflow: 'hidden'
-    }}>
-      {/* Steps Header */}
-      <div style={{ 
-        padding: '2rem', 
-        borderBottom: '1px solid #e5e7eb',
-        background: '#f9fafb'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          maxWidth: '800px',
-          margin: '0 auto'
-        }}>
-          {steps.map((step, index) => (
-            <div key={step.id} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                alignItems: 'center',
-                flex: 1
-              }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  background: step.status === 'completed' ? '#10b981' : 
-                             step.status === 'current' ? '#3b82f6' : '#e5e7eb',
-                  color: step.status === 'pending' ? '#6b7280' : 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem'
-                }}>
-                  {step.status === 'completed' ? (
-                    <CheckCircle size={24} />
-                  ) : (
-                    <span>{step.id}</span>
-                  )}
-                </div>
-                <div style={{ 
-                  fontSize: '0.75rem', 
-                  fontWeight: '500',
-                  color: step.status === 'current' ? '#1f2937' : '#6b7280',
-                  textAlign: 'center'
-                }}>
-                  {step.title}
-                </div>
+    <div className={panelClass}>
+      <div className="border-b border-cyan-400/10 bg-slate-950/45 p-5">
+        <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-5">
+          {steps.map((step) => (
+            <div key={step.id} className="flex flex-col items-center text-center">
+              <div className={`mb-2 flex size-10 items-center justify-center rounded-full border text-sm font-bold ${step.status === 'completed' ? 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100' : step.status === 'current' ? 'border-blue-300/30 bg-blue-500/20 text-blue-100' : 'border-slate-500/30 bg-slate-900 text-slate-500'}`}>
+                {step.status === 'completed' ? <CheckCircle className="h-5 w-5" /> : step.id}
               </div>
-              {index < steps.length - 1 && (
-                <div style={{
-                  flex: 1,
-                  height: '2px',
-                  background: step.status === 'completed' ? '#10b981' : '#e5e7eb',
-                  marginTop: '-2rem'
-                }} />
-              )}
+              <div className={`text-xs font-semibold uppercase tracking-[0.12em] ${step.status === 'current' ? 'text-white' : 'text-slate-400'}`}>{step.title}</div>
+              <div className="mt-1 hidden text-xs text-slate-500 xl:block">{step.description}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Step Content */}
-      <div style={{ minHeight: '400px' }}>
-        {renderStepContent()}
-      </div>
+      <div className="min-h-[400px]">{renderStepContent()}</div>
 
-      {/* Navigation */}
-      <div style={{ 
-        padding: '1.5rem 2rem', 
-        borderTop: '1px solid #e5e7eb',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <button
-          onClick={handlePrevStep}
-          disabled={currentStep === 1}
-          style={{
-            padding: '0.5rem 1.5rem',
-            background: 'white',
-            color: '#3b82f6',
-            border: '1px solid #3b82f6',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-            opacity: currentStep === 1 ? 0.5 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <ChevronLeft size={16} />
+      <div className="flex items-center justify-between border-t border-cyan-400/10 p-5">
+        <button type="button" onClick={handlePrevStep} disabled={currentStep === 1} className={outlineButtonClass}>
+          <ChevronLeft className="h-4 w-4" />
           Anterior
         </button>
-
-        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-          Paso {currentStep} de {steps.length}
-        </div>
-
-        <button
-          onClick={handleNextStep}
-          disabled={currentStep === 5}
-          style={{
-            padding: '0.5rem 1.5rem',
-            background: currentStep === 5 ? '#e5e7eb' : '#3b82f6',
-            color: currentStep === 5 ? '#6b7280' : 'white',
-            border: 'none',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: currentStep === 5 ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
+        <div className="text-sm font-semibold text-slate-400">Paso {currentStep} de {steps.length}</div>
+        <button type="button" onClick={handleNextStep} disabled={currentStep === 5} className={outlineButtonClass}>
           Siguiente
-          <ChevronRight size={16} />
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </div>

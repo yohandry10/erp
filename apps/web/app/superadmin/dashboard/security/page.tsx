@@ -98,10 +98,10 @@ export default function SecurityDashboard() {
 
   if (tenantLoading || !user) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-          <p style={{ color: 'var(--primary-500)' }}>Cargando...</p>
+      <div className="flex items-center justify-center">
+        <div className="text-center">
+          <div className="loading-spinner"></div>
+          <p className="text-[var(--primary-500)]">Cargando...</p>
         </div>
       </div>
     )
@@ -139,8 +139,8 @@ export default function SecurityDashboard() {
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: '0.5rem' }}>
+        <div className="flex-[1]">
+          <div className="mb-2">
             <button onClick={() => router.push('/superadmin/dashboard')} className="btn btn-secondary">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -165,14 +165,14 @@ export default function SecurityDashboard() {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem 0' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-          <p style={{ color: 'var(--primary-500)' }}>Cargando datos de seguridad...</p>
+        <div className="text-center py-12 px-0">
+          <div className="loading-spinner"></div>
+          <p className="text-[var(--primary-500)]">Cargando datos de seguridad...</p>
         </div>
       ) : (
         <>
           {/* Statistics Cards */}
-          <div className="stats-grid" style={{ marginBottom: '2rem' }}>
+          <div className="stats-grid mb-8">
             <div className="stat-card">
               <div className="stat-header">
                 <h3>VIOLACIONES TOTALES</h3>
@@ -187,7 +187,7 @@ export default function SecurityDashboard() {
                 <h3>VIOLACIONES CRÍTICAS</h3>
                 <span className="stat-icon">🚨</span>
               </div>
-              <div className="stat-value" style={{ color: '#ef4444' }}>
+              <div className="stat-value text-red-500">
                 {stats?.criticalViolations || 0}
               </div>
               <div className="stat-subtitle">
@@ -229,7 +229,7 @@ export default function SecurityDashboard() {
                 <h3>ALERTAS PENDIENTES</h3>
                 <span className="stat-icon">🔴</span>
               </div>
-              <div className="stat-value" style={{ color: '#f59e0b' }}>
+              <div className="stat-value text-amber-500">
                 {stats?.unacknowledgedAlerts || 0}
               </div>
               <div className="stat-subtitle">Sin reconocer</div>
@@ -256,21 +256,14 @@ export default function SecurityDashboard() {
                     {unacknowledgedAlerts.map((alert) => (
                       <tr key={alert.id}>
                         <td>{new Date(alert.triggered_at).toLocaleString('es-PE')}</td>
-                        <td style={{ fontWeight: '500' }}>{alert.alert_name}</td>
+                        <td className="font-medium">{alert.alert_name}</td>
                         <td>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            border: '1px solid',
-                            ...getSeverityStyle(alert.severity)
-                          }}>
+                          <span className="py-1 px-3 rounded-full text-3 font-semibold border">
                             {alert.severity}
                           </span>
                         </td>
                         <td>{alert.message}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{alert.affected_table || '-'}</td>
+                        <td>{alert.affected_table || '-'}</td>
                         <td>{alert.user_email || '-'}</td>
                       </tr>
                     ))}
@@ -293,23 +286,23 @@ export default function SecurityDashboard() {
                   <thead>
                     <tr>
                       <th>Tabla</th>
-                      <th style={{ textAlign: 'right' }}>Total</th>
-                      <th style={{ textAlign: 'right' }}>Críticas</th>
-                      <th style={{ textAlign: 'right' }}>Cross-Tenant</th>
-                      <th style={{ textAlign: 'right' }}>Sin Tenant</th>
-                      <th style={{ textAlign: 'right' }}>Usuarios</th>
+                      <th className="text-right">Total</th>
+                      <th className="text-right">Críticas</th>
+                      <th className="text-right">Cross-Tenant</th>
+                      <th className="text-right">Sin Tenant</th>
+                      <th className="text-right">Usuarios</th>
                       <th>Última</th>
                     </tr>
                   </thead>
                   <tbody>
                     {violationsByTable.map((table) => (
                       <tr key={table.table_name}>
-                        <td style={{ fontFamily: 'monospace', fontWeight: '500' }}>{table.table_name}</td>
-                        <td style={{ textAlign: 'right', fontWeight: '600' }}>{table.total_violations}</td>
-                        <td style={{ textAlign: 'right', color: '#ef4444' }}>{table.critical_count}</td>
-                        <td style={{ textAlign: 'right' }}>{table.cross_tenant_count}</td>
-                        <td style={{ textAlign: 'right' }}>{table.missing_tenant_count}</td>
-                        <td style={{ textAlign: 'right' }}>{table.unique_users}</td>
+                        <td className="font-medium">{table.table_name}</td>
+                        <td className="text-right font-semibold">{table.total_violations}</td>
+                        <td className="text-right text-red-500">{table.critical_count}</td>
+                        <td className="text-right">{table.cross_tenant_count}</td>
+                        <td className="text-right">{table.missing_tenant_count}</td>
+                        <td className="text-right">{table.unique_users}</td>
                         <td>{new Date(table.last_violation).toLocaleString('es-PE')}</td>
                       </tr>
                     ))}
@@ -344,23 +337,16 @@ export default function SecurityDashboard() {
                     {recentViolations.map((violation) => (
                       <tr key={violation.id}>
                         <td>{new Date(violation.timestamp).toLocaleString('es-PE')}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{violation.table_name}</td>
+                        <td>{violation.table_name}</td>
                         <td>{violation.operation}</td>
                         <td>{getViolationTypeLabel(violation.violation_type)}</td>
                         <td>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            border: '1px solid',
-                            ...getSeverityStyle(violation.severity)
-                          }}>
+                          <span className="py-1 px-3 rounded-full text-3 font-semibold border">
                             {violation.severity}
                           </span>
                         </td>
                         <td>{violation.user_email || 'N/A'}</td>
-                        <td style={{ fontFamily: 'monospace' }}>{violation.ip_address || '-'}</td>
+                        <td>{violation.ip_address || '-'}</td>
                       </tr>
                     ))}
                   </tbody>

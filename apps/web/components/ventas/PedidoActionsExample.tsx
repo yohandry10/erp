@@ -60,7 +60,7 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
         <div>
           <button>Generar Factura</button>
           {shouldSuggestGRE() && (
-            <p style={{ color: 'orange' }}>
+            <p>
               💡 Se recomienda generar GRE para este pedido
             </p>
           )}
@@ -87,12 +87,7 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
   // Ejemplo 3: Mostrar información del flujo actual
   const renderFlowInfo = () => {
     return (
-      <div style={{
-        padding: '1rem',
-        background: isFlujologistica ? '#e0f2fe' : '#fef3c7',
-        borderRadius: '8px',
-        marginBottom: '1rem',
-      }}>
+      <div className="p-4 rounded-2 mb-4">
         <h3>Configuración Actual</h3>
         <ul>
           <li>Tipo de Empresa: {config?.tipo_empresa}</li>
@@ -124,17 +119,10 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
     )
 
     return (
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div className="flex gap-2 mb-4">
         {steps.map((step, index) => (
           <div
-            key={index}
-            style={{
-              padding: '0.5rem 1rem',
-              background: step.active ? '#10b981' : '#e5e7eb',
-              color: step.active ? 'white' : '#6b7280',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-            }}
+            key={index} className="py-2 px-4 rounded-[6px] text-[0.875rem]"
           >
             {step.label}
           </div>
@@ -153,12 +141,7 @@ export function PedidoActionsExample({ pedido }: PedidoActionsExampleProps) {
 
       {/* Ejemplo 5: Validación de GRE obligatorio */}
       {isGreObligatorio && pedido.estado === 'LISTO_FACTURAR' && (
-        <div style={{
-          padding: '1rem',
-          background: '#fee2e2',
-          borderRadius: '8px',
-          marginTop: '1rem',
-        }}>
+        <div className="p-4 bg-[#fee2e2] rounded-2 mt-4">
           <strong>⚠️ Atención:</strong> Este pedido requiere una Guía de Remisión Electrónica
           antes de poder facturar.
         </div>

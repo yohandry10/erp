@@ -99,24 +99,12 @@ export default function NuevoProductoPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.push('/dashboard/inventario/productos')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.25rem 0'
-            }}
+            onClick={() => router.push('/dashboard/inventario/productos')} className="inline-flex items-center gap-2 text-gray-500 text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
           >
             <ArrowLeft size={16} />
             Volver a Productos
           </button>
-          <h1 className="dashboard-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1 className="dashboard-title flex items-center gap-3">
             <Package size={32} />
             Nuevo Producto
           </h1>
@@ -124,21 +112,12 @@ export default function NuevoProductoPage() {
         </div>
       </div>
 
-      <div style={{
-        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-        color: 'white',
-        padding: '1rem 1.5rem',
-        borderRadius: '12px',
-        marginBottom: '2rem',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '1rem'
-      }}>
-        <div style={{ fontSize: '2rem' }}>ℹ️</div>
+      <div className="text-white py-4 px-6 rounded-3 mb-8 flex items-center gap-4">
+        <div className="text-8">ℹ️</div>
         <div>
-          <h3 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Información Importante</h3>
-          <p style={{ fontSize: '0.875rem', opacity: 0.95 }}>
-            Los campos marcados con <span style={{ color: '#fbbf24' }}>*</span> son obligatorios.
+          <h3 className="font-semibold mb-1">Información Importante</h3>
+          <p className="text-[0.875rem] opacity-[0.95]">
+            Los campos marcados con <span className="text-[#fbbf24]">*</span> son obligatorios.
           </p>
         </div>
       </div>
@@ -146,25 +125,16 @@ export default function NuevoProductoPage() {
       <form onSubmit={handleSubmit} noValidate>
         {(submitError || Object.keys(errors).length > 0) && (
           <div
-            role="alert"
-            style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#991b1b',
-              padding: '0.875rem 1rem',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-              fontSize: '0.875rem'
-            }}
+            role="alert" className="bg-[#fef2f2] border text-red-800 py-[0.875rem] px-4 rounded-2 mb-4 text-[0.875rem]"
           >
             {submitError || 'Revise los campos marcados antes de crear el producto.'}
           </div>
         )}
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Información Básica</h2>
           <div className="modal-grid">
             <div>
-              <label>Código <span style={{ color: 'var(--red-500)' }}>*</span></label>
+              <label>Código <span className="text-[var(--red-500)]">*</span></label>
               <input
                 type="text"
                 name="codigo"
@@ -175,7 +145,7 @@ export default function NuevoProductoPage() {
                 placeholder="Ej: PROD001"
               />
               {errors.codigo && (
-                <p id="producto-codigo-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-codigo-error" className="text-red-500 text-3 mt-1">
                   {errors.codigo}
                 </p>
               )}
@@ -192,8 +162,8 @@ export default function NuevoProductoPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label>Nombre <span style={{ color: 'var(--red-500)' }}>*</span></label>
+          <div className="mt-4">
+            <label>Nombre <span className="text-[var(--red-500)]">*</span></label>
             <input
               type="text"
               name="nombre"
@@ -204,13 +174,13 @@ export default function NuevoProductoPage() {
               placeholder="Nombre del producto"
             />
             {errors.nombre && (
-              <p id="producto-nombre-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p id="producto-nombre-error" className="text-red-500 text-3 mt-1">
                 {errors.nombre}
               </p>
             )}
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
+          <div className="mt-4">
             <label>Descripción</label>
             <textarea
               name="descripcion"
@@ -221,8 +191,8 @@ export default function NuevoProductoPage() {
             />
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label>Categoría <span style={{ color: 'var(--red-500)' }}>*</span></label>
+          <div className="mt-4">
+            <label>Categoría <span className="text-[var(--red-500)]">*</span></label>
             <select
               name="categoria"
               value={formData.categoria}
@@ -239,14 +209,14 @@ export default function NuevoProductoPage() {
               <option value="OTROS">Otros</option>
             </select>
             {errors.categoria && (
-              <p id="producto-categoria-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              <p id="producto-categoria-error" className="text-red-500 text-3 mt-1">
                 {errors.categoria}
               </p>
             )}
           </div>
         </div>
 
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Precios e Impuestos</h2>
           <div className="modal-grid">
             <div>
@@ -263,13 +233,13 @@ export default function NuevoProductoPage() {
                 placeholder="0.00"
               />
               {errors.precioCompra && (
-                <p id="producto-precio-compra-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-precio-compra-error" className="text-red-500 text-3 mt-1">
                   {errors.precioCompra}
                 </p>
               )}
             </div>
             <div>
-              <label>Precio de Venta <span style={{ color: 'var(--red-500)' }}>*</span></label>
+              <label>Precio de Venta <span className="text-[var(--red-500)]">*</span></label>
               <input
                 type="number"
                 name="precioVenta"
@@ -282,7 +252,7 @@ export default function NuevoProductoPage() {
                 placeholder="0.00"
               />
               {errors.precioVenta && (
-                <p id="producto-precio-venta-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-precio-venta-error" className="text-red-500 text-3 mt-1">
                   {errors.precioVenta}
                 </p>
               )}
@@ -302,7 +272,7 @@ export default function NuevoProductoPage() {
                 placeholder="18"
               />
               {errors.impuesto && (
-                <p id="producto-impuesto-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-impuesto-error" className="text-red-500 text-3 mt-1">
                   {errors.impuesto}
                 </p>
               )}
@@ -310,7 +280,7 @@ export default function NuevoProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Inventario</h2>
           <div className="modal-grid">
             <div>
@@ -326,7 +296,7 @@ export default function NuevoProductoPage() {
                 placeholder="0"
               />
               {errors.stock && (
-                <p id="producto-stock-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-stock-error" className="text-red-500 text-3 mt-1">
                   {errors.stock}
                 </p>
               )}
@@ -344,7 +314,7 @@ export default function NuevoProductoPage() {
                 placeholder="0"
               />
               {errors.stockMinimo && (
-                <p id="producto-stock-minimo-error" style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                <p id="producto-stock-minimo-error" className="text-red-500 text-3 mt-1">
                   {errors.stockMinimo}
                 </p>
               )}
@@ -352,7 +322,7 @@ export default function NuevoProductoPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+        <div className="flex gap-4 justify-end">
           <button
             type="button"
             onClick={() => router.push('/dashboard/inventario/productos')}
@@ -368,7 +338,7 @@ export default function NuevoProductoPage() {
           >
             {isLoading ? (
               <>
-                <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                <div className="loading-spinner w-4 h-4"></div>
                 Guardando...
               </>
             ) : (

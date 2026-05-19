@@ -61,12 +61,12 @@ $montoTotal = 0
 for ($i = 0; $i -lt [Math]::Min(2, $cxpsPendientes.Count); $i++) {
     $cxp = $cxpsPendientes[$i]
     $montoPago = [Math]::Min(100, $cxp.saldo) # Pagar 100 o el saldo completo si es menor
-    
+
     $pagos += @{
         cxp_id = $cxp.id
         monto = $montoPago
     }
-    
+
     $montoTotal += $montoPago
 }
 
@@ -100,10 +100,10 @@ $pagoLoteDto = @{
 
 try {
     $pagoResponse = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/tesoreria/lote" -Method Post -Headers $headers -Body $pagoLoteDto
-    
+
     Write-Host "✓ Lote de pagos procesado exitosamente" -ForegroundColor Green
     Write-Host ""
-    
+
     Write-Host "=== RESULTADO DEL LOTE ===" -ForegroundColor Cyan
     Write-Host "Lote ID: $($pagoResponse.data.lote_id)" -ForegroundColor White
     Write-Host "Total de pagos: $($pagoResponse.data.total_pagos)" -ForegroundColor White
@@ -111,14 +111,14 @@ try {
     Write-Host "Pagos exitosos: $($pagoResponse.data.pagos_exitosos)" -ForegroundColor Green
     Write-Host "Pagos fallidos: $($pagoResponse.data.pagos_fallidos)" -ForegroundColor $(if ($pagoResponse.data.pagos_fallidos -eq 0) { "Green" } else { "Red" })
     Write-Host ""
-    
+
     Write-Host "=== CUENTA BANCARIA ===" -ForegroundColor Cyan
     Write-Host "Nombre: $($pagoResponse.data.cuenta_bancaria.nombre)" -ForegroundColor White
     Write-Host "Saldo anterior: $($pagoResponse.data.cuenta_bancaria.saldo_anterior)" -ForegroundColor White
     Write-Host "Saldo nuevo: $($pagoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor White
     Write-Host "Diferencia: $($pagoResponse.data.cuenta_bancaria.saldo_anterior - $pagoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Yellow
     Write-Host ""
-    
+
     Write-Host "=== DETALLE DE PAGOS ===" -ForegroundColor Cyan
     foreach ($pago in $pagoResponse.data.pagos) {
         Write-Host "Proveedor: $($pago.proveedor)" -ForegroundColor White
@@ -129,13 +129,13 @@ try {
         Write-Host "  Movimiento bancario ID: $($pago.movimiento_bancario_id)" -ForegroundColor Gray
         Write-Host ""
     }
-    
+
     # 7. Verificar que los cambios se aplicaron correctamente
     Write-Host "6. Verificando cambios en la base de datos..." -ForegroundColor Yellow
-    
+
     # Verificar cuenta bancaria
     $cuentaActualizada = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$($cuentaBancaria.id)" -Method Get -Headers $headers
-    
+
     if ([Math]::Abs($cuentaActualizada.data.saldo - $pagoResponse.data.cuenta_bancaria.saldo_nuevo) -lt 0.01) {
         Write-Host "✓ Saldo de cuenta bancaria actualizado correctamente" -ForegroundColor Green
     } else {
@@ -143,46 +143,46 @@ try {
         Write-Host "  Esperado: $($pagoResponse.data.cuenta_bancaria.saldo_nuevo)" -ForegroundColor Gray
         Write-Host "  Actual: $($cuentaActualizada.data.saldo)" -ForegroundColor Gray
     }
-    
+
     # Verificar CxP actualizadas
     $cxpVerificadas = 0
     foreach ($pago in $pagoResponse.data.pagos) {
         $cxpActualizada = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/cxp/$($pago.cxp_id)" -Method Get -Headers $headers
-        
+
         if ([Math]::Abs($cxpActualizada.data.saldo - $pago.saldo_nuevo) -lt 0.01 -and $cxpActualizada.data.estado -eq $pago.estado_nuevo) {
             $cxpVerificadas++
         } else {
             Write-Host "✗ Error: CxP $($pago.numero_documento) no actualizada correctamente" -ForegroundColor Red
         }
     }
-    
+
     if ($cxpVerificadas -eq $pagoResponse.data.pagos.Count) {
         Write-Host "✓ Todas las CxP actualizadas correctamente ($cxpVerificadas/$($pagoResponse.data.pagos.Count))" -ForegroundColor Green
     } else {
         Write-Host "✗ Solo $cxpVerificadas de $($pagoResponse.data.pagos.Count) CxP verificadas" -ForegroundColor Red
     }
-    
+
     Write-Host ""
     Write-Host "=== TEST COMPLETADO EXITOSAMENTE ===" -ForegroundColor Green
-    
+
 } catch {
     Write-Host "✗ Error procesando lote de pagos" -ForegroundColor Red
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    
+
     if ($_.Exception.Response) {
         $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
         $responseBody = $reader.ReadToEnd()
         Write-Host "Respuesta del servidor:" -ForegroundColor Yellow
         Write-Host $responseBody -ForegroundColor Gray
     }
-    
+
     Write-Host ""
     Write-Host "=== VERIFICANDO ROLLBACK ===" -ForegroundColor Yellow
     Write-Host "Si la transacción funcionó correctamente, no debería haber cambios parciales" -ForegroundColor Gray
-    
+
     # Verificar que la cuenta bancaria no cambió
     $cuentaActualizada = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/bancos/cuentas/$($cuentaBancaria.id)" -Method Get -Headers $headers
-    
+
     if ([Math]::Abs($cuentaActualizada.data.saldo - $cuentaBancaria.saldo) -lt 0.01) {
         Write-Host "✓ Saldo de cuenta bancaria sin cambios (rollback correcto)" -ForegroundColor Green
     } else {
@@ -190,7 +190,7 @@ try {
         Write-Host "  Saldo original: $($cuentaBancaria.saldo)" -ForegroundColor Gray
         Write-Host "  Saldo actual: $($cuentaActualizada.data.saldo)" -ForegroundColor Gray
     }
-    
+
     exit 1
 }
 

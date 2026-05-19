@@ -75,21 +75,21 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
 
   if (loading) {
     return (
-      <div className="activity-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-        <p style={{ color: '#6b7280' }}>Cargando reporte de aging...</p>
+      <div className="activity-card p-8 text-center">
+        <div className="loading-spinner"></div>
+        <p className="text-gray-500">Cargando reporte de aging...</p>
       </div>
     )
   }
 
   if (!agingData || agingData.resumen.total.cantidad === 0) {
     return (
-      <div className="activity-card" style={{ padding: '2rem', textAlign: 'center' }}>
-        <BarChart3 size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#374151' }}>
+      <div className="activity-card p-8 text-center">
+        <BarChart3 size={48} className="text-gray-400" />
+        <h3 className="text-[1.125rem] font-semibold mb-2 text-gray-700">
           No hay cuentas vencidas
         </h3>
-        <p style={{ color: '#6b7280' }}>
+        <p className="text-gray-500">
           Todas las cuentas por pagar están al día
         </p>
       </div>
@@ -144,39 +144,20 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   return (
     <div className="activity-card">
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '1px solid rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <BarChart3 size={24} style={{ color: '#3b82f6' }} />
+      <div className="flex justify-between items-center mb-6 pb-4 border-b">
+        <div className="flex items-center gap-3">
+          <BarChart3 size={24} className="text-blue-500" />
           <div>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827' }}>
+            <h3 className="text-[1.125rem] font-semibold text-gray-900">
               Aging de Cuentas por Pagar
             </h3>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            <p className="text-[0.875rem] text-gray-500 mt-1">
               Antigüedad de deudas vencidas
             </p>
           </div>
         </div>
         <button
-          onClick={loadAgingData}
-          style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500'
-          }}
+          onClick={loadAgingData} className="py-2 px-4 rounded-[6px] border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
         >
           <RefreshCw size={16} />
           Actualizar
@@ -184,97 +165,57 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
       </div>
 
       {/* Summary Stats */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{
-          padding: '1rem',
-          borderRadius: '8px',
-          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-          color: 'white'
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', opacity: 0.9 }}>
+      <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-8">
+        <div className="p-4 rounded-2 text-white">
+          <div className="text-3 font-semibold opacity-[0.9]">
             Total Vencido
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: '700', marginTop: '0.5rem' }}>
+          <div className="text-7 font-bold mt-2">
             {formatCurrency(resumen.total.monto)}
           </div>
-          <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', opacity: 0.9 }}>
+          <div className="text-[0.875rem] mt-1 opacity-[0.9]">
             {resumen.total.cantidad} cuenta{resumen.total.cantidad !== 1 ? 's' : ''}
           </div>
         </div>
 
-        <div style={{
-          padding: '1rem',
-          borderRadius: '8px',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)'
-        }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#991b1b' }}>
+        <div className="p-4 rounded-2 bg-[rgba(239,_68,_68,_0.1)] border">
+          <div className="text-3 font-semibold text-red-800">
             Más Crítico (+90 días)
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: '700', marginTop: '0.5rem', color: '#dc2626' }}>
+          <div className="text-6 font-bold mt-2 text-red-600">
             {formatCurrency(resumen.rango_mas_90.monto)}
           </div>
-          <div style={{ fontSize: '0.875rem', marginTop: '0.25rem', color: '#991b1b' }}>
+          <div className="text-[0.875rem] mt-1 text-red-800">
             {resumen.rango_mas_90.cantidad} cuenta{resumen.rango_mas_90.cantidad !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
 
       {/* Aging Bars */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '1rem' }}>
+      <div className="mb-8">
+        <h4 className="text-[0.875rem] font-semibold text-gray-700 mb-4">
           Distribución por Antigüedad
         </h4>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-4">
           {ranges.map((range, index) => (
             <div key={index}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                marginBottom: '0.5rem'
-              }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#374151' }}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[0.875rem] font-medium text-gray-700">
                   {range.label}
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                <div className="flex items-center gap-4">
+                  <span className="text-3 text-gray-500">
                     {range.cantidad} cuenta{range.cantidad !== 1 ? 's' : ''}
                   </span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: range.color }}>
+                  <span className="text-[0.875rem] font-semibold">
                     {formatCurrency(range.monto)}
                   </span>
                 </div>
               </div>
-              <div style={{
-                width: '100%',
-                height: '32px',
-                background: range.bgColor,
-                borderRadius: '6px',
-                overflow: 'hidden',
-                position: 'relative'
-              }}>
-                <div style={{
-                  width: `${range.percentage}%`,
-                  height: '100%',
-                  background: range.color,
-                  transition: 'width 0.5s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  paddingRight: '0.75rem'
-                }}>
+              <div className="w-[100%] h-8 rounded-[6px] overflow-hidden relative">
+                <div className="h-[100%] transition flex items-center justify-end pr-3">
                   {range.percentage > 15 && (
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      fontWeight: '600', 
-                      color: 'white' 
-                    }}>
+                    <span className="text-3 font-semibold text-white">
                       {range.percentage.toFixed(0)}%
                     </span>
                   )}
@@ -288,134 +229,60 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
       {/* Top Debtors */}
       {por_proveedor.length > 0 && (
         <div>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.5rem',
-            marginBottom: '1rem'
-          }}>
-            <AlertTriangle size={18} style={{ color: '#ef4444' }} />
-            <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle size={18} className="text-red-500" />
+            <h4 className="text-[0.875rem] font-semibold text-gray-700">
               Proveedores con Mayor Deuda Vencida
             </h4>
           </div>
-          <div style={{ overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="overflow-auto">
+            <table className="w-[100%]">
               <thead>
-                <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                  <th style={{ 
-                    textAlign: 'left', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                <tr>
+                  <th className="text-left p-3 font-semibold text-3 text-gray-500">
                     Proveedor
                   </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
                     0-30
                   </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
                     31-60
                   </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
                     61-90
                   </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
                     +90
                   </th>
-                  <th style={{ 
-                    textAlign: 'right', 
-                    padding: '0.75rem', 
-                    fontWeight: '600', 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    color: '#6b7280' 
-                  }}>
+                  <th className="text-right p-3 font-semibold text-3 text-gray-500">
                     Total
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {por_proveedor.slice(0, 10).map((proveedor, index) => (
-                  <tr key={proveedor.proveedor_id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                    <td style={{ padding: '0.75rem' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  <tr key={proveedor.proveedor_id} className="border-b">
+                    <td className="p-3">
+                      <div className="text-[0.875rem] font-medium">
                         {proveedor.proveedor_razon_social}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      <div className="text-3 text-gray-500">
                         RUC: {proveedor.proveedor_ruc} • {proveedor.cantidad_cxp} cuenta{proveedor.cantidad_cxp !== 1 ? 's' : ''}
                       </div>
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      textAlign: 'right', 
-                      fontSize: '0.875rem',
-                      color: proveedor.rango_0_30 > 0 ? '#f59e0b' : '#9ca3af'
-                    }}>
+                    <td className="p-3 text-right text-[0.875rem]">
                       {proveedor.rango_0_30 > 0 ? formatCurrency(proveedor.rango_0_30) : '-'}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      textAlign: 'right', 
-                      fontSize: '0.875rem',
-                      color: proveedor.rango_31_60 > 0 ? '#f97316' : '#9ca3af'
-                    }}>
+                    <td className="p-3 text-right text-[0.875rem]">
                       {proveedor.rango_31_60 > 0 ? formatCurrency(proveedor.rango_31_60) : '-'}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      textAlign: 'right', 
-                      fontSize: '0.875rem',
-                      color: proveedor.rango_61_90 > 0 ? '#ef4444' : '#9ca3af'
-                    }}>
+                    <td className="p-3 text-right text-[0.875rem]">
                       {proveedor.rango_61_90 > 0 ? formatCurrency(proveedor.rango_61_90) : '-'}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      textAlign: 'right', 
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: proveedor.rango_mas_90 > 0 ? '#dc2626' : '#9ca3af'
-                    }}>
+                    <td className="p-3 text-right text-[0.875rem] font-semibold">
                       {proveedor.rango_mas_90 > 0 ? formatCurrency(proveedor.rango_mas_90) : '-'}
                     </td>
-                    <td style={{ 
-                      padding: '0.75rem', 
-                      textAlign: 'right', 
-                      fontSize: '0.875rem',
-                      fontWeight: '700',
-                      color: '#111827'
-                    }}>
+                    <td className="p-3 text-right text-[0.875rem] font-bold text-gray-900">
                       {formatCurrency(proveedor.total)}
                     </td>
                   </tr>

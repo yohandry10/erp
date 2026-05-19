@@ -88,11 +88,11 @@ export default function DescargasPage() {
       <div className="activity-section">
         <div className="activity-header">
           <h2 className="activity-title">
-            <Filter size={18} style={{ marginRight: 8 }} /> Filtros
+            <Filter className="mr-2 h-[18px] w-[18px]" /> Filtros
           </h2>
         </div>
         <div className="activity-card">
-          <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Fecha desde</label>
               <input
@@ -135,7 +135,7 @@ export default function DescargasPage() {
             </div>
             <div className="flex items-end">
               <button className="primary-btn" onClick={cargar} disabled={loading}>
-                <Download size={16} style={{ marginRight: 6 }} /> Buscar
+                <Download className="mr-1.5 h-4 w-4" /> Buscar
               </button>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function DescargasPage() {
       <div className="activity-section">
         <div className="activity-header">
           <h2 className="activity-title">
-            <FileText size={18} style={{ marginRight: 8 }} /> Resultados
+            <FileText className="mr-2 h-[18px] w-[18px]" /> Resultados
           </h2>
         </div>
         <div className="activity-card">

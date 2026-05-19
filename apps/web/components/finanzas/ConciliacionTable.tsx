@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  CheckCircle, 
+import {
+  CheckCircle,
   Clock, 
   TrendingUp, 
   TrendingDown,
@@ -10,6 +10,15 @@ import {
   AlertCircle,
   Move
 } from 'lucide-react';
+import { formatDate } from '@/lib/format-utils';
+import { cn } from '@/lib/utils';
+
+const thClass = 'px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.08em] text-slate-500';
+const tdClass = 'px-3 py-3 text-sm text-slate-700';
+const amountClass = 'text-sm font-bold text-blue-700';
+const statusIconClass = 'text-blue-600';
+const mutedIconClass = 'text-slate-400';
+const panelHeaderClass = 'flex items-center justify-between bg-blue-600 px-4 py-3 text-sm font-semibold text-white';
 
 interface MovimientoBancario {
   id: string;
@@ -60,15 +69,7 @@ export default function ConciliacionTable({
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
-
-  const getRowStyle = (
+  const getRowClass = (
     movimiento: MovimientoBancario,
     isSelected: boolean,
     isHovered: boolean,
@@ -81,45 +82,23 @@ export default function ConciliacionTable({
       (movimiento.id === hoveredMatchId || movimiento.match_id === hoveredMatchId);
 
     if (isSelected) {
-      return {
-        background: isSistema ? '#dbeafe' : '#d1fae5',
-        borderLeft: `4px solid ${isSistema ? '#3b82f6' : '#10b981'}`,
-      };
+      return isSistema
+        ? 'border-l-4 border-l-blue-600 bg-blue-50'
+        : 'border-l-4 border-l-cyan-600 bg-cyan-50';
     }
     if (movimiento.conciliado && highlightMatches) {
-      // Highlight automatic matches with a distinct style
       if (movimiento.match_automatico) {
-        const baseStyle = {
-          background: 'linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)',
-          borderLeft: '4px solid #10b981',
-          boxShadow: '0 0 0 1px rgba(16, 185, 129, 0.2)',
-        };
-        
-        // Enhanced highlight when hovering over matched pair
-        if (isMatchedPairHovered) {
-          return {
-            ...baseStyle,
-            background: 'linear-gradient(90deg, #d1fae5 0%, #a7f3d0 100%)',
-            boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            transform: 'scale(1.01)',
-          };
-        }
-        
-        return baseStyle;
+        return cn(
+          'border-l-4 border-l-cyan-500 bg-cyan-50/80 shadow-[inset_0_0_0_1px_rgba(14,116,144,0.12)]',
+          isMatchedPairHovered && 'scale-[1.01] bg-cyan-100 shadow-[inset_0_0_0_2px_rgba(14,116,144,0.22)]'
+        );
       }
-      return {
-        background: '#f0fdf4',
-        borderLeft: '4px solid #10b981',
-      };
+      return 'border-l-4 border-l-cyan-500 bg-cyan-50/60';
     }
     if (isHovered) {
-      return {
-        background: '#f9fafb',
-      };
+      return 'bg-slate-50';
     }
-    return {
-      background: 'white',
-    };
+    return 'bg-white';
   };
 
   const handleRowClick = (id: string, isSistema: boolean) => {
@@ -140,18 +119,11 @@ export default function ConciliacionTable({
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', movimiento.id);
     
-    // Add visual feedback
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '0.5';
-    }
   };
 
   const handleDragEnd = (e: React.DragEvent) => {
     setDraggedItem(null);
     setDropTarget(null);
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '1';
-    }
   };
 
   const handleDragOver = (e: React.DragEvent, movimiento: MovimientoBancario, isSistema: boolean) => {
@@ -215,7 +187,7 @@ export default function ConciliacionTable({
     isHovered: boolean,
     isSistema: boolean
   ) => {
-    const rowStyle = getRowStyle(movimiento, isSelected, isHovered, isSistema);
+    const rowClass = getRowClass(movimiento, isSelected, isHovered, isSistema);
     const isDropTarget = dropTarget === movimiento.id;
     const isDragging = draggedItem?.id === movimiento.id;
     const canBeDragged = !readOnly && !movimiento.conciliado;
@@ -255,84 +227,54 @@ export default function ConciliacionTable({
         onClick={() => handleRowClick(movimiento.id, isSistema)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{
-          ...rowStyle,
-          cursor: canBeDragged ? 'grab' : readOnly ? 'default' : 'pointer',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          borderBottom: '1px solid #e5e7eb',
-          opacity: isDragging ? 0.5 : 1,
-          ...(isDropTarget && {
-            background: 'linear-gradient(90deg, #fef3c7 0%, #fde68a 100%)',
-            borderLeft: '4px solid #f59e0b',
-            boxShadow: '0 0 0 2px rgba(245, 158, 11, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            transform: 'scale(1.02)',
-          }),
-        }}
+        className={cn(
+          'border-b border-slate-200 transition duration-200',
+          canBeDragged ? 'cursor-grab' : readOnly ? 'cursor-default' : 'cursor-pointer',
+          rowClass,
+          isDragging && 'opacity-50',
+          isDropTarget && 'scale-[1.01] border-l-4 border-l-blue-500 bg-blue-100 shadow-[inset_0_0_0_2px_rgba(37,99,235,0.22)]'
+        )}
       >
         {/* Status Icon */}
-        <td style={{ padding: '0.75rem', width: '60px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        <td className="w-[60px] px-3 py-3">
+          <div className="flex items-center gap-1">
             {canBeDragged && (
               <span title="Arrastrar para conciliar">
                 <Move 
                   size={14} 
-                  style={{ 
-                    color: '#9ca3af',
-                    cursor: 'grab',
-                    flexShrink: 0
-                  }} 
+                  className="shrink-0 cursor-grab text-slate-400"
                 />
               </span>
             )}
             {movimiento.conciliado ? (
               movimiento.match_automatico ? (
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                <div className="relative inline-block">
+                  <CheckCircle size={18} className={statusIconClass} />
                   <Link2
                     size={10}
-                    style={{
-                      position: 'absolute',
-                      bottom: -2,
-                      right: -2,
-                      color: '#3b82f6',
-                      background: 'white',
-                      borderRadius: '50%',
-                    }}
+                    className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white text-blue-600"
                   />
                 </div>
               ) : (
-                <CheckCircle size={18} style={{ color: '#10b981' }} />
+                <CheckCircle size={18} className={statusIconClass} />
               )
             ) : (
-              <Clock size={18} style={{ color: '#f59e0b' }} />
+              <Clock size={18} className={mutedIconClass} />
             )}
           </div>
         </td>
 
         {/* Fecha */}
-        <td style={{ padding: '0.75rem' }}>
-          <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+        <td className={tdClass}>
+          <span>
             {formatDate(movimiento.fecha)}
           </span>
         </td>
 
         {/* Tipo */}
-        <td style={{ padding: '0.75rem' }}>
+        <td className={tdClass}>
           <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              background:
-                movimiento.tipo === 'ABONO'
-                  ? 'rgba(16, 185, 129, 0.1)'
-                  : 'rgba(239, 68, 68, 0.1)',
-              color: movimiento.tipo === 'ABONO' ? '#10b981' : '#ef4444',
-            }}
+            className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700"
           >
             {movimiento.tipo === 'ABONO' ? (
               <TrendingUp size={12} />
@@ -344,38 +286,17 @@ export default function ConciliacionTable({
         </td>
 
         {/* Descripción */}
-        <td style={{ padding: '0.75rem', maxWidth: '250px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <td className={cn(tdClass, 'max-w-[250px]')}>
+          <div className="flex items-center gap-2">
             <div
-              style={{
-                fontSize: '0.875rem',
-                color: '#111827',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1,
-              }}
+              className="flex-1 truncate text-sm text-slate-950"
               title={movimiento.descripcion}
             >
               {movimiento.descripcion}
             </div>
             {movimiento.match_automatico && (
               <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.125rem 0.375rem',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  borderRadius: '4px',
-                  fontSize: '0.625rem',
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.025em',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                }}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-blue-600 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-white shadow-sm"
                 title="Match realizado automáticamente"
               >
                 <Link2 size={10} />
@@ -384,28 +305,15 @@ export default function ConciliacionTable({
             )}
           </div>
           {movimiento.referencia && (
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                marginTop: '0.125rem',
-                fontFamily: 'monospace',
-              }}
-            >
+            <div className="mt-0.5 font-mono text-xs text-slate-500">
               Ref: {movimiento.referencia}
             </div>
           )}
         </td>
 
         {/* Monto */}
-        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-          <span
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: '700',
-              color: movimiento.tipo === 'ABONO' ? '#10b981' : '#ef4444',
-            }}
-          >
+        <td className={cn(tdClass, 'text-right')}>
+          <span className={amountClass}>
             {movimiento.tipo === 'ABONO' ? '+' : '-'} {formatCurrency(movimiento.monto)}
           </span>
         </td>
@@ -427,67 +335,41 @@ export default function ConciliacionTable({
     : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="flex flex-col gap-6">
       {/* Legend and Statistics */}
       {highlightMatches && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-4">
           {/* Legend */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '1.5rem',
-              padding: '1rem',
-              background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              border: '1px solid #e5e7eb',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={16} style={{ color: '#f59e0b' }} />
-              <span style={{ color: '#374151', fontWeight: '500' }}>Pendiente</span>
+          <div className="flex flex-wrap gap-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className={mutedIconClass} />
+              <span className="font-medium text-slate-700">Pendiente</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle size={16} style={{ color: '#10b981' }} />
-              <span style={{ color: '#374151', fontWeight: '500' }}>Conciliado Manual</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} className={statusIconClass} />
+              <span className="font-medium text-slate-700">Conciliado Manual</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <CheckCircle size={16} style={{ color: '#10b981' }} />
+            <div className="flex items-center gap-2">
+              <div className="relative inline-block">
+                <CheckCircle size={16} className={statusIconClass} />
                 <Link2
                   size={8}
-                  style={{
-                    position: 'absolute',
-                    bottom: -1,
-                    right: -1,
-                    color: '#3b82f6',
-                    background: 'white',
-                    borderRadius: '50%',
-                  }}
+                  className="absolute -bottom-px -right-px rounded-full bg-white text-blue-600"
                 />
               </div>
-              <span style={{ color: '#374151', fontWeight: '500' }}>
+              <span className="font-medium text-slate-700">
                 Match Automático
               </span>
               <span
-                style={{
-                  padding: '0.125rem 0.5rem',
-                  background: 'linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '4px',
-                  fontSize: '0.75rem',
-                  color: '#065f46',
-                  fontWeight: '600',
-                }}
+                className="rounded border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-800"
               >
                 Resaltado
               </span>
             </div>
             {!readOnly && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Move size={16} style={{ color: '#9ca3af' }} />
-                <span style={{ color: '#374151', fontWeight: '500' }}>
+              <div className="flex items-center gap-2">
+                <Move size={16} className={mutedIconClass} />
+                <span className="font-medium text-slate-700">
                   Arrastra entre columnas para conciliar
                 </span>
               </div>
@@ -496,52 +378,36 @@ export default function ConciliacionTable({
 
           {/* Statistics */}
           {totalConciliados > 0 && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '1rem',
-                padding: '1rem',
-                background: 'white',
-                borderRadius: '8px',
-                border: '1px solid #e5e7eb',
-              }}
-            >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+            <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="text-center">
+                <div className="mb-1 text-xs text-slate-500">
                   Total Conciliados
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+                <div className="text-2xl font-bold text-slate-950">
                   {totalConciliados}
                 </div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+              <div className="text-center">
+                <div className="mb-1 text-xs text-slate-500">
                   Matches Automáticos
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#3b82f6' }}>
+                <div className="text-2xl font-bold text-blue-600">
                   {matchesAutomaticos}
                 </div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+              <div className="text-center">
+                <div className="mb-1 text-xs text-slate-500">
                   Matches Manuales
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>
+                <div className="text-2xl font-bold text-cyan-700">
                   {matchesManuales}
                 </div>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+              <div className="text-center">
+                <div className="mb-1 text-xs text-slate-500">
                   % Automático
                 </div>
-                <div
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: '700',
-                    color: porcentajeAutomatico >= 80 ? '#10b981' : porcentajeAutomatico >= 50 ? '#f59e0b' : '#ef4444',
-                  }}
-                >
+                <div className="text-2xl font-bold text-blue-700">
                   {porcentajeAutomatico}%
                 </div>
               </div>
@@ -552,117 +418,44 @@ export default function ConciliacionTable({
 
       {/* Dual Table - Pendientes */}
       <div>
-        <h3
-          style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: '#111827',
-            marginBottom: '1rem',
-          }}
-        >
+        <h3 className="mb-4 text-lg font-semibold text-slate-950">
           Movimientos Pendientes de Conciliar
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+        <div className="grid gap-6 xl:grid-cols-2">
           {/* Sistema */}
-          <div
-            style={{
-              border: '2px solid #3b82f6',
-              borderRadius: '8px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                background: '#3b82f6',
-                color: 'white',
-                padding: '0.75rem 1rem',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
+          <div className="overflow-hidden rounded-lg border-2 border-blue-600">
+            <div className={panelHeaderClass}>
               <span>MOVIMIENTOS DEL SISTEMA</span>
-              <span
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                }}
-              >
+              <span className="rounded-full bg-white/20 px-2 py-1 text-xs">
                 {movimientosSistemaPendientes.length}
               </span>
             </div>
-            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+            <div className="max-h-[500px] overflow-y-auto">
               {movimientosSistemaPendientes.length === 0 ? (
-                <div
-                  style={{
-                    padding: '3rem',
-                    textAlign: 'center',
-                    color: '#6b7280',
-                  }}
-                >
+                <div className="px-8 py-12 text-center text-slate-500">
                   <CheckCircle
                     size={48}
-                    style={{ margin: '0 auto 1rem', color: '#10b981' }}
+                    className="mx-auto mb-4 text-blue-600"
                   />
-                  <p style={{ fontSize: '0.875rem' }}>
+                  <p className="text-sm">
                     Todos los movimientos del sistema están conciliados
                   </p>
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <th style={{ padding: '0.5rem', width: '60px' }}></th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="w-[60px] px-2 py-2"></th>
+                      <th className={thClass}>
                         Fecha
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={thClass}>
                         Tipo
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={thClass}>
                         Descripción
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'right',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={cn(thClass, 'text-right')}>
                         Monto
                       </th>
                     </tr>
@@ -683,105 +476,39 @@ export default function ConciliacionTable({
           </div>
 
           {/* Extracto */}
-          <div
-            style={{
-              border: '2px solid #10b981',
-              borderRadius: '8px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                background: '#10b981',
-                color: 'white',
-                padding: '0.75rem 1rem',
-                fontWeight: '600',
-                fontSize: '0.875rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
+          <div className="overflow-hidden rounded-lg border-2 border-cyan-600">
+            <div className="flex items-center justify-between bg-cyan-700 px-4 py-3 text-sm font-semibold text-white">
               <span>MOVIMIENTOS DEL EXTRACTO</span>
-              <span
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                }}
-              >
+              <span className="rounded-full bg-white/20 px-2 py-1 text-xs">
                 {movimientosExtractoPendientes.length}
               </span>
             </div>
-            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+            <div className="max-h-[500px] overflow-y-auto">
               {movimientosExtractoPendientes.length === 0 ? (
-                <div
-                  style={{
-                    padding: '3rem',
-                    textAlign: 'center',
-                    color: '#6b7280',
-                  }}
-                >
+                <div className="px-8 py-12 text-center text-slate-500">
                   <AlertCircle
                     size={48}
-                    style={{ margin: '0 auto 1rem', color: '#f59e0b' }}
+                    className="mx-auto mb-4 text-slate-400"
                   />
-                  <p style={{ fontSize: '0.875rem' }}>
+                  <p className="text-sm">
                     No hay movimientos del extracto pendientes
                   </p>
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <th style={{ padding: '0.5rem', width: '60px' }}></th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="w-[60px] px-2 py-2"></th>
+                      <th className={thClass}>
                         Fecha
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={thClass}>
                         Tipo
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={thClass}>
                         Descripción
                       </th>
-                      <th
-                        style={{
-                          padding: '0.5rem',
-                          textAlign: 'right',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                        }}
-                      >
+                      <th className={cn(thClass, 'text-right')}>
                         Monto
                       </th>
                     </tr>
@@ -806,90 +533,29 @@ export default function ConciliacionTable({
       {/* Movimientos Conciliados */}
       {(movimientosSistemaConciliados.length > 0 || movimientosExtractoConciliados.length > 0) && (
         <div>
-          <h3
-            style={{
-              fontSize: '1.125rem',
-              fontWeight: '600',
-              color: '#111827',
-              marginBottom: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <CheckCircle size={20} style={{ color: '#10b981' }} />
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-950">
+            <CheckCircle size={20} className={statusIconClass} />
             Movimientos Conciliados ({movimientosSistemaConciliados.length})
           </h3>
-          <div
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="max-h-[400px] overflow-y-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '0.75rem', width: '60px' }}></th>
-                    <th
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                  <tr className="border-b border-slate-200 bg-slate-50">
+                    <th className="w-[60px] px-3 py-3"></th>
+                    <th className={thClass}>
                       Fecha
                     </th>
-                    <th
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                    <th className={thClass}>
                       Tipo
                     </th>
-                    <th
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                    <th className={thClass}>
                       Descripción
                     </th>
-                    <th
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                    <th className={thClass}>
                       Origen
                     </th>
-                    <th
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'right',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        color: '#6b7280',
-                        textTransform: 'uppercase',
-                      }}
-                    >
+                    <th className={cn(thClass, 'text-right')}>
                       Monto
                     </th>
                   </tr>
@@ -902,63 +568,33 @@ export default function ConciliacionTable({
                         if (mov.match_id) setHoveredMatchId(mov.id);
                       }}
                       onMouseLeave={() => setHoveredMatchId(null)}
-                      style={{
-                        background: mov.match_automatico 
-                          ? 'linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)'
-                          : '#f0fdf4',
-                        borderBottom: '1px solid #e5e7eb',
-                        borderLeft: '4px solid #10b981',
-                        boxShadow: mov.match_automatico 
-                          ? '0 0 0 1px rgba(16, 185, 129, 0.2)'
-                          : 'none',
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                        transform: hoveredMatchId && mov.match_id && 
-                          (mov.id === hoveredMatchId || mov.match_id === hoveredMatchId)
-                          ? 'scale(1.01)'
-                          : 'scale(1)',
-                      }}
+                      className={cn(
+                        'border-b border-slate-200 border-l-4 border-l-cyan-500 bg-cyan-50/70 transition duration-200',
+                        mov.match_automatico && 'shadow-[inset_0_0_0_1px_rgba(14,116,144,0.12)]',
+                        hoveredMatchId && mov.match_id && (mov.id === hoveredMatchId || mov.match_id === hoveredMatchId) && 'scale-[1.01]'
+                      )}
                     >
-                      <td style={{ padding: '0.75rem' }}>
+                      <td className={tdClass}>
                         {mov.match_automatico ? (
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
-                            <CheckCircle size={18} style={{ color: '#10b981' }} />
+                          <div className="relative inline-block">
+                            <CheckCircle size={18} className={statusIconClass} />
                             <Link2
                               size={10}
-                              style={{
-                                position: 'absolute',
-                                bottom: -2,
-                                right: -2,
-                                color: '#3b82f6',
-                                background: 'white',
-                                borderRadius: '50%',
-                              }}
+                              className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white text-blue-600"
                             />
                           </div>
                         ) : (
-                          <CheckCircle size={18} style={{ color: '#10b981' }} />
+                          <CheckCircle size={18} className={statusIconClass} />
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#374151' }}>
+                      <td className={tdClass}>
+                        <span>
                           {formatDate(mov.fecha)}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
+                      <td className={tdClass}>
                         <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            background:
-                              mov.tipo === 'ABONO'
-                                ? 'rgba(16, 185, 129, 0.1)'
-                                : 'rgba(239, 68, 68, 0.1)',
-                            color: mov.tipo === 'ABONO' ? '#10b981' : '#ef4444',
-                          }}
+                          className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700"
                         >
                           {mov.tipo === 'ABONO' ? (
                             <TrendingUp size={12} />
@@ -968,34 +604,14 @@ export default function ConciliacionTable({
                           {mov.tipo}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div
-                            style={{
-                              fontSize: '0.875rem',
-                              color: '#111827',
-                              flex: 1,
-                            }}
-                          >
+                      <td className={tdClass}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 text-sm text-slate-950">
                             {mov.descripcion}
                           </div>
                           {mov.match_automatico && (
                             <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                padding: '0.125rem 0.375rem',
-                                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                                color: 'white',
-                                borderRadius: '4px',
-                                fontSize: '0.625rem',
-                                fontWeight: '700',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.025em',
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                              }}
+                              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-blue-600 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-white shadow-sm"
                               title="Match realizado automáticamente"
                             >
                               <Link2 size={10} />
@@ -1004,40 +620,23 @@ export default function ConciliacionTable({
                           )}
                         </div>
                         {mov.referencia && (
-                          <div
-                            style={{
-                              fontSize: '0.75rem',
-                              color: '#6b7280',
-                              marginTop: '0.125rem',
-                              fontFamily: 'monospace',
-                            }}
-                          >
+                          <div className="mt-0.5 font-mono text-xs text-slate-500">
                             Ref: {mov.referencia}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '0.75rem' }}>
+                      <td className={tdClass}>
                         <span
-                          style={{
-                            fontSize: '0.75rem',
-                            fontWeight: '600',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '4px',
-                            background: mov.es_extracto ? '#d1fae5' : '#dbeafe',
-                            color: mov.es_extracto ? '#065f46' : '#1e40af',
-                          }}
+                          className={cn(
+                            'rounded px-2 py-1 text-xs font-semibold',
+                            mov.es_extracto ? 'bg-cyan-50 text-cyan-800' : 'bg-blue-50 text-blue-800'
+                          )}
                         >
                           {mov.es_extracto ? 'Extracto' : 'Sistema'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                        <span
-                          style={{
-                            fontSize: '0.875rem',
-                            fontWeight: '700',
-                            color: mov.tipo === 'ABONO' ? '#10b981' : '#ef4444',
-                          }}
-                        >
+                      <td className={cn(tdClass, 'text-right')}>
+                        <span className={amountClass}>
                           {mov.tipo === 'ABONO' ? '+' : '-'} {formatCurrency(mov.monto)}
                         </span>
                       </td>

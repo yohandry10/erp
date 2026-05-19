@@ -99,162 +99,80 @@ export default function DemoTenantModal({ tenant, onClose, onSuccess }: DemoTena
   const modalContent = (
     <>
       <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          zIndex: 9999,
-        }}
+        onClick={onClose} className="fixed inset-0 bg-[rgba(15,_23,_42,_0.6)] z-[9999]"
       />
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-        }}
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       >
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 520,
-            background: 'white',
-            borderRadius: 16,
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            padding: '1.5rem',
-          }}
+        <div className="w-[100%] bg-white shadow p-6"
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Activar demo</h3>
-            <p style={{ margin: '0.25rem 0 0', color: '#64748b' }}>
+          <div className="mb-4">
+            <h3 className="text-5 font-bold m-0">Activar demo</h3>
+            <p className="text-slate-500">
               {tenant.razon_social}
             </p>
             {tenant.is_demo && (
-              <p style={{ margin: '0.35rem 0 0', color: '#2563eb', fontWeight: 600 }}>
+              <p className="text-blue-600 font-semibold">
                 Demo activa{tenant.demo_expires_at ? ` hasta ${new Date(tenant.demo_expires_at).toLocaleString('es-PE')}` : ''}
               </p>
             )}
           </div>
 
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
+          <div className="grid gap-3">
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Email</label>
+              <label className="text-3 font-semibold text-slate-500">Email</label>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="cliente@empresa.com"
-                style={{
-                  width: '100%',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 8,
-                  padding: '0.65rem 0.8rem',
-                  fontSize: '0.9rem',
-                }}
+                placeholder="cliente@empresa.com" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Contraseña</label>
+              <label className="text-3 font-semibold text-slate-500">Contraseña</label>
               <input
                 type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contraseña temporal"
-                style={{
-                  width: '100%',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 8,
-                  padding: '0.65rem 0.8rem',
-                  fontSize: '0.9rem',
-                }}
+                placeholder="Contraseña temporal" className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Días de demo</label>
+              <label className="text-3 font-semibold text-slate-500">Días de demo</label>
               <input
                 type="number"
                 min={1}
                 max={90}
                 value={days}
-                onChange={(e) => setDays(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 8,
-                  padding: '0.65rem 0.8rem',
-                  fontSize: '0.9rem',
-                }}
+                onChange={(e) => setDays(Number(e.target.value))} className="w-[100%] border py-[0.65rem] px-[0.8rem] text-3.5"
               />
             </div>
           </div>
 
           {(error || success) && (
-            <div
-              style={{
-                marginTop: '1rem',
-                padding: '0.75rem 1rem',
-                borderRadius: 8,
-                background: error ? '#fee2e2' : '#dcfce7',
-                color: error ? '#991b1b' : '#166534',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-              }}
+            <div className="mt-4 py-3 px-4 font-semibold text-3.5"
             >
               {error || success}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+          <div className="flex gap-3 mt-5">
             <button
               type="button"
               onClick={handleActivate}
-              disabled={loading}
-              style={{
-                flex: 1,
-                padding: '0.75rem 1rem',
-                borderRadius: 10,
-                border: 'none',
-                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                color: 'white',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
+              disabled={loading} className="flex-[1] py-3 px-4 border-0 text-white font-bold cursor-pointer"
             >
               Activar demo
             </button>
             <button
               type="button"
               onClick={handleDeactivate}
-              disabled={loading}
-              style={{
-                flex: 1,
-                padding: '0.75rem 1rem',
-                borderRadius: 10,
-                border: '1px solid #e2e8f0',
-                background: 'white',
-                color: '#0f172a',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
+              disabled={loading} className="flex-[1] py-3 px-4 border bg-white text-slate-950 font-bold cursor-pointer"
             >
               Quitar demo
             </button>
             <button
               type="button"
-              onClick={onClose}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: 10,
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
-                color: '#475569',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
+              onClick={onClose} className="py-3 px-4 border bg-slate-50 text-slate-600 font-bold cursor-pointer"
             >
               Cerrar
             </button>

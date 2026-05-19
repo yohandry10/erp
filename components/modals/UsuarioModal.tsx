@@ -247,12 +247,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
                     <div className="flex items-center gap-2">
                       <span 
                         className="w-3 h-3 rounded-full"
-                        style={{ 
-                          backgroundColor: rol.nombre === 'ADMIN' ? '#8b5cf6' :
-                                         rol.nombre === 'CONTADOR' ? '#3b82f6' :
-                                         rol.nombre === 'VENDEDOR' ? '#10b981' :
-                                         rol.nombre === 'ALMACENERO' ? '#f59e0b' : '#6b7280'
-                        }}
+                       
                       />
                       <span className="font-medium">{rol.nombre}</span>
                       <span className="text-sm text-gray-500">- {rol.descripcion}</span>

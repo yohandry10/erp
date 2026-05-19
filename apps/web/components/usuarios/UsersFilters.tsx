@@ -15,20 +15,11 @@ export default function UsersFilters({
   onRolChange, 
   onEstadoChange 
 }: UsersFiltersProps) {
-  const selectStyle = { 
-    padding: '0.5rem 1rem', 
-    borderRadius: '8px', 
-    border: '1px solid rgba(255,255,255,0.2)', 
-    background: 'rgba(255,255,255,0.1)',
-    color: 'white'
-  }
-
   return (
-    <div style={{ display: 'flex', gap: '1rem' }}>
+    <div className="flex flex-col gap-2 sm:flex-row">
       <select 
         value={filtroRol}
-        onChange={(e) => onRolChange(e.target.value)}
-        style={selectStyle}
+        onChange={(e) => onRolChange(e.target.value)} className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
       >
         <option value="todos">Todos los roles</option>
         {roles.map((rol) => (
@@ -38,8 +29,7 @@ export default function UsersFilters({
       
       <select 
         value={filtroEstado}
-        onChange={(e) => onEstadoChange(e.target.value)}
-        style={selectStyle}
+        onChange={(e) => onEstadoChange(e.target.value)} className="h-10 rounded-md border border-cyan-400/20 bg-slate-900/70 px-3 text-sm text-slate-100 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950"
       >
         <option value="todos">Todos los estados</option>
         <option value="ACTIVO">Activo</option>

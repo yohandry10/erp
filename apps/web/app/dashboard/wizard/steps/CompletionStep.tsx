@@ -65,166 +65,59 @@ export function CompletionStep() {
   }
 
   return (
-    <div style={{ padding: '1rem 0' }}>
-      <div style={{
-        textAlign: 'center',
-        marginBottom: '2rem',
-      }}>
-        <div style={{
-          width: '100px',
-          height: '100px',
-          margin: '0 auto 1.5rem',
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--success-500), var(--success-700))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)',
-        }}>
-          <CheckCircle size={60} style={{ color: 'white' }} />
+    <div className="py-4 px-0">
+      <div className="text-center mb-8">
+        <div className="w-[100px] h-[100px] rounded-full flex items-center justify-center shadow">
+          <CheckCircle size={60} className="text-white" />
         </div>
 
-        <h3 style={{
-          fontSize: '2rem',
-          fontWeight: '700',
-          color: 'var(--primary-900)',
-          marginBottom: '0.75rem',
-        }}>
+        <h3 className="text-8 font-bold text-[var(--primary-900)] mb-3">
           ¡Configuración Completada!
         </h3>
 
-        <p style={{
-          fontSize: '1.125rem',
-          color: 'var(--primary-600)',
-          maxWidth: '600px',
-          margin: '0 auto',
-          lineHeight: '1.6',
-        }}>
+        <p className="text-[1.125rem] text-[var(--primary-600)] max-w-[600px] my-0 mx-auto leading-7">
           Tu sistema está listo para comenzar a emitir comprobantes electrónicos
         </p>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gap: '1rem',
-        marginTop: '2rem',
-        marginBottom: '2rem',
-      }}>
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          padding: '1.25rem',
-          backgroundColor: 'rgba(16, 185, 129, 0.05)',
-          borderRadius: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            backgroundColor: 'var(--success-100)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <CheckCircle size={24} style={{ color: 'var(--success-600)' }} />
+      <div className="grid gap-4 mt-8 mb-8">
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
+          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+            <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: 'var(--primary-900)',
-              marginBottom: '0.25rem',
-            }}>
+            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
               Datos Empresariales Configurados
             </h4>
-            <p style={{
-              fontSize: '0.875rem',
-              color: 'var(--primary-600)',
-              lineHeight: '1.5',
-              margin: 0,
-            }}>
+            <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
               Tu {documentoFiscal}, razón social y dirección están registrados correctamente
             </p>
           </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          padding: '1.25rem',
-          backgroundColor: 'rgba(16, 185, 129, 0.05)',
-          borderRadius: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            backgroundColor: 'var(--success-100)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <CheckCircle size={24} style={{ color: 'var(--success-600)' }} />
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
+          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+            <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: 'var(--primary-900)',
-              marginBottom: '0.25rem',
-            }}>
+            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
               Certificado Digital Activo
             </h4>
-            <p style={{
-              fontSize: '0.875rem',
-              color: 'var(--primary-600)',
-              lineHeight: '1.5',
-              margin: 0,
-            }}>
+            <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
               Tu certificado digital está cargado y listo para firmar documentos
             </p>
           </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          padding: '1.25rem',
-          backgroundColor: 'rgba(16, 185, 129, 0.05)',
-          borderRadius: '12px',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            backgroundColor: 'var(--success-100)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <CheckCircle size={24} style={{ color: 'var(--success-600)' }} />
+        <div className="flex gap-4 p-5 bg-[rgba(16,_185,_129,_0.05)] rounded-3 border">
+          <div className="w-12 h-12 rounded-3 bg-[var(--success-100)] flex items-center justify-center shrink-0">
+            <CheckCircle size={24} className="text-[var(--success-600)]" />
           </div>
           <div>
-            <h4 style={{
-              fontSize: '1rem',
-              fontWeight: '600',
-              color: 'var(--primary-900)',
-              marginBottom: '0.25rem',
-            }}>
+            <h4 className="text-4 font-semibold text-[var(--primary-900)] mb-1">
               Validaciones Exitosas
             </h4>
-            <p style={{
-              fontSize: '0.875rem',
-              color: 'var(--primary-600)',
-              lineHeight: '1.5',
-              margin: 0,
-            }}>
+            <p className="text-[0.875rem] text-[var(--primary-600)] leading-6 m-0">
               Toda tu configuración ha sido verificada y aprobada
             </p>
           </div>
@@ -232,71 +125,28 @@ export function CompletionStep() {
       </div>
 
       {error && (
-        <div style={{
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#fee2e2',
-          border: '1px solid #fca5a5',
-          borderRadius: '8px',
-          color: '#dc2626',
-          fontSize: '0.875rem',
-        }}>
+        <div className="mb-6 p-4 bg-[#fee2e2] border rounded-2 text-red-600 text-[0.875rem]">
           {error}
         </div>
       )}
 
-        <div style={{
-          marginTop: '2rem',
-          padding: '1.5rem',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1))',
-          borderRadius: '12px',
-          border: '1px solid rgba(139, 92, 246, 0.2)',
-          textAlign: 'center',
-        }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          marginBottom: '0.75rem',
-        }}>
-          <Sparkles size={20} style={{ color: 'var(--primary-600)' }} />
-          <h4 style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: 'var(--primary-900)',
-            margin: 0,
-          }}>
+        <div className="mt-8 p-6 rounded-3 border text-center">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <Sparkles size={20} className="text-[var(--primary-600)]" />
+          <h4 className="text-4 font-semibold text-[var(--primary-900)] m-0">
             ¿Qué sigue?
           </h4>
         </div>
-        <p style={{
-          fontSize: '0.875rem',
-          color: 'var(--primary-600)',
-          lineHeight: '1.6',
-          margin: '0 0 1rem 0',
-        }}>
+        <p className="text-[0.875rem] text-[var(--primary-600)] leading-7 mt-0 mr-0 mb-4 ml-0">
           Ahora puedes comenzar a usar el sistema para emitir facturas, boletas,
           guías de remisión y más. Explora el dashboard para conocer todas las funcionalidades.
         </p>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          gap: '1rem',
-        }}>
+        <div className="flex flex-wrap justify-center gap-4">
           <Button
             onClick={handleComplete}
             disabled={isCompleting || isResetting}
-            size="lg"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '1rem',
-              padding: '0.75rem 2rem',
-            }}
+            size="lg" className="inline-flex items-center gap-2 text-4 py-3 px-8"
           >
             {isCompleting ? (
               <>Finalizando...</>
@@ -312,14 +162,7 @@ export function CompletionStep() {
             onClick={handleReset}
             disabled={isCompleting || isResetting}
             variant="outline"
-            size="lg"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '1rem',
-              padding: '0.75rem 2rem',
-            }}
+            size="lg" className="inline-flex items-center gap-2 text-4 py-3 px-8"
           >
             {isResetting ? (
               <>Reiniciando...</>

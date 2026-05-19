@@ -51,13 +51,13 @@ function Invoke-SupabaseQuery {
         [string]$Query,
         [string]$Description
     )
-    
+
     Write-Host "Ejecutando: $Description" -ForegroundColor $Yellow
-    
+
     $body = @{
         query = $Query
     } | ConvertTo-Json
-    
+
     try {
         $response = Invoke-RestMethod -Uri "$SUPABASE_URL/rest/v1/rpc/exec_sql" `
             -Method Post `
@@ -67,7 +67,7 @@ function Invoke-SupabaseQuery {
                 "Content-Type" = "application/json"
             } `
             -Body $body
-        
+
         return $response
     } catch {
         Write-Host "Error ejecutando query: $_" -ForegroundColor $Red
@@ -91,14 +91,14 @@ Write-Host "========================================`n" -ForegroundColor $Cyan
 # Verificación 1: Tabla existe
 Write-Host "1. Verificando existencia de tabla..." -ForegroundColor $Yellow
 $query1 = @"
-SELECT 
-  CASE 
+SELECT
+  CASE
     WHEN EXISTS (
-      SELECT 1 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' 
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
         AND table_name = 'centros_costo'
-    ) 
+    )
     THEN '✅ PASS: Tabla centros_costo existe'
     ELSE '❌ FAIL: Tabla centros_costo NO existe'
   END AS resultado;
@@ -107,15 +107,15 @@ SELECT
 # Verificación 2: Columna tenant_id existe
 Write-Host "2. Verificando columna tenant_id..." -ForegroundColor $Yellow
 $query2 = @"
-SELECT 
-  CASE 
+SELECT
+  CASE
     WHEN EXISTS (
-      SELECT 1 
-      FROM information_schema.columns 
-      WHERE table_schema = 'public' 
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
         AND table_name = 'centros_costo'
         AND column_name = 'tenant_id'
-    ) 
+    )
     THEN '✅ PASS: Columna tenant_id existe'
     ELSE '❌ FAIL: Columna tenant_id NO existe'
   END AS resultado;
@@ -124,9 +124,9 @@ SELECT
 # Verificación 3: RLS habilitado
 Write-Host "3. Verificando RLS habilitado..." -ForegroundColor $Yellow
 $query3 = @"
-SELECT 
-  CASE 
-    WHEN relrowsecurity = true 
+SELECT
+  CASE
+    WHEN relrowsecurity = true
     THEN '✅ PASS: RLS habilitado'
     ELSE '❌ FAIL: RLS NO habilitado'
   END AS resultado
@@ -138,15 +138,15 @@ WHERE relname = 'centros_costo'
 # Verificación 4: Política existe
 Write-Host "4. Verificando política de aislamiento..." -ForegroundColor $Yellow
 $query4 = @"
-SELECT 
-  CASE 
+SELECT
+  CASE
     WHEN EXISTS (
-      SELECT 1 
-      FROM pg_policies 
-      WHERE schemaname = 'public' 
+      SELECT 1
+      FROM pg_policies
+      WHERE schemaname = 'public'
         AND tablename = 'centros_costo'
         AND policyname = 'centros_costo_tenant_isolation'
-    ) 
+    )
     THEN '✅ PASS: Política tenant_isolation existe'
     ELSE '❌ FAIL: Política NO existe'
   END AS resultado;
@@ -155,15 +155,15 @@ SELECT
 # Verificación 5: Índice en tenant_id
 Write-Host "5. Verificando índice en tenant_id..." -ForegroundColor $Yellow
 $query5 = @"
-SELECT 
-  CASE 
+SELECT
+  CASE
     WHEN EXISTS (
-      SELECT 1 
-      FROM pg_indexes 
-      WHERE schemaname = 'public' 
+      SELECT 1
+      FROM pg_indexes
+      WHERE schemaname = 'public'
         AND tablename = 'centros_costo'
         AND indexname LIKE '%tenant_id%'
-    ) 
+    )
     THEN '✅ PASS: Índice en tenant_id existe'
     ELSE '⚠️  WARNING: Índice no encontrado'
   END AS resultado;

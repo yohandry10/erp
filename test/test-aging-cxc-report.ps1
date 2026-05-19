@@ -2,7 +2,7 @@
 # GET /api/ventas/reportes/cxc-aging
 
 $baseUrl = "http://localhost:3001/api"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 
 $headers = @{
     "Authorization" = "Bearer $token"

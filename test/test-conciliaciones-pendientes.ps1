@@ -6,7 +6,7 @@ Write-Host ""
 
 # Configuración
 $baseUrl = "http://localhost:3002"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "d290f1ee-6c54-4b01-90e6-d701748f0851"
 
 # Obtener conciliaciones pendientes
@@ -20,16 +20,16 @@ $headers = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion/pendientes" -Method Get -Headers $headers
-    
+
     Write-Host "✓ Conciliaciones pendientes obtenidas exitosamente" -ForegroundColor Green
     Write-Host ""
-    
+
     if ($response.data.Count -eq 0) {
         Write-Host "  No hay conciliaciones pendientes" -ForegroundColor Yellow
     } else {
         Write-Host "  Total de conciliaciones pendientes: $($response.data.Count)" -ForegroundColor Cyan
         Write-Host ""
-        
+
         foreach ($conciliacion in $response.data) {
             Write-Host "  Conciliación ID: $($conciliacion.id)" -ForegroundColor White
             Write-Host "    Período: $($conciliacion.periodo)" -ForegroundColor Gray
@@ -50,11 +50,11 @@ try {
             Write-Host ""
         }
     }
-    
+
     Write-Host ""
     Write-Host "=== Respuesta completa ===" -ForegroundColor Cyan
     $response | ConvertTo-Json -Depth 10
-    
+
 } catch {
     Write-Host "✗ Error obteniendo conciliaciones pendientes:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red

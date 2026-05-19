@@ -29,6 +29,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../auth/current-user.decorator';
 
 @ApiTags('Compras - Órdenes de Compra')
 @Controller('compras/ordenes')
@@ -60,10 +61,11 @@ export class OrdenesCompraController {
   })
   async create(
     @Body(ValidationPipe) createDto: CreateOrdenCompraDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
-      const orden = await this.ordenesCompraService.create(createDto, tenantId);
+      const orden = await this.ordenesCompraService.create(createDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Orden de compra creada exitosamente',
@@ -175,11 +177,12 @@ export class OrdenesCompraController {
   async update(
     @Param('id') id: string,
     @Body(ValidationPipe) updateDto: UpdateOrdenCompraDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
       // HARDENING: usamos tenant del contexto, ignoramos valores externos.
-      const orden = await this.ordenesCompraService.update(id, updateDto, tenantId);
+      const orden = await this.ordenesCompraService.update(id, updateDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Orden de compra actualizada exitosamente',
@@ -212,10 +215,11 @@ export class OrdenesCompraController {
   async aprobar(
     @Param('id') id: string,
     @Body(ValidationPipe) aprobarDto: AprobarOrdenCompraDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
-      const orden = await this.ordenesCompraService.aprobar(id, aprobarDto, tenantId);
+      const orden = await this.ordenesCompraService.aprobar(id, aprobarDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Orden de compra aprobada exitosamente',
@@ -248,11 +252,12 @@ export class OrdenesCompraController {
   async rechazar(
     @Param('id') id: string,
     @Body(ValidationPipe) rechazarDto: RechazarOrdenCompraDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
       // HARDENING: usamos tenant del contexto para evitar fuga multi-tenant.
-      const orden = await this.ordenesCompraService.rechazar(id, rechazarDto, tenantId);
+      const orden = await this.ordenesCompraService.rechazar(id, rechazarDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Orden de compra rechazada exitosamente',
@@ -288,11 +293,12 @@ export class OrdenesCompraController {
   async cancelar(
     @Param('id') id: string,
     @Body(ValidationPipe) cancelarDto: CancelarOrdenCompraDto,
-    @CurrentTenant() tenantId: string
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
   ) {
     try {
       // HARDENING: ignoramos tenant externo; usamos contexto autenticado.
-      const orden = await this.ordenesCompraService.cancelar(id, cancelarDto, tenantId);
+      const orden = await this.ordenesCompraService.cancelar(id, cancelarDto, tenantId, user?.id);
       return {
         success: true,
         message: 'Orden de compra cancelada exitosamente',

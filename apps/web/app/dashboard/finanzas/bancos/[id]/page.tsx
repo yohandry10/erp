@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { 
@@ -85,6 +85,7 @@ export default function CuentaBancariaDetallePage() {
     total: 0,
     totalPages: 0
   })
+  const movimientosRequestSeq = useRef(0)
 
   const loadCuenta = useCallback(async () => {
     if (!cuentaId) return
@@ -107,6 +108,8 @@ export default function CuentaBancariaDetallePage() {
   const loadMovimientos = useCallback(async (page: number = 1) => {
     if (!cuentaId) return
 
+    const requestId = ++movimientosRequestSeq.current
+
     try {
       setLoadingMovimientos(true)
       
@@ -122,16 +125,25 @@ export default function CuentaBancariaDetallePage() {
       })
 
       const response = await get(`/api/finanzas/bancos/cuentas/${cuentaId}/movimientos?${queryParams}`)
-      
+
+      if (requestId !== movimientosRequestSeq.current) {
+        return
+      }
+
       if (response?.success) {
         setMovimientos(response.data || [])
         setPagination(prev => response.pagination || prev)
       }
     } catch (error) {
+      if (requestId !== movimientosRequestSeq.current) {
+        return
+      }
       console.error('Error loading movimientos:', error)
       alert('Error: No se pudieron cargar los movimientos')
     } finally {
-      setLoadingMovimientos(false)
+      if (requestId === movimientosRequestSeq.current) {
+        setLoadingMovimientos(false)
+      }
     }
   }, [cuentaId, get, filters, pagination.limit])
 
@@ -220,26 +232,16 @@ export default function CuentaBancariaDetallePage() {
     return (
       <div className="dashboard-container">
         <div className="activity-card">
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-            <AlertCircle size={48} style={{ margin: '0 auto 1rem', color: '#ef4444' }} />
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+          <div className="text-center p-12 text-gray-500">
+            <AlertCircle size={48} className="text-red-500" />
+            <h3 className="text-[1.125rem] font-semibold mb-2">
               Cuenta bancaria no encontrada
             </h3>
-            <p style={{ marginBottom: '1.5rem' }}>
+            <p className="mb-6">
               La cuenta bancaria que buscas no existe o no tienes permisos para verla
             </p>
             <button
-              onClick={() => router.push('/dashboard/finanzas/bancos')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#3b82f6',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}
+              onClick={() => router.push('/dashboard/finanzas/bancos')} className="py-3 px-6 rounded-2 border-0 bg-blue-500 text-white cursor-pointer text-[0.875rem] font-semibold"
             >
               Volver a Cuentas Bancarias
             </button>
@@ -256,18 +258,9 @@ export default function CuentaBancariaDetallePage() {
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push('/dashboard/finanzas/bancos')}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center'
-            }}
+            onClick={() => router.push('/dashboard/finanzas/bancos')} className="p-2 rounded-2 border bg-white cursor-pointer flex items-center"
           >
             <ArrowLeft size={20} />
           </button>
@@ -278,14 +271,13 @@ export default function CuentaBancariaDetallePage() {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="flex gap-4 items-center">
           <button
             onClick={() => {
               loadCuenta()
               loadMovimientos(pagination.page)
             }}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+            className="refresh-btn py-3 px-6"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -294,31 +286,16 @@ export default function CuentaBancariaDetallePage() {
       </div>
 
       {/* Cuenta Info Card */}
-      <div className="activity-card" style={{ marginBottom: '2rem' }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '2rem'
-        }}>
+      <div className="activity-card mb-8">
+        <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-8">
           {/* Tipo de Cuenta */}
           <div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6b7280', 
-              marginBottom: '0.5rem',
-              fontWeight: '500',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>
+            <div className="text-3 text-gray-500 mb-2 font-medium">
               Tipo de Cuenta
             </div>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem' 
-            }}>
-              <CreditCard size={20} style={{ color: '#3b82f6' }} />
-              <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827' }}>
+            <div className="flex items-center gap-2">
+              <CreditCard size={20} className="text-blue-500" />
+              <span className="text-4 font-semibold text-gray-900">
                 {TIPO_CUENTA_LABELS[cuenta.tipo_cuenta] || cuenta.tipo_cuenta}
               </span>
             </div>
@@ -326,23 +303,12 @@ export default function CuentaBancariaDetallePage() {
 
           {/* Moneda */}
           <div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6b7280', 
-              marginBottom: '0.5rem',
-              fontWeight: '500',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>
+            <div className="text-3 text-gray-500 mb-2 font-medium">
               Moneda
             </div>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem' 
-            }}>
-              <DollarSign size={20} style={{ color: '#10b981' }} />
-              <span style={{ fontSize: '1rem', fontWeight: '600', color: '#111827' }}>
+            <div className="flex items-center gap-2">
+              <DollarSign size={20} className="text-[#10b981]" />
+              <span className="text-4 font-semibold text-gray-900">
                 {cuenta.moneda}
               </span>
             </div>
@@ -350,84 +316,33 @@ export default function CuentaBancariaDetallePage() {
 
           {/* Saldo */}
           <div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6b7280', 
-              marginBottom: '0.5rem',
-              fontWeight: '500',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>
+            <div className="text-3 text-gray-500 mb-2 font-medium">
               Saldo Disponible
             </div>
-            <div style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: '700', 
-              color: saldoColor 
-            }}>
+            <div className="text-6 font-bold">
               {formatCurrency(cuenta.saldo, cuenta.moneda)}
             </div>
           </div>
 
           {/* Estado */}
           <div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6b7280', 
-              marginBottom: '0.5rem',
-              fontWeight: '500',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em'
-            }}>
+            <div className="text-3 text-gray-500 mb-2 font-medium">
               Estado
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="flex flex-col gap-2">
               {cuenta.activa ? (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  color: '#10b981',
-                  width: 'fit-content'
-                }}>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(16,_185,_129,_0.1)] text-[#10b981]">
                   <CheckCircle size={14} />
                   ACTIVA
                 </span>
               ) : (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  background: 'rgba(107, 114, 128, 0.1)',
-                  color: '#6b7280',
-                  width: 'fit-content'
-                }}>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(107,_114,_128,_0.1)] text-gray-500">
                   <XCircle size={14} />
                   INACTIVA
                 </span>
               )}
               {cuenta.permite_sobregiro && (
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  color: '#f59e0b',
-                  width: 'fit-content'
-                }}>
+                <span className="inline-flex items-center gap-1 py-1 px-3 rounded-full text-3 font-semibold bg-[rgba(245,_158,_11,_0.1)] text-amber-500">
                   <AlertCircle size={14} />
                   PERMITE SOBREGIRO
                 </span>
@@ -439,72 +354,24 @@ export default function CuentaBancariaDetallePage() {
 
       {/* Movimientos Section */}
       <div className="activity-section">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap',
-          gap: '1rem'
-        }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+          <h2 className="text-5 font-semibold text-gray-900">
             Movimientos Bancarios
           </h2>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div className="flex gap-3 items-center">
             <button
-              onClick={handleExportMovimientos}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
+              onClick={handleExportMovimientos} className="py-3 px-4 rounded-2 border bg-white text-gray-700 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2"
             >
               <Download size={16} />
               Exportar
             </button>
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: showFilters ? '#f3f4f6' : 'white',
-                color: '#374151',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                position: 'relative'
-              }}
+              onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-2 border text-gray-700 cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 relative"
             >
               <Filter size={16} />
               Filtros
               {activeFiltersCount > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-0.5rem',
-                  right: '-0.5rem',
-                  background: '#3b82f6',
-                  color: 'white',
-                  borderRadius: '9999px',
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.625rem',
-                  fontWeight: '700'
-                }}>
+                <span className="absolute bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-2.5 font-bold">
                   {activeFiltersCount}
                 </span>
               )}
@@ -514,80 +381,37 @@ export default function CuentaBancariaDetallePage() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="activity-card" style={{ marginBottom: '1.5rem' }}>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '1rem'
-            }}>
+          <div className="activity-card mb-6">
+            <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4">
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                   Fecha Desde
                 </label>
                 <input
                   type="date"
                   value={filters.fecha_desde || ''}
-                  onChange={(e) => handleFilterChange('fecha_desde', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem'
-                  }}
+                  onChange={(e) => handleFilterChange('fecha_desde', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 />
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                   Fecha Hasta
                 </label>
                 <input
                   type="date"
                   value={filters.fecha_hasta || ''}
-                  onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem'
-                  }}
+                  onChange={(e) => handleFilterChange('fecha_hasta', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 />
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                   Tipo
                 </label>
                 <select
                   value={filters.tipo || ''}
-                  onChange={(e) => handleFilterChange('tipo', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem'
-                  }}
+                  onChange={(e) => handleFilterChange('tipo', e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 >
                   <option value="">Todos</option>
                   <option value="ABONO">Abono</option>
@@ -596,25 +420,12 @@ export default function CuentaBancariaDetallePage() {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.875rem', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '0.5rem'
-                }}>
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                   Conciliado
                 </label>
                 <select
                   value={filters.conciliado === '' ? '' : filters.conciliado?.toString()}
-                  onChange={(e) => handleFilterChange('conciliado', e.target.value === '' ? '' : e.target.value === 'true')}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.875rem'
-                  }}
+                  onChange={(e) => handleFilterChange('conciliado', e.target.value === '' ? '' : e.target.value === 'true')} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
                 >
                   <option value="">Todos</option>
                   <option value="true">Conciliado</option>
@@ -624,19 +435,9 @@ export default function CuentaBancariaDetallePage() {
             </div>
 
             {activeFiltersCount > 0 && (
-              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+              <div className="mt-4 pt-4 border-t">
                 <button
-                  onClick={handleClearFilters}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    background: 'white',
-                    color: '#374151',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500'
-                  }}
+                  onClick={handleClearFilters} className="py-2 px-4 rounded-[6px] border bg-white text-gray-700 cursor-pointer text-[0.875rem] font-medium"
                 >
                   Limpiar Filtros
                 </button>

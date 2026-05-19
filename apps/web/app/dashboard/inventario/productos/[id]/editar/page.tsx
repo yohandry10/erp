@@ -108,24 +108,12 @@ export default function EditarProductoPage() {
       <div className="dashboard-header">
         <div>
           <button
-            onClick={() => router.push('/dashboard/inventario/productos')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#6b7280',
-              fontSize: '0.875rem',
-              marginBottom: '0.5rem',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.25rem 0'
-            }}
+            onClick={() => router.push('/dashboard/inventario/productos')} className="inline-flex items-center gap-2 text-gray-500 text-[0.875rem] mb-2 border-0 cursor-pointer py-1 px-0"
           >
             <ArrowLeft size={16} />
             Volver a Productos
           </button>
-          <h1 className="dashboard-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <h1 className="dashboard-title flex items-center gap-3">
             <Package size={32} />
             Editar Producto
           </h1>
@@ -134,11 +122,11 @@ export default function EditarProductoPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Información Básica</h2>
           <div className="modal-grid">
             <div>
-              <label>Código <span style={{ color: 'var(--red-500)' }}>*</span></label>
+              <label>Código <span className="text-[var(--red-500)]">*</span></label>
               <input
                 type="text"
                 name="codigo"
@@ -160,8 +148,8 @@ export default function EditarProductoPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label>Nombre <span style={{ color: 'var(--red-500)' }}>*</span></label>
+          <div className="mt-4">
+            <label>Nombre <span className="text-[var(--red-500)]">*</span></label>
             <input
               type="text"
               name="nombre"
@@ -172,7 +160,7 @@ export default function EditarProductoPage() {
             />
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
+          <div className="mt-4">
             <label>Descripción</label>
             <textarea
               name="descripcion"
@@ -183,8 +171,8 @@ export default function EditarProductoPage() {
             />
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label>Categoría <span style={{ color: 'var(--red-500)' }}>*</span></label>
+          <div className="mt-4">
+            <label>Categoría <span className="text-[var(--red-500)]">*</span></label>
             <select
               name="categoria"
               value={formData.categoria}
@@ -201,8 +189,8 @@ export default function EditarProductoPage() {
             </select>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+          <div className="mt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 name="activo"
@@ -214,7 +202,7 @@ export default function EditarProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Precios e Impuestos</h2>
           <div className="modal-grid">
             <div>
@@ -230,7 +218,7 @@ export default function EditarProductoPage() {
               />
             </div>
             <div>
-              <label>Precio de Venta <span style={{ color: 'var(--red-500)' }}>*</span></label>
+              <label>Precio de Venta <span className="text-[var(--red-500)]">*</span></label>
               <input
                 type="number"
                 name="precioVenta"
@@ -258,16 +246,10 @@ export default function EditarProductoPage() {
           </div>
         </div>
 
-        <div className="activity-card" style={{ marginBottom: '2rem' }}>
+        <div className="activity-card mb-8">
           <h2 className="activity-title">Inventario</h2>
-          <div style={{
-            background: 'var(--amber-50)',
-            border: '1px solid var(--amber-200)',
-            borderRadius: 'var(--border-radius)',
-            padding: '1rem',
-            marginBottom: '1rem'
-          }}>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--amber-700)' }}>
+          <div className="bg-[var(--amber-50)] border p-4 mb-4">
+            <p className="m-0 text-[0.875rem] text-[var(--amber-700)]">
               ⚠️ El stock actual no se puede modificar desde aquí. Use movimientos de inventario para ajustar el stock.
             </p>
           </div>
@@ -286,7 +268,7 @@ export default function EditarProductoPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+        <div className="flex gap-4 justify-end">
           <button
             type="button"
             onClick={() => router.push('/dashboard/inventario/productos')}
@@ -302,7 +284,7 @@ export default function EditarProductoPage() {
           >
             {isLoading ? (
               <>
-                <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                <div className="loading-spinner w-4 h-4"></div>
                 Guardando...
               </>
             ) : (

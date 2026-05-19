@@ -353,89 +353,29 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
   const vacanteSeleccionada = vacantes.find(v => v.id === formData.id_vacante)
 
   const modalContent = (
-    <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        padding: '1rem'
-      }}
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
       onClick={handleClose}
     >
-      <div 
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          width: '100%',
-          maxWidth: '900px',
-          maxHeight: '90vh',
-          overflow: 'hidden'
-        }}
+      <div className="bg-white rounded-3 shadow w-[100%] max-w-[900px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          padding: '2rem 2rem 1rem 2rem',
-          borderBottom: '2px solid #e5e7eb'
-        }}>
+        <div className="flex justify-between items-center pt-8 pr-8 pb-4 pl-8">
           <div>
-            <h2 style={{ 
-              fontSize: '1.75rem', 
-              fontWeight: 'bold', 
-              margin: 0,
-              color: '#1f2937',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem'
-            }}>
+            <h2 className="text-7 font-bold m-0 text-gray-800 flex items-center gap-3">
               👤 {candidato?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
             </h2>
-            <p style={{ 
-              fontSize: '0.875rem', 
-              color: '#6b7280', 
-              margin: '0.5rem 0 0 0' 
-            }}>
+            <p className="text-[0.875rem] text-gray-500 mt-2 mr-0 mb-0 ml-0">
               {candidato?.id ? 'Actualizar información del candidato' : 'Registrar nueva postulación'}
             </p>
           </div>
           
           {/* Indicador de pasos */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="flex items-center gap-2">
             {[1, 2, 3, 4].map((step) => (
               <div 
-                key={step} 
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 'bold',
-                  backgroundColor: step === currentStep 
-                    ? '#10b981' 
-                    : step < currentStep 
-                      ? '#d1fae5'
-                      : '#e5e7eb',
-                  color: step === currentStep 
-                    ? 'white' 
-                    : step < currentStep 
-                      ? '#065f46'
-                      : '#6b7280'
-                }}
+                key={step} className="w-8 h-8 rounded-full flex items-center justify-center text-[0.875rem] font-bold"
               >
                 {step}
               </div>
@@ -443,21 +383,7 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
           </div>
 
           <button
-            onClick={handleClose}
-            style={{
-              width: '2rem',
-              height: '2rem',
-              borderRadius: '50%',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold',
-              fontSize: '1rem'
-            }}
+            onClick={handleClose} className="w-8 h-8 rounded-full bg-red-500 text-white border-0 cursor-pointer flex items-center justify-center font-bold text-4"
           >
             ✕
           </button>
@@ -465,14 +391,8 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
         
         {/* Información de vacante seleccionada */}
         {vacanteSeleccionada && (
-          <div style={{ 
-            margin: '1rem 2rem',
-            padding: '1rem',
-            backgroundColor: '#d1fae5',
-            borderRadius: '8px',
-            border: '1px solid #10b981'
-          }}>
-            <div style={{ fontSize: '0.875rem', color: '#065f46' }}>
+          <div className="my-4 mx-8 p-4 bg-[#d1fae5] rounded-2 border">
+            <div className="text-[0.875rem] text-[#065f46]">
               <strong>📋 Vacante:</strong> {vacanteSeleccionada.titulo} • 
               <strong> 🏢 Depto:</strong> {vacanteSeleccionada.departamento} •
               <strong> 💰 Salario:</strong> S/ {vacanteSeleccionada.salario_min} - S/ {vacanteSeleccionada.salario_max}
@@ -481,57 +401,24 @@ export default function CandidatoModal({ isOpen, onClose, onSuccess, candidato, 
         )}
 
         {/* Contenido */}
-        <div style={{ 
-          padding: '2rem', 
-          overflowY: 'auto', 
-          maxHeight: 'calc(90vh - 200px)' 
-        }}>
+        <div className="p-8 overflow-y-auto">
           
           {/* PASO 1: Información personal */}
           {currentStep === 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ 
-                backgroundColor: '#dbeafe', 
-                border: '1px solid #3b82f6', 
-                borderRadius: '8px', 
-                padding: '1.5rem' 
-              }}>
-                <h3 style={{ 
-                  fontSize: '1.125rem', 
-                  fontWeight: '600', 
-                  color: '#1e40af', 
-                  margin: '0 0 1rem 0' 
-                }}>
+            <div className="flex flex-col gap-6">
+              <div className="bg-[#dbeafe] border rounded-2 p-6">
+                <h3 className="text-[1.125rem] font-semibold text-[#1e40af] mt-0 mr-0 mb-4 ml-0">
                   👤 Información Personal
                 </h3>
                 
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-                  gap: '1rem' 
-                }}>
+                <div className="grid grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))] gap-4">
                   <div>
-                    <label style={{ 
-                      display: 'block', 
-                      fontSize: '0.875rem', 
-                      fontWeight: '600', 
-                      color: '#374151', 
-                      marginBottom: '0.5rem' 
-                    }}>
+                    <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
                       📋 Vacante *
                     </label>
                     <select
                       value={formData.id_vacante}
-                      onChange={(e) => handleInputChange('id_vacante', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '0.875rem',
-                        outline: 'none',
-                        backgroundColor: 'white'
-                      }}
+                      onChange={(e) => handleInputChange('id_vacante', e.target.value)} className="w-[100%] p-3 border rounded-[6px] text-[0.875rem] bg-white"
                       required
                     >
                       <option value="">Seleccionar vacante...</option>

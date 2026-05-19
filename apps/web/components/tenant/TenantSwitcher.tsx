@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTenant } from '@/contexts/TenantContext'
 import { useApi } from '@/hooks/use-api'
 import {
@@ -20,18 +20,30 @@ interface Tenant {
 
 export function TenantSwitcher() {
   const { tenant, user, isSuperAdmin, switchTenant } = useTenant()
-  const { get } = useApi()
+  const { get } = useApi({ showErrorToast: false })
+  const getRef = useRef(get)
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(false)
   const [switching, setSwitching] = useState(false)
 
-  // Fetch available tenants
   useEffect(() => {
-    const fetchTenants = async () => {
+    getRef.current = get
+  }, [get])
+
+  // Fetch available tenants
+  const fetchTenants = useCallback(async () => {
+      if (!isSuperAdmin) return
       setLoading(true)
       try {
-        const response = await get('/tenants')
-        const tenantsData = response?.data || response || []
+        const response = await getRef.current('/tenants')
+        const rawTenants = response?.data ?? response
+        const tenantsData = Array.isArray(rawTenants)
+          ? rawTenants
+          : Array.isArray(rawTenants?.items)
+            ? rawTenants.items
+            : Array.isArray(rawTenants?.tenants)
+              ? rawTenants.tenants
+              : []
         // Filter to only show active tenants
         const activeTenants = tenantsData.filter(
           (t: Tenant) => t.estado === 'ACTIVO' || t.estado === 'PRUEBA'
@@ -43,10 +55,11 @@ export function TenantSwitcher() {
       } finally {
         setLoading(false)
       }
-    }
+  }, [isSuperAdmin])
 
+  useEffect(() => {
     fetchTenants()
-  }, [get])
+  }, [fetchTenants])
 
   const handleTenantSwitch = async (tenantId: string) => {
     if (tenantId === tenant?.id) {
@@ -56,7 +69,8 @@ export function TenantSwitcher() {
     setSwitching(true)
     try {
       await switchTenant(tenantId)
-      // The page will reload after successful switch
+      // Force full page reload to flush all React state/cache from previous tenant
+      window.location.reload()
     } catch (error) {
       console.error('Error switching tenant:', error)
       setSwitching(false)
@@ -69,26 +83,10 @@ export function TenantSwitcher() {
   }
 
   return (
-    <div style={{ 
-      background: 'white',
-      border: '1px solid #e2e8f0',
-      borderRadius: '12px',
-      padding: '1rem',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
+    <div className="bg-white border rounded-3 p-4 shadow">
       {/* Label */}
-      <div style={{ 
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        fontSize: '0.75rem',
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: '0.5rem',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em'
-      }}>
-        <Building2 style={{ width: '14px', height: '14px' }} />
+      <div className="flex items-center gap-2 text-3 font-semibold text-slate-500 mb-2">
+        <Building2 className="w-3.5 h-3.5" />
         <span>Empresa Actual</span>
       </div>
       
@@ -98,33 +96,15 @@ export function TenantSwitcher() {
         onValueChange={handleTenantSwitch}
         disabled={loading || switching}
       >
-        <SelectTrigger style={{
-          width: '100%',
-          background: '#f8fafc',
-          border: '1px solid #cbd5e1',
-          borderRadius: '8px',
-          padding: '0.625rem 0.75rem',
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          color: '#1e293b',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
+        <SelectTrigger className="w-[100%] bg-slate-50 border rounded-2 py-2.5 px-3 text-[0.875rem] font-medium text-slate-800 cursor-pointer transition flex items-center justify-between">
           {switching ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <RefreshCw style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-3.5 h-3.5" />
               <span>Cambiando...</span>
             </div>
           ) : (
             <SelectValue>
-              <span style={{ 
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap">
                 {tenant?.nombre || 'Seleccionar empresa'}
               </span>
             </SelectValue>
@@ -134,76 +114,29 @@ export function TenantSwitcher() {
           position="popper"
           side="bottom"
           align="start"
-          sideOffset={8}
-          style={{
-            width: 'var(--radix-select-trigger-width)',
-            maxHeight: '300px',
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-            zIndex: 9999,
-            overflow: 'auto'
-          }}
+          sideOffset={8} className="max-h-[300px] bg-white border rounded-2 shadow z-[9999] overflow-auto"
         >
           {loading ? (
-            <div style={{ 
-              padding: '0.75rem 1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#64748b',
-              fontSize: '0.875rem'
-            }}>
-              <RefreshCw style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />
+            <div className="py-3 px-4 flex items-center gap-2 text-slate-500 text-[0.875rem]">
+              <RefreshCw className="w-3.5 h-3.5" />
               <span>Cargando empresas...</span>
             </div>
           ) : tenants.length === 0 ? (
-            <div style={{ 
-              padding: '0.75rem 1rem',
-              color: '#64748b',
-              fontSize: '0.875rem',
-              textAlign: 'center'
-            }}>
+            <div className="py-3 px-4 text-slate-500 text-[0.875rem] text-center">
               No hay empresas disponibles
             </div>
           ) : (
             tenants.map((t) => (
               <SelectItem 
                 key={t.id} 
-                value={t.id}
-                style={{
-                  padding: '0.625rem 1rem',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  transition: 'background 0.15s'
-                }}
+                value={t.id} className="py-2.5 px-4 cursor-pointer text-[0.875rem] flex items-center justify-between transition"
               >
-                <div style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  gap: '0.5rem'
-                }}>
-                  <span style={{ 
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
+                <div className="flex items-center justify-between w-[100%] gap-2">
+                  <span className="flex-[1] overflow-hidden text-ellipsis whitespace-nowrap">
                     {t.nombre}
                   </span>
                   {t.id === tenant?.id && (
-                    <Check style={{ 
-                      width: '16px',
-                      height: '16px',
-                      color: '#3b82f6',
-                      flexShrink: 0
-                    }} />
+                    <Check className="w-4 h-4 text-blue-500 shrink-0" />
                   )}
                 </div>
               </SelectItem>

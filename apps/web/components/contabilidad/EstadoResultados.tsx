@@ -2,10 +2,13 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useApi } from '@/hooks/use-api'
-import { Download, AlertCircle, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react'
+import { Download, AlertCircle, TrendingUp, TrendingDown, FileText } from 'lucide-react'
 import { IngresosVsGastosChart } from './IngresosVsGastosChart'
 import { exportToExcel, formatCurrencyForExcel, formatPercentageForExcel } from '@/lib/excel-export'
 import { exportEstadoResultadosToPDF } from '@/lib/pdf-export'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface EstadoResultadosData {
   ingresos: {
@@ -109,14 +112,7 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
     const isPositive = absolute >= 0
     
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.5rem',
-        fontSize: '0.75rem',
-        color: isPositive ? 'var(--emerald-600)' : 'var(--red-600)',
-        fontWeight: '600'
-      }}>
+      <div className={cn('flex items-center gap-2 text-xs font-semibold', isPositive ? 'text-cyan-200' : 'text-blue-200')}>
         {isPositive ? '↑' : '↓'}
         {formatCurrency(Math.abs(absolute))} ({Math.abs(percentage).toFixed(1)}%)
       </div>
@@ -182,22 +178,22 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
   if (loading) {
     return (
-      <div className="activity-card">
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Cargando Estado de Resultados...</p>
-        </div>
-      </div>
+      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100">
+        <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-400/20 border-t-cyan-300" />
+          <p className="text-sm font-medium text-slate-300">Cargando Estado de Resultados...</p>
+        </CardContent>
+      </Card>
     )
   }
 
   if (!data) {
     return (
-      <div className="activity-card">
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--primary-400)' }}>
-          <p>No hay datos disponibles para el período seleccionado</p>
-        </div>
-      </div>
+      <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100">
+        <CardContent className="flex min-h-[160px] items-center justify-center p-6 text-center text-sm text-slate-300">
+          No hay datos disponibles para el período seleccionado
+        </CardContent>
+      </Card>
     )
   }
 
@@ -212,14 +208,14 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
 
   const renderRow = (label: string, current: number, isNegative: boolean = false) => {
     return (
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', alignItems: 'center' }}>
-        <span style={{ color: 'var(--primary-700)' }}>{label}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontWeight: '600', color: isNegative ? 'var(--red-600)' : 'var(--primary-800)' }}>
+      <div className="flex items-center justify-between gap-4 border-b border-cyan-400/10 py-2 last:border-b-0">
+        <span className="text-sm text-slate-300">{label}</span>
+        <div className="flex items-center gap-4 text-right">
+          <span className={cn('font-semibold', isNegative ? 'text-blue-200' : 'text-cyan-100')}>
             {isNegative ? `(${formatCurrency(current)})` : formatCurrency(current)}
           </span>
           {showComparison && previousData && (
-            <div style={{ minWidth: '150px', textAlign: 'right' }}>
+            <div className="min-w-[150px] text-right">
               {renderVariation(current, getPreviousValue(label))}
             </div>
           )}
@@ -247,330 +243,195 @@ export function EstadoResultados({ anio, mes, showComparison = false }: EstadoRe
   }
 
   return (
-    <div className="activity-card">
-      {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        paddingBottom: '1rem',
-        borderBottom: '2px solid var(--primary-100)'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary-800)', margin: 0 }}>
+    <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-2xl shadow-blue-950/20">
+      <CardHeader className="border-b border-cyan-400/10 bg-white/[0.03] px-5 py-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="text-xl text-white">
             Estado de Resultados (P&L)
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--primary-600)', marginTop: '0.25rem' }}>
-            Período: {anio} - {String(mes).padStart(2, '0')}
-            {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
-          </p>
-        </div>
+            </CardTitle>
+            <p className="mt-1 text-sm text-slate-400">
+              Período: {anio} - {String(mes).padStart(2, '0')}
+              {showComparison && ` vs ${prevAnio} - ${String(prevMes).padStart(2, '0')}`}
+            </p>
+          </div>
         
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
+          <div className="flex flex-wrap gap-2">
+            <Button
             onClick={handleExportExcel}
-            className="secondary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+              variant="outline"
+              className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
           >
-            <Download size={16} />
-            Exportar a Excel
-          </button>
-          <button
+              <Download className="h-4 w-4" />
+              Exportar Excel
+            </Button>
+            <Button
             onClick={handleExportPDF}
-            className="secondary-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
+              variant="outline"
+              className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
           >
-            <FileText size={16} />
-            Exportar a PDF
-          </button>
+              <FileText className="h-4 w-4" />
+              Exportar PDF
+            </Button>
+          </div>
         </div>
-      </div>
+      </CardHeader>
 
+      <CardContent className="space-y-4 p-5">
       {error && (
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--red-50)', 
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-          <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
+          <div className="flex items-center gap-3 rounded-xl border border-blue-300/20 bg-blue-400/10 p-4">
+            <AlertCircle className="h-5 w-5 text-blue-100" />
+            <p className="text-sm text-blue-50">
             {error}
           </p>
         </div>
       )}
 
-      {/* Estado de Resultados */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* INGRESOS */}
-        <div>
-          <div style={{ 
-            padding: '0.75rem 1rem', 
-            background: 'var(--emerald-100)', 
-            borderRadius: '8px 8px 0 0',
-            fontWeight: '700',
-            fontSize: '0.875rem',
-            color: 'var(--emerald-800)'
-          }}>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+          <div className="space-y-4">
+            <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
+              <div className="border-b border-cyan-400/10 bg-cyan-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">
             INGRESOS
           </div>
-          <div style={{ padding: '1rem', border: '1px solid var(--primary-200)', borderTop: 'none' }}>
+              <div className="p-4">
             {renderRow('Ventas', data.ingresos.ventas)}
             {renderRow('Otros Ingresos', data.ingresos.otros_ingresos)}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '0.75rem 0',
-              marginTop: '0.5rem',
-              borderTop: '2px solid var(--primary-300)',
-              fontWeight: '700',
-              fontSize: '1rem',
-              alignItems: 'center'
-            }}>
-              <span style={{ color: 'var(--emerald-700)' }}>Total Ingresos</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ color: 'var(--emerald-700)' }}>
+                <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
+                  <span className="text-cyan-100">Total Ingresos</span>
+                  <div className="flex items-center gap-4 text-right">
+                    <span className="text-cyan-100">
                   {formatCurrency(data.ingresos.total_ingresos)}
                 </span>
                 {showComparison && previousData && (
-                  <div style={{ minWidth: '150px', textAlign: 'right' }}>
+                      <div className="min-w-[150px]">
                     {renderVariation(data.ingresos.total_ingresos, previousData.ingresos.total_ingresos)}
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
+            </section>
 
-        {/* COSTOS */}
-        <div>
-          <div style={{ 
-            padding: '0.75rem 1rem', 
-            background: 'var(--amber-100)', 
-            borderRadius: '8px 8px 0 0',
-            fontWeight: '700',
-            fontSize: '0.875rem',
-            color: 'var(--amber-800)'
-          }}>
+            <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
+              <div className="border-b border-cyan-400/10 bg-blue-400/10 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-blue-100">
             COSTOS
           </div>
-          <div style={{ padding: '1rem', border: '1px solid var(--primary-200)', borderTop: 'none' }}>
+              <div className="p-4">
             {renderRow('Costo de Ventas', data.costos.costo_ventas, true)}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '0.75rem 0',
-              marginTop: '0.5rem',
-              borderTop: '2px solid var(--primary-300)',
-              fontWeight: '700',
-              fontSize: '1rem',
-              alignItems: 'center'
-            }}>
-              <span style={{ color: 'var(--primary-800)' }}>
+                <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
+                  <span className="text-white">
                 Utilidad Bruta
-                <span style={{ 
-                  marginLeft: '0.5rem', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600',
-                  color: 'var(--primary-600)'
-                }}>
+                    <span className="ml-2 text-xs font-semibold text-slate-400">
                   ({margenBruto.toFixed(2)}%)
                 </span>
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ color: data.costos.utilidad_bruta >= 0 ? 'var(--emerald-700)' : 'var(--red-700)' }}>
+                  <div className="flex items-center gap-4 text-right">
+                    <span className="text-cyan-100">
                   {formatCurrency(data.costos.utilidad_bruta)}
                 </span>
                 {showComparison && previousData && (
-                  <div style={{ minWidth: '150px', textAlign: 'right' }}>
+                      <div className="min-w-[150px]">
                     {renderVariation(data.costos.utilidad_bruta, previousData.costos.utilidad_bruta)}
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
+            </section>
 
-        {/* GASTOS */}
-        <div>
-          <div style={{ 
-            padding: '0.75rem 1rem', 
-            background: 'var(--red-100)', 
-            borderRadius: '8px 8px 0 0',
-            fontWeight: '700',
-            fontSize: '0.875rem',
-            color: 'var(--red-800)'
-          }}>
+            <section className="overflow-hidden rounded-xl border border-cyan-400/15 bg-white/[0.03]">
+              <div className="border-b border-cyan-400/10 bg-slate-800 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-100">
             GASTOS OPERATIVOS
           </div>
-          <div style={{ padding: '1rem', border: '1px solid var(--primary-200)', borderTop: 'none' }}>
+              <div className="p-4">
             {renderRow('Gastos Administrativos', data.gastos.gastos_administrativos, true)}
             {renderRow('Gastos de Ventas', data.gastos.gastos_ventas, true)}
             {renderRow('Gastos Financieros', data.gastos.gastos_financieros, true)}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '0.75rem 0',
-              marginTop: '0.5rem',
-              borderTop: '2px solid var(--primary-300)',
-              fontWeight: '700',
-              fontSize: '1rem',
-              alignItems: 'center'
-            }}>
-              <span style={{ color: 'var(--red-700)' }}>Total Gastos</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ color: 'var(--red-700)' }}>
+                <div className="mt-3 flex items-center justify-between gap-4 border-t border-cyan-400/20 pt-3 text-base font-bold">
+                  <span className="text-blue-100">Total Gastos</span>
+                  <div className="flex items-center gap-4 text-right">
+                    <span className="text-blue-100">
                   ({formatCurrency(data.gastos.total_gastos)})
                 </span>
                 {showComparison && previousData && (
-                  <div style={{ minWidth: '150px', textAlign: 'right' }}>
+                      <div className="min-w-[150px]">
                     {renderVariation(data.gastos.total_gastos, previousData.gastos.total_gastos)}
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
+            </section>
+          </div>
 
-        {/* UTILIDAD NETA */}
-        <div style={{ 
-          padding: '1.5rem', 
-          background: data.utilidad_neta >= 0 ? 'var(--emerald-50)' : 'var(--red-50)',
-          borderRadius: '8px',
-          border: `2px solid ${data.utilidad_neta >= 0 ? 'var(--emerald-300)' : 'var(--red-300)'}`
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '600', 
-                color: 'var(--primary-600)',
-                marginBottom: '0.5rem'
-              }}>
-                UTILIDAD NETA
-              </div>
-              <div style={{ 
-                fontSize: '1.75rem', 
-                fontWeight: '700', 
-                color: data.utilidad_neta >= 0 ? 'var(--emerald-700)' : 'var(--red-700)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
-              }}>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/80">Utilidad neta</div>
+              <div className="mt-3 flex items-center gap-3 text-3xl font-bold text-white">
                 {data.utilidad_neta >= 0 ? (
-                  <TrendingUp size={32} />
+                  <TrendingUp className="h-8 w-8 text-cyan-200" />
                 ) : (
-                  <TrendingDown size={32} />
+                  <TrendingDown className="h-8 w-8 text-blue-200" />
                 )}
                 {formatCurrency(data.utilidad_neta)}
               </div>
               {showComparison && previousData && (
-                <div style={{ marginTop: '0.75rem' }}>
+                <div className="mt-3">
                   {renderVariation(data.utilidad_neta, previousData.utilidad_neta)}
                 </div>
               )}
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '600', 
-                color: 'var(--primary-600)',
-                marginBottom: '0.5rem'
-              }}>
+              <div className="mt-5 rounded-xl border border-cyan-400/15 bg-slate-950/40 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                 MARGEN NETO
               </div>
-              <div style={{ 
-                fontSize: '1.5rem', 
-                fontWeight: '700', 
-                color: data.utilidad_neta >= 0 ? 'var(--emerald-700)' : 'var(--red-700)'
-              }}>
+                <div className="mt-2 text-2xl font-bold text-cyan-100">
                 {margenNeto.toFixed(2)}%
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Gráfico: Ingresos vs Gastos */}
-        <div style={{ 
-          marginTop: '2rem',
-          padding: '1.5rem',
-          background: 'var(--primary-50)',
-          borderRadius: '8px'
-        }}>
-          <h3 style={{ 
-            fontSize: '1rem', 
-            fontWeight: '700', 
-            color: 'var(--primary-800)', 
-            marginBottom: '1rem',
-            textAlign: 'center'
-          }}>
+            <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4">
+              <h3 className="text-center text-sm font-bold text-white">
             Comparación: Ingresos vs Costos y Gastos
           </h3>
+              <div className="mt-4">
           <IngresosVsGastosChart 
             ingresos={data.ingresos.total_ingresos}
             costos={data.costos.costo_ventas}
             gastos={data.gastos.total_gastos}
           />
         </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Indicadores */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(3, 1fr)', 
-          gap: '1rem',
-          marginTop: '1rem'
-        }}>
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--primary-50)', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--primary-600)', marginBottom: '0.5rem' }}>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
               Total Ingresos
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--emerald-700)' }}>
+            <div className="text-xl font-bold text-cyan-100">
               {formatCurrency(data.ingresos.total_ingresos)}
             </div>
           </div>
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--primary-50)', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--primary-600)', marginBottom: '0.5rem' }}>
+          <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
               Total Costos y Gastos
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--red-700)' }}>
+            <div className="text-xl font-bold text-blue-100">
               {formatCurrency(data.costos.costo_ventas + data.gastos.total_gastos)}
             </div>
           </div>
-          <div style={{ 
-            padding: '1rem', 
-            background: 'var(--primary-50)', 
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--primary-600)', marginBottom: '0.5rem' }}>
+          <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-center">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/70">
               Margen Bruto
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary-800)' }}>
+            <div className="text-xl font-bold text-white">
               {margenBruto.toFixed(2)}%
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTenant } from '@/contexts/TenantContext'
 import { useApi } from '@/hooks/use-api'
 import CrearTenants from '@/components/superadmin/CrearTenants'
 import { TenantSwitcher } from '@/components/tenant/TenantSwitcher'
+import { Building2, Shield, UserCheck, Users } from 'lucide-react'
+import { PageShell } from '@/components/erp/page-shell'
+import { MetricCard } from '@/components/erp/metric-card'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface SystemStats {
   totalTenants: number
@@ -17,7 +22,8 @@ interface SystemStats {
 export default function SuperAdminDashboard() {
   const router = useRouter()
   const { user, isSuperAdmin, loading: tenantLoading } = useTenant()
-  const { get } = useApi()
+  const { get } = useApi({ showErrorToast: false })
+  const getRef = useRef(get)
   const [stats, setStats] = useState<SystemStats>({
     totalTenants: 0,
     activeTenants: 0,
@@ -25,6 +31,11 @@ export default function SuperAdminDashboard() {
     activeUsers: 0,
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [statsError, setStatsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getRef.current = get
+  }, [get])
 
   // Route protection - redirect if not super-admin
   useEffect(() => {
@@ -34,15 +45,22 @@ export default function SuperAdminDashboard() {
   }, [isSuperAdmin, tenantLoading, router])
 
   // Fetch system-wide statistics
-  useEffect(() => {
-    const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
       if (!isSuperAdmin) return
 
       setLoadingStats(true)
+      setStatsError(null)
       try {
         // Fetch tenants to calculate stats
-        const tenantsResponse = await get('/tenants')
-        const tenants = tenantsResponse?.data || tenantsResponse || []
+        const tenantsResponse = await getRef.current('/tenants')
+        const rawTenants = tenantsResponse?.data ?? tenantsResponse
+        const tenants = Array.isArray(rawTenants)
+          ? rawTenants
+          : Array.isArray(rawTenants?.items)
+            ? rawTenants.items
+            : Array.isArray(rawTenants?.tenants)
+              ? rawTenants.tenants
+              : []
 
         const totalTenants = tenants.length
         const activeTenants = tenants.filter((t: any) => t.estado === 'ACTIVO').length
@@ -68,23 +86,27 @@ export default function SuperAdminDashboard() {
         })
       } catch (error) {
         console.error('Error fetching system stats:', error)
+        setStatsError(error instanceof Error ? error.message : 'No se pudieron cargar estadísticas del sistema')
       } finally {
         setLoadingStats(false)
       }
-    }
+  }, [isSuperAdmin])
 
+  useEffect(() => {
     fetchStats()
-  }, [isSuperAdmin, get])
+  }, [fetchStats])
 
   // Show loading state
   if (tenantLoading || !user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
+      <PageShell title="Super Admin" description="Validando sesión y privilegios globales.">
+        <div className="grid min-h-[360px] place-items-center rounded-3xl border border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-700">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-300/20 border-t-cyan-300 group-data-[erp-theme=light]/dashboard:border-blue-100 group-data-[erp-theme=light]/dashboard:border-t-blue-600" />
+            <p className="text-sm font-semibold">Cargando Super Admin...</p>
+          </div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
@@ -94,138 +116,51 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-            <button
-              onClick={() => router.push('/dashboard')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                borderRadius: '8px',
-                color: '#2563eb',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-              Ir al Dashboard
-            </button>
-          </div>
-          <h1 className="dashboard-title">Super Admin Dashboard</h1>
-          <p className="dashboard-subtitle">Gestiona todos los tenants y configuración del sistema</p>
-        </div>
-        {/* Tenant Switcher */}
-        <div style={{ width: '280px' }}>
+    <PageShell
+      title="Super Admin Dashboard"
+      description="Gestión global de tenants, seguridad y configuración del sistema."
+      actions={
+        <>
+          <Button variant="secondary" onClick={() => router.push('/dashboard')}>Ir al Dashboard</Button>
           <TenantSwitcher />
+        </>
+      }
+    >
+      {statsError ? (
+        <div className="rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-800">
+          {statsError}
         </div>
-      </div>
+      ) : null}
 
       {/* Statistics Cards */}
-      <div className="stats-grid" style={{ marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>TOTAL TENANTS</h3>
-            <span className="stat-icon">🏢</span>
-          </div>
-          <div className="stat-value">
-            {loadingStats ? '...' : stats.totalTenants}
-          </div>
-          <div className="stat-subtitle">
-            {stats.activeTenants} activos
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>TENANTS ACTIVOS</h3>
-            <span className="stat-icon">✅</span>
-          </div>
-          <div className="stat-value">
-            {loadingStats ? '...' : stats.activeTenants}
-          </div>
-          <div className="stat-subtitle">
-            {stats.totalTenants > 0
-              ? `${Math.round((stats.activeTenants / stats.totalTenants) * 100)}% del total`
-              : 'Sin tenants'}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>USUARIOS TOTALES</h3>
-            <span className="stat-icon">👥</span>
-          </div>
-          <div className="stat-value">
-            {loadingStats ? '...' : stats.totalUsers}
-          </div>
-          <div className="stat-subtitle">
-            En todos los tenants
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>USUARIOS ACTIVOS</h3>
-            <span className="stat-icon">📈</span>
-          </div>
-          <div className="stat-value">
-            {loadingStats ? '...' : stats.activeUsers}
-          </div>
-          <div className="stat-subtitle">
-            {stats.totalUsers > 0
-              ? `${Math.round((stats.activeUsers / stats.totalUsers) * 100)}% del total`
-              : 'Sin usuarios'}
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Total tenants" value={loadingStats ? '...' : stats.totalTenants} description={`${stats.activeTenants} activos`} icon={Building2} tone="info" />
+        <MetricCard title="Tenants activos" value={loadingStats ? '...' : stats.activeTenants} description={stats.totalTenants > 0 ? `${Math.round((stats.activeTenants / stats.totalTenants) * 100)}% del total` : 'Sin tenants'} icon={Shield} tone="success" />
+        <MetricCard title="Usuarios totales" value={loadingStats ? '...' : stats.totalUsers} description="En todos los tenants" icon={Users} tone="default" />
+        <MetricCard title="Usuarios activos" value={loadingStats ? '...' : stats.activeUsers} description={stats.totalUsers > 0 ? `${Math.round((stats.activeUsers / stats.totalUsers) * 100)}% del total` : 'Sin usuarios'} icon={UserCheck} tone="warning" />
       </div>
 
       {/* Quick Actions */}
-      <div className="activity-section">
-        <h2 className="activity-title">Acciones Rápidas</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+      <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950">
+        <CardHeader>
+          <CardTitle className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Acciones rápidas</CardTitle>
+        </CardHeader>
+        <CardContent>
           <button
             onClick={() => router.push('/superadmin/dashboard/security')}
-            className="activity-item"
-            style={{
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%)',
-              border: '2px solid rgba(239, 68, 68, 0.2)',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
+            className="flex w-full items-center gap-4 rounded-2xl border border-cyan-400/15 bg-slate-900/50 p-4 text-left transition hover:border-cyan-300/40 hover:bg-cyan-400/10 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50"
           >
-            <span style={{ fontSize: '2rem' }}>🔒</span>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.25rem' }}>
-                Dashboard de Seguridad
-              </h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--primary-500)' }}>
-                Monitoreo RLS y alertas
-              </p>
-            </div>
+            <Shield className="h-6 w-6 text-cyan-300 group-data-[erp-theme=light]/dashboard:text-blue-600" />
+            <span>
+              <span className="block font-bold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">Dashboard de Seguridad</span>
+              <span className="text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">Monitoreo RLS y alertas</span>
+            </span>
           </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Tenant Management */}
       <CrearTenants />
-    </div>
+    </PageShell>
   )
 }

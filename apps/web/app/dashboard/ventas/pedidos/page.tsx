@@ -122,36 +122,13 @@ export default function PedidosPage() {
     const style = map[normalized] || map.SIN_EVALUAR
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '9999px',
-            fontSize: '0.72rem',
-            fontWeight: 600,
-            backgroundColor: style.bg,
-            color: style.text,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
+      <div className="flex flex-col gap-1.5">
+        <span className="inline-flex items-center py-1 px-3 rounded-full text-[0.72rem] font-semibold"
         >
           {normalized}
         </span>
         {requiere && (
-          <span
-            style={{
-              fontSize: '0.7rem',
-              fontWeight: 600,
-              color: '#c2410c',
-              backgroundColor: 'rgba(249, 115, 22, 0.08)',
-              borderRadius: '4px',
-              display: 'inline-flex',
-              padding: '0.15rem 0.5rem',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
+          <span className="text-[0.7rem] font-semibold text-[#c2410c] bg-[rgba(249,_115,_22,_0.08)] rounded-[4px] inline-flex py-[0.15rem] px-2"
           >
             Requiere aprobación
           </span>
@@ -174,11 +151,11 @@ export default function PedidosPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL PEDIDOS</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
+            <FileText className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{pedidos.length}</div>
           <div className="stat-subtitle">Pedidos registrados</div>
@@ -186,7 +163,7 @@ export default function PedidosPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>FILTRADOS</h3>
-            <Filter className="stat-icon" style={{ color: '#10b981' }} />
+            <Filter className="stat-icon text-[#10b981]" />
           </div>
           <div className="stat-value">{filteredPedidos.length}</div>
           <div className="stat-subtitle">Pedidos mostrados</div>
@@ -195,48 +172,21 @@ export default function PedidosPage() {
 
       {/* Search and Filters */}
       <div className="activity-section">
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '300px', position: 'relative' }}>
+        <div className="flex gap-4 mb-4 flex-wrap">
+          <div className="flex-[1] min-w-[300px] relative">
             <Search
-              size={20}
-              style={{
-                position: 'absolute',
-                left: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }}
+              size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
               placeholder="Buscar por número o cliente..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 3rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-2 border text-[0.875rem]"
             />
           </div>
 
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: showFilters ? '#3b82f6' : 'white',
-              color: showFilters ? 'white' : '#374151',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={() => setShowFilters(!showFilters)} className="py-3 px-4 rounded-2 border cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <Filter size={16} />
             Filtros
@@ -244,8 +194,7 @@ export default function PedidosPage() {
 
           <button
             onClick={loadPedidos}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1rem' }}
+            className="refresh-btn py-3 px-4"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -254,30 +203,14 @@ export default function PedidosPage() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem',
-            marginBottom: '1.5rem',
-            padding: '1rem',
-            background: '#f9fafb',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
-          }}>
+          <div className="grid grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-4 mb-6 p-4 bg-[#f9fafb] rounded-2 border">
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Estado
               </label>
               <select
                 value={estadoFilter}
-                onChange={(e) => setEstadoFilter(e.target.value as EstadoPedido | '')}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => setEstadoFilter(e.target.value as EstadoPedido | '')} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               >
                 <option value="">Todos</option>
                 {Object.entries(ESTADO_LABELS).map(([value, label]) => (
@@ -287,57 +220,36 @@ export default function PedidosPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Cliente
               </label>
               <input
                 type="text"
                 placeholder="Filtrar por cliente..."
                 value={clienteFilter}
-                onChange={(e) => setClienteFilter(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => setClienteFilter(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha Desde
               </label>
               <input
                 type="date"
                 value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => setFechaDesde(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
+              <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">
                 Fecha Hasta
               </label>
               <input
                 type="date"
                 value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem'
-                }}
+                onChange={(e) => setFechaHasta(e.target.value)} className="w-[100%] p-2 rounded-[6px] border text-[0.875rem]"
               />
             </div>
           </div>
@@ -351,94 +263,79 @@ export default function PedidosPage() {
               <p>Cargando pedidos...</p>
             </div>
           ) : filteredPedidos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <div className="text-center p-12 text-gray-500">
+              <FileText size={48} className="text-gray-400" />
+              <h3 className="text-[1.125rem] font-semibold mb-2">
                 No se encontraron pedidos
               </h3>
-              <p style={{ marginBottom: '1.5rem' }}>
+              <p className="mb-6">
                 {searchTerm || estadoFilter || clienteFilter || fechaDesde || fechaHasta
                   ? 'Intenta ajustar los filtros de búsqueda'
                   : 'Crea tu primer pedido haciendo clic en "Nuevo Pedido"'}
               </p>
             </div>
           ) : (
-            <div style={{ overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-auto">
+              <table className="w-[100%]">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                  <tr>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Número
                     </th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Cliente
                     </th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Fecha
                     </th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Estado
                     </th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Estado Crédito
                     </th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-left p-4 font-semibold text-3 text-gray-500">
                       Total
                     </th>
-                    <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <th className="text-right p-4 font-semibold text-3 text-gray-500">
                       Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPedidos.map((pedido) => (
-                    <tr key={pedido.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
+                    <tr key={pedido.id} className="border-b">
+                      <td className="p-4">
+                        <div className="text-[0.875rem] font-semibold">
                           {pedido.numero}
                         </div>
                       </td>
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+                      <td className="p-4">
+                        <div className="text-[0.875rem] font-semibold text-gray-900">
                           {pedido.cliente?.razon_social || 'N/A'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                        <div className="text-3 text-gray-500">
                           {pedido.cliente?.documento_numero || ''}
                         </div>
                       </td>
-                      <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                      <td className="p-4 text-[0.875rem] text-gray-500">
                         {formatFecha(pedido.fecha_pedido)}
                       </td>
-                      <td style={{ padding: '1rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.75rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          background: ESTADO_COLORS[pedido.estado].bg,
-                          color: ESTADO_COLORS[pedido.estado].text
-                        }}>
+                      <td className="p-4">
+                        <span className="py-1 px-3 rounded-full text-3 font-medium">
                           {ESTADO_LABELS[pedido.estado]}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem' }}>
+                      <td className="p-4">
                         {renderEstadoCredito(pedido.estado_credito, pedido.requiere_aprobacion)}
                       </td>
-                      <td style={{ padding: '1rem', fontSize: '0.875rem', fontWeight: '600' }}>
+                      <td className="p-4 text-[0.875rem] font-semibold">
                         {formatMonto(pedido.total)}
                       </td>
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      <td className="p-4">
+                        <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => handleVerDetalle(pedido.id)}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: '#3b82f6',
-                              color: 'white',
-                              cursor: 'pointer'
-                            }}
+                            onClick={() => handleVerDetalle(pedido.id)} className="p-2 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer"
                             title="Ver detalle"
                           >
                             <Eye size={16} />
@@ -455,7 +352,7 @@ export default function PedidosPage() {
 
         {/* Results Summary */}
         {!loading && filteredPedidos.length > 0 && (
-          <div style={{ marginTop: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+          <div className="mt-4 text-[0.875rem] text-gray-500">
             Mostrando {filteredPedidos.length} de {pedidos.length} pedidos
           </div>
         )}

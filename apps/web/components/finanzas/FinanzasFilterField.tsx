@@ -18,14 +18,8 @@ export default function FinanzasFilterField({
   minWidth = '200px'
 }: FinanzasFilterFieldProps) {
   return (
-    <div style={{ flex: 1, minWidth }}>
-      <label style={{ 
-        display: 'block', 
-        fontSize: '0.875rem', 
-        fontWeight: '500', 
-        marginBottom: '0.5rem', 
-        color: '#374151' 
-      }}>
+    <div className="flex-[1]">
+      <label className="block text-[0.875rem] font-medium mb-2 text-gray-700">
         {label}
       </label>
       {children}

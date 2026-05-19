@@ -97,7 +97,7 @@ test.describe('Finanzas - Tesorería', () => {
     await expect(pagoModal).not.toBeVisible();
     
     // Verify the payment was applied (check for updated saldo or payment history)
-    const historialSection = page.locator('text=Historial de Pagos');
+    const historialSection = page.getByRole('heading', { name: 'Historial de Pagos' });
     await expect(historialSection).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(referenciaPago)).toBeVisible({ timeout: 10000 });
     
@@ -145,7 +145,9 @@ test.describe('Finanzas - Tesorería', () => {
     const cuentaBancariaSelect = page.getByRole('combobox').first();
     await expect(cuentaBancariaSelect).toBeVisible({ timeout: 10000 });
     await cuentaBancariaSelect.click();
-    await page.getByRole('option').first().click();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(cuentaBancariaSelect, 'Debe quedar seleccionada una cuenta bancaria real').not.toContainText('Seleccione una cuenta');
     
     // Wait for account details to load
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
@@ -360,11 +362,12 @@ test.describe('Finanzas - Tesorería', () => {
     await page.screenshot({ path: 'tests/screenshots/conciliacion-import-modal.png', fullPage: true });
     
     // Create a sample CSV file content
-    const csvContent = `Fecha,Descripcion,Cargo,Abono,Saldo
-05/05/2026,TRANSFERENCIA RECIBIDA,,1500.00,1500.00
-06/05/2026,PAGO PROVEEDOR,800.00,,700.00
-07/05/2026,DEPOSITO,,2000.00,2700.00
-08/05/2026,COMISION BANCARIA,25.00,,2675.00`;
+    const todayCsv = new Date().toISOString().split('T')[0];
+    const csvRunId = Date.now();
+    const csvContent = `Fecha,Descripcion,Referencia,Tipo,Monto
+${todayCsv},PAGO E2E CXP,EXT-E2E-CARGO-${csvRunId},CARGO,1.00
+${todayCsv},TRANSFERENCIA RECIBIDA,EXT-E2E-ABONO-${csvRunId},ABONO,1500.00
+${todayCsv},COMISION BANCARIA,EXT-E2E-COMISION-${csvRunId},CARGO,25.00`;
     
     // Look for file input
     const fileInput = page.locator('input[type="file"]');

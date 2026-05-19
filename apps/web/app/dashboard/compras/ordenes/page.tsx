@@ -1,24 +1,25 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useApi } from '@/hooks/use-api'
-import { 
-  Plus, 
-  RefreshCw,
-  FileText,
-  Clock,
+import {
   CheckCircle,
-  XCircle,
-  Package,
-  AlertCircle,
-  Eye,
+  Clock,
+  Download,
   Edit,
+  Eye,
+  FileText,
   LayoutGrid,
   List,
-  Download,
-  Filter
+  Package,
+  Plus,
+  RefreshCw,
+  XCircle,
+  type LucideIcon,
 } from 'lucide-react'
+import { useApi } from '@/hooks/use-api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface OrdenCompra {
   id: string
@@ -41,82 +42,93 @@ interface OrdenCompra {
 
 type EstadoOrden = 'BORRADOR' | 'APROBACION' | 'APROBADA' | 'PARCIAL' | 'RECIBIDA' | 'CERRADA' | 'ANULADA'
 
-const ESTADOS_CONFIG: Record<EstadoOrden, {
+type EstadoConfig = {
   label: string
-  color: string
-  bgColor: string
-  icon: any
-}> = {
+  icon: LucideIcon
+  badge: string
+  panel: string
+  border: string
+}
+
+const ESTADOS_CONFIG: Record<EstadoOrden, EstadoConfig> = {
   BORRADOR: {
     label: 'Borrador',
-    color: '#6b7280',
-    bgColor: 'rgba(107, 114, 128, 0.1)',
-    icon: Edit
+    icon: Edit,
+    badge: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
+    panel: 'from-slate-500/15 to-slate-500/5',
+    border: 'border-slate-400/25',
   },
   APROBACION: {
-    label: 'En Aprobación',
-    color: '#f59e0b',
-    bgColor: 'rgba(245, 158, 11, 0.1)',
-    icon: Clock
+    label: 'En aprobacion',
+    icon: Clock,
+    badge: 'border-amber-300/30 bg-amber-300/10 text-amber-100',
+    panel: 'from-amber-300/15 to-amber-300/5',
+    border: 'border-amber-300/25',
   },
   APROBADA: {
     label: 'Aprobada',
-    color: '#10b981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
-    icon: CheckCircle
+    icon: CheckCircle,
+    badge: 'border-cyan-300/30 bg-cyan-300/10 text-cyan-100',
+    panel: 'from-cyan-300/15 to-cyan-300/5',
+    border: 'border-cyan-300/25',
   },
   PARCIAL: {
     label: 'Parcial',
-    color: '#3b82f6',
-    bgColor: 'rgba(59, 130, 246, 0.1)',
-    icon: Package
+    icon: Package,
+    badge: 'border-blue-300/30 bg-blue-300/10 text-blue-100',
+    panel: 'from-blue-300/15 to-blue-300/5',
+    border: 'border-blue-300/25',
   },
   RECIBIDA: {
     label: 'Recibida',
-    color: '#059669',
-    bgColor: 'rgba(5, 150, 105, 0.1)',
-    icon: CheckCircle
+    icon: CheckCircle,
+    badge: 'border-teal-300/30 bg-teal-300/10 text-teal-100',
+    panel: 'from-teal-300/15 to-teal-300/5',
+    border: 'border-teal-300/25',
   },
   CERRADA: {
     label: 'Cerrada',
-    color: '#6b7280',
-    bgColor: 'rgba(107, 114, 128, 0.1)',
-    icon: FileText
+    icon: FileText,
+    badge: 'border-cyan-400/25 bg-cyan-400/10 text-cyan-100',
+    panel: 'from-cyan-400/15 to-cyan-400/5',
+    border: 'border-cyan-400/20',
   },
   ANULADA: {
     label: 'Anulada',
-    color: '#ef4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    icon: XCircle
-  }
+    icon: XCircle,
+    badge: 'border-slate-300/30 bg-slate-300/10 text-slate-100',
+    panel: 'from-slate-300/15 to-slate-300/5',
+    border: 'border-slate-300/20',
+  },
 }
 
 const ESTADO_QUICK_FILTERS: Array<{ label: string; value: '' | EstadoOrden }> = [
   { label: 'Todas', value: '' },
   { label: 'Borrador', value: 'BORRADOR' },
-  { label: 'En aprobación', value: 'APROBACION' },
+  { label: 'En aprobacion', value: 'APROBACION' },
   { label: 'Aprobada', value: 'APROBADA' },
   { label: 'Parcial', value: 'PARCIAL' },
   { label: 'Recibida', value: 'RECIBIDA' },
   { label: 'Anulada', value: 'ANULADA' },
 ]
 
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
 export default function OrdenesCompraPage() {
   const router = useRouter()
   const { get } = useApi()
-  
+
   const [ordenes, setOrdenes] = useState<OrdenCompra[]>([])
   const [proveedores, setProveedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban')
-  
-  // Filters
   const [estadoFilter, setEstadoFilter] = useState<string>('')
   const [proveedorFilter, setProveedorFilter] = useState<string>('')
   const [fechaDesde, setFechaDesde] = useState<string>('')
   const [fechaHasta, setFechaHasta] = useState<string>('')
-  
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalOrdenes, setTotalOrdenes] = useState(0)
@@ -126,13 +138,12 @@ export default function OrdenesCompraPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      
+
       if (estadoFilter) params.append('estado', estadoFilter)
       if (proveedorFilter) params.append('proveedor_id', proveedorFilter)
       if (fechaDesde) params.append('fecha_desde', fechaDesde)
       if (fechaHasta) params.append('fecha_hasta', fechaHasta)
-      
-      // Only add pagination for list view
+
       if (viewMode === 'list') {
         const offset = (currentPage - 1) * itemsPerPage
         params.append('limit', itemsPerPage.toString())
@@ -140,7 +151,7 @@ export default function OrdenesCompraPage() {
       }
 
       const response = await get(`/compras/ordenes?${params.toString()}`)
-      
+
       if (response?.success) {
         const data = response.data || []
         setOrdenes(data)
@@ -149,7 +160,7 @@ export default function OrdenesCompraPage() {
       }
     } catch (error) {
       console.error('Error loading ordenes:', error)
-      alert('Error: No se pudieron cargar las órdenes de compra')
+      alert('Error: No se pudieron cargar las ordenes de compra')
     } finally {
       setLoading(false)
     }
@@ -158,9 +169,7 @@ export default function OrdenesCompraPage() {
   const loadProveedores = useCallback(async () => {
     try {
       const response = await get('/compras/proveedores?activo=true')
-      if (response?.success) {
-        setProveedores(response.data || [])
-      }
+      if (response?.success) setProveedores(response.data || [])
     } catch (error) {
       console.error('Error loading proveedores:', error)
     }
@@ -179,21 +188,6 @@ export default function OrdenesCompraPage() {
     setCurrentPage(1)
   }
 
-  const handleProveedorFilterChange = (value: string) => {
-    setProveedorFilter(value)
-    setCurrentPage(1)
-  }
-
-  const handleFechaDesdeChange = (value: string) => {
-    setFechaDesde(value)
-    setCurrentPage(1)
-  }
-
-  const handleFechaHastaChange = (value: string) => {
-    setFechaHasta(value)
-    setCurrentPage(1)
-  }
-
   const handleClearFilters = () => {
     setEstadoFilter('')
     setProveedorFilter('')
@@ -203,7 +197,7 @@ export default function OrdenesCompraPage() {
   }
 
   const handleExport = () => {
-    alert('📥 Funcionalidad de exportación próximamente')
+    alert('Funcionalidad de exportacion proximamente')
   }
 
   const formatCurrency = (amount: number | undefined) => {
@@ -215,9 +209,9 @@ export default function OrdenesCompraPage() {
   }
 
   const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '—'
+    if (!dateString) return '-'
     const parsed = new Date(dateString)
-    if (Number.isNaN(parsed.getTime())) return '—'
+    if (Number.isNaN(parsed.getTime())) return '-'
     return parsed.toLocaleDateString('es-PE', {
       year: 'numeric',
       month: '2-digit',
@@ -225,35 +219,63 @@ export default function OrdenesCompraPage() {
     })
   }
 
-  const getOrdenesByEstado = (estado: EstadoOrden) => {
-    return ordenes.filter(orden => orden.estado === estado)
-  }
-
+  const getOrdenesByEstado = (estado: EstadoOrden) => ordenes.filter((orden) => orden.estado === estado)
   const isFilterActive = estadoFilter || proveedorFilter || fechaDesde || fechaHasta
 
   const getEstadoBadge = (estado: string) => {
     const config = ESTADOS_CONFIG[estado as EstadoOrden]
     if (!config) return null
-    
     const Icon = config.icon
-    
+
     return (
-      <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem 0.75rem',
-        borderRadius: '9999px',
-        fontSize: '0.75rem',
-        fontWeight: '500',
-        background: config.color,
-        color: 'white'
-      }}>
-        <Icon size={14} />
+      <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${config.badge}`}>
+        <Icon className="h-3.5 w-3.5" />
         {config.label}
       </span>
     )
   }
+
+  const statCards = [
+    { label: 'Total', value: ordenes.length, icon: FileText },
+    { label: 'En aprobacion', value: ordenes.filter((orden) => orden.estado === 'APROBACION').length, icon: Clock },
+    { label: 'Aprobadas', value: ordenes.filter((orden) => orden.estado === 'APROBADA').length, icon: CheckCircle },
+    { label: 'Recibidas', value: ordenes.filter((orden) => orden.estado === 'RECIBIDA').length, icon: Package },
+  ]
+
+  const renderOrderCard = (orden: OrdenCompra, config: EstadoConfig) => (
+    <button
+      key={orden.id}
+      type="button"
+      onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)}
+      className={`group w-full rounded-2xl border ${config.border} bg-slate-950/70 p-4 text-left shadow-xl shadow-blue-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-slate-900/90`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-mono text-sm font-bold text-white">{orden.numero}</div>
+          <div className="mt-1 text-xs text-slate-400">{formatDate(orden.fecha_orden)}</div>
+        </div>
+        {getEstadoBadge(orden.estado)}
+      </div>
+
+      <div className="mt-4 min-h-14">
+        <div className="line-clamp-2 text-sm font-semibold text-slate-100">{orden.proveedores?.razon_social || 'Proveedor N/A'}</div>
+        {orden.proveedores?.ruc && <div className="mt-1 text-xs text-cyan-200/60">RUC: {orden.proveedores.ruc}</div>}
+      </div>
+
+      <div className={`mt-4 rounded-xl border ${config.border} bg-gradient-to-br ${config.panel} p-3`}>
+        <div className={labelClass}>Total</div>
+        <div className="mt-1 text-xl font-bold text-cyan-50">{formatCurrency(orden.total)}</div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-cyan-400/10 pt-3 text-xs text-slate-400">
+        <span>{orden.fecha_entrega_esperada ? `Entrega: ${formatDate(orden.fecha_entrega_esperada)}` : 'Sin entrega programada'}</span>
+        <span className="inline-flex items-center gap-1 text-cyan-200">
+          <Eye className="h-3.5 w-3.5" />
+          Ver
+        </span>
+      </div>
+    </button>
+  )
 
   const renderKanbanColumn = (estado: EstadoOrden) => {
     const config = ESTADOS_CONFIG[estado]
@@ -261,300 +283,30 @@ export default function OrdenesCompraPage() {
     const Icon = config.icon
 
     return (
-      <div
-        key={estado}
-        style={{
-          flex: '1',
-          minWidth: '320px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem'
-        }}
-      >
-        {/* Column Header */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-            backdropFilter: 'blur(20px) saturate(180%)',
-            borderRadius: '12px',
-            padding: '1rem 1.5rem',
-            boxShadow: 'var(--shadow-md)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                background: config.bgColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: config.color
-              }}
-            >
-              <Icon size={20} />
+      <div key={estado} className="flex min-w-[280px] flex-1 flex-col gap-3">
+        <div className={`rounded-2xl border ${config.border} bg-gradient-to-br ${config.panel} p-4 shadow-xl shadow-blue-950/20`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className={`rounded-xl border ${config.border} bg-slate-950/70 p-3 text-cyan-100`}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-white">{config.label}</h3>
+                <p className="text-xs text-cyan-100/60">{ordenesEstado.length} ordenes</p>
+              </div>
             </div>
-            <div>
-              <h3 style={{ 
-                fontSize: '0.875rem', 
-                fontWeight: '700', 
-                color: 'var(--primary-800)',
-                margin: 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                {config.label}
-              </h3>
-              <p style={{ 
-                fontSize: '0.75rem', 
-                color: 'var(--primary-500)', 
-                margin: 0 
-              }}>
-                {ordenesEstado.length} {ordenesEstado.length === 1 ? 'orden' : 'órdenes'}
-              </p>
-            </div>
-          </div>
-          <div
-            style={{
-              background: config.bgColor,
-              color: config.color,
-              padding: '0.25rem 0.75rem',
-              borderRadius: '9999px',
-              fontSize: '0.875rem',
-              fontWeight: '700'
-            }}
-          >
-            {ordenesEstado.length}
+            <span className={`rounded-full border px-3 py-1 text-sm font-bold ${config.badge}`}>{ordenesEstado.length}</span>
           </div>
         </div>
 
-        {/* Column Content */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            minHeight: '400px',
-            maxHeight: '70vh',
-            overflowY: 'auto',
-            padding: '0.5rem'
-          }}
-        >
+        <div className="flex max-h-[64vh] min-h-[300px] flex-col gap-3 overflow-y-auto rounded-2xl border border-cyan-400/10 bg-slate-950/35 p-3">
           {ordenesEstado.length === 0 ? (
-            <div
-              style={{
-                background: 'rgba(255, 255, 255, 0.5)',
-                borderRadius: '12px',
-                padding: '2rem',
-                textAlign: 'center',
-                color: 'var(--primary-400)',
-                border: '2px dashed var(--primary-200)'
-              }}
-            >
-              <Icon size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
-              <p style={{ fontSize: '0.875rem', margin: 0 }}>
-                No hay órdenes en {config.label.toLowerCase()}
-              </p>
+            <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-5 text-center text-slate-400">
+              <Icon className="mb-2 h-7 w-7 text-cyan-200/40" />
+              <p className="text-sm">Sin ordenes en {config.label.toLowerCase()}</p>
             </div>
           ) : (
-            ordenesEstado.map((orden) => (
-              <div
-                key={orden.id}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                  backdropFilter: 'blur(20px) saturate(180%)',
-                  borderRadius: '12px',
-                  padding: '1.25rem',
-                  boxShadow: 'var(--shadow-md)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow-xl)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow-md)'
-                }}
-                onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)}
-              >
-                {/* Top Border Indicator */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: config.color,
-                    borderRadius: '12px 12px 0 0'
-                  }}
-                />
-
-                {/* Order Number */}
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '700',
-                    color: 'var(--primary-800)',
-                    fontFamily: 'monospace',
-                    marginBottom: '0.25rem'
-                  }}>
-                    {orden.numero}
-                  </div>
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--primary-500)'
-                  }}>
-                    {formatDate(orden.fecha_orden)}
-                  </div>
-                </div>
-
-                {/* Provider */}
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: 'var(--primary-700)',
-                    marginBottom: '0.25rem'
-                  }}>
-                    {orden.proveedores?.razon_social || 'Proveedor N/A'}
-                  </div>
-                  {orden.proveedores?.ruc && (
-                    <div style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--primary-500)'
-                    }}>
-                      RUC: {orden.proveedores.ruc}
-                    </div>
-                  )}
-                </div>
-
-                {/* Total */}
-                <div
-                  style={{
-                    background: config.bgColor,
-                    borderRadius: '8px',
-                    padding: '0.75rem',
-                    marginBottom: '0.75rem'
-                  }}
-                >
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--primary-600)',
-                    marginBottom: '0.25rem'
-                  }}>
-                    Total
-                  </div>
-                  <div style={{
-                    fontSize: '1.25rem',
-                    fontWeight: '700',
-                    color: config.color
-                  }}>
-                    {formatCurrency(orden.total)}
-                  </div>
-                </div>
-
-                {/* Expected Delivery */}
-                {orden.fecha_entrega_esperada && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: 'var(--primary-500)',
-                    marginBottom: '0.75rem'
-                  }}>
-                    <Clock size={14} />
-                    <span>Entrega: {formatDate(orden.fecha_entrega_esperada)}</span>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  paddingTop: '0.75rem',
-                  borderTop: '1px solid var(--primary-200)'
-                }}>
-                  {(orden.estado === 'APROBADA' || orden.estado === 'PARCIAL') && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        router.push(`/dashboard/inventario/recepciones?oc=${orden.id}`)
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '0.5rem',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: '#0ea5e9',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#0284c7'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#0ea5e9'
-                      }}
-                    >
-                      <Package size={14} />
-                      Recepcionar
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/dashboard/compras/ordenes/${orden.id}`)
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '0.5rem',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: 'var(--blue-500)',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.25rem',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--blue-600)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--blue-500)'
-                    }}
-                  >
-                    <Eye size={14} />
-                    Ver
-                  </button>
-                </div>
-              </div>
-            ))
+            ordenesEstado.map((orden) => renderOrderCard(orden, config))
           )}
         </div>
       </div>
@@ -562,460 +314,206 @@ export default function OrdenesCompraPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Órdenes de Compra</h1>
-          <p className="dashboard-subtitle">Gestiona tus órdenes de compra con vista kanban o lista</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {/* View Mode Toggle */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem',
-            background: 'white',
-            padding: '0.25rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db'
-          }}>
-            <button
-              onClick={() => setViewMode('kanban')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: viewMode === 'kanban' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'kanban' ? 'white' : '#6b7280',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <LayoutGrid size={16} />
-              Kanban
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                border: 'none',
-                background: viewMode === 'list' ? '#3b82f6' : 'transparent',
-                color: viewMode === 'list' ? 'white' : '#6b7280',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <List size={16} />
-              Lista
-            </button>
+    <div className="min-h-screen bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+        <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-cyan-100">
+                ERP Purchasing Board
+              </div>
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white">Ordenes de Compra</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-300">
+                Seguimiento compacto de ordenes, aprobaciones, recepciones y proveedores activos.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <div className="flex rounded-2xl border border-cyan-400/20 bg-slate-950/70 p-1">
+                <Button
+                  type="button"
+                  onClick={() => setViewMode('kanban')}
+                  className={`gap-2 rounded-xl ${viewMode === 'kanban' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Kanban
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`gap-2 rounded-xl ${viewMode === 'list' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <List className="h-4 w-4" />
+                  Lista
+                </Button>
+              </div>
+              <Button type="button" onClick={loadOrdenes} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => router.push('/dashboard/compras/ordenes/nueva')} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Nueva orden
+              </Button>
+            </div>
           </div>
-          
-          <button
-            onClick={loadOrdenes}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1.5rem' }}
-          >
-            <RefreshCw size={16} />
-            Actualizar
-          </button>
-          <button 
-            className="refresh-btn"
-            onClick={() => router.push('/dashboard/compras/ordenes/nueva')}
-          >
-            <Plus size={20} />
-            Nueva Orden
-          </button>
-        </div>
-      </div>
+        </section>
 
-      {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>TOTAL</h3>
-            <FileText className="stat-icon" style={{ color: '#3b82f6' }} />
-          </div>
-          <div className="stat-value">{ordenes.length}</div>
-          <div className="stat-subtitle">Órdenes</div>
-        </div>
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {statCards.map(({ label, value, icon: Icon }) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>{label}</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                  <div className="mt-1 text-xs text-cyan-100/55">Ordenes</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <Icon className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
 
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>EN APROBACIÓN</h3>
-            <Clock className="stat-icon" style={{ color: '#f59e0b' }} />
-          </div>
-          <div className="stat-value">
-            {ordenes.filter(o => o.estado === 'APROBACION').length}
-          </div>
-          <div className="stat-subtitle">Pendientes</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>APROBADAS</h3>
-            <CheckCircle className="stat-icon" style={{ color: '#10b981' }} />
-          </div>
-          <div className="stat-value">
-            {ordenes.filter(o => o.estado === 'APROBADA').length}
-          </div>
-          <div className="stat-subtitle">Listas</div>
-        </div>
-
-      <div className="stat-card">
-        <div className="stat-header">
-          <h3>RECIBIDAS</h3>
-          <Package className="stat-icon" style={{ color: '#059669' }} />
-        </div>
-        <div className="stat-value">
-          {ordenes.filter(o => o.estado === 'RECIBIDA').length}
-        </div>
-        <div className="stat-subtitle">Completadas</div>
-      </div>
-    </div>
-
-    <div
-      style={{
-        display: 'flex',
-        gap: '0.5rem',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-      }}
-    >
-      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Estados:</span>
-      {ESTADO_QUICK_FILTERS.map((filter) => {
-        const isActive = estadoFilter === filter.value
-        return (
-          <button
-            key={filter.label}
-            onClick={() => handleEstadoFilterChange(filter.value)}
-            style={{
-              padding: '0.5rem 0.9rem',
-              borderRadius: '999px',
-              border: isActive ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(148, 163, 184, 0.4)',
-              background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'rgba(148, 163, 184, 0.12)',
-              color: isActive ? '#1d4ed8' : '#475569',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'background 0.15s ease, color 0.15s ease',
-            }}
-          >
-            {filter.label}
-          </button>
-        )
-      })}
-    </div>
-
-      {/* Filters - Only show in list view */}
-      {viewMode === 'list' && (
-        <div className="activity-section">
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Estado
-              </label>
-              <select
-                value={estadoFilter}
-                onChange={(e) => handleEstadoFilterChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              >
-                <option value="">Todos los estados</option>
-                <option value="BORRADOR">Borrador</option>
-                <option value="APROBACION">En Aprobación</option>
-                <option value="APROBADA">Aprobada</option>
-                <option value="PARCIAL">Parcial</option>
-                <option value="RECIBIDA">Recibida</option>
-                <option value="CERRADA">Cerrada</option>
-                <option value="ANULADA">Anulada</option>
-              </select>
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="flex flex-col gap-4 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={labelClass}>Estados</span>
+              {ESTADO_QUICK_FILTERS.map((filter) => {
+                const isActive = estadoFilter === filter.value
+                return (
+                  <Button
+                    key={filter.label}
+                    type="button"
+                    onClick={() => handleEstadoFilterChange(filter.value)}
+                    variant="outline"
+                    className={`h-9 rounded-full border-cyan-400/20 px-4 text-xs ${isActive ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-950/50 text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    {filter.label}
+                  </Button>
+                )
+              })}
             </div>
 
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Proveedor
-              </label>
-              <select
-                value={proveedorFilter}
-                onChange={(e) => handleProveedorFilterChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              >
-                <option value="">Todos los proveedores</option>
-                {proveedores.map((proveedor) => (
-                  <option key={proveedor.id} value={proveedor.id}>
-                    {proveedor.razon_social}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ flex: 1, minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Fecha Desde
-              </label>
-              <input
-                type="date"
-                value={fechaDesde}
-                onChange={(e) => handleFechaDesdeChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              />
-            </div>
-
-            <div style={{ flex: 1, minWidth: '180px' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem', color: '#374151' }}>
-                Fecha Hasta
-              </label>
-              <input
-                type="date"
-                value={fechaHasta}
-                onChange={(e) => handleFechaHastaChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '0.875rem',
-                  background: 'white'
-                }}
-              />
-            </div>
-
-            {isFilterActive && (
-              <button
-                onClick={handleClearFilters}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #d1d5db',
-                  background: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#ef4444'
-                }}
-              >
-                <XCircle size={16} />
-                Limpiar Filtros
-              </button>
+            {viewMode === 'list' && (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[180px_minmax(220px,1fr)_170px_170px_auto_auto] xl:items-end">
+                <label className="space-y-2">
+                  <span className={labelClass}>Estado</span>
+                  <select className={inputClass} value={estadoFilter} onChange={(e) => handleEstadoFilterChange(e.target.value)}>
+                    <option value="">Todos los estados</option>
+                    {Object.entries(ESTADOS_CONFIG).map(([value, config]) => (
+                      <option key={value} value={value}>
+                        {config.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className={labelClass}>Proveedor</span>
+                  <select className={inputClass} value={proveedorFilter} onChange={(e) => setProveedorFilter(e.target.value)}>
+                    <option value="">Todos los proveedores</option>
+                    {proveedores.map((proveedor) => (
+                      <option key={proveedor.id} value={proveedor.id}>
+                        {proveedor.razon_social}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className={labelClass}>Desde</span>
+                  <input className={inputClass} type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+                </label>
+                <label className="space-y-2">
+                  <span className={labelClass}>Hasta</span>
+                  <input className={inputClass} type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+                </label>
+                {isFilterActive && (
+                  <Button type="button" onClick={handleClearFilters} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                    <XCircle className="h-4 w-4" />
+                    Limpiar
+                  </Button>
+                )}
+                <Button type="button" onClick={handleExport} variant="outline" className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </Button>
+              </div>
             )}
+          </CardContent>
+        </Card>
 
-            <button
-              onClick={handleExport}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500'
-              }}
-            >
-              <Download size={16} />
-              Exportar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Content - Kanban or List */}
-      <div className="activity-section">
-        {loading ? (
-          <div className="loading">
-            <div className="loading-spinner"></div>
-            <p>Cargando órdenes de compra...</p>
-          </div>
-        ) : viewMode === 'kanban' ? (
-          <div
-            style={{
-              display: 'flex',
-              gap: '1.5rem',
-              overflowX: 'auto',
-              paddingBottom: '1rem'
-            }}
-          >
-            {renderKanbanColumn('BORRADOR')}
-            {renderKanbanColumn('APROBACION')}
-            {renderKanbanColumn('APROBADA')}
-            {renderKanbanColumn('PARCIAL')}
-            {renderKanbanColumn('RECIBIDA')}
-            {renderKanbanColumn('CERRADA')}
-            {renderKanbanColumn('ANULADA')}
-          </div>
-        ) : (
-          /* List View */
-          <div className="activity-card">
-            {ordenes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                <FileText size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  No hay órdenes de compra
-                </h3>
-                <p style={{ marginBottom: '1.5rem' }}>
-                  {isFilterActive
-                    ? 'No se encontraron órdenes con los filtros aplicados'
-                    : 'Comienza creando tu primera orden de compra'}
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardContent className="p-4">
+            {loading ? (
+              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-slate-300">
+                <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
+                <p>Cargando ordenes de compra...</p>
+              </div>
+            ) : viewMode === 'kanban' ? (
+              <div className="grid gap-3 xl:grid-cols-4 2xl:grid-cols-7">
+                {renderKanbanColumn('BORRADOR')}
+                {renderKanbanColumn('APROBACION')}
+                {renderKanbanColumn('APROBADA')}
+                {renderKanbanColumn('PARCIAL')}
+                {renderKanbanColumn('RECIBIDA')}
+                {renderKanbanColumn('CERRADA')}
+                {renderKanbanColumn('ANULADA')}
+              </div>
+            ) : ordenes.length === 0 ? (
+              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-cyan-400/20 bg-slate-950/45 p-8 text-center">
+                <FileText className="mb-3 h-12 w-12 text-cyan-200/50" />
+                <h3 className="text-lg font-bold text-white">No hay ordenes de compra</h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  {isFilterActive ? 'No se encontraron ordenes con los filtros aplicados.' : 'Comienza creando tu primera orden de compra.'}
                 </p>
                 {!isFilterActive && (
-                  <button
-                    onClick={() => router.push('/dashboard/compras/ordenes/nueva')}
-                    className="refresh-btn"
-                  >
-                    <Plus size={16} />
-                    Crear Primera Orden
-                  </button>
+                  <Button type="button" onClick={() => router.push('/dashboard/compras/ordenes/nueva')} className="mt-4 gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                    <Plus className="h-4 w-4" />
+                    Crear primera orden
+                  </Button>
                 )}
               </div>
             ) : (
-              <>
-                <div style={{ overflow: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          N° Orden
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Proveedor
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Fecha Orden
-                        </th>
-                        <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Fecha Entrega
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Total
-                        </th>
-                        <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Estado
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
-                          Acciones
-                        </th>
+              <div className="overflow-hidden rounded-2xl border border-cyan-400/10">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[960px] border-collapse text-sm">
+                    <thead className="bg-slate-950/80 text-xs uppercase tracking-[0.12em] text-cyan-200/70">
+                      <tr>
+                        <th className="px-4 py-3 text-left">N Orden</th>
+                        <th className="px-4 py-3 text-left">Proveedor</th>
+                        <th className="px-4 py-3 text-left">Fecha orden</th>
+                        <th className="px-4 py-3 text-left">Fecha entrega</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-cyan-400/10">
                       {ordenes.map((orden) => (
-                        <tr key={orden.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
-                              {orden.numero}
-                            </div>
+                        <tr key={orden.id} className="bg-slate-950/35 text-slate-200 transition hover:bg-slate-900/70">
+                          <td className="px-4 py-3 font-mono font-semibold text-white">{orden.numero}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-slate-100">{orden.proveedores?.razon_social || 'N/A'}</div>
+                            {orden.proveedores?.ruc && <div className="text-xs text-cyan-100/55">RUC: {orden.proveedores.ruc}</div>}
                           </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
-                              {orden.proveedores?.razon_social || 'N/A'}
-                            </div>
-                            {orden.proveedores?.ruc && (
-                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                                RUC: {orden.proveedores.ruc}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
-                            {formatDate(orden.fecha_orden)}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            {orden.fecha_entrega_esperada ? (
-                              <div style={{ fontSize: '0.875rem', color: '#374151' }}>
-                                {formatDate(orden.fecha_entrega_esperada)}
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
-                            {formatCurrency(orden.total)}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            {getEstadoBadge(orden.estado)}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                          <td className="px-4 py-3 text-slate-300">{formatDate(orden.fecha_orden)}</td>
+                          <td className="px-4 py-3 text-slate-300">{formatDate(orden.fecha_entrega_esperada)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-cyan-50">{formatCurrency(orden.total)}</td>
+                          <td className="px-4 py-3 text-center">{getEstadoBadge(orden.estado)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-end gap-2">
                               {(orden.estado === 'APROBADA' || orden.estado === 'PARCIAL') && (
-                                <button
-                                  onClick={() => router.push(`/dashboard/inventario/recepciones?oc=${orden.id}`)}
-                                  style={{
-                                    padding: '0.5rem',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    background: '#0ea5e9',
-                                    color: 'white',
-                                    cursor: 'pointer'
-                                  }}
-                                  title="Recepcionar OC"
-                                >
-                                  <Package size={16} />
-                                </button>
+                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/inventario/recepciones?oc=${orden.id}`)} className="bg-cyan-600 text-white hover:bg-cyan-500" title="Recepcionar OC">
+                                  <Package className="h-4 w-4" />
+                                </Button>
                               )}
-                              <button
-                                onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)}
-                                style={{
-                                  padding: '0.5rem',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: '#3b82f6',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}
-                                title="Ver detalle"
-                              >
-                                <Eye size={16} />
-                              </button>
+                              <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}`)} className="bg-blue-600 text-white hover:bg-blue-500" title="Ver detalle">
+                                <Eye className="h-4 w-4" />
+                              </Button>
                               {orden.estado === 'BORRADOR' && (
-                                <button
-                                  onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)}
-                                  style={{
-                                    padding: '0.5rem',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    background: '#10b981',
-                                    color: 'white',
-                                    cursor: 'pointer'
-                                  }}
-                                  title="Editar"
-                                >
-                                  <Edit size={16} />
-                                </button>
+                                <Button type="button" size="sm" onClick={() => router.push(`/dashboard/compras/ordenes/${orden.id}/editar`)} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white" title="Editar">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -1025,87 +523,44 @@ export default function OrdenesCompraPage() {
                   </table>
                 </div>
 
-                {/* Pagination */}
                 {totalPages > 1 && (
-                  <div style={{ 
-                    padding: '1rem', 
-                    borderTop: '1px solid rgba(0,0,0,0.1)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                  <div className="flex flex-col gap-3 border-t border-cyan-400/10 bg-slate-950/70 p-4 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
+                    <div>
                       Mostrando <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> a{' '}
-                      <strong>{Math.min(currentPage * itemsPerPage, totalOrdenes)}</strong> de{' '}
-                      <strong>{totalOrdenes}</strong> órdenes
+                      <strong>{Math.min(currentPage * itemsPerPage, totalOrdenes)}</strong> de <strong>{totalOrdenes}</strong> ordenes
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          borderRadius: '6px',
-                          border: '1px solid #d1d5db',
-                          background: currentPage === 1 ? '#f3f4f6' : 'white',
-                          cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                          fontSize: '0.875rem'
-                        }}
-                      >
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
                         Anterior
-                      </button>
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      </Button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, index) => {
                         let pageNum
-                        if (totalPages <= 5) {
-                          pageNum = i + 1
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i
-                        } else {
-                          pageNum = currentPage - 2 + i
-                        }
-                        
+                        if (totalPages <= 5) pageNum = index + 1
+                        else if (currentPage <= 3) pageNum = index + 1
+                        else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + index
+                        else pageNum = currentPage - 2 + index
+
                         return (
-                          <button
+                          <Button
                             key={pageNum}
+                            type="button"
                             onClick={() => setCurrentPage(pageNum)}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              borderRadius: '6px',
-                              border: '1px solid #d1d5db',
-                              background: currentPage === pageNum ? '#3b82f6' : 'white',
-                              color: currentPage === pageNum ? 'white' : '#374151',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                              minWidth: '40px'
-                            }}
+                            className={currentPage === pageNum ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white'}
                           >
                             {pageNum}
-                          </button>
+                          </Button>
                         )
                       })}
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          borderRadius: '6px',
-                          border: '1px solid #d1d5db',
-                          background: currentPage === totalPages ? '#f3f4f6' : 'white',
-                          cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                          fontSize: '0.875rem'
-                        }}
-                      >
+                      <Button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} variant="outline" className="border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white">
                         Siguiente
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
-        )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

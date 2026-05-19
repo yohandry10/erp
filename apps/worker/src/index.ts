@@ -91,6 +91,37 @@ const metrics = {
   posFacturacionDb: { runs: 0, procesadas: 0, errores: 0 },
 };
 
+function renderPrometheusMetrics(): string {
+  const lines = [
+    '# HELP erp_worker_up Worker process liveness.',
+    '# TYPE erp_worker_up gauge',
+    'erp_worker_up 1',
+    '# HELP erp_worker_pos_cpe_retry_runs_total POS CPE retry job runs.',
+    '# TYPE erp_worker_pos_cpe_retry_runs_total counter',
+    `erp_worker_pos_cpe_retry_runs_total ${metrics.posCpeRetry.runs}`,
+    '# HELP erp_worker_pos_cpe_retry_processed_total POS CPE retry processed documents.',
+    '# TYPE erp_worker_pos_cpe_retry_processed_total counter',
+    `erp_worker_pos_cpe_retry_processed_total ${metrics.posCpeRetry.procesadas}`,
+    '# HELP erp_worker_pos_cpe_retry_errors_total POS CPE retry job errors.',
+    '# TYPE erp_worker_pos_cpe_retry_errors_total counter',
+    `erp_worker_pos_cpe_retry_errors_total ${metrics.posCpeRetry.errores}`,
+    '# HELP erp_worker_pos_cpe_retry_skipped_total POS CPE retry skipped documents.',
+    '# TYPE erp_worker_pos_cpe_retry_skipped_total counter',
+    `erp_worker_pos_cpe_retry_skipped_total ${metrics.posCpeRetry.omitidas}`,
+    '# HELP erp_worker_pos_invoicing_runs_total POS pending invoicing job runs.',
+    '# TYPE erp_worker_pos_invoicing_runs_total counter',
+    `erp_worker_pos_invoicing_runs_total ${metrics.posFacturacionDb.runs}`,
+    '# HELP erp_worker_pos_invoicing_processed_total POS pending invoicing processed documents.',
+    '# TYPE erp_worker_pos_invoicing_processed_total counter',
+    `erp_worker_pos_invoicing_processed_total ${metrics.posFacturacionDb.procesadas}`,
+    '# HELP erp_worker_pos_invoicing_errors_total POS pending invoicing job errors.',
+    '# TYPE erp_worker_pos_invoicing_errors_total counter',
+    `erp_worker_pos_invoicing_errors_total ${metrics.posFacturacionDb.errores}`,
+  ];
+
+  return `${lines.join('\n')}\n`;
+}
+
 // Helper para registrar cron en integration_logs (tenant_id fijo 'system' o el que se pase)
 async function logCronRun(entry: {
   tenant_id?: string;
@@ -520,11 +551,15 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Graceful shutdown
+// Graceful shutdown (single handler — avoids duplicate SIGTERM race)
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await cpeWorker.close();
-  await sireWorker.close();
+  try {
+    await cpeWorker.close();
+    await sireWorker.close();
+  } catch (err) {
+    logger.error('Error during graceful shutdown:', err);
+  }
   process.exit(0);
 });
 
@@ -619,7 +654,7 @@ class BackgroundWorker {
 
       const { data: cpe, error } = await supabase
         .from('cpe')
-        .select('*')
+        .select('id, tenant_id, estado, idempotency_key')
         .eq('id', data.cpeId)
         .eq('estado', 'PENDIENTE_ENVIO')
         .single();
@@ -661,7 +696,7 @@ class BackgroundWorker {
 
       const { data: gre, error } = await supabase
         .from('gre')
-        .select('*')
+        .select('id, tenant_id, estado, idempotency_key')
         .eq('id', data.greId)
         .eq('estado', 'PENDIENTE_ENVIO')
         .single();
@@ -727,10 +762,10 @@ class BackgroundWorker {
     try {
       console.log('📦 [Worker] Verificando stock crítico...');
 
-      // Traer stock y mínimo, filtrar en memoria para evitar comparaciones columna-columna en PostgREST
+      // Traer stock y mínimo con tenant_id, filtrar en memoria para evitar comparaciones columna-columna en PostgREST
       const { data: productos, error } = await supabase
         .from('productos')
-        .select('codigo, nombre, stock, stock_minimo');
+        .select('tenant_id, codigo, nombre, stock, stock_minimo');
 
       if (error) {
         console.error('❌ [Worker] Error consultando stock crítico:', error);
@@ -749,12 +784,17 @@ class BackgroundWorker {
         return true;
       }
 
-      console.log(`⚠️ [Worker] ${criticos.length} productos con stock crítico detectados`);
-      // Aquí se podrían enviar notificaciones, emails, etc.
-      for (const producto of criticos) {
-        console.log(
-          `⚠️ [Worker] Stock crítico: ${producto.codigo} - ${producto.nombre} (Stock: ${producto.stock}, Mínimo: ${producto.stock_minimo})`
-        );
+      // Agrupar por tenant para separar la información por contexto
+      const criticosPorTenant = new Map<string, typeof criticos>();
+      for (const p of criticos) {
+        const tid = (p as any).tenant_id || 'sin-tenant';
+        if (!criticosPorTenant.has(tid)) criticosPorTenant.set(tid, []);
+        criticosPorTenant.get(tid)!.push(p);
+      }
+
+      console.log(`⚠️ [Worker] ${criticos.length} productos con stock crítico detectados en ${criticosPorTenant.size} tenant(s)`);
+      for (const [tid, items] of criticosPorTenant) {
+        console.log(`⚠️ [Worker] Tenant ${tid}: ${items.length} productos con stock crítico`);
       }
 
       return true;
@@ -981,6 +1021,23 @@ logger.info('   - POS pending invoicing: Every 10 minutes');
 import http from 'http';
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/metrics') {
+    // Require METRICS_TOKEN or HEALTH_TOKEN for metrics endpoint
+    const metricsToken = process.env.METRICS_TOKEN || runtimeConfig.healthToken;
+    if (metricsToken) {
+      const token = req.headers['x-metrics-token'] || req.headers['authorization'];
+      const cleaned = Array.isArray(token) ? token[0] : (token || '').toString().replace(/^Bearer\s+/i, '');
+      if (cleaned !== metricsToken) {
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        res.end('Unauthorized');
+        return;
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+    res.end(renderPrometheusMetrics());
+    return;
+  }
+
   if (req.url === '/health' || req.url === '/healthz') {
     // Protección opcional con HEALTH_TOKEN
     if (runtimeConfig.healthToken) {
@@ -1006,16 +1063,16 @@ server.listen(healthPort, () => {
   logger.info(`🩺 [Health] Worker health endpoint listening on :${healthPort}`);
 });
 
-// MANEJO DE SEÑALES
-process.on('SIGINT', () => {
+// MANEJO DE SEÑALES (SIGTERM ya registrado arriba con graceful BullMQ shutdown)
+process.on('SIGINT', async () => {
   console.log('🛑 [Worker] Recibida señal SIGINT, cerrando worker...');
   worker.stop();
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('🛑 [Worker] Recibida señal SIGTERM, cerrando worker...');
-  worker.stop();
+  try {
+    await cpeWorker.close();
+    await sireWorker.close();
+  } catch (err) {
+    console.error('Error during SIGINT shutdown:', err);
+  }
   process.exit(0);
 });
 

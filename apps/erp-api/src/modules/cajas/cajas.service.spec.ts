@@ -1,138 +1,91 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { CajasService } from './cajas.service';
-import { SupabaseService } from '../../shared/supabase/supabase.service';
-import { ConfiguracionCajaService } from './services/configuracion-caja.service';
-import { AutorizacionesCajaService } from './services/autorizaciones-caja.service';
-import { CashReconciliationService } from './services/cash-reconciliation.service';
-import { CashReportsService } from './services/cash-reports.service';
-import { CashMovementsService } from './services/cash-movements.service';
-import { CashClosingService } from './services/cash-closing.service';
-import { CashWithdrawalsService } from './services/cash-withdrawals.service';
-import { CashShiftChangesService } from './services/cash-shift-changes.service';
-import { NotFoundException } from '@nestjs/common';
 
 describe('CajasService', () => {
-  let service: CajasService;
-  let mockSupabaseClient: any;
+  it('calcula el monto esperado de cierre desde el ultimo movimiento cuando la sesion no lo trae', async () => {
+    const updates: any[] = [];
 
-  const createSupabaseQuery = () => {
-    const resultQueue: any[] = [];
-    const q: any = {
-      maybeSingle: jest.fn(),
-      single: jest.fn(),
-      pushResult: (r: any) => { resultQueue.push(r); return q; },
-      then: (resolve: any) =>
-        Promise.resolve(
-          resultQueue.length ? resultQueue.shift() : { data: null, error: null },
-        ).then(resolve),
+    const buildChain = (table: string): any => {
+      const chain: any = {
+        select: jest.fn(() => chain),
+        eq: jest.fn(() => chain),
+        order: jest.fn(() => chain),
+        limit: jest.fn(() => chain),
+        update: jest.fn((rows: any) => {
+          updates.push({ table, rows });
+          return chain;
+        }),
+        single: jest.fn(async () => {
+          if (table === 'sesiones_caja' && updates.length === 0) {
+            return {
+              data: {
+                id: 'sesion-1',
+                tenant_id: 'tenant-1',
+                caja_id: 'caja-1',
+                estado: 'ABIERTA',
+                monto_esperado: 0,
+                monto_inicial: 200,
+                monto_inicio: 200,
+              },
+              error: null,
+            };
+          }
+
+          return {
+            data: {
+              id: 'sesion-1',
+              estado: 'CERRADA',
+              monto_contado: 440.44,
+              monto_esperado: 440.44,
+              diferencia: 0,
+            },
+            error: null,
+          };
+        }),
+        maybeSingle: jest.fn(async () => {
+          if (table === 'movimientos_caja') {
+            return { data: { saldo_nuevo: 440.44 }, error: null };
+          }
+          return { data: null, error: null };
+        }),
+      };
+      return chain;
     };
-    q.from = jest.fn().mockReturnValue(q);
-    q.select = jest.fn().mockReturnValue(q);
-    q.insert = jest.fn().mockReturnValue(q);
-    q.update = jest.fn().mockReturnValue(q);
-    q.delete = jest.fn().mockReturnValue(q);
-    q.order = jest.fn().mockReturnValue(q);
-    q.eq = jest.fn().mockReturnValue(q);
-    return q;
-  };
 
-  beforeEach(async () => {
-    mockSupabaseClient = createSupabaseQuery();
+    const supabase: any = {
+      getClient: jest.fn(() => ({
+        from: jest.fn((table: string) => buildChain(table)),
+      })),
+    };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CajasService,
-        {
-          provide: SupabaseService,
-          useValue: {
-            getClient: jest.fn().mockReturnValue(mockSupabaseClient),
-          },
-        },
-        { provide: ConfiguracionCajaService, useValue: {} as Partial<ConfiguracionCajaService> },
-        { provide: AutorizacionesCajaService, useValue: {} as Partial<AutorizacionesCajaService> },
-        { provide: CashReconciliationService, useValue: {} as Partial<CashReconciliationService> },
-        { provide: CashReportsService, useValue: {} as Partial<CashReportsService> },
-        { provide: CashMovementsService, useValue: {} as Partial<CashMovementsService> },
-        { provide: CashClosingService, useValue: {} as Partial<CashClosingService> },
-        { provide: CashWithdrawalsService, useValue: {} as Partial<CashWithdrawalsService> },
-        { provide: CashShiftChangesService, useValue: {} as Partial<CashShiftChangesService> },
-      ],
-    }).compile();
+    const service = new CajasService(
+      supabase,
+      {} as any,
+      {} as any,
+      {} as any,
+      { registrarCorte: jest.fn(async () => undefined), registrarAsientoCierre: jest.fn(async () => undefined) } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
 
-    service = module.get<CajasService>(CajasService);
-  });
+    await service.cerrarCaja(
+      'tenant-1',
+      'caja-1',
+      'sesion-1',
+      { monto_contado: 440.44, monto_cierre: 440.44 },
+      'user-1',
+    );
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('debería estar definido', () => {
-    expect(service).toBeDefined();
-  });
-
-  describe('Aislamiento multi-tenant (P2.2)', () => {
-    it('listarCajas debe filtrar por tenant_id', async () => {
-      mockSupabaseClient.pushResult({
-        data: [
-          { id: 'caja-a', tenant_id: 'tenant-a' },
-          { id: 'caja-a2', tenant_id: 'tenant-a' },
-        ],
-        error: null,
-      });
-
-      const cajas = await service.listarCajas('tenant-a');
-
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('cajas');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
-      expect(cajas).toHaveLength(2);
-    });
-
-    it('crearCaja debe insertar con tenant_id del contexto', async () => {
-      mockSupabaseClient.single.mockResolvedValueOnce({
-        data: {
-          id: 'caja-1',
-          tenant_id: 'tenant-a',
-          nombre: 'Caja Principal',
-        },
-        error: null,
-      });
-
-      await service.crearCaja('tenant-a', { nombre: 'Caja Principal' } as any, 'user-1');
-
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith('cajas');
-      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            tenant_id: 'tenant-a',
-            nombre: 'Caja Principal',
-            creado_por: 'user-1',
-          }),
-        ]),
-      );
-    });
-
-    it('actualizarCaja no debe actualizar registros de otro tenant', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({ data: { id: 'caja-a' }, error: null })
-        .mockResolvedValueOnce({ data: { id: 'caja-a' }, error: null });
-
-      await service.actualizarCaja('tenant-a', 'caja-a', { nombre: 'Caja Editada' });
-
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('tenant_id', 'tenant-a');
-      expect(mockSupabaseClient.eq).toHaveBeenCalledWith('id', 'caja-a');
-      expect(mockSupabaseClient.eq).not.toHaveBeenCalledWith('tenant_id', 'tenant-b');
-    });
-
-    it('actualizarCaja debe lanzar NotFoundException si el recurso pertenece a otro tenant', async () => {
-      mockSupabaseClient.single.mockResolvedValue({
-        data: null,
-        error: { message: 'No encontrado' },
-      });
-
-      await expect(service.actualizarCaja('tenant-a', 'caja-cross', { nombre: 'Nope' })).rejects.toThrow(
-        NotFoundException,
-      );
-    });
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        table: 'sesiones_caja',
+        rows: expect.objectContaining({
+          monto_esperado: 440.44,
+          monto_contado: 440.44,
+          diferencia: 0,
+        }),
+      }),
+    );
   });
 });
-

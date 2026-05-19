@@ -357,7 +357,7 @@ export class RrhhService {
 
     if (tipo === 'entrada') {
       if (registroExistente) {
-        throw new Error('Ya se registró entrada para este día');
+        throw new ConflictException('Ya se registró entrada para este día');
       }
 
       const { data, error } = await this.supabaseService
@@ -391,7 +391,7 @@ export class RrhhService {
       return { success: true, data: data?.[0], message: 'Entrada registrada' };
     } else {
       if (!registroExistente || registroExistente.hora_salida) {
-        throw new Error(
+        throw new BadRequestException(
           'No se puede registrar salida sin entrada o ya se registró salida',
         );
       }
@@ -402,7 +402,7 @@ export class RrhhService {
       
       // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
       if (salida.getTime() <= entrada.getTime()) {
-        throw new Error(
+        throw new BadRequestException(
           `La hora de salida (${horaActual}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
         );
       }
@@ -1344,37 +1344,6 @@ export class RrhhService {
     <head>
         <meta charset="UTF-8">
         <title>Boleta de Pago - ${empleado.nombres} ${empleado.apellidos}</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-            .boleta { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2563eb; padding-bottom: 20px; }
-            .company { font-size: 24px; font-weight: bold; color: #2563eb; margin-bottom: 5px; }
-            .title { font-size: 18px; color: #374151; margin-bottom: 10px; }
-            .periodo { font-size: 16px; color: #6b7280; }
-            
-            .empleado-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .info-section { background: #f8fafc; padding: 15px; border-radius: 6px; border-left: 4px solid #2563eb; }
-            .info-label { font-weight: 600; color: #374151; margin-bottom: 5px; }
-            .info-value { color: #6b7280; }
-            
-            .pagos-detalle { margin-bottom: 30px; }
-            .pagos-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            .pagos-table th, .pagos-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-            .pagos-table th { background-color: #f3f4f6; font-weight: 600; color: #374151; }
-            .pagos-table tr:hover { background-color: #f9fafb; }
-            
-            .resumen { background: #ecfdf5; padding: 20px; border-radius: 8px; border: 1px solid #d1fae5; }
-            .resumen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-            .resumen-item { text-align: center; }
-            .resumen-label { font-size: 14px; color: #374151; margin-bottom: 5px; }
-            .resumen-valor { font-size: 20px; font-weight: bold; }
-            .bruto { color: #059669; }
-            .descuentos { color: #dc2626; }
-            .neto { color: #2563eb; }
-            
-            .footer { margin-top: 30px; text-align: center; color: #6b7280; font-size: 12px; }
-            .numero { text-align: right; }
-        </style>
     </head>
     <body>
         <div class="boleta">
@@ -1450,7 +1419,7 @@ export class RrhhService {
             </div>
 
             <div class="resumen">
-                <h3 style="margin-top: 0; text-align: center; color: #374151;">Resumen Total</h3>
+                <h3>Resumen Total</h3>
                 <div class="resumen-grid">
                     <div class="resumen-item">
                         <div class="resumen-label">Total Bruto</div>
@@ -1519,17 +1488,70 @@ export class RrhhService {
       throw new Error('Tenant requerido para RRHH');
     }
     const currentTenantId = tenantId;
+    const empleadoId = contratoData?.id_empleado || contratoData?.empleado_id;
+    if (!empleadoId) {
+      throw new BadRequestException('Debe enviar empleado_id para crear contrato');
+    }
+
+    const metadataBase =
+      contratoData?.metadata && typeof contratoData.metadata === 'object' && !Array.isArray(contratoData.metadata)
+        ? contratoData.metadata
+        : {};
+    const metadata = {
+      ...metadataBase,
+      ...(contratoData?.cargo ? { cargo: String(contratoData.cargo).trim() } : {}),
+    };
+    const camposPermitidos = [
+      'id',
+      'id_empleado',
+      'empleado_id',
+      'tipo_contrato',
+      'fecha_inicio',
+      'fecha_fin',
+      'sueldo_bruto',
+      'salario',
+      'moneda',
+      'beneficios',
+      'regimen_pensionario',
+      'jornada_laboral',
+      'periodo_prueba_meses',
+      'fecha_firma',
+      'estado',
+      'activo',
+      'metadata',
+    ];
+    const datosLimpios = Object.fromEntries(
+      Object.entries({
+        ...contratoData,
+        id_empleado: empleadoId,
+        empleado_id: empleadoId,
+        sueldo_bruto: contratoData?.sueldo_bruto ?? contratoData?.salario,
+        salario: contratoData?.salario ?? contratoData?.sueldo_bruto,
+      })
+        .filter(([key]) => camposPermitidos.includes(key))
+        .filter(([, value]) => value !== '' && value !== undefined && value !== null)
+    );
+    if (Object.keys(metadata).length > 0) {
+      datosLimpios.metadata = metadata;
+    }
 
     const { data, error } = await this.supabaseService
       .getClient()
       .from('contratos')
       .insert({
-        ...contratoData,
+        ...datosLimpios,
         tenant_id: currentTenantId,
       })
       .select();
 
-    if (error) throw error;
+    if (error) {
+      const isDuplicate = error.code === '23505' ||
+        String(error.message || '').toLowerCase().includes('duplicate key');
+      if (isDuplicate) {
+        throw new ConflictException('Ya existe un contrato activo para el empleado, fecha y tipo indicados');
+      }
+      throw error;
+    }
     return { success: true, data: data?.[0] };
   }
 
@@ -1669,7 +1691,7 @@ export class RrhhService {
 
     if (tipo === 'entrada') {
       if (registroExistente) {
-        throw new Error('Ya se registró entrada para este día');
+        throw new ConflictException('Ya se registró entrada para este día');
       }
 
       const { data, error } = await this.supabaseService
@@ -1699,7 +1721,7 @@ export class RrhhService {
       
       // ✅ FIX: Validar que hora de salida sea posterior a hora de entrada
       if (salida.getTime() <= entrada.getTime()) {
-        throw new Error(
+        throw new BadRequestException(
           `La hora de salida (${hora}) debe ser posterior a la hora de entrada (${registroExistente.hora_entrada})`,
         );
       }

@@ -28,7 +28,7 @@ Write-Host "📋 PASO 1: Obteniendo presupuestos existentes..." -ForegroundColor
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos" -Method Get -Headers $headers
-    
+
     if ($response.success -and $response.data.Count -gt 0) {
         $presupuesto = $response.data[0]
         Write-Host "✅ Presupuesto encontrado:" -ForegroundColor Green
@@ -56,7 +56,7 @@ Write-Host "🔄 PASO 2: Actualizando ejecución presupuestal del presupuesto...
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$($presupuesto.id)/actualizar-ejecucion" -Method Post -Headers $headers
-    
+
     if ($response.success) {
         Write-Host "✅ Ejecución presupuestal actualizada:" -ForegroundColor Green
         Write-Host "   Monto ejecutado (después): S/ $($response.data.monto_ejecutado)" -ForegroundColor White
@@ -64,7 +64,7 @@ try {
         Write-Host "   Monto disponible: S/ $($response.data.monto_disponible)" -ForegroundColor White
         Write-Host "   Mensaje: $($response.message)" -ForegroundColor White
         Write-Host ""
-        
+
         # Verificar alertas
         if ($response.data.porcentaje_ejecutado -gt 100) {
             Write-Host "🚨 ALERTA: SOBREGIRO detectado ($($response.data.porcentaje_ejecutado)%)" -ForegroundColor Red
@@ -90,7 +90,7 @@ Write-Host "🔄 PASO 3: Actualizando ejecución de todos los presupuestos del p
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/periodo/$($presupuesto.periodo_contable_id)/actualizar-ejecucion" -Method Post -Headers $headers
-    
+
     if ($response.success) {
         Write-Host "✅ Actualización masiva completada:" -ForegroundColor Green
         Write-Host "   Presupuestos actualizados: $($response.data.actualizados)" -ForegroundColor White
@@ -113,7 +113,7 @@ Write-Host "🔍 PASO 4: Verificando cambios..." -ForegroundColor Yellow
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/$($presupuesto.id)" -Method Get -Headers $headers
-    
+
     if ($response.success) {
         Write-Host "✅ Presupuesto verificado:" -ForegroundColor Green
         Write-Host "   Monto ejecutado: S/ $($response.data.monto_ejecutado)" -ForegroundColor White
@@ -136,7 +136,7 @@ Write-Host "📊 PASO 5: Obteniendo comparación presupuesto vs real..." -Foregr
 
 try {
     $response = Invoke-RestMethod -Uri "$baseUrl/contabilidad/presupuestos/comparacion/$($presupuesto.periodo_contable_id)" -Method Get -Headers $headers
-    
+
     if ($response.success) {
         Write-Host "✅ Comparación obtenida:" -ForegroundColor Green
         Write-Host "   Período: $($response.data.periodo.descripcion)" -ForegroundColor White

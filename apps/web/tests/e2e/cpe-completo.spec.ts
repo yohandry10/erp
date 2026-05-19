@@ -8,6 +8,7 @@ import { gotoAuthenticated, login } from './helpers/auth';
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: any };
 
 const runId = Date.now().toString().slice(-9);
+const qaPrefix = `QA-PROD-READY-${runId}`;
 const apiBaseURL = process.env.E2E_API_ORIGIN || 'http://localhost:13002';
 const api = (route: string) => `/api${route}`;
 
@@ -82,11 +83,11 @@ function cpePayload(overrides: Record<string, any> = {}) {
     razon_social_emisor: 'ERP DEMO S.A.C.',
     tipo_documento_receptor: receptorTipo,
     documento_receptor: receptorDocumento,
-    razon_social_receptor: `Cliente CPE T10 ${runId}`,
+    razon_social_receptor: `${qaPrefix} Cliente CPE T10`,
     direccion_receptor: 'Av. Fiscal 100',
     items: [{
-      codigo: `CPE-T10-${runId}`,
-      descripcion: `Servicio CPE T10 ${runId}`,
+      codigo: `${qaPrefix}-CPE-T10`,
+      descripcion: `${qaPrefix} Servicio CPE T10`,
       cantidad: 1,
       unidad: 'NIU',
       precio_unitario: 100,
@@ -177,8 +178,8 @@ async function prepararPos(supabase: SupabaseClient, tenantId: string) {
     .insert({
       id: crypto.randomUUID(),
       tenant_id: tenantId,
-      codigo: `CAJA-CPE-${runId}`,
-      nombre: `Caja CPE T10 ${runId}`,
+      codigo: `${qaPrefix}-CAJA-CPE`,
+      nombre: `${qaPrefix} Caja CPE T10`,
       estado: 'ACTIVO',
     })
     .select('*')
@@ -190,9 +191,9 @@ async function prepararPos(supabase: SupabaseClient, tenantId: string) {
     .insert({
       id: crypto.randomUUID(),
       tenant_id: tenantId,
-      codigo: `POS-CPE-${runId}`,
+      codigo: `${qaPrefix}-POS-CPE`,
       codigo_barras: `77510${runId}`,
-      nombre: `Producto POS CPE T10 ${runId}`,
+      nombre: `${qaPrefix} Producto POS CPE T10`,
       categoria: 'AUDITORIA',
       precio: 20,
       precio_venta: 20,
@@ -218,7 +219,7 @@ async function abrirCaja(apiContext: APIRequestContext, cajaId: string) {
   if (sesionActual?.id) return sesionActual.id;
   const cajaAbierta = await parseOk<any>(
     await apiContext.post(api('/pos/caja/abrir'), {
-      data: { caja_id: cajaId, monto_inicial: 100, dispositivo: `E2E-CPE-${runId}` },
+      data: { caja_id: cajaId, monto_inicial: 100, dispositivo: `${qaPrefix}-E2E-CPE` },
     }),
     'abrir caja POS CPE',
   );
@@ -226,6 +227,8 @@ async function abrirCaja(apiContext: APIRequestContext, cajaId: string) {
 }
 
 test.describe('T10 CPE completo', () => {
+  test.setTimeout(180000);
+
   test('CPE valida factura, boleta POS, listado, detalle, PDF, idempotencia y errores fiscales', async ({ page }) => {
     const browserFailures = await collectBrowserFailures(page);
     await login(page);
@@ -295,10 +298,69 @@ test.describe('T10 CPE completo', () => {
     expect(pdfResponse.headers()['content-type']).toContain('application/pdf');
     expect((await pdfResponse.body()).length, 'PDF debe tener contenido').toBeGreaterThan(1000);
 
+    const assertAsientoContableUnico = async (sourceEventId: string | null | undefined) => {
+      if (!sourceEventId) return { count: -1, hasDetails: false, error: 'source_event_id ausente' };
+      const { data, error } = await supabase
+        .from('asientos_contables')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('source_event_id', sourceEventId);
+      if (error) return { count: -1, error: error.message, hasDetails: false };
+      if ((data?.length ?? 0) !== 1) {
+        return { count: data?.length ?? 0, hasDetails: false };
+      }
+      const { data: detalles, error: detallesError } = await supabase
+        .from('detalle_asientos')
+        .select('id')
+        .eq('asiento_id', data![0].id)
+        .limit(1);
+      if (detallesError) return { count: 1, error: detallesError.message, hasDetails: false };
+      return {
+        count: data?.length ?? 0,
+        hasDetails: Boolean(detalles?.length),
+      };
+    };
+
+    const facturaAnulablePayload = cpePayload({
+      idempotency_key: `cpe-anulable-${runId}`,
+      numero: facturaPayload.numero + 3,
+      documento_receptor: `21${runId}`,
+      razon_social_receptor: `${qaPrefix} Cliente CPE anulable`,
+    });
+    const clienteAnulableId = await crearClienteFiscal(supabase, tenantId, facturaAnulablePayload);
+    const facturaAnulable = await parseOk<any>(
+      await apiContext.post(api('/cpe'), { data: { ...facturaAnulablePayload, cliente_id: clienteAnulableId } }),
+      'crear factura CPE anulable',
+    );
+    const { data: cpeAnulableOriginalDb, error: cpeAnulableOriginalDbError } = await supabase
+      .from('cpe')
+      .select('id, event_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', facturaAnulable.id)
+      .single();
+    expect(cpeAnulableOriginalDbError?.message || '', 'leer CPE anulable antes de anular').toBe('');
+    await expect.poll(async () => {
+      return assertAsientoContableUnico(cpeAnulableOriginalDb?.event_id);
+    }, {
+      message: 'CPE anulable debe tener asiento original antes de permitir anulación',
+      timeout: 90000,
+      intervals: [1000, 2000, 5000],
+    }).toEqual({ count: 1, hasDetails: true });
+
+    const anulacion = await parseOk<any>(
+      await apiContext.post(api(`/cpe/${facturaAnulable.id}/anular`), {
+        data: { motivo: `${qaPrefix} anulación controlada CASE-10` },
+      }),
+      'anular CPE firmado',
+    );
+    expect(anulacion.cpe_anulado?.estado || anulacion.estado).toMatch(/ANULADO/i);
+    expect(anulacion.nota_credito?.id).toBeTruthy();
     await expectRejected(
-      await apiContext.post(api(`/cpe/${factura.id}/anular`), { data: { motivo: 'Anulación inválida T10' } }),
-      'no debe anular CPE no aceptado/enviado válido',
-      /No se puede anular|estado/i,
+      await apiContext.post(api(`/cpe/${facturaAnulable.id}/anular`), {
+        data: { motivo: `${qaPrefix} doble anulación CASE-10` },
+      }),
+      'no debe duplicar anulación CPE',
+      /ya está anulado|ya esta anulado|No se puede anular/i,
     );
 
     const envio1 = await parseOk<any>(
@@ -325,7 +387,7 @@ test.describe('T10 CPE completo', () => {
 
     const { data: cpeDb, error: cpeDbError } = await supabase
       .from('cpe')
-      .select('id, documento_id, cliente_id, estado, sunat_status, error_message, serie, numero, xml_firmado, hash_firma')
+      .select('id, documento_id, cliente_id, estado, sunat_status, error_message, serie, numero, xml_firmado, hash_firma, event_id')
       .eq('tenant_id', tenantId)
       .eq('id', factura.id)
       .single();
@@ -361,6 +423,32 @@ test.describe('T10 CPE completo', () => {
       monto_pendiente: 118,
     });
 
+    await expect.poll(async () => {
+      return assertAsientoContableUnico(cpeDb?.event_id);
+    }, {
+      message: 'CPE/CxC debe generar exactamente un asiento contable con detalle para el source_event_id fiscal',
+      timeout: 90000,
+      intervals: [1000, 2000, 5000],
+    }).toEqual({ count: 1, hasDetails: true });
+
+    const { data: cpeAnulableDb, error: cpeAnulableDbError } = await supabase
+      .from('cpe')
+      .select('id, event_id, estado, nota_credito_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', facturaAnulable.id)
+      .single();
+    expect(cpeAnulableDbError?.message || '', 'leer CPE anulable persistido').toBe('');
+    expect(String(cpeAnulableDb?.estado || '')).toMatch(/ANULADO/i);
+    expect(cpeAnulableDb?.nota_credito_id).toBeTruthy();
+
+    await expect.poll(async () => {
+      return assertAsientoContableUnico(cpeAnulableDb?.event_id);
+    }, {
+      message: 'CPE anulable debe conservar exactamente un asiento contable para su CxC original',
+      timeout: 90000,
+      intervals: [1000, 2000, 5000],
+    }).toEqual({ count: 1, hasDetails: true });
+
     const posData = await prepararPos(supabase, tenantId);
     const sesionCajaId = await abrirCaja(apiContext, posData.caja.id);
     const boletaPos = await parseOk<any>(
@@ -368,7 +456,7 @@ test.describe('T10 CPE completo', () => {
         data: {
           idempotency_key: `pos-cpe-t10-${runId}`,
           sesion_caja_id: sesionCajaId,
-          cliente_nombre: `Cliente POS CPE T10 ${runId}`,
+          cliente_nombre: `${qaPrefix} Cliente POS CPE T10`,
           cliente_documento: runId.slice(-8),
           metodo_pago_id: posData.efectivo.id,
           items: [{

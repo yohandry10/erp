@@ -152,6 +152,12 @@ const CandidatosPage = () => {
   if (loading) {
     return (
       <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div>
+            <h1 className="dashboard-title">Candidatos</h1>
+            <p className="dashboard-subtitle">Cargando postulantes, vacantes activas y departamentos disponibles.</p>
+          </div>
+        </div>
         <div className="loading">
           <div className="loading-spinner"></div>
           <p>Cargando candidatos...</p>
@@ -168,7 +174,7 @@ const CandidatosPage = () => {
           <h1 className="dashboard-title">CVs & Candidatos</h1>
           <p className="dashboard-subtitle">Gestión de reclutamiento y selección</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className="flex gap-4">
           <button 
             className="refresh-btn"
             onClick={() => setShowVacanteModal(true)}
@@ -224,23 +230,15 @@ const CandidatosPage = () => {
       </div>
 
       {/* Filtros */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '1.5rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px'
-      }}>
+      <div className="flex gap-4 mb-6 p-4 bg-[#f8f9fa] rounded-2">
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Estado:
           </label>
           <select 
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="form-control"
-            style={{ width: '150px' }}
+            className="form-control w-[150px]"
           >
             <option value="todos">Todos</option>
             <option value="postulante">Postulante</option>
@@ -252,14 +250,13 @@ const CandidatosPage = () => {
         </div>
 
         <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <label className="block mb-2 font-medium">
             Vacante:
           </label>
           <select 
             value={filtroVacante}
             onChange={(e) => setFiltroVacante(e.target.value)}
-            className="form-control"
-            style={{ width: '200px' }}
+            className="form-control w-[200px]"
           >
             <option value="todas">Todas las vacantes</option>
             {vacantes.map(v => (
@@ -304,20 +301,9 @@ const CandidatosPage = () => {
                   <td>{candidato.telefono}</td>
                   <td>{candidato.experiencia_anos || 0} años</td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '50px', 
-                        height: '8px', 
-                        background: '#e5e7eb', 
-                        borderRadius: '4px',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{ 
-                          width: `${(candidato.puntuacion_cv || 0)}%`, 
-                          height: '100%', 
-                          background: candidato.puntuacion_cv >= 80 ? '#10b981' : 
-                                     candidato.puntuacion_cv >= 60 ? '#f59e0b' : '#ef4444' 
-                        }}></div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-[50px] h-2 bg-[#e5e7eb] rounded-[4px] overflow-hidden">
+                        <div className="h-[100%]"></div>
                       </div>
                       <span className="text-sm">{candidato.puntuacion_cv || 0}%</span>
                     </div>
@@ -329,7 +315,7 @@ const CandidatosPage = () => {
                   </td>
                   <td>{new Date(candidato.fecha_postulacion).toLocaleDateString('es-PE')}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="flex gap-2">
                       <button
                         onClick={() => {
                           setCandidatoEdit(candidato);
@@ -358,11 +344,7 @@ const CandidatosPage = () => {
           </table>
 
           {filtrarCandidatos().length === 0 && (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '2rem',
-              color: '#6b7280'
-            }}>
+            <div className="text-center p-8 text-gray-500">
               No hay candidatos que coincidan con los filtros seleccionados.
             </div>
           )}
@@ -371,51 +353,23 @@ const CandidatosPage = () => {
 
       {/* Modal de candidato - Simple y elegante */}
       {showModal && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            padding: '1rem'
-          }}
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.75)] flex items-center justify-center z-[99999] p-4"
           onClick={() => {
             setShowModal(false);
             setCandidatoEdit(null);
           }}
         >
-          <div 
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '600px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-            }}
+          <div className="bg-white rounded-3 w-[100%] max-w-[600px] overflow-y-auto shadow"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ 
-              padding: '2rem 2rem 1rem 2rem',
-              borderBottom: '2px solid #e5e7eb',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              borderRadius: '12px 12px 0 0'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="pt-8 pr-8 pb-4 pl-8 text-white">
+              <div className="flex justify-between items-center">
                 <div>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 'bold', margin: 0 }}>
+                  <h2 className="text-7 font-bold m-0">
                     👤 {candidatoEdit?.id ? 'Editar Candidato' : 'Nuevo Candidato'}
                   </h2>
-                  <p style={{ fontSize: '0.875rem', opacity: 0.9, margin: '0.5rem 0 0 0' }}>
+                  <p className="text-[0.875rem] opacity-[0.9] mt-2 mr-0 mb-0 ml-0">
                     {candidatoEdit?.id ? 'Actualizar información del postulante' : 'Registrar nueva postulación de CV'}
                   </p>
                 </div>
@@ -424,17 +378,7 @@ const CandidatosPage = () => {
                   onClick={() => {
                     setShowModal(false);
                     setCandidatoEdit(null);
-                  }}
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '1.25rem'
-                  }}
+                  }} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer text-5"
                 >
                   ✕
                 </button>
@@ -572,140 +516,84 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
   const vacanteSeleccionada = vacantes.find((v: any) => v.id === formData.id_vacante);
 
   return (
-    <form onSubmit={handleSubmit} style={{ padding: '2rem' }}>
+    <form onSubmit={handleSubmit} className="p-8">
       {/* Info de vacante seleccionada */}
       {vacanteSeleccionada && (
-        <div style={{ 
-          marginBottom: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#dbeafe',
-          borderRadius: '8px',
-          border: '1px solid #3b82f6'
-        }}>
-          <div style={{ fontSize: '0.875rem', color: '#1e40af', fontWeight: '600' }}>
+        <div className="mb-6 p-4 bg-[#dbeafe] rounded-2 border">
+          <div className="text-[0.875rem] text-[#1e40af] font-semibold">
             📋 <strong>Postula para:</strong> {vacanteSeleccionada.titulo} • <strong>Depto:</strong> {vacanteSeleccionada.departamento}
           </div>
         </div>
       )}
 
       {/* Información Básica */}
-      <div style={{ 
-        marginBottom: '1.5rem',
-        padding: '1.5rem',
-        backgroundColor: '#f8fafc',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0'
-      }}>
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
-          color: '#1e293b', 
-          margin: '0 0 1rem 0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+      <div className="mb-6 p-6 bg-slate-50 rounded-2 border">
+        <h3 className="text-[1.125rem] font-semibold text-slate-800 mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
           👤 Información Personal
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               Nombres *
             </label>
             <input
               type="text"
               value={formData.nombres}
-              onChange={(e) => setFormData({...formData, nombres: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, nombres: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="Juan Carlos"
               required
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               Apellidos *
             </label>
             <input
               type="text"
               value={formData.apellidos}
-              onChange={(e) => setFormData({...formData, apellidos: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, apellidos: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="Pérez García"
               required
             />
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               📧 Email *
             </label>
             <input
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="juan.perez@gmail.com"
               required
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               📱 Teléfono
             </label>
             <input
               type="tel"
               value={formData.telefono}
-              onChange={(e) => setFormData({...formData, telefono: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, telefono: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="+51 999 888 777"
             />
           </div>
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+          <label className="block text-[0.875rem] font-semibold mb-2">
             🏢 Vacante que Postula *
           </label>
           <select
             value={formData.id_vacante}
-            onChange={(e) => setFormData({...formData, id_vacante: e.target.value})}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              outline: 'none',
-              backgroundColor: 'white'
-            }}
+            onChange={(e) => setFormData({...formData, id_vacante: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-white"
             required
           >
             <option value="">Seleccionar vacante...</option>
@@ -719,81 +607,45 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       </div>
 
       {/* Información Profesional */}
-      <div style={{ 
-        marginBottom: '1.5rem',
-        padding: '1.5rem',
-        backgroundColor: '#f0fdf4',
-        borderRadius: '8px',
-        border: '1px solid #bbf7d0'
-      }}>
-        <h3 style={{ 
-          fontSize: '1.125rem', 
-          fontWeight: '600', 
-          color: '#14532d', 
-          margin: '0 0 1rem 0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+      <div className="mb-6 p-6 bg-[#f0fdf4] rounded-2 border">
+        <h3 className="text-[1.125rem] font-semibold text-[#14532d] mt-0 mr-0 mb-4 ml-0 flex items-center gap-2">
           💼 Información Profesional
         </h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 mb-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               Experiencia (años)
             </label>
             <input
               type="number"
               value={formData.experiencia_anos}
-              onChange={(e) => setFormData({...formData, experiencia_anos: parseInt(e.target.value) || 0})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, experiencia_anos: parseInt(e.target.value) || 0})} className="w-[100%] p-3 border rounded-[6px]"
               min="0"
               max="50"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               💰 Pretensión Salarial (S/)
             </label>
             <input
               type="number"
               value={formData.pretension_salarial}
-              onChange={(e) => setFormData({...formData, pretension_salarial: parseInt(e.target.value) || 0})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, pretension_salarial: parseInt(e.target.value) || 0})} className="w-[100%] p-3 border rounded-[6px]"
               min="0"
               step="100"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               Estado del Proceso
             </label>
             <select
               value={formData.estado}
-              onChange={(e) => setFormData({...formData, estado: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none',
-                backgroundColor: 'white'
-              }}
+              onChange={(e) => setFormData({...formData, estado: e.target.value})} className="w-[100%] p-3 border rounded-[6px] bg-white"
             >
               <option value="postulante">📝 Postulante</option>
               <option value="entrevista">🤝 En Entrevista</option>
@@ -804,41 +656,27 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+        <div className="grid grid-cols-[1fr_1fr] gap-4">
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               📄 URL del CV
             </label>
             <input
               type="url"
               value={formData.cv_url}
-              onChange={(e) => setFormData({...formData, cv_url: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, cv_url: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="https://drive.google.com/file/..."
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <label className="block text-[0.875rem] font-semibold mb-2">
               🔗 LinkedIn
             </label>
             <input
               type="url"
               value={formData.linkedin_url}
-              onChange={(e) => setFormData({...formData, linkedin_url: e.target.value})}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                outline: 'none'
-              }}
+              onChange={(e) => setFormData({...formData, linkedin_url: e.target.value})} className="w-[100%] p-3 border rounded-[6px]"
               placeholder="https://linkedin.com/in/..."
             />
           </div>
@@ -846,64 +684,29 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
       </div>
 
       {/* Observaciones */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+      <div className="mb-6">
+        <label className="block text-[0.875rem] font-semibold mb-2">
           📝 Observaciones
         </label>
         <textarea
           value={formData.observaciones}
           onChange={(e) => setFormData({...formData, observaciones: e.target.value})}
-          rows={3}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            outline: 'none',
-            resize: 'vertical'
-          }}
+          rows={3} className="w-[100%] p-3 border rounded-[6px]"
           placeholder="Notas sobre entrevistas, fortalezas detectadas, etc..."
         />
       </div>
 
       {/* Botones */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'flex-end', 
-        gap: '1rem',
-        paddingTop: '1rem',
-        borderTop: '1px solid #e5e7eb'
-      }}>
+      <div className="flex justify-end gap-4 pt-4 border-t">
         <button
           type="button"
-          onClick={onCancel}
-          style={{
-            padding: '0.75rem 1.5rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            backgroundColor: 'white',
-            color: '#374151',
-            cursor: 'pointer',
-            fontWeight: '500'
-          }}
+          onClick={onCancel} className="py-3 px-6 border rounded-[6px] bg-white text-gray-700 cursor-pointer font-medium"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            border: 'none',
-            borderRadius: '6px',
-            backgroundColor: loading ? '#9ca3af' : '#3b82f6',
-            color: 'white',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
+          disabled={loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-medium flex items-center gap-2"
         >
           {loading ? (
             <>⏳ Guardando...</>

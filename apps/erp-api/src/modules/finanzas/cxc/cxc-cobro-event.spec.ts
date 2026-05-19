@@ -68,6 +68,30 @@ describe('CxcService - CobroRegistrado Event', () => {
   });
 
   describe('registrarPago', () => {
+    it('rechaza fechas de cobro inválidas antes de persistir', async () => {
+      await expect(
+        service.registrarPago('tenant-123', 'cxc-456', {
+          monto: 100,
+          fecha_pago: '2026-02-31',
+          metodo_pago: 'TRANSFERENCIA',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
+    it('rechaza montos con más de dos decimales antes de persistir', async () => {
+      await expect(
+        service.registrarPago('tenant-123', 'cxc-456', {
+          monto: 10.005,
+          fecha_pago: '2026-05-14',
+          metodo_pago: 'TRANSFERENCIA',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockSupabaseClient.from).not.toHaveBeenCalled();
+    });
+
     it('should emit CobroRegistrado event and insert into outbox when payment is registered', async () => {
       // Arrange
       const tenantId = 'tenant-123';
@@ -128,10 +152,12 @@ describe('CxcService - CobroRegistrado Event', () => {
         }),
       };
 
-      // Mock update cuenta (needs to chain two .eq() calls)
+      // Mock update cuenta (needs to chain three .eq() calls + .select() for optimistic concurrency)
       const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
       const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
-      const mockCuentaEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockCuentaSelect = jest.fn().mockResolvedValueOnce({ data: [{ id: cuentaId }], error: null });
+      const mockCuentaEq3 = jest.fn().mockReturnValue({ select: mockCuentaSelect });
+      const mockCuentaEq2 = jest.fn().mockReturnValue({ eq: mockCuentaEq3 });
       const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
 
       mockSupabaseClient.insert
@@ -146,6 +172,7 @@ describe('CxcService - CobroRegistrado Event', () => {
       await service.registrarPago(tenantId, cuentaId, pagoDto, userId);
 
       // Assert - Verify EventBus emission
+      expect(eventBusService.emitPagoFactura).not.toHaveBeenCalled();
       expect(eventBusService.emitCobroRegistrado).toHaveBeenCalledTimes(1);
       expect(eventBusService.emitCobroRegistrado).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -261,10 +288,12 @@ describe('CxcService - CobroRegistrado Event', () => {
         }),
       };
 
-      // Mock update cuenta (needs to chain two .eq() calls)
+      // Mock update cuenta (needs to chain three .eq() calls + .select() for optimistic concurrency)
       const mockIdempotencyEq2 = jest.fn().mockResolvedValueOnce({ error: null });
       const mockIdempotencyEq1 = jest.fn().mockReturnValue({ eq: mockIdempotencyEq2 });
-      const mockCuentaEq2 = jest.fn().mockResolvedValueOnce({ error: null });
+      const mockCuentaSelect = jest.fn().mockResolvedValueOnce({ data: [{ id: cuentaId }], error: null });
+      const mockCuentaEq3 = jest.fn().mockReturnValue({ select: mockCuentaSelect });
+      const mockCuentaEq2 = jest.fn().mockReturnValue({ eq: mockCuentaEq3 });
       const mockCuentaEq1 = jest.fn().mockReturnValue({ eq: mockCuentaEq2 });
 
       mockSupabaseClient.insert

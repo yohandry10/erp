@@ -91,42 +91,19 @@ export default function VencimientosAlert({
     : { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', icon: '#f59e0b' }
 
   return (
-    <div style={{
-      background: alertColor.bg,
-      border: `2px solid ${alertColor.border}`,
-      borderRadius: '12px',
-      padding: '1rem',
-      marginBottom: '1.5rem',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-    }}>
+    <div className="rounded-3 p-4 mb-6 shadow">
       {/* Header */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        gap: '1rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-          <AlertTriangle size={24} style={{ color: alertColor.icon, flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <h3 style={{ 
-              fontSize: '1rem', 
-              fontWeight: '700', 
-              color: alertColor.text,
-              margin: 0,
-              marginBottom: '0.25rem'
-            }}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-[1]">
+          <AlertTriangle size={24} className="shrink-0" />
+          <div className="flex-[1]">
+            <h3 className="text-4 font-bold m-0 mb-1">
               {vencidosCount > 0 
                 ? `⚠️ ${vencidosCount} cuenta${vencidosCount > 1 ? 's' : ''} vencida${vencidosCount > 1 ? 's' : ''}`
                 : `📅 ${proximosCount} cuenta${proximosCount > 1 ? 's' : ''} por vencer`
               }
             </h3>
-            <p style={{ 
-              fontSize: '0.875rem', 
-              color: alertColor.text,
-              margin: 0,
-              opacity: 0.9
-            }}>
+            <p className="text-[0.875rem] m-0 opacity-[0.9]">
               {vencidosCount > 0 && proximosCount > 0
                 ? `${vencidosCount} vencida${vencidosCount > 1 ? 's' : ''} y ${proximosCount} próxima${proximosCount > 1 ? 's' : ''} a vencer`
                 : vencidosCount > 0
@@ -139,23 +116,9 @@ export default function VencimientosAlert({
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setExpanded(!expanded)}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '8px',
-              border: `1px solid ${alertColor.border}`,
-              background: 'white',
-              color: alertColor.text,
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s ease'
-            }}
+            onClick={() => setExpanded(!expanded)} className="py-2 px-4 rounded-2 bg-white cursor-pointer text-[0.875rem] font-semibold flex items-center gap-2 transition"
           >
             {expanded ? (
               <>
@@ -170,19 +133,7 @@ export default function VencimientosAlert({
           <button
             onClick={() => setDismissed(true)}
             aria-label="Cerrar alerta de vencimientos"
-            title="Cerrar alerta de vencimientos"
-            style={{
-              padding: '0.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'transparent',
-              color: alertColor.text,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'all 0.2s ease',
-              opacity: 0.7
-            }}
+            title="Cerrar alerta de vencimientos" className="p-2 rounded-2 border-0 bg-transparent cursor-pointer flex items-center transition opacity-[0.7]"
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '1'
               e.currentTarget.style.background = 'rgba(0,0,0,0.05)'
@@ -199,36 +150,15 @@ export default function VencimientosAlert({
 
       {/* Expanded Details */}
       {expanded && (
-        <div style={{ 
-          marginTop: '1rem',
-          paddingTop: '1rem',
-          borderTop: `1px solid ${alertColor.border}`
-        }}>
-          <div style={{ 
-            display: 'grid',
-            gap: '0.75rem',
-            maxHeight: '400px',
-            overflowY: 'auto'
-          }}>
+        <div className="mt-4 pt-4">
+          <div className="grid gap-3 max-h-[400px] overflow-y-auto">
             {vencimientos.map((vencimiento) => {
               const itemColor = getAlertColor(vencimiento.dias_restantes)
               const isOverdue = vencimiento.dias_restantes < 0
 
               return (
                 <div
-                  key={vencimiento.id}
-                  style={{
-                    background: 'white',
-                    border: `1px solid ${itemColor.border}`,
-                    borderRadius: '8px',
-                    padding: '0.75rem 1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    transition: 'all 0.2s ease',
-                    cursor: onCuentaClick ? 'pointer' : 'default'
-                  }}
+                  key={vencimiento.id} className="bg-white rounded-2 py-3 px-4 flex items-center justify-between gap-4 transition"
                   onClick={() => onCuentaClick?.(vencimiento.id)}
                   onMouseEnter={(e) => {
                     if (onCuentaClick) {
@@ -243,30 +173,16 @@ export default function VencimientosAlert({
                     }
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                    <Clock size={20} style={{ color: itemColor.border, flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontSize: '0.875rem', 
-                        fontWeight: '600',
-                        color: '#111827',
-                        marginBottom: '0.25rem'
-                      }}>
+                  <div className="flex items-center gap-3 flex-[1]">
+                    <Clock size={20} className="shrink-0" />
+                    <div className="flex-[1]">
+                      <div className="text-[0.875rem] font-semibold text-gray-900 mb-1">
                         {vencimiento.numero_documento}
-                        <span style={{ 
-                          marginLeft: '0.5rem',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          color: '#6b7280'
-                        }}>
+                        <span className="ml-2 text-3 font-medium text-gray-500">
                           • {vencimiento.proveedor_razon_social}
                         </span>
                       </div>
-                      <div style={{ 
-                        fontSize: '0.75rem',
-                        color: itemColor.text,
-                        fontWeight: '600'
-                      }}>
+                      <div className="text-3 font-semibold">
                         {isOverdue 
                           ? `⚠️ Vencido hace ${Math.abs(vencimiento.dias_restantes)} día${Math.abs(vencimiento.dias_restantes) > 1 ? 's' : ''}`
                           : vencimiento.dias_restantes === 0
@@ -278,13 +194,7 @@ export default function VencimientosAlert({
                       </div>
                     </div>
                   </div>
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    fontWeight: '700',
-                    color: itemColor.text,
-                    textAlign: 'right',
-                    flexShrink: 0
-                  }}>
+                  <div className="text-[0.875rem] font-bold text-right shrink-0">
                     {formatCurrency(vencimiento.saldo, vencimiento.moneda)}
                   </div>
                 </div>

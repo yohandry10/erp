@@ -166,45 +166,15 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
   if (!isOpen) return null
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      zIndex: 10000,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }} onClick={onClose}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        width: '100%',
-        maxWidth: '500px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,_0,_0,_0.6)] z-[10000] flex items-center justify-center p-5" onClick={onClose}>
+      <div className="bg-white rounded-3 p-6 w-[100%] max-w-[500px] overflow-auto shadow" onClick={(e) => e.stopPropagation()}>
         
         {/* Header */}
-        <div style={{ marginBottom: '24px', position: 'relative' }}>
-          <h2 style={{ 
-            fontSize: '24px', 
-            fontWeight: '600', 
-            marginBottom: '8px',
-            color: '#1f2937',
-            paddingRight: '40px'
-          }}>
+        <div className="mb-6 relative">
+          <h2 className="text-6 font-semibold mb-2 text-gray-800 pr-10">
             {isEdit ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}
           </h2>
-          <p style={{ 
-            color: '#6b7280', 
-            fontSize: '14px' 
-          }}>
+          <p className="text-gray-500 text-3.5">
             {isEdit 
               ? 'Modifica la información del usuario del sistema.'
               : 'Crea un nuevo usuario del sistema con sus permisos y rol correspondiente.'
@@ -216,27 +186,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
             type="button"
             aria-label="Cerrar modal de usuario"
             title="Cerrar modal de usuario"
-            onClick={onClose}
-            style={{
-              position: 'absolute',
-              top: '0',
-              right: '0',
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: '#ef4444',
-              border: 'none',
-              color: 'white',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.3s ease',
-              transform: 'rotate(0deg)',
-              zIndex: 1
-            }}
+            onClick={onClose} className="absolute top-0 right-0 w-8 h-8 rounded-full bg-red-500 border-0 text-white text-[18px] font-bold cursor-pointer flex items-center justify-center transition z-[1]"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#dc2626';
               e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
@@ -254,164 +204,89 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
 
         <form onSubmit={handleSubmit}>
           {/* Nombre */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
-              Nombre Completo <span style={{ color: '#ef4444' }}>*</span>
+          <div className="mb-5">
+            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
+              Nombre Completo <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.nombre}
               onChange={(e) => handleInputChange('nombre', e.target.value)}
-              placeholder="Ej: Juan Carlos García"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: errors.nombre ? '2px solid #ef4444' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              placeholder="Ej: Juan Carlos García" className="w-[100%] p-3 rounded-2 text-3.5 transition"
             />
             {errors.nombre && (
-              <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+              <p className="text-3 text-red-500 mt-[4px]">
                 {errors.nombre}
               </p>
             )}
           </div>
 
           {/* Email */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
-              Email <span style={{ color: '#ef4444' }}>*</span>
+          <div className="mb-5">
+            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
+              Email <span className="text-red-500">*</span>
             </label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="Ej: juan.garcia@empresa.com"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: errors.email ? '2px solid #ef4444' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              placeholder="Ej: juan.garcia@empresa.com" className="w-[100%] p-3 rounded-2 text-3.5 transition"
             />
             {errors.email && (
-              <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+              <p className="text-3 text-red-500 mt-[4px]">
                 {errors.email}
               </p>
             )}
           </div>
 
           {/* Teléfono */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
+          <div className="mb-5">
+            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
               Teléfono
             </label>
             <input
               type="text"
               value={formData.telefono}
               onChange={(e) => handleInputChange('telefono', e.target.value)}
-              placeholder="Ej: 987654321"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
+              placeholder="Ej: 987654321" className="w-[100%] p-3 border rounded-2 text-3.5 transition"
             />
           </div>
 
           {/* Contraseña - Solo en creación */}
           {!isEdit && (
             <>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '14px', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '6px'
-                }}>
-                  Contraseña <span style={{ color: '#ef4444' }}>*</span>
+              <div className="mb-5">
+                <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
+                  Contraseña <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: errors.password ? '2px solid #ef4444' : '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
+                  placeholder="Mínimo 8 caracteres" className="w-[100%] p-3 rounded-2 text-3.5 transition"
                 />
                 {errors.password && (
-                  <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                  <p className="text-3 text-red-500 mt-[4px]">
                     {errors.password}
                   </p>
                 )}
-                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                <p className="text-[11px] text-gray-500 mt-[4px]">
                   Debe incluir mayúscula, minúscula y número
                 </p>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '14px', 
-                  fontWeight: '500', 
-                  color: '#374151',
-                  marginBottom: '6px'
-                }}>
-                  Confirmar Contraseña <span style={{ color: '#ef4444' }}>*</span>
+              <div className="mb-5">
+                <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
+                  Confirmar Contraseña <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
                   value={formData.confirmarPassword}
                   onChange={(e) => handleInputChange('confirmarPassword', e.target.value)}
-                  placeholder="Repite la contraseña"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: errors.confirmarPassword ? '2px solid #ef4444' : '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
-                  }}
+                  placeholder="Repite la contraseña" className="w-[100%] p-3 rounded-2 text-3.5 transition"
                 />
                 {errors.confirmarPassword && (
-                  <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+                  <p className="text-3 text-red-500 mt-[4px]">
                     {errors.confirmarPassword}
                   </p>
                 )}
@@ -420,29 +295,13 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
           )}
 
           {/* Rol */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: '#374151',
-              marginBottom: '6px'
-            }}>
-              Rol <span style={{ color: '#ef4444' }}>*</span>
+          <div className="mb-5">
+            <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
+              Rol <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.rol_id}
-              onChange={(e) => handleInputChange('rol_id', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: errors.rol_id ? '2px solid #ef4444' : '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                backgroundColor: 'white',
-                cursor: 'pointer'
-              }}
+              onChange={(e) => handleInputChange('rol_id', e.target.value)} className="w-[100%] p-3 rounded-2 text-3.5 bg-white cursor-pointer"
             >
               <option value="">Seleccionar rol</option>
               {roles.map((rol) => (
@@ -452,7 +311,7 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
               ))}
             </select>
             {errors.rol_id && (
-              <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
+              <p className="text-3 text-red-500 mt-[4px]">
                 {errors.rol_id}
               </p>
             )}
@@ -460,29 +319,13 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
 
           {/* Estado - Solo en edición */}
           {isEdit && (
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '14px', 
-                fontWeight: '500', 
-                color: '#374151',
-                marginBottom: '6px'
-              }}>
+            <div className="mb-5">
+              <label className="block text-3.5 font-medium text-gray-700 mb-[6px]">
                 Estado
               </label>
               <select
                 value={formData.estado}
-                onChange={(e) => handleInputChange('estado', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  backgroundColor: 'white',
-                  cursor: 'pointer'
-                }}
+                onChange={(e) => handleInputChange('estado', e.target.value)} className="w-[100%] p-3 border rounded-2 text-3.5 bg-white cursor-pointer"
               >
                 <option value="ACTIVO">Activo</option>
                 <option value="INACTIVO">Inactivo</option>
@@ -492,46 +335,17 @@ export default function UsuarioModal({ isOpen, onClose, onSuccess, usuario, role
           )}
 
           {/* Botones */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
-            justifyContent: 'flex-end',
-            paddingTop: '16px',
-            borderTop: '1px solid #e5e7eb'
-          }}>
+          <div className="flex gap-3 justify-end pt-4 border-t">
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
-              style={{
-                padding: '12px 24px',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                color: '#374151',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
+              disabled={loading} className="py-3 px-6 border rounded-2 bg-white text-gray-700 text-3.5 font-medium cursor-pointer transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={loading}
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '8px',
-                backgroundColor: loading ? '#9ca3af' : '#3b82f6',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                minWidth: '120px'
-              }}
+              disabled={loading} className="py-3 px-6 border-0 rounded-2 text-white text-3.5 font-medium transition min-w-[120px]"
             >
               {loading ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Crear Usuario')}
             </button>

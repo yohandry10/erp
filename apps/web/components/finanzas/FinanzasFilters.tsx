@@ -23,26 +23,12 @@ export default function FinanzasFilters({
   showExport = true
 }: FinanzasFiltersProps) {
   return (
-    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    <div className="flex gap-4 flex-wrap items-end">
       {children}
       
       {isActive && (
         <button
-          onClick={onClear}
-          style={{
-            padding: '0.75rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#ef4444',
-            transition: 'all 0.2s ease'
-          }}
+          onClick={onClear} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-red-500 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#fee2e2'
             e.currentTarget.style.borderColor = '#ef4444'
@@ -59,21 +45,7 @@ export default function FinanzasFilters({
 
       {showExport && onExport && (
         <button
-          onClick={onExport}
-          style={{
-            padding: '0.75rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            background: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            color: '#374151',
-            transition: 'all 0.2s ease'
-          }}
+          onClick={onExport} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium text-gray-700 transition"
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#f3f4f6'
             e.currentTarget.style.borderColor = '#9ca3af'

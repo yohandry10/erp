@@ -1,14 +1,28 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Building2, FileText, PackageCheck, Plus, RefreshCw, ShoppingCart, Truck, type LucideIcon } from 'lucide-react'
 import OrdenCompraModal from '../../../components/modals/OrdenCompraModal'
 import ProveedorModal from '../../../components/modals/ProveedorModal'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import { useToast } from '@/components/ui/use-toast'
 import { useApi } from '@/hooks/use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type AnyRecord = Record<string, any>
+
+type StatCard = {
+  label: string
+  value: string | number
+  icon: LucideIcon
+}
+
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
+
+const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
 export default function ComprasPage() {
   const { toast } = useToast()
@@ -27,17 +41,9 @@ export default function ComprasPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isProveedorModalOpen, setIsProveedorModalOpen] = useState(false)
-
-  // TIPADO EXPLÍCITO PARA EVITAR ERRORES EN LAS PROPS
   const [selectedOrden, setSelectedOrden] = useState<AnyRecord | null>(null)
   const [selectedProveedor, setSelectedProveedor] = useState<AnyRecord | null>(null)
-
-  const [filters, setFilters] = useState({
-    estado: '',
-    proveedor_id: '',
-  })
-
-  // Estado para diálogos de confirmación
+  const [filters, setFilters] = useState({ estado: '', proveedor_id: '' })
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean
     title: string
@@ -49,13 +55,8 @@ export default function ComprasPage() {
     title: '',
     message: '',
     onConfirm: () => {},
-    variant: 'default'
+    variant: 'default',
   })
-
-  // DEBUG: Observar cambios en el estado del modal
-  useEffect(() => {
-    console.log('🔄 Estado del modal cambió a:', isModalOpen)
-  }, [isModalOpen])
 
   useEffect(() => {
     loadData()
@@ -73,11 +74,7 @@ export default function ComprasPage() {
       await Promise.all([loadStats(), loadOrdenes(), loadProveedores()])
     } catch (error) {
       console.error('Error loading data:', error)
-      toast({
-        title: 'Error',
-        description: 'Error al cargar los datos',
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: 'Error al cargar los datos', variant: 'destructive' })
     } finally {
       setIsLoading(false)
     }
@@ -85,34 +82,16 @@ export default function ComprasPage() {
 
   const loadStats = async () => {
     try {
-      const timestamp = Date.now()
-      console.log('📊 [Frontend] Cargando stats...')
-
-      // ✅ Usar useApi en lugar de fetch directo
-      const data = await get(`/compras/stats?_t=${timestamp}`)
-
-      console.log('📊 [Frontend] Stats recibidas:', data)
-
+      const data = await get(`/compras/stats?_t=${Date.now()}`)
       const nextStats = unwrapApiObject(data, stats)
       if (apiSucceeded(data)) {
         setStats(nextStats)
-        console.log('📊 [Frontend] Stats actualizadas en estado:', nextStats)
-        console.log('💰 [Frontend] Monto total que debería mostrarse:', nextStats.montoTotalMes)
       } else {
-        console.error('📊 [Frontend] Error en respuesta:', data)
-        toast({
-          title: 'Error',
-          description: 'Error al cargar estadísticas de compras',
-          variant: 'destructive',
-        })
+        toast({ title: 'Error', description: 'Error al cargar estadísticas de compras', variant: 'destructive' })
       }
     } catch (error) {
-      console.error('📊 [Frontend] Error loading stats:', error)
-      toast({
-        title: 'Error de conexión',
-        description: 'No se pudo conectar con el servidor para cargar estadísticas',
-        variant: 'destructive',
-      })
+      console.error('Error loading stats:', error)
+      toast({ title: 'Error de conexión', description: 'No se pudo conectar con el servidor', variant: 'destructive' })
     }
   }
 
@@ -122,12 +101,8 @@ export default function ComprasPage() {
       if (filters.estado) queryParams.append('estado', filters.estado)
       if (filters.proveedor_id) queryParams.append('proveedor_id', filters.proveedor_id)
 
-      // ✅ Usar useApi en lugar de fetch directo
       const data = await get(`/compras/ordenes?${queryParams.toString()}`)
-      
-      if (apiSucceeded(data)) {
-        setOrdenes(unwrapApiArray(data))
-      }
+      if (apiSucceeded(data)) setOrdenes(unwrapApiArray(data))
     } catch (error) {
       console.error('Error loading ordenes:', error)
     }
@@ -135,23 +110,10 @@ export default function ComprasPage() {
 
   const loadProveedores = async () => {
     try {
-      console.log('🔥 [COMPRAS PAGE] CARGANDO PROVEEDORES...')
-      
-      // ✅ Usar useApi en lugar de fetch directo
       const data = await get('/compras/proveedores')
-      
-      console.log('🔥 [COMPRAS PAGE] Response data:', JSON.stringify(data, null, 2))
-
-      if (apiSucceeded(data)) {
-        const proveedores = unwrapApiArray(data)
-        console.log('🔥 [COMPRAS PAGE] Proveedores recibidos:', proveedores.length)
-        setProveedores(proveedores)
-        console.log('🔥 [COMPRAS PAGE] Estado proveedores actualizado')
-      } else {
-        console.error('🔥 [COMPRAS PAGE] Error en respuesta:', data?.error)
-      }
+      if (apiSucceeded(data)) setProveedores(unwrapApiArray(data))
     } catch (error) {
-      console.error('🔥 [COMPRAS PAGE] Error loading proveedores:', error)
+      console.error('Error loading proveedores:', error)
     }
   }
 
@@ -168,14 +130,9 @@ export default function ComprasPage() {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          // ✅ Usar useApi en lugar de fetch directo
           const data = await del(`/compras/ordenes/${id}`)
-
           if (data?.success) {
-            toast({
-              title: 'Éxito',
-              description: 'Orden eliminada correctamente',
-            })
+            toast({ title: 'Éxito', description: 'Orden eliminada correctamente' })
             loadOrdenes()
             loadStats()
           } else {
@@ -189,7 +146,7 @@ export default function ComprasPage() {
             variant: 'destructive',
           })
         }
-      }
+      },
     })
   }
 
@@ -197,28 +154,18 @@ export default function ComprasPage() {
     setConfirmDialog({
       isOpen: true,
       title: 'Marcar Orden como Entregada',
-      message: '¿Marcar esta orden como entregada?\n\nEsto actualizará automáticamente:\n• Stock de productos\n• Registros contables\n• Cuentas por pagar',
+      message: '¿Marcar esta orden como entregada?\n\nEsto actualizará automáticamente stock, contabilidad y cuentas por pagar.',
       variant: 'warning',
       onConfirm: async () => {
         try {
-          // ✅ Usar useApi en lugar de fetch directo
-          const result = await put(`/compras/ordenes/${id}/estado`, {
-            estado: 'ENTREGADO'
-          })
-
+          const result = await put(`/compras/ordenes/${id}/estado`, { estado: 'ENTREGADO' })
           if (result?.success) {
             toast({
-              title: '✅ Orden Entregada',
-              description:
-                '🔄 Actualizaciones automáticas realizadas:\n• Stock actualizado\n• Asientos contables creados\n• Cuentas por pagar registradas',
+              title: 'Orden entregada',
+              description: 'Stock, asientos contables y cuentas por pagar actualizados.',
             })
-
             await Promise.all([loadOrdenes(), loadStats()])
-
-            // Actualización optimista
-            setOrdenes((prev) =>
-              prev.map((orden: AnyRecord) => (orden.id === id ? { ...orden, estado: 'ENTREGADO' } : orden))
-            )
+            setOrdenes((prev) => prev.map((orden: AnyRecord) => (orden.id === id ? { ...orden, estado: 'ENTREGADO' } : orden)))
           } else {
             toast({
               title: 'Error',
@@ -241,606 +188,281 @@ export default function ComprasPage() {
   const handleModalSuccess = async (ordenData?: AnyRecord) => {
     await Promise.all([loadOrdenes(), loadStats()])
     setSelectedOrden(null)
-
-    if (ordenData?.estado === 'ENTREGADO') {
-      toast({
-        title: '🚚 Orden Entregada',
-        description: 'La orden ha sido marcada como entregada. El inventario se actualizará automáticamente.',
-      })
-    } else {
-      toast({
-        title: 'Éxito',
-        description: 'Orden guardada correctamente - Estadísticas actualizadas',
-      })
-    }
-
-    console.log('🔄 [Compras] Datos actualizados después de modal success')
-  }
-
-  const handleModalClose = () => {
-    setIsModalOpen(false)
-    setSelectedOrden(null)
-  }
-
-  const handleProveedorModalClose = () => {
-    setIsProveedorModalOpen(false)
-    setSelectedProveedor(null)
-  }
-
-  const handleProveedorModalSuccess = async () => {
-    console.log('🔥 [COMPRAS] PROVEEDOR CREADO - RECARGANDO TODO...')
-
-    await loadProveedores()
-    await loadStats()
-
-    console.log('🔥 [COMPRAS] DATOS ACTUALIZADOS DESPUÉS DE CREAR PROVEEDOR')
-
     toast({
-      title: '✅ Proveedor Creado',
-      description: 'El proveedor se ha agregado correctamente',
+      title: ordenData?.estado === 'ENTREGADO' ? 'Orden entregada' : 'Éxito',
+      description: ordenData?.estado === 'ENTREGADO' ? 'La orden fue entregada y el inventario se actualizará.' : 'Orden guardada correctamente.',
     })
   }
 
-  const getStatusColor = (estado: string) => {
-    switch (estado) {
-      case 'PENDIENTE':
-        return { background: '#f59e0b', color: 'white' }
-      case 'ENTREGADO':
-        return { background: '#10b981', color: 'white' }
-      case 'FACTURADO':
-        return { background: '#3b82f6', color: 'white' }
-      case 'CANCELADO':
-        return { background: '#ef4444', color: 'white' }
-      default:
-        return { background: '#6b7280', color: 'white' }
-    }
+  const handleProveedorModalSuccess = async () => {
+    await loadProveedores()
+    await loadStats()
+    toast({ title: 'Proveedor creado', description: 'El proveedor se ha agregado correctamente' })
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
-      style: 'currency',
-      currency: 'PEN',
-    }).format(amount)
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('es-PE')
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE')
-  }
+  const statusBadge = (estado: string) => (
+    <span className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase text-cyan-100">
+      {estado || 'Sin estado'}
+    </span>
+  )
 
   if (isLoading) {
     return (
-      <div className="dashboard-container">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-white">Cargando...</div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+        <Card className="mx-auto max-w-[1500px] border-cyan-400/20 bg-slate-950/70 text-slate-100">
+          <CardContent className="flex min-h-[180px] items-center justify-center gap-3 p-6">
+            <RefreshCw className="h-7 w-7 animate-spin text-cyan-200" />
+            <span className="text-sm font-medium text-slate-300">Cargando compras...</span>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
+  const statCards: StatCard[] = [
+    { label: 'Compras del mes', value: formatCurrency(stats.montoTotalMes), icon: ShoppingCart },
+    { label: 'Ordenes activas', value: stats.ordenesActivas, icon: FileText },
+    { label: 'Proveedores', value: stats.proveedoresActivos, icon: Building2 },
+    { label: 'Vencidas', value: stats.ordenesVencidas, icon: Truck },
+  ]
+
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Gestión de Compras</h1>
-        <p className="dashboard-subtitle">Administra tus compras y proveedores</p>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            className="refresh-btn"
-            onClick={async () => {
-              console.log('🔄 Refrescando datos...')
-              await loadData()
-              toast({
-                title: 'Datos actualizados',
-                description: 'Los datos han sido actualizados correctamente',
-              })
-            }}
-            style={{ backgroundColor: '#10b981' }}
-          >
-            🔄 Actualizar
-          </button>
-          <button
-            className="refresh-btn"
-            onClick={() => {
-              console.log('🔥 Botón Nueva Orden clickeado!')
-              console.log('Estado actual isModalOpen:', isModalOpen)
-              setIsModalOpen(true)
-              console.log('Estado después setIsModalOpen(true):', true)
-            }}
-          >
-            + Nueva Orden
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>COMPRAS DEL MES</h3>
-            <span className="stat-icon">🛒</span>
-          </div>
-          <div className="stat-value">{formatCurrency(stats.montoTotalMes)}</div>
-          <div className="stat-subtitle">Total del mes</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>ÓRDENES ACTIVAS</h3>
-            <span className="stat-icon">📋</span>
-          </div>
-          <div className="stat-value">{stats.ordenesActivas}</div>
-          <div className="stat-subtitle">Órdenes pendientes</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <h3>PROVEEDORES</h3>
-            <span className="stat-icon">🏢</span>
-          </div>
-          <div className="stat-value">{stats.proveedoresActivos}</div>
-          <div className="stat-subtitle">Proveedores activos</div>
-        </div>
-
-        <div className="stat-card alert">
-          <div className="stat-header">
-            <h3>VENCIDAS</h3>
-            <span className="stat-icon">⚠️</span>
-          </div>
-          <div className="stat-value warning">{stats.ordenesVencidas}</div>
-          <div className="stat-subtitle">Órdenes vencidas</div>
-        </div>
-      </div>
-
-      {/* Purchase Orders Section */}
-      <div className="activity-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 className="activity-title">Órdenes de Compra</h2>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <select
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-              }}
-              value={filters.estado}
-              onChange={(e) => setFilters({ ...filters, estado: e.target.value })}
-            >
-              <option value="">Todos los estados</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="ENTREGADO">Entregado</option>
-              <option value="FACTURADO">Facturado</option>
-              <option value="CANCELADO">Cancelado</option>
-            </select>
-
-            <select
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: 'white',
-              }}
-              value={filters.proveedor_id}
-              onChange={(e) => setFilters({ ...filters, proveedor_id: e.target.value })}
-            >
-              <option value="">Todos los proveedores</option>
-              {proveedores.map((proveedor: AnyRecord) => (
-                <option key={proveedor.id} value={proveedor.id}>
-                  {proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Orders Table */}
-        <div className="activity-card">
-          {ordenes.length === 0 ? (
-            <div className="activity-empty" style={{ padding: '3rem', textAlign: 'center' }}>
-              <div
-                style={{
-                  fontSize: '4rem',
-                  marginBottom: '1rem',
-                  filter: 'grayscale(0.3)',
-                  opacity: 0.6,
-                }}
-              >
-                📋
-              </div>
-              <h3
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '600',
-                  color: 'var(--primary-700)',
-                  marginBottom: '0.5rem',
-                }}
-              >
-                Listo para gestionar compras
-              </h3>
-              <p
-                style={{
-                  color: 'var(--primary-500)',
-                  fontSize: '1rem',
-                  marginBottom: '0',
-                }}
-              >
-                Comienza creando tu primera orden de compra
-              </p>
-            </div>
-          ) : (
-            <div style={{ overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>N° Orden</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Proveedor</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Fecha</th>
-                    <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600' }}>Entrega</th>
-                    <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Items</th>
-                    <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600' }}>Total</th>
-                    <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Estado</th>
-                    <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ordenes.map((orden: AnyRecord) => {
-                    const statusStyle = getStatusColor(orden.estado)
-                    const itemsCount = Array.isArray(orden.items) ? orden.items.length : 0
-
-                    return (
-                      <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }} key={orden.id}>
-                        <td style={{ padding: '1rem', fontWeight: '600', fontFamily: 'monospace' }}>{orden.numero}</td>
-                        <td style={{ padding: '1rem' }}>
-                          <div>
-                            <div style={{ fontWeight: '600' }}>{orden.proveedores?.nombre || 'N/A'}</div>
-                            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>RUC: {orden.proveedores?.ruc || 'N/A'}</div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem' }}>{formatDate(orden.fecha_orden)}</td>
-                        <td style={{ padding: '1rem' }}>{formatDate(orden.fecha_entrega)}</td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>{itemsCount}</td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
-                          {formatCurrency(parseFloat(orden.total) || 0)}
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <span
-                            style={{
-                              ...statusStyle,
-                              padding: '0.4rem 0.8rem',
-                              borderRadius: '20px',
-                              fontSize: '0.8rem',
-                              fontWeight: '600',
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            {orden.estado}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            <button
-                              style={{
-                                background: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.4rem 0.8rem',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => handleEditOrden(orden)}
-                            >
-                              Ver
-                            </button>
-                            <button
-                              style={{
-                                background: '#10b981',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.4rem 0.8rem',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => handleEditOrden(orden)}
-                            >
-                              Editar
-                            </button>
-                            {orden.estado === 'PENDIENTE' && (
-                              <button
-                                style={{
-                                  background: '#f59e0b',
-                                  color: 'white',
-                                  border: 'none',
-                                  padding: '0.4rem 0.8rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.8rem',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                }}
-                                onClick={() => handleMarcarEntregado(orden.id)}
-                                title="Marcar como entregado - Actualizará automáticamente el inventario"
-                              >
-                                📦 Entregar
-                              </button>
-                            )}
-                            {orden.estado === 'ENTREGADO' && (
-                              <span
-                                style={{
-                                  background: '#10b981',
-                                  color: 'white',
-                                  padding: '0.4rem 0.8rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.8rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                }}
-                                title="Esta orden ya fue entregada"
-                              >
-                                ✅ Entregada
-                              </span>
-                            )}
-                            <button
-                              style={{
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                padding: '0.4rem 0.8rem',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => handleDeleteOrden(orden.id)}
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Proveedores Principales */}
-      <div className="activity-section">
-        <div
-          className="activity-header"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1.5rem',
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
-            padding: '1.5rem 2rem',
-            borderRadius: 'var(--border-radius-lg)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          <div>
-            <h2 className="activity-title" style={{ marginBottom: '0.5rem' }}>
-              Proveedores Principales
-            </h2>
-            <p style={{ color: 'var(--primary-400)', fontSize: '0.95rem' }}>Gestiona tu red de proveedores estratégicos</p>
-          </div>
-          <button
-            className="refresh-btn"
-            onClick={() => setIsProveedorModalOpen(true)}
-            style={{
-              background: 'var(--gradient-success)',
-              fontSize: '0.95rem',
-              padding: '0.875rem 1.5rem',
-            }}
-          >
-            <span style={{ fontSize: '1.2rem' }}>+</span>
-            Agregar Proveedor
-          </button>
-        </div>
-
-        <div className="activity-card">
-          {(() => {
-            console.log('🔥 [PROVEEDORES RENDER] Total proveedores:', proveedores.length)
-            console.log('🔥 [PROVEEDORES RENDER] Datos proveedores:', proveedores)
-            return null
-          })()}
-
-          {proveedores.length === 0 ? (
-            <div className="activity-empty" style={{ padding: '3rem', textAlign: 'center' }}>
-              <div
-                style={{
-                  fontSize: '4rem',
-                  marginBottom: '1rem',
-                  filter: 'grayscale(0.3)',
-                  opacity: 0.6,
-                }}
-              >
-                🏢
-              </div>
-              <h3
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '600',
-                  color: 'var(--primary-700)',
-                  marginBottom: '0.5rem',
-                }}
-              >
-                Construye tu red de proveedores
-              </h3>
-              <p
-                style={{
-                  color: 'var(--primary-500)',
-                  fontSize: '1rem',
-                }}
-              >
-                Agrega proveedores para gestionar tus compras de manera eficiente
-              </p>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                gap: '1.5rem',
-                padding: '1rem',
-              }}
-            >
-              {proveedores.slice(0, 6).map((proveedor: AnyRecord) => (
-                <div
-                  key={proveedor.id}
-                  className="stat-card"
-                  style={{
-                    padding: '1.5rem',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                  onClick={() => {
-                    setSelectedProveedor(proveedor)
-                    setIsProveedorModalOpen(true)
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      right: 0,
-                      width: '60px',
-                      height: '60px',
-                      background: 'linear-gradient(135deg, var(--emerald-500), var(--emerald-600))',
-                      borderRadius: '0 0 0 60px',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      justifyContent: 'flex-end',
-                      padding: '0.5rem',
-                      opacity: 0.1,
-                    }}
-                  >
-                    <span style={{ fontSize: '1.2rem' }}>🏢</span>
-                  </div>
-
-                  <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <h3
-                          style={{
-                            fontWeight: '700',
-                            color: 'var(--primary-800)',
-                            fontSize: '1.1rem',
-                            marginBottom: '0.25rem',
-                            lineHeight: '1.3',
-                          }}
-                        >
-                          {proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}
-                        </h3>
-                        <span
-                          style={{
-                            background: 'var(--gradient-success)',
-                            color: 'white',
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: '20px',
-                            fontSize: '0.7rem',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                          }}
-                        >
-                          Activo
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: '1rem' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.9rem',
-                          color: 'var(--primary-600)',
-                          marginBottom: '0.4rem',
-                          fontWeight: '500',
-                        }}
-                      >
-                        <span style={{ fontSize: '1rem' }}>🆔</span>
-                        RUC: {proveedor.ruc}
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.9rem',
-                          color: 'var(--primary-600)',
-                          fontWeight: '400',
-                        }}
-                      >
-                        <span style={{ fontSize: '1rem' }}>👤</span>
-                        {proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto'}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                      <button
-                        className="btn-icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedProveedor(proveedor)
-                          setIsProveedorModalOpen(true)
-                        }}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          fontSize: '0.8rem',
-                          fontWeight: '600',
-                        }}
-                        title="Editar proveedor"
-                      >
-                        ✏️ Editar
-                      </button>
-                    </div>
-                  </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 text-slate-100">
+      <div className="mx-auto max-w-[1500px] space-y-4">
+        <section className="rounded-2xl border border-cyan-400/20 bg-slate-950/70 px-5 py-4 shadow-2xl shadow-blue-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                <ShoppingCart className="h-6 w-6" />
+              </span>
+              <div>
+                <div className="mb-2 inline-flex rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                  ERP Purchasing Center
                 </div>
-              ))}
+                <h1 className="text-3xl font-bold tracking-tight text-white">Gestión de Compras</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  Órdenes, proveedores y seguimiento operativo conectados a inventario, CxP y contabilidad.
+                </p>
+              </div>
             </div>
-          )}
-        </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={async () => {
+                  await loadData()
+                  toast({ title: 'Datos actualizados', description: 'Compras sincronizadas correctamente' })
+                }}
+                variant="outline"
+                className="gap-2 border-cyan-400/20 bg-white/10 text-cyan-50 hover:bg-white/15 hover:text-white"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Button>
+              <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Nueva orden
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {statCards.map(({ label, value, icon: Icon }) => (
+            <Card key={label} className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div>
+                  <div className={labelClass}>{label}</div>
+                  <div className="mt-3 text-2xl font-bold text-white">{value}</div>
+                </div>
+                <span className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-100">
+                  <Icon className="h-5 w-5" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <Card className="border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Filtros operativos</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-4 md:grid-cols-[220px_minmax(0,1fr)_auto] md:items-end">
+            <label className="space-y-2">
+              <span className={labelClass}>Estado</span>
+              <select className={inputClass} value={filters.estado} onChange={(e) => setFilters({ ...filters, estado: e.target.value })}>
+                <option value="">Todos los estados</option>
+                <option value="PENDIENTE">Pendiente</option>
+                <option value="ENTREGADO">Entregado</option>
+                <option value="FACTURADO">Facturado</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className={labelClass}>Proveedor</span>
+              <select className={inputClass} value={filters.proveedor_id} onChange={(e) => setFilters({ ...filters, proveedor_id: e.target.value })}>
+                <option value="">Todos los proveedores</option>
+                {proveedores.map((proveedor: AnyRecord) => (
+                  <option key={proveedor.id} value={proveedor.id}>
+                    {proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFilters({ estado: '', proveedor_id: '' })}
+              className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+            >
+              Limpiar
+            </Button>
+          </CardContent>
+        </Card>
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+              <CardTitle className="text-base text-white">Órdenes de compra</CardTitle>
+              <p className="text-xs text-slate-400">Mostrando {ordenes.length} órdenes con los filtros actuales.</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {ordenes.length === 0 ? (
+                <div className="flex min-h-[260px] flex-col items-center justify-center gap-4 p-8 text-center">
+                  <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                    <FileText className="h-10 w-10 text-cyan-100" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Listo para gestionar compras</h3>
+                    <p className="mt-2 text-sm text-slate-400">Crea una orden de compra para iniciar el flujo operativo.</p>
+                  </div>
+                  <Button type="button" onClick={() => setIsModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                    <Plus className="h-4 w-4" />
+                    Nueva orden
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[980px] border-collapse">
+                    <thead className="bg-cyan-400/10">
+                      <tr className="border-b border-cyan-400/15 text-left text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">
+                        <th className="px-4 py-3">Orden</th>
+                        <th className="px-4 py-3">Proveedor</th>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Entrega</th>
+                        <th className="px-4 py-3 text-right">Items</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Estado</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ordenes.map((orden: AnyRecord) => {
+                        const itemsCount = Array.isArray(orden.items) ? orden.items.length : 0
+                        return (
+                          <tr key={orden.id} className="border-b border-cyan-400/10 text-sm text-slate-200 transition hover:bg-cyan-400/10">
+                            <td className="px-4 py-3 font-mono font-semibold text-white">{orden.numero}</td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-white">{orden.proveedores?.nombre || orden.proveedores?.razon_social || 'N/A'}</div>
+                              <div className="mt-1 text-xs text-slate-500">RUC: {orden.proveedores?.ruc || 'N/A'}</div>
+                            </td>
+                            <td className="px-4 py-3">{formatDate(orden.fecha_orden)}</td>
+                            <td className="px-4 py-3">{formatDate(orden.fecha_entrega)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-white">{itemsCount}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-white">{formatCurrency(parseFloat(orden.total) || 0)}</td>
+                            <td className="px-4 py-3 text-center">{statusBadge(orden.estado)}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <Button type="button" size="sm" variant="outline" onClick={() => handleEditOrden(orden)} className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+                                  Ver
+                                </Button>
+                                {orden.estado === 'PENDIENTE' && (
+                                  <Button type="button" size="sm" onClick={() => handleMarcarEntregado(orden.id)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                                    <PackageCheck className="h-4 w-4" />
+                                    Entregar
+                                  </Button>
+                                )}
+                                <Button type="button" size="sm" variant="outline" onClick={() => handleDeleteOrden(orden.id)} className="border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white">
+                                  Eliminar
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-fit overflow-hidden border-cyan-400/20 bg-slate-950/65 text-slate-100 shadow-xl shadow-blue-950/20">
+            <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
+              <div>
+                <CardTitle className="text-base text-white">Proveedores principales</CardTitle>
+                <p className="mt-1 text-xs text-slate-400">Red activa para compras.</p>
+              </div>
+              <Button type="button" size="sm" onClick={() => setIsProveedorModalOpen(true)} className="gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                <Plus className="h-4 w-4" />
+                Agregar
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4">
+              {proveedores.length === 0 ? (
+                <div className="rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-sm text-slate-400">
+                  Agrega proveedores para operar compras.
+                </div>
+              ) : (
+                proveedores.slice(0, 6).map((proveedor: AnyRecord) => (
+                  <button
+                    key={proveedor.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedProveedor(proveedor)
+                      setIsProveedorModalOpen(true)
+                    }}
+                    className="w-full rounded-xl border border-cyan-400/15 bg-white/[0.03] p-4 text-left transition hover:bg-cyan-400/10"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-white">{proveedor.razon_social || proveedor.nombre_comercial || proveedor.nombre || 'Sin nombre'}</div>
+                        <div className="mt-1 text-xs text-slate-500">RUC: {proveedor.ruc || 'N/A'}</div>
+                      </div>
+                      {statusBadge('Activo')}
+                    </div>
+                    <div className="mt-3 text-xs text-slate-400">{proveedor.contacto || proveedor.email || proveedor.telefono || 'Sin contacto'}</div>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <OrdenCompraModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setSelectedOrden(null) }} onSuccess={handleModalSuccess} orden={selectedOrden || undefined} />
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant={confirmDialog.variant}
+        />
+        <ProveedorModal
+          isOpen={isProveedorModalOpen}
+          onClose={() => { setIsProveedorModalOpen(false); setSelectedProveedor(null) }}
+          onSuccess={handleProveedorModalSuccess}
+          proveedor={selectedProveedor || undefined}
+        />
       </div>
-
-      {/* Modales */}
-      <OrdenCompraModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleModalSuccess}
-        // Enviar undefined cuando no hay selección para cumplir con el tipo opcional
-        orden={selectedOrden || undefined}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-        onConfirm={confirmDialog.onConfirm}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        variant={confirmDialog.variant}
-      />
-
-      <ProveedorModal
-        isOpen={isProveedorModalOpen}
-        onClose={handleProveedorModalClose}
-        onSuccess={handleProveedorModalSuccess}
-        // Evita pasar null a una prop opcional (usa undefined)
-        proveedor={selectedProveedor || undefined}
-      />
     </div>
   )
 }

@@ -2,7 +2,7 @@
 # Este script prueba que la validación funciona correctamente
 
 $baseUrl = "http://localhost:3000"
-$token = "[REMOVED]"
+$token = "REPLACE_WITH_TEST_JWT"
 $tenantId = "vierdes"
 
 $headers = @{
@@ -51,7 +51,7 @@ $body = @{
 
 try {
     $resultado = Invoke-RestMethod -Uri "$baseUrl/api/finanzas/conciliacion/$conciliacionId/cerrar" -Method Post -Headers $headers -Body $body
-    
+
     if ($pendientesSistema -gt 0 -or $pendientesExtracto -gt 0) {
         Write-Host "   ERROR: Debería haber fallado con movimientos pendientes" -ForegroundColor Red
     } else {

@@ -12,10 +12,10 @@ import { ProductGrid, ProductoPOS } from '@/components/pos/ProductGrid'
 import { QuickActions } from '@/components/pos/QuickActions'
 import { QuickClient } from '@/components/pos/QuickClient'
 import VentaExitosaModal from '@/components/pos/VentaExitosaModal'
-import './pos-styles.css'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { AlertTriangle, Check, CircleDollarSign, FileText, Loader2, Lock, RefreshCw, Settings } from 'lucide-react'
 
 interface ItemVenta {
   producto: ProductoPOS
@@ -68,6 +68,27 @@ interface EstadoCaja {
   cajaId?: string
   sesionId?: string
 }
+
+const posShellClass =
+  'min-h-screen max-w-full bg-[radial-gradient(circle_at_18%_12%,rgba(34,211,238,0.18),transparent_26rem),radial-gradient(circle_at_86%_18%,rgba(99,102,241,0.18),transparent_30rem),linear-gradient(135deg,#020617_0%,#071426_42%,#0f172a_100%)] p-6 text-slate-100'
+
+const posHeaderClass =
+  'relative mb-6 overflow-hidden rounded-[28px] border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(2,8,23,0.96),rgba(15,23,42,0.9)),radial-gradient(circle_at_82%_0%,rgba(37,99,235,0.28),transparent_24rem)] p-8 shadow-[0_24px_70px_rgba(2,8,23,0.42)]'
+
+const posPanelClass =
+  'rounded-2xl border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(2,8,23,0.86)),radial-gradient(circle_at_100%_0%,rgba(34,211,238,0.16),transparent_18rem)] text-slate-100 shadow-[0_20px_55px_rgba(2,8,23,0.35)]'
+
+const posInputClass =
+  'rounded-lg border border-cyan-400/25 bg-slate-950/70 text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10 placeholder:text-slate-500'
+
+const posPrimaryButtonClass =
+  'rounded-lg border border-cyan-300/30 bg-gradient-to-br from-blue-600 to-cyan-500 px-4 py-3 font-semibold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50'
+
+const posSecondaryButtonClass =
+  'rounded-lg border border-slate-400/25 bg-slate-900/75 px-4 py-3 font-semibold text-blue-100 transition hover:border-cyan-300/45 hover:bg-slate-800/90 disabled:cursor-not-allowed disabled:opacity-50'
+
+const posTinyButtonClass =
+  'rounded-md border border-slate-400/25 bg-slate-900/75 px-2 py-1 text-xs font-semibold text-blue-100 transition hover:border-cyan-300/45 hover:bg-slate-800/90'
 
 export default function POSPage() {
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
@@ -129,6 +150,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   const [mostrarModalPago, setMostrarModalPago] = useState(false)
   const [mostrarVentaExitosa, setMostrarVentaExitosa] = useState(false)
   const [ventaExitosaData, setVentaExitosaData] = useState<any>(null)
+  const [procesandoVenta, setProcesandoVenta] = useState(false)
 
   // Estados de formularios
   const [montoInicialInput, setMontoInicialInput] = useState('')
@@ -555,13 +577,10 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           ? (item.precio_original * item.cantidad * descuento.valor / 100)
           : descuento.valor
 
-        const precioConDescuento = item.precio_original - (descuentoMonto / item.cantidad)
-
         return {
           ...item,
           descuento_porcentaje: descuento.tipo === 'PORCENTAJE' ? descuento.valor : 0,
           descuento_monto: descuentoMonto,
-          precio_unitario: Math.max(0, precioConDescuento),
           subtotal: Math.max(0, (item.precio_original * item.cantidad) - descuentoMonto)
         }
       }
@@ -640,11 +659,11 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           ? {
             ...item,
             cantidad: item.cantidad + 1,
-            precio_unitario: precioFinal,
+            precio_unitario: producto.precio_venta,
             precio_original: producto.precio_venta,
             descuento_porcentaje: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) / producto.precio_venta * 100) : 0,
             descuento_monto: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) * (item.cantidad + 1)) : 0,
-            subtotal: (item.cantidad + 1) * precioFinal
+            subtotal: ((item.cantidad + 1) * producto.precio_venta) - (precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) * (item.cantidad + 1)) : 0)
           }
           : item
       ))
@@ -652,7 +671,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
       setCarrito([...carrito, {
         producto,
         cantidad: 1,
-        precio_unitario: precioFinal,
+        precio_unitario: producto.precio_venta,
         precio_original: producto.precio_venta,
         descuento_porcentaje: precioFinal < producto.precio_venta ? ((producto.precio_venta - precioFinal) / producto.precio_venta * 100) : 0,
         descuento_monto: precioFinal < producto.precio_venta ? (producto.precio_venta - precioFinal) : 0,
@@ -687,11 +706,22 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         }
       }
 
-      setCarrito(carrito.map(item =>
-        item.producto.id === productoId
-          ? { ...item, cantidad: nuevaCantidad, subtotal: nuevaCantidad * item.precio_unitario }
-          : item
-      ))
+      setCarrito(carrito.map(item => {
+        if (item.producto.id !== productoId) return item
+
+        const descuentoMonto = item.descuento_porcentaje > 0
+          ? (item.precio_original * nuevaCantidad * item.descuento_porcentaje / 100)
+          : item.descuento_monto > 0 && item.cantidad > 0
+            ? (item.descuento_monto / item.cantidad) * nuevaCantidad
+            : 0
+
+        return {
+          ...item,
+          cantidad: nuevaCantidad,
+          descuento_monto: descuentoMonto,
+          subtotal: Math.max(0, (item.precio_original * nuevaCantidad) - descuentoMonto)
+        }
+      }))
     }
   }
 
@@ -706,6 +736,10 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
   }
 
   const procesarVenta = async () => {
+    if (procesandoVenta) {
+      return
+    }
+
     // 1. Validaciones iniciales
     if (carrito.length === 0) {
       toast({
@@ -849,6 +883,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
     }
 
     let resultado: any = null;
+    setProcesandoVenta(true)
     try {
       // 3. Cambiar estado a PENDIENTE_PAGO
       setEstadoVentaActual({ estado: 'PENDIENTE_PAGO', fecha_estado: new Date().toISOString() })
@@ -965,16 +1000,10 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           }))
         }
 
-        // 8. Recargar historial y productos para reflejar stock real sin cerrar la caja.
-        console.log('🔄 Recargando historial de ventas...')
-        await recargarHistorialVentas().catch(err => console.warn('⚠️ Error recargando historial:', err))
-        await recargarProductos().catch(err => console.warn('⚠️ Error recargando productos:', err))
-
-        // 9. Mostrar modal de venta exitosa con opción de imprimir
+        // 8. Mostrar confirmación inmediatamente; la recarga posterior no debe bloquear al cajero.
         console.log('✅ Venta procesada exitosamente:', resultado)
         const totalVenta = totalServidor ?? calcularTotal()
 
-        // Preparar datos para el modal de éxito
         setVentaExitosaData({
           venta_id: ventaInfo.venta_id,
           numero_ticket: ventaInfo.numero_ticket || comprobante.numero,
@@ -983,13 +1012,17 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           impuestos: impuestosServidor ?? calcularImpuestos(),
           estado: ventaInfo.estado || 'PAGADA',
           factura_electronica: ventaInfo.factura_electronica || false,
+          facturacion_pendiente: ventaInfo.facturacion_pendiente || ventaInfo.cpe_pendiente || false,
           cpe_id: ventaInfo.cpe_id,
           cliente_nombre: clienteActual?.razon_social || clienteActual?.nombres || 'Cliente General',
           fecha: new Date().toISOString(),
         })
         setMostrarVentaExitosa(true)
 
-        // 10. Resetear estado para nueva venta (mantener caja abierta)
+        recargarHistorialVentas().catch(err => console.warn('⚠️ Error recargando historial:', err))
+        recargarProductos().catch(err => console.warn('⚠️ Error recargando productos:', err))
+
+        // 9. Resetear estado para nueva venta (mantener caja abierta)
         setEstadoVentaActual({ estado: 'EN_PROGRESO', fecha_estado: new Date().toISOString() })
       } else {
         // Error del backend - mostrar error real
@@ -1054,6 +1087,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
         title: '❌ Error procesando venta',
         description: errorMessage,
       })
+    } finally {
+      setProcesandoVenta(false)
     }
   }
 
@@ -1323,12 +1358,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   // Mostrar loading mientras se cargan los datos iniciales
   if (isLoading || !datosInicializados) {
     return (
-      <div className="dashboard-container pos-page">
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="stat-card" style={{ maxWidth: '400px', textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⏳</div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Cargando POS...</h2>
-            <p style={{ color: 'var(--text-secondary)' }}>Verificando estado de caja</p>
+      <div className={posShellClass}>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className={`${posPanelClass} w-full max-w-[460px] p-8 text-center`}>
+            <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-100">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+            <h2 className="mb-2 text-2xl font-semibold text-white">Cargando POS...</h2>
+            <p className="text-slate-400">Verificando estado de caja</p>
           </div>
         </div>
       </div>
@@ -1349,29 +1386,17 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
   return (
     <>
       {!estadoCaja || estadoCaja.estado === 'CERRADA' ? (
-        <div className="dashboard-container pos-page">
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="stat-card" style={{ maxWidth: '500px', textAlign: 'center' }}>
-              <div style={{ marginBottom: '2rem' }}>
-                <div
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    margin: '0 auto 2rem',
-                    background: hayCajasDisponibles ? 'var(--gradient-danger)' : 'var(--gradient-warning)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '4rem',
-                  }}
-                >
-                  {hayCajasDisponibles ? '🔒' : '⚠️'}
+        <div className={posShellClass}>
+          <div className="flex min-h-screen items-center justify-center">
+            <div className={`${posPanelClass} max-w-[500px] p-8 text-center`}>
+              <div className="mb-8">
+                <div className="mx-auto mb-8 flex size-[112px] items-center justify-center rounded-3xl border border-cyan-400/25 bg-cyan-400/10 text-cyan-100 shadow-[0_22px_55px_rgba(8,145,178,0.18)]">
+                  {hayCajasDisponibles ? <Lock className="h-14 w-14" /> : <AlertTriangle className="h-14 w-14" />}
                 </div>
-                <h2 className="dashboard-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+                <h2 className="mb-4 text-4xl font-bold text-slate-50">
                   {hayCajasDisponibles ? 'CAJA CERRADA' : 'SIN CAJA CONFIGURADA'}
                 </h2>
-                <p className="dashboard-subtitle" style={{ marginBottom: '2rem' }}>
+                <p className="mb-8 text-slate-300">
                   {hayCajasDisponibles
                     ? 'Para usar el sistema POS, primero debe abrir la caja registradora con el monto inicial'
                     : 'No hay cajas registradoras configuradas. Vaya a Configuración para crear una caja primero.'}
@@ -1379,31 +1404,18 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 {hayCajasDisponibles ? (
                   <button
                     onClick={abrirCaja}
-                    className="btn btn-primary"
-                    style={{
-                      width: '100%',
-                      padding: '1.5rem 2rem',
-                      fontSize: '1.2rem',
-                      background: 'var(--gradient-success)',
-                    }}
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-300/30 bg-gradient-to-br from-blue-600 to-cyan-500 px-8 py-6 text-lg font-bold text-white shadow-[0_20px_45px_rgba(37,99,235,0.26)] transition hover:brightness-110"
                   >
-                    💰 Abrir Caja Registradora
+                    <CircleDollarSign className="h-5 w-5" />
+                    Abrir Caja Registradora
                   </button>
                 ) : (
                   <a
                     href="/dashboard/wizard"
-                    className="btn btn-primary"
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '1.5rem 2rem',
-                      fontSize: '1.2rem',
-                      background: 'var(--gradient-primary)',
-                      textDecoration: 'none',
-                      textAlign: 'center',
-                    }}
+                    className="flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 px-8 py-6 text-center text-lg font-bold text-white no-underline shadow-lg transition hover:brightness-110"
                   >
-                    ⚙️ Ir a Configuración
+                    <Settings className="h-5 w-5" />
+                    Ir a Configuración
                   </a>
                 )}
               </div>
@@ -1412,51 +1424,37 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
           {/* Panel inline para abrir caja (evita doble modal superpuesto) */}
           {mostrarModalAbrirCaja && (
-            <div className="stat-card" style={{ maxWidth: '500px', margin: '1.5rem auto 0', padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>💰 Abrir Caja</h3>
-              <label htmlFor="monto-inicial-caja" style={{ display: 'block', marginBottom: '0.5rem' }}>
+            <div className={`${posPanelClass} mx-auto mt-6 max-w-[500px] p-6`}>
+              <h3 className="mb-4 flex items-center gap-2 text-2xl font-semibold text-white">
+                <CircleDollarSign className="h-6 w-6 text-cyan-200" />
+                Abrir Caja
+              </h3>
+              <label htmlFor="monto-inicial-caja" className="mb-2 block text-sm font-semibold text-slate-300">
                 Monto inicial ({currencySymbol})
               </label>
               <input
                 id="monto-inicial-caja"
                 name="monto-inicial-caja"
-                type="number"
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
                 value={montoInicialInput}
                 onChange={(e) => setMontoInicialInput(e.target.value)}
                 placeholder="0.00"
-                style={{
-                  width: '100%',
-                  padding: '1rem',
-                  fontSize: '1.2rem',
-                  border: '2px solid var(--border-color)',
-                  borderRadius: '8px',
-                  marginBottom: '1rem'
-                }}
+                className={`${posInputClass} mb-4 w-full p-4 text-lg`}
                 autoFocus
               />
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              <div className="flex gap-4">
                 <button
-                  className="btn"
                   onClick={confirmarAbrirCaja}
-                  style={{
-                    flex: 1,
-                    padding: '1rem',
-                    background: 'var(--gradient-success)',
-                    color: 'white',
-                    border: 'none'
-                  }}
+                  className={`${posPrimaryButtonClass} flex flex-1 items-center justify-center gap-2 p-4`}
                 >
-                  ✅ Confirmar
+                  <Check className="h-4 w-4" />
+                  Confirmar
                 </button>
                 <button
-                  className="btn"
                   onClick={() => setMostrarModalAbrirCaja(false)}
-                  style={{
-                    flex: 1,
-                    padding: '1rem',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)'
-                  }}
+                  className={`${posSecondaryButtonClass} flex-1 p-4`}
                 >
                   Cancelar
                 </button>
@@ -1465,54 +1463,47 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
           )}
         </div>
       ) : (
-        <div className="dashboard-container pos-page">
+        <div className={posShellClass}>
           {/* Header del POS empresarial */}
-          <div className="dashboard-header pos-header">
+          <div className={posHeaderClass}>
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.07)_1px,transparent_1px)] bg-[length:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+            <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="dashboard-title" style={{ fontSize: '2.5rem' }}>
-                🛒 Sistema POS Empresarial
+              <div className="mb-3 inline-flex rounded-full border border-cyan-300/30 bg-cyan-600/15 px-3 py-1 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-cyan-100">
+                Punto de venta conectado
+              </div>
+              <h1 className="text-4xl font-bold tracking-normal text-slate-50">
+                Sistema POS Empresarial
               </h1>
-              <p className="dashboard-subtitle">
-                Caja: <span className="status-success">{estadoCaja?.estado}</span> | Productos:{' '}
-                <span style={{ fontWeight: '600' }}>{productosFiltrados.length}</span> | En Carrito:{' '}
-                <span style={{ fontWeight: '600' }}>{carrito.length}</span>
+              <p className="mt-2 text-lg text-slate-300">
+                Caja: <span className="rounded-full border border-cyan-300/30 bg-cyan-500/15 px-3 py-1 text-sm font-bold text-cyan-100">{estadoCaja?.estado}</span> | Productos:{' '}
+                <span className="font-semibold">{productosFiltrados.length}</span> | En Carrito:{' '}
+                <span className="font-semibold">{carrito.length}</span>
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="flex gap-4">
               <button
                 onClick={recargarProductos}
-                className="btn"
-                style={{
-                  background: 'var(--gradient-primary)',
-                  color: 'white',
-                  border: 'none',
-                }}
+                className={`${posPrimaryButtonClass} inline-flex items-center gap-2`}
               >
-                🔄 Sincronizar
+                <RefreshCw className="h-4 w-4" />
+                Sincronizar
               </button>
               <button
                 onClick={() => router.push('/dashboard/cajas#cortes')}
-                className="btn"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  padding: '0.8rem 1.2rem',
-                }}
+                className={`${posSecondaryButtonClass} inline-flex items-center gap-2`}
               >
-                📄 Ver cortes
+                <FileText className="h-4 w-4" />
+                Ver cortes
               </button>
               <button
                 onClick={cerrarCaja}
-                className="btn"
-                style={{
-                  background: 'var(--gradient-danger)',
-                  color: 'white',
-                  border: 'none',
-                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-300/35 bg-slate-900/75 px-4 py-3 font-semibold text-blue-100 shadow-[0_16px_34px_rgba(37,99,235,0.18)] transition hover:border-cyan-300/45 hover:bg-slate-800/90"
               >
-                🔒 Cerrar Caja
+                <Lock className="h-4 w-4" />
+                Cerrar Caja
               </button>
+            </div>
             </div>
           </div>
 
@@ -1532,24 +1523,13 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   (1000 * 60 * 60 * 24)
                 );
                 return daysUntilExpiration < 30 && daysUntilExpiration > 0 ? (
-                  <div
-                    style={{
-                      background: 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)',
-                      border: '2px solid #FF9800',
-                      borderRadius: 'var(--border-radius)',
-                      padding: '1rem 1.5rem',
-                      marginBottom: '1.5rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                    }}
-                  >
-                    <div style={{ fontSize: '2rem' }}>⏰</div>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ margin: 0, color: '#E65100', fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  <div className="mb-6 flex items-center gap-4 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-6 py-4 text-cyan-50">
+                    <AlertTriangle className="h-7 w-7 text-cyan-100" />
+                    <div className="flex-1">
+                      <h3 className="m-0 text-lg font-bold">
                         Certificado Próximo a Vencer
                       </h3>
-                      <p style={{ margin: '0.5rem 0 0 0', color: '#E65100' }}>
+                      <p className="m-0 mt-2">
                         Su certificado digital vence en {daysUntilExpiration} días. Renuévelo pronto para evitar
                         interrupciones.
                       </p>
@@ -1559,20 +1539,13 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               })()
             )}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 350px 450px',
-              gap: '1.5rem',
-              height: 'calc(100vh - 250px)',
-            }}
-          >
+          <div className="grid grid-cols-1 items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(380px,440px)]">
             {/* Panel Izquierdo - Productos */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="flex min-w-0 flex-col gap-4 2xl:row-span-3">
               {/* Filtros y Búsqueda */}
-              <div className="stat-card" style={{ marginBottom: '1rem', padding: '1.5rem' }}>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
+              <div className={`${posPanelClass} p-5`}>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                  <div>
                     <label htmlFor="pos-busqueda" className="sr-only">Buscar productos</label>
                     <input
                       id="pos-busqueda"
@@ -1582,14 +1555,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       value={busqueda}
                       list="pos-busqueda-options"
                       onChange={(e) => setBusqueda(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '1rem',
-                        border: '2px solid var(--primary-300)',
-                        borderRadius: 'var(--border-radius)',
-                        fontSize: '1rem',
-                        background: 'white',
-                      }}
+                      className={`${posInputClass} w-full p-4 text-base`}
                     />
                     <datalist id="pos-busqueda-options">
                       {(productos || []).slice(0, 50).map((p) => (
@@ -1603,13 +1569,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     name="pos-categoria"
                     value={categoriaFiltro}
                     onChange={(e) => setCategoriaFiltro(e.target.value)}
-                    style={{
-                      padding: '1rem',
-                      border: '2px solid var(--primary-300)',
-                      borderRadius: 'var(--border-radius)',
-                      minWidth: '180px',
-                      background: 'white',
-                    }}
+                    className={`${posInputClass} w-full p-4`}
                   >
                     <option value="">Todas las categorías</option>
                     {categorias.map((cat) => (
@@ -1622,41 +1582,28 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               </div>
 
               {/* Panel de Herramientas Avanzadas */}
-              <div className="stat-card" style={{ marginBottom: '1rem', padding: '1rem' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+              <div className={`${posPanelClass} p-4`}>
+                <div className="flex flex-wrap items-center gap-4">
                   {/* Estado de Venta */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>Estado:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Estado:</span>
                     <span
-                      style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor:
-                          estadoVentaActual.estado === 'EN_PROGRESO'
-                            ? 'var(--blue-100)'
-                            : estadoVentaActual.estado === 'PENDIENTE_PAGO'
-                              ? 'var(--amber-100)'
-                              : estadoVentaActual.estado === 'PAGADA'
-                                ? 'var(--emerald-100)'
-                                : 'var(--red-100)',
-                        color:
-                          estadoVentaActual.estado === 'EN_PROGRESO'
-                            ? 'var(--blue-800)'
-                            : estadoVentaActual.estado === 'PENDIENTE_PAGO'
-                              ? 'var(--amber-800)'
-                              : estadoVentaActual.estado === 'PAGADA'
-                                ? 'var(--emerald-800)'
-                                : 'var(--red-800)',
-                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        estadoVentaActual.estado === 'EN_PROGRESO'
+                          ? 'border border-cyan-300/25 bg-cyan-400/10 text-cyan-100'
+                          : estadoVentaActual.estado === 'PENDIENTE_PAGO'
+                            ? 'border border-blue-300/25 bg-blue-400/10 text-blue-100'
+                            : estadoVentaActual.estado === 'PAGADA'
+                              ? 'border border-cyan-300/25 bg-cyan-400/10 text-cyan-100'
+                              : 'border border-slate-300/25 bg-slate-400/10 text-slate-100'
+                      }`}
                     >
                       {estadoVentaActual.estado.replace('_', ' ')}
                     </span>
                   </div>
 
                   {/* Búsqueda por Código de Barras */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="flex items-center gap-2">
                     <label htmlFor="pos-codigo-barras" className="sr-only">Código de barras</label>
                     <input
                       id="pos-codigo-barras"
@@ -1665,19 +1612,13 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                       placeholder="📱 Código de barras"
                       value={busquedaPorCodigoBarras}
                       onChange={(e) => setBusquedaPorCodigoBarras(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid var(--primary-300)',
-                        borderRadius: '4px',
-                        fontSize: '0.875rem',
-                        width: '150px',
-                      }}
+                      className={`${posInputClass} w-[150px] p-2 text-sm`}
                     />
                   </div>
 
                   {/* Descuento Global */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <label htmlFor="pos-descuento-tipo" style={{ fontSize: '0.875rem', fontWeight: '600' }}>Desc:</label>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="pos-descuento-tipo" className="text-sm font-semibold">Desc:</label>
                     <select
                       id="pos-descuento-tipo"
                       name="pos-descuento-tipo"
@@ -1688,12 +1629,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           tipo: e.target.value as 'PORCENTAJE' | 'MONTO_FIJO',
                         })
                       }
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid var(--primary-300)',
-                        borderRadius: '4px',
-                        fontSize: '0.875rem',
-                      }}
+                      className={`${posInputClass} p-2 text-sm`}
                     >
                       <option value="PORCENTAJE">%</option>
                       <option value="MONTO_FIJO">{currencySymbol}</option>
@@ -1711,32 +1647,20 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         })
                       }
                       placeholder="0"
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid var(--primary-300)',
-                        borderRadius: '4px',
-                        fontSize: '0.875rem',
-                        width: '80px',
-                      }}
+                      className={`${posInputClass} w-20 p-2 text-sm`}
                     />
                   </div>
 
                   {/* Switches de Modo */}
-                  <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div className="flex gap-4">
                     <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                      }}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
                     >
                       <input
                         type="checkbox"
                         checked={modoVentaRapida}
                         onChange={(e) => setModoVentaRapida(e.target.checked)}
-                        style={{ transform: 'scale(1.2)' }}
+                        className="scale-125"
                       />
                       ⚡ Rápida
                     </label>
@@ -1747,17 +1671,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
               {/* Grid de Productos */}
               <div
-                style={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  background:
-                    'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  borderRadius: 'var(--border-radius-xl)',
-                  padding: '1.5rem',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: 'var(--shadow-xl)',
-                }}
+                className={`${posPanelClass} min-h-[720px] flex-1 overflow-y-auto p-5`}
               >
                 <ProductGrid
                   productos={productosFiltrados}
@@ -1770,63 +1684,30 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
             {/* Panel Central - Detalles de Venta */}
             <div
-              style={{
-                width: '350px',
-                display: 'flex',
-                flexDirection: 'column',
-                background:
-                  'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: 'var(--border-radius-xl)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: 'var(--shadow-2xl)',
-                overflow: 'hidden',
-              }}
+              className={`${posPanelClass} flex min-w-0 flex-col overflow-hidden 2xl:col-start-2 2xl:row-start-1`}
             >
               {/* Header del Carrito */}
               <div
-                style={{
-                  background: 'var(--gradient-primary)',
-                  color: 'white',
-                  padding: '1rem',
-                  textAlign: 'center',
-                }}
+                className="border-b border-white/15 bg-gradient-to-br from-blue-600 to-cyan-500 p-4 text-center text-white"
               >
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>🛒 Carrito</h2>
+                <h2 className="text-xl font-bold">Carrito</h2>
               </div>
 
               {/* Lista de Items en Carrito */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              <div className="flex-1 overflow-y-auto p-4">
                 {carrito.length === 0 ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      color: 'var(--primary-500)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <span style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛍️</span>
+                  <div className="flex min-h-[170px] flex-col items-center justify-center text-center text-slate-400">
+                    <span className="mb-4 text-5xl">🛍️</span>
                     <p>El carrito está vacío</p>
-                    <p style={{ fontSize: '0.875rem' }}>Agregue productos desde la izquierda</p>
+                    <p className="text-sm">Agregue productos desde el catálogo</p>
                   </div>
                 ) : (
                   carrito.map((item) => (
                     <div
                       key={item.producto.id}
-                      className="stat-card"
-                      style={{
-                        padding: '1rem',
-                        marginBottom: '1rem',
-                        display: 'flex',
-                        gap: '1rem',
-                        alignItems: 'center',
-                      }}
+                      className="mb-4 flex items-center gap-4 rounded-xl border border-cyan-400/15 bg-slate-900/70 p-4 text-slate-100"
                     >
-                      <div style={{ flexShrink: 0 }}>
+                      <div className="shrink-0">
                         {item.producto.imagen_url ? (
                           <Image
                             src={item.producto.imagen_url}
@@ -1834,72 +1715,45 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                             width={60}
                             height={60}
                             unoptimized
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              objectFit: 'cover',
-                              borderRadius: 'var(--border-radius)',
-                            }}
+                            className="size-[60px] rounded-lg object-cover"
                           />
                         ) : (
-                          <div
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              background: 'var(--primary-100)',
-                              borderRadius: 'var(--border-radius)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '1.5rem',
-                            }}
-                          >
+                          <div className="flex size-[60px] items-center justify-center rounded-lg bg-slate-800 text-2xl">
                             📦
                           </div>
                         )}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4
-                          style={{
-                            fontWeight: '600',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            fontSize: '0.875rem',
-                          }}
-                        >
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-sm font-semibold">
                           {item.producto.nombre}
                         </h4>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--primary-500)' }}>
+                          <p className="text-xs text-cyan-300">
                             {formatCurrency(item.precio_unitario)}
                           </p>
-                        <p style={{ fontSize: '0.7rem', color: '#9CA3AF', margin: 0 }}>
+                        <p className="m-0 text-[0.7rem] text-slate-400">
                           Stock: {item.producto.stock_disponible ?? item.producto.stock_actual ?? 0}
                         </p>
-                        <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                        <div className="mt-1 flex flex-wrap gap-1">
                           <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
+                            className={posTinyButtonClass}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 5)}
                           >
                             -5%
                           </button>
                           <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
+                            className={posTinyButtonClass}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 10)}
                           >
                             -10%
                           </button>
                           <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', minWidth: 'auto' }}
+                            className={posTinyButtonClass}
                             onClick={() => aplicarDescuentoRapido(item.producto.id, 0)}
                           >
                             ↺
                           </button>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <div className="mt-2 flex items-center gap-2">
                           <button
                             onClick={() => actualizarCantidad(item.producto.id, item.cantidad - 1)}
                             className="btn-icon"
@@ -1915,8 +1769,8 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           </button>
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
+                      <div className="text-right">
+                          <p className="text-sm font-bold">
                             {formatCurrency(item.subtotal)}
                           </p>
                         <button
@@ -1935,57 +1789,30 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               {/* Footer del Carrito (Resumen) */}
               {carrito.length > 0 && (
                 <div
-                  style={{
-                    padding: '1.5rem',
-                    borderTop: '1px solid var(--primary-200)',
-                    background: 'rgba(248, 250, 252, 0.7)',
-                  }}
+                  className="border-t border-cyan-400/15 bg-slate-950/80 p-6 text-blue-100"
                 >
                   <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '0.75rem',
-                      fontSize: '0.875rem',
-                    }}
+                    className="mb-3 flex justify-between text-sm"
                   >
                     <span>Subtotal</span>
                     <span>{formatCurrency(calcularSubtotal())}</span>
                   </div>
                   <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '0.75rem',
-                      fontSize: '0.875rem',
-                    }}
+                    className="mb-3 flex justify-between text-sm"
                   >
                     <span>Descuentos</span>
-                    <span style={{ color: 'var(--red-600)' }}>
+                    <span className="text-blue-200">
                       - {formatCurrency(calcularDescuentoTotal())}
                     </span>
                   </div>
                   <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '1rem',
-                      fontSize: '0.875rem',
-                    }}
+                    className="mb-4 flex justify-between text-sm"
                   >
                     <span>{taxLabel}</span>
                     <span>{formatCurrency(calcularImpuestos())}</span>
                   </div>
                   <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontWeight: 'bold',
-                      fontSize: '1.5rem',
-                      color: 'var(--primary-800)',
-                      borderTop: '2px dashed var(--primary-300)',
-                      paddingTop: '1rem',
-                    }}
+                    className="flex justify-between border-t-2 border-dashed border-cyan-300/25 pt-4 text-2xl font-bold text-cyan-100"
                   >
                     <span>TOTAL</span>
                     <span>{formatCurrency(calcularTotal())}</span>
@@ -1993,31 +1820,13 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
                   {/* GRE Indicator */}
                 {greEnabled && calcularTotal() > greThreshold && (
-                    <div
-                      style={{
-                        marginTop: '1rem',
-                        padding: '0.75rem',
-                        background: 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)',
-                        border: '2px solid #2196F3',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                      }}
-                    >
-                      <span style={{ fontSize: '1.25rem' }}>📦</span>
-                      <div style={{ flex: 1 }}>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            color: '#1565C0',
-                          }}
-                        >
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-3">
+                      <span className="text-xl">📦</span>
+                      <div className="flex-1">
+                        <p className="m-0 text-xs font-bold text-cyan-100">
                           GRE Automática
                         </p>
-                        <p style={{ margin: 0, fontSize: '0.7rem', color: '#1976D2' }}>
+                        <p className="m-0 text-[0.7rem] text-slate-300">
                           Se generará Guía de Remisión (&gt; {formatCurrency(greThreshold)})
                         </p>
                       </div>
@@ -2029,25 +1838,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
             {/* Panel Derecho - Cliente y Pago */}
             <div
-              style={{
-                width: '450px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.5rem',
-              }}
+              className="flex min-h-[470px] min-w-0 flex-col gap-4 2xl:col-start-2 2xl:row-start-2"
             >
               {/* Selección de Cliente y Tipo de Comprobante */}
               <div
-                className="stat-card"
-                style={{
-                  padding: '1.5rem',
-                  background:
-                    'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                  backdropFilter: 'blur(20px)',
-                }}
+                className={`${posPanelClass} p-6`}
               >
-                <h3 id="cliente-section-title" style={{ fontWeight: 'bold', marginBottom: '1rem' }}>👤 Cliente</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <h3 id="cliente-section-title" className="mb-4 font-bold">👤 Cliente</h3>
+                <div className="mb-3 flex gap-2">
                   <label htmlFor="pos-cliente" className="sr-only">Seleccionar cliente</label>
                   <select
                     id="pos-cliente"
@@ -2055,12 +1853,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     value={clienteSeleccionado}
                     onChange={(e) => setClienteSeleccionado(e.target.value)}
                     aria-labelledby="cliente-section-title"
-                    style={{
-                      flex: 1,
-                      padding: '0.75rem',
-                      border: '1px solid var(--primary-300)',
-                      borderRadius: '4px',
-                    }}
+                    className={`${posInputClass} flex-1 p-3`}
                   >
                     <option value="">-- Seleccionar cliente --</option>
                     {clientes.map((c) => (
@@ -2071,19 +1864,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   </select>
                 </div>
                 {clienteActual && (
-                  <div style={{ fontSize: '0.875rem', padding: '0.75rem', background: 'var(--emerald-50)', borderRadius: '8px', border: '1px solid var(--emerald-200)', marginBottom: '0.75rem' }}>
-                    <div style={{ fontWeight: '600', color: 'var(--emerald-700)' }}>
-                      ✅ {clienteActual.razon_social || `${clienteActual.nombres || ''} ${clienteActual.apellidos || ''}`.trim()}
+                  <div className="mb-3 rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm">
+                    <div className="flex items-center gap-2 font-semibold text-cyan-100">
+                      <Check className="h-4 w-4" />
+                      {clienteActual.razon_social || `${clienteActual.nombres || ''} ${clienteActual.apellidos || ''}`.trim()}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--emerald-600)' }}>
+                    <div className="mt-1 text-xs text-slate-300">
                       {clienteActual.tipo_documento}: {getClienteDocumento(clienteActual)}
                     </div>
                   </div>
                 )}
                 {!clienteActual && (
                   <button
-                    className="btn btn-secondary"
-                    style={{ width: '100%', marginBottom: '0.75rem' }}
+                    className={`${posSecondaryButtonClass} mb-3 w-full`}
                     onClick={() => window.open('/dashboard/ventas/clientes', '_blank')}
                   >
                     ➕ Crear nuevo cliente
@@ -2091,21 +1884,19 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 )}
 
                 {/* Tipo de Comprobante */}
-                <div style={{ marginTop: '0.75rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--primary-600)', marginBottom: '0.5rem', display: 'block' }}>
-                    📄 Tipo de Comprobante
+                <div className="mt-3">
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/80">
+                    Tipo de Comprobante
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex gap-2">
                     <button
-                      className={`btn ${tipoComprobante === '03' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ flex: 1 }}
+                      className={`flex-1 ${tipoComprobante === '03' ? posPrimaryButtonClass : posSecondaryButtonClass}`}
                       onClick={() => setTipoComprobante('03')}
                     >
                       🧾 Boleta
                     </button>
                     <button
-                      className={`btn ${tipoComprobante === '01' ? 'btn-primary' : 'btn-secondary'}`}
-                      style={{ flex: 1 }}
+                      className={`flex-1 ${tipoComprobante === '01' ? posPrimaryButtonClass : posSecondaryButtonClass}`}
                       onClick={() => setTipoComprobante('01')}
                         disabled={!clienteActual || clienteActual.tipo_documento !== documentoFiscal}
                         title={!clienteActual || clienteActual.tipo_documento !== documentoFiscal ? `Factura requiere cliente con ${documentoFiscal}` : ''}
@@ -2114,8 +1905,9 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     </button>
                   </div>
                     {tipoComprobante === '01' && clienteActual?.tipo_documento !== documentoFiscal && (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--red-500)', marginTop: '0.25rem' }}>
-                        ⚠️ Factura requiere cliente con {documentoFiscal}
+                      <p className="mt-1 flex items-center gap-1 text-xs text-blue-100">
+                        <AlertTriangle className="h-3 w-3" />
+                        Factura requiere cliente con {documentoFiscal}
                       </p>
                     )}
                 </div>
@@ -2123,19 +1915,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
               {/* Métodos de Pago */}
               <div
-                className="stat-card"
-                style={{
-                  padding: '1.5rem',
-                  background:
-                    'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  flex: 1,
-                }}
+                className={`${posPanelClass} flex-1 p-6`}
               >
-                <h3 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>💳 Pago</h3>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Modo de pago</span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                <h3 className="mb-4 font-bold">💳 Pago</h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-300">Modo de pago</span>
+                  <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={pagosMixtos}
@@ -2158,19 +1943,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 </div>
                 {!pagosMixtos ? (
                   <>
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: '1rem',
-                        marginBottom: '1rem',
-                      }}
-                    >
+                    <div className="mb-4 grid grid-cols-2 gap-4">
                       {metodosPago.map((metodo) => (
                         <button
                           key={metodo.id}
                           onClick={() => setMetodoPagoSeleccionado(metodo.id)}
-                          className={`btn ${metodoPagoSeleccionado === metodo.id ? 'btn-primary' : 'btn-secondary'}`}
+                        className={metodoPagoSeleccionado === metodo.id ? posPrimaryButtonClass : posSecondaryButtonClass}
                         >
                           {metodo.nombre}
                         </button>
@@ -2182,37 +1960,23 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                         value={referenciaPago}
                         onChange={(e) => setReferenciaPago(e.target.value)}
                         placeholder="N° de referencia / operación"
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem',
-                          border: '1px solid var(--primary-300)',
-                          borderRadius: '4px',
-                        }}
+                        className={`${posInputClass} w-full p-3`}
                       />
                     )}
                   </>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="flex flex-col gap-3">
                     {pagos.map((pago, index) => {
                       const metodo = metodosPago.find((m) => m.id === pago.metodo_pago_id)
                       return (
                         <div
                           key={`pago-${index}`}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 0.8fr 0.2fr',
-                            gap: '0.5rem',
-                            alignItems: 'center',
-                          }}
+                          className="grid grid-cols-[1fr_0.8fr_auto] items-center gap-2"
                         >
                           <select
                             value={pago.metodo_pago_id}
                             onChange={(e) => actualizarPago(index, 'metodo_pago_id', e.target.value)}
-                            style={{
-                              padding: '0.5rem',
-                              border: '1px solid var(--primary-300)',
-                              borderRadius: '4px',
-                            }}
+                            className={`${posInputClass} p-2`}
                           >
                             <option value="">-- Método --</option>
                             {metodosPago.map((metodoPago) => (
@@ -2228,17 +1992,12 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                             value={pago.monto}
                             onChange={(e) => actualizarPago(index, 'monto', e.target.value)}
                             placeholder={`${currencySymbol} 0.00`}
-                            style={{
-                              padding: '0.5rem',
-                              border: '1px solid var(--primary-300)',
-                              borderRadius: '4px',
-                            }}
+                            className={`${posInputClass} p-2`}
                           />
                           <button
                             type="button"
                             onClick={() => eliminarPago(index)}
-                            className="btn btn-secondary"
-                            style={{ padding: '0.5rem', minWidth: '40px' }}
+                            className={posTinyButtonClass}
                           >
                             🗑️
                           </button>
@@ -2248,12 +2007,7 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                               value={pago.referencia || ''}
                               onChange={(e) => actualizarPago(index, 'referencia', e.target.value)}
                               placeholder="Referencia"
-                              style={{
-                                gridColumn: 'span 3',
-                                padding: '0.5rem',
-                                border: '1px solid var(--primary-300)',
-                                borderRadius: '4px',
-                              }}
+                              className={`${posInputClass} col-span-3 p-2`}
                             />
                           )}
                         </div>
@@ -2262,16 +2016,15 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                     <button
                       type="button"
                       onClick={agregarPago}
-                      className="btn btn-secondary"
-                      style={{ width: '100%' }}
+                      className={`${posSecondaryButtonClass} w-full`}
                     >
                       ➕ Agregar pago
                     </button>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <div className="flex justify-between text-sm">
                       <span>Total pagos</span>
                       <strong>{formatCurrency(totalPagosMixtos)}</strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <div className="flex justify-between text-sm">
                       <span>Restante</span>
                       <strong>{formatCurrency(Math.max(0, calcularTotal() - totalPagosMixtos))}</strong>
                     </div>
@@ -2280,35 +2033,27 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
               </div>
 
               {/* Acciones Finales */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="flex flex-col gap-4">
                 <button
                   onClick={procesarVenta}
                   disabled={
-                    carrito.length === 0
-                    || (!pagosMixtos && !metodoPagoSeleccionado)
-                    || (pagosMixtos && pagos.length === 0)
+                    procesandoVenta
+                  || carrito.length === 0
+                  || (!pagosMixtos && !metodoPagoSeleccionado)
+                  || (pagosMixtos && pagos.length === 0)
                   }
-                  className="btn btn-primary"
-                  style={{
-                    padding: '1.5rem',
-                    fontSize: '1.25rem',
-                    background: 'var(--gradient-success)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                  }}
+                  className="rounded-xl border border-cyan-300/30 bg-gradient-to-br from-blue-600 to-cyan-500 p-6 text-xl font-bold text-white shadow-[0_18px_36px_rgba(37,99,235,0.26)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Procesar Venta ({formatCurrency(calcularTotal())})
+                  {procesandoVenta ? 'Procesando venta...' : `Procesar Venta (${formatCurrency(calcularTotal())})`}
                 </button>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="flex gap-4">
                   <button
-                    className="btn btn-secondary"
-                    style={{ flex: 1 }}
+                    className={`${posSecondaryButtonClass} flex-1`}
                     onClick={() => setCarrito([])}
                   >
                     Cancelar
                   </button>
-                  <button className="btn btn-secondary" style={{ flex: 1 }}>
+                  <button className={`${posSecondaryButtonClass} flex-1`}>
                     Guardar
                   </button>
                 </div>
@@ -2317,59 +2062,41 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
             {/* Historial de Ventas Recientes */}
             <div
-              className="stat-card"
-              style={{
-                gridColumn: 'span 3',
-                padding: '1.5rem',
-                background:
-                  'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                backdropFilter: 'blur(20px)',
-              }}
+              className={`${posPanelClass} p-6 2xl:col-span-2`}
             >
-              <h3 style={{ fontWeight: 'bold', marginBottom: '1rem' }}>📊 Historial de Ventas del Día</h3>
-              <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <h3 className="mb-4 font-bold">📊 Historial de Ventas del Día</h3>
+              <div className="max-h-[200px] overflow-y-auto">
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr style={{ background: 'var(--primary-100)' }}>
-                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Ticket</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Cliente</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acción</th>
+                    <tr className="bg-cyan-400/10 text-slate-300">
+                      <th className="p-3 text-left">Ticket</th>
+                      <th className="p-3 text-left">Cliente</th>
+                      <th className="p-3 text-right">Total</th>
+                      <th className="p-3 text-center">Estado</th>
+                      <th className="p-3 text-center">Acción</th>
                     </tr>
                   </thead>
                   <tbody>
                     {historialVentas.map((venta: any) => (
                       <tr
                         key={venta.id}
-                        style={{
-                          borderBottom: '1px solid var(--primary-200)',
-                          background:
-                            facturaSeleccionada?.id === venta.id ? 'var(--blue-100)' : 'transparent',
-                        }}
+                        className={`border-b border-cyan-400/10 ${facturaSeleccionada?.id === venta.id ? 'bg-blue-500/15' : 'bg-transparent'}`}
                       >
-                        <td style={{ padding: '0.75rem' }}>
+                        <td className="p-3">
                           {venta.numero_venta || venta.numero_ticket || `#${venta.id}`}
                         </td>
-                        <td style={{ padding: '0.75rem' }}>{venta.cliente_nombre || 'General'}</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        <td className="p-3">{venta.cliente_nombre || 'General'}</td>
+                        <td className="p-3 text-right font-bold">
                           {formatCurrency(venta.total)}
                         </td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <td className="p-3 text-center">
                           <span
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '999px',
-                              fontSize: '0.75rem',
-                              backgroundColor:
-                                venta.estado === 'PAGADA' ? 'var(--emerald-100)' : 'var(--amber-100)',
-                              color: venta.estado === 'PAGADA' ? 'var(--emerald-800)' : 'var(--amber-800)',
-                            }}
+                            className={`rounded-full border px-2 py-1 text-xs ${venta.estado === 'PAGADA' ? 'border-cyan-300/25 bg-cyan-400/15 text-cyan-100' : 'border-blue-300/25 bg-blue-400/15 text-blue-100'}`}
                           >
                             {venta.estado}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <td className="p-3 text-center">
                           <button onClick={() => handleVerFactura(venta)} className="btn-icon">
                             👁️
                           </button>
@@ -2384,47 +2111,25 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
           {/* Modal de Factura Detallada */}
           {facturaSeleccionada && (
-            <div style={{
-              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 2000, padding: '2rem'
-            }}>
-              <div style={{
-                width: '800px',
-                maxWidth: '90vw',
-                background: 'white',
-                borderRadius: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                maxHeight: '90vh'
-              }}>
+            <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/75 p-8">
+              <div className="flex max-h-[90vh] w-[800px] max-w-[90vw] flex-col rounded-lg bg-white text-slate-700 shadow-2xl">
                 {/* Header del Modal */}
-                <div style={{
-                  padding: '1rem 1.5rem',
-                  borderBottom: '1px solid #e5e7eb',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#111827' }}>
+                <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                  <h2 className="text-xl font-semibold text-slate-950">
                     Vista Previa del Comprobante
                   </h2>
                   <button
                     onClick={() => setFacturaSeleccionada(null)}
-                    style={{
-                      background: 'none', border: 'none', fontSize: '1.5rem',
-                      cursor: 'pointer', color: '#6b7280'
-                    }}
+                    className="border-0 bg-transparent text-2xl leading-none text-slate-500 transition hover:text-slate-900"
                   >
                     &times;
                   </button>
                 </div>
 
                 {/* Contenido de la Factura (Scrollable) */}
-                <div style={{ overflowY: 'auto', padding: '2rem', fontFamily: 'sans-serif', color: '#374151' }}>
+                <div className="overflow-y-auto p-8 font-sans text-slate-700">
                   {/* Encabezado del Documento */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '1.5rem' }}>
+                  <div className="flex justify-between gap-6 pb-6">
                     <div>
                       {empresaInfo?.logo_url ? (
                         <Image
@@ -2433,50 +2138,32 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                           width={160}
                           height={60}
                           unoptimized
-                          style={{ maxHeight: '60px', width: 'auto', marginBottom: '1rem', objectFit: 'contain' }}
+                          className="mb-4 h-auto max-h-[60px] w-auto object-contain"
                         />
                       ) : (
-                        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
+                        <h1 className="text-2xl font-bold text-slate-950">
                           {empresaInfo?.nombre_comercial || 'Mi Empresa'}
                         </h1>
                       )}
-                      <p style={{ fontSize: '0.875rem' }}>{empresaInfo?.direccion || 'Dirección de la Empresa'}</p>
-                      <p style={{ fontSize: '0.875rem' }}>Email: {empresaInfo?.email || 'email@empresa.com'}</p>
-                      <p style={{ fontSize: '0.875rem' }}>Teléfono: {empresaInfo?.telefono || '987654321'}</p>
+                      <p className="text-sm">{empresaInfo?.direccion || 'Dirección de la Empresa'}</p>
+                      <p className="text-sm">Email: {empresaInfo?.email || 'email@empresa.com'}</p>
+                      <p className="text-sm">Teléfono: {empresaInfo?.telefono || '987654321'}</p>
                     </div>
-                    <div style={{
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      textAlign: 'center',
-                      width: '250px'
-                    }}>
-                      <h2 style={{ fontSize: '1.125rem', fontWeight: 'bold', textTransform: 'uppercase', color: '#111827' }}>
+                    <div className="w-[250px] rounded-lg border-2 border-slate-200 p-4 text-center">
+                      <h2 className="text-lg font-bold uppercase text-slate-950">
                         R.U.C. {empresaInfo?.ruc || '20000000001'}
                       </h2>
-                      <h3 style={{
-                        background: '#f3f4f6', padding: '0.5rem', borderRadius: '4px',
-                        fontSize: '1rem', fontWeight: '600', margin: '0.5rem 0',
-                        textTransform: 'uppercase', color: '#1f2937'
-                      }}>
+                      <h3 className="my-2 rounded bg-slate-100 p-2 text-base font-semibold uppercase text-slate-800">
                         {facturaSeleccionada.tipo_comprobante || 'Factura de Venta'}
                       </h3>
-                      <p style={{ fontSize: '1rem', fontWeight: 'bold', color: '#be123c' }}>
+                      <p className="text-base font-bold text-blue-700">
                         N° {facturaSeleccionada.numero_venta || '001-0001'}
                       </p>
                     </div>
                   </div>
 
                   {/* Datos del Cliente y Venta */}
-                  <div style={{
-                    borderTop: '1px solid #e5e7eb',
-                    borderBottom: '1px solid #e5e7eb',
-                    padding: '1rem 0',
-                    marginBottom: '1.5rem',
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '2rem'
-                  }}>
+                  <div className="mb-6 grid grid-cols-2 gap-8 border-y border-slate-200 py-4">
                     <div>
                       <p><strong>Cliente:</strong> {facturaSeleccionada.cliente_nombre || 'Cliente General'}</p>
                         <p><strong>Documento:</strong> {facturaSeleccionada.cliente_documento || 'Sin documento'}</p>
@@ -2489,26 +2176,26 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
                   {/* Tabla de Items */}
                   {loadingFactura ? (
-                    <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando detalles...</p>
+                    <p className="p-8 text-center">Cargando detalles...</p>
                   ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead style={{ background: '#f9fafb' }}>
+                    <table className="w-full border-collapse text-sm">
+                      <thead className="bg-slate-50">
                         <tr>
-                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>CÓDIGO</th>
-                          <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>DESCRIPCIÓN</th>
-                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>CANT.</th>
-                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>P. UNIT.</th>
-                          <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>TOTAL</th>
+                          <th className="p-3 text-left font-semibold">CÓDIGO</th>
+                          <th className="p-3 text-left font-semibold">DESCRIPCIÓN</th>
+                          <th className="p-3 text-right font-semibold">CANT.</th>
+                          <th className="p-3 text-right font-semibold">P. UNIT.</th>
+                          <th className="p-3 text-right font-semibold">TOTAL</th>
                         </tr>
                       </thead>
                       <tbody>
                         {detallesFactura.map(item => (
-                          <tr key={item.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={{ padding: '0.75rem' }}>{item.codigo_producto}</td>
-                            <td style={{ padding: '0.75rem' }}>{item.descripcion}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{item.cantidad}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(item.precio_unitario)}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>{formatCurrency(item.subtotal)}</td>
+                          <tr key={item.id} className="border-b border-slate-100">
+                            <td className="p-3">{item.codigo_producto}</td>
+                            <td className="p-3">{item.descripcion}</td>
+                            <td className="p-3 text-right">{item.cantidad}</td>
+                            <td className="p-3 text-right">{formatCurrency(item.precio_unitario)}</td>
+                            <td className="p-3 text-right">{formatCurrency(item.subtotal)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -2516,25 +2203,21 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                   )}
 
                   {/* Totales */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                    <div style={{ width: '280px', fontSize: '0.875rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                  <div className="mt-6 flex justify-end">
+                    <div className="w-[280px] text-sm">
+                      <div className="flex justify-between p-2">
                         <span>Subtotal:</span>
                         <strong>{formatCurrency(facturaSeleccionada.subtotal || 0)}</strong>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                      <div className="flex justify-between p-2">
                         <span>Descuentos:</span>
                         <strong>- {formatCurrency(facturaSeleccionada.descuentos || 0)}</strong>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem' }}>
+                      <div className="flex justify-between p-2">
                         <span>{taxLabel}:</span>
                         <strong>{formatCurrency(facturaSeleccionada.impuestos || 0)}</strong>
                       </div>
-                      <div style={{
-                        display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0.5rem',
-                        borderTop: '2px solid #d1d5db', marginTop: '0.5rem',
-                        fontSize: '1.125rem', fontWeight: 'bold', color: '#111827'
-                      }}>
+                      <div className="mt-2 flex justify-between border-t-2 border-slate-300 px-2 py-3 text-lg font-bold text-slate-950">
                         <span>TOTAL:</span>
                         <span>{formatCurrency(facturaSeleccionada.total || 0)}</span>
                       </div>
@@ -2543,27 +2226,14 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
                 </div>
 
                 {/* Footer del Modal */}
-                <div style={{
-                  padding: '1rem 1.5rem',
-                  borderTop: '1px solid #e5e7eb',
-                  background: '#f9fafb',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '1rem'
-                }}>
+                <div className="flex justify-end gap-4 border-t border-slate-200 bg-slate-50 px-6 py-4">
                   <button
                     onClick={() => setFacturaSeleccionada(null)}
-                    style={{
-                      padding: '0.5rem 1rem', background: 'white', border: '1px solid #d1d5db',
-                      borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
-                    }}
+                    className="rounded-md border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100"
                   >
                     Cerrar
                   </button>
-                  <button style={{
-                    padding: '0.5rem 1rem', background: '#2563eb', color: 'white',
-                    border: '1px solid #2563eb', borderRadius: '6px', cursor: 'pointer', fontWeight: '600'
-                  }}>
+                  <button className="rounded-md border border-blue-600 bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700">
                     🖨️ Imprimir
                   </button>
                 </div>
@@ -2573,154 +2243,63 @@ ${JSON.stringify(resultado.debug_info, null, 2)}`;
 
           {/* Modal de Cierre de Caja */}
           {mostrarModalCerrarCaja && (
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                backdropFilter: 'blur(8px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 2000,
-                padding: '2rem',
-              }}
-            >
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                  backdropFilter: 'blur(20px)',
-                  borderRadius: '24px',
-                  padding: '2rem',
-                  width: '100%',
-                  maxWidth: '450px',
-                  boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  position: 'relative',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                    borderRadius: '24px 24px 0 0',
-                  }}
-                />
-                <h3
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    marginBottom: '1.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                  }}
-                >
-                  🔒 Cerrar Caja
+            <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/80 p-8 backdrop-blur">
+              <div className="relative w-full max-w-[450px] rounded-3xl border border-cyan-400/25 bg-slate-950/95 p-8 text-slate-100 shadow-2xl shadow-blue-950/40 backdrop-blur-xl">
+                <div className="absolute inset-x-0 top-0 h-1 rounded-t-3xl bg-gradient-to-r from-blue-600 to-cyan-500" />
+                <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold text-white">
+                  <Lock className="h-6 w-6 text-cyan-200" />
+                  Cerrar Caja
                 </h3>
 
-                <div
-                  style={{
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '12px',
-                    padding: '1rem',
-                    marginBottom: '1.5rem',
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#991b1b' }}>
+                <div className="mb-6 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                  <p className="m-0 text-sm text-cyan-50">
                     <strong>Monto inicial:</strong> {formatCurrency(estadoCaja?.montoInicial || 0)}
                   </p>
                 </div>
 
                 <label
                   htmlFor="monto-contado-cierre"
-                  style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                  }}
+                  className="mb-2 block font-semibold text-slate-300"
                 >
                   Ingrese el monto contado en caja:
                 </label>
                 <input
                   id="monto-contado-cierre"
                   name="monto-contado-cierre"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
                   value={montoContadoInput}
                   onChange={(e) => setMontoContadoInput(e.target.value)}
                   placeholder="0.00"
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    fontSize: '1.2rem',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '12px',
-                    marginBottom: '1rem',
-                  }}
+                  className={`${posInputClass} mb-4 w-full p-4 text-xl`}
                   autoFocus
                 />
 
                 {montoContadoInput && (
                   <div
-                    style={{
-                      background: parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#ecfdf5' : '#fef2f2',
-                      border: `1px solid ${parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#a7f3d0' : '#fecaca'}`,
-                      borderRadius: '12px',
-                      padding: '1rem',
-                      marginBottom: '1.5rem',
-                    }}
+                    className="mb-6 rounded-xl border border-cyan-400/20 bg-white/[0.04] p-4"
                   >
-                    <p style={{ margin: 0, fontSize: '0.9rem', color: parseFloat(montoContadoInput) - (estadoCaja?.montoInicial || 0) >= 0 ? '#065f46' : '#991b1b' }}>
+                    <p className="m-0 text-sm text-cyan-50">
                       <strong>Diferencia:</strong> {formatCurrency(parseFloat(montoContadoInput || '0') - (estadoCaja?.montoInicial || 0))}
                     </p>
                   </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="flex gap-4">
                   <button
                     onClick={confirmarCerrarCaja}
-                    style={{
-                      flex: 1,
-                      padding: '1rem',
-                      background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                    }}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-cyan-300/30 bg-gradient-to-br from-blue-600 to-cyan-500 p-4 text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:brightness-110"
                   >
-                    ✅ Confirmar Cierre
+                    <Check className="h-4 w-4" />
+                    Confirmar Cierre
                   </button>
                   <button
                     onClick={() => {
                       setMostrarModalCerrarCaja(false)
                       setMontoContadoInput('')
                     }}
-                    style={{
-                      flex: 1,
-                      padding: '1rem',
-                      background: '#f1f5f9',
-                      color: '#475569',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                    }}
+                    className="flex-1 rounded-xl border border-slate-400/25 bg-slate-900/75 p-4 text-base font-semibold text-blue-100 transition hover:border-cyan-300/45 hover:bg-slate-800/90"
                   >
                     Cancelar
                   </button>

@@ -70,35 +70,14 @@ export default function NuevoCentroCostoPage() {
       {/* Header */}
       <div className="dashboard-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+          <div className="flex items-center gap-4 mb-2">
             <button
               aria-label="Volver a centros de costo"
-              onClick={() => router.push('/dashboard/contabilidad/centros-costo')}
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: 'var(--primary-100)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--primary-600)',
-                border: 'none',
-                cursor: 'pointer'
-              }}
+              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="w-12 h-12 rounded-3 bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)] border-0 cursor-pointer"
             >
               <ArrowLeft size={24} />
             </button>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '12px',
-              background: 'var(--primary-100)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary-600)'
-            }}>
+            <div className="w-12 h-12 rounded-3 bg-[var(--primary-100)] flex items-center justify-center text-[var(--primary-600)]">
               <Building2 size={24} />
             </div>
             <h1 className="dashboard-title">Nuevo Centro de Costo</h1>
@@ -113,33 +92,19 @@ export default function NuevoCentroCostoPage() {
       <div className="activity-card">
         <form onSubmit={handleSubmit}>
           {error && (
-            <div style={{ 
-              padding: '1rem', 
-              background: 'var(--red-50)', 
-              borderRadius: '8px',
-              marginBottom: '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem'
-            }}>
-              <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-              <p style={{ fontSize: '0.875rem', color: 'var(--red-700)', margin: 0 }}>
+            <div className="p-4 bg-[var(--red-50)] rounded-2 mb-6 flex items-center gap-3">
+              <AlertCircle size={20} className="text-[var(--red-600)]" />
+              <p className="text-[0.875rem] text-[var(--red-700)] m-0">
                 {error}
               </p>
             </div>
           )}
 
-          <div style={{ display: 'grid', gap: '1.5rem' }}>
+          <div className="grid gap-6">
             {/* Código */}
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.875rem', 
-                fontWeight: '600', 
-                marginBottom: '0.5rem',
-                color: 'var(--primary-700)'
-              }}>
-                Código <span style={{ color: 'var(--red-600)' }}>*</span>
+              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+                Código <span className="text-[var(--red-600)]">*</span>
               </label>
               <input
                 type="text"
@@ -150,36 +115,23 @@ export default function NuevoCentroCostoPage() {
                     setErrors({ ...errors, codigo: '' })
                   }
                 }}
-                placeholder="Ej: CC-001"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${errors.codigo ? 'var(--red-500)' : 'var(--primary-300)'}`,
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
+                placeholder="Ej: CC-001" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
                 disabled={loading}
               />
               {errors.codigo && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                <p className="text-3 text-[var(--red-600)] mt-1">
                   {errors.codigo}
                 </p>
               )}
-              <p style={{ fontSize: '0.75rem', color: 'var(--primary-500)', marginTop: '0.25rem' }}>
+              <p className="text-3 text-[var(--primary-500)] mt-1">
                 Código único para identificar el centro de costo
               </p>
             </div>
 
             {/* Nombre */}
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.875rem', 
-                fontWeight: '600', 
-                marginBottom: '0.5rem',
-                color: 'var(--primary-700)'
-              }}>
-                Nombre <span style={{ color: 'var(--red-600)' }}>*</span>
+              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
+                Nombre <span className="text-[var(--red-600)]">*</span>
               </label>
               <input
                 type="text"
@@ -190,18 +142,11 @@ export default function NuevoCentroCostoPage() {
                     setErrors({ ...errors, nombre: '' })
                   }
                 }}
-                placeholder="Ej: Administración"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: `1px solid ${errors.nombre ? 'var(--red-500)' : 'var(--primary-300)'}`,
-                  borderRadius: '8px',
-                  fontSize: '0.875rem'
-                }}
+                placeholder="Ej: Administración" className="w-[100%] p-3 rounded-2 text-[0.875rem]"
                 disabled={loading}
               />
               {errors.nombre && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
+                <p className="text-3 text-[var(--red-600)] mt-1">
                   {errors.nombre}
                 </p>
               )}
@@ -209,68 +154,36 @@ export default function NuevoCentroCostoPage() {
 
             {/* Descripción */}
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '0.875rem', 
-                fontWeight: '600', 
-                marginBottom: '0.5rem',
-                color: 'var(--primary-700)'
-              }}>
+              <label className="block text-[0.875rem] font-semibold mb-2 text-[var(--primary-700)]">
                 Descripción
               </label>
               <textarea
                 value={formData.descripcion}
                 onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                 placeholder="Descripción del centro de costo (opcional)"
-                rows={4}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid var(--primary-300)',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  resize: 'vertical'
-                }}
+                rows={4} className="w-[100%] p-3 border rounded-2 text-[0.875rem]"
                 disabled={loading}
               />
             </div>
           </div>
 
           {/* Botones */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '1rem', 
-            justifyContent: 'flex-end',
-            marginTop: '2rem',
-            paddingTop: '1.5rem',
-            borderTop: '1px solid var(--primary-200)'
-          }}>
+          <div className="flex gap-4 justify-end mt-8 pt-6 border-t">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/contabilidad/centros-costo')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'white',
-                color: 'var(--primary-700)',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
+              onClick={() => router.push('/dashboard/contabilidad/centros-costo')} className="py-3 px-6 bg-white text-[var(--primary-700)] border rounded-2 text-[0.875rem] font-semibold cursor-pointer"
               disabled={loading}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="primary-btn"
-              style={{ padding: '0.75rem 1.5rem' }}
+              className="primary-btn py-3 px-6"
               disabled={loading}
             >
               {loading ? (
                 <>
-                  <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                  <div className="loading-spinner w-4 h-4"></div>
                   Guardando...
                 </>
               ) : (

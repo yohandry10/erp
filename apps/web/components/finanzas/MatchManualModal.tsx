@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { formatDate } from '@/lib/format-utils';
 
 interface MovimientoBancario {
   id: string;
@@ -43,7 +44,7 @@ export default function MatchManualModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  const API_BASE_URL = '/backend';
 
   const loadMovimientos = useCallback(async () => {
     if (!conciliacionId) return;
@@ -171,14 +172,6 @@ export default function MatchManualModal({
       style: 'currency',
       currency: 'PEN',
     }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-PE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
   };
 
   const getSelectedSistemaMovimiento = () => {

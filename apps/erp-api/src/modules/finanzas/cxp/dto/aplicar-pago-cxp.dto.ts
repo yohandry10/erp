@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class AplicarPagoCxpDto {
   @ApiProperty({
@@ -8,7 +8,7 @@ export class AplicarPagoCxpDto {
     minimum: 0.01,
   })
   @IsNotEmpty({ message: 'El monto es requerido' })
-  @IsNumber({}, { message: 'El monto debe ser un número' })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto debe ser un número con máximo 2 decimales' })
   @Min(0.01, { message: 'El monto debe ser mayor a 0' })
   monto: number;
 
@@ -17,7 +17,7 @@ export class AplicarPagoCxpDto {
     example: '2025-10-25',
   })
   @IsNotEmpty({ message: 'La fecha de pago es requerida' })
-  @IsString({ message: 'La fecha debe ser una cadena de texto' })
+  @IsDateString({}, { message: 'La fecha de pago debe ser una fecha válida en formato ISO' })
   fecha_pago: string;
 
   @ApiProperty({

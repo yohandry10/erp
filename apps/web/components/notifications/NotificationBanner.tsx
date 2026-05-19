@@ -1,10 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { AlertCircle, AlertTriangle, Info, X } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
 
 export interface BannerNotification {
   id: string
@@ -26,135 +26,89 @@ interface NotificationBannerProps {
 const bannerConfig = {
   info: {
     icon: Info,
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-300',
-    iconColor: 'text-blue-600',
-    textColor: 'text-blue-900',
+    className: 'border-cyan-300/20 bg-cyan-400/10 text-cyan-50',
+    iconClassName: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-200',
   },
   warning: {
     icon: AlertTriangle,
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-300',
-    iconColor: 'text-blue-600',
-    textColor: 'text-blue-900',
+    className: 'border-blue-300/20 bg-blue-400/10 text-blue-50',
+    iconClassName: 'border-blue-300/20 bg-blue-300/10 text-blue-100',
   },
   error: {
     icon: AlertCircle,
-    bgColor: 'bg-red-50',
-    borderColor: 'border-red-200',
-    iconColor: 'text-red-600',
-    textColor: 'text-red-900',
+    className: 'border-cyan-200/25 bg-slate-900 text-cyan-50',
+    iconClassName: 'border-cyan-200/20 bg-cyan-200/10 text-cyan-100',
   },
+}
+
+function readDismissedBanners() {
+  if (typeof window === 'undefined') return []
+
+  try {
+    const value = window.localStorage.getItem('dismissedBanners')
+    return value ? JSON.parse(value) : []
+  } catch {
+    return []
+  }
 }
 
 export function NotificationBanner({ notification, onDismiss }: NotificationBannerProps) {
   const router = useRouter()
   const [isDismissed, setIsDismissed] = useState(false)
-  const config = bannerConfig[notification.severity]
+  const config = bannerConfig[notification.severity] ?? bannerConfig.info
   const Icon = config.icon
 
-  if (isDismissed) {
-    return null
-  }
+  if (isDismissed) return null
 
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
+  const handleDismiss = (event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
     setIsDismissed(true)
-    
-    // If persistent, store dismissal in localStorage
-    if (notification.persistent) {
-      const dismissedBanners = JSON.parse(
-        localStorage.getItem('dismissedBanners') || '[]'
-      )
-      dismissedBanners.push({
-        id: notification.id,
-        dismissedAt: new Date().toISOString(),
-      })
-      localStorage.setItem('dismissedBanners', JSON.stringify(dismissedBanners))
-    }
-    
-    // Call onDismiss callback after state update
-    setTimeout(() => {
-      onDismiss?.(notification.id)
-    }, 100)
-  }
 
-  const handleAction = () => {
-    if (notification.actionUrl) {
-      router.push(notification.actionUrl)
+    if (notification.persistent && typeof window !== 'undefined') {
+      const dismissedBanners = readDismissedBanners()
+      dismissedBanners.push({ id: notification.id, dismissedAt: new Date().toISOString() })
+      window.localStorage.setItem('dismissedBanners', JSON.stringify(dismissedBanners))
     }
+
+    window.setTimeout(() => onDismiss?.(notification.id), 100)
   }
 
   return (
-    <div
-      className={cn(
-        'rounded-xl border p-4 mb-4',
-        config.bgColor,
-        config.borderColor
-      )}
-      style={{ boxShadow: 'var(--shadow-md)' }}
-    >
+    <div className={cn('mb-4 rounded-2xl border p-4 shadow-lg shadow-blue-950/15', config.className)}>
       <div className="flex items-start gap-4">
-        <div 
-          className={cn('flex-shrink-0 rounded-lg p-2', config.iconColor)}
-          style={{ 
-            backgroundColor: notification.severity === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)'
-          }}
-        >
-          <Icon className="h-6 w-6" />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <h4 className={cn('text-base font-semibold mb-1', config.textColor)}>
-            {notification.title}
-          </h4>
-          <p className={cn('text-sm', config.textColor, 'opacity-90')}>
-            {notification.message}
-          </p>
-          
+        <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl border', config.iconClassName)}>
+          <Icon className="h-5 w-5" />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-bold text-white">{notification.title}</h4>
+          <p className="mt-1 text-sm leading-5 text-slate-300">{notification.message}</p>
+
           {notification.actionUrl && notification.actionLabel && (
-            <button
-              className="btn btn-primary"
-              onClick={handleAction}
-              style={{ marginTop: '0.75rem' }}
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => router.push(notification.actionUrl!)}
+              className="mt-3 bg-cyan-400 text-slate-950 hover:bg-cyan-300"
             >
               {notification.actionLabel}
-            </button>
+            </Button>
           )}
         </div>
-        
+
         {notification.dismissible && (
-          <button
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Cerrar notificación"
             onClick={handleDismiss}
-            style={{
-              flexShrink: 0,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#64748b',
-              padding: '0.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '4px',
-              transition: 'all 0.2s',
-              width: '24px',
-              height: '24px',
-              justifyContent: 'center'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(100, 116, 139, 0.1)'
-              e.currentTarget.style.color = '#1e293b'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-              e.currentTarget.style.color = '#64748b'
-            }}
-            aria-label="Cerrar"
+            className="h-8 w-8 shrink-0 text-slate-400 hover:bg-cyan-400/10 hover:text-cyan-100"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
     </div>

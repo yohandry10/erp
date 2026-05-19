@@ -139,11 +139,11 @@ export default function ProveedoresPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', marginBottom: '2rem' }}>
+      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL PROVEEDORES</h3>
-            <Building2 className="stat-icon" style={{ color: '#3b82f6' }} />
+            <Building2 className="stat-icon text-blue-500" />
           </div>
           <div className="stat-value">{totalProveedores}</div>
           <div className="stat-subtitle">Proveedores registrados</div>
@@ -152,7 +152,7 @@ export default function ProveedoresPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>ACTIVOS</h3>
-            <span className="stat-icon" style={{ fontSize: '1.5rem' }}>✅</span>
+            <span className="stat-icon text-6">✅</span>
           </div>
           <div className="stat-value">
             {proveedores.filter(p => p.activo).length}
@@ -163,7 +163,7 @@ export default function ProveedoresPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>INACTIVOS</h3>
-            <span className="stat-icon" style={{ fontSize: '1.5rem' }}>⏸️</span>
+            <span className="stat-icon text-6">⏸️</span>
           </div>
           <div className="stat-value">
             {proveedores.filter(p => !p.activo).length}
@@ -174,44 +174,22 @@ export default function ProveedoresPage() {
 
       {/* Filters */}
       <div className="activity-section">
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '300px', position: 'relative' }}>
+        <div className="flex gap-4 mb-6 flex-wrap">
+          <div className="flex-[1] min-w-[300px] relative">
             <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: '1rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                color: '#9ca3af' 
-              }} 
+              size={20} className="absolute left-4 top-[50%] -translate-y-1/2 text-gray-400" 
             />
             <input
               type="text"
               placeholder="Buscar por RUC, razón social o nombre comercial..."
               value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem 0.75rem 3rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.875rem'
-              }}
+              onChange={(e) => handleSearch(e.target.value)} className="w-[100%] pt-3 pr-4 pb-3 pl-12 rounded-2 border text-[0.875rem]"
             />
           </div>
 
           <select
             value={activoFilter}
-            onChange={(e) => handleActivoFilterChange(e.target.value)}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.875rem',
-              background: 'white',
-              minWidth: '150px'
-            }}
+            onChange={(e) => handleActivoFilterChange(e.target.value)} className="py-3 px-4 rounded-2 border text-[0.875rem] bg-white min-w-[150px]"
           >
             <option value="">Todos los estados</option>
             <option value="true">Activos</option>
@@ -220,15 +198,7 @@ export default function ProveedoresPage() {
 
           <select
             value={condicionesPagoFilter}
-            onChange={(e) => handleCondicionesPagoFilterChange(e.target.value)}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.875rem',
-              background: 'white',
-              minWidth: '180px'
-            }}
+            onChange={(e) => handleCondicionesPagoFilterChange(e.target.value)} className="py-3 px-4 rounded-2 border text-[0.875rem] bg-white min-w-[180px]"
           >
             <option value="">Todas las condiciones</option>
             <option value="CONTADO">Contado</option>
@@ -241,38 +211,14 @@ export default function ProveedoresPage() {
           </select>
 
           <button
-            onClick={handleImport}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={handleImport} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <Upload size={16} />
             Importar
           </button>
 
           <button
-            onClick={handleExport}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            onClick={handleExport} className="py-3 px-4 rounded-2 border bg-white cursor-pointer flex items-center gap-2 text-[0.875rem] font-medium"
           >
             <Download size={16} />
             Exportar
@@ -280,8 +226,7 @@ export default function ProveedoresPage() {
 
           <button
             onClick={loadProveedores}
-            className="refresh-btn"
-            style={{ padding: '0.75rem 1rem' }}
+            className="refresh-btn py-3 px-4"
           >
             <RefreshCw size={16} />
             Actualizar
@@ -296,12 +241,12 @@ export default function ProveedoresPage() {
               <p>Cargando proveedores...</p>
             </div>
           ) : proveedores.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <Building2 size={48} style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
-              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+            <div className="text-center p-12 text-gray-500">
+              <Building2 size={48} className="text-gray-400" />
+              <h3 className="text-[1.125rem] font-semibold mb-2">
                 No hay proveedores
               </h3>
-              <p style={{ marginBottom: '1.5rem' }}>
+              <p className="mb-6">
                 {searchTerm || activoFilter || condicionesPagoFilter
                   ? 'No se encontraron proveedores con los filtros aplicados'
                   : 'Comienza agregando tu primer proveedor'}
@@ -318,140 +263,98 @@ export default function ProveedoresPage() {
             </div>
           ) : (
             <>
-              <div style={{ overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="overflow-auto">
+                <table className="w-[100%]">
                   <thead>
-                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.1)' }}>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                    <tr>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         RUC
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Razón Social
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Contacto
                       </th>
-                      <th style={{ textAlign: 'left', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-left p-4 font-semibold text-3 text-gray-500">
                         Condiciones
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Límite Crédito
                       </th>
-                      <th style={{ textAlign: 'center', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-center p-4 font-semibold text-3 text-gray-500">
                         Estado
                       </th>
-                      <th style={{ textAlign: 'right', padding: '1rem', fontWeight: '600', fontSize: '0.75rem', textTransform: 'uppercase', color: '#6b7280' }}>
+                      <th className="text-right p-4 font-semibold text-3 text-gray-500">
                         Acciones
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {proveedores.map((proveedor) => (
-                      <tr key={proveedor.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', fontFamily: 'monospace' }}>
+                      <tr key={proveedor.id} className="border-b">
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-semibold">
                             {proveedor.ruc}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#111827' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] font-semibold text-gray-900">
                             {proveedor.razon_social}
                           </div>
                           {proveedor.nombre_comercial && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            <div className="text-3 text-gray-500">
                               {proveedor.nombre_comercial}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                        <td className="p-4">
+                          <div className="text-[0.875rem] text-gray-700">
                             {proveedor.contacto || '-'}
                           </div>
                           {proveedor.email && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            <div className="text-3 text-gray-500">
                               {proveedor.email}
                             </div>
                           )}
                           {proveedor.telefono && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                            <div className="text-3 text-gray-500">
                               📞 {proveedor.telefono}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                        <td className="p-4 text-[0.875rem] text-gray-500">
                           {proveedor.condiciones_pago ? (
-                            <span style={{
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.75rem',
-                              fontWeight: '500',
-                              background: proveedor.condiciones_pago === 'CONTADO' 
-                                ? 'rgba(16, 185, 129, 0.1)' 
-                                : 'rgba(59, 130, 246, 0.1)',
-                              color: proveedor.condiciones_pago === 'CONTADO' 
-                                ? '#059669' 
-                                : '#2563eb'
-                            }}>
+                            <span className="py-1 px-3 rounded-full text-3 font-medium">
                               {proveedor.condiciones_pago.replace('CREDITO_', 'Crédito ')}
                             </span>
                           ) : '-'}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right', fontSize: '0.875rem', fontWeight: '600', color: '#374151' }}>
+                        <td className="p-4 text-right text-[0.875rem] font-semibold text-gray-700">
                           {formatCurrency(proveedor.limite_credito)}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500',
-                            background: proveedor.activo ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                            color: proveedor.activo ? '#059669' : '#dc2626'
-                          }}>
+                        <td className="p-4 text-center">
+                          <span className="py-1 px-3 rounded-full text-3 font-medium">
                             {proveedor.activo ? 'ACTIVO' : 'INACTIVO'}
                           </span>
                         </td>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => router.push(`/dashboard/compras/proveedores/${proveedor.id}`)}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: '#3b82f6',
-                                color: 'white',
-                                cursor: 'pointer'
-                              }}
+                              onClick={() => router.push(`/dashboard/compras/proveedores/${proveedor.id}`)} className="p-2 rounded-[6px] border-0 bg-blue-500 text-white cursor-pointer"
                               title="Ver detalle"
                             >
                               <Eye size={16} />
                             </button>
                             <button
-                              onClick={() => router.push(`/dashboard/compras/proveedores/${proveedor.id}/editar`)}
-                              style={{
-                                padding: '0.5rem',
-                                borderRadius: '6px',
-                                border: 'none',
-                                background: '#10b981',
-                                color: 'white',
-                                cursor: 'pointer'
-                              }}
+                              onClick={() => router.push(`/dashboard/compras/proveedores/${proveedor.id}/editar`)} className="p-2 rounded-[6px] border-0 bg-[#10b981] text-white cursor-pointer"
                               title="Editar"
                             >
                               <Edit size={16} />
                             </button>
                             {proveedor.activo && (
                               <button
-                                onClick={() => handleDelete(proveedor.id, proveedor.razon_social)}
-                                style={{
-                                  padding: '0.5rem',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: '#ef4444',
-                                  color: 'white',
-                                  cursor: 'pointer'
-                                }}
+                                onClick={() => handleDelete(proveedor.id, proveedor.razon_social)} className="p-2 rounded-[6px] border-0 bg-red-500 text-white cursor-pointer"
                                 title="Desactivar"
                               >
                                 <Trash2 size={16} />
@@ -467,30 +370,16 @@ export default function ProveedoresPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div style={{ 
-                  padding: '1rem', 
-                  borderTop: '1px solid rgba(0,0,0,0.1)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ fontSize: '0.875rem', color: '#374151' }}>
+                <div className="p-4 border-t flex justify-between items-center">
+                  <div className="text-[0.875rem] text-gray-700">
                     Mostrando <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> a{' '}
                     <strong>{Math.min(currentPage * itemsPerPage, totalProveedores)}</strong> de{' '}
                     <strong>{totalProveedores}</strong> proveedores
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: currentPage === 1 ? '#f3f4f6' : 'white',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem'
-                      }}
+                      disabled={currentPage === 1} className="py-2 px-4 rounded-[6px] border text-[0.875rem]"
                     >
                       Anterior
                     </button>
@@ -509,17 +398,7 @@ export default function ProveedoresPage() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            border: '1px solid #d1d5db',
-                            background: currentPage === pageNum ? '#3b82f6' : 'white',
-                            color: currentPage === pageNum ? 'white' : '#374151',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            minWidth: '40px'
-                          }}
+                          onClick={() => setCurrentPage(pageNum)} className="py-2 px-4 rounded-[6px] border cursor-pointer text-[0.875rem] min-w-10"
                         >
                           {pageNum}
                         </button>
@@ -527,15 +406,7 @@ export default function ProveedoresPage() {
                     })}
                     <button
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        border: '1px solid #d1d5db',
-                        background: currentPage === totalPages ? '#f3f4f6' : 'white',
-                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem'
-                      }}
+                      disabled={currentPage === totalPages} className="py-2 px-4 rounded-[6px] border text-[0.875rem]"
                     >
                       Siguiente
                     </button>

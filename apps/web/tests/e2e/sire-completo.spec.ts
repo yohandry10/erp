@@ -360,6 +360,8 @@ test.describe('T12 SIRE completo', () => {
 
     await gotoAuthenticated(page, '/dashboard/sire');
     await expect(page.getByRole('heading', { name: 'SIRE - Sistema de Registros Electrónicos' })).toBeVisible({ timeout: 15000 });
+    await page.locator('input[type="month"]').fill(periodoSire);
+    await page.getByRole('button', { name: '🔄 Actualizar' }).click();
     await expect(page.locator('td', { hasText: periodoSire }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('td', { hasText: /Registro de Ventas|Registro de Compras/i }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).not.toContainText(/Cargando reportes SIRE|Application error|Error fatal|Unhandled/i);

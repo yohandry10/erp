@@ -1,0 +1,58 @@
+name: Infra
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'docker-compose*.yml'
+      - 'apps/**/Dockerfile'
+      - 'monitoring/**'
+      - '.github/workflows/infra.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docker-compose*.yml'
+      - 'apps/**/Dockerfile'
+      - 'monitoring/**'
+      - '.github/workflows/infra.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-and-observability:
+    name: Compose and observability config
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose files
+        run: |
+          docker compose --env-file .env.example -f docker-compose.yml config --quiet
+          docker compose --env-file .env.example -f docker-compose.validation.yml config --quiet
+
+      - name: Validate Prometheus config and rules
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:latest \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Validate Grafana dashboards JSON
+        run: |
+          find monitoring/grafana/dashboards -name '*.json' -print0 | xargs -0 -n1 jq empty
+
+      - name: Build runtime images
+        run: docker compose --env-file .env.example build erp-api web worker
+
+      - name: Summary
+        run: |
+          echo "## Infra ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "- docker compose config OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Prometheus promtool OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Grafana dashboard JSON OK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dockerfiles build OK" >> "$GITHUB_STEP_SUMMARY"

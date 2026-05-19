@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
+import { useState } from 'react'
+import { AlertCircle, CheckCircle, Plus, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface DetalleAsiento {
   cuenta_id: string
@@ -39,12 +42,17 @@ interface AsientoFormProps {
   loading?: boolean
 }
 
+const inputClass =
+  'w-full rounded-xl border border-cyan-400/20 bg-slate-950/70 px-3 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10 disabled:cursor-not-allowed disabled:opacity-60'
+
+const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
+
 export default function AsientoForm({
   onSubmit,
   onCancel,
   cuentas,
   centrosCosto,
-  loading = false
+  loading = false,
 }: AsientoFormProps) {
   const [formData, setFormData] = useState<AsientoFormData>({
     fecha: new Date().toISOString().split('T')[0],
@@ -52,13 +60,12 @@ export default function AsientoForm({
     referencia: '',
     detalles: [
       { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
-      { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' }
-    ]
+      { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' },
+    ],
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Calcular totales
   const totalDebe = formData.detalles.reduce((sum, d) => sum + (d.debe || 0), 0)
   const totalHaber = formData.detalles.reduce((sum, d) => sum + (d.haber || 0), 0)
   const diferencia = Math.abs(totalDebe - totalHaber)
@@ -67,10 +74,7 @@ export default function AsientoForm({
   const handleAddDetalle = () => {
     setFormData({
       ...formData,
-      detalles: [
-        ...formData.detalles,
-        { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' }
-      ]
+      detalles: [...formData.detalles, { cuenta_id: '', debe: 0, haber: 0, concepto: '', centro_costo_id: '' }],
     })
   }
 
@@ -79,30 +83,23 @@ export default function AsientoForm({
       setErrors({ ...errors, detalles: 'Debe haber al menos 2 movimientos' })
       return
     }
-    const newDetalles = formData.detalles.filter((_, i) => i !== index)
-    setFormData({ ...formData, detalles: newDetalles })
+    setFormData({ ...formData, detalles: formData.detalles.filter((_, i) => i !== index) })
   }
 
   const handleDetalleChange = (index: number, field: keyof DetalleAsiento, value: any) => {
     const newDetalles = [...formData.detalles]
     newDetalles[index] = { ...newDetalles[index], [field]: value }
 
-    // Si se cambia la cuenta, actualizar código y nombre
     if (field === 'cuenta_id') {
-      const cuenta = cuentas.find(c => c.id === value)
+      const cuenta = cuentas.find((c) => c.id === value)
       if (cuenta) {
         newDetalles[index].cuenta_codigo = cuenta.codigo
         newDetalles[index].cuenta_nombre = cuenta.nombre
       }
     }
 
-    // Si se ingresa debe, limpiar haber y viceversa
-    if (field === 'debe' && value > 0) {
-      newDetalles[index].haber = 0
-    }
-    if (field === 'haber' && value > 0) {
-      newDetalles[index].debe = 0
-    }
+    if (field === 'debe' && value > 0) newDetalles[index].haber = 0
+    if (field === 'haber' && value > 0) newDetalles[index].debe = 0
 
     setFormData({ ...formData, detalles: newDetalles })
   }
@@ -110,38 +107,18 @@ export default function AsientoForm({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.fecha) {
-      newErrors.fecha = 'La fecha es requerida'
-    }
+    if (!formData.fecha) newErrors.fecha = 'La fecha es requerida'
+    if (!formData.concepto.trim()) newErrors.concepto = 'El concepto es requerido'
+    if (formData.detalles.length < 2) newErrors.detalles = 'Debe haber al menos 2 movimientos'
 
-    if (!formData.concepto.trim()) {
-      newErrors.concepto = 'El concepto es requerido'
-    }
-
-    if (formData.detalles.length < 2) {
-      newErrors.detalles = 'Debe haber al menos 2 movimientos'
-    }
-
-    // Validar cada detalle
     formData.detalles.forEach((detalle, index) => {
-      if (!detalle.cuenta_id) {
-        newErrors[`detalle_${index}_cuenta`] = 'Seleccione una cuenta'
-      }
-      if (!detalle.concepto.trim()) {
-        newErrors[`detalle_${index}_concepto`] = 'El concepto es requerido'
-      }
-      if (detalle.debe === 0 && detalle.haber === 0) {
-        newErrors[`detalle_${index}_monto`] = 'Debe ingresar un monto en debe o haber'
-      }
-      if (detalle.debe > 0 && detalle.haber > 0) {
-        newErrors[`detalle_${index}_monto`] = 'Solo puede ingresar debe o haber, no ambos'
-      }
+      if (!detalle.cuenta_id) newErrors[`detalle_${index}_cuenta`] = 'Seleccione una cuenta'
+      if (!detalle.concepto.trim()) newErrors[`detalle_${index}_concepto`] = 'El concepto es requerido'
+      if (detalle.debe === 0 && detalle.haber === 0) newErrors[`detalle_${index}_monto`] = 'Debe ingresar un monto'
+      if (detalle.debe > 0 && detalle.haber > 0) newErrors[`detalle_${index}_monto`] = 'Use debe o haber, no ambos'
     })
 
-    // Validar balance
-    if (!isBalanced) {
-      newErrors.balance = `El asiento no cuadra. Diferencia: S/ ${diferencia.toFixed(2)}`
-    }
+    if (!isBalanced) newErrors.balance = `El asiento no cuadra. Diferencia: S/ ${diferencia.toFixed(2)}`
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -149,10 +126,7 @@ export default function AsientoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     try {
       await onSubmit(formData)
@@ -161,481 +135,241 @@ export default function AsientoForm({
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PE', {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
     }).format(amount)
-  }
+
+  const fieldError = (key: string) =>
+    errors[key] ? <p className="mt-1 text-xs font-medium text-cyan-100">{errors[key]}</p> : null
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Información General */}
-      <div className="activity-card">
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--primary-800)' }}>
-          Información General
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Fecha *
+    <form onSubmit={handleSubmit} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="space-y-4">
+        <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Informacion general</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 p-5 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className={labelClass}>Fecha *</span>
+              <input
+                type="date"
+                value={formData.fecha}
+                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                className={cn(inputClass, errors.fecha && 'border-cyan-200')}
+                disabled={loading}
+              />
+              {fieldError('fecha')}
             </label>
-            <input
-              type="date"
-              value={formData.fecha}
-              onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: errors.fecha ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
-              disabled={loading}
-            />
-            {errors.fecha && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
-                {errors.fecha}
-              </p>
-            )}
-          </div>
 
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Referencia
+            <label className="space-y-2">
+              <span className={labelClass}>Referencia</span>
+              <input
+                type="text"
+                value={formData.referencia}
+                onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
+                placeholder="Ej: F001-00123"
+                className={inputClass}
+                disabled={loading}
+              />
             </label>
-            <input
-              type="text"
-              value={formData.referencia}
-              onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
-              placeholder="Ej: F001-00123"
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem'
-              }}
-              disabled={loading}
-            />
-          </div>
 
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '0.875rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: 'var(--primary-700)'
-            }}>
-              Concepto *
+            <label className="space-y-2 md:col-span-2">
+              <span className={labelClass}>Concepto *</span>
+              <textarea
+                value={formData.concepto}
+                onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
+                placeholder="Descripcion del asiento contable"
+                rows={3}
+                className={cn(inputClass, 'resize-none', errors.concepto && 'border-cyan-200')}
+                disabled={loading}
+              />
+              {fieldError('concepto')}
             </label>
-            <textarea
-              value={formData.concepto}
-              onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
-              placeholder="Descripción del asiento contable"
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: errors.concepto ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                resize: 'vertical'
-              }}
+          </CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/20 bg-slate-950/70 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="flex-row items-center justify-between border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Movimientos debe / haber</CardTitle>
+            <Button
+              type="button"
+              onClick={handleAddDetalle}
               disabled={loading}
-            />
-            {errors.concepto && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
-                {errors.concepto}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Detalles del Asiento */}
-      <div className="activity-card">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1rem'
-        }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-            Movimientos (Debe / Haber)
-          </h3>
-          <button
-            type="button"
-            onClick={handleAddDetalle}
-            disabled={loading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              background: 'var(--primary-600)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            <Plus size={16} />
-            Agregar Movimiento
-          </button>
-        </div>
-
-        {errors.detalles && (
-          <div style={{ 
-            padding: '0.75rem', 
-            background: 'var(--red-50)', 
-            borderRadius: '8px',
-            marginBottom: '1rem'
-          }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--red-700)' }}>
-              {errors.detalles}
-            </p>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {formData.detalles.map((detalle, index) => (
-            <div 
-              key={index}
-              style={{
-                padding: '1rem',
-                border: '1px solid var(--primary-200)',
-                borderRadius: '8px',
-                background: 'var(--primary-50)'
-              }}
+              className="gap-2 bg-blue-600 text-white hover:bg-blue-500"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-700)' }}>
-                  Movimiento {index + 1}
-                </span>
-                {formData.detalles.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDetalle(index)}
-                    disabled={loading}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.5rem',
-                      background: 'var(--red-100)',
-                      color: 'var(--red-700)',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Trash2 size={14} />
-                    Eliminar
-                  </button>
-                )}
+              <Plus className="h-4 w-4" />
+              Agregar
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3 p-5">
+            {errors.detalles && (
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+                {errors.detalles}
               </div>
+            )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    marginBottom: '0.5rem',
-                    color: 'var(--primary-700)'
-                  }}>
-                    Cuenta *
-                  </label>
-                  <select
-                    value={detalle.cuenta_id}
-                    onChange={(e) => handleDetalleChange(index, 'cuenta_id', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: errors[`detalle_${index}_cuenta`] ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      background: 'white'
-                    }}
-                    disabled={loading}
-                  >
-                    <option value="">Seleccione una cuenta</option>
-                    {cuentas.map((cuenta) => (
-                      <option key={cuenta.id} value={cuenta.id}>
-                        {cuenta.codigo} - {cuenta.nombre}
-                      </option>
-                    ))}
-                  </select>
-                  {errors[`detalle_${index}_cuenta`] && (
-                    <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
-                      {errors[`detalle_${index}_cuenta`]}
-                    </p>
+            {formData.detalles.map((detalle, index) => (
+              <div key={index} className="rounded-2xl border border-cyan-400/15 bg-slate-900/70 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-white">Movimiento {index + 1}</span>
+                  {formData.detalles.length > 2 && (
+                    <Button
+                      type="button"
+                      onClick={() => handleRemoveDetalle(index)}
+                      disabled={loading}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Quitar
+                    </Button>
                   )}
                 </div>
 
-                <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    marginBottom: '0.5rem',
-                    color: 'var(--emerald-700)'
-                  }}>
-                    Debe
+                <div className="grid gap-3 lg:grid-cols-[minmax(220px,2fr)_130px_130px_minmax(160px,1fr)]">
+                  <label className="space-y-2">
+                    <span className={labelClass}>Cuenta *</span>
+                    <select
+                      value={detalle.cuenta_id}
+                      onChange={(e) => handleDetalleChange(index, 'cuenta_id', e.target.value)}
+                      className={cn(inputClass, errors[`detalle_${index}_cuenta`] && 'border-cyan-200')}
+                      disabled={loading}
+                    >
+                      <option value="">Seleccione una cuenta</option>
+                      {cuentas.map((cuenta) => (
+                        <option key={cuenta.id} value={cuenta.id}>
+                          {cuenta.codigo} - {cuenta.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldError(`detalle_${index}_cuenta`)}
                   </label>
+
+                  <label className="space-y-2">
+                    <span className={labelClass}>Debe</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={detalle.debe || ''}
+                      onChange={(e) => handleDetalleChange(index, 'debe', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className={cn(inputClass, errors[`detalle_${index}_monto`] && 'border-cyan-200')}
+                      disabled={loading}
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className={labelClass}>Haber</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={detalle.haber || ''}
+                      onChange={(e) => handleDetalleChange(index, 'haber', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className={cn(inputClass, errors[`detalle_${index}_monto`] && 'border-cyan-200')}
+                      disabled={loading}
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className={labelClass}>Centro</span>
+                    <select
+                      value={detalle.centro_costo_id || ''}
+                      onChange={(e) => handleDetalleChange(index, 'centro_costo_id', e.target.value)}
+                      className={inputClass}
+                      disabled={loading}
+                    >
+                      <option value="">Sin centro</option>
+                      {centrosCosto.map((centro) => (
+                        <option key={centro.id} value={centro.id}>
+                          {centro.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label className="mt-3 block space-y-2">
+                  <span className={labelClass}>Concepto *</span>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={detalle.debe || ''}
-                    onChange={(e) => handleDetalleChange(index, 'debe', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: errors[`detalle_${index}_monto`] ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem'
-                    }}
+                    type="text"
+                    value={detalle.concepto}
+                    onChange={(e) => handleDetalleChange(index, 'concepto', e.target.value)}
+                    placeholder="Descripcion del movimiento"
+                    className={cn(inputClass, errors[`detalle_${index}_concepto`] && 'border-cyan-200')}
                     disabled={loading}
                   />
-                </div>
-
-                <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    marginBottom: '0.5rem',
-                    color: 'var(--blue-700)'
-                  }}>
-                    Haber
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={detalle.haber || ''}
-                    onChange={(e) => handleDetalleChange(index, 'haber', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: errors[`detalle_${index}_monto`] ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem'
-                    }}
-                    disabled={loading}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '0.75rem', 
-                    fontWeight: '600', 
-                    marginBottom: '0.5rem',
-                    color: 'var(--primary-700)'
-                  }}>
-                    Centro de Costo
-                  </label>
-                  <select
-                    value={detalle.centro_costo_id || ''}
-                    onChange={(e) => handleDetalleChange(index, 'centro_costo_id', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid var(--primary-300)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      background: 'white'
-                    }}
-                    disabled={loading}
-                  >
-                    <option value="">Sin centro</option>
-                    {centrosCosto.map((centro) => (
-                      <option key={centro.id} value={centro.id}>
-                        {centro.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginTop: '0.75rem' }}>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: '0.75rem', 
-                  fontWeight: '600', 
-                  marginBottom: '0.5rem',
-                  color: 'var(--primary-700)'
-                }}>
-                  Concepto *
+                  {fieldError(`detalle_${index}_concepto`)}
+                  {fieldError(`detalle_${index}_monto`)}
                 </label>
-                <input
-                  type="text"
-                  value={detalle.concepto}
-                  onChange={(e) => handleDetalleChange(index, 'concepto', e.target.value)}
-                  placeholder="Descripción del movimiento"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: errors[`detalle_${index}_concepto`] ? '2px solid var(--red-500)' : '1px solid var(--primary-300)',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem'
-                  }}
-                  disabled={loading}
-                />
-                {errors[`detalle_${index}_concepto`] && (
-                  <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.25rem' }}>
-                    {errors[`detalle_${index}_concepto`]}
-                  </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <aside className="space-y-4">
+        <Card className="sticky top-4 border-cyan-400/20 bg-slate-950/75 text-slate-100 shadow-xl shadow-blue-950/20">
+          <CardHeader className="border-b border-cyan-400/10 px-5 py-4">
+            <CardTitle className="text-base text-white">Resumen del asiento</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/10 p-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70">Debe</div>
+                <div className="mt-2 text-lg font-bold text-white">{formatCurrency(totalDebe)}</div>
+              </div>
+              <div className="rounded-xl border border-blue-400/15 bg-blue-400/10 p-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-200/70">Haber</div>
+                <div className="mt-2 text-lg font-bold text-white">{formatCurrency(totalHaber)}</div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-cyan-400/15 bg-slate-900/75 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-300">Diferencia</span>
+                <span className="text-xl font-bold text-white">{formatCurrency(diferencia)}</span>
+              </div>
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/10 p-3">
+                {isBalanced ? (
+                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-cyan-100" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-cyan-100" />
                 )}
-              </div>
-
-              {errors[`detalle_${index}_monto`] && (
-                <p style={{ fontSize: '0.75rem', color: 'var(--red-600)', marginTop: '0.5rem' }}>
-                  {errors[`detalle_${index}_monto`]}
+                <p className="text-sm font-medium text-cyan-50">
+                  {isBalanced ? 'El asiento esta balanceado correctamente.' : 'Debe y haber deben cuadrar antes de guardar.'}
                 </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Resumen y Balance */}
-      <div className="activity-card">
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--primary-800)' }}>
-          Resumen
-        </h3>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Total Debe</span>
-            <span style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--emerald-600)' }}>
-              {formatCurrency(totalDebe)}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--primary-600)' }}>Total Haber</span>
-            <span style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--blue-600)' }}>
-              {formatCurrency(totalHaber)}
-            </span>
-          </div>
-
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            paddingTop: '0.75rem',
-            borderTop: '2px solid var(--primary-200)'
-          }}>
-            <span style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--primary-800)' }}>Diferencia</span>
-            <span style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: '700', 
-              color: isBalanced ? 'var(--emerald-600)' : 'var(--red-600)' 
-            }}>
-              {formatCurrency(diferencia)}
-            </span>
-          </div>
-
-          {isBalanced ? (
-            <div style={{ 
-              background: 'var(--emerald-50)',
-              borderRadius: '8px',
-              padding: '0.75rem',
-              marginTop: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <CheckCircle size={20} style={{ color: 'var(--emerald-600)' }} />
-              <div style={{ fontSize: '0.875rem', color: 'var(--emerald-700)', fontWeight: '600' }}>
-                El asiento está balanceado correctamente
               </div>
+              {errors.balance && <p className="mt-3 text-sm font-semibold text-cyan-100">{errors.balance}</p>}
             </div>
-          ) : (
-            <div style={{ 
-              background: 'var(--red-50)',
-              borderRadius: '8px',
-              padding: '0.75rem',
-              marginTop: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <AlertCircle size={20} style={{ color: 'var(--red-600)' }} />
-              <div style={{ fontSize: '0.875rem', color: 'var(--red-700)', fontWeight: '600' }}>
-                El asiento está descuadrado. Debe = Haber para poder guardar.
-              </div>
+
+            <div className="grid gap-2">
+              <Button
+                type="submit"
+                disabled={loading || !isBalanced}
+                className="w-full bg-blue-600 text-white hover:bg-blue-500 disabled:bg-slate-700"
+              >
+                {loading ? 'Guardando...' : 'Guardar asiento'}
+              </Button>
+              <Button
+                type="button"
+                onClick={onCancel}
+                disabled={loading}
+                variant="outline"
+                className="w-full border-cyan-400/20 bg-white/5 text-cyan-50 hover:bg-white/10 hover:text-white"
+              >
+                Cancelar
+              </Button>
             </div>
-          )}
-
-          {errors.balance && (
-            <p style={{ fontSize: '0.875rem', color: 'var(--red-600)', marginTop: '0.5rem', fontWeight: '600' }}>
-              {errors.balance}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Botones de Acción */}
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: 'white',
-            color: 'var(--primary-700)',
-            border: '1px solid var(--primary-300)',
-            borderRadius: '8px',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={loading || !isBalanced}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: loading || !isBalanced ? 'var(--primary-300)' : 'var(--primary-600)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: loading || !isBalanced ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Guardando...' : 'Guardar Asiento'}
-        </button>
-      </div>
+          </CardContent>
+        </Card>
+      </aside>
     </form>
   )
 }

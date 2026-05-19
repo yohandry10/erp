@@ -19,7 +19,7 @@ try {
     $loginResponse = Invoke-RestMethod -Uri "$baseUrl/auth/login" -Method Post -Body $loginBody -ContentType "application/json"
     $token = $loginResponse.access_token
     $tenantId = $loginResponse.user.tenant_id
-    
+
     Write-Host "✅ Login successful" -ForegroundColor Green
     Write-Host "   Token: $($token.Substring(0, 20))..." -ForegroundColor Gray
     Write-Host "   Tenant ID: $tenantId" -ForegroundColor Gray
@@ -40,14 +40,14 @@ $headers = @{
 
 try {
     $response = Invoke-RestMethod -Uri $endpoint -Method Get -Headers $headers
-    
+
     Write-Host "✅ GET request successful" -ForegroundColor Green
     Write-Host ""
     Write-Host "📊 Response:" -ForegroundColor Cyan
     Write-Host "   Success: $($response.success)" -ForegroundColor Gray
     Write-Host "   Total periodos: $($response.data.Count)" -ForegroundColor Gray
     Write-Host ""
-    
+
     if ($response.data.Count -gt 0) {
         Write-Host "📋 Periodos found:" -ForegroundColor Cyan
         foreach ($periodo in $response.data) {
@@ -63,10 +63,10 @@ try {
         Write-Host "ℹ️  No periodos found for this tenant" -ForegroundColor Yellow
         Write-Host "   This is normal if no periodos have been created yet" -ForegroundColor Gray
     }
-    
+
     Write-Host ""
     Write-Host "✅ TEST PASSED: GET /api/contabilidad/periodos works correctly" -ForegroundColor Green
-    
+
 } catch {
     Write-Host "❌ GET request failed: $_" -ForegroundColor Red
     Write-Host ""
