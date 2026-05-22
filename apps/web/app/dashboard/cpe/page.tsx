@@ -11,7 +11,7 @@ import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { FileText, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { FileText, Plus, ShieldCheck } from 'lucide-react'
 
 interface CpeDocument {
   id: string
@@ -62,7 +62,7 @@ export default function CPEPage() {
     moneda: ''
   })
 
-  const { get, post, loading } = useApiCall<CpeDocument[]>()
+  const { get, post } = useApiCall<CpeDocument[]>()
   const { get: getStats } = useApiCall<CpeStats>()
 
   const loadDocuments = useCallback(async () => {
@@ -190,17 +190,6 @@ export default function CPEPage() {
 
   const handleCpeCreated = () => {
     loadData() // Reload all data when a new CPE is created
-  }
-
-  if (loading && documents.length === 0) {
-    return (
-      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
-        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
-          <p className="text-sm text-slate-300">Cargando comprobantes...</p>
-        </div>
-      </div>
-    )
   }
 
   return (

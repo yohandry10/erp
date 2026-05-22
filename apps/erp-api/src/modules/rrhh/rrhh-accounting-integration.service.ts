@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 
 export interface AsientoPlanilla {
@@ -24,6 +24,8 @@ export interface EmpleadoPlanilla {
 
 @Injectable()
 export class RrhhAccountingIntegrationService {
+  private readonly logger = new Logger(RrhhAccountingIntegrationService.name);
+
   constructor(private readonly supabase: SupabaseService) {}
 
   /**
@@ -31,7 +33,7 @@ export class RrhhAccountingIntegrationService {
    */
   async generarAsientosPlanilla(planillaData: AsientoPlanilla): Promise<string> {
     try {
-      console.log(`📚 Generando asientos contables para planilla ${planillaData.periodo}`);
+      this.logger.debug(`📚 Generando asientos contables para planilla ${planillaData.periodo}`);
 
       const numeroAsiento = `PLAN-${planillaData.periodo}-${Date.now()}`;
       const fechaAsiento = new Date().toISOString();
@@ -82,9 +84,9 @@ export class RrhhAccountingIntegrationService {
 
       if (detallesError) throw detallesError;
 
-      console.log(`✅ Asiento contable creado: ${numeroAsiento}`);
-      console.log(`   📊 Total Debe: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
-      console.log(`   📊 Total Haber: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
+      this.logger.debug(`✅ Asiento contable creado: ${numeroAsiento}`);
+      this.logger.debug(`   📊 Total Debe: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
+      this.logger.debug(`   📊 Total Haber: S/ ${planillaData.totalIngresos + planillaData.totalAportes}`);
 
       return asientoCreado.id;
     } catch (error) {
@@ -178,8 +180,8 @@ export class RrhhAccountingIntegrationService {
    */
   private calcularImpuestoRenta(planillaData: AsientoPlanilla): number {
     // Cálculo simplificado - en la práctica se debe obtener del detalle real
-    const UIT_2024 = 5150;
-    const limiteAnualExonerado = 7 * UIT_2024;
+    const UIT_2026 = 5500;
+    const limiteAnualExonerado = 7 * UIT_2026;
     const limiteExoneradoMensual = limiteAnualExonerado / 12;
     
     let totalImpuesto = 0;
@@ -256,7 +258,7 @@ export class RrhhAccountingIntegrationService {
 
       if (detallesError) throw detallesError;
 
-      console.log(`✅ Asiento de pago creado: ${numeroAsiento}`);
+      this.logger.debug(`✅ Asiento de pago creado: ${numeroAsiento}`);
       return asientoCreado.id;
     } catch (error) {
       console.error('❌ Error generando asiento de pago:', error);
@@ -359,7 +361,7 @@ export class RrhhAccountingIntegrationService {
 
       if (detallesError) throw detallesError;
 
-      console.log(`✅ Asiento de liquidación creado: ${numeroAsiento}`);
+      this.logger.debug(`✅ Asiento de liquidación creado: ${numeroAsiento}`);
       return asientoCreado.id;
     } catch (error) {
       console.error('❌ Error generando asiento de liquidación:', error);

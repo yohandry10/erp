@@ -36,7 +36,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   const [loading, setLoading] = useState(false)
   
   const { toast } = useToast()
-  const { loading: authLoading } = useAuth()
+  const { loading: authLoading, session } = useAuth()
   const {
     showErrorToast = true,
     showSuccessToast = false,
@@ -60,8 +60,12 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      if (authLoading) {
+      let resolvedSession = session
+
+      if (authLoading || !resolvedSession?.access_token) {
         await new Promise(resolve => setTimeout(resolve, 100))
+        const { data } = await customAuth.getSession()
+        resolvedSession = data.session || resolvedSession
       }
       
       const API_BASE_URL = '/backend'
@@ -103,6 +107,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        ...(resolvedSession?.access_token ? { Authorization: `Bearer ${resolvedSession.access_token}` } : {}),
         ...optionsHeaders,
       }
 
@@ -145,12 +150,17 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           })
           clearTimeout(timer)
 
-          // Handle 401 Unauthorized - redirect to login
+          // Handle 401 Unauthorized. Some module endpoints can return 401 for
+          // permission gaps; only close the whole session if auth/profile also fails.
           if (response.status === 401) {
-        // Limpiar sesión y redirigir al login
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          await customAuth.signOut()
-          window.location.href = '/login'
+            const { data } = await customAuth.getSession()
+            if (data.session) {
+              throw new Error('No autorizado para consultar este recurso')
+            }
+
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              await customAuth.signOut()
+              window.location.href = '/login'
             }
             throw new Error('Unauthorized - Session expired')
           }
@@ -251,7 +261,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [toast, authLoading, showErrorToast, showSuccessToast])
+  }, [toast, authLoading, session?.access_token, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
 
   // Métodos helper
   const get = useCallback((endpoint: string, reqOptions?: ApiRequestOptions) => {

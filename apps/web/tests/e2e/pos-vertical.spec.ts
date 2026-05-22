@@ -364,8 +364,10 @@ test.describe('T08 POS vertical completo', () => {
     );
     expect(ventaDuplicada.venta_id).toBe(venta.venta_id);
 
+    // El endpoint es GET (consulta los detalles de una venta por id), no POST.
+    // El test tenía POST con body redundante — error de método HTTP.
     const detalles = await parseOk<any[]>(
-      await apiContext.post(api(`/pos/detalles-venta/${venta.venta_id}`), { data: { venta_id: venta.venta_id } }),
+      await apiContext.get(api(`/pos/detalles-venta/${venta.venta_id}`)),
       'detalle POS persistido',
     );
     expect(detalles).toHaveLength(1);

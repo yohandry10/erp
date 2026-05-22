@@ -9,6 +9,9 @@ import Decimal from 'decimal.js';
 import { DevolucionProveedorEmitidaEvent } from '../../../shared/events/event-bus.service';
 import { TesoreriaService } from '../tesoreria/tesoreria.service';
 
+const BANCARIZACION_PEN_MIN = 2000;
+const BANCARIZACION_USD_MIN = 500;
+
 @Injectable()
 export class CxpService {
   private readonly logger = new Logger(CxpService.name);
@@ -351,44 +354,73 @@ export class CxpService {
       );
     }
 
-    // 🔴 TAREA 17: Validar cálculos de retenciones si se implementan en el futuro
-    // Nota: Actualmente CxP no tiene campos de retenciones, pero esta validación
-    // prepara el código para cuando se agreguen estos campos
-    // Si en el futuro se agregan retenciones/percepciones/detracciones a CxP,
-    // descomentar y completar esta validación:
-    /*
-    if (dto.retencion || dto.percepcion || dto.detraccion) {
-      const proveedor = await this.obtenerProveedor(dto.proveedor_id, tenantId);
+    const ajustesTributarios = {
+      retencion: this.round2(dto.retencion ?? 0),
+      percepcion: this.round2(dto.percepcion ?? 0),
+      detraccion: this.round2(dto.detraccion ?? 0),
+      anticipo: this.round2(dto.anticipo ?? 0),
+    };
+    const tieneAjustesTributarios = Object.values(ajustesTributarios).some((monto) => monto > 0);
+
+    if (tieneAjustesTributarios) {
       const empresaConfig = await this.retencionesValidation.obtenerConfiguracionEmpresa(tenantId);
-      
-      const ajustes = {
-        retencion: dto.retencion ?? 0,
-        percepcion: dto.percepcion ?? 0,
-        detraccion: dto.detraccion ?? 0,
-        anticipo: dto.anticipo ?? 0,
-      };
-      
+
       const validacion = await this.retencionesValidation.validarCalculoAjustes(
         dto.total,
-        ajustes,
-        proveedor ? {
-          sujeto_retencion: proveedor.sujeto_retencion,
-          retencion_tasa: proveedor.retencion_tasa,
-          sujeto_percepcion: proveedor.sujeto_percepcion,
-          percepcion_tasa: proveedor.percepcion_tasa,
-          sujeto_detraccion: proveedor.sujeto_detraccion,
-          detraccion_tasa: proveedor.detraccion_tasa,
-        } : undefined,
+        ajustesTributarios,
+        undefined,
         empresaConfig
       );
-      
+
       if (!validacion.valido) {
         throw new BadRequestException(
           `Error en cálculo de ajustes tributarios: ${validacion.errores.join('; ')}`
         );
       }
+
+      const saldoCalculado = this.round2(
+        Math.max(
+          dto.total
+          - ajustesTributarios.retencion
+          - ajustesTributarios.detraccion
+          - ajustesTributarios.anticipo
+          + ajustesTributarios.percepcion,
+          0,
+        ),
+      );
+      const validacionSaldo = this.retencionesValidation.validarMontoPendiente(
+        dto.total,
+        ajustesTributarios,
+        saldoCalculado,
+      );
+
+      if (!validacionSaldo.valido) {
+        throw new BadRequestException(`Error en saldo de CxP con ajustes tributarios: ${validacionSaldo.error}`);
+      }
     }
-    */
+
+    const saldoInicial = tieneAjustesTributarios
+      ? this.retencionesValidation.validarMontoPendiente(
+          dto.total,
+          ajustesTributarios,
+          this.round2(
+            Math.max(
+              dto.total
+              - ajustesTributarios.retencion
+              - ajustesTributarios.detraccion
+              - ajustesTributarios.anticipo
+              + ajustesTributarios.percepcion,
+              0,
+            ),
+          ),
+        ).montoEsperado
+      : this.round2(dto.total);
+    const estadoInicial =
+      saldoInicial <= 0
+        ? 'PAGADA'
+        : saldoInicial < this.round2(dto.total)
+          ? 'PARCIAL'
+          : 'PENDIENTE';
 
     // Calcular fecha de vencimiento según condiciones de pago
     const condicionesPago = dto.condiciones_pago ?? 'CONTADO';
@@ -409,9 +441,14 @@ export class CxpService {
       subtotal: this.round2(dto.subtotal),
       igv: this.round2(dto.igv),
       total: this.round2(dto.total),
-      saldo: this.round2(dto.total), // Inicialmente el saldo es igual al total
+      saldo: saldoInicial,
+      saldo_pendiente: saldoInicial,
+      retencion_total: ajustesTributarios.retencion,
+      percepcion_total: ajustesTributarios.percepcion,
+      detraccion_total: ajustesTributarios.detraccion,
+      anticipo_total: ajustesTributarios.anticipo,
       moneda: dto.moneda ?? 'PEN',
-      estado: 'PENDIENTE',
+      estado: estadoInicial,
       observaciones: dto.observaciones ?? null,
       created_by: userId ?? null,
       created_at: new Date().toISOString(),
@@ -447,6 +484,10 @@ export class CxpService {
         subtotal: Number(cxp.subtotal),
         igv: Number(cxp.igv),
         total: Number(cxp.total),
+        retencion: Number(cxp.retencion_total ?? ajustesTributarios.retencion),
+        percepcion: Number(cxp.percepcion_total ?? ajustesTributarios.percepcion),
+        detraccion: Number(cxp.detraccion_total ?? ajustesTributarios.detraccion),
+        anticipo: Number(cxp.anticipo_total ?? ajustesTributarios.anticipo),
         moneda: cxp.moneda,
         fechaEmision: cxp.fecha_emision,
         fechaVencimiento: cxp.fecha_vencimiento,
@@ -735,6 +776,13 @@ export class CxpService {
       );
     }
 
+    // WARN: Fallback path — TesoreriaService no inyectado.
+    // Movimiento bancario y saldo de cuenta NO se crean sincrónicamente;
+    // solo se emite evento PagoProveedorRegistrado (eventual consistency).
+    this.logger.warn(
+      `CXP_FALLBACK_PATH tenant=${tenantId} cxp=${cxpId}: TesoreriaService no disponible, usando path por evento`,
+    );
+
     const client = this.supabase.getClient();
 
     // Validar que el monto sea positivo
@@ -783,6 +831,15 @@ export class CxpService {
         `El monto del pago (${dto.monto}) no puede ser mayor al saldo pendiente (${cxp.saldo})`,
       );
     }
+
+    const requiereBancarizacion = this.validarBancarizacionPago({
+      moneda: cxp.moneda,
+      montoPago: dto.monto,
+      totalOperacion: cxp.total,
+      metodoPago: dto.metodo_pago,
+      cuentaBancariaId: dto.cuenta_bancaria_id,
+      referencia: dto.referencia,
+    });
 
     const proveedorNombre: string | null =
       (cxp as any)?.proveedor?.razon_social ?? null;
@@ -852,14 +909,23 @@ export class CxpService {
 
     // HARDENING: Optimistic concurrency — si otro pago ya cambio el saldo, este falla
     const saldoAnterior = cxp.saldo;
+    const updateCxpData: Record<string, any> = {
+      saldo: nuevoSaldo,
+      estado: nuevoEstado,
+      ultimo_pago: dto.fecha_pago,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (requiereBancarizacion) {
+      updateCxpData.bancarizacion_requerida = true;
+      updateCxpData.bancarizacion_validada = true;
+      updateCxpData.bancarizacion_medio_pago = dto.metodo_pago;
+      updateCxpData.bancarizacion_referencia = dto.referencia?.trim() ?? null;
+    }
+
     const { data: cxpActualizada, error: errorActualizar } = await client
       .from('cuentas_por_pagar')
-      .update({
-        saldo: nuevoSaldo,
-        estado: nuevoEstado,
-        ultimo_pago: dto.fecha_pago,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateCxpData)
       .eq('tenant_id', tenantId)
       .eq('id', cxpId)
       .eq('saldo', saldoAnterior)
@@ -919,11 +985,13 @@ export class CxpService {
       };
 
       this.eventBus.emitPagoProveedorRegistrado(eventoPayload);
-      console.log('✅ Evento PagoProveedorRegistrado emitido exitosamente');
+      this.logger.log(`PagoProveedorRegistrado emitido cxp=${cxpId} pago=${pagoId}`);
     } catch (errorEvento) {
-      console.error('❌ Error emitiendo evento PagoProveedorRegistrado:', errorEvento);
-      // No fallar la operación si el evento no se pudo emitir
-      // El evento se puede reintentar o procesar manualmente
+      // CRITICAL en fallback path: sin evento, no se crea movimiento bancario
+      this.logger.error(
+        `EVENTO_PAGO_FALLIDO cxp=${cxpId} tenant=${tenantId}: movimiento bancario NO creado. ` +
+        `Requiere intervención manual. Error: ${errorEvento?.message ?? errorEvento}`,
+      );
     }
 
     return {
@@ -1411,6 +1479,52 @@ export class CxpService {
     }
 
     return this.round2(amount);
+  }
+
+  private validarBancarizacionPago(input: {
+    moneda: string;
+    montoPago: number;
+    totalOperacion?: number | null;
+    metodoPago?: string | null;
+    cuentaBancariaId?: string | null;
+    referencia?: string | null;
+  }): boolean {
+    const moneda = String(input.moneda || 'PEN').trim().toUpperCase();
+    const montoBase = Math.max(
+      Number(input.montoPago || 0),
+      Number(input.totalOperacion || 0),
+    );
+    const umbral =
+      moneda === 'PEN'
+        ? BANCARIZACION_PEN_MIN
+        : moneda === 'USD'
+          ? BANCARIZACION_USD_MIN
+          : null;
+
+    if (umbral === null || montoBase < umbral) {
+      return false;
+    }
+
+    const metodoPago = String(input.metodoPago || '').trim().toUpperCase();
+    if (metodoPago === 'EFECTIVO') {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} supera el umbral de bancarización (${moneda} ${umbral.toFixed(2)}); no puede pagarse en efectivo`,
+      );
+    }
+
+    if (!input.cuentaBancariaId) {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} requiere cuenta bancaria por bancarización`,
+      );
+    }
+
+    if (!input.referencia?.trim()) {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} requiere referencia bancaria por bancarización`,
+      );
+    }
+
+    return true;
   }
 
   private normalizarFechaPago(value: string): string {
