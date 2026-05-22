@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class AplicarPagoCxpDto {
   @ApiProperty({
@@ -26,7 +26,7 @@ export class AplicarPagoCxpDto {
     enum: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
   })
   @IsNotEmpty({ message: 'El método de pago es requerido' })
-  @IsString({ message: 'El método de pago debe ser una cadena de texto' })
+  @IsIn(['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'], { message: 'Método de pago inválido. Valores permitidos: EFECTIVO, TRANSFERENCIA, CHEQUE, TARJETA' })
   metodo_pago: string;
 
   @ApiProperty({

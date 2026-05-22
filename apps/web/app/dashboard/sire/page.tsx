@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Download, FileText, RefreshCw, Send, ShieldCheck } from 'lucide-react'
 
 import SireReportModal from '@/components/modals/SireReportModal'
@@ -34,6 +34,12 @@ interface SireStats {
   pendientes: number
 }
 
+interface SireFilters {
+  periodo: string
+  tipoReporte: string
+  estado: string
+}
+
 const inputClass =
   'rounded-xl border border-cyan-400/20 bg-slate-950/75 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-400/10'
 
@@ -63,23 +69,49 @@ export default function SIREPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
   const [activeSunatSendId, setActiveSunatSendId] = useState<string | null>(null)
-  const [filters, setFilters] = useState({
+  const [filters, setFiltersState] = useState<SireFilters>({
     periodo: getCurrentPeriod(),
     tipoReporte: '',
     estado: ''
   })
+  const filtersRef = useRef<SireFilters>(filters)
+  const periodoInputRef = useRef<HTMLInputElement>(null)
+  const reportRequestSeq = useRef(0)
 
   const { get, post, loading } = useApiCall<SireReport[]>()
   const { get: getStats } = useApiCall<SireStats>()
 
-  const loadReports = useCallback(async () => {
+  const updateFilters = useCallback((patch: Partial<SireFilters>) => {
+    setFiltersState(prev => {
+      const next = { ...prev, ...patch }
+      filtersRef.current = next
+      return next
+    })
+  }, [])
+
+  const loadReports = useCallback(async (overrideFilters?: SireFilters) => {
+    const baseFilters = overrideFilters ?? filtersRef.current
+    const visiblePeriodo = periodoInputRef.current?.value
+    const effectiveFilters = {
+      ...baseFilters,
+      periodo: visiblePeriodo || baseFilters.periodo,
+    }
+    const requestSeq = ++reportRequestSeq.current
     const queryParams = new URLSearchParams()
-    if (filters.periodo) queryParams.append('periodo', filters.periodo)
-    if (filters.tipoReporte) queryParams.append('tipoReporte', filters.tipoReporte)
-    if (filters.estado) queryParams.append('estado', filters.estado)
+    if (effectiveFilters.periodo) queryParams.append('periodo', effectiveFilters.periodo)
+    if (effectiveFilters.tipoReporte) queryParams.append('tipoReporte', effectiveFilters.tipoReporte)
+    if (effectiveFilters.estado) queryParams.append('estado', effectiveFilters.estado)
 
     const response = await get(`/api/sire/reportes?${queryParams}`)
     const reports = unwrapApiArray<SireReport>(response)
+    if (requestSeq !== reportRequestSeq.current) {
+      return
+    }
+    const currentVisiblePeriodo = periodoInputRef.current?.value
+    if (currentVisiblePeriodo && currentVisiblePeriodo !== effectiveFilters.periodo) {
+      return
+    }
+
     if (apiSucceeded(response)) {
       console.log('SIRE Reports recibidos:', reports)
       setReports(reports)
@@ -87,7 +119,7 @@ export default function SIREPage() {
       console.log('No hay reportes SIRE o respuesta incorrecta:', response)
       setReports([])
     }
-  }, [get, filters])
+  }, [get])
 
   const loadStats = useCallback(async () => {
     const response = await getStats('/api/sire/stats')
@@ -111,9 +143,9 @@ export default function SIREPage() {
     }
   }, [getStats])
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (overrideFilters?: SireFilters) => {
     await Promise.all([
-      loadReports(),
+      loadReports(overrideFilters),
       loadStats()
     ])
   }, [loadReports, loadStats])
@@ -168,7 +200,7 @@ export default function SIREPage() {
     try {
       const response = await post(`/api/sire/reportes/${reportId}/enviar-sunat`)
       if (apiSucceeded(response)) {
-        await loadReports()
+        await loadReports(filtersRef.current)
         await loadStats()
       }
     } finally {
@@ -192,8 +224,18 @@ export default function SIREPage() {
   }
 
   const handleReportGenerated = () => {
-    loadData()
+    loadData(filtersRef.current)
   }
+
+  const handleRefresh = useCallback(() => {
+    const nextFilters = {
+      ...filtersRef.current,
+      periodo: periodoInputRef.current?.value || filtersRef.current.periodo
+    }
+    filtersRef.current = nextFilters
+    setFiltersState(nextFilters)
+    loadData(nextFilters)
+  }, [loadData])
 
   if (!country.loading && !isPeru) {
     return (
@@ -206,17 +248,6 @@ export default function SIREPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
-    )
-  }
-
-  if (loading && reports.length === 0) {
-    return (
-      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
-        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
-          <p className="text-sm text-slate-300">Cargando reportes SIRE...</p>
-        </div>
       </div>
     )
   }
@@ -268,14 +299,25 @@ export default function SIREPage() {
           </CardHeader>
           <CardContent className="grid gap-3 p-4 lg:grid-cols-[160px_220px_180px_auto] lg:items-end">
             <input
+              ref={periodoInputRef}
               type="month"
-              value={filters.periodo}
-              onChange={(event) => setFilters(prev => ({ ...prev, periodo: event.target.value }))}
+              defaultValue={filters.periodo}
+              onChange={(event) => {
+                const { value } = event.currentTarget
+                updateFilters({ periodo: value })
+              }}
+              onInput={(event) => {
+                const { value } = event.currentTarget
+                updateFilters({ periodo: value })
+              }}
               className={inputClass}
             />
             <select
               value={filters.tipoReporte}
-              onChange={(event) => setFilters(prev => ({ ...prev, tipoReporte: event.target.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget
+                updateFilters({ tipoReporte: value })
+              }}
               className={inputClass}
             >
               <option value="">Todos los tipos</option>
@@ -286,7 +328,10 @@ export default function SIREPage() {
             </select>
             <select
               value={filters.estado}
-              onChange={(event) => setFilters(prev => ({ ...prev, estado: event.target.value }))}
+              onChange={(event) => {
+                const { value } = event.currentTarget
+                updateFilters({ estado: value })
+              }}
               className={inputClass}
             >
               <option value="">Todos los estados</option>
@@ -296,7 +341,7 @@ export default function SIREPage() {
               <option value="PENDIENTE">Pendiente</option>
               <option value="ERROR">Error</option>
             </select>
-            <Button type="button" onClick={loadData} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
+            <Button type="button" onClick={handleRefresh} variant="outline" className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-white">
               <RefreshCw className="h-4 w-4" />
               Actualizar
             </Button>

@@ -28,6 +28,53 @@ export class PleExportService {
     return tenantId;
   }
 
+  private assertPeriodoValido(anio: number, mes: number): void {
+    if (!Number.isInteger(anio) || anio < 1900 || anio > 2100) {
+      throw new Error(`Año PLE inválido: ${anio}`);
+    }
+    if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+      throw new Error(`Mes PLE inválido: ${mes}`);
+    }
+  }
+
+  private resolveRucPle(empresa?: { ruc?: string | null } | null): string {
+    const ruc = String(empresa?.ruc || '').replace(/\D/g, '');
+    if (!/^\d{11}$/.test(ruc)) {
+      throw new Error('RUC de empresa requerido para exportación PLE SUNAT');
+    }
+    return ruc;
+  }
+
+  private formatPleDate(value: unknown): string {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoDate) return `${isoDate[1]}${isoDate[2]}${isoDate[3]}`;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const yyyy = parsed.getUTCFullYear().toString().padStart(4, '0');
+    const mm = (parsed.getUTCMonth() + 1).toString().padStart(2, '0');
+    const dd = parsed.getUTCDate().toString().padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
+  }
+
+  private formatPleAmount(value: unknown): string {
+    const numeric = Number(value || 0);
+    return (Number.isFinite(numeric) ? numeric : 0).toFixed(2);
+  }
+
+  private sanitizePleText(value: unknown, maxLength = 200): string {
+    return String(value || '')
+      .replace(/\|/g, ' ')
+      .replace(/[\r\n\t]/g, ' ')
+      .trim()
+      .substring(0, maxLength);
+  }
+
+  private toPleLine(fields: Array<string | number>): string {
+    return `${fields.map((field) => String(field ?? '')).join('|')}|`;
+  }
+
   /**
    * Genera nombre de archivo PLE según formato SUNAT
    * Formato: LE{RUC}{AAAA}{MM}{DD}{LIBRO}{OPERACION}{CONTENIDO}{MONEDA}{INDICADOR}.TXT
@@ -56,6 +103,7 @@ export class PleExportService {
    * Estructura según Resolución de Superintendencia N° 286-2009/SUNAT
    */
   async exportarLibroDiario(anio: number, mes: number): Promise<{ filename: string; content: string }> {
+    this.assertPeriodoValido(anio, mes);
     const tenantId = this.resolveTenantId();
     this.logger.log(`📚 Exportando Libro Diario PLE ${anio}-${mes.toString().padStart(2, '0')}`);
 
@@ -66,7 +114,7 @@ export class PleExportService {
       .eq('tenant_id', tenantId)
       .single();
 
-    const ruc = empresa?.ruc || '00000000000';
+    const ruc = this.resolveRucPle(empresa);
 
     // Obtener asientos del período
     const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
@@ -126,12 +174,12 @@ export class PleExportService {
         const periodo = `${anio}${mes.toString().padStart(2, '0')}00`;
         const cuo = `M${(asiento as any).numero_asiento?.toString().padStart(8, '0') || correlativo.toString().padStart(8, '0')}`;
         const codigoCuenta = cuenta?.codigo || '';
-        const fechaContable = ((asiento as any).fecha || '').replace(/-/g, '');
-        const glosa = (detalle.concepto || (asiento as any).concepto || '').substring(0, 200).replace(/\|/g, ' ');
-        const debe = (detalle.debe || 0).toFixed(2);
-        const haber = (detalle.haber || 0).toFixed(2);
+        const fechaContable = this.formatPleDate((asiento as any).fecha);
+        const glosa = this.sanitizePleText(detalle.concepto || (asiento as any).concepto);
+        const debe = this.formatPleAmount(detalle.debe);
+        const haber = this.formatPleAmount(detalle.haber);
 
-        const linea = [
+        const linea = this.toPleLine([
           periodo,                    // 1. Período
           cuo,                        // 2. CUO
           correlativo.toString(),     // 3. Correlativo
@@ -153,7 +201,7 @@ export class PleExportService {
           haber,                      // 19. Haber
           '',                         // 20. Dato estructurado
           '1',                        // 21. Estado (1=Activo)
-        ].join('|');
+        ]);
 
         lineas.push(linea);
         correlativo++;
@@ -172,6 +220,7 @@ export class PleExportService {
    * Exporta Libro Mayor (6.1) en formato PLE
    */
   async exportarLibroMayor(anio: number, mes: number): Promise<{ filename: string; content: string }> {
+    this.assertPeriodoValido(anio, mes);
     const tenantId = this.resolveTenantId();
     this.logger.log(`📚 Exportando Libro Mayor PLE ${anio}-${mes.toString().padStart(2, '0')}`);
 
@@ -181,7 +230,7 @@ export class PleExportService {
       .eq('tenant_id', tenantId)
       .single();
 
-    const ruc = empresa?.ruc || '00000000000';
+    const ruc = this.resolveRucPle(empresa);
 
     // Obtener movimientos agrupados por cuenta
     const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
@@ -217,10 +266,10 @@ export class PleExportService {
       const periodo = `${anio}${mes.toString().padStart(2, '0')}00`;
       const cuo = `M${asiento?.numero_asiento?.toString().padStart(8, '0') || correlativo.toString().padStart(8, '0')}`;
       const codigoCuenta = cuenta?.codigo || '';
-      const fechaContable = (asiento?.fecha || '').replace(/-/g, '');
-      const glosa = (mov.concepto || asiento?.concepto || '').substring(0, 200).replace(/\|/g, ' ');
+      const fechaContable = this.formatPleDate(asiento?.fecha);
+      const glosa = this.sanitizePleText(mov.concepto || asiento?.concepto);
 
-      const linea = [
+      const linea = this.toPleLine([
         periodo,
         cuo,
         correlativo.toString(),
@@ -238,11 +287,11 @@ export class PleExportService {
         fechaContable,
         glosa,
         '',
-        (mov.debe || 0).toFixed(2),
-        (mov.haber || 0).toFixed(2),
+        this.formatPleAmount(mov.debe),
+        this.formatPleAmount(mov.haber),
         '',
         '1',
-      ].join('|');
+      ]);
 
       lineas.push(linea);
       correlativo++;
@@ -260,6 +309,7 @@ export class PleExportService {
    * Exporta Balance de Comprobación (3.1) en formato PLE
    */
   async exportarBalanceComprobacion(anio: number, mes: number): Promise<{ filename: string; content: string }> {
+    this.assertPeriodoValido(anio, mes);
     const tenantId = this.resolveTenantId();
     this.logger.log(`📚 Exportando Balance de Comprobación PLE ${anio}-${mes.toString().padStart(2, '0')}`);
 
@@ -269,7 +319,7 @@ export class PleExportService {
       .eq('tenant_id', tenantId)
       .single();
 
-    const ruc = empresa?.ruc || '00000000000';
+    const ruc = this.resolveRucPle(empresa);
 
     // Obtener saldos por cuenta
     const fechaInicio = `${anio}-${mes.toString().padStart(2, '0')}-01`;
@@ -296,8 +346,18 @@ export class PleExportService {
       for (const cuenta of cuentas || []) {
         const { data: totales } = await this.supabase.getClient()
           .from('detalle_asientos')
-          .select('debe, haber')
-          .eq('cuenta_id', cuenta.id);
+          .select(`
+            debe,
+            haber,
+            asientos_contables!inner(
+              tenant_id,
+              fecha
+            )
+          `)
+          .eq('cuenta_id', cuenta.id)
+          .eq('asientos_contables.tenant_id', tenantId)
+          .gte('asientos_contables.fecha', fechaInicio)
+          .lte('asientos_contables.fecha', fechaFin);
 
         const totalDebe = (totales || []).reduce((sum, t) => sum + (t.debe || 0), 0);
         const totalHaber = (totales || []).reduce((sum, t) => sum + (t.haber || 0), 0);
@@ -320,17 +380,17 @@ export class PleExportService {
 
     for (const cuenta of balanceData || []) {
       // Formato PLE 3.1
-      const linea = [
+      const linea = this.toPleLine([
         periodo,                              // 1. Período
         cuenta.codigo || '',                  // 2. Código cuenta
-        (cuenta.saldo_deudor || 0).toFixed(2),   // 3. Saldo deudor inicial
-        (cuenta.saldo_acreedor || 0).toFixed(2), // 4. Saldo acreedor inicial
-        (cuenta.debe || 0).toFixed(2),        // 5. Debe del período
-        (cuenta.haber || 0).toFixed(2),       // 6. Haber del período
-        (cuenta.saldo_deudor || 0).toFixed(2),   // 7. Saldo deudor final
-        (cuenta.saldo_acreedor || 0).toFixed(2), // 8. Saldo acreedor final
+        this.formatPleAmount(cuenta.saldo_deudor),   // 3. Saldo deudor inicial
+        this.formatPleAmount(cuenta.saldo_acreedor), // 4. Saldo acreedor inicial
+        this.formatPleAmount(cuenta.debe),        // 5. Debe del período
+        this.formatPleAmount(cuenta.haber),       // 6. Haber del período
+        this.formatPleAmount(cuenta.saldo_deudor),   // 7. Saldo deudor final
+        this.formatPleAmount(cuenta.saldo_acreedor), // 8. Saldo acreedor final
         '1',                                  // 9. Estado
-      ].join('|');
+      ]);
 
       lineas.push(linea);
     }

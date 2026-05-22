@@ -4,6 +4,9 @@ import { EventBusService } from '../../../shared/events/event-bus.service';
 import { v4 as uuidv4 } from 'uuid';
 import { RegistrarPagoDto, RegistrarPagoLoteDto, ListarPagosQueryDto, ProgramacionPagosQueryDto, FlujoCajaQueryDto } from './dto';
 
+const BANCARIZACION_PEN_MIN = 2000;
+const BANCARIZACION_USD_MIN = 500;
+
 @Injectable()
 export class TesoreriaService {
   constructor(
@@ -119,6 +122,15 @@ export class TesoreriaService {
       );
     }
 
+    const requiereBancarizacion = this.validarBancarizacionPago({
+      moneda: cxp.moneda,
+      montoPago: dto.monto,
+      totalOperacion: cxp.total,
+      metodoPago: dto.metodo_pago,
+      cuentaBancariaId: dto.cuenta_bancaria_id,
+      referencia: dto.referencia,
+    });
+
     // Si se especificó cuenta bancaria, validar que existe y tiene saldo suficiente
     let cuentaBancaria: any = null;
     let saldoCuentaAnterior: number | null = null;
@@ -170,14 +182,23 @@ export class TesoreriaService {
 
       // 3. HARDENING: Optimistic concurrency — si otro pago ya cambio el saldo, falla
       const saldoAnterior = cxp.saldo;
+      const updateCxpData: Record<string, any> = {
+        saldo: nuevoSaldo,
+        estado: nuevoEstado,
+        ultimo_pago: dto.fecha_pago,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (requiereBancarizacion) {
+        updateCxpData.bancarizacion_requerida = true;
+        updateCxpData.bancarizacion_validada = true;
+        updateCxpData.bancarizacion_medio_pago = dto.metodo_pago;
+        updateCxpData.bancarizacion_referencia = dto.referencia?.trim() ?? null;
+      }
+
       const { data: cxpActualizada, error: errorActualizar } = await client
         .from('cuentas_por_pagar')
-        .update({
-          saldo: nuevoSaldo,
-          estado: nuevoEstado,
-          ultimo_pago: dto.fecha_pago,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateCxpData)
         .eq('tenant_id', tenantId)
         .eq('id', dto.cxp_id)
         .eq('saldo', saldoAnterior)
@@ -594,6 +615,9 @@ export class TesoreriaService {
 
     // Generar ID de lote si no se proporciona referencia
     const loteId = dto.referencia_lote || `LOTE-${new Date().getTime()}`;
+    if (String(dto.metodo_pago || '').trim().toUpperCase() === 'EFECTIVO') {
+      throw new BadRequestException('Los pagos en lote a proveedores deben registrarse con medio de pago bancarizado');
+    }
 
     // Preparar array de pagos para la función de base de datos
     const pagosArray = dto.pagos.map(p => ({
@@ -1042,6 +1066,52 @@ export class TesoreriaService {
 
   private round2(value: number): number {
     return Math.round(value * 100) / 100;
+  }
+
+  private validarBancarizacionPago(input: {
+    moneda: string;
+    montoPago: number;
+    totalOperacion?: number | null;
+    metodoPago?: string | null;
+    cuentaBancariaId?: string | null;
+    referencia?: string | null;
+  }): boolean {
+    const moneda = String(input.moneda || 'PEN').trim().toUpperCase();
+    const montoBase = Math.max(
+      Number(input.montoPago || 0),
+      Number(input.totalOperacion || 0),
+    );
+    const umbral =
+      moneda === 'PEN'
+        ? BANCARIZACION_PEN_MIN
+        : moneda === 'USD'
+          ? BANCARIZACION_USD_MIN
+          : null;
+
+    if (umbral === null || montoBase < umbral) {
+      return false;
+    }
+
+    const metodoPago = String(input.metodoPago || '').trim().toUpperCase();
+    if (metodoPago === 'EFECTIVO') {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} supera el umbral de bancarización (${moneda} ${umbral.toFixed(2)}); no puede pagarse en efectivo`,
+      );
+    }
+
+    if (!input.cuentaBancariaId) {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} requiere cuenta bancaria por bancarización`,
+      );
+    }
+
+    if (!input.referencia?.trim()) {
+      throw new BadRequestException(
+        `La operación ${moneda} ${montoBase.toFixed(2)} requiere referencia bancaria por bancarización`,
+      );
+    }
+
+    return true;
   }
 
   private normalizarMontoPago(value: number): number {

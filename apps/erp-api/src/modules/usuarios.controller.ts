@@ -37,8 +37,21 @@ const USUARIO_SAFE_COLUMNS = `
   updated_at
 `;
 
+const DEMO_ALLOWED_ROLE_NAMES = new Set([
+  'ADMIN_DEMO',
+  'GERENCIA',
+  'COMPRAS',
+  'ALMACEN',
+  'VENDEDOR',
+  'CAJERO',
+  'FINANZAS',
+  'CONTADOR',
+  'RRHH',
+]);
+const DEMO_MAX_USERS = 5;
+
 @ApiTags('usuarios-sistema')
-@Controller('usuarios-sistema')
+@Controller(['usuarios-sistema', 'usuarios'])
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UsuariosController {
   constructor(
@@ -129,11 +142,75 @@ export class UsuariosController {
     return tenantId;
   }
 
+  private async getDemoContext(tenantId: string): Promise<{
+    isDemo: boolean;
+    expiresAt: string | null;
+    retentionUntil: string | null;
+  }> {
+    const { data } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('is_demo, demo_expires_at')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    const isDemo = data?.is_demo === true;
+    const expiresAt = data?.demo_expires_at || null;
+
+    return {
+      isDemo,
+      expiresAt,
+      retentionUntil: expiresAt ? new Date(new Date(expiresAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
+    };
+  }
+
+  private async assertDemoUserLimit(tenantId: string): Promise<void> {
+    const { count, error } = await this.supabaseService
+      .getClient()
+      .from('usuarios_sistema')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('activo', true);
+
+    if (error) {
+      throw new BadRequestException(`No se pudo validar límite de usuarios demo: ${error.message}`);
+    }
+
+    if ((count || 0) >= DEMO_MAX_USERS) {
+      throw new ForbiddenException(`El demo permite hasta ${DEMO_MAX_USERS} usuarios activos`);
+    }
+  }
+
+  private async assertDemoRoleAllowed(tenantId: string, roleId: string): Promise<void> {
+    const { data: role, error } = await this.supabaseService
+      .getClient()
+      .from('roles')
+      .select('id, nombre')
+      .eq('id', roleId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error || !role) {
+      throw new BadRequestException('Rol no válido para este tenant');
+    }
+
+    const roleName = String(role.nombre || '').trim().toUpperCase();
+    if (!DEMO_ALLOWED_ROLE_NAMES.has(roleName)) {
+      throw new ForbiddenException('Ese rol no está disponible en modo demo');
+    }
+  }
+
   @Get('/')
   @RequirePermission('configuracion', 'ver', 'usuarios')
   @ApiOperation({ summary: 'Obtener todos los usuarios del sistema' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios obtenida exitosamente' })
-  async getUsuarios(@Req() req: any, @Query('rol') rol?: string, @Query('estado') estado?: string) {
+  async getUsuarios(
+    @Req() req: any,
+    @Query('rol') rol?: string,
+    @Query('estado') estado?: string,
+    @Query('activo') activo?: string,
+    @Query('limit') limit?: string,
+  ) {
     try {
       console.log('👥 Obteniendo usuarios del sistema...');
       const user = req.user as any;
@@ -162,6 +239,20 @@ export class UsuariosController {
 
       if (estado && estado !== 'todos') {
         query = query.eq('estado', estado);
+      }
+
+      if (activo != null && activo !== '') {
+        const activoNormalizado = String(activo).trim().toLowerCase();
+        if (['true', '1', 'si', 'sí'].includes(activoNormalizado)) {
+          query = query.eq('activo', true);
+        } else if (['false', '0', 'no'].includes(activoNormalizado)) {
+          query = query.eq('activo', false);
+        }
+      }
+
+      const parsedLimit = Number.parseInt(String(limit || ''), 10);
+      if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+        query = query.limit(Math.min(parsedLimit, 100));
       }
 
       const { data: usuarios, error } = await query;
@@ -262,6 +353,7 @@ export class UsuariosController {
       console.log('🔑 Obteniendo roles del sistema...');
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
+      const demoContext = await this.getDemoContext(tenantId);
 
       const { data: roles, error } = await this.supabaseService
         .getClient()
@@ -291,7 +383,11 @@ export class UsuariosController {
       }
 
       // Calcular estadísticas y formatear permisos por rol
-      const rolesConStats = roles?.map(rol => {
+      const rolesFiltrados = demoContext.isDemo
+        ? roles?.filter((rol) => DEMO_ALLOWED_ROLE_NAMES.has(String(rol.nombre || '').trim().toUpperCase()))
+        : roles;
+
+      const rolesConStats = rolesFiltrados?.map(rol => {
         // Extraer permisos únicos en formato legible
         const permisosSet = new Set<string>();
         rol.rol_permisos?.forEach((rp: any) => {
@@ -324,7 +420,7 @@ export class UsuariosController {
         };
       });
 
-      console.log(`✅ ${roles?.length || 0} roles encontrados`);
+      console.log(`✅ ${rolesConStats?.length || 0} roles encontrados`);
 
       return {
         success: true,
@@ -351,10 +447,16 @@ export class UsuariosController {
 
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
+      const demoContext = await this.getDemoContext(tenantId);
 
       // Validar datos requeridos
       if (!usuarioData.nombre || !usuarioData.email || !usuarioData.rol_id || !usuarioData.password) {
         throw new BadRequestException('Datos requeridos: nombre, email, rol_id, password');
+      }
+
+      if (demoContext.isDemo) {
+        await this.assertDemoUserLimit(tenantId);
+        await this.assertDemoRoleAllowed(tenantId, usuarioData.rol_id);
       }
 
       // Validar contraseña
@@ -404,6 +506,12 @@ export class UsuariosController {
         telefono: usuarioData.telefono || null,
         estado,
         activo: estado === 'ACTIVO',
+        is_super_admin: false,
+        is_demo_user: demoContext.isDemo,
+        demo_email_temp: demoContext.isDemo ? usuarioData.email : null,
+        demo_expires_at: demoContext.isDemo ? demoContext.expiresAt : null,
+        demo_retention_until: demoContext.isDemo ? demoContext.retentionUntil : null,
+        demo_created_by: demoContext.isDemo ? user?.id || null : null,
         fecha_ultimo_acceso: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -479,6 +587,7 @@ export class UsuariosController {
       console.log(`✏️ Actualizando usuario: ${id}`);
       const user = req.user as any;
       const tenantId = this.resolveTenantOrThrow(req);
+      const demoContext = await this.getDemoContext(tenantId);
 
       // Verificar que el usuario existe
       const { data: usuarioExistente } = await this.supabaseService
@@ -499,6 +608,10 @@ export class UsuariosController {
         updated_at: new Date().toISOString()
       };
       const requestedRoleId = datosActualizacion.rol_id;
+
+      if (demoContext.isDemo && requestedRoleId) {
+        await this.assertDemoRoleAllowed(tenantId, requestedRoleId);
+      }
 
       // Remover campos que no deben actualizarse directamente
       delete datosActualizacion.id;

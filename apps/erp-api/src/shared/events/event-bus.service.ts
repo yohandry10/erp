@@ -306,6 +306,9 @@ export interface PlanillaCalculadaEvent {
 }
 
 export interface PlanillaPagadaEvent {
+  eventId?: string;
+  tenantId: string;
+  idempotencyKey?: string;
   planillaId: string;
   periodo: string;
   totalPagado: number;
@@ -404,7 +407,10 @@ export interface FacturaProveedorRegistradaEvent {
   subtotal: number;
   igv: number;
   total: number;
+  retencion?: number | null;
+  percepcion?: number | null;
   detraccion?: number | null;
+  anticipo?: number | null;
   moneda: string;
   tipoCambio?: number | null;
   fechaEmision: string;
@@ -642,6 +648,15 @@ export interface DashboardMetricsUpdatedEvent {
 @Injectable()
 export class EventBusService {
   private eventEmitter = new EventEmitter();
+  private readonly canonicalOutboxEventTypes = new Set([
+    'cxc.creada',
+    'cobro.registrado',
+    'recepcion.registrada',
+    'pago.proveedor.registrado',
+    'planilla.liquidada',
+    'planilla.pagada',
+    'cpe.anulado',
+  ]);
 
   constructor(private readonly outboxService?: OutboxService) {
     this.eventEmitter.setMaxListeners(200); // Aumentamos el límite para más listeners
@@ -681,12 +696,18 @@ export class EventBusService {
           data?.correlation_id ||
           undefined;
 
+        const canonicalEventId =
+          this.canonicalOutboxEventTypes.has(eventType)
+            ? data?.eventId || data?.event_id
+            : undefined;
+
         await this.outboxService.persistEventStandard({
           tenantId,
           eventType,
           aggregateType,
           aggregateId,
           eventData: data,
+          eventId: canonicalEventId,
           idempotencyKey,
         });
         console.log(`✅ [EventBus] Evento ${eventType} persistido en outbox`);
@@ -926,7 +947,7 @@ export class EventBusService {
   }
 
   emitPlanillaPagada(data: PlanillaPagadaEvent) {
-    this.emit('planilla.pagada', data, 'rrhh');
+    this.emit('planilla.pagada', data, 'rrhh', data.tenantId);
   }
 
   emitEmpleadoAsistencia(data: EmpleadoAsistenciaEvent) {

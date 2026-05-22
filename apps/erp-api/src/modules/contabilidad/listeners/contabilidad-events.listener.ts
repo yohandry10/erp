@@ -35,6 +35,8 @@ export class ContabilidadEventsListener implements OnModuleInit {
     'AjusteInventarioAplicado',
     'planilla.liquidada',
     'PlanillaLiquidada',
+    'planilla.pagada',
+    'PlanillaPagada',
     'depreciacion.generada',
     'DepreciacionGenerada',
     'cpe.anulado',
@@ -175,6 +177,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         aggregateId,
         idempotencyKey,
         eventData,
+        eventId: eventData.eventId || eventData.event_id,
       });
 
       const { error } = await this.supabaseService
@@ -434,6 +437,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
           case 'planilla.liquidada':
           case 'PlanillaLiquidada':
             await this.handlePlanillaLiquidada(evento);
+            break;
+
+          case 'planilla.pagada':
+          case 'PlanillaPagada':
+            await this.handlePlanillaPagada(evento);
             break;
 
       case 'depreciacion.generada':
@@ -1273,6 +1281,48 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaLiquidada:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handler para eventos de planilla pagada → Asiento: Dr 411 Rem. por Pagar / Cr 10 Bancos
+   */
+  private async handlePlanillaPagada(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'planilla.pagada');
+
+      const pagoData = {
+        tenant_id: tenantId,
+        fecha: eventData.fechaPago || new Date().toISOString(),
+        monto: eventData.totalPagado,
+        metodo_pago: eventData.metodoPago || 'transferencia',
+        planilla_id: eventData.planillaId,
+        referencia: `PAGO-PLANILLA-${eventData.planillaId}`,
+        source_event_id: evento.event_id || eventData.eventId || eventData.planillaId || evento.aggregate_id,
+        event_id: evento.event_id || eventData.eventId,
+      };
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoPagoPlanilla(pagoData);
+
+      const eventId = pagoData.event_id;
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          pagoData.referencia,
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de pago planilla no se pudo verificar para evento ${eventId}`,
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de pago planilla no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaPagada:`, error);
       throw error;
     }
   }
