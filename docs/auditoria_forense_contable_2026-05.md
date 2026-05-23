@@ -38,9 +38,43 @@ Evidencia final de pruebas:
 
 Riesgos residuales no cerrados por codigo en esta remediacion:
 
-- Envio SUNAT/OSE/SIRE real requiere credenciales, certificados, acuses y smoke productivo autorizado.
+- Envio SUNAT/OSE/SIRE real requiere credenciales, certificados, acuses y smoke productivo autorizado. Esto no es una falla de codigo: es una validacion operacional que solo puede hacerse con secretos reales del contribuyente o del OSE.
 - La auditoria legal final debe validar regimenes especificos del contribuyente y codigos/tasas SPOT por giro real; el control tecnico de CxP/bancarizacion ya quedo aplicado para nuevos flujos.
+- Antes de produccion real, el operador debe aplicar las migraciones `331` y `332` en el ambiente destino, cargar secretos, configurar el tenant y ejecutar un smoke fiscal externo.
 - El arbol local sigue teniendo cambios previos del usuario no relacionados; no se hizo revert de nada ajeno.
+
+### 0.1 Checklist Para Cargar Credenciales y Cerrar Produccion
+
+Este checklist es para el usuario/operador que va a poner credenciales reales. No debe subirse ningun secreto al repositorio.
+
+1. Preparar secretos del ambiente.
+   - En el backend/API definir `CERT_ENCRYPTION_KEY` con minimo 32 caracteres. Si se va a usar un certificado global de respaldo, definir tambien `PFX_PATH` y `PFX_PASS`.
+   - Si se emite por OSE, definir el endpoint y credenciales reales: `OSE_URL`, `OSE_USERNAME`, `OSE_PASSWORD` o los campos equivalentes del tenant (`oseApiKey`, `oseBearerToken`, `oseAuthTipo`).
+   - Si se emite directo contra SUNAT, definir las credenciales reales o de homologacion segun corresponda: `SUNAT_ENVIRONMENT`, `SUNAT_USERNAME`, `SUNAT_PASSWORD`, `SUNAT_API_KEY`, `SUNAT_API_SECRET`.
+   - Guardar estos valores en el gestor de secretos del despliegue, por ejemplo variables seguras de Vercel/Docker/Supabase/CI. Localmente usar `.env.local`; nunca commitear estos valores.
+
+2. Configurar el tenant desde la aplicacion.
+   - Entrar como administrador del tenant y completar el wizard/configuracion de empresa: RUC, razon social, direccion fiscal, ubigeo, regimen, moneda, series y modo de emision.
+   - Cargar el certificado digital PFX/P12 y su password desde el flujo de configuracion. La API valida el payload en `POST /api/configuration/wizard/validate-certificate` y completa la configuracion en `POST /api/configuration/complete`.
+   - Si el tenant usa OSE, guardar `emisionCpeModo=OSE_API`, `oseActivo=true`, `oseUrl` y el metodo de autenticacion real. Si no usa OSE, dejar `SUNAT_DIRECTO` y validar el certificado/credenciales SUNAT.
+
+3. Verificar estado antes de emitir.
+   - Consultar `GET /api/configuration/status`; debe quedar completo, con certificado existente y vigente.
+   - Consultar `GET /api/configuration/empresa` y revisar RUC, series, modo de emision, OSE/SUNAT y fecha de vencimiento del certificado.
+   - Ejecutar una firma XML sin envio y luego una emision de homologacion autorizada. Guardar CDR/ticket/acuse en evidencia operativa.
+
+4. Hacer smoke fiscal externo.
+   - Emitir CPE y GRE de prueba autorizados por SUNAT/OSE/homologacion.
+   - Generar SIRE RVIE/RCE del periodo de prueba y validar ticket/acuse real si el servicio externo esta habilitado.
+   - Exportar PLE del periodo de prueba y validarlo con el software/servicio oficial antes de usarlo como libro definitivo.
+   - Confirmar que `integration_logs`, asientos, CxC/CxP, SIRE/PLE y dashboard contable reflejan la misma operacion.
+
+5. Pasar a produccion.
+   - Cambiar `SUNAT_ENVIRONMENT` o endpoint OSE a produccion solo despues del smoke exitoso.
+   - Bloquear cambios de configuracion fiscal a roles autorizados.
+   - Activar monitoreo de certificado por vencer, outbox no completado, CPE sin asiento, SIRE/PLE vs mayor y pagos sujetos a bancarizacion.
+
+Lectura ejecutiva: tras esta remediacion, lo que falta para produccion no es "programar otra regla contable base"; falta que el contribuyente cargue secretos reales, complete configuracion fiscal, valide contra SUNAT/OSE/PLE/PLAME real y conserve acuses.
 
 ## 1. Resumen Ejecutivo
 
@@ -126,17 +160,17 @@ Limitaciones:
 
 | Regla | Fuente oficial | Estado esperado en ERP | Estado auditado |
 |---|---|---|---|
-| IGV 2026 tasa aplicable 18% | [SUNAT IGV](https://emprender.sunat.gob.pe/principales-impuestos/impuesto-general-las-ventas-igv/impuesto-general-las-ventas) | Debito fiscal ventas y credito fiscal compras correctamente separados | Parcial. Calculo existe, pero compras/CxP no discriminan todo el universo de credito valido/no valido |
-| Calculo IGV mensual = IGV ventas - IGV compras | [SUNAT calculo IGV](https://orientacion.sunat.gob.pe/3109-05-calculo-del-impuesto) | Reconciliacion CPE/SIRE/libro mayor 40 | Parcial; no se pudo cerrar por muestra CPE sin asiento |
+| IGV 2026 tasa aplicable 18% | [SUNAT IGV](https://emprender.sunat.gob.pe/principales-impuestos/impuesto-general-las-ventas-igv/impuesto-general-las-ventas) | Debito fiscal ventas y credito fiscal compras correctamente separados | Cubierto tecnicamente para flujos probados; el cierre mensual real debe ejecutarse con data productiva y SIRE/PLE oficiales |
+| Calculo IGV mensual = IGV ventas - IGV compras | [SUNAT calculo IGV](https://orientacion.sunat.gob.pe/3109-05-calculo-del-impuesto) | Reconciliacion CPE/SIRE/libro mayor 40 | Mitigado para flujos nuevos con trazabilidad `event_id` -> asiento; datos historicos sin correlacion canonica requieren limpieza antes de migrarse a produccion |
 | UIT 2026 S/ 5,500 | [SUNAT UIT](https://www.sunat.gob.pe/indicestasas/uit.html) | Quinta categoria, multas, topes y thresholds deben depender de UIT vigente | Cubierto tecnicamente para planillas: `normativa_peru_periodos` 2026 seeded y servicio RRHH resuelve por periodo |
 | SIRE gestiona RVIE/RCE y propuesta IGV | [SIRE SUNAT](https://sire.sunat.gob.pe/) | RVIE/RCE deben cuadrar CPE/compras y tener acuse/proceso externo | Parcial; generacion local existe, envio SUNAT de SIRE es mock/estado local |
-| CPE factura sustenta costo/gasto y credito fiscal; NC revierte operaciones | [CPE SUNAT](https://cpe.sunat.gob.pe/tipos_de_comprobantes/factura) | Cada CPE debe tener trazabilidad fiscal, contable y de anulacion | No conforme en muestra: CPE con `event_id` sin asiento |
+| CPE factura sustenta costo/gasto y credito fiscal; NC revierte operaciones | [CPE SUNAT](https://cpe.sunat.gob.pe/tipos_de_comprobantes/factura) | Cada CPE debe tener trazabilidad fiscal, contable y de anulacion | Mitigado para flujos nuevos y E2E criticos; CPE historicos sin `event_id` siguen como deuda de limpieza si se decide promoverlos |
 | Detracciones, percepciones y retenciones IGV | [SUNAT detracciones](https://orientacion.sunat.gob.pe/como-funcionan-las-detracciones) | Validar codigo, tasa, umbral, medio de pago y cuenta SPOT segun operacion | Parcial mitigado: CxC y CxP modelan/validan ajustes; matriz legal por actividad sigue siendo configuracion del contribuyente |
-| PLE TXT validado por estructura, parametros y constancia | [SUNAT PLE](https://emprender.sunat.gob.pe/comprobantes-libros/registros-libros-electronicos/programa-libros-electronicos-ple) | Archivos en moneda nacional, PCGE vigente, comprobantes y campos correctos | Parcial alto riesgo; exportador PLE tiene fecha/campos/moneda incompletos |
-| PCGE vigente | [MEF PCGE](https://www.mef.gob.pe/contenidos/conta_publ/documentac/VERSION_MODIFICADA_PCG_EMPRESARIAL.pdf) | Plan de cuentas con cuentas oficiales y subcuentas tributarias suficientes | Parcial; base tiene 86 cuentas, faltan pruebas de subcuentas legales por regimen |
+| PLE TXT validado por estructura, parametros y constancia | [SUNAT PLE](https://emprender.sunat.gob.pe/comprobantes-libros/registros-libros-electronicos/programa-libros-electronicos-ple) | Archivos en moneda nacional, PCGE vigente, comprobantes y campos correctos | Mitigado estructuralmente; falta validacion operacional con software/servicio oficial PLE antes de presentacion |
+| PCGE vigente | [MEF PCGE](https://www.mef.gob.pe/contenidos/conta_publ/documentac/VERSION_MODIFICADA_PCG_EMPRESARIAL.pdf) | Plan de cuentas con cuentas oficiales y subcuentas tributarias suficientes | Cubierto base y RRHH; subcuentas finas por regimen/giro deben parametrizarse por contador del contribuyente |
 | PLAME/T-Registro | [SUNAT Planilla Electronica](https://emprender.sunat.gob.pe/principales-impuestos/planilla/planilla-electronica) | Ingresos, descuentos, dias, aportes, EsSalud, ONP, AFP, 4ta/5ta | Parcial mitigado; planillas y RRHH E2E OK, pero export PLAME real no fue validado |
-| Cuarta categoria 8%, umbral S/ 1,500 y suspension 2026 | [Gob.pe SUNAT 4ta](https://www.gob.pe/1156) | Validar suspension, umbrales mensuales/anuales y retencion por recibo | Parcial; existe modulo de retenciones, pero seeds faltan por tenant |
-| Quinta categoria con tasas progresivas 8%, 14%, 17%, 20%, 30% | [SUNAT personas](https://personas.sunat.gob.pe/trabajador-dependiente/declaracion-pago) | Proyeccion anual, 7 UIT, retencion mensual acumulativa | No conforme si se usa tasa plana o calculo simplificado |
+| Cuarta categoria 8%, umbral S/ 1,500 y suspension 2026 | [Gob.pe SUNAT 4ta](https://www.gob.pe/1156) | Validar suspension, umbrales mensuales/anuales y retencion por recibo | Mitigado con seeds/validadores por tenant; suspension SUNAT del proveedor debe registrarse como evidencia operativa |
+| Quinta categoria con tasas progresivas 8%, 14%, 17%, 20%, 30% | [SUNAT personas](https://personas.sunat.gob.pe/trabajador-dependiente/declaracion-pago) | Proyeccion anual, 7 UIT, retencion mensual acumulativa | Mitigado con UIT 2026, 7 UIT y escala progresiva en planillas; validar PLAME real antes de declarar |
 | AFP mayo 2026 | [SBS comisiones AFP](https://www.sbs.gob.pe/app/spp/empleadores/comisiones_spp/paginas/comision_prima.aspx) | Aporte 10%, prima y comision por AFP/periodo | Cubierto con tabla normativa 2026 y overrides por contrato para comision/seguro AFP |
 | RMV S/ 1,130 desde 2025 y asignacion familiar 10% RMV | [MTPE RMV](https://www.gob.pe/institucion/mtpe/normas-legales/6335262-006-2024-tr), [MTPE asignacion familiar](https://www.gob.pe/institucion/mtpe/noticias/601761-quienes-tienen-derecho-a-percibir-la-asignacion-familiar/) | Asignacion familiar S/ 113.00 mientras RMV sea S/ 1,130 | Cubierto para planillas con `asignacion_familiar=113.00` en normativa 2026 |
 | Bancarizacion desde S/ 2,000 o US$ 500 | [SUNAT bancarizacion](https://emprender.sunat.gob.pe/comprobantes-libros/comprobantes-pago/bancarizacion) | Pagos que superen umbral deben exigir medio de pago bancario | Cubierto tecnicamente en CxP/Tesoreria: rechaza efectivo y exige cuenta + referencia |
