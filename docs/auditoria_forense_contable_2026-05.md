@@ -36,6 +36,15 @@ Evidencia final de pruebas:
 | `validar_contabilidad_asientos_estado_runtime` | OK, 17/17 checks |
 | `validar_accounting_production_compliance_runtime` | OK, 5/5 checks |
 
+Validacion adicional 2026-05-23 con certificado digital de prueba local:
+
+- Archivo detectado: `certs/demo.pfx`.
+- Resultado: el PFX se puede leer con la configuracion local sin exponer secretos.
+- Vigencia observada: 2025-10-19 a 2027-10-19.
+- Test focal ejecutado: `pnpm --filter @erp-suite/erp-api run test -- src/shared/crypto/xml-signer-runtime.spec.ts --runInBand`.
+- Resultado: OK; `XmlSigner` carga el certificado desde el workspace y no cae en fallback demo.
+- Alcance: valida lectura de certificado y capacidad tecnica de firma XML. No valida aceptacion legal SUNAT/OSE, CDR, ticket, acuse, ni envio SIRE/PLE/PLAME real.
+
 Riesgos residuales no cerrados por codigo en esta remediacion:
 
 - Envio SUNAT/OSE/SIRE real requiere credenciales, certificados, acuses y smoke productivo autorizado. Esto no es una falla de codigo: es una validacion operacional que solo puede hacerse con secretos reales del contribuyente o del OSE.
