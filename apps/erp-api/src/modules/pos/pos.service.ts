@@ -300,7 +300,7 @@ export class PosService {
 
     const { data: productos, error } = await this.supabase.getClient()
       .from('productos')
-      .select('id, codigo, nombre, precio_venta, stock, stock_actual, stock_reservado, activo, estado, es_servicio, controla_stock, unidad_medida')
+      .select('id, codigo, nombre, precio_venta, precio_compra, costo, stock, stock_actual, stock_reservado, activo, estado, es_servicio, controla_stock, unidad_medida')
       .eq('tenant_id', tenantId)
       .in('id', productIds);
 
@@ -480,52 +480,55 @@ export class PosService {
         throw new Error(`Stock insuficiente para ${producto.nombre || producto.codigo || item.producto_id}`);
       }
 
-      const { error: updateStockError } = await client
+      const { data: movimientoId, error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
+        p_producto_id: item.producto_id,
+        p_cantidad: cantidad,
+        p_referencia_tipo: 'VENTA_POS',
+        p_referencia_id: ventaId,
+        p_notas: `Salida POS por venta ${ventaId}`,
+      });
+      if (salidaError) {
+        throw salidaError;
+      }
+
+      const { data: productoActualizado, error: productoActualizadoError } = await client
         .from('productos')
+        .select('stock_actual, stock, stock_reservado')
+        .eq('tenant_id', tenantId)
+        .eq('id', item.producto_id)
+        .maybeSingle();
+      if (productoActualizadoError) {
+        throw productoActualizadoError;
+      }
+
+      const stockFinal = Number(productoActualizado?.stock_actual ?? nuevoStock);
+      const stockReservadoFinal = Number(productoActualizado?.stock_reservado ?? stockReservado);
+      const costoUnitario = Number(producto.precio_compra ?? producto.costo ?? 0);
+      producto.stock_actual = stockFinal;
+      producto.stock = String(productoActualizado?.stock ?? stockFinal);
+
+      const { error: movimientoUpdateError } = await client
+        .from('movimientos_inventario')
         .update({
-          stock_actual: nuevoStock,
-          stock: String(nuevoStock),
-          updated_at: new Date().toISOString(),
+          created_by: userId,
+          motivo: `Venta POS ${ventaId}`,
+          stock_actual: String(stockFinal),
+          stock_reservado: String(stockReservadoFinal),
+          activo: true,
+          estado: 'ACTIVO',
+          metadata: {
+            source: 'pos',
+            idempotency_key: ventaData.idempotency_key,
+            numero_ticket: ventaData.numero_ticket,
+            metodo_costeo: 'ULTIMO_COSTO',
+            costo_unitario: costoUnitario,
+            valor_total: new Decimal(costoUnitario).times(cantidad).toDecimalPlaces(2).toNumber(),
+          },
         })
         .eq('tenant_id', tenantId)
-        .eq('id', item.producto_id);
-      if (updateStockError) {
-        throw updateStockError;
-      }
-      producto.stock_actual = nuevoStock;
-      producto.stock = String(nuevoStock);
-
-      const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-        tenant_id: tenantId,
-        producto_id: item.producto_id,
-        tipo: 'SALIDA',
-        cantidad,
-        referencia_tipo: 'VENTA_POS',
-        referencia_id: ventaId,
-        created_by: userId,
-        motivo: `Venta POS ${ventaId}`,
-        notas: `Salida POS por venta ${ventaId}`,
-        stock_actual: String(nuevoStock),
-        stock_reservado: String(stockReservado),
-        activo: true,
-        estado: 'ACTIVO',
-        metadata: {
-          source: 'pos',
-          idempotency_key: ventaData.idempotency_key,
-          numero_ticket: ventaData.numero_ticket,
-        },
-      });
-      if (movimientoError) {
-        await client
-          .from('productos')
-          .update({
-            stock_actual: stockActual,
-            stock: String(stockActual),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('tenant_id', tenantId)
-          .eq('id', item.producto_id);
-        throw movimientoError;
+        .eq('id', movimientoId);
+      if (movimientoUpdateError) {
+        throw movimientoUpdateError;
       }
     }
   }

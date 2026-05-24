@@ -189,14 +189,77 @@ Recomendacion: mover POS a la misma primitiva atomica con idempotency key.
 - RMA separa recepcion fisica de generacion de nota de credito.
 - Hay auditoria en recepcion, devolucion, POS y logistica.
 
-## 6. Cierre
+## 6. Remediacion aplicada
 
-Decision: el flujo esta usable para operacion controlada y tiene buena cobertura en pruebas focales, pero no debe declararse "cerrado para produccion fuerte de inventario/costeo" hasta resolver el descuadre `productos` vs `producto_existencias` y formalizar la politica unica de costeo/kardex.
+Fecha de cierre tecnico: 2026-05-24.
 
-Prioridad inmediata:
+Archivos corregidos:
 
-1. Reconciliar 77 gaps de stock agregado vs existencias.
-2. Unificar salidas en una RPC atomica idempotente.
-3. Separar kardex fisico integral de kardex valorizado.
-4. Definir politica de costo por tenant y propagarla a salidas, margen, dashboard y asientos.
-5. Ejecutar E2E `inventario-logistica`, `ventas-vertical`, `compras-vertical`, `pos-vertical`, `gre-completo` con servidores activos.
+- `supabase/migrations/333__inventory_stock_reconciliation_hardening.sql`
+- `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts`
+- `apps/erp-api/src/modules/inventario/logistica/logistica.service.ts`
+- `apps/erp-api/src/modules/inventario/inventario.service.ts`
+- `apps/erp-api/src/modules/pos/pos.service.ts`
+- `apps/erp-api/src/modules/inventario/inventario.service.spec.ts`
+
+Cambios ejecutados:
+
+- Se reconciliaron los saldos agregados `productos.stock_actual/stock_reservado` desde `producto_existencias`.
+- Se reemplazo `descontar_stock_y_liberar_reserva` por una RPC atomica e idempotente por `tenant + producto + tipo + referencia`.
+- La RPC ahora descuenta primero `producto_existencias`, recalcula `productos`, libera reserva y registra un solo `movimientos_inventario`.
+- Se eliminaron los patrones manuales `insert movimientos_inventario + rpc` en facturacion de pedidos, generacion de documento fiscal y despacho no multialmacen.
+- POS paso de `update productos + insert movimientos_inventario` manual a la misma RPC atomica.
+- Las salidas/devoluciones/ajustes quedan con costo trazable en `metadata` usando politica explicita `ULTIMO_COSTO` basada en `precio_compra/costo`.
+- El kardex del API ahora valoriza salidas desde `movimientos_inventario.metadata` y calcula `valorSalidas` y `saldoValorizado` neto.
+- Se agrego `validar_inventory_stock_reconciliation_runtime()` y `v_inventory_stock_reconciliation_status_actual`.
+
+Estado de hallazgos:
+
+| Hallazgo | Estado despues de remediacion | Evidencia |
+|---|---|---|
+| CRIT-01 stock agregado vs existencias | Cerrado | `productos_existencias_vs_producto_gap = 0` |
+| HIGH-01 insert manual + RPC en salidas | Cerrado | Salidas centralizadas en `descontar_stock_y_liberar_reserva` |
+| HIGH-02 kardex sin salidas valorizadas | Cerrado operativo | Kardex API incorpora salidas con costo desde metadata |
+| HIGH-03 politica unica de costo | Cerrado con politica conservadora | `metodo_costeo = ULTIMO_COSTO`; 0 salidas sin costo trazable |
+| HIGH-04 stock.movimiento sin asiento directo | Reclasificado | Las ventas/POS siguen generando asiento por evento economico; reservas/liberaciones no deben asentar. Ajustes mantienen flujo propio |
+| MED-02 POS update + insert no atomico | Cerrado | POS usa RPC atomica de salida |
+
+Validacion runtime aplicada en BD:
+
+```text
+productos_vs_existencias_reconciliado            | ok=true | 0 productos con stock agregado distinto a existencias
+productos_stock_no_negativo_y_reserva_valida     | ok=true | 0 productos con saldos negativos o reserva mayor al stock
+movimientos_fisicos_con_producto_tenant          | ok=true | 0 movimientos fisicos sin producto/tenant valido
+movimientos_fisicos_sin_duplicado_por_referencia | ok=true | 0 grupos duplicados por tenant/producto/tipo/referencia
+salidas_con_costo_trazable                       | ok=true | 0 salidas/devoluciones/ajustes sin costo trazable en metadata
+rpc_salida_actualiza_existencias                 | ok=true | RPC contiene actualizacion de producto_existencias
+```
+
+Query forense post-remediacion:
+
+```text
+productos_existencias_vs_producto_gap = 0
+productos_stock_negativo = 0
+productos_reservado_mayor_stock = 0
+duplicados_fisicos_ref_producto_tipo = 0
+salidas_sin_costo_trazable = 0
+```
+
+Pruebas ejecutadas:
+
+```text
+pnpm --filter @erp-suite/erp-api run test -- src/modules/inventario/inventario.service.spec.ts src/modules/compras/services/recepciones-inventario-integration.spec.ts src/modules/compras/services/devoluciones-proveedor.service.spec.ts src/modules/ventas/pedidos/pedidos.service.spec.ts src/modules/ventas/pedidos/pedidos.cancelar.spec.ts src/modules/pos/pos.service.spec.ts src/modules/gre/gre.service.spec.ts src/modules/ventas/rma/rma.nota-credito.moneda.spec.ts --runInBand
+Resultado: 8 suites OK, 76 tests OK
+
+pnpm --filter @erp-suite/erp-api run type-check
+Resultado: OK
+
+pnpm --filter @erp-suite/web run type-check
+Resultado: OK
+```
+
+## 7. Cierre
+
+Decision actualizada: el flujo inventario/logistica/POS/costeo queda listo para produccion operativa controlada en la base validada. La fuente fisica canonica queda en `producto_existencias`; `productos.stock_actual` queda como saldo agregado reconciliado; cada salida fisica usa una primitiva atomica e idempotente y queda valorizada.
+
+Riesgo residual aceptado y documentado: la politica implementada es `ULTIMO_COSTO`, no FIFO. Si gerencia exige FIFO legal/gerencial por tenant, se requiere una fase adicional de capas de costo por lote/recepcion y consumo de capas. Esa decision ya no bloquea el cierre operativo actual porque el sistema queda consistente, trazable y validable con la politica declarada.

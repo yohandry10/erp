@@ -493,50 +493,39 @@ export class InventarioService {
         );
       }
 
-      // Operación atómica: decrementar stock y stock_reservado
-      const nuevoStockActual = stockActual - cantidad;
-      const nuevoStockReservado = Math.max(0, stockReservado - cantidad);
+      const { data: movimientoId, error: salidaError } = await this.supabase.getClient()
+        .rpc('descontar_stock_y_liberar_reserva', {
+          p_producto_id: producto_id,
+          p_cantidad: cantidad,
+          p_referencia_tipo: referencia_tipo ?? null,
+          p_referencia_id: referencia_id ?? null,
+          p_notas: `Salida de ${cantidad} unidades${referencia_tipo ? ` (${referencia_tipo})` : ''}`,
+        });
 
-      const { error: updateError } = await this.supabase.getClient()
-        .from('productos')
-        .update({
-          stock_actual: nuevoStockActual,
-          stock_reservado: nuevoStockReservado
-        })
-        .eq('tenant_id', tenant_id)
-        .eq('id', producto_id);
-
-      if (updateError) {
-        console.error('❌ Error actualizando stock:', updateError);
-        throw new BadRequestException(`Error actualizando stock: ${updateError.message}`);
+      if (salidaError) {
+        console.error('❌ Error descontando stock atomico:', salidaError);
+        throw new BadRequestException(`Error actualizando stock: ${salidaError.message}`);
       }
 
-      // Crear movimiento de SALIDA
-      const movimientoId = await this.crearMovimiento({
-        tenant_id,
-        producto_id,
-        tipo: TipoMovimiento.SALIDA,
-        cantidad,
-        referencia_tipo,
-        referencia_id,
-        notas: `Salida de ${cantidad} unidades${referencia_tipo ? ` (${referencia_tipo})` : ''}`,
-        emitirEvento: false,
-      });
+      const { data: productoActualizado, error: productoActualizadoError } = await this.supabase.getClient()
+        .from('productos')
+        .select('stock_actual, stock_reservado, precio_venta')
+        .eq('tenant_id', tenant_id)
+        .eq('id', producto_id)
+        .single();
+
+      if (productoActualizadoError || !productoActualizado) {
+        console.error('❌ Error obteniendo stock actualizado:', productoActualizadoError);
+        throw new BadRequestException('El stock fue descontado, pero no se pudo confirmar el saldo actualizado');
+      }
+
+      const nuevoStockActual = Number((productoActualizado as any).stock_actual || 0);
+      const nuevoStockReservado = Number((productoActualizado as any).stock_reservado || 0);
 
       console.log(`✅ Stock descontado exitosamente. Nuevo stock: ${nuevoStockActual}, stock_reservado: ${nuevoStockReservado}`);
 
-      // 🔴 CRÍTICO FIX: Emitir evento MovimientoStockEvent para contabilidad
-      // El evento ya se emite en crearMovimiento(), pero aquí tenemos acceso al stock anterior/nuevo
-      // Para asegurar que el evento tenga los valores correctos, lo emitimos aquí también
       try {
-        const { data: productoData } = await this.supabase.getClient()
-          .from('productos')
-          .select('precio_venta')
-          .eq('id', producto_id)
-          .eq('tenant_id', tenant_id)
-          .single();
-
-        const precioVenta = Number(productoData?.precio_venta || 0);
+        const precioVenta = Number((productoActualizado as any).precio_venta ?? (producto as any).precio_venta ?? 0);
         const valorTotal = precioVenta * cantidad;
 
         await this.eventBus.emitMovimientoStock({
@@ -557,11 +546,7 @@ export class InventarioService {
         // No bloquear la operación si falla el evento
       }
 
-      // Registrar auditoría (el userId se podría obtener de la referencia si está disponible)
-      // Por ahora, registramos el movimiento que ya tiene auditoría en crearMovimiento
-      // La auditoría de productos se puede agregar cuando se disponga de userId
-
-      return movimientoId;
+      return String(movimientoId);
     } catch (error) {
       console.error('❌ Error descontando stock:', error);
       throw error;
@@ -980,7 +965,7 @@ export class InventarioService {
 
       let salidasQuery = client
         .from('movimientos_inventario')
-        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas')
+        .select('id, tenant_id, producto_id, tipo, cantidad, created_at, referencia_tipo, referencia_id, notas, metadata')
         .eq('tenant_id', tenantId)
         .in('tipo', ['SALIDA', 'AJUSTE', 'DEVOLUCION']);
 
@@ -1006,6 +991,8 @@ export class InventarioService {
 
       const movimientosSalida = (salidasData ?? []).map((movimiento: any) => {
         const cantidad = Number(movimiento.cantidad ?? 0);
+        const costoUnitario = this.round2(Number(movimiento.metadata?.costo_unitario ?? 0));
+        const valorTotal = this.round2(Number(movimiento.metadata?.valor_total ?? costoUnitario * cantidad));
         return {
           id: movimiento.id,
           tipo: movimiento.tipo ?? 'SALIDA',
@@ -1013,8 +1000,8 @@ export class InventarioService {
           documento: movimiento.referencia_tipo ?? null,
           estado: null,
           cantidad,
-          costoUnitario: 0,
-          valorTotal: 0,
+          costoUnitario,
+          valorTotal,
           moneda: 'PEN',
           producto: {
             id: movimiento.producto_id,
@@ -1048,10 +1035,16 @@ export class InventarioService {
       const totalSalidas = movimientos
         .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'SALIDA')
         .reduce((sum, mov) => sum + Number(mov.cantidad ?? 0), 0);
-      const valorEntradas = movimientos.reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
+      const valorEntradas = movimientos
+        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'ENTRADA')
+        .reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
+      const valorSalidas = movimientos
+        .filter((mov) => String(mov.tipo ?? '').toUpperCase() === 'SALIDA')
+        .reduce((sum, mov) => sum + Number(mov.valorTotal ?? 0), 0);
       const valorPorMoneda = movimientos.reduce<Record<string, number>>((acc, mov) => {
         const moneda = mov.moneda ?? 'PEN';
-        acc[moneda] = (acc[moneda] ?? 0) + Number(mov.valorTotal ?? 0);
+        const signo = String(mov.tipo ?? '').toUpperCase() === 'SALIDA' ? -1 : 1;
+        acc[moneda] = (acc[moneda] ?? 0) + signo * Number(mov.valorTotal ?? 0);
         return acc;
       }, {});
 
@@ -1060,8 +1053,9 @@ export class InventarioService {
         totalEntradas: this.round2(totalEntradas),
         totalSalidas: this.round2(totalSalidas),
         valorEntradas: this.round2(valorEntradas),
+        valorSalidas: this.round2(valorSalidas),
         saldoCantidad: this.round2(totalEntradas - totalSalidas),
-        saldoValorizado: this.round2(valorEntradas),
+        saldoValorizado: this.round2(valorEntradas - valorSalidas),
         valorPorMoneda: Object.entries(valorPorMoneda).reduce<Record<string, number>>((acc, [moneda, valor]) => {
           acc[moneda] = this.round2(valor);
           return acc;

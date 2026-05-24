@@ -226,28 +226,28 @@ describe('InventarioService', () => {
                 error: null,
             });
 
-            // 2. Update Producto (Expected: Stock 95, Reserved 5)
-            mockSupabaseClient.update.mockReturnValueOnce(mockSupabaseClient);
+            mockSupabaseClient.rpc.mockResolvedValueOnce({
+                data: 'mov-salida-1',
+                error: null,
+            });
 
-            // 3. Crear Movimiento
             mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { id: 'mov-salida-1' },
+                data: { precio_venta: 100, stock_actual: '95', stock_reservado: '5' },
                 error: null
             });
 
-            // 4. Get product again for event emission (eventBus checks product)
-            mockSupabaseClient.single.mockResolvedValueOnce({
-                data: { precio_venta: 100, stock_actual: '95' },
-                error: null
+            const movimientoId = await service.descontarStock(productoId, cantidad, tenantId, 'VENTA', 'v1');
+
+            expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('descontar_stock_y_liberar_reserva', {
+                p_producto_id: productoId,
+                p_cantidad: cantidad,
+                p_referencia_tipo: 'VENTA',
+                p_referencia_id: 'v1',
+                p_notas: 'Salida de 5 unidades (VENTA)',
             });
 
-            await service.descontarStock(productoId, cantidad, tenantId, 'VENTA', 'v1');
-
-            expect(mockSupabaseClient.update).toHaveBeenCalledWith({
-                stock_actual: 95,
-                stock_reservado: 5
-            });
-
+            expect(movimientoId).toBe('mov-salida-1');
+            expect(mockSupabaseClient.update).not.toHaveBeenCalled();
             expect(eventBusService.emitMovimientoStock).toHaveBeenCalled();
         });
 

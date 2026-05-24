@@ -1604,28 +1604,13 @@ export class PedidosService {
 
         const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
 
-        // Crear movimiento de SALIDA
-        if (!yaTieneSalidaRegistrada) {
-          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'SALIDA',
-            cantidad: item.cantidad,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: id,
-            notas: `Salida por facturación de pedido ${pedido.numero}`,
-          });
-
-          if (movimientoError) {
-            throw new BadRequestException('No se pudo registrar el movimiento de salida de inventario');
-          }
-        }
-
-        // Descontar stock (agregado) y liberar reserva
         if (!yaTieneSalidaRegistrada) {
           const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
             p_producto_id: item.producto_id,
             p_cantidad: item.cantidad,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: id,
+            p_notas: `Salida por facturación de pedido ${pedido.numero}`,
           });
 
           if (salidaError) {
@@ -2124,23 +2109,12 @@ export class PedidosService {
         const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
 
         if (!yaTieneSalidaRegistrada) {
-          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'SALIDA',
-            cantidad: item.cantidad,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: pedidoId,
-            notas: `Salida por documento fiscal de pedido ${pedido.numero}`,
-          });
-
-          if (movimientoError) {
-            throw new BadRequestException('No se pudo registrar el movimiento de salida de inventario');
-          }
-
           const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
             p_producto_id: item.producto_id,
             p_cantidad: item.cantidad,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: pedidoId,
+            p_notas: `Salida por documento fiscal de pedido ${pedido.numero}`,
           });
 
           if (salidaError) {
