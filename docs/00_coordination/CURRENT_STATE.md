@@ -58,12 +58,20 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 
 ## Pendientes reales
 
+Bloqueados por dependencias externas (no estan en alcance de codigo):
+
 - Cargar certificado digital SUNAT/OSE productivo y credenciales externas reales.
 - Cargar secretos productivos finales y proveedor real de email si aplica.
 - Ejecutar smoke fiscal externo con CPE/GRE/SIRE/PLE/PLAME segun alcance del contribuyente.
-- Revalidar `327..335` con `psql --set=ON_ERROR_STOP=1` en una BD nueva/limpia antes de declararlo linea canonica para despliegues futuros.
+
+Operacionales continuos:
+
 - Mantener monitoreo de outbox, CPE sin asiento, SIRE/PLE vs mayor, pagos sujetos a bancarizacion y divergencias de inventario.
-- Reconciliar 3 productos con `productos.stock_actual` distinto de `SUM(producto_existencias)` y backfill de metadata de costo en 14 salidas/devoluciones/ajustes pre-`333` (residual no critico; el RPC nuevo evita generar mas divergencias).
+
+Cerrados en sesion 2026-05-24:
+
+- ~~Revalidar `327..335` con `psql --set=ON_ERROR_STOP=1` en una BD nueva/limpia~~ -> revalidacion completa de `000..335` ejecutada el 2026-05-24, 22/22 validadores OK.
+- ~~Reconciliar 3 productos descuadrados + 14 salidas sin costo pre-`333`~~ -> backfill aplicado el 2026-05-24, validador inventario quedo 6/6 OK.
 
 ## Estado de aplicacion 327..335 en BD remota (verificado 2026-05-24)
 
@@ -81,11 +89,21 @@ Verificacion read-only via `psql --dbname="$POSTGRES_URL"` contra `wypnbcptofqdm
 | 334 | Aplicada | Tabla `financial_forensic_repair_log` + RPC `registrar_cxc_pago_tx` + `conciliar_movimientos_bancarios_tx` |
 | 335 | Aplicada | `descontar_stock_y_liberar_reserva` con descuento autoritativo (verificado via `pg_get_functiondef`) |
 
-Validadores runtime ejecutados post-`331`:
+Validadores runtime ejecutados post-`331` y post-backfill residual (2026-05-24):
 
 - `validar_accounting_production_compliance_runtime(NULL)`: **5/5 OK**.
 - `validar_tesoreria_caja_bancos_runtime(NULL)`: **11/11 OK**.
-- `validar_inventory_stock_reconciliation_runtime(NULL)`: **4/6 OK**; 2 residuales documentados como pendiente no critico arriba.
+- `validar_inventory_stock_reconciliation_runtime(NULL)`: **6/6 OK** (era 4/6 antes del backfill; los 3 productos descuadrados y 14 salidas pre-`333` quedaron cerrados con UPDATE puntual).
+
+## Revalidacion 000..335 en BD limpia (2026-05-24)
+
+Ejercicio de "linea canonica desde cero" ejecutado contra Postgres 16 limpio en Docker (`erp-pg-revalidate` en `:15432`, descartado al final):
+
+1. Pre-requisitos minimos creados antes de aplicar: extensions `pgcrypto` y `uuid-ossp`; esquemas `app` y `auth`; tabla skeleton `auth.users`; roles `anon`, `authenticated`, `service_role` (BYPASSRLS). Estos prerequisitos son los que Supabase provee de fabrica y no estan declarados en las migraciones; se documentan aqui para reproducir el despliegue en un Postgres no-Supabase.
+2. Aplicacion en orden de las 332 migraciones disponibles (huecos historicos `006..009`, max `335`) con `psql --dbname --set=ON_ERROR_STOP=1 -q -f`. Todas aplicaron limpio sin errores.
+3. Validadores runtime sobre la BD reconstruida: **22/22 OK** (inventory 6/6, accounting compliance 5/5, tesoreria 11/11).
+
+Conclusion: las 332 migraciones forman una linea canonica reproducible sobre Postgres 16. Cualquier despliegue futuro a un Supabase nuevo solo necesita los prerequisitos del paso 1 (los gestiona Supabase por defecto en proyectos nuevos).
 
 ## Protocolo de nueva sesion
 
