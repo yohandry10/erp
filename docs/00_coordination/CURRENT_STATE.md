@@ -61,9 +61,31 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 - Cargar certificado digital SUNAT/OSE productivo y credenciales externas reales.
 - Cargar secretos productivos finales y proveedor real de email si aplica.
 - Ejecutar smoke fiscal externo con CPE/GRE/SIRE/PLE/PLAME segun alcance del contribuyente.
-- Confirmar en el entorno destino que estan aplicadas las migraciones manuales `312..326` y las posteriores `327..335`.
-- Revalidar `327..335` con `psql --set=ON_ERROR_STOP=1` antes de declararlo linea canonica en una BD nueva/remota.
+- Revalidar `327..335` con `psql --set=ON_ERROR_STOP=1` en una BD nueva/limpia antes de declararlo linea canonica para despliegues futuros.
 - Mantener monitoreo de outbox, CPE sin asiento, SIRE/PLE vs mayor, pagos sujetos a bancarizacion y divergencias de inventario.
+- Reconciliar 3 productos con `productos.stock_actual` distinto de `SUM(producto_existencias)` y backfill de metadata de costo en 14 salidas/devoluciones/ajustes pre-`333` (residual no critico; el RPC nuevo evita generar mas divergencias).
+
+## Estado de aplicacion 327..335 en BD remota (verificado 2026-05-24)
+
+Verificacion read-only via `psql --dbname="$POSTGRES_URL"` contra `wypnbcptofqdmoynlonq`: 28 artefactos clave (funciones, indices, tablas, vistas) presentes; `331__production_accounting_flow_hardening.sql` se detecto NO aplicada (faltaban `app.seed_operational_defaults_for_tenant` y `ux_conceptos_planilla_tenant_codigo`) y se aplico limpia el mismo dia.
+
+| Migration | Estado | Notas |
+|---|---|---|
+| 327 | Aplicada | `pos_registrar_venta_full_tx` + idx idempotency |
+| 328 | Aplicada | Uniques de sesiones de caja |
+| 329 | Aplicada | `create_demo_tenant` con fix pgcrypto |
+| 330 | Aplicada | RBAC demo admin + expiry idx |
+| 331 | Aplicada 2026-05-24 | Faltaba en remoto; aplicada limpia (`BEGIN`..`COMMIT`, 0 errores; trigger fiscal `tenants`, 24 filas updated) |
+| 332 | Aplicada | Tabla `normativa_peru_periodos` + validador compliance |
+| 333 | Aplicada | Validador inventario + view de status |
+| 334 | Aplicada | Tabla `financial_forensic_repair_log` + RPC `registrar_cxc_pago_tx` + `conciliar_movimientos_bancarios_tx` |
+| 335 | Aplicada | `descontar_stock_y_liberar_reserva` con descuento autoritativo (verificado via `pg_get_functiondef`) |
+
+Validadores runtime ejecutados post-`331`:
+
+- `validar_accounting_production_compliance_runtime(NULL)`: **5/5 OK**.
+- `validar_tesoreria_caja_bancos_runtime(NULL)`: **11/11 OK**.
+- `validar_inventory_stock_reconciliation_runtime(NULL)`: **4/6 OK**; 2 residuales documentados como pendiente no critico arriba.
 
 ## Protocolo de nueva sesion
 
