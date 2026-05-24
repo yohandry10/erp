@@ -61,6 +61,7 @@ Documentación técnica del ERP, organizada por dominio. Solo se listan document
 
 | Documento | Propósito |
 |---|---|
+| [release/GO_LIVE_RUNBOOK.md](release/GO_LIVE_RUNBOOK.md) | **Runbook ejecutable día Go-Live** — pre-requisitos, secuencia paso a paso, comandos exactos, rollback. Único camino aprobado para llevar a producción real |
 | [release/production-checklist.md](release/production-checklist.md) | Checklist técnico previo a release |
 | [release/branch-protection.md](release/branch-protection.md) | Reglas de protección de `main` |
 
@@ -84,3 +85,4 @@ Documentación profunda de la lógica de negocio por dominio. Estos manuales son
 - **¿Voy a modificar un módulo?** → `00_coordination/FLOW_STATUS.md` + `manuals/modules/<MODULO>.md` + auditoría forense aplicable
 - **¿Necesito agregar un endpoint?** → `security/route-access-matrix.md` para definir su access tier
 - **¿Voy a deployar?** → `release/production-checklist.md` + `production-readiness/ERP_PRODUCTION_READINESS.md`
+- **¿Tengo credenciales productivas y voy a ejecutar Go-Live?** → `release/GO_LIVE_RUNBOOK.md` (única ruta aprobada)
