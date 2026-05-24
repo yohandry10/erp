@@ -610,6 +610,22 @@ export class CpeService {
         .single();
 
       if (error) {
+        if (error.code === '23505' && String(error.message || '').includes('idempotency')) {
+          const { data: racedCpe, error: racedLookupError } = await supabaseClient
+            .from('cpe')
+            .select('*')
+            .eq('tenant_id', tenantId)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle();
+
+          if (!racedLookupError && racedCpe) {
+            this.logger.warn(
+              `♻️ [CPE] Carrera idempotente detectada para ${idempotencyKey}, retornando CPE existente ${racedCpe.id}`,
+            );
+            return this.mapToDto(racedCpe);
+          }
+        }
+
         console.error('Database error:', error);
         throw new BadRequestException('Error creating CPE: ' + error.message);
       }

@@ -24,6 +24,22 @@ const CUENTAS_OPERATIVAS_RUNTIME: Record<string, Omit<PlanCuenta, 'id' | 'tenant
     acepta_movimiento: true,
     estado: 'ACTIVO',
   },
+  '20': {
+    codigo: '20',
+    nombre: 'Mercaderias',
+    tipo: 'ACTIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
+  '40': {
+    codigo: '40',
+    nombre: 'Tributos por pagar',
+    tipo: 'PASIVO',
+    nivel: 2,
+    acepta_movimiento: true,
+    estado: 'ACTIVO',
+  },
   '69': {
     codigo: '69',
     nombre: 'Costo de ventas',
@@ -109,11 +125,7 @@ export class PlanCuentasService {
       throw new Error('Error obteniendo cuentas del plan de cuentas');
     }
 
-    if (!data || data.length === 0) {
-      throw new Error('No se encontraron cuentas en el plan de cuentas');
-    }
-
-    const cuentas = [...data];
+    const cuentas = [...(data || [])];
     const cuentasEncontradas = cuentas.map((c) => c.codigo);
     let cuentasFaltantes = codigosUnicos.filter(
       (codigo) => !cuentasEncontradas.includes(codigo)

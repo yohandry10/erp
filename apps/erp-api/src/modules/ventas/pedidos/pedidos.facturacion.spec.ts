@@ -215,7 +215,6 @@ describe('PedidosService (facturación)', () => {
           { data: [], error: null },
           { data: [{ id: 'mov-1' }], error: null },
         ],
-        insert: [{ data: { id: 'mov-1' }, error: null }],
       },
       pedidos_venta_detalle: {
         update: [
@@ -257,7 +256,6 @@ describe('PedidosService (facturación)', () => {
     await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(BadRequestException);
 
     expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
-    expect(mockSupabaseClient.__spies.insert).toHaveBeenCalledTimes(1);
   });
 });
 

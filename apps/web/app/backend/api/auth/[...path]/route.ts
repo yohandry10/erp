@@ -11,10 +11,12 @@ async function proxyAuth(request: NextRequest, context: { params: Promise<{ path
   const contentType = request.headers.get('content-type')
   const cookie = request.headers.get('cookie')
   const userAgent = request.headers.get('user-agent')
+  const authorization = request.headers.get('authorization')
 
   if (contentType) headers.set('content-type', contentType)
   if (cookie) headers.set('cookie', cookie)
   if (userAgent) headers.set('user-agent', userAgent)
+  if (authorization) headers.set('authorization', authorization)
 
   const response = await fetch(targetUrl, {
     method: request.method,

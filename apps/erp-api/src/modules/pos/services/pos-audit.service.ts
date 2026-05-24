@@ -111,8 +111,9 @@ export class PosAuditService {
 
       return data;
     } catch (error) {
-      this.logger.error(`Error en registrarEvento: ${error.message}`);
-      // No lanzamos error para no interrumpir el flujo de venta
+      this.logger.error(`❌ ALERTA: Fallo registrando evento POS de auditoría (tipo=${evento?.tipo_evento}): ${error.message}`);
+      // No lanzamos error para no interrumpir el flujo de venta.
+      // Se loggea como error (no warn) para que sea detectable en monitoreo.
       return null;
     }
   }

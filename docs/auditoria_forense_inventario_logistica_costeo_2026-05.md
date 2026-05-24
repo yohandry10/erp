@@ -263,3 +263,13 @@ Resultado: OK
 Decision actualizada: el flujo inventario/logistica/POS/costeo queda listo para produccion operativa controlada en la base validada. La fuente fisica canonica queda en `producto_existencias`; `productos.stock_actual` queda como saldo agregado reconciliado; cada salida fisica usa una primitiva atomica e idempotente y queda valorizada.
 
 Riesgo residual aceptado y documentado: la politica implementada es `ULTIMO_COSTO`, no FIFO. Si gerencia exige FIFO legal/gerencial por tenant, se requiere una fase adicional de capas de costo por lote/recepcion y consumo de capas. Esa decision ya no bloquea el cierre operativo actual porque el sistema queda consistente, trazable y validable con la politica declarada.
+
+Nota posterior 2026-05-24: se agrego `335__descontar_stock_authoritative.sql` para corregir la funcion `descontar_stock_y_liberar_reserva` introducida en `333__inventory_stock_reconciliation_hardening.sql`. La correccion evita que `productos.stock_actual` se sobrescriba con `SUM(producto_existencias)` despues del descuento cuando existen desincronizaciones historicas; el saldo agregado de `productos` queda como salida autoritativa y `producto_existencias` conserva el rastro fisico granular por almacen.
+
+Reproduccion observada antes del fix (e2e `inventario-logistica.spec.ts`): tras recepcion 9 + devolucion compra 2 (descuenta solo `productos.stock_actual` sin sincronizar `producto_existencias`), el despacho de 3 unidades dejaba `productos.stock_actual = 6` en lugar del esperado `4`, porque la RPC recalculaba `productos = SUM(producto_existencias) = 9 - 3 = 6`, pisando el descuento previo de la devolucion. El fix `335` reemplaza el recalculo por un descuento autoritativo `productos.stock_actual -= p_cantidad` y mantiene el descuento granular en `producto_existencias` para preservar el rastro fisico.
+
+Validacion post-fix:
+
+- E2e `apps/web/tests/e2e/inventario-logistica.spec.ts` en isolation: 1 passed (1.9m), demo tenant fresco, despacho confirmado deja stock en `4` como espera el spec.
+- Jest backend completo: `951/951` (baseline restaurada; el unico fallo previo en `pedidos.facturacion.spec.ts:259` se resolvio en paralelo actualizando el mock al nuevo flow consolidado de `b55c886`, sin insert directo + rpc).
+- Migration aplicada en remoto (proyecto `wypnbcptofqdmoynlonq`) via `psql --dbname="$POSTGRES_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/335__descontar_stock_authoritative.sql`. Verificado con `pg_get_functiondef`: la funcion contiene `GREATEST(... stock_actual ... - p_cantidad, 0)` y ya no reescribe `productos` via `SUM(pe.stock_actual)`.

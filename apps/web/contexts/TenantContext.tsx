@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { customAuth } from '@/lib/auth-service'
 import type { Tenant, User, TenantContextValue } from './types'
 import type { Session } from '@/lib/auth-service'
+import { useAuth } from './AuthContext'
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined)
 
@@ -19,6 +20,7 @@ function buildMinimalTenantFromUser(user: User): Tenant {
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
+  const { session: authSession, loading: authLoading } = useAuth()
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -143,6 +145,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [user, refreshTenant])
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
+
+    if (authSession) {
+      extractFromSession(authSession)
+      return
+    }
+
     customAuth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         setLoading(false)
@@ -157,7 +169,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [extractFromSession])
+  }, [authLoading, authSession, extractFromSession])
 
   const value: TenantContextValue = {
     tenant,

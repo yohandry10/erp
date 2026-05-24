@@ -314,11 +314,7 @@ const menuItems: MenuItem[] = [
     title: 'Auditoría',
     href: '/dashboard/audit-logs',
     icon: Shield,
-    permission: {
-      modulo: 'configuracion',
-      accion: 'ver',
-      recurso: 'usuarios'
-    }
+    superAdminOnly: true
   },
   {
     title: 'Ayuda',
@@ -356,10 +352,15 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     }
   }, [isSubmenuActive])
 
-  // El Admin del tenant tiene acceso a todo el menú
-  // Los roles vienen del JWT como array de strings: ['ADMIN', 'VENDEDOR', etc]
-  const userRoles: string[] = user?.roles || []
-  const isAdmin = userRoles.includes('ADMIN')
+  // El Admin del tenant tiene acceso a todo el menú.
+  // Los roles vienen del JWT como string[]: ['ADMIN', 'ADMIN_DEMO', ...] pero el
+  // endpoint /api/auth/login devuelve objetos {id, nombre, descripcion}. Aceptamos
+  // ambas formas por defensa en profundidad (snapshots antiguos en localStorage).
+  const rawRoles = Array.isArray(user?.roles) ? user!.roles : []
+  const userRoles: string[] = rawRoles
+    .map((r: any) => (typeof r === 'string' ? r : r?.nombre))
+    .filter((r: any): r is string => typeof r === 'string' && r.length > 0)
+  const isAdmin = userRoles.some((role) => ['ADMIN', 'ADMIN_DEMO'].includes(role.toUpperCase()))
 
   // Si es Admin o SuperAdmin, mostrar todo sin verificar permisos
   const bypassPermissions = isSuperAdmin || isAdmin
@@ -492,11 +493,35 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
   )
 }
 
+function SidebarMenuLoading({ isTablet }: { isTablet: boolean }) {
+  const rows = ['Dashboard', 'Módulos', 'Operación', 'Administración', 'Ayuda']
+
+  return (
+    <div className="space-y-2" aria-label="Cargando menú">
+      {rows.map((row, index) => (
+        <div
+          key={row}
+          className={cn(
+            'flex min-h-11 animate-pulse items-center rounded-xl border border-cyan-300/10 bg-cyan-400/5 text-slate-500',
+            isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
+          )}
+        >
+          <span className={cn('mr-3 shrink-0 rounded bg-cyan-300/20', isTablet ? 'h-[18px] w-[18px]' : 'h-5 w-5')} />
+          <span
+            className="h-3 rounded bg-cyan-300/15"
+            style={{ width: `${index === 0 ? 72 : 96 + (index % 2) * 32}px` }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { toast } = useToast()
-  const { isSuperAdmin, user } = useTenant()
+  const { isSuperAdmin, user, loading: tenantLoading } = useTenant()
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
@@ -622,16 +647,20 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className={cn('flex-1 overflow-y-auto', isTablet ? 'px-3 py-6' : 'px-4 py-8')}>
-          {filteredMenuItems.map((item) => (
-            <MenuItem
-              key={item.href || item.title}
-              item={item}
-              pathname={pathname}
-              isTablet={isTablet}
-              isMobile={isMobile}
-              onClose={() => isMobile && setIsOpen(false)}
-            />
-          ))}
+          {tenantLoading ? (
+            <SidebarMenuLoading isTablet={isTablet} />
+          ) : (
+            filteredMenuItems.map((item) => (
+              <MenuItem
+                key={item.href || item.title}
+                item={item}
+                pathname={pathname}
+                isTablet={isTablet}
+                isMobile={isMobile}
+                onClose={() => isMobile && setIsOpen(false)}
+              />
+            ))
+          )}
         </nav>
 
         {/* User Section */}

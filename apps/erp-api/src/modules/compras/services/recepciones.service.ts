@@ -335,7 +335,25 @@ export class RecepcionesService {
       // Generar número de recepción
       const numero = await this.generarNumeroRecepcion(tenantId);
 
-      // Crear recepción
+      // Validar TODOS los items ANTES de insertar el header (evitar header huérfano)
+      const validatedItems: Array<{ item: any; detalle: any }> = [];
+      for (const item of dto.items) {
+        const detalle = orden.detalles.find(d => d.id === item.detalle_id);
+        if (!detalle) {
+          throw new BadRequestException(`Detalle ${item.detalle_id} no encontrado en la orden`);
+        }
+
+        const cantidadPendiente = Number(detalle.cantidad) - Number(detalle.cantidad_recibida || 0);
+        if (item.cantidad_recibida > cantidadPendiente) {
+          throw new BadRequestException(
+            `La cantidad recibida (${item.cantidad_recibida}) excede la cantidad pendiente (${cantidadPendiente}) para el producto ${detalle.descripcion}`
+          );
+        }
+
+        validatedItems.push({ item, detalle });
+      }
+
+      // Crear recepción (header) — solo después de validar todos los items
       const { data: recepcion, error: recepcionError } = await this.supabase.getClient()
         .from('recepciones')
         .insert({
@@ -355,23 +373,9 @@ export class RecepcionesService {
         throw new BadRequestException(`Error al crear recepción: ${recepcionError.message}`);
       }
 
-      // Crear items de recepción
+      // Crear items de recepción (ya validados)
       const itemsToInsert = [];
-      for (const item of dto.items) {
-        // Validar que el detalle existe en la orden
-        const detalle = orden.detalles.find(d => d.id === item.detalle_id);
-        if (!detalle) {
-          throw new BadRequestException(`Detalle ${item.detalle_id} no encontrado en la orden`);
-        }
-
-        // Validar que no se exceda la cantidad pendiente
-        const cantidadPendiente = Number(detalle.cantidad) - Number(detalle.cantidad_recibida || 0);
-        if (item.cantidad_recibida > cantidadPendiente) {
-          throw new BadRequestException(
-            `La cantidad recibida (${item.cantidad_recibida}) excede la cantidad pendiente (${cantidadPendiente}) para el producto ${detalle.descripcion}`
-          );
-        }
-
+      for (const { item, detalle } of validatedItems) {
         itemsToInsert.push({
           recepcion_id: recepcion.id,
           detalle_id: item.detalle_id,
@@ -658,6 +662,7 @@ export class RecepcionesService {
       const { data: detalles, error: detallesError } = await this.supabase.getClient()
         .from('orden_compra_detalles')
         .select('cantidad, cantidad_recibida')
+        .eq('tenant_id', tenantId)
         .eq('orden_id', ordenId);
 
       if (detallesError) {

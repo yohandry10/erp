@@ -443,7 +443,9 @@ test.describe('T08 POS vertical completo', () => {
     }).toBeGreaterThan(0);
 
     await gotoAuthenticated(page, '/dashboard/pos');
-    await expect(page.getByText(venta.numero_ticket, { exact: false })).toBeVisible({ timeout: 20000 });
+    // .first() evita strict mode violation: el número de ticket aparece
+    // varias veces en la página (lista + detalle expandido).
+    await expect(page.getByText(venta.numero_ticket, { exact: false }).first()).toBeVisible({ timeout: 20000 });
     await gotoAuthenticated(page, '/dashboard/inventario/kardex');
     await expect(page.locator('body')).toContainText(/Kardex|Movimientos/i, { timeout: 20000 });
     await gotoAuthenticated(page, '/dashboard/cpe');

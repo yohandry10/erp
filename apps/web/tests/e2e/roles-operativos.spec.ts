@@ -33,8 +33,13 @@ type LoginResponse = {
 };
 
 function getOperationalPassword(): string {
+  // Prioridad: TEST_USER_PASSWORD explícito > DATABASE_URL > default seed.
+  // Antes priorizaba DATABASE_URL, lo que rompía cuando el e2e corre con un
+  // demo tenant (TEST_USER_EMAIL=demo-X@temp.local) pero DATABASE_URL apunta
+  // a Supabase con otro password — el login fallaba con 401 y luego rate-limit.
+  if (process.env.TEST_USER_PASSWORD) return process.env.TEST_USER_PASSWORD;
   if (process.env.DATABASE_URL) return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
-  return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+  return 'AdminProd2026!';
 }
 
 type RoleCase = {
@@ -120,6 +125,7 @@ test.describe('RBAC operativo por roles diarios', () => {
 
     const roleByName = new Map((roles || []).map((role) => [role.nombre, role.id]));
     const adminContext = await contextFor(admin.access_token);
+    const createdUserIds: string[] = [];
 
     for (const roleCase of roleCases) {
       const roleId = roleByName.get(roleCase.role);
@@ -139,7 +145,9 @@ test.describe('RBAC operativo por roles diarios', () => {
       const createText = await createResponse.text();
       expect(createResponse.ok(), `crear usuario ${roleCase.role}: ${createText}`).toBe(true);
       const created = JSON.parse(createText);
-      expect(created?.data?.id || created?.id, `crear usuario ${roleCase.role} debe devolver id`).toBeTruthy();
+      const createdUserId = created?.data?.id || created?.id;
+      expect(createdUserId, `crear usuario ${roleCase.role} debe devolver id`).toBeTruthy();
+      createdUserIds.push(createdUserId);
 
       const userLogin = await loginApi(email, password);
       const tokenRoles = (userLogin.user.roles || []).map((role) =>
@@ -153,5 +161,17 @@ test.describe('RBAC operativo por roles diarios', () => {
     }
 
     await adminContext.dispose();
+
+    // Cleanup honesto: borrar los 9 usuarios RBAC creados para no acumular
+    // en el demo entre runs (el demo tiene cap DEMO_MAX_USERS).
+    if (createdUserIds.length) {
+      try {
+        await supabase.from('user_roles').delete().in('usuario_sistema_id', createdUserIds);
+        await supabase.from('usuarios_sistema').delete().in('id', createdUserIds);
+        await supabase.from('users').delete().in('id', createdUserIds);
+      } catch (cleanupError) {
+        console.warn('roles-operativos cleanup warning:', cleanupError);
+      }
+    }
   });
 });

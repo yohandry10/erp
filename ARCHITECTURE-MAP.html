@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ERP Architecture Map</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d2a8ff;
+    --accent4: #f0883e;
+    --accent5: #f778ba;
+    --red: #f85149;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+  }
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: .5rem;
+  }
+  .header p { color: var(--text-muted); font-size: 1.1rem; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 2rem 0 3rem;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    min-width: 140px;
+  }
+  .stat-card .number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-card .label {
+    font-size: .8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 3rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+  }
+  .section-header .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .section-body {
+    padding: 1.5rem;
+  }
+
+  /* Mermaid diagrams */
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+    overflow-x: auto;
+  }
+  .mermaid svg {
+    max-width: 100%;
+  }
+
+  /* Two column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 900px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  /* Tables */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+  }
+  .data-table th {
+    text-align: left;
+    padding: .6rem .8rem;
+    background: rgba(88,166,255,.08);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: .5rem .8rem;
+    border-bottom: 1px solid rgba(48,54,61,.5);
+    color: var(--text);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(88,166,255,.04); }
+  .data-table code {
+    background: rgba(88,166,255,.1);
+    color: var(--accent);
+    padding: .15rem .4rem;
+    border-radius: 4px;
+    font-size: .8rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--accent2); }
+  .badge-purple { background: rgba(210,168,255,.15); color: var(--accent3); }
+  .badge-orange { background: rgba(240,136,62,.15); color: var(--accent4); }
+  .badge-pink { background: rgba(247,120,186,.15); color: var(--accent5); }
+  .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+
+  /* Color codes for icon backgrounds */
+  .icon-blue { background: rgba(88,166,255,.15); }
+  .icon-green { background: rgba(63,185,80,.15); }
+  .icon-purple { background: rgba(210,168,255,.15); }
+  .icon-orange { background: rgba(240,136,62,.15); }
+  .icon-pink { background: rgba(247,120,186,.15); }
+
+  /* Subsection */
+  .subsection {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .subsection:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  .subsection h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+  }
+
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: .85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <h1>ERP Architecture Map</h1>
+  <p>Multi-tenant ERP System &mdash; NestJS + Next.js + Supabase</p>
+</div>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-card"><div class="number">55</div><div class="label">Controllers</div></div>
+  <div class="stat-card"><div class="number">140+</div><div class="label">DB Tables</div></div>
+  <div class="stat-card"><div class="number">32</div><div class="label">Event Types</div></div>
+  <div class="stat-card"><div class="number">95+</div><div class="label">Frontend Pages</div></div>
+  <div class="stat-card"><div class="number">45</div><div class="label">RPC Functions</div></div>
+  <div class="stat-card"><div class="number">948</div><div class="label">Tests</div></div>
+</div>
+
+<!-- 1. SYSTEM OVERVIEW -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-blue">&#9881;</div>
+    <h2>1. System Overview</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph TB
+  subgraph Frontend["Frontend — Next.js 14"]
+    WEB["App Router + Tailwind + shadcn/ui<br/>~95 pages"]
+  end
+
+  subgraph Backend["Backend — NestJS"]
+    API["REST API<br/>55 Controllers<br/>JWT + RBAC"]
+    EB["EventBus<br/>In-Memory + Outbox"]
+    SH["Shared Services<br/>TenantContext | FinancialInteg<br/>AccountingEntries | InventoryInteg"]
+  end
+
+  subgraph Database["Supabase — PostgreSQL"]
+    DB[("140+ Tables<br/>45 RPCs<br/>RLS + Policies")]
+  end
+
+  subgraph Worker["Worker — BullMQ"]
+    WK["Background Jobs<br/>CPE | GRE | SIRE"]
+  end
+
+  WEB -->|"HTTPS / REST"| API
+  API --> EB
+  API --> SH
+  SH --> DB
+  EB -->|"outbox_events"| DB
+  EB -->|"Cron 1min"| DB
+  API -->|"Queue jobs"| WK
+  WK -->|"Process"| DB
+
+  style Frontend fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style Backend fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style Database fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style Worker fill:#1a2332,stroke:#f0883e,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 2. MODULE MAP -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-green">&#9733;</div>
+    <h2>2. Module Dependency Map</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph TB
+  CORE["CORE / SHARED<br/>TenantContext · EventBus · Outbox<br/>SupabaseService · AuthGuard"]
+
+  CORE --> VENTAS["VENTAS<br/>Cotizaciones · Pedidos<br/>Clientes · RMA · Reportes"]
+  CORE --> COMPRAS["COMPRAS<br/>Cotiz Compra · Ordenes<br/>Recepciones · Proveedores<br/>Devoluciones"]
+  CORE --> FINANZAS["FINANZAS<br/>CxC · CxP · Bancos<br/>Tesoreria · Conciliacion"]
+  CORE --> CONTAB["CONTABILIDAD<br/>Asientos · Plan Cuentas<br/>Periodos · Presupuestos<br/>Centros Costo"]
+  CORE --> INV["INVENTARIO<br/>Productos · Almacenes<br/>Kardex · Logistica"]
+  CORE --> POS["POS<br/>Venta rapida · Pagos<br/>Sesion caja · Audit"]
+  CORE --> CAJAS["CAJAS<br/>Apertura · Cierre<br/>Movimientos · Auth"]
+  CORE --> RRHH["RRHH<br/>Empleados · Planillas<br/>Asistencia · Contratos"]
+  CORE --> CPE["CPE / GRE<br/>Fact Electronica<br/>Guias Remision"]
+  CORE --> SIRE["SIRE<br/>Libros SUNAT"]
+  CORE --> SEC["SEGURIDAD<br/>Roles · Permisos<br/>Audit Logs · Rate Limit"]
+
+  VENTAS -->|"factura.emitida"| FINANZAS
+  VENTAS -->|"venta.procesada"| CONTAB
+  VENTAS -->|"pedido.confirmado"| INV
+  COMPRAS -->|"recepcion.registrada"| FINANZAS
+  COMPRAS -->|"recepcion.registrada"| CONTAB
+  COMPRAS -->|"cerrarRecepcion"| INV
+  FINANZAS -->|"cobro/pago"| CONTAB
+  POS -->|"pos.venta.registrada"| CONTAB
+  POS --> CAJAS
+  RRHH -->|"planilla.liquidada"| CONTAB
+  VENTAS -->|"CPE queue"| CPE
+
+  style CORE fill:#1f2937,stroke:#58a6ff,color:#e6edf3
+  style VENTAS fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style COMPRAS fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style FINANZAS fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style CONTAB fill:#1a2332,stroke:#f778ba,color:#e6edf3
+  style INV fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style POS fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style CAJAS fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style RRHH fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style CPE fill:#1a2332,stroke:#f778ba,color:#e6edf3
+  style SIRE fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style SEC fill:#1a2332,stroke:#f85149,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 3. EVENT SYSTEM -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-purple">&#9889;</div>
+    <h2>3. Event System Architecture</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  subgraph Producers["EVENT PRODUCERS"]
+    P1["POS"]
+    P2["Pedidos"]
+    P3["Recepciones"]
+    P4["CxP / CxC"]
+    P5["RRHH"]
+    P6["Inventario"]
+  end
+
+  EB["EventBus<br/>───────<br/>Dual Emission"]
+
+  P1 & P2 & P3 & P4 & P5 & P6 -->|"emit()"| EB
+
+  subgraph HotPath["HOT PATH"]
+    AE["AccountingEntries<br/>Service<br/>(POS only)"]
+    FI["FinancialIntegration<br/>Service"]
+  end
+
+  subgraph DurablePath["OUTBOX PATH"]
+    OT[("outbox_events<br/>table")]
+    CL["ContabilidadEvents<br/>Listener<br/>(cron 1min)"]
+    AG["AsientosGenerator<br/>Service"]
+    OW["OutboxWorker<br/>(cron 1min)"]
+  end
+
+  EB -->|"in-memory"| AE
+  EB -->|"in-memory"| FI
+  EB -->|"persist"| OT
+  OT -->|"25 types"| CL
+  CL --> AG
+  OT -->|"other types"| OW
+  AG -->|"save"| DB[("asientos_contables<br/>asiento_lineas")]
+
+  style Producers fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style HotPath fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style DurablePath fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+    </pre>
+
+    <div class="subsection">
+      <h3>Idempotency — 4 Layers</h3>
+      <pre class="mermaid">
+graph LR
+  E["Event<br/>arrives"] --> L1["1. buscarAsiento<br/>PorEvento<br/>(source_event_id)"]
+  L1 -->|"not found"| L2["2. UNIQUE<br/>constraint<br/>(DB level)"]
+  L2 -->|"no conflict"| L3["3. activeSource<br/>EventIds Set<br/>(in-process lock)"]
+  L3 -->|"not locked"| L4["4. consolidar<br/>AsientoUnico<br/>(post-insert dedup)"]
+  L4 --> OK["Asiento<br/>Created"]
+
+  L1 -->|"found"| SKIP["Skip<br/>Duplicate"]
+  L2 -->|"conflict 23505"| SKIP
+  L3 -->|"locked"| SKIP
+
+  style E fill:#1f2937,stroke:#58a6ff,color:#e6edf3
+  style OK fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style SKIP fill:#1a2332,stroke:#f85149,color:#e6edf3
+      </pre>
+    </div>
+
+    <div class="subsection">
+      <h3>Event Types — Accounting Templates</h3>
+      <table class="data-table">
+        <thead>
+          <tr><th>Event</th><th>Source</th><th>Accounting Entry</th><th>Template</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>venta.procesada</code></td><td>PedidosService</td><td>Factura venta</td><td>Dr 12 CxC / Cr 70 Ventas + Cr 40 IGV</td></tr>
+          <tr><td><code>pos.venta.registrada</code></td><td>PosService</td><td>Venta POS</td><td>Dr 10 Caja / Cr 70 Ventas + Cr 40 IGV</td></tr>
+          <tr><td><code>cobro.registrado</code></td><td>CxcService</td><td>Cobro</td><td>Dr 10 Bancos / Cr 12 CxC</td></tr>
+          <tr><td><code>recepcion.registrada</code></td><td>RecepcionesService</td><td>Compra</td><td>Dr 20 Inv + Dr 40 IGV / Cr 42 CxP</td></tr>
+          <tr><td><code>pago.proveedor.registrado</code></td><td>CxpService</td><td>Pago proveedor</td><td>Dr 42 Proveedores / Cr 10 Bancos</td></tr>
+          <tr><td><code>devolucion.proveedor.registrada</code></td><td>DevolucionesService</td><td>Devolucion</td><td>Dr 42 Prov / Cr 20 Inv + Cr 40 IGV</td></tr>
+          <tr><td><code>planilla.liquidada</code></td><td>PlanillasService</td><td>Planilla</td><td>Dr 621 Sueldos / Cr 403 + Cr 411</td></tr>
+          <tr><td><code>depreciacion.generada</code></td><td>ContabilidadService</td><td>Depreciacion</td><td>Dr 68 Deprec / Cr 39 Acum</td></tr>
+          <tr><td><code>cpe.anulado</code></td><td>CpeService</td><td>Anulacion</td><td>Reversa del asiento original</td></tr>
+          <tr><td><code>ajuste.inventario.aplicado</code></td><td>InventarioService</td><td>Ajuste</td><td>Dr/Cr 20 Inv / Cr/Dr 69 Ajustes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 4. POS SALE FLOW -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-green">&#128722;</div>
+    <h2>4. POS Sale Flow (Hot Path)</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph TB
+  CAJ["Cajero"] -->|"POST /pos/venta"| CTRL["PosController"]
+  CTRL --> SVC["PosService<br/>procesarVenta()"]
+
+  SVC --> V["1. Validar<br/>Caja abierta<br/>Productos<br/>Pagos = Total"]
+  V --> DOC["2. Crear documento<br/>ventas · venta_detalle<br/>documentos"]
+  DOC --> STK["3. Reservar stock<br/>RPC: reservar_stock_atomico<br/>productos · movimientos_inv"]
+  STK --> PAG["4. Registrar pagos<br/>pagos · pagos_detalle"]
+  PAG --> MOV["5. Movimiento caja<br/>movimientos_caja"]
+  MOV --> EVT["6. Emit event<br/>pos.venta.registrada"]
+  EVT --> ACC["7. Accounting (HOT)<br/>AccountingEntriesService<br/>Dr 10 Caja / Cr 70+40"]
+
+  style CAJ fill:#1f2937,stroke:#58a6ff,color:#e6edf3
+  style SVC fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style ACC fill:#1a2332,stroke:#f778ba,color:#e6edf3
+    </pre>
+    <div class="subsection">
+      <h3>Tables Touched</h3>
+      <table class="data-table">
+        <thead><tr><th>Table</th><th>Operation</th><th>Step</th></tr></thead>
+        <tbody>
+          <tr><td><code>ventas</code></td><td>INSERT</td><td>2</td></tr>
+          <tr><td><code>venta_detalle</code></td><td>INSERT</td><td>2</td></tr>
+          <tr><td><code>documentos</code></td><td>INSERT</td><td>2</td></tr>
+          <tr><td><code>productos</code></td><td>UPDATE (stock)</td><td>3</td></tr>
+          <tr><td><code>movimientos_inventario</code></td><td>INSERT</td><td>3</td></tr>
+          <tr><td><code>pagos</code> + <code>pagos_detalle</code></td><td>INSERT</td><td>4</td></tr>
+          <tr><td><code>movimientos_caja</code></td><td>INSERT</td><td>5</td></tr>
+          <tr><td><code>asientos_contables</code> + <code>asiento_lineas</code></td><td>INSERT</td><td>7</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 5. VENTAS E2E -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-blue">&#128196;</div>
+    <h2>5. Ventas E2E Flow</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  COT["Cotizacion<br/>───────<br/>BORRADOR<br/>→ ENVIADA<br/>→ ACEPTADA"]
+  PED["Pedido<br/>───────<br/>BORRADOR<br/>→ CONFIRMADO"]
+  CONF["Confirmar<br/>───────<br/>Stock --<br/>RPC: reservar_<br/>stock_atomico"]
+  FACT["Facturar<br/>───────<br/>generarFactura()<br/>CPE queued"]
+
+  COT -->|"RPC: convertir_<br/>cotizacion_a_pedido"| PED
+  PED -->|"confirmar()"| CONF
+  CONF -->|"generarFactura()"| FACT
+
+  FACT -->|"factura.emitida"| CXC["CxC creada<br/>auto via<br/>listener"]
+  FACT -->|"venta.procesada"| ASI["Asiento contable<br/>Dr 12 / Cr 70+40"]
+  FACT -->|"CPE queue"| CPE["Facturacion<br/>electronica<br/>SUNAT"]
+
+  style COT fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style PED fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style CONF fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style FACT fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style CXC fill:#1a2332,stroke:#f778ba,color:#e6edf3
+  style ASI fill:#1a2332,stroke:#f778ba,color:#e6edf3
+  style CPE fill:#1a2332,stroke:#f0883e,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 6. COMPRAS E2E -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-orange">&#128230;</div>
+    <h2>6. Compras E2E Flow</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  CC["Cotiz. Compra<br/>───────<br/>BORRADOR<br/>→ ENVIADA<br/>→ ACEPTADA"]
+  OC["Orden Compra<br/>───────<br/>BORRADOR<br/>→ APROBADA<br/>→ RECIBIDA"]
+  REC["Recepcion<br/>───────<br/>cerrarRecepcion()<br/>Stock ++<br/>RPC: registrar_<br/>entrada_stock"]
+  PAG["CxP + Pago<br/>───────<br/>CxP auto via<br/>listener<br/>Pago manual"]
+
+  CC -->|"crear OC"| OC
+  OC -->|"crear recepcion"| REC
+  REC -->|"recepcion.registrada"| PAG
+
+  REC -->|"recepcion.registrada"| ASI1["Asiento compra<br/>Dr 20+40 / Cr 42"]
+  PAG -->|"pago.proveedor.registrado"| ASI2["Asiento pago<br/>Dr 42 / Cr 10"]
+
+  subgraph Reverso["DEVOLUCION (Reverse)"]
+    DEV["Devolucion Prov<br/>───────<br/>Stock --<br/>CxP reversa<br/>Asiento reverso"]
+  end
+
+  REC -.->|"si hay problemas"| DEV
+
+  style CC fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style OC fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style REC fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style PAG fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style Reverso fill:#1f2937,stroke:#f85149,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 7. CAJAS -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-orange">&#128176;</div>
+    <h2>7. Cash Register Flow (Cajas)</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  ABRIR["ABRIR CAJA<br/>───────<br/>POST /cajas/abrir<br/>───────<br/>✓ No otra abierta<br/>✓ Monto fondo<br/>✓ Concurrency lock"]
+  OPS["OPERACIONES<br/>───────<br/>Ventas POS<br/>Ingresos<br/>Egresos<br/>Autorizaciones"]
+  CERRAR["CERRAR CAJA<br/>───────<br/>POST /cajas/cerrar<br/>───────<br/>✓ Caja abierta<br/>✓ Mismo usuario<br/>✓ Monto coincide<br/>✓ Turno activo<br/>✓ Concurrencia<br/>✓ Auth supervisor"]
+
+  ABRIR -->|"sesiones_caja<br/>estado: ABIERTA"| OPS
+  OPS -->|"movimientos_caja"| CERRAR
+  CERRAR -->|"estado: CERRADA"| FIN["Sesion cerrada<br/>Arqueo generado"]
+
+  style ABRIR fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style OPS fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style CERRAR fill:#1a2332,stroke:#f0883e,color:#e6edf3
+    </pre>
+    <div class="subsection">
+      <h3>Services</h3>
+      <table class="data-table">
+        <thead><tr><th>Service</th><th>Responsibility</th></tr></thead>
+        <tbody>
+          <tr><td><code>CajasService</code></td><td>Main orchestrator — open/close/movements</td></tr>
+          <tr><td><code>CashAuthorizationService</code></td><td>Supervisor PIN validation for discrepancies</td></tr>
+          <tr><td><code>CashClosingService</code></td><td>Closing logic, arqueo calculation</td></tr>
+          <tr><td><code>CashConcurrencyService</code></td><td>Optimistic locking for concurrent access</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 8. CONTABILIDAD -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-pink">&#128209;</div>
+    <h2>8. Accounting Integration (Dual Path)</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph TB
+  subgraph PathA["PATH A: HOT — POS"]
+    POS2["PosService"] -->|"direct call"| AES["AccountingEntries<br/>Service"]
+    AES --> DB1[("asientos_contables")]
+  end
+
+  subgraph PathB["PATH B: BATCH — Outbox"]
+    ANY["Any Service<br/>(Pedidos, CxP, etc)"] -->|"EventBus.emit()"| OBX[("outbox_events<br/>(persisted)")]
+    OBX -->|"cron 1min"| CEL["ContabilidadEvents<br/>Listener"]
+    CEL --> AGS["AsientosGenerator<br/>Service"]
+    AGS --> DB2[("asientos_contables")]
+  end
+
+  subgraph DLQ["DLQ — Dead Letter Queue"]
+    FAIL["Failed event<br/>retry_count >= 3"] --> DL["status: dead_letter"]
+    DL -->|"manual restart<br/>max 3 restarts"| OBX
+    STUCK["PROCESSING > 15min"] -->|"resetStuckEvents"| OBX
+  end
+
+  style PathA fill:#1f2937,stroke:#f0883e,color:#e6edf3
+  style PathB fill:#1f2937,stroke:#d2a8ff,color:#e6edf3
+  style DLQ fill:#1f2937,stroke:#f85149,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 9. RRHH -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-purple">&#128101;</div>
+    <h2>9. Payroll Flow (RRHH)</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  CREAR["CREAR PLANILLA<br/>───────<br/>Periodo<br/>Empleados<br/>estado: BORRADOR"]
+  CALC["CALCULAR<br/>───────<br/>Sueldos brutos<br/>Horas extra<br/>AFP/ONP<br/>Essalud<br/>Impuestos"]
+  LIQ["LIQUIDAR<br/>───────<br/>Generar boletas<br/>emit: planilla.<br/>liquidada"]
+  PAGO["PAGAR<br/>───────<br/>Registro pago<br/>masivo<br/>emit: planilla.<br/>pagada"]
+
+  CREAR --> CALC --> LIQ --> PAGO
+
+  LIQ -->|"planilla.liquidada<br/>(outbox)"| ASI["Asiento contable<br/>Dr 621 Sueldos<br/>Cr 403 Retenciones<br/>Cr 411 Neto a pagar"]
+
+  style CREAR fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style CALC fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style LIQ fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style PAGO fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style ASI fill:#1a2332,stroke:#f778ba,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 10. DATABASE -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-purple">&#128451;</div>
+    <h2>10. Database Schema Overview</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+erDiagram
+  tenants ||--o{ usuarios_sistema : has
+  tenants ||--o{ clientes : has
+  tenants ||--o{ proveedores : has
+  tenants ||--o{ productos : has
+  tenants ||--o{ empleados : has
+
+  clientes ||--o{ cotizaciones_venta : places
+  cotizaciones_venta ||--o{ cotizacion_detalle : contains
+  clientes ||--o{ pedidos_venta : orders
+  pedidos_venta ||--o{ pedidos_venta_detalle : contains
+  pedidos_venta ||--o{ ventas : generates
+  ventas ||--o{ venta_detalle : contains
+  ventas ||--o{ documentos : "creates doc"
+  ventas ||--o{ pagos : receives
+
+  proveedores ||--o{ ordenes_compra : receives
+  ordenes_compra ||--o{ orden_compra_detalle : contains
+  ordenes_compra ||--o{ recepciones : generates
+  recepciones ||--o{ recepcion_detalle : contains
+
+  productos ||--o{ movimientos_inventario : tracks
+  productos ||--o{ stock_almacen : "stock per"
+  almacenes ||--o{ stock_almacen : stores
+
+  documentos ||--o{ cuentas_por_cobrar : "generates CxC"
+  recepciones ||--o{ cuentas_por_pagar : "generates CxP"
+
+  plan_cuentas ||--o{ asiento_lineas : uses
+  asientos_contables ||--o{ asiento_lineas : contains
+    </pre>
+
+    <div class="subsection">
+      <h3>Tables by Domain</h3>
+      <div class="two-col">
+        <table class="data-table">
+          <thead><tr><th colspan="2">Ventas</th></tr></thead>
+          <tbody>
+            <tr><td><code>clientes</code></td><td>Customers</td></tr>
+            <tr><td><code>cotizaciones_venta</code></td><td>Quotes</td></tr>
+            <tr><td><code>pedidos_venta</code></td><td>Orders</td></tr>
+            <tr><td><code>ventas</code> + <code>venta_detalle</code></td><td>Sales</td></tr>
+            <tr><td><code>documentos</code></td><td>Fiscal docs</td></tr>
+            <tr><td><code>pagos</code> + <code>pagos_detalle</code></td><td>Payments</td></tr>
+          </tbody>
+        </table>
+        <table class="data-table">
+          <thead><tr><th colspan="2">Compras</th></tr></thead>
+          <tbody>
+            <tr><td><code>proveedores</code></td><td>Suppliers</td></tr>
+            <tr><td><code>cotizaciones_compra</code></td><td>Purchase quotes</td></tr>
+            <tr><td><code>ordenes_compra</code></td><td>Purchase orders</td></tr>
+            <tr><td><code>recepciones</code></td><td>Goods receipt</td></tr>
+            <tr><td><code>devoluciones_proveedor</code></td><td>Returns</td></tr>
+          </tbody>
+        </table>
+        <table class="data-table">
+          <thead><tr><th colspan="2">Finanzas</th></tr></thead>
+          <tbody>
+            <tr><td><code>cuentas_por_cobrar</code></td><td>AR</td></tr>
+            <tr><td><code>cuentas_por_pagar</code></td><td>AP</td></tr>
+            <tr><td><code>cuentas_bancarias</code></td><td>Bank accounts</td></tr>
+            <tr><td><code>movimientos_bancarios</code></td><td>Bank movements</td></tr>
+            <tr><td><code>conciliaciones_bancarias</code></td><td>Reconciliation</td></tr>
+          </tbody>
+        </table>
+        <table class="data-table">
+          <thead><tr><th colspan="2">Contabilidad</th></tr></thead>
+          <tbody>
+            <tr><td><code>plan_cuentas</code></td><td>Chart of accounts</td></tr>
+            <tr><td><code>asientos_contables</code></td><td>Journal entries</td></tr>
+            <tr><td><code>asiento_lineas</code></td><td>Entry lines</td></tr>
+            <tr><td><code>periodos_contables</code></td><td>Periods</td></tr>
+            <tr><td><code>centros_costo</code></td><td>Cost centers</td></tr>
+            <tr><td><code>presupuestos</code></td><td>Budgets</td></tr>
+          </tbody>
+        </table>
+        <table class="data-table">
+          <thead><tr><th colspan="2">Inventario</th></tr></thead>
+          <tbody>
+            <tr><td><code>productos</code></td><td>Products</td></tr>
+            <tr><td><code>almacenes</code></td><td>Warehouses</td></tr>
+            <tr><td><code>stock_almacen</code></td><td>Stock per warehouse</td></tr>
+            <tr><td><code>movimientos_inventario</code></td><td>Stock movements</td></tr>
+            <tr><td><code>kardex</code></td><td>Kardex ledger</td></tr>
+          </tbody>
+        </table>
+        <table class="data-table">
+          <thead><tr><th colspan="2">RRHH + System</th></tr></thead>
+          <tbody>
+            <tr><td><code>empleados</code></td><td>Employees</td></tr>
+            <tr><td><code>planillas</code></td><td>Payroll</td></tr>
+            <tr><td><code>sesiones_caja</code></td><td>Cash sessions</td></tr>
+            <tr><td><code>outbox_events</code></td><td>Event sourcing</td></tr>
+            <tr><td><code>audit_logs</code></td><td>Audit trail</td></tr>
+            <tr><td><code>background_jobs</code></td><td>Worker queue</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 11. SECURITY -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-pink">&#128274;</div>
+    <h2>11. Security & Multi-Tenancy</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  REQ["HTTP Request<br/>+ JWT Token"] --> JG["JwtAuthGuard<br/>Validate token<br/>Extract user"]
+  JG --> RG["RoleGuard<br/>Check permissions<br/>user_roles → roles"]
+  RG --> TC["TenantContext<br/>Service<br/>Set tenant_id"]
+  TC --> SVC["Service Layer<br/>getClient() uses<br/>service_role_key"]
+  SVC --> DB[("PostgreSQL<br/>RLS ENABLED<br/>+ FORCED")]
+
+  SVC -.->|"⚠️ service_role<br/>BYPASSES RLS<br/>Must add .eq(tenant_id)"| DB
+
+  style REQ fill:#1f2937,stroke:#58a6ff,color:#e6edf3
+  style JG fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style RG fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style TC fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style DB fill:#1a2332,stroke:#f85149,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 12. FRONTEND PAGE MAP -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-blue">&#128187;</div>
+    <h2>12. Frontend Page Map (~95 pages)</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph TB
+  ROOT["/"] --> LOGIN["/login"]
+  ROOT --> DEMO["/demo"]
+  ROOT --> ADMIN["/admin/dashboard"]
+  ROOT --> DASH["/dashboard"]
+
+  DASH --> WIZARD["/wizard"]
+  DASH --> POS3["/pos"]
+  DASH --> CAJAS2["/cajas"]
+  DASH --> CONFIG["/configuracion"]
+
+  DASH --> V["/ventas"]
+  V --> VC["/cotizaciones"]
+  V --> VP["/pedidos"]
+  V --> VCL["/clientes"]
+  V --> VA["/aprobaciones"]
+  V --> VR["/reportes"]
+
+  DASH --> C["/compras"]
+  C --> CCO["/cotizaciones"]
+  C --> CO["/ordenes"]
+  C --> CR["/recepciones"]
+  C --> CPR["/proveedores"]
+  C --> CD["/devoluciones"]
+
+  DASH --> I["/inventario"]
+  I --> IP["/productos"]
+  I --> IA["/almacenes"]
+  I --> IK["/kardex"]
+  I --> IL["/logistica"]
+
+  DASH --> F["/finanzas"]
+  F --> FC["/cxc"]
+  F --> FP["/cxp"]
+  F --> FB["/bancos"]
+  F --> FT["/tesoreria"]
+  F --> FN["/conciliacion"]
+
+  DASH --> CT["/contabilidad"]
+  CT --> CTA["/asientos"]
+  CT --> CTP["/periodos"]
+  CT --> CTCC["/centros-costo"]
+  CT --> CTPR["/presupuestos"]
+  CT --> CTE["/estados"]
+  CT --> CTM["/monitoreo"]
+
+  DASH --> RH["/rrhh"]
+  RH --> RHA["/asistencia"]
+  RH --> RHP["/pagos"]
+  RH --> RHC["/contratos"]
+
+  DASH --> CPE2["/cpe"]
+  DASH --> GRE["/gre"]
+  DASH --> SIRE2["/sire"]
+  DASH --> DOCS["/documentos"]
+  DASH --> AUDIT["/audit-logs"]
+
+  style DASH fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style V fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style C fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style I fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style F fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+  style CT fill:#1a2332,stroke:#f778ba,color:#e6edf3
+  style RH fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- 13. API ENDPOINTS TABLE -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-green">&#128279;</div>
+    <h2>13. API Endpoint Map (55 Controllers)</h2>
+  </div>
+  <div class="section-body">
+    <div class="two-col">
+      <div>
+        <table class="data-table">
+          <thead><tr><th>Route</th><th>Domain</th></tr></thead>
+          <tbody>
+            <tr><td><code>/auth</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/usuarios-sistema</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/users</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/roles</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/permissions</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/tenants</code></td><td><span class="badge badge-blue">Auth</span></td></tr>
+            <tr><td><code>/pos</code></td><td><span class="badge badge-green">POS</span></td></tr>
+            <tr><td><code>/cajas</code></td><td><span class="badge badge-green">POS</span></td></tr>
+            <tr><td><code>/ventas/cotizaciones</code></td><td><span class="badge badge-green">Ventas</span></td></tr>
+            <tr><td><code>/ventas/pedidos</code></td><td><span class="badge badge-green">Ventas</span></td></tr>
+            <tr><td><code>/ventas/clientes</code></td><td><span class="badge badge-green">Ventas</span></td></tr>
+            <tr><td><code>/ventas/rma</code></td><td><span class="badge badge-green">Ventas</span></td></tr>
+            <tr><td><code>/ventas/reportes</code></td><td><span class="badge badge-green">Ventas</span></td></tr>
+            <tr><td><code>/cotizaciones</code></td><td><span class="badge badge-green">Ventas (legacy)</span></td></tr>
+            <tr><td><code>/compras</code></td><td><span class="badge badge-orange">Compras (legacy)</span></td></tr>
+            <tr><td><code>/compras/cotizaciones</code></td><td><span class="badge badge-orange">Compras</span></td></tr>
+            <tr><td><code>/compras/ordenes</code></td><td><span class="badge badge-orange">Compras</span></td></tr>
+            <tr><td><code>/compras/recepciones</code></td><td><span class="badge badge-orange">Compras</span></td></tr>
+            <tr><td><code>/compras/proveedores</code></td><td><span class="badge badge-orange">Compras</span></td></tr>
+            <tr><td><code>/compras/devoluciones</code></td><td><span class="badge badge-orange">Compras</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <table class="data-table">
+          <thead><tr><th>Route</th><th>Domain</th></tr></thead>
+          <tbody>
+            <tr><td><code>/finanzas</code></td><td><span class="badge badge-purple">Finanzas (legacy)</span></td></tr>
+            <tr><td><code>/finanzas/cxc</code></td><td><span class="badge badge-purple">Finanzas</span></td></tr>
+            <tr><td><code>/finanzas/cxp</code></td><td><span class="badge badge-purple">Finanzas</span></td></tr>
+            <tr><td><code>/finanzas/bancos</code></td><td><span class="badge badge-purple">Finanzas</span></td></tr>
+            <tr><td><code>/finanzas/tesoreria</code></td><td><span class="badge badge-purple">Finanzas</span></td></tr>
+            <tr><td><code>/finanzas/conciliacion</code></td><td><span class="badge badge-purple">Finanzas</span></td></tr>
+            <tr><td><code>/contabilidad</code></td><td><span class="badge badge-pink">Contabilidad</span></td></tr>
+            <tr><td><code>/inventario</code></td><td><span class="badge badge-blue">Inventario</span></td></tr>
+            <tr><td><code>/inventario/logistica</code></td><td><span class="badge badge-blue">Inventario</span></td></tr>
+            <tr><td><code>/rrhh</code></td><td><span class="badge badge-purple">RRHH</span></td></tr>
+            <tr><td><code>/cpe</code></td><td><span class="badge badge-orange">CPE</span></td></tr>
+            <tr><td><code>/cpe/baja</code></td><td><span class="badge badge-orange">CPE</span></td></tr>
+            <tr><td><code>/gre</code></td><td><span class="badge badge-orange">GRE</span></td></tr>
+            <tr><td><code>/sire</code></td><td><span class="badge badge-orange">SIRE</span></td></tr>
+            <tr><td><code>/dashboard</code></td><td><span class="badge badge-blue">System</span></td></tr>
+            <tr><td><code>/reports</code></td><td><span class="badge badge-blue">System</span></td></tr>
+            <tr><td><code>/configuracion</code></td><td><span class="badge badge-blue">System</span></td></tr>
+            <tr><td><code>/audit-logs</code></td><td><span class="badge badge-red">Security</span></td></tr>
+            <tr><td><code>/security</code></td><td><span class="badge badge-red">Security</span></td></tr>
+            <tr><td><code>/observability</code></td><td><span class="badge badge-red">System</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 14. WORKER -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon icon-orange">&#9881;</div>
+    <h2>14. Worker Architecture</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mermaid">
+graph LR
+  API2["NestJS API<br/>Queue jobs"] -->|"Redis"| BULL["BullMQ"]
+
+  BULL --> CPE3["CPE Queue<br/>───────<br/>Facturacion<br/>electronica<br/>SUNAT"]
+  BULL --> GRE2["GRE Queue<br/>───────<br/>Guias de<br/>remision<br/>SUNAT"]
+  BULL --> SIRE3["SIRE Queue<br/>───────<br/>Libros<br/>electronicos<br/>SUNAT"]
+
+  CPE3 & GRE2 & SIRE3 --> DB3[("PostgreSQL<br/>background_jobs<br/>comprobantes_electronicos<br/>guias_remision")]
+
+  style BULL fill:#1a2332,stroke:#f0883e,color:#e6edf3
+  style CPE3 fill:#1a2332,stroke:#58a6ff,color:#e6edf3
+  style GRE2 fill:#1a2332,stroke:#3fb950,color:#e6edf3
+  style SIRE3 fill:#1a2332,stroke:#d2a8ff,color:#e6edf3
+    </pre>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  ERP Architecture Map &mdash; Generated 2026-05-20 &mdash; Baseline: 948/948 tests, TSC 0 errors
+</div>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#161b22',
+      primaryColor: '#1a2332',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#58a6ff',
+      secondaryColor: '#1f2937',
+      tertiaryColor: '#1a2332',
+      fontFamily: 'Segoe UI, -apple-system, sans-serif',
+      fontSize: '14px',
+      nodeBorder: '#58a6ff',
+      mainBkg: '#1a2332',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      edgeLabelBackground: '#161b22',
+      nodeTextColor: '#e6edf3'
+    },
+    flowchart: {
+      useMaxWidth: true,
+      htmlLabels: true,
+      curve: 'basis',
+      padding: 15,
+      nodeSpacing: 30,
+      rankSpacing: 50
+    },
+    er: {
+      useMaxWidth: true,
+      fontSize: 12
+    }
+  });
+</script>
+
+</body>
+</html>

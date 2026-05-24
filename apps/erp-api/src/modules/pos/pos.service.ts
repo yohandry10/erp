@@ -84,8 +84,8 @@ export class PosService {
     const cleaned = (doc || '').trim();
     if (/^(10|15|17|20)\d{9}$/.test(cleaned)) return '6'; // RUC
     if (/^\d{8}$/.test(cleaned)) return '1'; // DNI
-    if (/^[A-Z0-9]{9}$/i.test(cleaned)) return '4'; // CE
-    if (/^[A-Z0-9]{6,12}$/i.test(cleaned)) return '7'; // Pasaporte genérico
+    if (/^[A-Z0-9]{9,12}$/i.test(cleaned)) return '4'; // CE (carné de extranjería, 9-12 chars)
+    if (/^[A-Z0-9]{6,8}$/i.test(cleaned)) return '7'; // Pasaporte genérico
     return '0'; // Otros
   }
 
@@ -199,25 +199,30 @@ export class PosService {
     const normalizedSerie = String(serie || '').trim().toUpperCase();
     let max = 0;
 
+    // Obtener solo el MAX correlativo de cada tabla (orden DESC + limit 1)
+    // en vez de fetch masivo con LIMIT(1000) que podía subestimar el máximo.
     const [ventas, cpes, documentos] = await Promise.all([
       client
         .from('ventas_pos')
         .select('numero_ticket, correlativo')
         .eq('tenant_id', tenantId)
         .eq('serie', normalizedSerie)
-        .limit(1000),
+        .order('correlativo', { ascending: false })
+        .limit(5),
       client
         .from('cpe')
         .select('numero')
         .eq('tenant_id', tenantId)
         .eq('serie', normalizedSerie)
-        .limit(1000),
+        .order('numero', { ascending: false })
+        .limit(5),
       client
         .from('documentos')
         .select('numero')
         .eq('tenant_id', tenantId)
         .eq('serie', normalizedSerie)
-        .limit(1000),
+        .order('numero', { ascending: false })
+        .limit(5),
     ]);
 
     for (const result of [ventas, cpes, documentos]) {
@@ -355,9 +360,11 @@ export class PosService {
       metodo_pago_id?: string | null;
     }> | null;
     ventaData: any;
+    tasaIgv?: number;
   }): Promise<void> {
     const client = this.supabase.getClient();
     const { ventaId, tenantId, userId, items, productos, pagos, ventaData } = params;
+    const tasaIgvEfectiva = params.tasaIgv ?? 0.18;
 
     const { data: detallesExistentes, error: detalleLookupError } = await client
       .from('detalle_ventas_pos')
@@ -374,7 +381,7 @@ export class PosService {
       const detalleRows = items.map((item: any, index: number) => {
         const producto = productos.get(item.producto_id) || {};
         const subtotal = Number(item.subtotal ?? 0);
-        const impuesto = new Decimal(subtotal).times(0.18).toDecimalPlaces(2).toNumber();
+        const impuesto = new Decimal(subtotal).times(tasaIgvEfectiva).toDecimalPlaces(2).toNumber();
         return {
           tenant_id: tenantId,
           venta_id: ventaId,
@@ -1194,6 +1201,7 @@ export class PosService {
               total: totalCalculado,
               numero_ticket: ventaResult.numero_ticket,
             },
+            tasaIgv,
           });
         } catch (impactoError) {
           this.logger.error('❌ Error persistiendo impactos POS; revirtiendo venta:', impactoError);
@@ -1249,7 +1257,7 @@ export class PosService {
         }
         }
       } catch (movError) {
-        this.logger.warn('⚠️ No se pudo registrar movimiento de caja POS:', movError);
+        this.logger.error('❌ ALERTA: No se pudo registrar movimiento de caja POS (monto esperado será incorrecto al cierre):', movError);
       }
 
       // En POS la venta no debe esperar firma/XML/eventos fiscales. Se deja una cola durable
@@ -1497,15 +1505,49 @@ export class PosService {
 
             if (cuentaCreada) {
               cuentaPorCobrarId = cuentaCreada.id;
+              await this.supabase.getClient()
+                .from('ventas_pos')
+                .update({
+                  cuenta_por_cobrar_id: cuentaPorCobrarId,
+                  cxc_pendiente: false,
+                  cxc_error: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', ventaResult.id)
+                .eq('tenant_id', user.tenant_id);
               this.logger.log(`✅ [POS] Cuenta por cobrar creada: ${cuentaPorCobrarId} para venta ${ventaResult.id}`);
             } else {
               this.logger.warn(`⚠️ [POS] No se pudo obtener ID de cuenta por cobrar creada`);
             }
           }
         } catch (error) {
-          this.logger.error('❌ Error creando cuenta por cobrar para venta POS:', error);
-          // No bloquear la venta si falla crear CxC
-          // La venta ya está procesada y el stock ya se actualizó
+          this.logger.error(`❌ ALERTA: Error creando CxC para venta ${ventaResult.id} (crédito=${creditoMonto}). Receivable sin tracking:`, error);
+          await this.supabase.getClient()
+            .from('ventas_pos')
+            .update({
+              cxc_pendiente: true,
+              cxc_error: error?.message || 'Error creando cuenta por cobrar',
+              cxc_reintentos: 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', ventaResult.id)
+            .eq('tenant_id', user.tenant_id);
+
+          return {
+            success: false,
+            message: 'Venta registrada, pero la cuenta por cobrar no pudo crearse. Requiere regularización antes de cerrar caja/contabilidad.',
+            data: {
+              venta_id: ventaResult.id,
+              numero_ticket: ventaResult.numero_ticket,
+              cxc_pendiente: true,
+              error: error?.message || 'Error creando cuenta por cobrar',
+            },
+            error: {
+              tipo: 'ACCOUNTING_INTEGRATION_ERROR',
+              codigo: 'POS_CREDITO_CXC_PENDIENTE',
+              mensaje: 'No se pudo crear la cuenta por cobrar de la venta a crédito',
+            },
+          };
         }
       }
 
@@ -1577,7 +1619,6 @@ export class PosService {
           tipo: 'DATABASE_ERROR',
           mensaje: error.message,
           codigo: error.code,
-          detalles: error.details
         }
       };
     } finally {
@@ -1669,7 +1710,7 @@ export class PosService {
         user_agent: typeof data === 'number' ? undefined : data?.user_agent,
       };
 
-      const sesion = await this.cajasService.abrirCaja(user.tenant_id, cajaId, dto, user.id);
+      const sesion = await this.cajasService.abrirCaja(user.tenant_id, cajaId, dto, user.id, dto.ip_address);
 
       return {
         success: true,
@@ -2096,6 +2137,7 @@ export class PosService {
         .select('*')
         .or('cpe_pendiente.eq.true,cpe_id.is.null')
         .not('cpe_data', 'is', null)
+        .lt('intentos_facturacion', 5)
         .order('ultimo_intento_facturacion', { ascending: true })
         .limit(limit);
 
@@ -2186,35 +2228,34 @@ export class PosService {
    * Elimina venta y detalles para evitar estados inconsistentes cuando falla un paso crítico.
    */
   private async rollbackVenta(ventaId: string, tenantId: string): Promise<void> {
+    const errores: string[] = [];
+    const client = this.supabase.getClient();
+
+    // Intentar cada paso individualmente y registrar errores
     try {
-      await this.supabase.getClient()
-        .from('ventas_pos_pagos')
-        .delete()
-        .eq('venta_pos_id', ventaId)
-        .eq('tenant_id', tenantId);
+      await client.from('ventas_pos_pagos').delete().eq('venta_pos_id', ventaId).eq('tenant_id', tenantId);
+    } catch (err) { errores.push(`pagos: ${err?.message ?? err}`); }
 
-      await this.supabase.getClient()
-        .from('detalle_ventas_pos')
-        .delete()
-        .eq('venta_id', ventaId)
-        .eq('tenant_id', tenantId);
+    try {
+      await client.from('detalle_ventas_pos').delete().eq('venta_id', ventaId).eq('tenant_id', tenantId);
+    } catch (err) { errores.push(`detalle: ${err?.message ?? err}`); }
 
-      await this.supabase.getClient()
-        .from('ventas_pos')
-        .delete()
-        .eq('id', ventaId)
-        .eq('tenant_id', tenantId);
+    try {
+      await client.from('outbox_events').delete().eq('tenant_id', tenantId).eq('aggregate_type', 'venta_pos').eq('aggregate_id', ventaId);
+    } catch (err) { errores.push(`outbox: ${err?.message ?? err}`); }
 
-      await this.supabase.getClient()
-        .from('outbox_events')
-        .delete()
-        .eq('tenant_id', tenantId)
-        .eq('aggregate_type', 'venta_pos')
-        .eq('aggregate_id', ventaId);
+    try {
+      await client.from('ventas_pos').delete().eq('id', ventaId).eq('tenant_id', tenantId);
+    } catch (err) { errores.push(`venta: ${err?.message ?? err}`); }
 
-      this.logger.warn(`♻️ Venta ${ventaId} revertida por inconsistencia`);
-    } catch (err) {
-      this.logger.error(`❌ Error revirtiendo venta ${ventaId}:`, err);
+    if (errores.length > 0) {
+      this.logger.error(`ROLLBACK_PARTIAL venta=${ventaId} errores=[${errores.join('; ')}]`);
+      // Marcar como FALLIDA si no se pudo eliminar para que no quede huérfana
+      try {
+        await client.from('ventas_pos').update({ estado: 'ANULADA', observaciones: `Rollback parcial: ${errores.join('; ')}` }).eq('id', ventaId).eq('tenant_id', tenantId);
+      } catch { /* best effort */ }
+    } else {
+      this.logger.warn(`♻️ Venta ${ventaId} revertida completamente`);
     }
   }
 }

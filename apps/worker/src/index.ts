@@ -513,15 +513,26 @@ async function processSireGeneration(tenantId: string, period: string) {
 cron.schedule('0 */6 * * *', async () => {
   logger.info('Running scheduled CPE status check');
 
-  // Check pending CPE documents
-  const { data: pendingCpes } = await supabase
-    .from('cpe')
-    .select('id')
-    .eq('estado', 'SENT')
-    .lt('fecha_envio', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // 30 minutes old
+  try {
+    const { data: pendingCpes, error } = await supabase
+      .from('cpe')
+      .select('id')
+      .eq('estado', 'SENT')
+      .lt('fecha_envio', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+      .limit(100)
+      .order('fecha_envio', { ascending: true });
 
-  for (const cpe of pendingCpes || []) {
-    await cpeQueue.add('CHECK_STATUS', { cpeId: cpe.id }, { jobId: `cpe:check-status:${cpe.id}` });
+    if (error) {
+      logger.error('Error fetching pending CPEs for status check:', error);
+      return;
+    }
+
+    logger.info(`Found ${pendingCpes?.length ?? 0} pending CPEs for status check`);
+    for (const cpe of pendingCpes || []) {
+      await cpeQueue.add('CHECK_STATUS', { cpeId: cpe.id }, { jobId: `cpe:check-status:${cpe.id}` });
+    }
+  } catch (err) {
+    logger.error('CPE status cron failed:', err);
   }
 });
 
@@ -1051,7 +1062,7 @@ const server = http.createServer((req, res) => {
     }
 
     const body = JSON.stringify(healthCheck());
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(body);
     return;
   }

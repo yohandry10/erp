@@ -616,7 +616,7 @@ export class PedidosService {
       // Eliminar detalle anterior solo después de INSERT exitoso
       if (detalleAnterior && detalleAnterior.length > 0) {
         const idsAnteriores = detalleAnterior.map((d) => d.id);
-        await client.from('pedidos_venta_detalle').delete().in('id', idsAnteriores);
+        await client.from('pedidos_venta_detalle').delete().eq('tenant_id', tenantId).in('id', idsAnteriores);
       }
     }
 
@@ -2309,7 +2309,7 @@ export class PedidosService {
       if (detallesError) {
         this.logger.error('Error creando detalles del documento:', detallesError);
         // Rollback: eliminar documento
-        await client.from('documentos').delete().eq('id', documento.id);
+        await client.from('documentos').delete().eq('id', documento.id).eq('tenant_id', tenantId);
         throw new BadRequestException('Error al crear los detalles del documento');
       }
 

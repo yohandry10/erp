@@ -17,8 +17,13 @@ for (const envPath of [
 }
 
 function getOperationalPassword(): string {
+  // Prioridad: TEST_USER_PASSWORD explícito > DATABASE_URL > default seed.
+  // El priorizar DATABASE_URL primero rompía cuando el e2e corre con un demo
+  // tenant (TEST_USER_EMAIL=demo-XXX@temp.local) pero DATABASE_URL apunta a
+  // Supabase con otro password → el login fallaba 401 + rate-limit en cascada.
+  if (process.env.TEST_USER_PASSWORD) return process.env.TEST_USER_PASSWORD;
   if (process.env.DATABASE_URL) return decodeURIComponent(new URL(process.env.DATABASE_URL).password);
-  return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+  return 'AdminProd2026!';
 }
 
 const adminAuthFile = path.join(__dirname, '.auth', 'admin.json');

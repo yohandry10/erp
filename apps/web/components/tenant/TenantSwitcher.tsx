@@ -25,6 +25,7 @@ export function TenantSwitcher() {
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   useEffect(() => {
     getRef.current = get
@@ -67,12 +68,12 @@ export function TenantSwitcher() {
     }
 
     setSwitching(true)
+    setSwitchError(null)
     try {
       await switchTenant(tenantId)
-      // Force full page reload to flush all React state/cache from previous tenant
       window.location.reload()
     } catch (error) {
-      console.error('Error switching tenant:', error)
+      setSwitchError(error instanceof Error ? error.message : 'Error al cambiar de empresa')
       setSwitching(false)
     }
   }
@@ -90,6 +91,10 @@ export function TenantSwitcher() {
         <span>Empresa Actual</span>
       </div>
       
+      {switchError && (
+        <div className="text-red-600 text-xs mb-2 px-1">{switchError}</div>
+      )}
+
       {/* Tenant Selector */}
       <Select
         value={tenant?.id || ''}

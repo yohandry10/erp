@@ -1,53 +1,86 @@
 # ERP Documentation Hub
 
-Bienvenido a la documentación central del sistema ERP. Aquí encontrará toda la información técnica, manuales de módulos y guías de arquitectura.
+Documentación técnica del ERP, organizada por dominio. Solo se listan documentos **vigentes**.
 
-## 📚 Arquitectura y Referencia Técnica
+> **Entrada obligatoria:** Para iniciar una sesion nueva o decidir "donde vamos", leer primero `00_coordination/CURRENT_STATE.md` y `00_coordination/FLOW_STATUS.md`. Este README es indice; no es la fuente de estado vivo.
 
-Documentos fundamentales para entender la estructura del sistema. Los manuales creados en enero 2026 se mantienen como referencia historica hasta consolidarlos contra `PROJECT_REVIEW_INDEX.md` y `db_rebuild_status.md`.
+> **Política:** Los manuales pre-reconstrucción DB (enero 2026) y las docs de implementación RLS previas al hardening (octubre 2025) fueron borrados en mayo 2026. Si necesitás consultar contenido histórico, recuperá los archivos vía `git log -- <ruta>`. Ver `DOCUMENTATION_QUARANTINE.md` para la trazabilidad de los borrados.
 
-*   **[Arquitectura del Sistema](manuals/SYSTEM_ARCHITECTURE.md)**: Referencia historica de arquitectura; validar contra `../PROJECT_REVIEW_INDEX.md`.
-*   **[Referencia de Base de Datos](manuals/DATABASE_REFERENCE.md)**: Referencia historica; la fuente vigente de BD es `db_rebuild_status.md`.
-*   **[Guía del Desarrollador](manuals/DEVELOPER_GUIDE.md)**: Guia historica; validar setup actual contra `../README.md`, `configuration.md` y `ops/docker.md`.
+---
 
-## 📦 Módulos Funcionales (Manuales Detallados)
+## 🎯 Estado del proyecto
 
-Documentación profunda de la lógica de negocio, flujos de trabajo e implementaciones por área.
+| Documento | Propósito |
+|---|---|
+| [00_coordination/CURRENT_STATE.md](00_coordination/CURRENT_STATE.md) | **Fuente canonica actual** para recuperar contexto de sesion, migraciones vigentes y pendientes reales |
+| [00_coordination/FLOW_STATUS.md](00_coordination/FLOW_STATUS.md) | Matriz vigente de estado por flujo funcional y fuente primaria por dominio |
+| [00_coordination/AGENT_SYNC.md](00_coordination/AGENT_SYNC.md) | Contrato para coordinar Codex, Opus y cualquier `memory.md` |
+| [../x_doc/PROJECT_STATUS.md](../x_doc/PROJECT_STATUS.md) | Estado operativo histórico de estabilización (build, type-check, riesgos, rondas) |
+| [../x_doc/PROJECT_REVIEW_INDEX.md](../x_doc/PROJECT_REVIEW_INDEX.md) | Índice maestro histórico de revisión por vertical |
+| [production-readiness/ERP_PRODUCTION_READINESS.md](production-readiness/ERP_PRODUCTION_READINESS.md) | Gate de readiness para producción real |
+| [CODEX_HANDOFF_2026-05-24.md](CODEX_HANDOFF_2026-05-24.md) | Handoff más reciente: tesorería/caja/bancos/CxC/CxP y migración de cierre forense |
+| [DOCUMENTATION_QUARANTINE.md](DOCUMENTATION_QUARANTINE.md) | Trazabilidad de docs consolidados/borrados |
 
-### Comercial y Fiscal
-*   **[Ventas, POS y Fiscal](manuals/modules/VENTAS_POS_FISCAL.md)**
-    *   **Ventas**: Ciclo de pedido, cotizaciones, validaciones de stock y crédito.
-    *   **POS**: Venta rápida, sesiones de caja, manejo de concurrencia y modo offline.
-    *   **Fiscal (CPE)**: Facturación electrónica SUNAT/OSE, firma digital y generación de XML.
-    *   **RMA**: Gestión de devoluciones y notas de crédito.
+## 🗄️ Base de datos
 
-### Logística y Operaciones
-*   **[Compras e Inventario](manuals/modules/COMPRAS_INVENTARIO.md)**
-    *   **Compras**: Flujos de aprobación, órdenes de compra y gestión de proveedores.
-    *   **Inventario**: Modelo de stock real vs reservado, movimientos atómicos (RPC) y gestión de almacenes.
-    *   **Logística**: Picking, Packing y Despacho de pedidos.
+| Documento | Propósito |
+|---|---|
+| [db_rebuild_status.md](db_rebuild_status.md) | Fuente base histórica de reconstrucción `000..305`; complementarla con readiness/auditorías recientes antes de tocar BD |
+| [db_reconstruction_plan.md](db_reconstruction_plan.md) | Plan de reconstrucción (baseline pre-reset, feb 2026) |
+| [db_forensic_baseline.md](db_forensic_baseline.md) | Baseline forense pre-reset (feb 2026) |
+| `db_*.csv`, `db_*.txt`, `code_*.csv`, `code_*.txt` | Artefactos del baseline forense — útiles para reproducir auditorías. No tocar. |
 
-### Finanzas
-*   **[Finanzas y Contabilidad](manuals/modules/FINANZAS_CONTABILIDAD.md)**
-    *   **Tesorería (Cajas)**: Apertura/cierre de cajas, arqueos y conciliación.
-    *   **Cuentas por Cobrar (CxC)**: Gestión de deuda, retenciones/detracciones y pagos.
-    *   **Contabilidad**: Motor de asientos automáticos (`AsientosGenerator`), plan de cuentas y periodos fiscales.
+### Auditorías forenses recientes
 
-## 🔐 Seguridad y Auditoría
+| Documento | Propósito |
+|---|---|
+| [auditoria_forense_contable_2026-05.md](auditoria_forense_contable_2026-05.md) | Cierre contable/fiscal técnico, migraciones `331..332`, gates E2E y riesgos externos |
+| [auditoria_forense_inventario_logistica_costeo_2026-05.md](auditoria_forense_inventario_logistica_costeo_2026-05.md) | Inventario/logística/kardex/costeo, remediación `333__inventory...` + ajuste `335__descontar_stock_authoritative.sql` |
+| [auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md](auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md) | Tesorería/caja/bancos/CxC/CxP, remediación `334__treasury...` |
 
-Documentación específica sobre el sistema de seguridad y cumplimiento.
+## ⚙️ Configuración y operación
 
-*   **[Matriz de rutas API](security/route-access-matrix.md)**: Fuente vigente de autorizacion por endpoint.
-*   **[Sesión y autenticación](security/session-auth.md)**: Contrato actual de cookies HttpOnly y sesion.
-*   **[Rate limiting](security/rate-limiting.md)**: Configuracion vigente de throttling.
-*   **[Auditoría de acceso Supabase](security/supabase-access-audit.md)**: Uso de service role y controles de acceso.
-*   **[Dashboard de Seguridad](security/security-dashboard.md)**: Referencia del panel; revisar junto con la cuarentena documental.
+| Documento | Propósito |
+|---|---|
+| [configuration.md](configuration.md) | Variables de entorno del backend (`env.schema.ts`) |
+| [ops/docker.md](ops/docker.md) | Stack Docker y observabilidad |
+| [ops/health.md](ops/health.md) | Endpoints de health check |
+| [ops/observability.md](ops/observability.md) | Logging, métricas y traces locales |
+| [ops/supabase-connection.md](ops/supabase-connection.md) | Conexión directa a Supabase (pooler) |
 
-## 📈 Estado del Proyecto
+## 🔐 Seguridad
 
-*   **[Estado operativo vigente](../PROJECT_STATUS.md)**: Estado actualizado de build, type-check, riesgos y proximas rondas de revision.
-*   **[Indice maestro de revision](../PROJECT_REVIEW_INDEX.md)**: Matriz de cobertura para revisar exhaustivamente todo el proyecto.
-*   **[Cuarentena documental](DOCUMENTATION_QUARANTINE.md)**: Candidatos a consolidacion o borrado, sin eliminaciones automaticas.
-*   **[Estado de reconstruccion de BD](db_rebuild_status.md)**: Fuente vigente de migraciones `000..302`, validadores y riesgos pendientes.
-*   **[Estado historico 2026-01](manuals/PROJECT_STATUS.md)**: Documento anterior a la reconstruccion `000..301`; usar solo como referencia historica.
-*   **[Análisis Inicial](analisis.md)**: Auditoría completa inicial del código legado.
+| Documento | Propósito |
+|---|---|
+| [security/route-access-matrix.md](security/route-access-matrix.md) | **Fuente vigente** — matriz de autorización por endpoint |
+| [security/session-auth.md](security/session-auth.md) | Contrato de cookies HttpOnly y sesión |
+| [security/rate-limiting.md](security/rate-limiting.md) | Throttling global y por endpoint |
+| [security/supabase-access-audit.md](security/supabase-access-audit.md) | Uso de service role y controles RLS |
+
+## 🚀 Release
+
+| Documento | Propósito |
+|---|---|
+| [release/production-checklist.md](release/production-checklist.md) | Checklist técnico previo a release |
+| [release/branch-protection.md](release/branch-protection.md) | Reglas de protección de `main` |
+
+## 📦 Módulos funcionales
+
+Documentación profunda de la lógica de negocio por dominio. Estos manuales son referencia activa para entender los flujos completos:
+
+| Módulo | Cobertura |
+|---|---|
+| [manuals/modules/VENTAS_POS_FISCAL.md](manuals/modules/VENTAS_POS_FISCAL.md) | **Ventas** (cotizaciones, pedidos, crédito) · **POS** (sesiones de caja, offline, concurrencia) · **Fiscal CPE** (SUNAT/OSE, firma, XML) · **RMA** (devoluciones, notas de crédito) |
+| [manuals/modules/COMPRAS_INVENTARIO.md](manuals/modules/COMPRAS_INVENTARIO.md) | **Compras** (aprobaciones, OC, proveedores) · **Inventario** (stock real vs reservado, RPC atómicos, almacenes) · **Logística** (picking, packing, despacho) |
+| [manuals/modules/FINANZAS_CONTABILIDAD.md](manuals/modules/FINANZAS_CONTABILIDAD.md) | **Tesorería** (cajas, arqueos, conciliación) · **CxC** (retenciones/detracciones, pagos) · **Contabilidad** (AsientosGenerator, plan de cuentas, periodos) |
+
+---
+
+## Cómo navegar
+
+- **¿Empiezo una nueva sesión?** → `00_coordination/CURRENT_STATE.md` + `00_coordination/FLOW_STATUS.md`
+- **¿Soy nuevo y necesito setup?** → README raíz + `configuration.md` + `ops/docker.md`
+- **¿Quiero entender la BD?** → `00_coordination/CURRENT_STATE.md` + `db_rebuild_status.md`
+- **¿Voy a modificar un módulo?** → `00_coordination/FLOW_STATUS.md` + `manuals/modules/<MODULO>.md` + auditoría forense aplicable
+- **¿Necesito agregar un endpoint?** → `security/route-access-matrix.md` para definir su access tier
+- **¿Voy a deployar?** → `release/production-checklist.md` + `production-readiness/ERP_PRODUCTION_READINESS.md`

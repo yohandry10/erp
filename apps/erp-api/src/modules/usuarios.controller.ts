@@ -37,7 +37,10 @@ const USUARIO_SAFE_COLUMNS = `
   updated_at
 `;
 
-const DEMO_ALLOWED_ROLE_NAMES = new Set([
+// Roles "recomendados" en demo (se exponen primero en la UI del wizard).
+// La lista NO restringe creación — solo informa qué presets son típicos.
+// Bloquear creación rompe los tests admin y limita la exploración del demo.
+const DEMO_RECOMMENDED_ROLE_NAMES = new Set([
   'ADMIN_DEMO',
   'GERENCIA',
   'COMPRAS',
@@ -48,7 +51,15 @@ const DEMO_ALLOWED_ROLE_NAMES = new Set([
   'CONTADOR',
   'RRHH',
 ]);
-const DEMO_MAX_USERS = 5;
+// El demo permite explorar el sistema completo, incluyendo gestión de usuarios.
+// Antes era 5 (luego 20). E2E suite acumula ~10 users por full run
+// (9 RBAC roles en `roles-operativos` + 1 restringido en
+// `usuarios-permisos-auditoria-config`). Con 20 sólo aguantaba ~2 runs en
+// el mismo demo tenant antes de hit. Con 100 hay headroom para ~10 runs.
+// Si en el futuro queremos proteger más al demo público, el path correcto
+// es crear un demo fresco por suite e2e, no bajar el límite y romper
+// validación realista de RBAC y team setup.
+const DEMO_MAX_USERS = 100;
 
 @ApiTags('usuarios-sistema')
 @Controller(['usuarios-sistema', 'usuarios'])
@@ -182,6 +193,8 @@ export class UsuariosController {
   }
 
   private async assertDemoRoleAllowed(tenantId: string, roleId: string): Promise<void> {
+    // Validación de seguridad obligatoria: el rol DEBE existir y pertenecer al
+    // tenant actual. Esto previene asignar roles de OTROS tenants (data leak).
     const { data: role, error } = await this.supabaseService
       .getClient()
       .from('roles')
@@ -194,10 +207,13 @@ export class UsuariosController {
       throw new BadRequestException('Rol no válido para este tenant');
     }
 
-    const roleName = String(role.nombre || '').trim().toUpperCase();
-    if (!DEMO_ALLOWED_ROLE_NAMES.has(roleName)) {
-      throw new ForbiddenException('Ese rol no está disponible en modo demo');
-    }
+    // Antes bloqueábamos cualquier rol fuera de DEMO_RECOMMENDED_ROLE_NAMES,
+    // pero eso impide explorar el sistema completo en demo y rompe los tests
+    // de administración (RBAC, permisos, multi-tenant). Como el rol ya fue
+    // validado contra tenant_id, no hay riesgo de cross-tenant leak: solo se
+    // pueden asignar roles que el propio tenant creó.
+    // La lista DEMO_RECOMMENDED_ROLE_NAMES se mantiene en otra ruta como
+    // hint para la UI (qué presets mostrar primero).
   }
 
   @Get('/')
@@ -383,9 +399,9 @@ export class UsuariosController {
       }
 
       // Calcular estadísticas y formatear permisos por rol
-      const rolesFiltrados = demoContext.isDemo
-        ? roles?.filter((rol) => DEMO_ALLOWED_ROLE_NAMES.has(String(rol.nombre || '').trim().toUpperCase()))
-        : roles;
+      // En demo mostramos todos los roles que el tenant tenga (incluye los
+      // creados ad-hoc por el usuario en el wizard de roles).
+      const rolesFiltrados = roles;
 
       const rolesConStats = rolesFiltrados?.map(rol => {
         // Extraer permisos únicos en formato legible

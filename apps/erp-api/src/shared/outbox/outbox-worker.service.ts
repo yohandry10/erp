@@ -31,6 +31,8 @@ export class OutboxWorker implements OnModuleInit {
     'AjusteInventarioAplicado',
     'planilla.liquidada',
     'PlanillaLiquidada',
+    'planilla.pagada',
+    'PlanillaPagada',
     'depreciacion.generada',
     'DepreciacionGenerada',
     'cpe.anulado',

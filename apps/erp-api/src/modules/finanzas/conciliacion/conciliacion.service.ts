@@ -232,6 +232,21 @@ export class ConciliacionService {
       throw new BadRequestException('No se puede importar CSV en una conciliación cerrada');
     }
 
+    // Prevenir re-importación: verificar si ya existen movimientos de extracto para esta conciliación
+    const { count: existingExtracto } = await client
+      .from('movimientos_bancarios')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('conciliacion_id', conciliacionId)
+      .eq('es_extracto', true);
+
+    if (existingExtracto && existingExtracto > 0) {
+      throw new BadRequestException(
+        `Ya se importaron ${existingExtracto} movimientos de extracto para esta conciliación. ` +
+        `Elimine los movimientos existentes antes de re-importar.`,
+      );
+    }
+
     // Determinar el banco a usar para el parser
     const banco = dto.banco || conciliacion.cuentas_bancarias?.banco || 'GENERICO';
 
@@ -465,6 +480,20 @@ export class ConciliacionService {
     if (matches.length > 0) {
       // Actualizar cada par de movimientos con su match_id correspondiente
       for (const match of matches) {
+        const conciliadoPorRpc = await this.conciliarMovimientosViaRpcIfAvailable(
+          client,
+          tenantId,
+          conciliacionId,
+          match.sistema_id,
+          match.extracto_id,
+          true,
+          false,
+          0,
+        );
+        if (conciliadoPorRpc) {
+          continue;
+        }
+
         // Actualizar movimiento del sistema
         const { error: errorUpdateSistema } = await client
           .from('movimientos_bancarios')
@@ -635,6 +664,17 @@ export class ConciliacionService {
       ? this.round2(Number(dto.diferencia))
       : diferenciaCalculada;
 
+    const conciliadoPorRpc = await this.conciliarMovimientosViaRpcIfAvailable(
+      client,
+      tenantId,
+      conciliacionId,
+      dto.movimiento_sistema_id,
+      dto.movimiento_extracto_id,
+      false,
+      dto.aceptar_diferencia === true,
+      diferencia,
+    );
+    if (!conciliadoPorRpc) {
     // Marcar ambos movimientos como conciliados y registrar diferencia si existe
     const { error: errorUpdateSistema } = await client
       .from('movimientos_bancarios')
@@ -672,6 +712,7 @@ export class ConciliacionService {
     if (errorUpdateExtracto) {
       console.error('Error actualizando movimiento del extracto:', errorUpdateExtracto);
       throw new BadRequestException('No se pudo actualizar el movimiento del extracto');
+    }
     }
 
     return {
@@ -1028,11 +1069,17 @@ export class ConciliacionService {
     // conciliados durante el proceso de match (automático o manual).
     // Esta sección es informativa para documentar el comportamiento.
 
+    // Recalcular saldo_libro al cierre (puede haber cambiado desde la creación)
+    const saldoLibroActualizado = this.round2(
+      totalesSistema.abonos - totalesSistema.cargos + (conciliacion.saldo_inicial || 0),
+    );
+
     // Cerrar la conciliación
     const { data: conciliacionCerrada, error: errorCerrar } = await client
       .from('conciliaciones_bancarias')
       .update({
         estado: 'CERRADA',
+        saldo_libro: saldoLibroActualizado,
         cerrado_at: new Date().toISOString(),
         cerrado_by: userId || null,
         observaciones: conciliacion.observaciones || JSON.stringify(reporteDiferencias),
@@ -1200,6 +1247,53 @@ export class ConciliacionService {
       console.error('Error registrando plantilla CSV:', error);
       throw new BadRequestException('No se pudo registrar la plantilla CSV');
     }
+  }
+
+  private async conciliarMovimientosViaRpcIfAvailable(
+    client: any,
+    tenantId: string,
+    conciliacionId: string,
+    movimientoSistemaId: string,
+    movimientoExtractoId: string,
+    matchAutomatico: boolean,
+    aceptarDiferencia: boolean,
+    diferencia: number,
+  ): Promise<boolean> {
+    if (typeof client?.rpc !== 'function') {
+      return false;
+    }
+
+    const { error } = await client.rpc('conciliar_movimientos_bancarios_tx', {
+      p_tenant_id: tenantId,
+      p_conciliacion_id: conciliacionId,
+      p_movimiento_sistema_id: movimientoSistemaId,
+      p_movimiento_extracto_id: movimientoExtractoId,
+      p_match_automatico: matchAutomatico,
+      p_aceptar_diferencia: aceptarDiferencia,
+      p_diferencia: diferencia,
+    });
+
+    if (!error) {
+      return true;
+    }
+
+    const message = String(error?.message || error?.details || '');
+    const code = String(error?.code || '');
+    const rpcMissing =
+      code === 'PGRST202' ||
+      code === '42883' ||
+      message.includes('conciliar_movimientos_bancarios_tx') ||
+      message.includes('Could not find the function');
+
+    if (rpcMissing) {
+      console.warn(
+        'RPC conciliar_movimientos_bancarios_tx no disponible; se usa flujo legacy de conciliacion.',
+      );
+      return false;
+    }
+
+    console.error('Error en conciliar_movimientos_bancarios_tx:', error);
+    throw new BadRequestException(error.message || 'No se pudo conciliar los movimientos bancarios');
   }
 
   private round2(value: number): number {

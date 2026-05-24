@@ -617,12 +617,24 @@ export class CxcService {
 
     const montoPago = this.parseMontoPago(dto.monto);
     const fechaPago = this.parseFechaPago(dto.fecha_pago);
+    const pagoTxResult = await this.registrarPagoViaRpcIfAvailable(
+      client,
+      tenantId,
+      cuentaId,
+      dto,
+      userId,
+    );
+    if (pagoTxResult) {
+      return pagoTxResult;
+    }
+
     const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
 
     const pendienteActual = Number(cuenta.monto_pendiente ?? 0);
     const montoTotal = Number(cuenta.monto_total ?? 0);
 
-    if (montoPago - pendienteActual > 0.05) {
+    // Tolerancia de 1 centimo para redondeo; no permitir sobrepago real
+    if (montoPago - pendienteActual > 0.01) {
       throw new BadRequestException('El monto del pago supera el saldo pendiente');
     }
 
@@ -948,13 +960,13 @@ export class CxcService {
       console.error('Error insertando evento CobroRegistrado en outbox:', errorOutbox);
     }
 
-    if (userId) {
+    {
       const auditoriaAccion = esNotaCredito ? 'APLICAR_NOTA_CREDITO' : 'REGISTRAR_PAGO';
       try {
         await this.auditService.registrarCambio(
           'cuentas_por_cobrar',
           'UPDATE',
-          userId,
+          userId || 'SYSTEM',
           {
             old: { monto_pendiente: pendienteActual, estado: cuenta.estado },
             new: { monto_pendiente: nuevoPendiente, estado: nuevoEstado, dias_mora: diasMora },
@@ -974,6 +986,97 @@ export class CxcService {
         console.warn('⚠️ No se pudo registrar auditoría de pago CxC:', error);
       }
     }
+
+    return {
+      success: true,
+      data: detalleActualizado,
+    };
+  }
+
+  private async registrarPagoViaRpcIfAvailable(
+    client: any,
+    tenantId: string,
+    cuentaId: string,
+    dto: RegistrarPagoCxcDto,
+    userId?: string,
+  ): Promise<{ success: boolean; data: any } | null> {
+    if (typeof client?.rpc !== 'function') {
+      return null;
+    }
+
+    const userUuid = this.isUuid(userId) ? userId : null;
+    const { data, error } = await client.rpc('registrar_cxc_pago_tx', {
+      p_tenant_id: tenantId,
+      p_cuenta_id: cuentaId,
+      p_pago: {
+        monto: dto.monto,
+        fecha_pago: dto.fecha_pago,
+        moneda: dto.moneda,
+        metodo_pago: dto.metodo_pago,
+        referencia: dto.referencia,
+        notas: dto.notas,
+        cuenta_bancaria_id: dto.cuenta_bancaria_id,
+        tipo: dto.tipo,
+        aplica_retencion: dto.aplica_retencion,
+        retencion_monto: dto.retencion_monto,
+        documento_pago_id: dto.documento_pago_id,
+        idempotency_key: dto.idempotency_key,
+      },
+      p_user_id: userUuid,
+    });
+
+    if (error) {
+      const message = String(error?.message || error?.details || '');
+      const code = String(error?.code || '');
+      const rpcMissing =
+        code === 'PGRST202' ||
+        code === '42883' ||
+        message.includes('registrar_cxc_pago_tx') ||
+        message.includes('Could not find the function');
+
+      if (rpcMissing) {
+        this.logger.warn(
+          'RPC registrar_cxc_pago_tx no disponible; se usa flujo legacy de CxC.',
+        );
+        return null;
+      }
+
+      this.logger.error('Error en registrar_cxc_pago_tx:', error);
+      throw new BadRequestException(error.message || 'No se pudo registrar el pago de la cuenta por cobrar');
+    }
+
+    const payload = data ?? {};
+    const cuentaAnterior = payload.cuenta_anterior ?? payload.cuenta ?? {};
+    const pagoRegistrado = payload.pago ?? {};
+    const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
+    const saldoAnterior = Number(payload.saldo_anterior ?? cuentaAnterior.monto_pendiente ?? 0);
+    const saldoNuevo = Number(
+      payload.saldo_nuevo ??
+      detalleActualizado.monto_pendiente ??
+      detalleActualizado.saldo_pendiente ??
+      0,
+    );
+    const estadoNuevo = String(payload.estado_nuevo ?? detalleActualizado.estado ?? 'PENDIENTE');
+    const esNotaCredito = (dto.tipo ?? pagoRegistrado.tipo) === TipoMovimientoCxc.NOTA_CREDITO;
+    const medioCobro = esNotaCredito ? 'NOTA_CREDITO' : (dto.metodo_pago ?? pagoRegistrado.metodo_pago ?? 'EFECTIVO');
+
+    this.emitirEventoCobroRegistrado(
+      tenantId,
+      pagoRegistrado,
+      cuentaAnterior,
+      detalleActualizado,
+      saldoAnterior,
+      saldoNuevo,
+      estadoNuevo,
+      userId,
+      {
+        eventId: payload.event_id ?? pagoRegistrado.event_id ?? uuidv4(),
+        idempotencyKey: payload.idempotency_key ?? pagoRegistrado.idempotency_key ?? `cxc.cobro:${tenantId}:${pagoRegistrado.id}`,
+        medio: medioCobro,
+        cuentaBancariaId: dto.cuenta_bancaria_id || null,
+        timestamp: new Date().toISOString(),
+      },
+    );
 
     return {
       success: true,
@@ -1053,12 +1156,12 @@ export class CxcService {
 
     const detalleActualizado = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
 
-    if (userId) {
+    {
       try {
         await this.auditService.registrarCambio(
           'cuentas_por_cobrar',
           'UPDATE',
-          userId,
+          userId || 'SYSTEM',
           {
             old: { fecha_vencimiento: cuenta.fecha_vencimiento },
             new: { fecha_vencimiento: dto.nueva_fecha_vencimiento, dias_mora: diasMora },
@@ -1722,11 +1825,20 @@ export class CxcService {
     };
 
     const lookupByDocumento = async (documento: string): Promise<ClienteReferenciaInfo | null> => {
+      const documentoEnteroSeguro = this.toSafeIntegerDocument(documento);
+      const filters = [`ruc.eq.${documento}`, `codigo.eq.${documento}`];
+      if (documentoEnteroSeguro !== null) {
+        filters.push(
+          `numero_documento.eq.${documentoEnteroSeguro}`,
+          `documento_numero.eq.${documentoEnteroSeguro}`,
+        );
+      }
+
       const { data, error } = await client
         .from('clientes')
         .select('id, numero_documento')
         .eq('tenant_id', tenantId)
-        .or(`ruc.eq.${documento},codigo.eq.${documento}`)
+        .or(filters.join(','))
         .maybeSingle();
 
       if (error) {

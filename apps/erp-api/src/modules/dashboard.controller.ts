@@ -23,9 +23,9 @@ export class DashboardController {
   @ApiResponse({ status: 200, description: 'Datos de prueba creados exitosamente' })
   async seedTestData(@CurrentTenant() tenantId?: string) {
     try {
-      // HARDENING: bloquear ejecución en producción.
-      if (process.env.NODE_ENV === 'production') {
-        throw new ForbiddenException('Endpoint restringido en producción');
+      // HARDENING: solo permitir en development explícito (deny-by-default)
+      if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+        throw new ForbiddenException('Endpoint solo disponible en entorno de desarrollo');
       }
 
       console.log('🌱 [Dashboard] Creando datos de prueba...');

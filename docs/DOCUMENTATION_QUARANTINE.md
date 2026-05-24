@@ -19,8 +19,8 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 | Seguridad reciente | `docs/security/rate-limiting.md`, `session-auth.md`, `route-access-matrix.md`, `supabase-access-audit.md` |
 | Operacion reciente | `docs/ops/docker.md`, `docs/ops/health.md` |
 | Release reciente | `docs/release/production-checklist.md`, `branch-protection.md` |
-| Estado proyecto actual | `PROJECT_STATUS.md` |
-| Indice revision | `PROJECT_REVIEW_INDEX.md` |
+| Estado proyecto actual | `x_doc/PROJECT_STATUS.md` en el worktree actual |
+| Indice revision | `x_doc/PROJECT_REVIEW_INDEX.md` en el worktree actual |
 
 ## Candidatos iniciales
 
@@ -33,11 +33,11 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 | `docs/security/IMPLEMENTACION-AUDITORIA-RLS.md` | Vigente historico o duplicado | Mismo dominio que `rls-audit-system.md`. | Docs DB/security recientes. | Consolidar con RLS actual. |
 | `docs/security/rls-alerts-guide.md` | Requiere decision humana | Puede ser guia operativa aun util. | Docs ops/security recientes. | Verificar implementacion real en codigo. |
 | `docs/security/rls-alerts-quick-reference.md` | Requiere decision humana | Quick reference puede depender de guia anterior. | Guia consolidada de seguridad. | Mantener hasta consolidar. |
-| `docs/manuals/PROJECT_STATUS.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB `000..301`; referencia publica desde `docs/README.md`. | `PROJECT_STATUS.md` y `docs/db_rebuild_status.md`. | Mantener como historico hasta retirar/reemplazar enlace del hub. |
+| `docs/manuals/PROJECT_STATUS.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB `000..301`; referencia publica antigua desde `docs/README.md`. | `x_doc/PROJECT_STATUS.md` y `docs/db_rebuild_status.md`. | Borrado en ronda 7 tras reemplazo validado. |
 | `docs/manuals/DATABASE_REFERENCE.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB 2026-02. | `docs/db_rebuild_status.md` y catalogos DB. | Regenerar o marcar obsoleto. |
-| `docs/manuals/SYSTEM_ARCHITECTURE.md` | Vigente pero incompleto probable | Puede describir arquitectura general, pero previo a cambios recientes. | README + `PROJECT_REVIEW_INDEX.md`. | Actualizar, no borrar aun. |
-| `docs/manuals/MODULES_REFERENCE.md` | Vigente pero incompleto probable | Manual general anterior a migraciones finales. | Matriz de verticales en `PROJECT_REVIEW_INDEX.md`. | Actualizar tras rondas verticales. |
-| `docs/manuals/DEVELOPER_GUIDE.md` | Vigente pero incompleto probable | Puede conservar setup, pero necesita validar scripts actuales. | README + docs ops. | Actualizar tras gates. |
+| `docs/manuals/SYSTEM_ARCHITECTURE.md` | Desactualizado probable | Puede describir arquitectura general, pero previo a cambios recientes. | README + `x_doc/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
+| `docs/manuals/MODULES_REFERENCE.md` | Desactualizado probable | Manual general anterior a migraciones finales. | Matriz de verticales en `x_doc/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
+| `docs/manuals/DEVELOPER_GUIDE.md` | Desactualizado probable | Guia anterior a la consolidacion de README/docs ops. | README + docs ops. | Borrado en ronda 7 tras reemplazo validado. |
 | `docs/analisis.md` | Historico | Auditoria inicial de codigo legado. | No aplica. | Mantener como historico salvo decision. |
 | `route_matrix_block03.md` | Borrado seguro | Output raiz untracked, sin referencias fuera de cuarentena; contenia matriz vieja que contradice la vigente, por ejemplo `testConnection` como `PUBLIC`. | `docs/security/route-access-matrix.md`. | Borrado en ronda 6. |
 | `route_matrix_block03.csv` | Borrado seguro | Output raiz untracked, sin referencias fuera de cuarentena; duplicaba salida intermedia de matriz. | `docs/security/route-access-matrix.md`. | Borrado en ronda 6. |
@@ -56,10 +56,40 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 
 ## Borrados realizados
 
-- `docs/security/DASHBOARD_ARCHITECTURE.md`: 0 bytes, sin referencias entrantes fuera de cuarentena, reemplazo documental disponible.
-- `route_matrix_block03.md`, `route_matrix_block03.csv`, `tmp_route_audit.tsv`, `tmp_route_audit_v2.tsv`: outputs temporales raiz, untracked, sin referencias fuera de cuarentena, reemplazados por `docs/security/route-access-matrix.md`.
-- `apps/worker/src/queue-manager.js`, `apps/worker/src/queue-manager.d.ts`, `apps/worker/src/queue-manager.js.map`: compilados antiguos dentro de `src`, reemplazados por `queue-manager.ts` y salida `dist`.
-- `temp_retenciones.spec.ts`: spec temporal raiz reemplazado por `apps/erp-api/src/modules/finanzas/shared/retenciones-validation.service.spec.ts`.
+### Ronda 6 (mayo 2026 inicial)
+
+- `docs/security/DASHBOARD_ARCHITECTURE.md`: 0 bytes, sin referencias entrantes fuera de cuarentena.
+- `route_matrix_block03.md`, `route_matrix_block03.csv`, `tmp_route_audit.tsv`, `tmp_route_audit_v2.tsv`: outputs temporales raíz untracked, reemplazados por `docs/security/route-access-matrix.md`.
+- `apps/worker/src/queue-manager.js`, `apps/worker/src/queue-manager.d.ts`, `apps/worker/src/queue-manager.js.map`: compilados antiguos dentro de `src`.
+- `temp_retenciones.spec.ts`: spec temporal raíz reemplazado por `apps/erp-api/src/modules/finanzas/shared/retenciones-validation.service.spec.ts`.
+
+### Ronda 7 (mayo 2026 — consolidación documental)
+
+**Cluster security obsoleto (octubre 2025, pre-hardening DB):**
+
+| Archivo borrado | Razón | Recuperación si se necesita |
+|---|---|---|
+| `docs/security/SECURITY_DASHBOARD_IMPLEMENTATION.md` | Implementación oct 2025 pre-hardening; 0 refs entrantes externas. | `git log -- docs/security/SECURITY_DASHBOARD_IMPLEMENTATION.md` |
+| `docs/security/ALERT_SYSTEM_IMPLEMENTATION.md` | Implementación RLS alerts oct 2025; 0 refs entrantes externas. | `git log` |
+| `docs/security/IMPLEMENTACION-AUDITORIA-RLS.md` | Sistema auditoría RLS oct 2025; 0 refs externas. | `git log` |
+| `docs/security/rls-audit-system.md` | Solo referenciado por `IMPLEMENTACION-AUDITORIA-RLS.md` (también borrado). | `git log` |
+| `docs/security/rls-alerts-guide.md` | Solo referenciado por `ALERT_SYSTEM_IMPLEMENTATION.md` (borrado). | `git log` |
+| `docs/security/rls-alerts-quick-reference.md` | Solo referenciado por `ALERT_SYSTEM_IMPLEMENTATION.md`. | `git log` |
+| `docs/security/security-dashboard.md` | Contenido oct 2025 pre-hardening; refs solo desde README hubs (actualizados). | `git log` |
+
+**Manuals históricos (enero 2026, pre-reconstrucción DB feb 2026):**
+
+| Archivo borrado | Reemplazo vigente |
+|---|---|
+| `docs/manuals/DATABASE_REFERENCE.md` | `docs/db_rebuild_status.md` |
+| `docs/manuals/DEVELOPER_GUIDE.md` | `README.md` raíz + `docs/configuration.md` + `docs/ops/*` |
+| `docs/manuals/MODULES_REFERENCE.md` | `docs/manuals/modules/*` (modules) + `x_doc/PROJECT_REVIEW_INDEX.md` (matriz) |
+| `docs/manuals/PROJECT_STATUS.md` | `x_doc/PROJECT_STATUS.md` |
+| `docs/manuals/SYSTEM_ARCHITECTURE.md` | `x_doc/PROJECT_REVIEW_INDEX.md` (arquitectura por vertical) |
+
+**Mantenidos:** `docs/manuals/modules/{VENTAS_POS_FISCAL,COMPRAS_INVENTARIO,FINANZAS_CONTABILIDAD}.md` (manuales funcionales vigentes referenciados desde README raíz).
+
+**READMEs actualizados:** `docs/README.md` y `README.md` raíz; se removieron las referencias a los archivos borrados y se reorganizó el hub documental por dominio.
 
 ## Pendiente antes de borrar
 

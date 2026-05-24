@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, Home, Users, FileText, ShoppingCart, type LucideIcon } from 'lucide-react'
+import { CheckSquare, ChevronRight, FileText, Home, ShoppingCart, Users, type LucideIcon } from 'lucide-react'
 
 interface Breadcrumb {
   label: string
@@ -51,6 +51,10 @@ export default function VentasLayout({
       if (path === 'pedidos') {
         label = 'Pedidos'
         icon = ShoppingCart
+      }
+      if (path === 'aprobaciones') {
+        label = 'Aprobaciones'
+        icon = CheckSquare
       }
       if (path === 'nuevo') label = 'Nuevo'
       

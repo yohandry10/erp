@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 
 /**
@@ -147,16 +147,21 @@ export class CashConcurrencyService {
     ): Promise<void> {
         this.logger.warn(`Cierre administrativo solicitado: sesión=${sesionId}, admin=${adminId}`);
 
-        // TODO: Validar que adminId tenga rol ADMIN
-        // const { data: usuario } = await this.supabase.getClient()
-        //   .from('users')
-        //   .select('rol')
-        //   .eq('id', adminId)
-        //   .single();
-        //
-        // if (!usuario || usuario.rol !== 'ADMIN') {
-        //   throw new UnauthorizedException('Solo administradores pueden forzar cierres');
-        // }
+        // Validar que adminId tenga rol ADMIN
+        const { data: adminRoles } = await this.supabase
+            .getClient()
+            .from('user_roles')
+            .select('roles(nombre)')
+            .eq('usuario_sistema_id', adminId)
+            .eq('tenant_id', tenantId);
+
+        const roleNames = (adminRoles || [])
+            .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
+            .filter(Boolean);
+
+        if (!roleNames.includes('ADMIN')) {
+            throw new ForbiddenException('Solo usuarios con rol ADMIN pueden forzar cierres administrativos');
+        }
 
         // Obtener sesión
         const { data: sesion, error: sesionError } = await this.supabase
