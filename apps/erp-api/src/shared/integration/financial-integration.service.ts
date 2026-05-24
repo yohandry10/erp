@@ -110,6 +110,11 @@ export class FinancialIntegrationService {
       await this.procesarCompraParaFinanzas(event.data);
     });
 
+    this.eventBus.onRecepcionRegistrada(async (event) => {
+      console.log('💰 [Finanzas] Procesando recepcion registrada para KPIs...');
+      await this.procesarCompraParaFinanzas(event.data);
+    });
+
     this.eventBus.onGastoRegistrado(async (event) => {
       console.log('💰 [Finanzas] Procesando gasto registrado para KPIs...');
       await this.procesarGastoParaFinanzas(event.data);

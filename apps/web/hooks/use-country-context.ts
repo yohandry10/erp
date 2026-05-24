@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useApi } from './use-api';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CountryContext {
   paisId: number;
@@ -91,68 +91,74 @@ const resolveCurrencySymbol = (currencyCode: string, fallbackSymbol: string) => 
   return normalized || fallbackSymbol;
 };
 
+// Transforma el payload crudo del backend al CountryContext consumido por la app.
+// Función pura: facilita testing y reuso en `select` de useQuery.
+function buildCountryContext(empresaConfig: any): CountryContext {
+  if (!empresaConfig) return EMPTY_CONTEXT;
+
+  const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : 0;
+  const paisCodigo = typeof empresaConfig.pais === 'string'
+    ? empresaConfig.pais.toUpperCase()
+    : '';
+  const monedaDefecto = typeof empresaConfig.monedaDefecto === 'string'
+    ? empresaConfig.monedaDefecto.toUpperCase()
+    : '';
+
+  if (!paisId || !paisCodigo) return EMPTY_CONTEXT;
+
+  const countryData = CONTEXT_MAP[paisCodigo];
+  if (!countryData) {
+    return { ...EMPTY_CONTEXT, paisId, paisCodigo };
+  }
+
+  const resolvedMoneda = monedaDefecto || countryData.moneda;
+  return {
+    paisId,
+    paisCodigo,
+    ...countryData,
+    moneda: resolvedMoneda,
+    simboloMoneda: resolveCurrencySymbol(resolvedMoneda, countryData.simboloMoneda),
+    requiresSetup: false,
+    loading: false,
+  };
+}
+
+async function fetchCountryContext(): Promise<any> {
+  // /backend es el rewrite hacia el API (puerto 3002 en dev/local).
+  // El trailing slash es necesario por next.config.js trailingSlash: true.
+  const res = await fetch('/backend/api/configuration/context/country/', {
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) return null;
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  return json?.data ?? json;
+}
+
+export const COUNTRY_CONTEXT_QUERY_KEY = ['configuration', 'context', 'country'] as const;
+
 /**
- * Hook para obtener el contexto del país del tenant actual
- * Detecta automáticamente el país y retorna textos dinámicos
+ * Hook para obtener el contexto del país del tenant actual.
+ * Cacheado con TanStack Query: el endpoint tarda ~2.6s contra Supabase y los
+ * datos no cambian entre clicks, así que se comparte una única respuesta
+ * entre todos los componentes que llaman a este hook durante la sesión.
  */
 export function useCountryContext(): CountryContext {
-  const [context, setContext] = useState<CountryContext>(INITIAL_CONTEXT);
-  const api = useApi();
+  const { session } = useAuth();
 
-  useEffect(() => {
-    loadCountryContext();
-  }, []);
+  const { data, isLoading } = useQuery({
+    queryKey: COUNTRY_CONTEXT_QUERY_KEY,
+    queryFn: fetchCountryContext,
+    select: buildCountryContext,
+    enabled: !!session, // no llamar si aún no hay sesión hidratada
+    staleTime: 5 * 60 * 1000, // 5 min: el país del tenant no cambia con frecuencia
+    gcTime: 30 * 60 * 1000,   // 30 min en cache antes de garbage collect
+    retry: 1,
+  });
 
-  const loadCountryContext = async () => {
-    try {
-      // Obtener configuración de la empresa que incluye país
-      const response = await api.get('/api/configuration/context/country');
-      const empresaConfig = response?.data ?? response;
-      
-      if (empresaConfig) {
-        const paisId = empresaConfig.pais_id ? Number(empresaConfig.pais_id) : 0;
-        const paisCodigo = typeof empresaConfig.pais === 'string'
-          ? empresaConfig.pais.toUpperCase()
-          : '';
-        const monedaDefecto = typeof empresaConfig.monedaDefecto === 'string'
-          ? empresaConfig.monedaDefecto.toUpperCase()
-          : '';
-
-        if (!paisId || !paisCodigo) {
-          setContext(EMPTY_CONTEXT);
-          return;
-        }
-
-        const countryData = CONTEXT_MAP[paisCodigo];
-        if (!countryData) {
-          setContext({
-            ...EMPTY_CONTEXT,
-            paisId,
-            paisCodigo,
-          });
-          return;
-        }
-
-        const resolvedMoneda = monedaDefecto || countryData.moneda;
-        const resolvedSymbol = resolveCurrencySymbol(resolvedMoneda, countryData.simboloMoneda);
-
-        setContext({
-          paisId,
-          paisCodigo,
-          ...countryData,
-          moneda: resolvedMoneda,
-          simboloMoneda: resolvedSymbol,
-          requiresSetup: false,
-          loading: false,
-        });
-      } else {
-        setContext(EMPTY_CONTEXT);
-      }
-    } catch (error) {
-      console.error('Error loading country context:', error);
-      setContext(EMPTY_CONTEXT);
-    }
-  };
-
-  return context;
+  if (isLoading) return INITIAL_CONTEXT;
+  return data ?? EMPTY_CONTEXT;
 }

@@ -170,8 +170,8 @@ export class CashAuthorizationService {
 
     /**
      * Valida el código PIN de un supervisor
-     * TODO: Implementar validación real con tabla de usuarios y hasheado de PIN
-     * Por ahora, valida longitud y formato
+     * Nota: Validación de PIN contra hash requiere tabla supervisor_pins (pendiente de schema).
+     * Por ahora valida formato + verifica rol SUPERVISOR/ADMIN.
      */
     private async validarCodigoSupervisor(
         supervisorId: string,
@@ -183,32 +183,24 @@ export class CashAuthorizationService {
             throw new UnauthorizedException('Código de supervisor inválido (debe ser 6 dígitos)');
         }
 
-        // TODO: Verificar que el usuario tenga rol de supervisor
-        // const { data: usuario } = await this.supabase.getClient()
-        //   .from('users')
-        //   .select('rol')
-        //   .eq('id', supervisorId)
-        //   .eq('tenant_id', tenantId)
-        //   .single();
-        //
-        // if (!usuario || !['SUPERVISOR', 'ADMIN'].includes(usuario.rol)) {
-        //   throw new UnauthorizedException('El usuario no tiene permisos de supervisor');
-        // }
+        // Verificar que el usuario tenga rol de supervisor o admin
+        const { data: supervisorRoles } = await this.supabase.getClient()
+            .from('user_roles')
+            .select('roles(nombre)')
+            .eq('usuario_sistema_id', supervisorId)
+            .eq('tenant_id', tenantId);
 
-        // TODO: Validar código PIN contra hash almacenado
-        // const { data: pinData } = await this.supabase.getClient()
-        //   .from('supervisor_pins')
-        //   .select('hash_pin')
-        //   .eq('usuario_id', supervisorId)
-        //   .single();
-        //
-        // const hashCodigo = await bcrypt.hash(codigo, pinData.salt);
-        // if (hashCodigo !== pinData.hash_pin) {
-        //   throw new UnauthorizedException('Código de supervisor incorrecto');
-        // }
+        const roleNames = (supervisorRoles || [])
+            .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
+            .filter(Boolean);
 
-        // Por ahora, solo validamos el formato
-        this.logger.log(`Código de supervisor validado: ${supervisorId}`);
+        if (!roleNames.some((r: string) => ['SUPERVISOR', 'ADMIN'].includes(r))) {
+            throw new UnauthorizedException('El usuario no tiene permisos de supervisor');
+        }
+
+        // TODO: Validar código PIN contra hash almacenado (requiere tabla supervisor_pins)
+
+        this.logger.log(`Código de supervisor validado (rol verificado): ${supervisorId}`);
     }
 
     /**

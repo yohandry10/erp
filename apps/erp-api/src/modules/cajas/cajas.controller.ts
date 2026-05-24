@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards, BadRequestException, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, Req, UseGuards, BadRequestException, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { CajasService } from './cajas.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
@@ -53,9 +53,11 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() dto: AbrirCajaDto
+    @Body() dto: AbrirCajaDto,
+    @Req() req: any,
   ) {
-    const data = await this.service.abrirCaja(tenantId, id, dto, user?.id);
+    const ipAddress = req?.ip || req?.headers?.['x-forwarded-for'] || null;
+    const data = await this.service.abrirCaja(tenantId, id, dto, user?.id, ipAddress);
     return { success: true, data };
   }
 

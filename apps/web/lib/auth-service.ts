@@ -1,5 +1,19 @@
 const API_URL = '/backend';
 
+// Rutas públicas donde el middleware ya garantiza que NO hay sesión válida (si la
+// hubiera, redirigiría a /dashboard antes de renderizar). Cualquier llamada a
+// /auth/profile desde estas páginas produce un 401 esperado que ensucia la consola
+// sin aportar información. Lista exacta (no incluye sub-rutas como /demo/convert).
+const PUBLIC_AUTH_SKIP_PATHS = new Set(['/login', '/demo']);
+
+function isPublicAuthSkipPath(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  // next.config.js usa trailingSlash: true → puede llegar como "/login/".
+  const normalized = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+  return PUBLIC_AUTH_SKIP_PATHS.has(normalized);
+}
+
 export interface User {
   id: string;
   email: string;
@@ -19,10 +33,12 @@ export interface LoginResponse {
 
 export interface Session {
   user: User;
+  access_token?: string;
 }
 
 class AuthService {
   private session: Session | null = null;
+  private accessToken: string | null = null;
   private listeners: ((session: Session | null) => void)[] = [];
 
   constructor() {
@@ -30,25 +46,46 @@ class AuthService {
   }
 
   private normalizeUserPayload(raw: any): User {
+    // El backend devuelve `roles` con dos formas distintas:
+    //   - POST /api/auth/login → roles: [{ id, nombre, descripcion }]   (objetos)
+    //   - GET  /api/auth/profile → roles: ['ADMIN', ...]                (strings)
+    // Normalizamos a string[] siempre para que el resto de la app (sidebar,
+    // guards) pueda usar role.toUpperCase() / includes() sin chequeos de tipo.
+    const rawRoles = Array.isArray(raw?.roles) ? raw.roles : [];
+    const roles = rawRoles
+      .map((r: any) => (typeof r === 'string' ? r : r?.nombre))
+      .filter((r: any): r is string => typeof r === 'string' && r.length > 0);
+
     return {
       id: raw?.id,
       email: raw?.email,
       nombre: raw?.nombre || raw?.username || raw?.email?.split?.('@')[0] || 'Usuario',
       apellido: raw?.apellido || '',
       nombre_usuario: raw?.nombre_usuario || raw?.username,
-      roles: raw?.roles || [],
+      roles,
       tenant_id: raw?.tenant_id,
       is_super_admin: raw?.is_super_admin === true || raw?.isSuperAdmin === true || raw?.super_admin === true,
     };
   }
 
   private async fetchProfile() {
+    // Corto-circuito: en /login y /demo el middleware garantiza ausencia de
+    // sesión EN EL MOMENTO INICIAL. Pero después de signInWithPassword (login
+    // exitoso desde /demo o /login) ya tenemos accessToken en memoria y SÍ
+    // queremos llamar a /auth/profile para obtener el payload canónico
+    // (roles como string[], no como objetos). Por eso saltamos solo si aún
+    // no hay accessToken.
+    if (isPublicAuthSkipPath() && !this.accessToken) {
+      return null;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(`${API_URL}/api/auth/profile/`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
       },
       credentials: 'include',
       signal: controller.signal,
@@ -69,11 +106,13 @@ class AuthService {
 
   private saveSession(session: Session) {
     this.session = session;
+    this.accessToken = session.access_token || this.accessToken;
     this.notifyListeners();
   }
 
   private clearSession() {
     this.session = null;
+    this.accessToken = null;
     this.notifyListeners();
   }
 
@@ -112,10 +151,13 @@ class AuthService {
         };
       }
 
-      // Refrescar desde cookie para obtener el payload canónico del usuario.
+      this.accessToken = loginData.access_token;
+
+      // Refrescar desde cookie/token para obtener el payload canónico del usuario.
       const profileUser = await this.fetchProfile().catch(() => null);
       const session: Session = {
         user: profileUser || loginUser,
+        access_token: loginData.access_token,
       };
       this.saveSession(session);
 
@@ -145,16 +187,38 @@ class AuthService {
   }
 
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
+    let storedSession: Session | null = null;
+
     if (!this.session && typeof window !== 'undefined') {
+      try {
+        const raw =
+          window.localStorage.getItem('erp.auth.session.snapshot') ||
+          window.sessionStorage.getItem('erp.auth.session.snapshot');
+        storedSession = raw ? JSON.parse(raw) as Session : null;
+        if (storedSession?.access_token) {
+          this.accessToken = storedSession.access_token;
+        }
+
+        if (storedSession?.user?.id) {
+          this.saveSession(storedSession);
+        }
+      } catch {
+        /* ignore optimistic session hydration failures */
+      }
+    }
+
+    if (typeof window !== 'undefined') {
       try {
         const user = await this.fetchProfile();
         if (user) {
-          this.saveSession({ user });
-        } else {
+          this.saveSession({ user, access_token: this.accessToken || undefined });
+        } else if (!this.session) {
           this.clearSession();
         }
       } catch {
-        this.clearSession();
+        if (!this.session) {
+          this.clearSession();
+        }
       }
     }
 
@@ -174,6 +238,7 @@ class AuthService {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
         },
         credentials: 'include',
       });
@@ -185,7 +250,9 @@ class AuthService {
       const user = this.normalizeUserPayload(await response.json());
       const newSession: Session = {
         user,
+        access_token: session.access_token,
       };
+      this.accessToken = session.access_token;
 
       this.saveSession(newSession);
 

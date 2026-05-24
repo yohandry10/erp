@@ -1,14 +1,14 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { useEffect, useState, useCallback } from 'react'
 import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
   BarChart3,
-  CheckCircle,
   Clock,
+  Inbox,
+  PieChart as PieChartIcon,
   DollarSign,
   Download,
   FileSpreadsheet,
@@ -20,12 +20,26 @@ import {
   TrendingDown,
   TrendingUp,
   Truck,
+  Users,
   Zap,
 } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  BarChart as RBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Cell,
+  PieChart as RPieChart,
+  Pie,
+} from 'recharts'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/erp/empty-state'
 import { StatusBadge } from '@/components/erp/status-badge'
 import { useApiCall } from '@/hooks/use-api'
 import { useCountryContext } from '@/hooks/use-country-context'
@@ -33,6 +47,10 @@ import { useConfigurationStatus } from './hooks/useConfigurationStatus'
 import { ConfigurationBanner } from './components/ConfigurationBanner'
 import { ConfigurationModal } from './components/ConfigurationModal'
 import { DashboardNotificationBanners } from '@/components/notifications'
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface DashboardStats {
   totalCpe: number
@@ -68,6 +86,10 @@ interface RecentActivity {
   status: 'success' | 'warning' | 'error' | 'pending'
 }
 
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 const formatNumber = (value: number | undefined) =>
   Number(value ?? 0).toLocaleString('es-PE')
 
@@ -97,232 +119,312 @@ const DEFAULT_DASHBOARD_STATS: DashboardStats = {
   crecimientoVentas: 0,
 }
 
-const trendHeightClasses = [
-  'h-[32%]',
-  'h-[46%]',
-  'h-[38%]',
-  'h-[56%]',
-  'h-[52%]',
-  'h-[68%]',
-  'h-[61%]',
-  'h-[78%]',
-  'h-[72%]',
-  'h-[88%]',
-]
-
-const barHeightClasses = [
-  'h-2',
-  'h-[16%]',
-  'h-[24%]',
-  'h-[32%]',
-  'h-[40%]',
-  'h-[48%]',
-  'h-[56%]',
-  'h-[64%]',
-  'h-[72%]',
-  'h-[84%]',
-  'h-[96%]',
-]
-
-const progressWidthClasses = [
-  'w-0',
-  'w-[12%]',
-  'w-[20%]',
-  'w-[30%]',
-  'w-[40%]',
-  'w-[50%]',
-  'w-[60%]',
-  'w-[70%]',
-  'w-[80%]',
-  'w-[90%]',
-  'w-full',
-]
-
-const getBucketClass = (value: number, maxValue: number, classes: string[]) => {
-  if (value <= 0 || maxValue <= 0) {
-    return classes[0]
-  }
-
-  const bucket = Math.max(1, Math.min(classes.length - 1, Math.ceil((value / maxValue) * (classes.length - 1))))
-  return classes[bucket]
-}
-
 function getActivityIcon(type: RecentActivity['type']) {
-  switch (type) {
-    case 'VENTA':
-      return <DollarSign className="h-4 w-4 text-emerald-600" />
-    case 'COMPRA':
-      return <ShoppingCart className="h-4 w-4 text-blue-600" />
-    case 'CPE':
-      return <FileText className="h-4 w-4 text-purple-600" />
-    case 'GRE':
-      return <Truck className="h-4 w-4 text-orange-600" />
-    case 'COTIZACION':
-      return <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
-    default:
-      return <Activity className="h-4 w-4 text-slate-600" />
+  const map = {
+    VENTA: { Icon: DollarSign, color: 'text-emerald-400 group-data-[erp-theme=light]/dashboard:text-emerald-600' },
+    COMPRA: { Icon: ShoppingCart, color: 'text-cyan-400 group-data-[erp-theme=light]/dashboard:text-cyan-600' },
+    CPE: { Icon: FileText, color: 'text-violet-400 group-data-[erp-theme=light]/dashboard:text-violet-600' },
+    GRE: { Icon: Truck, color: 'text-amber-400 group-data-[erp-theme=light]/dashboard:text-amber-600' },
+    COTIZACION: { Icon: FileSpreadsheet, color: 'text-indigo-400 group-data-[erp-theme=light]/dashboard:text-indigo-600' },
   }
+  return map[type] || { Icon: Activity, color: 'text-slate-400' }
 }
 
 function getStatusTone(status: RecentActivity['status']) {
   switch (status) {
-    case 'success':
-      return 'success'
-    case 'warning':
-      return 'warning'
-    case 'error':
-      return 'danger'
-    case 'pending':
-    default:
-      return 'neutral'
+    case 'success': return 'success'
+    case 'warning': return 'warning'
+    case 'error': return 'danger'
+    default: return 'neutral'
   }
 }
 
 function getStatusLabel(status: RecentActivity['status']) {
   switch (status) {
-    case 'success':
-      return 'Completado'
-    case 'warning':
-      return 'Alerta'
-    case 'error':
-      return 'Error'
-    case 'pending':
-    default:
-      return 'Pendiente'
+    case 'success': return 'Completado'
+    case 'warning': return 'Alerta'
+    case 'error': return 'Error'
+    default: return 'Pendiente'
   }
 }
 
-const kpiToneClasses = {
+// ============================================================================
+// DESIGN TOKENS (alineados con Analytics para coherencia visual del producto)
+// ============================================================================
+
+const surface =
+  'rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-[#040c1c] via-[#020817] to-[#050d1f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:from-white group-data-[erp-theme=light]/dashboard:via-white group-data-[erp-theme=light]/dashboard:to-slate-50 group-data-[erp-theme=light]/dashboard:shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
+
+const eyebrow =
+  'text-[0.65rem] font-medium uppercase tracking-[0.18em] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500'
+
+const cardTitle =
+  'text-base font-semibold tracking-tight text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-900'
+
+const tabularNum = 'font-bold tabular-nums tracking-tight'
+
+const tonePalette = {
   cyan: {
-    card: 'border-cyan-400/20 from-cyan-500/15 via-slate-950/80 to-slate-950',
-    icon: 'border-cyan-300/30 bg-cyan-400/15 text-cyan-200 shadow-cyan-500/20',
-    value: 'text-cyan-50',
-    glow: 'from-cyan-400/80 to-blue-500/80',
+    text: 'text-cyan-300 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+    chip: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50 group-data-[erp-theme=light]/dashboard:text-cyan-700',
+    accent: '#22d3ee',
   },
   violet: {
-    card: 'border-violet-400/20 from-violet-500/15 via-slate-950/80 to-slate-950',
-    icon: 'border-violet-300/30 bg-violet-400/15 text-violet-200 shadow-violet-500/20',
-    value: 'text-violet-50',
-    glow: 'from-violet-400/80 to-fuchsia-500/80',
+    text: 'text-violet-300 group-data-[erp-theme=light]/dashboard:text-violet-700',
+    chip: 'border-violet-400/30 bg-violet-400/10 text-violet-300 group-data-[erp-theme=light]/dashboard:border-violet-200 group-data-[erp-theme=light]/dashboard:bg-violet-50 group-data-[erp-theme=light]/dashboard:text-violet-700',
+    accent: '#a78bfa',
   },
   emerald: {
-    card: 'border-emerald-400/20 from-emerald-500/15 via-slate-950/80 to-slate-950',
-    icon: 'border-emerald-300/30 bg-emerald-400/15 text-emerald-200 shadow-emerald-500/20',
-    value: 'text-emerald-50',
-    glow: 'from-emerald-400/80 to-teal-500/80',
+    text: 'text-emerald-300 group-data-[erp-theme=light]/dashboard:text-emerald-700',
+    chip: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300 group-data-[erp-theme=light]/dashboard:border-emerald-200 group-data-[erp-theme=light]/dashboard:bg-emerald-50 group-data-[erp-theme=light]/dashboard:text-emerald-700',
+    accent: '#34d399',
   },
   amber: {
-    card: 'border-amber-400/20 from-amber-500/15 via-slate-950/80 to-slate-950',
-    icon: 'border-amber-300/30 bg-amber-400/15 text-amber-200 shadow-amber-500/20',
-    value: 'text-amber-50',
-    glow: 'from-amber-400/80 to-orange-500/80',
+    text: 'text-amber-300 group-data-[erp-theme=light]/dashboard:text-amber-700',
+    chip: 'border-amber-400/30 bg-amber-400/10 text-amber-300 group-data-[erp-theme=light]/dashboard:border-amber-200 group-data-[erp-theme=light]/dashboard:bg-amber-50 group-data-[erp-theme=light]/dashboard:text-amber-700',
+    accent: '#fbbf24',
   },
   rose: {
-    card: 'border-rose-400/20 from-rose-500/15 via-slate-950/80 to-slate-950',
-    icon: 'border-rose-300/30 bg-rose-400/15 text-rose-200 shadow-rose-500/20',
-    value: 'text-rose-50',
-    glow: 'from-rose-400/80 to-red-500/80',
+    text: 'text-rose-300 group-data-[erp-theme=light]/dashboard:text-rose-700',
+    chip: 'border-rose-400/30 bg-rose-400/10 text-rose-300 group-data-[erp-theme=light]/dashboard:border-rose-200 group-data-[erp-theme=light]/dashboard:bg-rose-50 group-data-[erp-theme=light]/dashboard:text-rose-700',
+    accent: '#fb7185',
   },
-}
+} as const
 
-function MiniTrend({ tone }: { tone: keyof typeof kpiToneClasses }) {
-  const toneClass = kpiToneClasses[tone]
+type Tone = keyof typeof tonePalette
 
+// ============================================================================
+// EMPTY STATE — reutilizado para charts sin datos reales (sin mocks).
+// ============================================================================
+
+function ChartEmptyState({
+  height,
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  height: number | string
+  icon: any
+  title: string
+  subtitle?: string
+}) {
   return (
-    <div className="mt-5 flex h-12 items-end gap-1">
-      {trendHeightClasses.map((heightClass, index) => (
-        <span
-          key={`${tone}-${index}`}
-          className={`flex-1 rounded-t-sm bg-gradient-to-t ${toneClass.glow} ${heightClass} opacity-60 shadow-sm`}
-        />
-      ))}
+    <div
+      className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-cyan-400/15 bg-slate-950/30 px-6 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200/70 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30"
+      style={{ height }}
+    >
+      <Icon
+        size={26}
+        strokeWidth={1.6}
+        className="text-cyan-400/55 group-data-[erp-theme=light]/dashboard:text-cyan-600/70"
+      />
+      <p className="text-sm font-medium text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700">
+        {title}
+      </p>
+      {subtitle && (
+        <p className="max-w-[36ch] text-xs leading-5 text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+          {subtitle}
+        </p>
+      )}
     </div>
   )
 }
 
-function ExecutiveKpiCard({
-  title,
+// ============================================================================
+// KPI TILE — métrica con sparkline opcional (solo si hay serie temporal real)
+// ============================================================================
+
+function MetricTile({
+  label,
   value,
-  detail,
+  delta,
   icon: Icon,
   tone,
+  sparkData,
 }: {
-  title: string
-  value: ReactNode
-  detail: ReactNode
+  label: string
+  value: string
+  delta?: { value: string; direction: 'up' | 'down' | 'neutral'; description: string }
   icon: typeof DollarSign
-  tone: keyof typeof kpiToneClasses
+  tone: Tone
+  sparkData?: number[]
 }) {
-  const toneClass = kpiToneClasses[tone]
+  const cls = tonePalette[tone]
+  const hasSpark = !!sparkData && sparkData.length > 1 && sparkData.some((v) => Number(v) > 0)
+  const sparkPoints = hasSpark ? sparkData!.map((v, i) => ({ i, v })) : []
 
   return (
-    <article className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-2xl ${toneClass.card}`}>
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
-          <div className={`mt-3 text-2xl font-bold tracking-tight md:text-3xl ${toneClass.value}`}>{value}</div>
-          <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">{detail}</div>
-        </div>
-        <span className={`rounded-xl border p-3 shadow-lg ${toneClass.icon}`}>
-          <Icon className="h-5 w-5" />
+    <div className={`${surface} flex h-full flex-col gap-3 p-5`}>
+      <div className="flex items-start justify-between gap-2">
+        <span className={eyebrow}>{label}</span>
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg border ${cls.chip}`}>
+          <Icon size={15} strokeWidth={2.4} />
         </span>
       </div>
-      <MiniTrend tone={tone} />
-    </article>
+      <div className={`${tabularNum} text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-3xl`}>
+        {value}
+      </div>
+      {delta && (
+        <div className="flex items-center gap-1.5 text-xs">
+          {delta.direction === 'up' && <TrendingUp size={13} className="text-emerald-400" />}
+          {delta.direction === 'down' && <TrendingDown size={13} className="text-rose-400" />}
+          {delta.direction === 'neutral' && <Activity size={13} className="text-slate-400" />}
+          {delta.value && (
+            <span
+              className={
+                delta.direction === 'up'
+                  ? 'font-semibold tabular-nums text-emerald-300 group-data-[erp-theme=light]/dashboard:text-emerald-700'
+                  : delta.direction === 'down'
+                    ? 'font-semibold tabular-nums text-rose-300 group-data-[erp-theme=light]/dashboard:text-rose-700'
+                    : 'font-semibold tabular-nums text-slate-300 group-data-[erp-theme=light]/dashboard:text-slate-700'
+              }
+            >
+              {delta.value}
+            </span>
+          )}
+          <span className="text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            {delta.description}
+          </span>
+        </div>
+      )}
+      {/* Sparkline: solo se renderiza con serie temporal real. Sin datos no
+          dibujamos curva (evitamos sugerir actividad que no existe). */}
+      {hasSpark ? (
+        <div className="-mx-1 mt-auto h-10">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkPoints} margin={{ top: 2, right: 2, left: 2, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`spark-${tone}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={cls.accent} stopOpacity={0.6} />
+                  <stop offset="100%" stopColor={cls.accent} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="v"
+                stroke={cls.accent}
+                strokeWidth={1.5}
+                fill={`url(#spark-${tone})`}
+                isAnimationActive={false}
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        // Baseline visual: línea sutil al fondo, sin sugerir movimiento.
+        <div className="mt-auto h-px w-full bg-gradient-to-r from-transparent via-cyan-400/15 to-transparent group-data-[erp-theme=light]/dashboard:via-slate-300" />
+      )}
+    </div>
   )
 }
 
-function ExecutiveBarChart({
-  title,
-  subtitle,
+// ============================================================================
+// FINANCIAL FLOW CHART — bar chart limpio
+// ============================================================================
+
+function FinancialFlowChart({
   data,
   currencySymbol,
 }: {
-  title: string
-  subtitle: string
-  data: Array<{ label: string; value: number; tone: 'cyan' | 'violet' | 'emerald' | 'amber' | 'rose' }>
+  data: Array<{ label: string; value: number; tone: Tone }>
   currencySymbol: string
 }) {
-  const maxValue = Math.max(...data.map((item) => item.value), 1)
-  const colorClass = {
-    cyan: 'from-cyan-300 to-blue-500 shadow-cyan-500/30',
-    violet: 'from-violet-300 to-fuchsia-500 shadow-violet-500/30',
-    emerald: 'from-emerald-300 to-teal-500 shadow-emerald-500/30',
-    amber: 'from-amber-300 to-orange-500 shadow-amber-500/30',
-    rose: 'from-rose-300 to-red-500 shadow-rose-500/30',
-  }
+  const total = data.reduce((s, d) => s + d.value, 0)
+  const hasReal = total > 0
+
+  const chartData = data.map((d) => ({
+    label: d.label,
+    value: d.value,
+    tone: d.tone,
+  }))
 
   return (
-    <section className="rounded-3xl border border-cyan-400/20 bg-slate-950/85 p-5 shadow-2xl shadow-cyan-950/25 backdrop-blur-xl">
-      <div className="mb-6 flex items-start justify-between gap-4">
+    <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
+      <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">{title}</h2>
-          <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
+          <h3 className={cardTitle}>Flujo financiero y operacional</h3>
+          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Ventas, compras e inventario valorizado del periodo
+          </p>
         </div>
-        <span className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 p-3 text-cyan-100">
-          <BarChart3 className="h-5 w-5" />
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tonePalette.cyan.chip}`}>
+          <BarChart3 size={16} strokeWidth={2.4} />
         </span>
-      </div>
-      <div className="flex h-72 items-end gap-4 border-b border-l border-slate-700/70 px-2 pb-4">
-        {data.map((item) => (
-          <div key={item.label} className="flex h-full flex-1 flex-col justify-end gap-3">
-            <div className="flex flex-1 items-end">
-              <div
-                className={`w-full rounded-t-xl bg-gradient-to-t shadow-lg ${colorClass[item.tone]} ${getBucketClass(item.value, maxValue, barHeightClasses)}`}
-                title={`${item.label}: ${formatCurrency(item.value, currencySymbol)}`}
-              />
-            </div>
-            <div className="min-h-12 text-center">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">{item.label}</p>
-              <p className="mt-1 text-[0.7rem] text-slate-500">{formatCurrency(item.value, currencySymbol)}</p>
+      </header>
+
+      {/* Stat strip siempre visible: muestra valores reales aunque sean S/0. */}
+      <div className="grid gap-2 sm:grid-cols-4">
+        {data.map((d) => (
+          <div
+            key={d.label}
+            className="rounded-xl border border-cyan-400/15 bg-slate-950/60 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+          >
+            <div className={eyebrow}>{d.label}</div>
+            <div className={`${tabularNum} mt-0.5 text-sm ${tonePalette[d.tone].text}`}>
+              {formatCurrency(d.value, currencySymbol)}
             </div>
           </div>
         ))}
       </div>
-    </section>
+
+      {hasReal ? (
+        <div className="-mx-2 h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RBarChart data={chartData} margin={{ top: 12, right: 8, left: 0, bottom: 0 }} barCategoryGap="28%">
+              <defs>
+                {(['cyan', 'emerald', 'violet', 'amber', 'rose'] as Tone[]).map((t) => (
+                  <linearGradient key={t} id={`flow-${t}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={tonePalette[t].accent} stopOpacity={1} />
+                    <stop offset="100%" stopColor={tonePalette[t].accent} stopOpacity={0.6} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="2 4" stroke="rgba(100,116,139,0.18)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fill: '#64748b', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                width={50}
+                tickFormatter={(v: number) =>
+                  v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toLocaleString('es-PE')
+                }
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(56,189,248,0.06)' }}
+                contentStyle={{
+                  background: 'rgba(2, 8, 23, 0.96)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  borderRadius: 12,
+                  color: '#f8fafc',
+                  fontSize: 12,
+                }}
+                formatter={(value: any) => [formatCurrency(Number(value), currencySymbol), 'Valor']}
+              />
+              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={`url(#flow-${entry.tone})`} />
+                ))}
+              </Bar>
+            </RBarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <ChartEmptyState
+          height={260}
+          icon={BarChart3}
+          title="Sin movimiento financiero todavía"
+          subtitle="Las barras de ventas, compras e inventario aparecerán cuando registres operaciones del periodo."
+        />
+      )}
+    </div>
   )
 }
+
+// ============================================================================
+// FISCAL DONUT — Recharts Pie limpio
+// ============================================================================
 
 function FiscalDonut({
   cpe,
@@ -336,108 +438,339 @@ function FiscalDonut({
   isPeru: boolean
 }) {
   const segments = [
-    { label: 'CPE', value: cpe, strokeClass: 'stroke-cyan-300', dotClass: 'bg-cyan-300', barClass: 'bg-cyan-300' },
-    { label: 'GRE', value: gre, strokeClass: 'stroke-sky-400', dotClass: 'bg-sky-400', barClass: 'bg-sky-400' },
-    ...(isPeru
-      ? [{ label: 'SIRE', value: sire, strokeClass: 'stroke-blue-400', dotClass: 'bg-blue-400', barClass: 'bg-blue-400' }]
-      : []),
+    { name: 'CPE', value: cpe, color: tonePalette.cyan.accent },
+    { name: 'GRE', value: gre, color: tonePalette.amber.accent },
+    ...(isPeru ? [{ name: 'SIRE', value: sire, color: tonePalette.violet.accent }] : []),
   ]
-  const total = Math.max(segments.reduce((sum, item) => sum + item.value, 0), 1)
-  let offset = 25
+  const total = segments.reduce((s, item) => s + item.value, 0)
+  const hasReal = total > 0
 
   return (
-    <section className="rounded-3xl border border-violet-400/20 bg-gradient-to-br from-violet-500/15 via-slate-950/90 to-slate-950 p-5 shadow-2xl shadow-violet-950/25">
-      <div className="mb-5 flex items-start justify-between gap-4">
+    <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
+      <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-white">Mix fiscal</h2>
-          <p className="mt-1 text-sm text-slate-400">Documentos tributarios del periodo</p>
+          <h3 className={cardTitle}>Mix fiscal</h3>
+          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Documentos tributarios del periodo
+          </p>
         </div>
-        <span className="rounded-xl border border-violet-300/25 bg-violet-300/10 p-3 text-violet-100">
-          <FileText className="h-5 w-5" />
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tonePalette.violet.chip}`}>
+          <FileText size={16} strokeWidth={2.4} />
         </span>
-      </div>
-      <div className="grid items-center gap-5 md:grid-cols-[220px_1fr]">
-        <div className="relative mx-auto size-[220px]">
-          <svg viewBox="0 0 120 120" className="-rotate-90">
-            <circle cx="60" cy="60" r="42" fill="none" stroke="rgba(30,41,59,0.9)" strokeWidth="16" />
-            {segments.map((segment) => {
-              const dash = (segment.value / total) * 263.89
-              const circle = (
-                <circle
-                  key={segment.label}
-                  cx="60"
-                  cy="60"
-                  r="42"
-                  fill="none"
-                  className={segment.strokeClass}
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                  strokeDasharray={`${dash} 263.89`}
-                  strokeDashoffset={offset}
-                />
-              )
-              offset -= dash
-              return circle
-            })}
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xs uppercase tracking-[0.18em] text-slate-500">Total</span>
-            <span className="mt-1 text-3xl font-bold text-white">{formatNumber(total)}</span>
+      </header>
+
+      {hasReal ? (
+        <div className="relative mx-auto h-[180px] w-[180px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RPieChart>
+              <Pie
+                data={segments}
+                cx="50%"
+                cy="50%"
+                innerRadius={56}
+                outerRadius={84}
+                paddingAngle={3}
+                dataKey="value"
+                stroke="none"
+              >
+                {segments.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  background: 'rgba(2, 8, 23, 0.96)',
+                  border: '1px solid rgba(167, 139, 250, 0.35)',
+                  borderRadius: 12,
+                  color: '#f8fafc',
+                  fontSize: 12,
+                }}
+                formatter={(value: any, name: any) => [formatNumber(Number(value)), name]}
+              />
+            </RPieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className={eyebrow}>Total</span>
+            <span
+              className={`${tabularNum} mt-0.5 text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+            >
+              {formatNumber(total)}
+            </span>
           </div>
         </div>
-        <div className="space-y-3">
-          {segments.map((segment) => (
-            <div key={segment.label} className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`size-3 rounded-full ${segment.dotClass}`} />
-                  <span className="font-medium text-slate-200">{segment.label}</span>
-                </div>
-                <span className="font-semibold text-white">{formatNumber(segment.value)}</span>
-              </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
-                <div className={`h-full rounded-full ${segment.barClass} ${getBucketClass(segment.value, total, progressWidthClasses)}`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+      ) : (
+        <ChartEmptyState
+          height={180}
+          icon={PieChartIcon}
+          title="Sin documentos emitidos"
+          subtitle="El donut se llena al emitir CPE, GRE o reportes SIRE."
+        />
+      )}
+
+      {/* Lista siempre visible con valores reales (incluso si todos son 0). */}
+      <ul className="flex flex-col gap-2">
+        {segments.map((seg) => (
+          <li
+            key={seg.name}
+            className="flex items-center justify-between rounded-lg border border-cyan-400/10 bg-slate-950/40 px-3 py-2 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+          >
+            <span className="flex items-center gap-2 text-sm text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-800">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ background: seg.color, boxShadow: hasReal ? `0 0 10px ${seg.color}88` : 'none' }}
+              />
+              <span className="font-medium">{seg.name}</span>
+            </span>
+            <span
+              className={`${tabularNum} text-sm text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+            >
+              {formatNumber(seg.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
-function ActivityDistribution({ activities }: { activities: RecentActivity[] }) {
-  const counts = ['COMPRA', 'VENTA', 'CPE', 'GRE', 'COTIZACION'].map((type) => ({
-    type,
-    count: activities.filter((activity) => activity.type === type).length,
-  }))
-  const max = Math.max(...counts.map((item) => item.count), 1)
+// ============================================================================
+// ACTIVITY TIMELINE — clean list
+// ============================================================================
+
+function ActivityTimeline({
+  activities,
+  currencySymbol,
+}: {
+  activities: RecentActivity[]
+  currencySymbol: string
+}) {
+  return (
+    <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className={cardTitle}>Actividad reciente</h3>
+          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Últimos eventos trazables del tenant
+          </p>
+        </div>
+        <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wider ${tonePalette.cyan.chip}`}>
+          <Clock size={11} strokeWidth={2.5} />
+          Live
+        </span>
+      </header>
+
+      {activities.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {activities.slice(0, 6).map((activity) => {
+            const { Icon, color } = getActivityIcon(activity.type)
+            return (
+              <li
+                key={activity.id}
+                className="flex items-start gap-3 rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+              >
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/15 bg-slate-950/60 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white`}>
+                  <Icon size={15} strokeWidth={2.3} className={color} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="line-clamp-2 text-sm font-medium text-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-800">
+                      {activity.description}
+                    </p>
+                    <StatusBadge tone={getStatusTone(activity.status)} className="shrink-0 text-[0.65rem]">
+                      {getStatusLabel(activity.status)}
+                    </StatusBadge>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                    <span className="tabular-nums">
+                      {new Date(activity.date).toLocaleDateString('es-PE', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                    {activity.amount ? (
+                      <span className={`${tabularNum} text-[0.7rem] ${tonePalette.cyan.text}`}>
+                        {formatCurrency(activity.amount, currencySymbol)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cyan-400/20 bg-slate-950/40 p-8 text-center group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/30">
+          <Activity size={28} className="text-cyan-400/70 group-data-[erp-theme=light]/dashboard:text-cyan-600" />
+          <p className="text-sm font-medium text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-700">
+            Sin actividad reciente
+          </p>
+          <p className="text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Los eventos del tenant aparecerán aquí en tiempo real
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// EXECUTIVE RADAR — prioridades del día
+// ============================================================================
+
+function ExecutiveRadar({
+  conversion,
+  documentosFiscales,
+  alertas,
+  isPeru,
+  proximaRevision,
+}: {
+  conversion: number
+  documentosFiscales: number
+  alertas: number
+  isPeru: boolean
+  proximaRevision: Array<{ label: string; value: string; status: 'ok' | 'warn' | 'alert' }>
+}) {
+  const radarItems = [
+    {
+      label: 'Conversión comercial',
+      value: `${conversion.toFixed(1)}%`,
+      progress: Math.min(conversion, 100),
+      tone: 'cyan' as Tone,
+      sub: 'Cotizaciones → ventas',
+    },
+    {
+      label: 'Documentos fiscales',
+      value: formatNumber(documentosFiscales),
+      progress: documentosFiscales > 0 ? Math.min((documentosFiscales / 50) * 100, 100) : 5,
+      tone: 'violet' as Tone,
+      sub: `CPE, GRE${isPeru ? ' y SIRE' : ''} consolidados`,
+    },
+    {
+      label: 'Alertas críticas',
+      value: formatNumber(alertas),
+      progress: alertas > 0 ? Math.min(alertas * 10, 100) : 0,
+      tone: (alertas > 0 ? 'amber' : 'emerald') as Tone,
+      sub: 'Stock bajo y órdenes pendientes',
+    },
+  ]
 
   return (
-    <section className="rounded-3xl border border-slate-700/60 bg-slate-950/85 p-5 shadow-2xl shadow-slate-950/30">
-      <div className="mb-5 flex items-center justify-between">
+    <div className={`${surface} flex h-full flex-col gap-4 p-6`}>
+      <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Distribución operativa</h2>
-          <p className="mt-1 text-sm text-slate-400">Actividad reciente por módulo</p>
+          <h3 className={cardTitle}>Radar ejecutivo</h3>
+          <p className="mt-1 text-xs text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            Prioridades operativas del día
+          </p>
         </div>
-        <Activity className="h-5 w-5 text-cyan-200" />
-      </div>
-      <div className="space-y-4">
-        {counts.map((item) => (
-          <div key={item.type}>
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-300">{item.type}</span>
-              <span className="text-slate-500">{item.count}</span>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tonePalette.violet.chip}`}>
+          <Target size={16} strokeWidth={2.4} />
+        </span>
+      </header>
+
+      <div className="flex flex-col gap-3">
+        {radarItems.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-xl border border-cyan-400/10 bg-slate-950/40 p-3 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-slate-50"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-200 group-data-[erp-theme=light]/dashboard:text-slate-800">
+                {item.label}
+              </span>
+              <span className={`${tabularNum} text-sm ${tonePalette[item.tone].text}`}>
+                {item.value}
+              </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-              <div className={`h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 ${getBucketClass(item.count, max, progressWidthClasses)}`} />
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800/80 group-data-[erp-theme=light]/dashboard:bg-slate-200">
+              <span
+                className="block h-full rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${item.progress}%`,
+                  background: `linear-gradient(90deg, ${tonePalette[item.tone].accent}, ${tonePalette[item.tone].accent}cc)`,
+                  boxShadow: `0 0 12px ${tonePalette[item.tone].accent}55`,
+                }}
+              />
             </div>
+            <p className="mt-1.5 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+              {item.sub}
+            </p>
           </div>
         ))}
       </div>
-    </section>
+
+      {/* Próxima revisión strip */}
+      <div className="mt-auto rounded-xl border border-cyan-400/15 bg-slate-950/30 p-3 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-50/40">
+        <h4 className={`${eyebrow} mb-2`}>Siguiente revisión</h4>
+        <div className="grid gap-1.5">
+          {proximaRevision.map((item) => {
+            const toneCls =
+              item.status === 'alert'
+                ? tonePalette.rose
+                : item.status === 'warn'
+                  ? tonePalette.amber
+                  : tonePalette.emerald
+            return (
+              <div key={item.label} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-500">
+                  {item.label}
+                </span>
+                <span className={`font-semibold ${toneCls.text}`}>{item.value}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
+
+// ============================================================================
+// MODULES STRIP — bottom row
+// ============================================================================
+
+function ModuleTile({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  hint,
+}: {
+  label: string
+  value: string
+  icon: typeof FileText
+  tone: Tone
+  hint?: string
+}) {
+  const cls = tonePalette[tone]
+  return (
+    <div className={`${surface} flex h-full items-center gap-4 p-5`}>
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${cls.chip}`}>
+        <Icon size={20} strokeWidth={2.2} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className={eyebrow}>{label}</div>
+        <div
+          className={`${tabularNum} mt-0.5 text-2xl text-slate-50 group-data-[erp-theme=light]/dashboard:text-slate-950`}
+        >
+          {value}
+        </div>
+        {hint && (
+          <div className="mt-0.5 text-[0.7rem] text-slate-500 group-data-[erp-theme=light]/dashboard:text-slate-500">
+            {hint}
+          </div>
+        )}
+      </div>
+      <ArrowUpRight size={14} className="shrink-0 text-slate-600 group-data-[erp-theme=light]/dashboard:text-slate-400" />
+    </div>
+  )
+}
+
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
 
 export default function Dashboard() {
   const api = useApiCall({ throwOnError: true, timeoutMs: 30000 })
@@ -454,10 +787,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = useCallback(async (showLoading = false) => {
     try {
-      if (!showLoading) {
-        setIsRefreshing(true)
-      }
-
+      if (!showLoading) setIsRefreshing(true)
       setError(null)
 
       const [statsResult, activitiesResult] = await Promise.allSettled([
@@ -472,7 +802,9 @@ export default function Dashboard() {
           statsResult.status === 'rejected'
             ? statsResult.reason
             : statsResult.value?.message || 'Error al obtener estadísticas'
-        setError(`No se pudieron actualizar las métricas: ${reason instanceof Error ? reason.message : String(reason)}`)
+        setError(
+          `No se pudieron actualizar las métricas: ${reason instanceof Error ? reason.message : String(reason)}`,
+        )
       }
 
       if (activitiesResult.status === 'fulfilled' && activitiesResult.value?.success) {
@@ -483,11 +815,13 @@ export default function Dashboard() {
 
       setLastUpdate(new Date().toLocaleTimeString('es-PE'))
     } catch (err) {
-      setError(`No se pudieron actualizar las métricas: ${err instanceof Error ? err.message : 'Error desconocido'}`)
+      setError(
+        `No se pudieron actualizar las métricas: ${err instanceof Error ? err.message : 'Error desconocido'}`,
+      )
     } finally {
       setIsRefreshing(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -496,303 +830,231 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!isLoadingConfig && configStatus && !configStatus.isComplete) {
-      const timer = setTimeout(() => {
-        setShowConfigModal(true)
-      }, 1000)
+      const timer = setTimeout(() => setShowConfigModal(true), 1000)
       return () => clearTimeout(timer)
     }
   }, [isLoadingConfig, configStatus])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchDashboardData(false)
-    }, 30000)
-
+    const interval = setInterval(() => fetchDashboardData(false), 30000)
     return () => clearInterval(interval)
   }, [fetchDashboardData])
 
   const handleRefresh = () => fetchDashboardData(false)
 
-  const alertasCriticas = Number(stats?.productosConStockBajo ?? 0) + Number(stats?.ordenesCompraPendientes ?? 0)
+  // Derived metrics
+  const alertasCriticas =
+    Number(stats?.productosConStockBajo ?? 0) + Number(stats?.ordenesCompraPendientes ?? 0)
   const crecimiento = Number(stats?.crecimientoVentas ?? 0)
   const saludOperativa = Math.max(0, Math.min(100, 100 - alertasCriticas))
-  const eficienciaFiscal = Number(stats?.totalCpe ?? 0) + Number(stats?.totalGre ?? 0) + Number(stats?.totalSire ?? 0)
-  const stockRiskTone = alertasCriticas > 0 ? 'warning' : 'success'
+  const eficienciaFiscal =
+    Number(stats?.totalCpe ?? 0) + Number(stats?.totalGre ?? 0) + Number(stats?.totalSire ?? 0)
   const financialChartData = [
-    { label: 'Ventas mes', value: Number(stats?.ventasMes ?? 0), tone: 'cyan' as const },
-    { label: 'Ventas hoy', value: Number(stats?.ventasHoy ?? 0), tone: 'emerald' as const },
-    { label: 'Compras', value: Number(stats?.comprasMes ?? 0), tone: 'violet' as const },
-    { label: 'Inventario', value: Number(stats?.valorInventario ?? 0), tone: 'amber' as const },
+    { label: 'Ventas mes', value: Number(stats?.ventasMes ?? 0), tone: 'cyan' as Tone },
+    { label: 'Ventas hoy', value: Number(stats?.ventasHoy ?? 0), tone: 'emerald' as Tone },
+    { label: 'Compras', value: Number(stats?.comprasMes ?? 0), tone: 'violet' as Tone },
+    { label: 'Inventario', value: Number(stats?.valorInventario ?? 0), tone: 'amber' as Tone },
+  ]
+  const proximaRevision: Array<{ label: string; value: string; status: 'ok' | 'warn' | 'alert' }> = [
+    {
+      label: 'Caja y ventas',
+      value: Number(stats?.ventasHoy ?? 0) > 0 ? 'Con venta hoy' : 'Sin venta hoy',
+      status: Number(stats?.ventasHoy ?? 0) > 0 ? 'ok' : 'warn',
+    },
+    {
+      label: 'Compras',
+      value:
+        Number(stats?.ordenesCompraPendientes ?? 0) > 0
+          ? `${stats?.ordenesCompraPendientes} órdenes`
+          : 'Sin pendientes',
+      status: Number(stats?.ordenesCompraPendientes ?? 0) > 0 ? 'warn' : 'ok',
+    },
+    {
+      label: 'Stock',
+      value:
+        Number(stats?.productosConStockBajo ?? 0) > 0
+          ? `${stats?.productosConStockBajo} bajo stock`
+          : 'Stock estable',
+      status: Number(stats?.productosConStockBajo ?? 0) > 0 ? 'alert' : 'ok',
+    },
   ]
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020817] p-4 text-slate-100 md:p-6">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.055)_1px,transparent_1px)] bg-[size:44px_44px]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(14,165,233,0.14),transparent_28%,rgba(168,85,247,0.10)_58%,transparent_78%)]" />
-      <div className="relative mx-auto flex w-full max-w-[1720px] flex-col gap-5">
-      {configStatus && !configStatus.isComplete && (
-        <ConfigurationModal
-          isOpen={showConfigModal}
-          onClose={() => setShowConfigModal(false)}
-          missingItems={configStatus.missingItems}
-        />
-      )}
+    <main className="relative min-h-screen overflow-hidden bg-[#020817] p-4 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-slate-100 group-data-[erp-theme=light]/dashboard:text-slate-950 md:p-6">
+      {/* Atmospheric layers — sutiles, no distraen */}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.04)_1px,transparent_1px)] bg-[size:48px_48px] group-data-[erp-theme=light]/dashboard:bg-[linear-gradient(rgba(15,23,42,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.035)_1px,transparent_1px)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[400px] bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.12),transparent_70%)] group-data-[erp-theme=light]/dashboard:bg-[radial-gradient(ellipse_at_top,rgba(14,165,233,0.08),transparent_70%)]" />
 
-      {configStatus && !configStatus.isComplete && (
-        <ConfigurationBanner
-          missingItems={configStatus.missingItems}
-          completionPercentage={configStatus.completionPercentage}
-        />
-      )}
+      <div className="relative mx-auto flex w-full max-w-[1720px] flex-col gap-4">
+        {/* Banners superiores */}
+        {configStatus && !configStatus.isComplete && (
+          <ConfigurationModal
+            isOpen={showConfigModal}
+            onClose={() => setShowConfigModal(false)}
+            missingItems={configStatus.missingItems}
+          />
+        )}
+        {configStatus && !configStatus.isComplete && (
+          <ConfigurationBanner
+            missingItems={configStatus.missingItems}
+            completionPercentage={configStatus.completionPercentage}
+          />
+        )}
+        <DashboardNotificationBanners />
 
-      <DashboardNotificationBanners />
+        {error ? (
+          <Alert variant="destructive" className="border-rose-400/30 bg-rose-950/50 text-rose-50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Dashboard sin sincronización completa</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-      {error ? (
-        <Alert variant="destructive" className="border-red-400/30 bg-red-950/50 text-red-50">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Dashboard sin sincronización completa</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <header className="relative overflow-hidden rounded-3xl border border-slate-700/60 bg-slate-950/80 px-5 py-5 shadow-2xl shadow-cyan-950/30 backdrop-blur-xl md:px-7">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400/0 via-cyan-300/70 to-violet-400/0" />
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+        {/* ─── HEADER slim ─────────────────────────────────────────────── */}
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] ${tonePalette.cyan.chip}`}>
+                <Zap size={11} strokeWidth={2.5} />
                 ERP Command Center
               </span>
-              <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-200">
+              <span className={`rounded-full border px-2.5 py-1 text-[0.65rem] font-medium uppercase tracking-wider ${tonePalette.emerald.chip}`}>
                 Datos reales del tenant
               </span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
+            <h1 className="text-3xl font-bold tracking-tight text-white group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-4xl">
               Dashboard ejecutivo
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">
-              Visión operativa de ventas, compras, fiscal, logística, inventario y alertas críticas.
-              {lastUpdate ? ` Última sincronización: ${lastUpdate}.` : ''}
+            <p className="mt-1.5 max-w-3xl text-sm text-slate-400 group-data-[erp-theme=light]/dashboard:text-slate-600">
+              Visión operativa de ventas, compras, fiscal, logística e inventario.
+              {lastUpdate ? (
+                <span className="ml-1 tabular-nums text-slate-500">· Sync {lastUpdate}</span>
+              ) : null}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="border border-cyan-300/30 bg-cyan-400/15 text-cyan-50 shadow-lg shadow-cyan-950/40 hover:bg-cyan-300/25"
-            >
-              <RefreshCw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-              {isRefreshing ? 'Sincronizando...' : 'Actualizar'}
-            </Button>
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="shrink-0 border border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 group-data-[erp-theme=light]/dashboard:border-cyan-200 group-data-[erp-theme=light]/dashboard:bg-cyan-600 group-data-[erp-theme=light]/dashboard:text-white group-data-[erp-theme=light]/dashboard:hover:bg-cyan-700"
+          >
+            <RefreshCw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {isRefreshing ? 'Sincronizando…' : 'Actualizar'}
+          </Button>
+        </header>
+
+        {/* ─── KPI STRIP ──────────────────────────────────────────────── */}
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            label="Revenue operativo"
+            value={formatCurrency(stats?.ventasMes, currencySymbol)}
+            delta={{
+              value: `${crecimiento > 0 ? '+' : ''}${crecimiento}%`,
+              direction: crecimiento > 0 ? 'up' : crecimiento < 0 ? 'down' : 'neutral',
+              description: 'vs mes anterior',
+            }}
+            icon={DollarSign}
+            tone="cyan"
+          />
+          <MetricTile
+            label="Compras del periodo"
+            value={formatCurrency(stats?.comprasMes, currencySymbol)}
+            delta={{ value: '', direction: 'neutral', description: 'Inversión registrada' }}
+            icon={ShoppingCart}
+            tone="violet"
+          />
+          <MetricTile
+            label="Salud operativa"
+            value={`${saludOperativa}%`}
+            delta={{
+              value: String(alertasCriticas),
+              direction: alertasCriticas > 0 ? 'down' : 'up',
+              description: alertasCriticas === 1 ? 'alerta activa' : 'alertas activas',
+            }}
+            icon={Zap}
+            tone={alertasCriticas > 0 ? 'amber' : 'emerald'}
+          />
+          <MetricTile
+            label="Inventario total"
+            value={formatNumber(stats?.totalInventario)}
+            delta={{ value: '', direction: 'neutral', description: 'Productos con stock' }}
+            icon={Package}
+            tone="emerald"
+          />
+        </section>
+
+        {/* ─── HERO ROW: Flujo + Mix fiscal ───────────────────────────── */}
+        <section className="grid gap-3 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <FinancialFlowChart data={financialChartData} currencySymbol={currencySymbol} />
           </div>
-        </div>
-      </header>
-
-      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        <ExecutiveKpiCard
-          title="Revenue operativo"
-          value={formatCurrency(stats?.ventasMes, currencySymbol)}
-          icon={DollarSign}
-          tone="cyan"
-          detail={
-            <>
-              {crecimiento >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-emerald-300" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-rose-300" />
-              )}
-              <span>{`${crecimiento > 0 ? '+' : ''}${crecimiento}% vs mes anterior`}</span>
-            </>
-          }
-        />
-        <ExecutiveKpiCard
-          title="Compras del periodo"
-          value={formatCurrency(stats?.comprasMes, currencySymbol)}
-          icon={ShoppingCart}
-          tone="violet"
-          detail={
-            <>
-              <BarChart3 className="h-4 w-4 text-violet-300" />
-              <span>Inversión registrada</span>
-            </>
-          }
-        />
-        <ExecutiveKpiCard
-          title="Salud operativa"
-          value={`${saludOperativa}%`}
-          icon={Zap}
-          tone={stockRiskTone === 'success' ? 'emerald' : 'amber'}
-          detail={
-            <>
-              <AlertTriangle className={alertasCriticas > 0 ? 'h-4 w-4 text-amber-300' : 'h-4 w-4 text-emerald-300'} />
-              <span>{alertasCriticas} alertas activas</span>
-            </>
-          }
-        />
-        <ExecutiveKpiCard
-          title="Inventario total"
-          value={formatNumber(stats?.totalInventario)}
-          icon={Package}
-          tone="emerald"
-          detail="Productos con stock registrado"
-        />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <ExecutiveBarChart
-          title="Flujo financiero y operacional"
-          subtitle="Comparación de ventas, compras e inventario valorizado con datos reales del dashboard."
-          data={financialChartData}
-          currencySymbol={currencySymbol}
-        />
-
-        <FiscalDonut
-          cpe={Number(stats?.totalCpe ?? 0)}
-          gre={Number(stats?.totalGre ?? 0)}
-          sire={Number(stats?.totalSire ?? 0)}
-          isPeru={isPeru}
-        />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[0.72fr_0.88fr_0.7fr]">
-        <ActivityDistribution activities={activities} />
-
-        <div className="rounded-3xl border border-slate-700/60 bg-slate-950/80 p-5 shadow-2xl shadow-slate-950/40 backdrop-blur-xl">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Timeline operacional</h2>
-              <p className="mt-1 text-sm text-slate-400">Últimos eventos trazables</p>
-            </div>
-            <span className="inline-flex w-fit items-center rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-100">
-              <Clock className="mr-1 h-3 w-3" />
-              Live
-            </span>
+          <div>
+            <FiscalDonut
+              cpe={Number(stats?.totalCpe ?? 0)}
+              gre={Number(stats?.totalGre ?? 0)}
+              sire={Number(stats?.totalSire ?? 0)}
+              isPeru={isPeru}
+            />
           </div>
-          {activities.length > 0 ? (
-            <div className="space-y-3">
-              {activities.slice(0, 6).map((activity) => (
-                <div key={activity.id} className="relative rounded-2xl border border-slate-700/70 bg-slate-900/55 p-3 pl-12">
-                  <div className="absolute left-3 top-3 rounded-xl border border-slate-700 bg-slate-950 p-2">
-                      {getActivityIcon(activity.type)}
-                  </div>
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="line-clamp-2 text-sm font-medium text-slate-100">{activity.description}</p>
-                    <StatusBadge tone={getStatusTone(activity.status)} className="shrink-0">
-                      {getStatusLabel(activity.status)}
-                    </StatusBadge>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span>
-                      {new Date(activity.date).toLocaleDateString('es-PE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                    {activity.amount ? <span>{formatCurrency(activity.amount, currencySymbol)}</span> : null}
-                  </div>
-                </div>
-              ))}
-            </div>
+        </section>
+
+        {/* ─── OPERATIONAL ROW: Timeline + Radar ──────────────────────── */}
+        <section className="grid gap-3 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <ActivityTimeline activities={activities} currencySymbol={currencySymbol} />
+          </div>
+          <div>
+            <ExecutiveRadar
+              conversion={Number(stats?.tasaConversionCotizaciones ?? 0)}
+              documentosFiscales={eficienciaFiscal}
+              alertas={alertasCriticas}
+              isPeru={isPeru}
+              proximaRevision={proximaRevision}
+            />
+          </div>
+        </section>
+
+        {/* ─── MODULES STRIP ───────────────────────────────────────────── */}
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <ModuleTile
+            label="CPE"
+            value={formatNumber(stats?.totalCpe)}
+            icon={FileText}
+            tone="cyan"
+            hint="Comprobantes electrónicos"
+          />
+          <ModuleTile
+            label="GRE"
+            value={formatNumber(stats?.totalGre)}
+            icon={Truck}
+            tone="amber"
+            hint="Guías de remisión"
+          />
+          {isPeru ? (
+            <ModuleTile
+              label="SIRE"
+              value={formatNumber(stats?.totalSire)}
+              icon={Download}
+              tone="violet"
+              hint="Reportes SUNAT"
+            />
           ) : (
-            <EmptyState
-              icon={Activity}
-              title="No hay actividad reciente"
-              description="Los eventos empresariales aparecerán aquí cuando se generen."
+            <ModuleTile
+              label="Cotizaciones"
+              value={formatNumber(stats?.totalCotizaciones)}
+              icon={FileSpreadsheet}
+              tone="violet"
+              hint="Pendientes y emitidas"
             />
           )}
-        </div>
+          <ModuleTile
+            label="Usuarios"
+            value={formatNumber(stats?.totalUsers)}
+            icon={Users}
+            tone="emerald"
+            hint="Equipo activo"
+          />
+        </section>
 
-        <aside className="grid gap-5">
-          <div className="rounded-3xl border border-violet-400/20 bg-gradient-to-br from-violet-500/15 via-slate-950/90 to-slate-950 p-5 shadow-2xl shadow-violet-950/30">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-white">Radar ejecutivo</h2>
-                <p className="mt-1 text-sm text-slate-400">Prioridades del día</p>
-              </div>
-              <span className="rounded-xl border border-violet-300/30 bg-violet-300/10 p-3 text-violet-100">
-                <Target className="h-5 w-5" />
-              </span>
-            </div>
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Conversión comercial</span>
-                  <span className="font-semibold text-cyan-200">{Number(stats?.tasaConversionCotizaciones ?? 0).toFixed(1)}%</span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
-                  <div className={`h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 ${getBucketClass(Number(stats?.tasaConversionCotizaciones ?? 0), 100, progressWidthClasses)}`} />
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Documentos fiscales</span>
-                  <span className="font-semibold text-emerald-200">{formatNumber(eficienciaFiscal)}</span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
-                  CPE, GRE{isPeru ? ' y SIRE' : ''} consolidados en el periodo actual.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Alertas críticas</span>
-                  <span className={alertasCriticas > 0 ? 'font-semibold text-amber-200' : 'font-semibold text-emerald-200'}>
-                    {alertasCriticas}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Stock bajo y órdenes pendientes listas para revisión.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-cyan-400/20 bg-slate-950/85 p-5 shadow-2xl shadow-cyan-950/20">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Módulos conectados</h2>
-              <ArrowUpRight className="h-5 w-5 text-cyan-200" />
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <FileText className="mb-3 h-5 w-5 text-cyan-300" />
-                <p className="text-slate-400">CPE</p>
-                <p className="text-xl font-bold text-white">{formatNumber(stats?.totalCpe)}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <Truck className="mb-3 h-5 w-5 text-orange-300" />
-                <p className="text-slate-400">GRE</p>
-                <p className="text-xl font-bold text-white">{formatNumber(stats?.totalGre)}</p>
-              </div>
-              {isPeru ? (
-                <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                  <Download className="mb-3 h-5 w-5 text-blue-300" />
-                  <p className="text-slate-400">SIRE</p>
-                  <p className="text-xl font-bold text-white">{formatNumber(stats?.totalSire)}</p>
-                </div>
-              ) : null}
-              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-                <CheckCircle className="mb-3 h-5 w-5 text-emerald-300" />
-                <p className="text-slate-400">Usuarios</p>
-                <p className="text-xl font-bold text-white">{formatNumber(stats?.totalUsers)}</p>
-              </div>
-            </div>
-          </div>
-        </aside>
-      </section>
-
-      {process.env.NODE_ENV === 'development' && stats && (
-        <div className="rounded-2xl border border-slate-700/60 bg-slate-950/80 p-4 text-sm text-slate-400">
-            <strong className="text-slate-100">Debug Info:</strong>
-            <br />
-            Período: {stats.periodoCalculado?.inicio} {'->'} {stats.periodoCalculado?.fin}
-            <br />
-            Última actualización:{' '}
-            {stats.ultimaActualizacion ? new Date(stats.ultimaActualizacion).toLocaleString('es-PE') : 'N/A'}
-            <br />
-            Actividades: {activities.length} elementos
-        </div>
-      )}
       </div>
     </main>
   )

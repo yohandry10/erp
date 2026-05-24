@@ -61,10 +61,13 @@ function getSupabase(): SupabaseClient {
 }
 
 function getOperationalPassword(): string {
+  // Prioridad: TEST_USER_PASSWORD > DATABASE_URL. Antes priorizaba DATABASE_URL
+  // y fallaba 401 cuando el e2e corre con un demo tenant.
+  if (process.env.TEST_USER_PASSWORD) return process.env.TEST_USER_PASSWORD;
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) return decodeURIComponent(new URL(databaseUrl).password);
   expect(process.env.TEST_USER_PASSWORD, 'DATABASE_URL o TEST_USER_PASSWORD requerido').toBeTruthy();
-  return process.env.TEST_USER_PASSWORD!;
+  return '';
 }
 
 async function loginApi(email: string, password: string): Promise<LoginResponse> {

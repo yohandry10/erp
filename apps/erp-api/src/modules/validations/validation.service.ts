@@ -202,11 +202,13 @@ export class ValidationService {
     let isValid = true;
 
     try {
-      // Get empresa configuration with country
+      // Single roundtrip a Supabase: con la FK empresa_config.pais_id → paises.id
+      // (migración 171), podemos embeber el join. Antes eran 2 queries
+      // secuenciales (~2s contra Supabase remoto); ahora es 1 (~1s).
       const { data: empresa, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, direccion_fiscal, pais_id')
+        .select('ruc, razon_social, direccion_fiscal, pais_id, paises:paises!empresa_config_pais_id_fkey(codigo_iso, nombre)')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -217,15 +219,9 @@ export class ValidationService {
         return { isValid, missingFields, errors };
       }
 
-      // Get country info for validation rules
-      const { data: pais } = await this.supabaseService
-        .getClient()
-        .from('paises')
-        .select('codigo_iso, nombre')
-        .eq('id', empresa.pais_id)
-        .single();
-
-      const paisCodigo = pais?.codigo_iso || 'PE'; // Default to Peru
+      // `paises` viene como objeto (single FK) o null si pais_id es null/orphan.
+      const paisEmbed = (empresa as any).paises as { codigo_iso?: string; nombre?: string } | null;
+      const paisCodigo = paisEmbed?.codigo_iso || 'PE'; // Default to Peru
 
       // Check required fields
       if (!empresa.ruc || empresa.ruc.trim() === '') {

@@ -41,6 +41,9 @@ certs/
 *.pem
 *.key
 
+# Claude Code local settings
+.claude/
+
 # Playwright auth state
 apps/web/tests/e2e/.auth/
 apps/web/playwright-report/

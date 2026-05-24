@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { WizardProvider, useWizardContext } from './WizardContext'
 import { WizardContainer } from './WizardContainer'
 import { WelcomeStep } from './steps/WelcomeStep'
@@ -17,22 +18,20 @@ import { ConfigurationSummaryStep } from './steps/ConfigurationSummaryStep'
 function WizardContent() {
   const { state } = useWizardContext()
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
 
   useEffect(() => {
-    // Redirect superadmins to dashboard - they don't need wizard
-    const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr)
-        if (user?.is_super_admin === true || user?.isSuperAdmin === true) {
-          console.log('[Wizard] Superadmin detected, redirecting to dashboard')
-          router.push('/dashboard')
-        }
-      } catch (e) {
-        console.error('[Wizard] Error parsing user:', e)
-      }
+    // Solo los super-admins de plataforma se saltan el wizard (no necesitan
+    // configurar un tenant porque administran todos). Leemos del AuthContext
+    // (fuente de verdad ligada a la cookie HttpOnly), NO de localStorage:
+    // nada en el código actual escribe localStorage.user, así que el check
+    // anterior era código muerto y, si quedaba basura legacy, podía mandar
+    // a /dashboard a usuarios demo que sí necesitan el wizard.
+    if (authLoading) return
+    if (user?.is_super_admin === true) {
+      router.replace('/dashboard')
     }
-  }, [router])
+  }, [authLoading, user, router])
 
   const renderStep = () => {
     const currentStep = state.steps[state.currentStep]

@@ -23,35 +23,25 @@ export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
   const pathname = usePathname()
 
   useEffect(() => {
-    // No hacer nada mientras está cargando
-    if (loading) {
-      console.log('⏳ [AuthGuard] Cargando sesión...')
-      return
-    }
+    if (loading) return
 
-    // Si requiere auth y no hay sesión, redirigir a login
     if (requireAuth && !session) {
-      console.log('🔒 [AuthGuard] Ruta protegida sin sesión, redirigiendo a login')
-      console.log('🔒 [AuthGuard] Ruta actual:', pathname)
       router.push('/login')
       return
     }
 
-    // Si NO requiere auth y HAY sesión, redirigir a dashboard (ej: página de login)
     if (!requireAuth && session && pathname === '/login') {
-      console.log('✅ [AuthGuard] Usuario ya autenticado en página de login, redirigiendo a dashboard')
       router.push('/dashboard')
       return
     }
-
-    console.log('✅ [AuthGuard] Acceso permitido:', {
-      requireAuth,
-      hasSession: !!session,
-      pathname
-    })
   }, [session, loading, requireAuth, router, pathname])
 
   if (loading) {
+    // Si hay sesión cacheada (localStorage), mostrar children para evitar flash.
+    // Si no hay sesión cacheada, no mostrar nada (usuario probablemente no autenticado).
+    if (requireAuth && !session) {
+      return null
+    }
     return <>{children}</>
   }
 

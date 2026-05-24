@@ -4,18 +4,19 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
-import { PedidoVenta, EstadoPedido } from '@/types/ventas'
+import { PedidoVenta } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Package, AlertCircle, RefreshCw } from 'lucide-react'
+import { Package, RefreshCw } from 'lucide-react'
 import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { PreparacionPedidoModal } from '@/components/ventas/PreparacionPedidoModal'
+import { LogisticsDisabledState } from '../LogisticsDisabledState'
 
 export default function OrdenesPendientesPage() {
   const router = useRouter()
-  const { get, post } = useApi()
+  const { get } = useApi()
   const { loading: configLoading, isFlujologistica } = useEmpresaConfig()
 
   const [ordenes, setOrdenes] = useState<PedidoVenta[]>([])
@@ -76,13 +77,11 @@ export default function OrdenesPendientesPage() {
 
   if (!isFlujologistica) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-empty">
-          <Package />
-          <h3>Flujo de logística desactivado</h3>
-          <p>Activa el flujo de logística en configuración para preparar pedidos.</p>
-        </div>
-      </div>
+      <LogisticsDisabledState
+        icon={Package}
+        title="Activa logística para preparar pedidos"
+        description="Esta pantalla organiza los pedidos confirmados antes del despacho. Activa el flujo logístico para que almacén pueda preparar productos, marcar pedidos listos y entregar una trazabilidad clara."
+      />
     )
   }
 

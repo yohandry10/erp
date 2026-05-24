@@ -111,11 +111,13 @@ export default function ClientesPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
+      <div className="stats-grid ventas-stats-grid mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL CLIENTES</h3>
-            <Users className="stat-icon text-blue-500" />
+            <span className="stat-icon stat-icon-blue">
+              <Users />
+            </span>
           </div>
           <div className="stat-value">{totalClientes}</div>
           <div className="stat-subtitle">Clientes registrados</div>

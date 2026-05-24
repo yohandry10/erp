@@ -88,10 +88,24 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     request.tenantId = user.tenant_id;
     request.tenant_id = user.tenant_id;
 
-    // NOTA: Las validaciones adicionales de sesión y estado de usuario
-    // se han deshabilitado temporalmente debido a problemas con RLS de Supabase
-    // El JWT ya valida la autenticidad del usuario y su tenant
-    
+    // Validar sesión activa si AuthService está disponible y el token tiene session_token
+    if (this.authService && user.session_token) {
+      try {
+        const sessionValid = await this.authService.validateSession(user.session_token);
+        if (!sessionValid) {
+          this.logger.warn(`SESSION_REVOKED user=${user.email} path=${request.path}`);
+          throw new UnauthorizedException('Sesión expirada o revocada');
+        }
+      } catch (error) {
+        if (error instanceof UnauthorizedException) throw error;
+        // Si la validación falla por error de infra (RLS, etc), log y continuar
+        // El JWT sigue siendo válido — fail-open para no bloquear operaciones
+        this.logger.warn(
+          `SESSION_CHECK_ERROR user=${user.email} path=${request.path}: ${error?.message}`,
+        );
+      }
+    }
+
     return true;
   }
 

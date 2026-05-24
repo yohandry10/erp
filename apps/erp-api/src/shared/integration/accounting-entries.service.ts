@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Buffer } from 'buffer';
+import Decimal from 'decimal.js';
 import { SupabaseService } from '../supabase/supabase.service';
 import {
   EventBusService,
@@ -207,9 +208,10 @@ export class AccountingEntriesService {
 
   async procesarAsientoCompra(compra: CompraEntregadaEvent): Promise<string | null> {
     try {
-      // Separar base gravada e IGV crédito fiscal (cuenta 401)
-      const baseGravada = compra.subtotal || (compra.total / 1.18);
-      const igvCredito = compra.igv || (compra.total - baseGravada);
+      // Separar base gravada e IGV crédito fiscal (cuenta 401) — Decimal.js para precision
+      const totalDec = new Decimal(compra.total);
+      const baseGravada = compra.subtotal || totalDec.div(1.18).toDecimalPlaces(2).toNumber();
+      const igvCredito = compra.igv || new Decimal(compra.total).minus(baseGravada).toDecimalPlaces(2).toNumber();
 
       const asiento: AsientoContable = this.normalizeAsiento({
         fecha: new Date().toISOString().split('T')[0],

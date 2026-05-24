@@ -151,11 +151,13 @@ export default function AprobacionesPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
+      <div className="stats-grid ventas-stats-grid mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>PENDIENTES</h3>
-            <Clock className="stat-icon text-amber-500" />
+            <span className="stat-icon stat-icon-amber">
+              <Clock />
+            </span>
           </div>
           <div className="stat-value">{data.length}</div>
           <div className="stat-subtitle">Pedidos en espera</div>
@@ -164,7 +166,9 @@ export default function AprobacionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>MONTO COMPROMETIDO</h3>
-            <DollarSign className="stat-icon text-[#10b981]" />
+            <span className="stat-icon stat-icon-emerald">
+              <DollarSign />
+            </span>
           </div>
           <div className="stat-value text-5">
             {formatCurrency(totalPendiente)}
@@ -175,7 +179,9 @@ export default function AprobacionesPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>ÚLTIMA ACTUALIZACIÓN</h3>
-            <FileText className="stat-icon text-blue-500" />
+            <span className="stat-icon stat-icon-blue">
+              <FileText />
+            </span>
           </div>
           <div className="stat-value text-4">
             {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}

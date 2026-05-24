@@ -4,6 +4,8 @@ Fecha de corte: 2026-05-16
 Estado real: `validado tecnicamente en sandbox/local`
 Decision: no declarar produccion real absoluta hasta cargar certificado/secretos productivos y repetir smoke final contra esas credenciales.
 
+> Nota 2026-05-24: este documento sigue siendo la referencia del Gate 21/22, pero no representa por si solo el head actual del worktree. Despues del corte existen auditorias forenses de contabilidad, inventario/logistica/costeo y tesoreria/caja/bancos/CxC/CxP, mas migraciones `327..335`. La duplicidad local de prefijo `333__` quedo resuelta renumerando tesoreria a `334__treasury_cash_bank_forensic_closure.sql`; `335__descontar_stock_authoritative.sql` ajusta la salida autoritativa de inventario.
+
 ## Resumen Ejecutivo
 
 El ERP fue validado funcionalmente en entorno local/sandbox con:
@@ -229,7 +231,7 @@ Estado verificado:
 - API log local: sin `statusCode:500`, `HTTP 500`, `Unhandled`, `FATAL`, `dead_letter` ni `ECONNREFUSED` despues del reinicio validado.
 - `REDIS_REQUIRED=true` usado en el proceso API local.
 - `git diff --check`: OK.
-- Migraciones `312..326`: sin prefijos duplicados.
+- Migraciones `312..326`: sin prefijos duplicados al corte del 2026-05-16.
 - `.env.local` y logs locales: ignorados por Git.
 - GPT Pro acepto el cierre como `sandbox/local funcionalmente listo` y recomendo congelar funcionalidad salvo fallo en checks administrativos finales.
 
@@ -347,6 +349,12 @@ Limitacion:
 - Secretos productivos finales.
 - Proveedor real de email si el entorno productivo debe enviar correos.
 - Smoke final contra credenciales productivas reales despues de cargar certificado/secretos.
+
+### Pendiente Documental/Tecnico Posterior Al Corte
+
+- Revisar `docs/CODEX_HANDOFF_2026-05-24.md` antes de continuar trabajo: la sesion posterior agrego cierre forense de tesoreria/caja/bancos/CxC/CxP y aplico una migracion `334__treasury_cash_bank_forensic_closure.sql` en la BD configurada por `.env.local`.
+- Contrastar con `docs/auditoria_forense_inventario_logistica_costeo_2026-05.md`, que tambien documenta una migracion `333__inventory_stock_reconciliation_hardening.sql`.
+- Verificar el rango `327..335` sin prefijos duplicados y revalidarlo con `psql --set=ON_ERROR_STOP=1` antes de usarlo como linea canonica.
 
 ### Gate 22 - Infraestructura Docker y Observabilidad
 

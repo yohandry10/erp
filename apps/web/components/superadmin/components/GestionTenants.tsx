@@ -146,7 +146,7 @@ export default function GestionTenants({
 
         {!loading && !!error && (
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-5 text-sm font-semibold text-amber-100 group-data-[erp-theme=light]/dashboard:text-amber-800">
-            {error}
+            {process.env.NODE_ENV === 'development' ? error : 'Error al cargar los datos. Intente de nuevo.'}
           </div>
         )}
 

@@ -2,200 +2,275 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  Building2,
+  Check,
+  Clipboard,
+  CreditCard,
+  FileText,
+  Loader2,
+  Package,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+type DemoCredentials = {
+  email: string;
+  password: string;
+};
+
+const features = [
+  {
+    icon: BarChart3,
+    title: 'Contabilidad automatizada',
+    description: 'Asientos, balances y resultados con datos iniciales listos para revisar.',
+  },
+  {
+    icon: FileText,
+    title: 'Facturacion electronica',
+    description: 'Facturas, boletas, notas y validaciones fiscales en modo demostracion.',
+  },
+  {
+    icon: Package,
+    title: 'Inventario y kardex',
+    description: 'Almacenes, movimientos y stock de prueba para flujos operativos.',
+  },
+  {
+    icon: CreditCard,
+    title: 'POS multi-caja',
+    description: 'Ventas rapidas, sesiones de caja y metodos de pago configurados.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Seguridad por roles',
+    description: 'Tenant aislado con usuario demo y permisos operativos.',
+  },
+  {
+    icon: Users,
+    title: 'RRHH',
+    description: 'Empleados, asistencias y planillas para validar procesos diarios.',
+  },
+];
 
 export default function DemoPage() {
   const router = useRouter();
+  const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [credentials, setCredentials] = useState<DemoCredentials | null>(null);
 
   const handleStartDemo = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/api/demo/create`, {
+      const response = await fetch('/backend/api/demo/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dias_duracion: 14 }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error creando demo');
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || 'Error creando demo');
       }
 
       const data = await response.json();
 
-      // Guardar token y datos de demo
-      localStorage.setItem('token', data.token);
       localStorage.setItem('demo_credentials', JSON.stringify({
         email: data.email,
         password: data.password,
         tenant_id: data.tenant_id,
       }));
 
-      // Mostrar credenciales en la UI
+      await signIn(data.email, data.password);
       setCredentials({ email: data.email, password: data.password });
-    } catch (err: any) {
-      setError(err.message || 'Error al crear la demo');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al crear la demo');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleContinue = () => {
-    router.push('/dashboard');
+    // Tras crear el tenant demo aún falta configurar (RUC real, certificado,
+    // configuración fiscal). Mandamos directo al wizard en vez de /dashboard
+    // para que el usuario pueda completar la configuración. Antes esto saltaba
+    // a /dashboard y, si el layout no redirigía por requiresSetup=false (porque
+    // el seed ya pone empresa_config.pais='PE'), el usuario quedaba bloqueado
+    // sin poder configurar el tenant.
+    router.push('/dashboard/wizard');
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
   };
 
-  // Si ya tenemos credenciales, mostrar pantalla de éxito
   if (credentials) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="rounded-6 p-12 max-w-[500px] w-[100%] shadow text-center">
-          <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center text-10">
-            ✓
-          </div>
-          
-          <h1 className="text-8 font-extrabold text-slate-800 mb-2">
-            ¡Demo Creada!
-          </h1>
-          
-          <p className="text-slate-500 mb-8">
-            Guarda estas credenciales para volver a ingresar
-          </p>
-
-          <div className="bg-[#eff6ff] border rounded-3 p-6 mb-6 text-left">
-            <div className="mb-4">
-              <label className="text-3 text-slate-500 font-semibold">
-                Email
-              </label>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-[1] bg-white p-2 rounded-[6px] text-[0.875rem] text-slate-800">
-                  {credentials.email}
-                </code>
-                <button
-                  onClick={() => copyToClipboard(credentials.email)} className="bg-blue-500 text-white border-0 py-2 px-3 rounded-[6px] cursor-pointer text-3"
-                >
-                  Copiar
-                </button>
-              </div>
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-950">
+        <section className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl flex-col justify-center">
+          <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <BadgeCheck className="h-7 w-7" />
             </div>
-            
-            <div>
-              <label className="text-3 text-slate-500 font-semibold">
-                Contraseña
-              </label>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-[1] bg-white p-2 rounded-[6px] text-[0.875rem] text-slate-800">
-                  {credentials.password}
-                </code>
-                <button
-                  onClick={() => copyToClipboard(credentials.password)} className="bg-blue-500 text-white border-0 py-2 px-3 rounded-[6px] cursor-pointer text-3"
-                >
-                  Copiar
-                </button>
-              </div>
-            </div>
-          </div>
 
-          <button
-            onClick={handleContinue} className="w-[100%] py-4 px-8 text-white border-0 rounded-3 text-4 font-semibold cursor-pointer shadow"
-          >
-            Continuar al Dashboard →
-          </button>
-        </div>
-      </div>
+            <h1 className="text-3xl font-bold tracking-normal">Demo creada</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              La sesion demo ya esta iniciada. Conserva estas credenciales para volver a entrar.
+            </p>
+
+            <div className="mt-8 space-y-4 rounded-lg border border-blue-100 bg-blue-50 p-5">
+              <CredentialRow label="Email" value={credentials.email} onCopy={copyToClipboard} />
+              <CredentialRow label="Contrasena" value={credentials.password} onCopy={copyToClipboard} />
+            </div>
+
+            <button
+              onClick={handleContinue}
+              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              Configurar mi empresa
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <div className="flex items-center justify-center p-8">
-      <div className="max-w-[900px] w-[100%]">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <div className="w-[80px] h-[80px] rounded-5 flex items-center justify-center text-10 shadow">
-            ✨
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <section className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:px-10">
+        <div>
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 shadow-sm">
+            <Building2 className="h-4 w-4 text-blue-700" />
+            ERP Suite Demo
           </div>
-          <h1 className="text-10 font-black mb-2">
-            Prueba el ERP Completo
+
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-normal text-slate-950 md:text-5xl">
+            Prueba el ERP completo con una empresa demo operativa
           </h1>
-          <p className="text-5 text-slate-500">
-            14 días gratis • Sin tarjeta de crédito • Datos pre-cargados
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+            Se crea un tenant aislado por 14 dias con usuario, datos iniciales y acceso a los modulos principales.
           </p>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {features.map((feature) => (
+              <FeatureCard key={feature.title} {...feature} />
+            ))}
+          </div>
         </div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-[repeat(auto-fit,_minmax(280px,_1fr))] gap-4 mb-8">
-          <FeatureCard icon="📊" title="Contabilidad Automatizada" description="Asientos contables generados automáticamente" />
-          <FeatureCard icon="🧾" title="Facturación Electrónica" description="Facturas, boletas y notas con validación SUNAT" />
-          <FeatureCard icon="📦" title="Control de Inventario" description="Kardex valorizado, múltiples almacenes" />
-          <FeatureCard icon="💰" title="POS Multi-Caja" description="Punto de venta con múltiples cajas" />
-          <FeatureCard icon="📈" title="Reportes Financieros" description="Balance, resultados, flujo de caja" />
-          <FeatureCard icon="👥" title="Gestión de RRHH" description="Empleados, planillas, asistencias" />
-        </div>
+        <aside className="rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+            <Check className="h-6 w-6" />
+          </div>
 
-        {/* CTA Card */}
-        <div className="rounded-6 p-10 shadow text-center">
-          <h2 className="text-6 font-bold text-slate-800 mb-2">
-            ¿Listo para explorar?
-          </h2>
-          <p className="text-slate-500 mb-6">
-            Crearemos una empresa demo con datos realistas para que puedas probar todas las funcionalidades
+          <h2 className="text-2xl font-bold tracking-normal">Listo para explorar</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Crearemos una empresa demo con credenciales temporales y dejaremos la sesion iniciada.
           </p>
 
           {error && (
-            <div className="bg-[#fef2f2] border text-red-600 p-4 rounded-3 mb-4">
+            <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
               {error}
             </div>
           )}
 
           <button
             onClick={handleStartDemo}
-            disabled={loading} className="w-[100%] max-w-[400px] py-5 px-8 text-white border-0 rounded-3 text-[1.125rem] font-semibold shadow flex items-center justify-center gap-2 my-0 mx-auto"
+            disabled={loading}
+            className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? (
               <>
-                <span className="w-5 h-5 rounded-full" />
-                Creando tu empresa demo...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creando empresa demo
               </>
             ) : (
-              <>✨ Iniciar Demo Ahora</>
+              <>
+                Iniciar demo ahora
+                <ArrowRight className="h-4 w-4" />
+              </>
             )}
           </button>
 
-          <div className="mt-6 text-slate-500 text-[0.875rem]">
-            <p>✓ No requiere registro</p>
-            <p>✓ Acceso inmediato</p>
-            <p>✓ Datos de ejemplo incluidos</p>
+          <div className="mt-6 space-y-3 text-sm text-slate-600">
+            <Benefit text="No requiere registro previo" />
+            <Benefit text="Acceso inmediato al dashboard" />
+            <Benefit text="Datos de ejemplo incluidos" />
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="text-center mt-8 text-slate-500 text-[0.875rem]">
-          <p>
-            ¿Ya tienes una cuenta?{' '}
-            <a href="/login" className="text-blue-500">
-              Inicia sesión
+          <p className="mt-8 text-center text-sm text-slate-500">
+            Ya tienes una cuenta?{' '}
+            <a href="/login" className="font-medium text-blue-700 hover:text-blue-800">
+              Inicia sesion
             </a>
           </p>
-        </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+        <Icon className="h-5 w-5" />
       </div>
+      <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </article>
+  );
+}
+
+function Benefit({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Check className="h-4 w-4 text-emerald-600" />
+      <span>{text}</span>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+function CredentialRow({
+  label,
+  value,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  onCopy: (value: string) => void;
+}) {
   return (
-    <div className="rounded-4 p-6 shadow border flex items-start gap-4">
-      <div className="text-8">{icon}</div>
-      <div>
-        <h3 className="font-semibold text-slate-800 mb-1">{title}</h3>
-        <p className="text-[0.875rem] text-slate-500">{description}</p>
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
+      <div className="mt-1 flex items-center gap-2">
+        <code className="min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+          {value}
+        </code>
+        <button
+          type="button"
+          onClick={() => onCopy(value)}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-blue-700 text-white transition hover:bg-blue-800"
+          aria-label={`Copiar ${label}`}
+        >
+          <Clipboard className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

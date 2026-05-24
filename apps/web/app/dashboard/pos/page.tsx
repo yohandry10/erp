@@ -512,7 +512,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
 
       // Intentar obtener detalles desde API POS
       let detalles: any[] = [];
-      const detallesResponse = await api.post(`/api/pos/detalles-venta/${venta.id}`, { venta_id: venta.id });
+      const detallesResponse = await api.get(`/api/pos/detalles-venta/${venta.id}`);
 
       if (detallesResponse?.success && Array.isArray(detallesResponse.data) && detallesResponse.data.length > 0) {
         detalles = detallesResponse.data;
@@ -919,10 +919,18 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
         })),
         subtotal: calcularSubtotal(),
         descuentos: calcularDescuentoTotal(),
-        descuento_global: descuentoGlobal,
+        descuento_global: {
+          tipo: descuentoGlobal.tipo,
+          valor: descuentoGlobal.valor,
+        },
         impuestos: calcularImpuestos(),
         total: calcularTotal(),
-        comprobante: comprobante,
+        comprobante: {
+          serie: comprobante.serie,
+          correlativo: comprobante.correlativo,
+          tipo: comprobante.tipo,
+          numero: comprobante.numero,
+        },
         modo_venta_rapida: modoVentaRapida,
         permite_venta_sin_stock: ventaSinStock
       }

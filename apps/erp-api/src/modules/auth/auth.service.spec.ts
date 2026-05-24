@@ -5,6 +5,7 @@ import { AuthService, LoginDto } from './auth.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
 import { PermissionService } from '../permissions/permission.service';
+import { CacheService } from '../../shared/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
@@ -78,6 +79,12 @@ describe('AuthService', () => {
             invalidateUserPermissions: jest.fn(),
         };
 
+        const mockCache = {
+            get: jest.fn().mockResolvedValue(null),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 AuthService,
@@ -85,6 +92,7 @@ describe('AuthService', () => {
                 { provide: JwtService, useValue: mockJwt },
                 { provide: EmailService, useValue: mockEmail },
                 { provide: PermissionService, useValue: mockPermission },
+                { provide: CacheService, useValue: mockCache },
             ],
         }).compile();
 

@@ -4,6 +4,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { ConfigurationService } from './configuration.service';
+import { CacheService } from '../../shared/cache/cache.service';
+
+// Cache "dashboard bootstrap": ambos endpoints son llamados al cargar /dashboard
+// y consumen ~2.6s contra Supabase remoto (3-5 queries c/u). Cachear con TTL
+// corto reduce a <10ms en hits y mantiene fresco para cambios del wizard.
+// Falla seguro a memoria si Redis no está disponible (ver CacheService).
+const COUNTRY_TTL_SECONDS = 60;  // pais cambia sólo al editar empresa
+const STATUS_TTL_SECONDS = 30;   // cambia al completar pasos del wizard
 
 @ApiTags('configuration-context')
 @Controller('configuration/context')
@@ -15,6 +23,7 @@ export class ConfigurationContextController {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configurationService: ConfigurationService,
+    private readonly cacheService: CacheService,
   ) {}
 
   @Get('status')
@@ -29,7 +38,14 @@ export class ConfigurationContextController {
         );
       }
 
+      const cacheKey = `config:status:${tenantId}`;
+      const cached = await this.cacheService.get<any>(cacheKey);
+      if (cached) {
+        return { success: true, data: cached, cached: true };
+      }
+
       const status = await this.configurationService.getConfigurationStatus(tenantId);
+      await this.cacheService.set(cacheKey, status, STATUS_TTL_SECONDS);
 
       return {
         success: true,
@@ -59,6 +75,12 @@ export class ConfigurationContextController {
         );
       }
 
+      const cacheKey = `config:country:${tenantId}`;
+      const cached = await this.cacheService.get<{ requiresSetup: boolean; data: any }>(cacheKey);
+      if (cached) {
+        return { success: true, ...cached, cached: true };
+      }
+
       const { data, error } = await this.supabaseService
         .getClient()
         .from('empresa_config')
@@ -86,11 +108,9 @@ export class ConfigurationContextController {
       }
 
       if (!data) {
-        return {
-          success: true,
-          data: null,
-          requiresSetup: true,
-        };
+        const empty = { data: null, requiresSetup: true };
+        await this.cacheService.set(cacheKey, empty, COUNTRY_TTL_SECONDS);
+        return { success: true, ...empty };
       }
 
       const empresaConfig = data as any;
@@ -114,8 +134,7 @@ export class ConfigurationContextController {
 
       const requiresSetup = !paisId || !paisCodigo;
 
-      return {
-        success: true,
+      const payload = {
         requiresSetup,
         data: {
           id: empresaConfig.id,
@@ -133,6 +152,8 @@ export class ConfigurationContextController {
           umbral_gre_automatico: empresaConfig.umbral_gre_automatico,
         },
       };
+      await this.cacheService.set(cacheKey, payload, COUNTRY_TTL_SECONDS);
+      return { success: true, ...payload };
     } catch (error) {
       this.logger.error('Error getting country context:', error);
       throw new HttpException(
