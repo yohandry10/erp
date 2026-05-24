@@ -49,6 +49,7 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 | Estado por flujo | `docs/00_coordination/FLOW_STATUS.md` | Matriz de cierre y pendientes |
 | Reconstruccion BD base | `docs/db_rebuild_status.md` | Historico `000..305`; no usar solo para produccion |
 | Readiness local/sandbox | `docs/production-readiness/ERP_PRODUCTION_READINESS.md` | Gate 21/22 y decision de no produccion real absoluta |
+| Go-Live productivo | `docs/release/GO_LIVE_RUNBOOK.md` | Runbook ejecutable cuando el operador tenga credenciales reales |
 | Contabilidad/fiscal | `docs/auditoria_forense_contable_2026-05.md` | Cierre tecnico, legal externo pendiente |
 | Inventario/logistica/costeo | `docs/auditoria_forense_inventario_logistica_costeo_2026-05.md` | Cierre `333` y ajuste `335` |
 | Tesoreria/caja/bancos/CxC/CxP | `docs/auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md` | Cierre `334` |
@@ -58,11 +59,12 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 
 ## Pendientes reales
 
-Bloqueados por dependencias externas (no estan en alcance de codigo):
+Bloqueados por dependencias externas (no estan en alcance de codigo; ver `docs/release/GO_LIVE_RUNBOOK.md` para la secuencia exacta cuando esten disponibles):
 
 - Cargar certificado digital SUNAT/OSE productivo y credenciales externas reales.
 - Cargar secretos productivos finales y proveedor real de email si aplica.
 - Ejecutar smoke fiscal externo con CPE/GRE/SIRE/PLE/PLAME segun alcance del contribuyente.
+- Crear proyecto Supabase productivo dedicado y aplicarle `000..335` con los pre-requisitos no-Supabase de `1.1` del runbook.
 
 Operacionales continuos:
 
