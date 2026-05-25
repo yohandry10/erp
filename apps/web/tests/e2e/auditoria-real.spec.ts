@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 type AuditLog = {
@@ -250,12 +251,18 @@ test.describe('CASE-19 Auditoria real', () => {
     const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
     expect(detalleId, 'orden debe devolver detalle').toBeTruthy();
 
-    await parseOk<any>(
-      await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-        data: { aprobador_nombre: 'Admin CASE19', comentarios: `${prefix} aprobacion` },
-      }),
-      'aprobar orden auditada',
-    );
+    // SEC-001 fix: aprobador autentica con su propio JWT.
+    const aprobadorCtx = await apiContextAsAprobador();
+    try {
+      await parseOk<any>(
+        await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+          data: { aprobador_nombre: 'Admin CASE19', comentarios: `${prefix} aprobacion` },
+        }),
+        'aprobar orden auditada',
+      );
+    } finally {
+      await aprobadorCtx.dispose();
+    }
 
     const recepcion = await parseOk<any>(
       await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

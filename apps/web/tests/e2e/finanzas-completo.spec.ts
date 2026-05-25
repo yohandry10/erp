@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
-import { generateValidRucFromRunId, getAprobadorUserId } from './helpers/test-data';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -212,13 +212,18 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'orden compra T13 debe devolver detalle').toBeTruthy();
 
-  const aprobadorId = await getAprobadorUserId(apiContext);
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: { aprobador_id: aprobadorId, aprobador_nombre: 'Admin Finanzas T13', comentarios: 'Aprobacion T13' },
-    }),
-    'aprobar orden compra T13',
-  );
+  // SEC-001 fix: aprobador autentica con su propio JWT.
+  const aprobadorCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: { aprobador_nombre: 'Admin Finanzas T13', comentarios: 'Aprobacion T13' },
+      }),
+      'aprobar orden compra T13',
+    );
+  } finally {
+    await aprobadorCtx.dispose();
+  }
 
   const recepcion = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

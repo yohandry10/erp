@@ -366,11 +366,19 @@ export class OrdenesCompraService {
       );
     }
 
-    // Obtener información del aprobador
-    const aprobadorId = aprobarDto.aprobador_id || userId;
+    // SEC-001 FIX: usar SIEMPRE el user del JWT, nunca el body.
+    // El override historico (aprobarDto.aprobador_id || userId) permitia suplantar
+    // identidad y evadir audit trail. El DTO ya no expone aprobador_id.
+    const aprobadorId = userId;
+
+    if (!aprobadorId) {
+      throw new BadRequestException(
+        'No se pudo identificar al aprobador: token de sesion sin user_id.',
+      );
+    }
 
     // Bloquear auto-aprobación: el creador de la OC no puede aprobarla
-    if (aprobadorId && existingOrden.created_by && aprobadorId === existingOrden.created_by) {
+    if (existingOrden.created_by && aprobadorId === existingOrden.created_by) {
       throw new BadRequestException(
         'El creador de la orden de compra no puede aprobar su propia orden. Se requiere aprobación de otro usuario autorizado.',
       );
