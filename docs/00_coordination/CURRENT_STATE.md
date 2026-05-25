@@ -74,6 +74,7 @@ Cerrados en sesion 2026-05-24:
 
 - ~~Revalidar `327..335` con `psql --set=ON_ERROR_STOP=1` en una BD nueva/limpia~~ -> revalidacion completa de `000..335` ejecutada el 2026-05-24, 22/22 validadores OK.
 - ~~Reconciliar 3 productos descuadrados + 14 salidas sin costo pre-`333`~~ -> backfill aplicado el 2026-05-24, validador inventario quedo 6/6 OK.
+- ~~SEC-001: `/compras/ordenes/:id/aprobar` aceptaba `aprobador_id` en body ignorando el JWT~~ -> el DTO ya no expone `aprobador_id`, el service usa SIEMPRE el `userId` del JWT, runtime confirmado: la API responde `400 - property aprobador_id should not exist`. Helper `apiContextAsAprobador()` agregado en `apps/web/tests/e2e/helpers/test-data.ts` para que los e2e autentiquen el aprobador con su propio JWT. 7 specs e2e + 1 backend e2e migrados; `inventario-logistica.spec.ts` revalidado end-to-end (2.1m OK). Requiere env vars nuevas `TEST_APROBADOR_EMAIL` y `TEST_APROBADOR_PASSWORD` al correr e2e.
 
 ## Estado de aplicacion 327..335 en BD remota (verificado 2026-05-24)
 

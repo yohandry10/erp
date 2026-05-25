@@ -1,5 +1,6 @@
 import { APIRequestContext, APIResponse, Page, request as playwrightRequest, test, expect } from '@playwright/test';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { apiContextAsAprobador } from './helpers/test-data';
 
 /**
  * E2E Tests for Compras Module
@@ -124,15 +125,21 @@ async function crearRecepcionCerradaParaDevolucion(page: Page): Promise<{ numero
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'la orden debe devolver detalle para recepción').toBeTruthy();
 
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: {
-        aprobador_nombre: 'Admin QA',
-        comentarios: 'Setup UI devolución',
-      },
-    }),
-    'aprobar orden para devolución',
-  );
+  // SEC-001 fix: el creador no puede aprobar; aprobador autentica con su JWT.
+  const aprobadorCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: {
+          aprobador_nombre: 'Admin QA',
+          comentarios: 'Setup UI devolución',
+        },
+      }),
+      'aprobar orden para devolución',
+    );
+  } finally {
+    await aprobadorCtx.dispose();
+  }
 
   const recepcionBorrador = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

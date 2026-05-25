@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
-import { generateValidRucFromRunId, getAprobadorUserId } from './helpers/test-data';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -203,13 +203,18 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'orden SIRE debe devolver detalle').toBeTruthy();
 
-  const aprobadorSireId = await getAprobadorUserId(apiContext);
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: { aprobador_id: aprobadorSireId, aprobador_nombre: 'Admin SIRE T12', comentarios: 'Aprobación SIRE T12' },
-    }),
-    'aprobar orden compra SIRE',
-  );
+  // SEC-001 fix: aprobador autentica con su propio JWT.
+  const aprobadorSireCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorSireCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: { aprobador_nombre: 'Admin SIRE T12', comentarios: 'Aprobación SIRE T12' },
+      }),
+      'aprobar orden compra SIRE',
+    );
+  } finally {
+    await aprobadorSireCtx.dispose();
+  }
 
   const recepcion = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

@@ -1,6 +1,6 @@
 import { expect, test, APIResponse, Page, request as playwrightRequest, APIRequestContext } from '@playwright/test';
 import { login, gotoAuthenticated } from './helpers/auth';
-import { generateValidRucFromRunId, getAprobadorUserId } from './helpers/test-data';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -155,19 +155,24 @@ test.describe('T06 Compras vertical completo', () => {
     const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
     expect(detalleId, 'la orden debe devolver el detalle creado para recepcionar').toBeTruthy();
 
-    // Segregación de funciones: el creador NO puede aprobar. Tomamos un user
-    // distinto del tenant (creado por el demo seed como "aprobador-...").
-    const aprobadorId = await getAprobadorUserId(apiContext);
-    const aprobada = await parseOk<any>(
-      await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-        data: {
-          aprobador_id: aprobadorId,
-          aprobador_nombre: 'Admin Auditor T06',
-          comentarios: 'Aprobación funcional T06',
-        },
-      }),
-      'aprobar orden de compra',
-    );
+    // Segregación de funciones: el creador NO puede aprobar (SEC-001 fix). El
+    // aprobador autentica con su propio JWT y aprueba; aprobador_id ya no se
+    // acepta en el body.
+    const aprobadorCtx = await apiContextAsAprobador();
+    let aprobada: any;
+    try {
+      aprobada = await parseOk<any>(
+        await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+          data: {
+            aprobador_nombre: 'Admin Auditor T06',
+            comentarios: 'Aprobación funcional T06',
+          },
+        }),
+        'aprobar orden de compra',
+      );
+    } finally {
+      await aprobadorCtx.dispose();
+    }
     expect(aprobada.estado).toBe('APROBADA');
 
     await expectStatus(

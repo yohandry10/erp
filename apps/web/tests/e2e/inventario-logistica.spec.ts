@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
-import { generateValidRucFromRunId, getAprobadorUserId } from './helpers/test-data';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: any };
 
@@ -231,20 +231,22 @@ test.describe('T09 Inventario y logística', () => {
       const detalleOrdenId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
       expect(detalleOrdenId, 'orden debe devolver detalle para recepción').toBeTruthy();
 
-      // Segregación de funciones: el creador de la OC no puede aprobarla.
-      // El demo seed crea un segundo user "aprobador-..." con rol ADMIN
-      // justamente para este flujo.
-      const aprobadorId = await getAprobadorUserId(apiContext);
-      await parseOk<any>(
-        await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-          data: {
-            aprobador_id: aprobadorId,
-            aprobador_nombre: 'Admin T09',
-            comentarios: 'Aprobación inventario T09',
-          },
-        }),
-        'aprobar orden T09',
-      );
+      // Segregación de funciones (SEC-001 fix): el aprobador autentica con su
+      // propio JWT. aprobador_id ya no se acepta en el body.
+      const aprobadorCtx = await apiContextAsAprobador();
+      try {
+        await parseOk<any>(
+          await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+            data: {
+              aprobador_nombre: 'Admin T09',
+              comentarios: 'Aprobación inventario T09',
+            },
+          }),
+          'aprobar orden T09',
+        );
+      } finally {
+        await aprobadorCtx.dispose();
+      }
 
       const recepcionBorrador = await parseOk<any>(
         await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

@@ -80,6 +80,7 @@ export function generateValidRucFromRunId(runId: string, prefix: string = '20'):
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { APIRequestContext } from '@playwright/test';
+import { request as playwrightRequest } from '@playwright/test';
 
 /**
  * Descubre un user_id distinto al actualmente autenticado, dentro del mismo
@@ -121,4 +122,54 @@ export async function getAprobadorUserId(apiContext: APIRequestContext): Promise
     );
   }
   return other.id;
+}
+
+/**
+ * Crea un APIRequestContext autenticado como el aprobador del demo (segundo user
+ * con rol ADMIN). Necesario tras SEC-001 fix: el endpoint `/compras/ordenes/:id/aprobar`
+ * ya no acepta `aprobador_id` en el body — el aprobador es siempre el JWT user.
+ *
+ * Requiere env vars TEST_APROBADOR_EMAIL y TEST_APROBADOR_PASSWORD. Las creds del
+ * aprobador se obtienen de la respuesta de `POST /api/demo/create` (campos
+ * `aprobador_email` y `aprobador_password`).
+ *
+ * Importante: el caller debe llamar `await aprobadorContext.dispose()` al final
+ * del test para no filtrar sesiones.
+ *
+ * @returns APIRequestContext con Authorization: Bearer <token del aprobador>
+ *          y baseURL = E2E_API_ORIGIN
+ */
+export async function apiContextAsAprobador(): Promise<APIRequestContext> {
+  const email = process.env.TEST_APROBADOR_EMAIL;
+  const password = process.env.TEST_APROBADOR_PASSWORD;
+  if (!email || !password) {
+    throw new Error(
+      'apiContextAsAprobador: TEST_APROBADOR_EMAIL y TEST_APROBADOR_PASSWORD son requeridas. ' +
+      'Obtenerlas de la respuesta de POST /api/demo/create (campos aprobador_email y aprobador_password).',
+    );
+  }
+
+  const baseURL = process.env.E2E_API_ORIGIN || 'http://localhost:3002';
+
+  // Contexto temporal solo para hacer login.
+  const loginCtx = await playwrightRequest.newContext({ baseURL });
+  try {
+    const loginResp = await loginCtx.post('/api/auth/login', { data: { email, password } });
+    if (!loginResp.ok()) {
+      throw new Error(
+        `apiContextAsAprobador: login fallo ${loginResp.status()}: ${await loginResp.text()}`,
+      );
+    }
+    const body = await loginResp.json();
+    const token = body.token || body.access_token || body.data?.token;
+    if (!token) {
+      throw new Error(`apiContextAsAprobador: respuesta de login sin token: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+    return playwrightRequest.newContext({
+      baseURL,
+      extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+    });
+  } finally {
+    await loginCtx.dispose();
+  }
 }
