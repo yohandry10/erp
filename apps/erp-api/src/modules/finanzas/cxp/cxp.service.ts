@@ -560,8 +560,11 @@ export class CxpService {
   async listarCuentasPorPagar(
     tenantId: string,
     filtros: FiltrarCxpDto,
-  ): Promise<{ success: boolean; data: any[] }> {
+  ): Promise<{ success: boolean; data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const client = this.supabase.getClient();
+    const page = filtros.page && filtros.page > 0 ? filtros.page : 1;
+    const limit = filtros.limit && filtros.limit > 0 ? Math.min(filtros.limit, 100) : 50;
+    const offset = (page - 1) * limit;
 
     // Construir query base
     let query = client
@@ -582,7 +585,7 @@ export class CxpService {
           id,
           numero
         )
-      `)
+      `, { count: 'exact' })
       .eq('tenant_id', tenantId)
       .order('fecha_emision', { ascending: false });
 
@@ -603,7 +606,7 @@ export class CxpService {
       query = query.eq('proveedor_id', filtros.proveedor_id);
     }
 
-    const { data: cxps, error } = await query;
+    const { data: cxps, error, count } = await query.range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Error listando cuentas por pagar:', error);
@@ -613,6 +616,12 @@ export class CxpService {
     return {
       success: true,
       data: cxps || [],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
     };
   }
 

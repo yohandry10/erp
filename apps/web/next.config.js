@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require('path')
-const isTauriBuild = process.env.NODE_ENV === 'production' && process.env.TAURI_BUILD
+const isTauriBuild =
+  process.env.NODE_ENV === 'production' &&
+  (process.env.TAURI_BUILD === '1' || process.env.npm_lifecycle_event === 'build:tauri')
 const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../..'),
   // Para Tauri necesitamos static export solo en build para producción

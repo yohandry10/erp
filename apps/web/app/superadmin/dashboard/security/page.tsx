@@ -51,6 +51,16 @@ interface Alert {
   acknowledged: boolean
 }
 
+const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : [])
+
+const unwrapArrayResponse = <T,>(response: any): T[] => toArray<T>(Array.isArray(response?.data) ? response.data : response)
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('es-PE')
+}
+
 export default function SecurityDashboard() {
   const router = useRouter()
   const { user, isSuperAdmin, loading: tenantLoading } = useTenant()
@@ -83,9 +93,9 @@ export default function SecurityDashboard() {
         ])
 
         setStats(statsRes?.data || statsRes)
-        setViolationsByTable(tablesRes?.data || tablesRes || [])
-        setRecentViolations(violationsRes?.data || violationsRes || [])
-        setUnacknowledgedAlerts(alertsRes?.data || alertsRes || [])
+        setViolationsByTable(unwrapArrayResponse<ViolationByTable>(tablesRes))
+        setRecentViolations(unwrapArrayResponse<RecentViolation>(violationsRes))
+        setUnacknowledgedAlerts(unwrapArrayResponse<Alert>(alertsRes))
       } catch (error) {
         console.error('Error fetching security data:', error)
       } finally {
@@ -255,7 +265,7 @@ export default function SecurityDashboard() {
                   <tbody>
                     {unacknowledgedAlerts.map((alert) => (
                       <tr key={alert.id}>
-                        <td>{new Date(alert.triggered_at).toLocaleString('es-PE')}</td>
+                        <td>{formatDateTime(alert.triggered_at)}</td>
                         <td className="font-medium">{alert.alert_name}</td>
                         <td>
                           <span className="py-1 px-3 rounded-full text-3 font-semibold border">
@@ -303,7 +313,7 @@ export default function SecurityDashboard() {
                         <td className="text-right">{table.cross_tenant_count}</td>
                         <td className="text-right">{table.missing_tenant_count}</td>
                         <td className="text-right">{table.unique_users}</td>
-                        <td>{new Date(table.last_violation).toLocaleString('es-PE')}</td>
+                        <td>{formatDateTime(table.last_violation)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -336,7 +346,7 @@ export default function SecurityDashboard() {
                   <tbody>
                     {recentViolations.map((violation) => (
                       <tr key={violation.id}>
-                        <td>{new Date(violation.timestamp).toLocaleString('es-PE')}</td>
+                        <td>{formatDateTime(violation.timestamp)}</td>
                         <td>{violation.table_name}</td>
                         <td>{violation.operation}</td>
                         <td>{getViolationTypeLabel(violation.violation_type)}</td>

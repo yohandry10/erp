@@ -1018,6 +1018,7 @@ const [ventaSinStock, setVentaSinStock] = useState(false)
           total: totalVenta,
           subtotal: subtotalServidor ?? calcularSubtotal(),
           impuestos: impuestosServidor ?? calcularImpuestos(),
+          tipo_comprobante: tipoComprobante,
           estado: ventaInfo.estado || 'PAGADA',
           factura_electronica: ventaInfo.factura_electronica || false,
           facturacion_pendiente: ventaInfo.facturacion_pendiente || ventaInfo.cpe_pendiente || false,

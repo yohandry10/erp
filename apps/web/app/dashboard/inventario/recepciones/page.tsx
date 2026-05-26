@@ -69,8 +69,13 @@ const ESTADOS: Array<{ value: RecepcionFilters['estado']; label: string }> = [
   { value: 'ANULADA', label: 'Anulada' },
 ]
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
 const formatCurrency = (value: number, currency: string = 'PEN') =>
-  new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(value)
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency }).format(toNumber(value))
 
 const formatDate = (value?: string | null) => {
   if (!value) return '—'
@@ -136,7 +141,25 @@ function RecepcionesContent() {
       setError(null)
       const response: RecepcionResponse | null = await get(`/inventario/recepciones?${buildQueryParams()}`)
       if (response?.success) {
-        setRecepciones(response.data ?? [])
+        setRecepciones((Array.isArray(response.data) ? response.data : []).map((recepcion: any) => ({
+          ...recepcion,
+          numero: recepcion?.numero || 'N/A',
+          estado: recepcion?.estado || 'BORRADOR',
+          totalItems: toNumber(recepcion?.totalItems),
+          totalCantidad: toNumber(recepcion?.totalCantidad),
+          totalValorizado: toNumber(recepcion?.totalValorizado),
+          almacenes: Array.isArray(recepcion?.almacenes) ? recepcion.almacenes : [],
+          items: Array.isArray(recepcion?.items)
+            ? recepcion.items.map((item: any, index: number) => ({
+                ...item,
+                id: item?.id || `${recepcion?.id || 'recepcion'}-${index}`,
+                cantidad: toNumber(item?.cantidad),
+                costoUnitario: toNumber(item?.costoUnitario),
+                valorTotal: toNumber(item?.valorTotal),
+                producto: item?.producto || { id: '', nombre: 'Producto', codigo: null },
+              }))
+            : [],
+        })))
         setPagination((prev) => response.pagination ?? prev)
       } else {
         setRecepciones([])
@@ -329,7 +352,7 @@ function RecepcionesContent() {
                     <span>
                       Cantidad recibida:{' '}
                       <strong className="text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-                        {recepcion.totalCantidad.toLocaleString('es-PE', {
+                        {toNumber(recepcion.totalCantidad).toLocaleString('es-PE', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -375,10 +398,10 @@ function RecepcionesContent() {
                           >
                             <div className="grid">
                               <span className="font-semibold text-white group-data-[erp-theme=light]/dashboard:text-slate-950">
-                                {item.producto.nombre ?? 'Producto'}
+                                {item.producto?.nombre ?? 'Producto'}
                               </span>
                               <span>
-                                {item.cantidad.toLocaleString('es-PE', {
+                                {toNumber(item.cantidad).toLocaleString('es-PE', {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
                                 })}

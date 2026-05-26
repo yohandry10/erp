@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchApi } from '@/lib/api-fetch';
 
 interface CountryContext {
   paisId: number;
@@ -124,12 +125,7 @@ function buildCountryContext(empresaConfig: any): CountryContext {
 }
 
 async function fetchCountryContext(): Promise<any> {
-  // /backend es el rewrite hacia el API (puerto 3002 en dev/local).
-  // El trailing slash es necesario por next.config.js trailingSlash: true.
-  const res = await fetch('/backend/api/configuration/context/country/', {
-    credentials: 'include',
-    cache: 'no-store',
-  });
+  const res = await fetchApi('/api/configuration/context/country/');
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) return null;
     throw new Error(`HTTP ${res.status}`);

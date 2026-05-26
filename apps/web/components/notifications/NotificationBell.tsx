@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -12,12 +12,19 @@ interface NotificationBellProps {
   className?: string
 }
 
+const UNREAD_REFRESH_MS = 60_000
+const UNREAD_REFRESH_JITTER_MS = 15_000
+
 export function NotificationBell({ className }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const inFlightRef = useRef(false)
   const { get } = useApi({ showErrorToast: false })
 
   const fetchUnreadCount = useCallback(async () => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+
     try {
       const response = await get('/api/notifications/unread')
       if (response?.success) {
@@ -29,14 +36,49 @@ export function NotificationBell({ className }: NotificationBellProps) {
       setUnreadCount(Array.isArray(response) ? response.length : 0)
     } catch (error) {
       console.error('Error fetching unread count:', error)
+    } finally {
+      inFlightRef.current = false
     }
   }, [get])
 
   useEffect(() => {
     fetchUnreadCount()
-    const interval = window.setInterval(fetchUnreadCount, 30000)
-    return () => window.clearInterval(interval)
+
+    let cancelled = false
+    let timer: ReturnType<typeof globalThis.setTimeout> | null = null
+
+    const schedule = () => {
+      if (cancelled) return
+      const jitter = Math.floor(Math.random() * UNREAD_REFRESH_JITTER_MS)
+      timer = globalThis.setTimeout(async () => {
+        if (!document.hidden) {
+          await fetchUnreadCount()
+        }
+        schedule()
+      }, UNREAD_REFRESH_MS + jitter)
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUnreadCount()
+      }
+    }
+
+    schedule()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      cancelled = true
+      if (timer) globalThis.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [fetchUnreadCount])
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchUnreadCount()
+    }
+  }, [fetchUnreadCount, isOpen])
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>

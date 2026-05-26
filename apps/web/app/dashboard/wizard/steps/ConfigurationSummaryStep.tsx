@@ -5,8 +5,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useWizardContext } from '../WizardContext'
 import { useCountryContext } from '@/hooks/use-country-context'
-
-const API_BASE_URL = '/backend'
+import { fetchApi } from '@/lib/api-fetch'
 
 interface EmpresaConfig {
   ruc?: string
@@ -66,7 +65,7 @@ export function ConfigurationSummaryStep() {
     const loadConfig = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`${API_BASE_URL}/api/configuration/empresa`, {
+        const response = await fetchApi('/api/configuration/empresa', {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
@@ -98,7 +97,7 @@ export function ConfigurationSummaryStep() {
     setMessage(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/configuration/empresa`, {
+      const response = await fetchApi('/api/configuration/empresa', {
         method: 'PUT',
         credentials: 'include',
         headers: {

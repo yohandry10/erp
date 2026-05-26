@@ -41,6 +41,41 @@ interface AgingCxpChartProps {
   proveedorId?: string
 }
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const emptyRange = { cantidad: 0, monto: 0 }
+
+const normalizeAgingData = (raw: any): AgingData => ({
+  fecha_reporte: raw?.fecha_reporte || new Date().toISOString(),
+  resumen: {
+    rango_0_30: {
+      cantidad: toNumber(raw?.resumen?.rango_0_30?.cantidad),
+      monto: toNumber(raw?.resumen?.rango_0_30?.monto),
+    },
+    rango_31_60: {
+      cantidad: toNumber(raw?.resumen?.rango_31_60?.cantidad),
+      monto: toNumber(raw?.resumen?.rango_31_60?.monto),
+    },
+    rango_61_90: {
+      cantidad: toNumber(raw?.resumen?.rango_61_90?.cantidad),
+      monto: toNumber(raw?.resumen?.rango_61_90?.monto),
+    },
+    rango_mas_90: {
+      cantidad: toNumber(raw?.resumen?.rango_mas_90?.cantidad),
+      monto: toNumber(raw?.resumen?.rango_mas_90?.monto),
+    },
+    total: {
+      cantidad: toNumber(raw?.resumen?.total?.cantidad),
+      monto: toNumber(raw?.resumen?.total?.monto),
+    },
+  },
+  por_proveedor: Array.isArray(raw?.por_proveedor) ? raw.por_proveedor : [],
+  detalle: Array.isArray(raw?.detalle) ? raw.detalle : [],
+})
+
 export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
   const { get } = useApi()
   const [agingData, setAgingData] = useState<AgingData | null>(null)
@@ -51,9 +86,9 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
       setLoading(true)
       const params = proveedorId ? `?proveedor_id=${proveedorId}` : ''
       const response = await get(`/api/finanzas/cxp/aging${params}`)
-      
+
       if (response?.success) {
-        setAgingData(response.data)
+        setAgingData(normalizeAgingData(response.data))
       }
     } catch (error) {
       console.error('Error loading aging data:', error)
@@ -70,7 +105,7 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   if (loading) {
@@ -82,7 +117,16 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
     )
   }
 
-  if (!agingData || agingData.resumen.total.cantidad === 0) {
+  const resumen = agingData?.resumen ?? {
+    rango_0_30: emptyRange,
+    rango_31_60: emptyRange,
+    rango_61_90: emptyRange,
+    rango_mas_90: emptyRange,
+    total: emptyRange,
+  }
+  const por_proveedor = agingData?.por_proveedor ?? []
+
+  if (!agingData || resumen.total.cantidad === 0) {
     return (
       <div className="activity-card p-8 text-center">
         <BarChart3 size={48} className="text-gray-400" />
@@ -95,8 +139,6 @@ export default function AgingCxpChart({ proveedorId }: AgingCxpChartProps) {
       </div>
     )
   }
-
-  const { resumen, por_proveedor } = agingData
 
   // Calculate percentages for visual bars
   const maxMonto = Math.max(

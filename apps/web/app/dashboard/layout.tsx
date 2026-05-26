@@ -11,6 +11,7 @@ import { OnboardingProvider } from '@/components/onboarding'
 import { DashboardThemeToggle } from '@/components/ui/dashboard-theme-toggle'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { NotificationBell } from '@/components/notifications'
+import { OfflineStatusBadge } from '@/components/offline/OfflineStatusBadge'
 
 export default function DashboardLayout({
   children,
@@ -82,6 +83,7 @@ export default function DashboardLayout({
             <Sidebar />
             <main className="relative ml-0 min-h-full max-w-[100vw] flex-1 overflow-auto bg-gradient-to-br from-slate-950 via-sky-950 to-slate-950 p-4 transition-[margin-left,background-color] duration-300 ease-out group-data-[erp-theme=light]/dashboard:from-slate-50 group-data-[erp-theme=light]/dashboard:via-slate-100 group-data-[erp-theme=light]/dashboard:to-slate-200 md:ml-[240px] md:max-w-[calc(100vw-240px)] md:p-6 lg:ml-[280px] lg:max-w-[calc(100vw-280px)] lg:p-8" data-theme={dashboardTheme}>
               <div className="fixed right-5 top-5 z-50 flex items-center gap-2">
+                <OfflineStatusBadge />
                 <NotificationBell />
                 <DashboardThemeToggle
                   theme={dashboardTheme}

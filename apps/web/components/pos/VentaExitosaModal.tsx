@@ -17,6 +17,7 @@ interface VentaExitosaModalProps {
     total: number
     subtotal: number
     impuestos: number
+    tipo_comprobante?: '01' | '03'
     estado: string
     factura_electronica: boolean
     facturacion_pendiente?: boolean
@@ -49,7 +50,13 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
   const currencySymbol = country.simboloMoneda || 'S/'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const documentoFiscal = country.documentoFiscal || 'RUC'
-  const documentoLabel = country.paisCodigo === 'PE' ? 'BOLETA' : 'TICKET'
+  const documentoLabel = country.paisCodigo !== 'PE'
+    ? 'TICKET'
+    : ventaData?.tipo_comprobante === '01'
+      ? 'FACTURA'
+      : ventaData?.tipo_comprobante === '03'
+        ? 'BOLETA'
+        : 'TICKET'
 
   useEffect(() => {
     if (!isOpen || !ventaData) return
@@ -105,6 +112,7 @@ export default function VentaExitosaModal({ isOpen, onClose, ventaData, empresaD
       total: ventaData.total,
       subtotal: ventaData.subtotal,
       impuestos: ventaData.impuestos,
+      tipo_comprobante: ventaData.tipo_comprobante,
       cliente_nombre: ventaData.cliente_nombre,
       fecha: ventaData.fecha,
       items: ventaData.items,

@@ -274,7 +274,8 @@ describe('CxpService', () => {
 
       const mockQuery = {
         eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValueOnce({ data: mockCxps, error: null }),
+        order: jest.fn().mockReturnThis(),
+        range: jest.fn().mockResolvedValueOnce({ data: mockCxps, error: null, count: mockCxps.length }),
       };
 
       mockSupabaseClient.from.mockReturnValueOnce({
@@ -285,6 +286,13 @@ describe('CxpService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockCxps);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 50,
+        total: 2,
+        totalPages: 1,
+      });
+      expect(mockQuery.range).toHaveBeenCalledWith(0, 49);
     });
 
     // Note: Filtering test is covered by integration tests

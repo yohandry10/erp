@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
+    "build:tauri": "next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
@@ -14,12 +15,13 @@
     "tauri:build": "tauri build",
     "tauri:build:debug": "tauri build --debug",
     "desktop:dev": "pnpm run tauri:dev",
-    "desktop:build": "pnpm run build && pnpm run tauri:build",
+    "desktop:build": "pnpm run tauri:build",
     "tauri": "tauri dev",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
+    "test:offline": "node tests/offline/verify-offline-store.mjs",
     "playwright:install": "playwright install chromium"
   },
   "dependencies": {

@@ -3,8 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useTenant } from '@/contexts/TenantContext'
-
-const API_BASE_URL = '/backend'
+import { fetchApi } from '@/lib/api-fetch'
 
 export interface ConfigurationStatus {
   isComplete: boolean
@@ -38,7 +37,7 @@ const EMPTY_STATUS: ConfigurationStatus = {
 }
 
 async function fetchConfigurationStatus(): Promise<ConfigurationStatus> {
-  const response = await fetch(`${API_BASE_URL}/api/configuration/context/status/`, {
+  const response = await fetchApi('/api/configuration/context/status/', {
     headers: { 'Content-Type': 'application/json' },
     mode: 'cors',
     credentials: 'include',

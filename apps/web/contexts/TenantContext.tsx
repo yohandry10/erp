@@ -5,6 +5,7 @@ import { customAuth } from '@/lib/auth-service'
 import type { Tenant, User, TenantContextValue } from './types'
 import type { Session } from '@/lib/auth-service'
 import { useAuth } from './AuthContext'
+import { fetchApi } from '@/lib/api-fetch'
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined)
 
@@ -28,10 +29,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const fetchTenantDetails = async (tenantId: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
-        credentials: 'include',
-      })
+      const response = await fetchApi(`/api/tenants/${tenantId}`)
 
       if (!response.ok) {
         setTenant({
@@ -119,13 +117,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const response = await fetch(`${API_BASE_URL}/api/auth/switch-tenant`, {
+      const response = await fetchApi('/api/auth/switch-tenant', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify({ targetTenantId }),
       })
 

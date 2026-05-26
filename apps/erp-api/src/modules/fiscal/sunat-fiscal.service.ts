@@ -51,11 +51,8 @@ export class SunatFiscalService extends FiscalServiceAbstract {
         numero: `${documento.serie}-${documento.numero}` 
       });
 
-      // 1. Generar XML
-      const xmlUnsigned = await this.generarXML(documento);
-      
-      // 2. Firmar XML
-      const xmlSigned = await this.firmarXML(xmlUnsigned);
+      // Si CPE ya entrego XML firmado, no se vuelve a firmar.
+      const xmlSigned = documento.xmlContent || await this.firmarXML(await this.generarXML(documento));
       
       // 3. Comprimir y enviar
       const fileName = `${documento.emisor.numeroDocumento}-${documento.tipoDocumento}-${documento.serie}-${documento.numero}`;
@@ -128,8 +125,14 @@ export class SunatFiscalService extends FiscalServiceAbstract {
   }
 
   async generarXML(documento: DocumentoElectronico): Promise<string> {
-    // Implementación específica para generar XML según estándares UBL de SUNAT
-    return this.buildSunatXML(documento);
+    if (documento.xmlContent) {
+      return documento.xmlContent;
+    }
+
+    throw new Error(
+      'SUNAT_DIRECTO requiere XML UBL generado por el modulo CPE. ' +
+      'Use CpeService/POST /api/cpe o configure emision_cpe_modo=OSE_API para un PSE.',
+    );
   }
 
   async firmarXML(xmlContent: string): Promise<string> {
@@ -169,29 +172,185 @@ export class SunatFiscalService extends FiscalServiceAbstract {
   }
 
   private async sendToSunat(zipBuffer: Buffer, fileName: string): Promise<FiscalResponse> {
-    // Implementación del envío SOAP a SUNAT (reutilizar lógica existente)
-    return new Promise((resolve) => {
-      // Simulación por ahora
-      resolve({
-        success: true,
-        codigoRespuesta: '0',
-        descripcionRespuesta: 'Aceptado por SUNAT'
-      });
+    return new Promise((resolve, reject) => {
+      try {
+        this.assertSunatDirectConfigured();
+        const postData = this.buildSunatRequest(zipBuffer, fileName, 'sendBill');
+        const endpoint = this.resolveSunatEndpoint();
+        const req = https.request(
+          {
+            hostname: endpoint.hostname,
+            port: endpoint.port,
+            path: endpoint.path,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/xml; charset=utf-8',
+              'Content-Length': Buffer.byteLength(postData),
+              SOAPAction: 'urn:sendBill',
+            },
+            auth: `${this.config.usuario}:${this.config.password}`,
+          },
+          (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+            res.on('end', () => resolve(this.parseSunatResponse(data)));
+          },
+        );
+
+        req.on('error', reject);
+        req.write(postData);
+        req.end();
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 
   private async queryStatusInSunat(ruc: string, tipoDocumento: string, serie: string, numero: string): Promise<FiscalResponse> {
-    // Implementación de consulta de estado (reutilizar lógica existente)
+    return new Promise((resolve, reject) => {
+      try {
+        this.assertSunatDirectConfigured();
+        const rucConsulta = ruc || this.config.empresaId;
+        if (!rucConsulta) {
+          throw new Error('RUC emisor requerido para consultar estado SUNAT');
+        }
+
+        const postData = this.buildStatusRequest(rucConsulta, tipoDocumento, serie, numero);
+        const endpoint = this.resolveSunatEndpoint();
+        const req = https.request(
+          {
+            hostname: endpoint.hostname,
+            port: endpoint.port,
+            path: endpoint.path,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/xml; charset=utf-8',
+              'Content-Length': Buffer.byteLength(postData),
+              SOAPAction: 'urn:getStatus',
+            },
+            auth: `${this.config.usuario}:${this.config.password}`,
+          },
+          (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+            res.on('end', () => resolve(this.parseSunatResponse(data)));
+          },
+        );
+
+        req.on('error', reject);
+        req.write(postData);
+        req.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  private assertSunatDirectConfigured(): void {
+    if (!this.config.url) throw new Error('URL SUNAT/OSE no configurada');
+    if (!this.config.usuario) throw new Error('Usuario SUNAT/OSE no configurado');
+    if (!this.config.password) throw new Error('Password SUNAT/OSE no configurado');
+  }
+
+  private resolveSunatEndpoint(): { hostname: string; port: number; path: string } {
+    const url = new URL(this.config.url);
+    const configuredPath = url.pathname && url.pathname !== '/' ? url.pathname : '';
+    const path =
+      configuredPath ||
+      (this.config.environment === 'homologacion' ? '/ol-ti-itcpfegem-beta/billService' : '');
+
+    if (!path) {
+      throw new Error(
+        'SUNAT_ENVIRONMENT=produccion requiere OSE_URL/SUNAT URL con path SOAP explicito. ' +
+        'No se usara un endpoint productivo inferido.',
+      );
+    }
+
     return {
-      success: true,
-      codigoRespuesta: '0',
-      descripcionRespuesta: 'Documento encontrado'
+      hostname: url.hostname,
+      port: Number(url.port || 443),
+      path,
     };
   }
 
-  private buildSunatXML(documento: DocumentoElectronico): string {
-    // Implementación específica para XML de SUNAT
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<!-- XML SUNAT generado para ${documento.serie}-${documento.numero} -->`;
+  private buildSunatRequest(zipBuffer: Buffer, fileName: string, operation: 'sendBill'): string {
+    const zipBase64 = zipBuffer.toString('base64');
+    return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:ser="http://service.sunat.gob.pe"
+               xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+  <soap:Header>
+    <wsse:Security>
+      <wsse:UsernameToken>
+        <wsse:Username>${this.config.usuario}</wsse:Username>
+        <wsse:Password>${this.config.password}</wsse:Password>
+      </wsse:UsernameToken>
+    </wsse:Security>
+  </soap:Header>
+  <soap:Body>
+    <ser:${operation}>
+      <fileName>${fileName}.zip</fileName>
+      <contentFile>${zipBase64}</contentFile>
+    </ser:${operation}>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  private buildStatusRequest(ruc: string, tipoDocumento: string, serie: string, numero: string): string {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:ser="http://service.sunat.gob.pe">
+  <soap:Header/>
+  <soap:Body>
+    <ser:getStatus>
+      <rucComprobante>${ruc}</rucComprobante>
+      <tipoComprobante>${tipoDocumento}</tipoComprobante>
+      <serieComprobante>${serie}</serieComprobante>
+      <numeroComprobante>${numero}</numeroComprobante>
+    </ser:getStatus>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  private parseSunatResponse(soapResponse: string): FiscalResponse {
+    const faultMatch = soapResponse.match(/<faultstring>(.*?)<\/faultstring>/);
+    if (faultMatch) {
+      return {
+        success: false,
+        codigoRespuesta: '99',
+        descripcionRespuesta: faultMatch[1],
+      };
+    }
+
+    const cdrMatch = soapResponse.match(/<applicationResponse>(.*?)<\/applicationResponse>/);
+    if (cdrMatch) {
+      return {
+        success: true,
+        codigoRespuesta: '0',
+        descripcionRespuesta: 'Aceptado por SUNAT',
+        cdr: cdrMatch[1],
+      };
+    }
+
+    const statusCodeMatch = soapResponse.match(/<statusCode>(.*?)<\/statusCode>/);
+    const statusMessageMatch = soapResponse.match(/<statusMessage>(.*?)<\/statusMessage>/);
+    if (statusCodeMatch || statusMessageMatch) {
+      const codigo = statusCodeMatch?.[1] || '0';
+      return {
+        success: codigo === '0',
+        codigoRespuesta: codigo,
+        descripcionRespuesta: statusMessageMatch?.[1] || 'Respuesta de estado SUNAT recibida',
+      };
+    }
+
+    return {
+      success: false,
+      codigoRespuesta: '98',
+      descripcionRespuesta: 'Respuesta de SUNAT no reconocida',
+    };
   }
 }

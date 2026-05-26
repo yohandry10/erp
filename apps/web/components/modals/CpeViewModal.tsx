@@ -47,6 +47,8 @@ interface CpeData {
   hash: string
   items: CpeItem[]
   tipo_documento: string
+  tasa_igv?: number
+  tasa_impuesto?: number
 }
 
 export default function CpeViewModal({
@@ -92,6 +94,7 @@ export default function CpeViewModal({
 
     const formatMoney = (value: number) => `${cpeData.moneda} ${value.toFixed(2)}`
     const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('es-PE')
+    const taxLabel = getTaxLabel(cpeData)
 
     const itemsHtml = Array.isArray(cpeData.items) && cpeData.items.length > 0
       ? cpeData.items.map((item, idx) => {
@@ -125,6 +128,7 @@ export default function CpeViewModal({
       <html>
       <head>
         <title>${getDocumentTypeName()} ${numeroFormateado}</title>
+        <style>${getThermalPrintStyles()}</style>
       </head>
       <body>
         <div class="header">
@@ -152,7 +156,7 @@ export default function CpeViewModal({
         
         <div class="totales">
           <div class="total-row"><span>Subtotal:</span><span>${formatMoney(cpeData.total_gravadas || 0)}</span></div>
-          <div class="total-row"><span>IGV (18%):</span><span>${formatMoney(cpeData.total_igv || 0)}</span></div>
+          <div class="total-row"><span>${taxLabel}:</span><span>${formatMoney(cpeData.total_igv || 0)}</span></div>
           <div class="total-row total-final"><span>TOTAL:</span><span>${formatMoney(cpeData.total_venta || 0)}</span></div>
         </div>
         
@@ -186,6 +190,45 @@ export default function CpeViewModal({
         return 'COMPROBANTE ELECTRÓNICO'
     }
   }
+
+  const getTaxLabel = (data: Pick<CpeData, 'total_gravadas' | 'total_igv' | 'tasa_igv' | 'tasa_impuesto'>) => {
+    const explicitRate = Number(data.tasa_igv ?? data.tasa_impuesto)
+    const derivedRate = Number(data.total_gravadas) > 0
+      ? (Number(data.total_igv || 0) / Number(data.total_gravadas)) * 100
+      : 18
+    const rate = Number.isFinite(explicitRate) && explicitRate > 0
+      ? (explicitRate <= 1 ? explicitRate * 100 : explicitRate)
+      : derivedRate
+    return `IGV (${Number(rate.toFixed(2))}%)`
+  }
+
+  const getThermalPrintStyles = () => `
+    @page { size: 80mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      width: 80mm;
+      margin: 0;
+      padding: 3mm;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .header, .footer { text-align: center; }
+    .empresa { font-size: 13px; font-weight: 700; text-transform: uppercase; }
+    .ruc, .tipo-doc, .numero, .fecha, .seccion { margin-top: 4px; }
+    .tipo-doc, .numero { font-weight: 700; }
+    .logo img { max-width: 38mm; max-height: 18mm; object-fit: contain; margin-bottom: 3mm; }
+    .items { margin: 8px 0; border-top: 1px dashed #333; border-bottom: 1px dashed #333; padding: 5px 0; }
+    .items > div, .total-row { display: flex; justify-content: space-between; gap: 6px; }
+    .items > div + div, .total-row + .total-row { margin-top: 3px; }
+    .items span:first-child { flex: 1; overflow-wrap: anywhere; }
+    .items span:last-child { white-space: nowrap; text-align: right; }
+    .table-head { font-weight: 700; }
+    .total-final { border-top: 1px solid #111; padding-top: 4px; font-weight: 700; font-size: 13px; }
+    .footer { margin-top: 8px; border-top: 1px dashed #333; padding-top: 5px; }
+    .hash { overflow-wrap: anywhere; }
+  `
 
   if (!isOpen) return null
 
@@ -358,7 +401,7 @@ export default function CpeViewModal({
                   <h3 className="mb-3 text-sm font-semibold uppercase text-cyan-200/80">Resumen de totales</h3>
                   <div className="space-y-3 text-sm">
                     <TotalRow label="Subtotal" value={`${cpeData.moneda} ${(cpeData.total_gravadas || 0).toFixed(2)}`} />
-                    <TotalRow label="IGV (18%)" value={`${cpeData.moneda} ${(cpeData.total_igv || 0).toFixed(2)}`} />
+                    <TotalRow label={getTaxLabel(cpeData)} value={`${cpeData.moneda} ${(cpeData.total_igv || 0).toFixed(2)}`} />
                     <div className="flex justify-between border-t border-cyan-400/10 pt-3 text-base font-semibold text-cyan-100">
                       <span>TOTAL:</span>
                       <span>{cpeData.moneda} {(cpeData.total_venta || 0).toFixed(2)}</span>
@@ -373,7 +416,7 @@ export default function CpeViewModal({
                   Documento generado automáticamente el {new Date().toLocaleDateString('es-PE')}
                 </p>
                 <p className="mt-1">
-                  Para consultas sobre este documento, contacte al emisor • Sistema certificado por SUNAT
+                  Para consultas sobre este documento, contacte al emisor
                 </p>
               </footer>
             </div>

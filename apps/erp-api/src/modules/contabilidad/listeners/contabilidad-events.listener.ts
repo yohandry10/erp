@@ -16,6 +16,8 @@ import { TenantContextService } from '../../../shared/tenant/tenant-context.serv
 @Injectable()
 export class ContabilidadEventsListener implements OnModuleInit {
   private readonly logger = new Logger(ContabilidadEventsListener.name);
+  private readonly cronLockKey = 'worker:outbox:contabilidad';
+  private readonly cronLockTtlSeconds = 240;
   private static isProcessing = false;
   private readonly accountingEventTypes = new Set([
     'venta.procesada',
@@ -228,6 +230,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async procesarEventosPendientesCron() {
+    if (process.env.ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED === 'false') {
+      return;
+    }
+
     await this.procesarEventosPendientes();
   }
 
@@ -242,6 +248,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
 
     ContabilidadEventsListener.isProcessing = true;
+    let lockAcquired = false;
 
     try {
       const backoffMs = this.supabaseService.getNetworkBackoffRemainingMs();
@@ -249,6 +256,12 @@ export class ContabilidadEventsListener implements OnModuleInit {
         this.logger.warn(
           `⚠️ [ContabilidadEventsListener] Supabase no disponible, reintentando en ${Math.ceil(backoffMs / 1000)}s`,
         );
+        return;
+      }
+
+      lockAcquired = await this.tryAcquireJobLock();
+      if (!lockAcquired) {
+        this.logger.debug('⏭️ [ContabilidadEventsListener] Otro nodo tiene el lock distribuido, saltando...');
         return;
       }
 
@@ -282,7 +295,49 @@ export class ContabilidadEventsListener implements OnModuleInit {
         this.logger.error('❌ [ContabilidadEventsListener] Error procesando eventos pendientes:', error);
       }
     } finally {
+      if (lockAcquired) {
+        await this.releaseJobLock();
+      }
       ContabilidadEventsListener.isProcessing = false;
+    }
+  }
+
+  private async tryAcquireJobLock(): Promise<boolean> {
+    try {
+      const client = (this.supabaseService as any).getPublicClient?.();
+      const rpc = client?.rpc;
+      if (typeof rpc !== 'function') {
+        return true;
+      }
+
+      const { data, error } = await rpc('acquire_job_lock', {
+        p_lock_key: this.cronLockKey,
+        p_lock_ttl_seconds: this.cronLockTtlSeconds,
+      });
+
+      if (error) {
+        this.logger.warn(`⚠️ [ContabilidadEventsListener] No se pudo adquirir lock distribuido: ${error.message}`);
+        return false;
+      }
+
+      return data === true || data === 'true';
+    } catch (error) {
+      this.logger.warn(`⚠️ [ContabilidadEventsListener] Error adquiriendo lock distribuido: ${error?.message || error}`);
+      return false;
+    }
+  }
+
+  private async releaseJobLock(): Promise<void> {
+    try {
+      const client = (this.supabaseService as any).getPublicClient?.();
+      const rpc = client?.rpc;
+      if (typeof rpc !== 'function') {
+        return;
+      }
+
+      await rpc('release_job_lock', { p_lock_key: this.cronLockKey });
+    } catch (error) {
+      this.logger.warn(`⚠️ [ContabilidadEventsListener] Error liberando lock distribuido: ${error?.message || error}`);
     }
   }
 

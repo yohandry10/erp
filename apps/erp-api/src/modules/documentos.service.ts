@@ -761,17 +761,31 @@ export class DocumentosService {
         throw new BadRequestException('El documento debe tener XML generado');
       }
 
-      // Simular envío a SUNAT (en producción aquí iría la integración real)
-      const resultadoEnvio = await this.simularEnvioSUNAT(doc);
+      const { data: cpe, error: cpeError } = await this.supabaseService
+        .getClient()
+        .from('cpe')
+        .select('id')
+        .eq('documento_id', id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (cpeError) {
+        throw new BadRequestException(`No se pudo buscar el CPE asociado: ${cpeError.message}`);
+      }
+
+      if (!cpe?.id) {
+        throw new BadRequestException('El envio SUNAT legacy esta deshabilitado. Cree/envie el CPE asociado desde el modulo CPE.');
+      }
+
+      await this.cpeService.resendToOse(cpe.id, tenantId || doc.tenant_id);
 
       // Actualizar estado del documento
       const { error } = await this.supabaseService
         .getClient()
         .from('documentos')
         .update({
-          estado: resultadoEnvio.success ? 'ENVIADO_SUNAT' : 'RECHAZADO',
-          estado_sunat: resultadoEnvio.codigoRespuesta,
-          cdr_content: resultadoEnvio.cdr,
+          estado: 'ENVIADO_SUNAT',
+          estado_sunat: 'ENVIADO_DESDE_CPE',
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
@@ -785,18 +799,16 @@ export class DocumentosService {
         id, 
         'ENVIADO_SUNAT', 
         userId, 
-        `Enviado a SUNAT: ${resultadoEnvio.codigoRespuesta}`, 
+        `Enviado a autoridad fiscal desde CPE ${cpe.id}`,
         tenantId
       );
 
       return {
-        success: resultadoEnvio.success,
+        success: true,
         data: {
-          codigo_respuesta: resultadoEnvio.codigoRespuesta,
-          mensaje: resultadoEnvio.mensaje,
-          cdr: resultadoEnvio.cdr,
+          cpe_id: cpe.id,
         },
-        message: resultadoEnvio.mensaje,
+        message: 'Documento enviado a autoridad fiscal desde CPE asociado',
       };
     } catch (error) {
       console.error('❌ Error enviando a SUNAT:', error);
@@ -1041,30 +1053,6 @@ export class DocumentosService {
     return `SHA256_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private async simularEnvioSUNAT(documento: any) {
-    // Simular tiempo de respuesta
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Simular respuesta de SUNAT (90% éxito)
-    const exito = Math.random() > 0.1;
-
-    if (exito) {
-      return {
-        success: true,
-        codigoRespuesta: '0',
-        mensaje: 'Comprobante recibido correctamente',
-        cdr: `CDR_${documento.serie}_${documento.numero}_${Date.now()}`,
-      };
-    } else {
-      return {
-        success: false,
-        codigoRespuesta: '2324',
-        mensaje: 'Error en la estructura del comprobante',
-        cdr: null,
-      };
-    }
-  }
-
   private async consultarRUCSUNAT(ruc: string) {
     // Simular consulta a SUNAT
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -1288,16 +1276,32 @@ export class DocumentosService {
         throw new NotFoundException('Documento no encontrado');
       }
 
-      // En producción aquí iría la generación real del PDF
-      const pdfContent = this.generarPDFContent(documento.data);
+      const { data: cpe, error: cpeError } = await this.supabaseService
+        .getClient()
+        .from('cpe')
+        .select('id')
+        .eq('documento_id', id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      if (cpeError) {
+        throw new BadRequestException(`No se pudo buscar el CPE asociado: ${cpeError.message}`);
+      }
+
+      if (!cpe?.id) {
+        throw new BadRequestException('El PDF legacy esta deshabilitado. Genere primero el CPE asociado y use /api/cpe/comprobantes/:id/pdf.');
+      }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'DESCARGADO', null, 'PDF descargado', tenantId);
+      await this.registrarAuditoria(id, 'DESCARGADO', null, `PDF CPE solicitado: ${cpe.id}`, tenantId);
 
       return {
         success: true,
-        data: pdfContent,
-        message: 'PDF generado correctamente',
+        data: {
+          cpe_id: cpe.id,
+          pdf_endpoint: `/api/cpe/comprobantes/${cpe.id}/pdf`,
+        },
+        message: 'Use el endpoint PDF del CPE asociado',
       };
     } catch (error) {
       console.error('❌ Error generando PDF:', error);
@@ -1334,15 +1338,5 @@ export class DocumentosService {
       }
       throw new BadRequestException('Error al descargar el XML');
     }
-  }
-
-  private generarPDFContent(documento: any): string {
-    // Simulación de contenido PDF (en producción sería un buffer PDF real)
-    return `PDF Content for Document ${documento.serie}-${documento.numero}
-Fecha: ${documento.fecha_emision}
-Cliente: ${documento.receptor_razon_social}
-Total: ${documento.moneda} ${documento.total}
-
-[This would be actual PDF binary content in production]`;
   }
 } 

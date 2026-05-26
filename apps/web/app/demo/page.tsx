@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchApi } from '@/lib/api-fetch';
 import {
   ArrowRight,
   BadgeCheck,
@@ -69,7 +70,7 @@ export default function DemoPage() {
     setError(null);
 
     try {
-      const response = await fetch('/backend/api/demo/create', {
+      const response = await fetchApi('/api/demo/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dias_duracion: 14 }),

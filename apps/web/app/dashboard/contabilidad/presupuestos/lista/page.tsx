@@ -80,6 +80,11 @@ const fieldClass =
 const selectContentClass =
   'border-cyan-400/20 bg-slate-950 text-slate-100 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
 function BudgetStatusBadge({ estado }: { estado: string }) {
   const status = {
     ACTIVO: { icon: CheckCircle, label: 'Activo', className: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-100' },
@@ -151,15 +156,15 @@ export default function PresupuestosListaPage() {
         get('/api/contabilidad/periodos'),
       ])
 
-      if (presupuestosRes?.success && presupuestosRes.data) {
+      if (presupuestosRes?.success && Array.isArray(presupuestosRes.data)) {
         setPresupuestos(presupuestosRes.data)
       }
 
-      if (centrosRes?.success && centrosRes.data) {
+      if (centrosRes?.success && Array.isArray(centrosRes.data)) {
         setCentrosCosto(centrosRes.data)
       }
 
-      if (periodosRes?.success && periodosRes.data) {
+      if (periodosRes?.success && Array.isArray(periodosRes.data)) {
         setPeriodos(periodosRes.data)
       }
     } catch (err: any) {
@@ -193,7 +198,7 @@ export default function PresupuestosListaPage() {
     new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
-    }).format(amount)
+    }).format(toNumber(amount))
 
   const formatPeriodo = (periodo?: { anio: number; mes: number }) => {
     if (!periodo) return '-'
@@ -205,10 +210,10 @@ export default function PresupuestosListaPage() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
       const matchesSearch =
-        presupuesto.centro_costo?.nombre.toLowerCase().includes(search) ||
-        presupuesto.centro_costo?.codigo.toLowerCase().includes(search) ||
-        presupuesto.cuenta?.nombre.toLowerCase().includes(search) ||
-        presupuesto.cuenta?.codigo.toLowerCase().includes(search) ||
+        presupuesto.centro_costo?.nombre?.toLowerCase().includes(search) ||
+        presupuesto.centro_costo?.codigo?.toLowerCase().includes(search) ||
+        presupuesto.cuenta?.nombre?.toLowerCase().includes(search) ||
+        presupuesto.cuenta?.codigo?.toLowerCase().includes(search) ||
         (presupuesto.notas && presupuesto.notas.toLowerCase().includes(search))
 
       if (!matchesSearch) return false
@@ -219,7 +224,7 @@ export default function PresupuestosListaPage() {
     if (estadoFilter !== 'TODOS' && presupuesto.estado !== estadoFilter) return false
 
     if (alertaFilter !== 'TODOS') {
-      const porcentaje = presupuesto.porcentaje_ejecutado
+      const porcentaje = toNumber(presupuesto.porcentaje_ejecutado)
       if (alertaFilter === 'SOBREGIRO' && porcentaje < 100) return false
       if (alertaFilter === 'ADVERTENCIA' && (porcentaje < 90 || porcentaje >= 100)) return false
       if (alertaFilter === 'NORMAL' && porcentaje >= 90) return false
@@ -231,10 +236,10 @@ export default function PresupuestosListaPage() {
   const stats = {
     total: presupuestos.length,
     activos: presupuestos.filter((p) => p.estado === 'ACTIVO').length,
-    sobregiros: presupuestos.filter((p) => p.porcentaje_ejecutado >= 100).length,
-    advertencias: presupuestos.filter((p) => p.porcentaje_ejecutado >= 90 && p.porcentaje_ejecutado < 100).length,
-    totalPresupuestado: presupuestos.reduce((sum, p) => sum + p.monto_presupuestado, 0),
-    totalEjecutado: presupuestos.reduce((sum, p) => sum + p.monto_ejecutado, 0),
+    sobregiros: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) >= 100).length,
+    advertencias: presupuestos.filter((p) => toNumber(p.porcentaje_ejecutado) >= 90 && toNumber(p.porcentaje_ejecutado) < 100).length,
+    totalPresupuestado: presupuestos.reduce((sum, p) => sum + toNumber(p.monto_presupuestado), 0),
+    totalEjecutado: presupuestos.reduce((sum, p) => sum + toNumber(p.monto_ejecutado), 0),
   }
 
   const hasFilters =
