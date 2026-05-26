@@ -1,5 +1,6 @@
-import { IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import { IsOptional, IsEnum, IsDateString, IsUUID, IsInt, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export enum EstadoCxp {
   PENDIENTE = 'PENDIENTE',
@@ -41,4 +42,30 @@ export class FiltrarCxpDto {
   @IsOptional()
   @IsUUID('4', { message: 'El ID del proveedor debe ser un UUID válido' })
   proveedor_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Numero de pagina',
+    example: 1,
+    minimum: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'La pagina debe ser un numero entero' })
+  @Min(1, { message: 'La pagina debe ser mayor o igual a 1' })
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Cantidad de registros por pagina',
+    example: 50,
+    minimum: 1,
+    maximum: 100,
+    default: 50,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'El limite debe ser un numero entero' })
+  @Min(1, { message: 'El limite debe ser mayor o igual a 1' })
+  @Max(100, { message: 'El limite no puede ser mayor a 100' })
+  limit?: number = 50;
 }

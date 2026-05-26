@@ -12,6 +12,7 @@ interface CpeModalProps {
 
 export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) {
   const { tasaIgv } = useTaxConfig()
+  const taxPercent = Math.round(tasaIgv * 10000) / 100
   const [formData, setFormData] = useState({
     tipoComprobante: '01', // Factura por defecto
     serie: 'F001',
@@ -123,7 +124,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
 
       newItems[index] = {
         ...newItems[index],
-        precioUnitario: valorUnitario * 1.18,
+        precioUnitario: valorUnitario * (1 + tasaIgv),
         igv: igvItem,
         total: totalItem
       }
@@ -407,7 +408,7 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
                 <div className="text-4 font-semibold">S/ {subtotal.toFixed(2)}</div>
               </div>
               <div>
-                <div className="font-semibold text-gray-500">IGV (18%):</div>
+                <div className="font-semibold text-gray-500">IGV ({taxPercent}%):</div>
                 <div className="text-4 font-semibold">S/ {totalIgv.toFixed(2)}</div>
               </div>
               <div>
@@ -448,4 +449,4 @@ export default function CpeModal({ isOpen, onClose, onSuccess }: CpeModalProps) 
       </div>
     </div>
   )
-} 
+}

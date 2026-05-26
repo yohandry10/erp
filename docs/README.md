@@ -35,6 +35,9 @@ Documentación técnica del ERP, organizada por dominio. Solo se listan document
 | Documento | Propósito |
 |---|---|
 | [auditoria_forense_contable_2026-05.md](auditoria_forense_contable_2026-05.md) | Cierre contable/fiscal técnico, migraciones `331..332`, gates E2E y riesgos externos |
+| [auditoria_impresion_cpe_facturas_2026-05.md](auditoria_impresion_cpe_facturas_2026-05.md) | Auditoría de impresión/representación CPE: PDF A4, ticket POS, rutas SUNAT/PSE y bloqueos antes de "solo credenciales" |
+| [auditoria_desktop_vs_web_2026-05.md](auditoria_desktop_vs_web_2026-05.md) | Auditoría de paridad desktop/Tauri vs web: build estático, proxy API, comandos nativos, plugins, offline y fiscal/PDF local |
+| [auditoria_multiusuario_performance_2026-05.md](auditoria_multiusuario_performance_2026-05.md) | Auditoría multiusuario: retries no idempotentes, polling, locks distribuidos de workers y pendientes de prueba de carga |
 | [auditoria_forense_inventario_logistica_costeo_2026-05.md](auditoria_forense_inventario_logistica_costeo_2026-05.md) | Inventario/logística/kardex/costeo, remediación `333__inventory...` + ajuste `335__descontar_stock_authoritative.sql` |
 | [auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md](auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md) | Tesorería/caja/bancos/CxC/CxP, remediación `334__treasury...` |
 

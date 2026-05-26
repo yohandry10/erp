@@ -117,6 +117,27 @@ const inputClass =
 
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const normalizeOrden = (raw: any): OrdenCompra => ({
+  id: raw?.id || '',
+  numero: raw?.numero || 'N/A',
+  proveedor_id: raw?.proveedor_id || '',
+  fecha_orden: raw?.fecha_orden || raw?.fecha || '',
+  fecha_entrega_esperada: raw?.fecha_entrega_esperada,
+  estado: String(raw?.estado || 'BORRADOR').toUpperCase(),
+  subtotal: toNumber(raw?.subtotal),
+  igv: toNumber(raw?.igv),
+  total: toNumber(raw?.total),
+  moneda: raw?.moneda || 'PEN',
+  observaciones: raw?.observaciones,
+  proveedores: raw?.proveedores,
+  detalles: Array.isArray(raw?.detalles) ? raw.detalles : [],
+})
+
 export default function OrdenesCompraPage() {
   const router = useRouter()
   const { get } = useApi()
@@ -153,10 +174,11 @@ export default function OrdenesCompraPage() {
       const response = await get(`/compras/ordenes?${params.toString()}`)
 
       if (response?.success) {
-        const data = response.data || []
+        const data = (Array.isArray(response.data) ? response.data : []).map(normalizeOrden)
         setOrdenes(data)
-        setTotalOrdenes(response.count || data.length)
-        setTotalPages(Math.ceil((response.count || data.length) / itemsPerPage))
+        const count = toNumber(response.count) || data.length
+        setTotalOrdenes(count)
+        setTotalPages(Math.max(1, Math.ceil(count / itemsPerPage)))
       }
     } catch (error) {
       console.error('Error loading ordenes:', error)
@@ -169,7 +191,7 @@ export default function OrdenesCompraPage() {
   const loadProveedores = useCallback(async () => {
     try {
       const response = await get('/compras/proveedores?activo=true')
-      if (response?.success) setProveedores(response.data || [])
+      if (response?.success) setProveedores(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('Error loading proveedores:', error)
     }
@@ -201,11 +223,10 @@ export default function OrdenesCompraPage() {
   }
 
   const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return '-'
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN',
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   const formatDate = (dateString?: string | null) => {

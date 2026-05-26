@@ -37,16 +37,37 @@ const ESTADO_CREDITO_COLOR: Record<string, { bg: string; text: string }> = {
   SIN_EVALUAR: { bg: 'rgba(148, 163, 184, 0.12)', text: '#475569' },
 }
 
-function formatCurrency(value?: number) {
-  if (value == null) return 'S/ 0.00'
-  return `S/ ${value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
 }
+
+function formatCurrency(value?: number) {
+  return `S/ ${toNumber(value).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+const normalizePedidos = (raw: unknown): PedidoPendiente[] =>
+  (Array.isArray(raw) ? raw : []).map((pedido: any) => ({
+    ...pedido,
+    id: pedido?.id || pedido?.numero || 'pedido',
+    numero: pedido?.numero || 'N/A',
+    total: toNumber(pedido?.total),
+    motivos: Array.isArray(pedido?.motivos) ? pedido.motivos : [],
+    resumen_credito: pedido?.resumen_credito
+      ? {
+          ...pedido.resumen_credito,
+          limite: toNumber(pedido.resumen_credito.limite),
+          pendiente: toNumber(pedido.resumen_credito.pendiente),
+        }
+      : null,
+  }))
 
 export default function AprobacionesPage() {
   const { get, post } = useApi()
   const [loading, setLoading] = useState(true)
   const [decidingId, setDecidingId] = useState<string | null>(null)
   const [data, setData] = useState<PedidoPendiente[]>([])
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null)
 
   const totalPendiente = useMemo(
     () => data.reduce((sum, pedido) => sum + (pedido.total || 0), 0),
@@ -59,9 +80,9 @@ export default function AprobacionesPage() {
       const response = await get('/ventas/pedidos/aprobaciones/pendientes')
 
       if (response?.success) {
-        setData(response.data || [])
+        setData(normalizePedidos(response.data))
       } else if (Array.isArray(response)) {
-        setData(response as PedidoPendiente[])
+        setData(normalizePedidos(response))
       } else {
         setData([])
       }
@@ -69,6 +90,7 @@ export default function AprobacionesPage() {
       console.error('Error al cargar aprobaciones pendientes:', error)
       alert('Error: No se pudieron cargar los pedidos pendientes de aprobación')
     } finally {
+      setUltimaActualizacion(new Date())
       setLoading(false)
     }
   }, [get])
@@ -119,7 +141,9 @@ export default function AprobacionesPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-PE', {
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return '-'
+    return date.toLocaleString('es-PE', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -184,9 +208,9 @@ export default function AprobacionesPage() {
             </span>
           </div>
           <div className="stat-value text-4">
-            {new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            {ultimaActualizacion?.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) ?? '--:--'}
           </div>
-          <div className="stat-subtitle">{new Date().toLocaleDateString('es-PE')}</div>
+          <div className="stat-subtitle">{ultimaActualizacion?.toLocaleDateString('es-PE') ?? '-'}</div>
         </div>
       </div>
 

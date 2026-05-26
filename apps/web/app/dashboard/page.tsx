@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -192,6 +192,9 @@ const tonePalette = {
 } as const
 
 type Tone = keyof typeof tonePalette
+
+const DASHBOARD_REFRESH_MS = 60_000
+const DASHBOARD_REFRESH_JITTER_MS = 15_000
 
 // ============================================================================
 // EMPTY STATE — reutilizado para charts sin datos reales (sin mocks).
@@ -774,6 +777,7 @@ function ModuleTile({
 
 export default function Dashboard() {
   const api = useApiCall({ throwOnError: true, timeoutMs: 30000 })
+  const dashboardFetchInFlightRef = useRef(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>(DEFAULT_DASHBOARD_STATS)
@@ -786,6 +790,12 @@ export default function Dashboard() {
   const currencySymbol = country.simboloMoneda || 'S/'
 
   const fetchDashboardData = useCallback(async (showLoading = false) => {
+    if (dashboardFetchInFlightRef.current) {
+      return
+    }
+
+    dashboardFetchInFlightRef.current = true
+
     try {
       if (!showLoading) setIsRefreshing(true)
       setError(null)
@@ -819,6 +829,7 @@ export default function Dashboard() {
         `No se pudieron actualizar las métricas: ${err instanceof Error ? err.message : 'Error desconocido'}`,
       )
     } finally {
+      dashboardFetchInFlightRef.current = false
       setIsRefreshing(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -836,8 +847,34 @@ export default function Dashboard() {
   }, [isLoadingConfig, configStatus])
 
   useEffect(() => {
-    const interval = setInterval(() => fetchDashboardData(false), 30000)
-    return () => clearInterval(interval)
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = () => {
+      if (cancelled) return
+      const jitter = Math.floor(Math.random() * DASHBOARD_REFRESH_JITTER_MS)
+      timer = setTimeout(async () => {
+        if (!document.hidden) {
+          await fetchDashboardData(false)
+        }
+        schedule()
+      }, DASHBOARD_REFRESH_MS + jitter)
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchDashboardData(false)
+      }
+    }
+
+    schedule()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [fetchDashboardData])
 
   const handleRefresh = () => fetchDashboardData(false)

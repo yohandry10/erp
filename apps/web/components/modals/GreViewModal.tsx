@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 import { unwrapApiObject } from '@/lib/api-contract'
+import { fetchApi } from '@/lib/api-fetch'
 
 interface GreViewModalProps {
   isOpen: boolean
@@ -54,9 +55,8 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
   const handleDownloadPdf = async () => {
     try {
-      const response = await fetch(`/backend/api/gre/guias/${documentId}/pdf/`, {
+      const response = await fetchApi(`/api/gre/guias/${documentId}/pdf/`, {
         method: 'GET',
-        credentials: 'include',
       })
 
       if (response.ok) {

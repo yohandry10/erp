@@ -1,6 +1,6 @@
 # Estado Actual del ERP
 
-Fecha de actualizacion: 2026-05-24
+Fecha de actualizacion: 2026-05-26 (entornos dev/prod separados)
 
 Este documento es la entrada canonica para recuperar contexto al iniciar una sesion nueva. No reemplaza las auditorias, manuales ni reportes; solo indica que leer primero y cual es la linea vigente.
 
@@ -19,6 +19,7 @@ Si la sesion toca base de datos, tambien consultar los artefactos baseline lista
 - ERP validado tecnicamente en entorno local/sandbox; no declarar produccion real absoluta sin certificado SUNAT/OSE productivo, secretos productivos, email real si aplica y smoke externo autorizado.
 - Readiness base: Gate 21/22 documentado al 2026-05-16 en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
 - Despues del corte de readiness existen auditorias forenses y migraciones posteriores. El head documental actual debe considerar `327..335`.
+- Auditoria multiusuario/performance aplicada el 2026-05-26: retries frontend no idempotentes desactivados para escrituras, polling visible/sin solapes, banners de configuracion cacheados y workers cron protegidos con locks distribuidos existentes.
 - El worktree contiene muchos cambios previos del usuario/de sesiones anteriores. No revertir ni stagear archivos por inercia.
 
 ## Migraciones vigentes
@@ -41,6 +42,18 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
   Select-Object Name,Count,@{Name='Files';Expression={($_.Group.Name -join ', ')}}
 ```
 
+## Entornos Supabase
+
+| Entorno | Proyecto | Ref | Cuenta | Host pooler | Archivo env |
+|---|---|---|---|---|---|
+| **PROD** | `erp` | `wypnbcptofqdmoynlonq` | yohandry10 | `aws-0-us-west-2.pooler.supabase.com` | `.env.production` |
+| **DEV** | `erp-dev` | `hbueraexcbowpfnjlppi` | yohandrydev.1995 | `aws-1-us-west-2.pooler.supabase.com` | `.env.dev` |
+
+- `erp-dev` creado 2026-05-25; 332/332 migraciones aplicadas; 22/22 validators OK (inventory 6/6, accounting 5/5, tesoreria 11/11).
+- Para cambiar entorno: `Copy-Item .env.dev .env.local` (dev) o `Copy-Item .env.production .env.local` (prod).
+- Supabase CLI instalado en `$env:USERPROFILE\supabase-cli\supabase.exe`. Token prod en cuenta yohandry10; token dev en cuenta yohandrydev.1995.
+- NUNCA commitear `.env.dev`, `.env.production` ni `.env.local` (cubiertos por `*.env.*` en `.gitignore`).
+
 ## Fuentes canonicas por tema
 
 | Tema | Fuente primaria | Notas |
@@ -51,6 +64,9 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 | Readiness local/sandbox | `docs/production-readiness/ERP_PRODUCTION_READINESS.md` | Gate 21/22 y decision de no produccion real absoluta |
 | Go-Live productivo | `docs/release/GO_LIVE_RUNBOOK.md` | Runbook ejecutable cuando el operador tenga credenciales reales |
 | Contabilidad/fiscal | `docs/auditoria_forense_contable_2026-05.md` | Cierre tecnico, legal externo pendiente |
+| Impresion CPE/facturas | `docs/auditoria_impresion_cpe_facturas_2026-05.md` | Auditoria/remediacion 2026-05-25: bloqueos de codigo mitigados; falta beta/CDR real con credenciales/PSE |
+| App desktop/Tauri | `docs/auditoria_desktop_vs_web_2026-05.md`, `apps/web/README-DESKTOP.md` | Online-first + offline local aplicado 2026-05-25: `offline_mode` fuerza cache/outbox, cola Tauri con lock local, sync usa API vigente, sidebar con prefetch limitado/escalonado, build/export/Tauri debug OK; 108/108 rutas exportadas smoke OK con API simulada; backend API sigue siendo autoritativo |
+| Multiusuario/performance | `docs/auditoria_multiusuario_performance_2026-05.md` | Mitigados cuellos de polling/retries no idempotentes y crons multi-instancia con locks distribuidos; falta prueba de carga real para p95/p99 |
 | Inventario/logistica/costeo | `docs/auditoria_forense_inventario_logistica_costeo_2026-05.md` | Cierre `333` y ajuste `335` |
 | Tesoreria/caja/bancos/CxC/CxP | `docs/auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md` | Cierre `334` |
 | Operacion Supabase | `docs/ops/supabase-connection.md` | Aplicacion manual por `psql` y notas remotas |
@@ -62,9 +78,12 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 Bloqueados por dependencias externas (no estan en alcance de codigo; ver `docs/release/GO_LIVE_RUNBOOK.md` para la secuencia exacta cuando esten disponibles):
 
 - Cargar certificado digital SUNAT/OSE productivo y credenciales externas reales.
+- Ejecutar beta/homologacion CPE con credenciales/certificado/PSE reales y CDR aceptado; la remediacion de codigo de impresion/emision CPE del 2026-05-25 ya esta aplicada localmente.
+- Antes de distribuir desktop: smoke del ejecutable contra API real, validar cola offline con reconexion real en el `.exe`, configurar `ALLOWED_ORIGINS`/CSP final y decidir si se requiere paridad completa de deep links dinamicos con refresh/acceso directo.
 - Cargar secretos productivos finales y proveedor real de email si aplica.
 - Ejecutar smoke fiscal externo con CPE/GRE/SIRE/PLE/PLAME segun alcance del contribuyente.
 - Crear proyecto Supabase productivo dedicado y aplicarle `000..335` con los pre-requisitos no-Supabase de `1.1` del runbook.
+- Ejecutar prueba de carga multiusuario contra API/Supabase reales: login, dashboard, POS, ventas, compras, CPE, inventario y finanzas; registrar p95/p99, 429/5xx y backlog de `outbox_events`.
 
 Operacionales continuos:
 

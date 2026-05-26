@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
+import { fetchApi } from '@/lib/api-fetch';
 
 import VacanteModal from '@/components/modals/VacanteModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -486,7 +487,7 @@ function CandidatoFormulario({ candidato, vacantes, onSuccess, onCancel }: any) 
         fecha_postulacion: candidato?.fecha_postulacion || new Date().toISOString()
       };
 
-      const response = await fetch(candidato?.id ? `/api/rrhh/candidatos/${candidato.id}` : '/api/rrhh/candidatos', {
+      const response = await fetchApi(candidato?.id ? `/api/rrhh/candidatos/${candidato.id}` : '/api/rrhh/candidatos', {
         method: candidato?.id ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(candidatoData),

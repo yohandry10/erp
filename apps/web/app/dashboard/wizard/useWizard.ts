@@ -4,8 +4,7 @@ import { useCallback } from 'react'
 import { useWizardContext } from './WizardContext'
 import { WizardConfiguration } from './types'
 import { useCountryContext } from '@/hooks/use-country-context'
-
-const API_BASE_URL = '/backend'
+import { fetchApi } from '@/lib/api-fetch'
 
 export function useWizard() {
   const country = useCountryContext()
@@ -32,7 +31,7 @@ export function useWizard() {
       }
 
       // PRIMERO: Verificar si la configuración ya está completa
-      const statusResponse = await fetch(`${API_BASE_URL}/api/configuration/status`, {
+      const statusResponse = await fetchApi('/api/configuration/status', {
         headers,
         credentials: 'include',
       })
@@ -72,7 +71,7 @@ export function useWizard() {
       }
 
       // SEGUNDO: Si no está completa, cargar el progreso del wizard
-      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/progress`, {
+      const response = await fetchApi('/api/configuration/wizard/progress', {
         headers,
         credentials: 'include',
       })
@@ -140,7 +139,7 @@ export function useWizard() {
       // Backend expects pasoActual to be 1-indexed (1, 2, 3...), not 0-indexed
       const pasoActual = state.currentStep + 1
 
-      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/step`, {
+      const response = await fetchApi('/api/configuration/wizard/step', {
         method: 'POST',
         headers,
         credentials: 'include',
@@ -209,7 +208,7 @@ export function useWizard() {
         throw new Error(errors.join('. '))
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/validate-certificate`, {
+      const response = await fetchApi('/api/configuration/wizard/validate-certificate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -353,7 +352,7 @@ export function useWizard() {
       }
 
       // Obtener token del localStorage (custom auth)
-      const response = await fetch(`${API_BASE_URL}/api/configuration/complete`, {
+      const response = await fetchApi('/api/configuration/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -387,7 +386,7 @@ export function useWizard() {
     try {
       setLoading(true)
 
-      const response = await fetch(`${API_BASE_URL}/api/configuration/wizard/reset`, {
+      const response = await fetchApi('/api/configuration/wizard/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

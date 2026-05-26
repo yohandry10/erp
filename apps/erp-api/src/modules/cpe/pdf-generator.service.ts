@@ -118,15 +118,12 @@ export class PdfGeneratorService {
       .single();
 
     if (error || !data) {
-      // Retornar configuración por defecto si no existe
-      return {
-        razon_social: 'EMPRESA DEMO',
-        ruc: '20000000000',
-        direccion: 'Av. Principal 123, Lima, Perú',
-        telefono: '(01) 123-4567',
-        email: 'contacto@empresa.pe',
-        logo_url: null
-      };
+      throw new Error(`Configuracion de empresa no encontrada para generar PDF CPE: ${tenantId}`);
+    }
+
+    const typedData = data as any;
+    if (!/^\d{11}$/.test(String(typedData.ruc || '').trim()) || !String(typedData.razon_social || '').trim()) {
+      throw new Error('Configuracion de empresa incompleta para PDF CPE: RUC y razon social son obligatorios');
     }
 
     return data;
@@ -169,6 +166,27 @@ export class PdfGeneratorService {
     }
   }
 
+  private async loadLogoBuffer(logoUrl?: string | null): Promise<Buffer | null> {
+    if (!logoUrl) {
+      return null;
+    }
+
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      if (String(logoUrl).startsWith('http')) {
+        const axios = require('axios');
+        const resp = await axios.get(logoUrl, { responseType: 'arraybuffer', timeout: 5000 });
+        return Buffer.from(resp.data);
+      }
+
+      return fs.readFileSync(path.resolve(logoUrl));
+    } catch (error) {
+      this.logger.warn(`No se pudo cargar logo para PDF CPE: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
   /**
    * Construye el documento PDF con formato oficial SUNAT
    */
@@ -180,6 +198,7 @@ export class PdfGeneratorService {
   ): Promise<Buffer> {
     const PDFDocument = (await import('pdfkit')).default;
     const chunks: Buffer[] = [];
+    const logoBuffer = await this.loadLogoBuffer(empresaConfig.logo_url);
 
     return new Promise((resolve, reject) => {
       try {
@@ -194,7 +213,7 @@ export class PdfGeneratorService {
         doc.on('error', reject);
 
         // ===== ENCABEZADO =====
-        this.addHeader(doc, empresaConfig, cpeData);
+        this.addHeader(doc, empresaConfig, cpeData, logoBuffer);
 
         // ===== INFORMACIÓN DEL COMPROBANTE =====
         this.addComprobanteInfo(doc, cpeData);
@@ -228,31 +247,13 @@ export class PdfGeneratorService {
   /**
    * Agrega el encabezado del documento
    */
-  private addHeader(doc: any, empresaConfig: any, cpeData: any): void {
+  private addHeader(doc: any, empresaConfig: any, cpeData: any, logoBuffer?: Buffer | null): void {
     const startY = 50;
 
     // Logo (si existe)
-    if (empresaConfig.logo_url) {
+    if (logoBuffer) {
       try {
-        // Cargar logo remoto como buffer
-        const fs = require('fs');
-        const path = require('path');
-        const axios = require('axios');
-
-        const loadLogo = async () => {
-          if (empresaConfig.logo_url.startsWith('http')) {
-            const resp = await axios.get(empresaConfig.logo_url, { responseType: 'arraybuffer' });
-            return Buffer.from(resp.data);
-          }
-          const localPath = path.resolve(empresaConfig.logo_url);
-          return fs.readFileSync(localPath);
-        };
-
-        loadLogo().then((buf: Buffer) => {
-          doc.image(buf, 50, startY, { width: 80 });
-        }).catch(() => {
-          // Ignorar si falla carga del logo
-        });
+        doc.image(logoBuffer, 50, startY, { width: 80 });
       } catch {
         // Ignorar si falla carga del logo
       }
@@ -260,11 +261,11 @@ export class PdfGeneratorService {
 
     // Información de la empresa (lado izquierdo)
     doc.fontSize(12).font('Helvetica-Bold')
-      .text(empresaConfig.razon_social || 'EMPRESA DEMO', 50, startY);
-    
+      .text(empresaConfig.razon_social, 50, startY);
+
     doc.fontSize(9).font('Helvetica')
-      .text(`RUC: ${empresaConfig.ruc || '20000000000'}`, 50, startY + 15)
-      .text(empresaConfig.direccion || 'Dirección no especificada', 50, startY + 28)
+      .text(`RUC: ${empresaConfig.ruc}`, 50, startY + 15)
+      .text(empresaConfig.direccion_fiscal || empresaConfig.direccion || 'Dirección no especificada', 50, startY + 28)
       .text(`Tel: ${empresaConfig.telefono || 'N/A'}`, 50, startY + 41)
       .text(`Email: ${empresaConfig.email || 'N/A'}`, 50, startY + 54);
 
@@ -405,8 +406,10 @@ export class PdfGeneratorService {
     doc.text('Op. Gravadas:', labelX, startY)
       .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_gravadas)}`, valueX, startY, { align: 'right' });
 
-    // IGV
-    doc.text('IGV (18%):', labelX, startY + 15)
+    const taxLabel = this.getTaxLabel(cpeData);
+
+    // Impuesto principal
+    doc.text(`${taxLabel}:`, labelX, startY + 15)
       .text(`${cpeData.moneda || 'PEN'} ${this.formatMoney(cpeData.total_igv)}`, valueX, startY + 15, { align: 'right' });
 
     // Total
@@ -475,7 +478,7 @@ export class PdfGeneratorService {
         );
     }
 
-    // Montos en letras y leyendas específicas según tipo de documento
+    // Leyendas específicas declaradas por la operación
     const leyendasEspecificas = this.getLeyendasEspecificas(cpeData);
     if (leyendasEspecificas.length > 0) {
       let currentY = y + 36;
@@ -486,11 +489,7 @@ export class PdfGeneratorService {
       });
     }
 
-    // Monto en letras
-    const total = parseFloat(cpeData.total_venta || cpeData.total || 0);
-    const totalEnLetras = this.numeroALetras(total, cpeData.moneda || 'PEN');
-    doc.fontSize(7).font('Helvetica-Bold')
-      .text(`SON: ${totalEnLetras}`, 50, doc.y + 46, { width: 495, align: 'center' });
+    doc.y = Math.max(doc.y, y + 48);
   }
 
   /**
@@ -531,6 +530,19 @@ export class PdfGeneratorService {
     return tipos[tipo] || 'DOCUMENTO';
   }
 
+  private getTaxLabel(cpeData: any): string {
+    const taxName = cpeData.impuesto_nombre || cpeData.tax_name || 'IGV';
+    const explicitRate = Number(cpeData.tasa_igv ?? cpeData.tasa_impuesto ?? cpeData.tax_rate);
+    const derivedRate = Number(cpeData.total_gravadas) > 0
+      ? (Number(cpeData.total_igv || 0) / Number(cpeData.total_gravadas)) * 100
+      : 18;
+    const rate = Number.isFinite(explicitRate) && explicitRate > 0
+      ? (explicitRate <= 1 ? explicitRate * 100 : explicitRate)
+      : derivedRate;
+
+    return `${taxName} (${Number(rate.toFixed(2))}%)`;
+  }
+
   private formatDate(dateString: string): string {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -542,7 +554,7 @@ export class PdfGeneratorService {
   }
 
   private formatMoney(amount: number): string {
-    return parseFloat(amount.toString()).toFixed(2);
+    return Number(amount || 0).toFixed(2);
   }
 
   /**
@@ -594,23 +606,25 @@ export class PdfGeneratorService {
    * Obtiene leyendas específicas según tipo de comprobante
    */
   private getLeyendasEspecificas(cpeData: any): string[] {
-    const leyendas: string[] = [];
+    const rawLeyendas = cpeData.leyendas || cpeData.leyendas_especificas || cpeData.legends;
+    const leyendas = Array.isArray(rawLeyendas)
+      ? rawLeyendas
+      : typeof rawLeyendas === 'string'
+        ? rawLeyendas.split(/\r?\n|;/)
+        : [];
 
-    // Leyenda para facturas
-    if (cpeData.tipo_documento === '01') {
-      leyendas.push('TRANSFERENCIA GRATUITA DE UN BIEN Y/O SERVICIO PRESTADO GRATUITAMENTE');
+    const normalized = leyendas
+      .map((leyenda) => String(leyenda || '').trim())
+      .filter(Boolean);
+
+    if (String(cpeData.tipo_operacion || '').trim() === '0200') {
+      normalized.push('TRANSFERENCIA GRATUITA DE UN BIEN Y/O SERVICIO PRESTADO GRATUITAMENTE');
     }
 
-    // Leyenda para boletas
-    if (cpeData.tipo_documento === '03') {
-      leyendas.push('BIENES TRANSFERIDOS EN LA AMAZONÍA REGIÓN SELVA PARA SER CONSUMIDOS EN LA MISMA');
+    if (Number(cpeData.monto_detraccion || cpeData.detraccion_monto || 0) > 0) {
+      normalized.push('OPERACIÓN SUJETA AL SISTEMA DE PAGO DE OBLIGACIONES TRIBUTARIAS');
     }
 
-    // Leyenda para operaciones gravadas
-    if (cpeData.total_igv > 0) {
-      leyendas.push('OPERACIÓN SUJETA AL SISTEMA DE PAGO DE OBLIGACIONES TRIBUTARIAS');
-    }
-
-    return leyendas;
+    return Array.from(new Set(normalized));
   }
 }

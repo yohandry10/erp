@@ -7,6 +7,7 @@ import path from 'node:path';
  */
 
 const waitForAuthRateLimitWindow = () => new Promise((resolve) => setTimeout(resolve, 61000));
+const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot';
 
 for (const envPath of [
   path.resolve(process.cwd(), '../../.env.local'),
@@ -29,6 +30,38 @@ function getDefaultPassword(): string {
   return process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
 }
 
+function getApiOrigin(): string {
+  return process.env.E2E_API_ORIGIN || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+}
+
+function normalizeLoginSession(loginData: any) {
+  const rawUser = loginData?.user || loginData?.data?.user;
+  const accessToken = loginData?.access_token || loginData?.token || loginData?.data?.access_token || loginData?.data?.token;
+  const roles = Array.isArray(rawUser?.roles)
+    ? rawUser.roles
+        .map((role: any) => (typeof role === 'string' ? role : role?.nombre))
+        .filter((role: any): role is string => typeof role === 'string' && role.length > 0)
+    : [];
+
+  if (!rawUser?.id || !rawUser?.email || !accessToken) {
+    throw new Error(`Respuesta de login incompleta para snapshot E2E: ${JSON.stringify(loginData).slice(0, 300)}`);
+  }
+
+  return {
+    user: {
+      id: rawUser.id,
+      email: rawUser.email,
+      nombre: rawUser.nombre || rawUser.username || rawUser.email.split('@')[0],
+      apellido: rawUser.apellido || '',
+      nombre_usuario: rawUser.nombre_usuario || rawUser.username,
+      roles,
+      tenant_id: rawUser.tenant_id,
+      is_super_admin: rawUser.is_super_admin === true || rawUser.isSuperAdmin === true || rawUser.super_admin === true,
+    },
+    access_token: accessToken,
+  };
+}
+
 /**
  * Login to the application
  * @param page - Playwright page object
@@ -44,7 +77,8 @@ export async function login(page: Page, email?: string, password?: string, force
     window.localStorage.setItem('selectedCountry', countryId);
   }, process.env.TEST_COUNTRY_ID || '1');
 
-  const existingProfileResponse = forceRefresh ? null : await page.request.get('/backend/api/auth/profile/');
+  const apiOrigin = getApiOrigin();
+  const existingProfileResponse = forceRefresh ? null : await page.request.get(`${apiOrigin}/api/auth/profile/`);
   if (existingProfileResponse?.ok()) {
     await page.goto('/dashboard/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await expect(page).toHaveURL(/\/dashboard\/?$/, { timeout: 30000 });
@@ -65,7 +99,7 @@ export async function login(page: Page, email?: string, password?: string, force
   await page.getByLabel('Correo Electrónico').waitFor({ timeout: 15000 });
   await expect(page.getByText('Cargando países...')).toBeHidden({ timeout: 60000 });
 
-  let loginResponse = await page.request.post('/backend/api/auth/login/', {
+  let loginResponse = await page.request.post(`${apiOrigin}/api/auth/login/`, {
     data: {
       email: userEmail,
       password: userPassword,
@@ -73,7 +107,7 @@ export async function login(page: Page, email?: string, password?: string, force
   });
   if (loginResponse.status() === 429) {
     await waitForAuthRateLimitWindow();
-    loginResponse = await page.request.post('/backend/api/auth/login/', {
+    loginResponse = await page.request.post(`${apiOrigin}/api/auth/login/`, {
       data: {
         email: userEmail,
         password: userPassword,
@@ -81,8 +115,19 @@ export async function login(page: Page, email?: string, password?: string, force
     });
   }
   expect(loginResponse.ok(), `El login backend debe responder 2xx, status=${loginResponse.status()}`).toBe(true);
+  const sessionSnapshot = normalizeLoginSession(await loginResponse.json());
 
-  const profileResponse = await page.request.get('/backend/api/auth/profile/');
+  await page.addInitScript(
+    ({ storageKey, session }) => {
+      window.localStorage.setItem(storageKey, JSON.stringify(session));
+      window.sessionStorage.setItem(storageKey, JSON.stringify(session));
+    },
+    { storageKey: AUTH_SESSION_STORAGE_KEY, session: sessionSnapshot },
+  );
+
+  const profileResponse = await page.request.get(`${apiOrigin}/api/auth/profile/`, {
+    headers: { Authorization: `Bearer ${sessionSnapshot.access_token}` },
+  });
   expect(profileResponse.ok(), `La cookie de sesión debe autenticar profile, status=${profileResponse.status()}`).toBe(true);
 
   await page.goto('/dashboard/', { waitUntil: 'domcontentloaded', timeout: 60000 });

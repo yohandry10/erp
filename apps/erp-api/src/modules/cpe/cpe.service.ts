@@ -267,10 +267,13 @@ export class CpeService {
   }
 
   private getDocumentoKeyFromCpe(cpeRecord: any) {
-    const tipoDocumento =
-      cpeRecord.tipo_documento === '03' || cpeRecord.tipo_documento === 'BOLETA'
-        ? 'BOLETA'
-        : 'FACTURA';
+    const tipoDocumentoSunat = this.normalizeTipoDocumentoSunat(cpeRecord.tipo_documento);
+    if (!['01', '03'].includes(tipoDocumentoSunat)) {
+      throw new BadRequestException(
+        `No se puede crear documento operativo directo para tipo CPE ${tipoDocumentoSunat}`,
+      );
+    }
+    const tipoDocumento = tipoDocumentoSunat === '03' ? 'BOLETA' : 'FACTURA';
     const numero =
       cpeRecord.numero != null
         ? String(cpeRecord.numero).padStart(8, '0')
@@ -462,6 +465,35 @@ export class CpeService {
       codigoDepartamento: '',
       regimenFiscal: typedData?.dian_regimen_fiscal ?? '',
       tipoContribuyente: typedData?.dian_tipo_contribuyente ?? '',
+    };
+  }
+
+  private async getEmpresaEmisorInfoStrict(tenantId: string) {
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .from('empresa_config')
+      .select('ruc, razon_social, direccion_fiscal, ubigeo, departamento, provincia')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(`No se pudo leer la configuracion fiscal de la empresa: ${error.message}`);
+    }
+
+    const typedData = data as any;
+    const ruc = String(typedData?.ruc || '').trim();
+    const razonSocial = String(typedData?.razon_social || '').trim();
+    if (!/^\d{11}$/.test(ruc) || !razonSocial) {
+      throw new BadRequestException('No se puede crear el CPE: faltan RUC o razon social reales en empresa_config');
+    }
+
+    return {
+      ruc,
+      razonSocial,
+      direccion: typedData?.direccion_fiscal ?? '',
+      ciudad: typedData?.provincia ?? '',
+      departamento: typedData?.departamento ?? '',
+      codigoUbigeo: typedData?.ubigeo ?? '',
     };
   }
 
@@ -797,6 +829,63 @@ export class CpeService {
     }
   }
 
+  async createFromComprobantePayload(payload: any, tenantId: string, userId?: string): Promise<FacturaDto> {
+    const tipoDocumento = this.normalizeTipoDocumentoSunat(
+      payload?.tipo_documento ?? payload?.tipoComprobante ?? payload?.tipo_comprobante,
+    );
+    const serie = String(payload?.serie || this.defaultSerieForTipo(tipoDocumento)).trim().toUpperCase();
+    const numero = await this.resolveNumeroCpe(tenantId, tipoDocumento, serie, payload?.numero ?? payload?.correlativo);
+    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
+    const documentoReceptor = String(
+      payload?.documento_receptor ?? payload?.clienteRuc ?? payload?.clienteDocumento ?? '',
+    ).replace(/\D/g, '');
+    const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
+      tipoDocumento,
+      payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,
+      documentoReceptor,
+    );
+    const razonSocialReceptor = String(
+      payload?.razon_social_receptor ?? payload?.clienteRazonSocial ?? payload?.clienteNombre ?? '',
+    ).trim();
+    if (!razonSocialReceptor) {
+      throw new BadRequestException('El receptor del CPE requiere razón social o nombre');
+    }
+
+    const items = this.normalizeComprobanteItems(payload?.items);
+    const totalGravadas = this.roundMoney(
+      payload?.total_gravadas ?? payload?.subtotal ?? items.reduce((sum, item) => sum + item.valor_venta, 0),
+    );
+    const totalIgv = this.roundMoney(
+      payload?.total_igv ?? payload?.totalIgv ?? items.reduce((sum, item) => sum + item.igv, 0),
+    );
+    const totalVenta = this.roundMoney(payload?.total_venta ?? payload?.total ?? totalGravadas + totalIgv);
+
+    const dto: CreateFacturaDto = {
+      tipo_documento: tipoDocumento as any,
+      serie,
+      numero,
+      ruc_emisor: emisor.ruc,
+      razon_social_emisor: emisor.razonSocial,
+      tipo_documento_receptor: tipoDocumentoReceptor,
+      documento_receptor: documentoReceptor,
+      razon_social_receptor: razonSocialReceptor,
+      direccion_receptor: payload?.direccion_receptor ?? payload?.clienteDireccion ?? '',
+      moneda: payload?.moneda || 'PEN',
+      items,
+      total_gravadas: totalGravadas,
+      total_igv: totalIgv,
+      total_venta: totalVenta,
+      fecha_emision: payload?.fecha_emision ?? payload?.fechaEmision,
+      fecha_vencimiento: payload?.fecha_vencimiento ?? payload?.fechaVencimiento,
+      idempotency_key:
+        payload?.idempotency_key ??
+        payload?.idempotencyKey ??
+        `cpe.ui:${tenantId}:${tipoDocumento}:${serie}:${numero}`,
+    } as CreateFacturaDto;
+
+    return this.create(dto, tenantId, userId);
+  }
+
   async crearCPEDesdeDocumento(documento: DocumentoFiscal, tenantId: string) {
     const client = this.supabaseService.getClient();
     const idempotencyKey = `doc.cpe:${documento.id}`;
@@ -816,7 +905,7 @@ export class CpeService {
       return existente;
     }
 
-    const tipoDocumentoSunat = documento.tipo_documento === '01' ? 'FACTURA' : 'BOLETA';
+    const tipoDocumentoSunat = this.normalizeTipoDocumentoSunat(documento.tipo_documento);
     const correlativo = Number(documento.numero);
     const xmlBase = this.buildXmlFromDocumentoFiscal(documento);
     const xmlSigner = await this.getXmlSigner(tenantId);
@@ -1897,7 +1986,7 @@ ${new Date().toLocaleString()}
   }
 
   private getTipoComprobanteText(tipo: string): string {
-    switch (tipo) {
+    switch (this.normalizeTipoDocumentoSunat(tipo, false) || tipo) {
       case '01':
         return 'Factura';
       case '03':
@@ -1911,6 +2000,163 @@ ${new Date().toLocaleString()}
       default:
         return tipo || 'Desconocido';
     }
+  }
+
+  private normalizeTipoDocumentoSunat(
+    tipo: string | null | undefined,
+    throwOnUnknown = true,
+  ): string {
+    const normalized = String(tipo || '').trim().toUpperCase();
+    const map: Record<string, string> = {
+      '01': '01',
+      FACTURA: '01',
+      'FACTURA ELECTRONICA': '01',
+      'FACTURA ELECTRÓNICA': '01',
+      '03': '03',
+      BOLETA: '03',
+      'BOLETA DE VENTA': '03',
+      'BOLETA DE VENTA ELECTRONICA': '03',
+      'BOLETA DE VENTA ELECTRÓNICA': '03',
+      '07': '07',
+      NOTA_CREDITO: '07',
+      'NOTA CREDITO': '07',
+      'NOTA CRÉDITO': '07',
+      'NOTA DE CREDITO': '07',
+      'NOTA DE CRÉDITO': '07',
+      '08': '08',
+      NOTA_DEBITO: '08',
+      'NOTA DEBITO': '08',
+      'NOTA DÉBITO': '08',
+      'NOTA DE DEBITO': '08',
+      'NOTA DE DÉBITO': '08',
+    };
+
+    const sunatCode = map[normalized];
+    if (!sunatCode && throwOnUnknown) {
+      throw new BadRequestException(`Tipo de documento CPE no soportado: ${tipo || '(vacio)'}`);
+    }
+
+    return sunatCode || '';
+  }
+
+  private defaultSerieForTipo(tipoDocumento: string): string {
+    switch (tipoDocumento) {
+      case '01':
+        return 'F001';
+      case '03':
+        return 'B001';
+      case '07':
+        return 'FC01';
+      case '08':
+        return 'FD01';
+      default:
+        return 'F001';
+    }
+  }
+
+  private async resolveNumeroCpe(
+    tenantId: string,
+    tipoDocumento: string,
+    serie: string,
+    provided?: any,
+  ): Promise<number> {
+    const numericProvided = Number(provided);
+    if (Number.isFinite(numericProvided) && numericProvided > 0) {
+      return Math.trunc(numericProvided);
+    }
+
+    const { data, error } = await this.supabaseService
+      .getClient()
+      .rpc('obtener_siguiente_numero_documento', {
+        p_tenant_id: tenantId,
+        p_tipo_documento: tipoDocumento,
+        p_serie: serie,
+      });
+
+    if (error) {
+      throw new BadRequestException(`No se pudo obtener el correlativo CPE: ${error.message}`);
+    }
+
+    const next = Number(Array.isArray(data) ? data[0] : data);
+    if (!Number.isFinite(next) || next <= 0) {
+      throw new BadRequestException(`Correlativo CPE invalido para ${tipoDocumento}-${serie}: ${data}`);
+    }
+
+    return Math.trunc(next);
+  }
+
+  private resolveTipoDocumentoReceptor(
+    tipoDocumentoCpe: string,
+    provided: any,
+    documentoReceptor: string,
+  ): string {
+    const normalized = String(provided || '').trim().toUpperCase();
+    const map: Record<string, string> = {
+      '1': '1',
+      DNI: '1',
+      '6': '6',
+      RUC: '6',
+      '4': '4',
+      CE: '4',
+      CARNET_EXTRANJERIA: '4',
+      '7': '7',
+      PASAPORTE: '7',
+    };
+    const resolved = map[normalized] || (documentoReceptor.length === 11 ? '6' : '1');
+
+    if (tipoDocumentoCpe === '01' && resolved !== '6') {
+      throw new BadRequestException('La factura requiere receptor con RUC');
+    }
+
+    return resolved;
+  }
+
+  private normalizeComprobanteItems(items: any[]): any[] {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new BadRequestException('El comprobante debe incluir al menos un item');
+    }
+
+    return items.map((item, index) => {
+      const cantidad = this.roundMoney(item?.cantidad ?? 0, 6);
+      const valorUnitario = this.roundMoney(
+        item?.valor_unitario ?? item?.valorUnitario ?? item?.precio_unitario ?? item?.precioUnitario ?? 0,
+        6,
+      );
+      const valorVenta = this.roundMoney(
+        item?.valor_venta ?? item?.valorVenta ?? cantidad * valorUnitario,
+      );
+      const igv = this.roundMoney(item?.igv ?? item?.impuesto_igv ?? item?.total_impuestos ?? 0);
+      const total = this.roundMoney(item?.total ?? item?.precio_venta ?? valorVenta + igv);
+      const precioUnitario = this.roundMoney(item?.precio_unitario ?? item?.precioUnitario ?? valorUnitario, 6);
+
+      if (cantidad <= 0) {
+        throw new BadRequestException(`El item ${index + 1} debe tener cantidad > 0`);
+      }
+      if (!String(item?.descripcion || '').trim()) {
+        throw new BadRequestException(`El item ${index + 1} requiere descripcion`);
+      }
+
+      return {
+        codigo: String(item?.codigo ?? item?.codigo_producto ?? `ITEM-${index + 1}`).trim(),
+        descripcion: String(item.descripcion).trim(),
+        cantidad,
+        unidad: String(item?.unidad ?? item?.unidad_medida ?? item?.unidadMedida ?? 'NIU').trim().toUpperCase(),
+        precio_unitario: precioUnitario,
+        valor_venta: valorVenta,
+        igv,
+        precio_venta: total,
+        total,
+      };
+    });
+  }
+
+  private roundMoney(value: any, decimals = 2): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return 0;
+    }
+
+    return Number(numeric.toFixed(decimals));
   }
 
   async getStatsFromDatabase(tenantId?: string) {

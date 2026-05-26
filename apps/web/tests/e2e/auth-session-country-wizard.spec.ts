@@ -27,6 +27,7 @@ function getOperationalPassword(): string {
 }
 
 const adminAuthFile = path.join(__dirname, '.auth', 'admin.json');
+const AUTH_SESSION_STORAGE_KEY = 'erp.auth.session.snapshot';
 const adminEmail = process.env.TEST_USER_EMAIL || 'admin@erp.local';
 const adminPassword = getOperationalPassword();
 const standardPassword = 'StdUserProd2026!';
@@ -39,6 +40,26 @@ type BrowserEvidence = {
 
 function getBaseURL(testInfo: { project: { use: Record<string, unknown> } }) {
   return String(testInfo.project.use.baseURL || process.env.BASE_URL || 'http://localhost:3001');
+}
+
+function getApiOrigin() {
+  return process.env.E2E_API_ORIGIN || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+}
+
+function readStoredAdminToken(): string | null {
+  try {
+    const storageState = JSON.parse(fs.readFileSync(adminAuthFile, 'utf8')) as {
+      origins?: Array<{ localStorage?: Array<{ name: string; value: string }> }>;
+    };
+    for (const origin of storageState.origins || []) {
+      const raw = origin.localStorage?.find((item) => item.name === AUTH_SESSION_STORAGE_KEY)?.value;
+      if (!raw) continue;
+      return JSON.parse(raw)?.access_token || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function attachBrowserEvidence(page: Page): BrowserEvidence {
@@ -123,7 +144,13 @@ async function loginThroughUi(page: Page, email: string, password: string) {
 }
 
 async function adminContext(baseURL: string): Promise<APIRequestContext> {
-  return request.newContext({ baseURL, storageState: adminAuthFile });
+  void baseURL;
+  const token = readStoredAdminToken();
+  return request.newContext({
+    baseURL: getApiOrigin(),
+    storageState: adminAuthFile,
+    extraHTTPHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
 }
 
 async function createStandardUser(baseURL: string) {
@@ -132,7 +159,7 @@ async function createStandardUser(baseURL: string) {
   const email = `standard-auth-${unique}@erp-e2e.local`;
 
   try {
-    const response = await api.post('/backend/api/users', {
+    const response = await api.post('/api/users', {
       data: {
         nombre: 'Usuario',
         apellido: 'Estandar Auth',
@@ -158,10 +185,18 @@ async function createStandardUser(baseURL: string) {
 }
 
 async function loginApi(baseURL: string, email: string, password: string) {
-  const api = await request.newContext({ baseURL });
-  const login = await api.post('/backend/api/auth/login', { data: { email, password } });
+  void baseURL;
+  const api = await request.newContext({ baseURL: getApiOrigin() });
+  const login = await api.post('/api/auth/login', { data: { email, password } });
   expect(login.ok(), `login API HTTP ${login.status()}: ${await login.text()}`).toBe(true);
-  return api;
+  const body = await login.json().catch(() => ({}));
+  const token = body.access_token || body.token || body.data?.access_token || body.data?.token;
+  if (!token) return api;
+  await api.dispose();
+  return request.newContext({
+    baseURL: getApiOrigin(),
+    extraHTTPHeaders: { Authorization: `Bearer ${token}` },
+  });
 }
 
 test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
@@ -197,9 +232,9 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     await expectDashboardReady(page);
 
     const api = await request.newContext({ baseURL, storageState: await context.storageState() });
-    const refresh = await api.post('/backend/api/auth/refresh');
+    const refresh = await api.post('/api/auth/refresh');
     expect(refresh.ok(), `refresh de sesión HTTP ${refresh.status()}: ${await refresh.text()}`).toBe(true);
-    const profile = await api.get('/backend/api/auth/profile');
+    const profile = await api.get('/api/auth/profile');
     expect(profile.ok(), `profile post-refresh HTTP ${profile.status()}: ${await profile.text()}`).toBe(true);
     await api.dispose();
 
@@ -222,15 +257,15 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     await expect(page).not.toHaveURL(/\/dashboard\/wizard/);
 
     const standardApi = await loginApi(baseURL, standardUser.email, standardUser.password);
-    const status = await standardApi.get('/backend/api/configuration/context/status');
+    const status = await standardApi.get('/api/configuration/context/status');
     expect(status.ok(), `estado seguro de configuración HTTP ${status.status()}: ${await status.text()}`).toBe(true);
-    const country = await standardApi.get('/backend/api/configuration/context/country');
+    const country = await standardApi.get('/api/configuration/context/country');
     expect(country.ok(), `contexto de país HTTP ${country.status()}: ${await country.text()}`).toBe(true);
     const countryBody = await country.json();
     expect(countryBody.data.pais).toBeTruthy();
     expect(countryBody.data.pais_id).toBeTruthy();
 
-    const forbiddenWizardWrite = await standardApi.post('/backend/api/configuration/wizard/step', {
+    const forbiddenWizardWrite = await standardApi.post('/api/configuration/wizard/step', {
       data: { pasoActual: 1, configuracionTemporal: { prueba: true } },
     });
     expect(forbiddenWizardWrite.status(), 'usuario sin permiso no debe guardar wizard').toBe(403);
@@ -245,13 +280,13 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     const standardUser = await createStandardUser(baseURL);
 
     const adminApi = await adminContext(baseURL);
-    const empresa = await adminApi.get('/backend/api/configuration/empresa');
+    const empresa = await adminApi.get('/api/configuration/empresa');
     expect(empresa.ok(), `lectura empresa admin HTTP ${empresa.status()}: ${await empresa.text()}`).toBe(true);
     const empresaBody = await empresa.json();
     expect(empresaBody.data.pais).toBeTruthy();
     expect(empresaBody.data.pais_id).toBeTruthy();
 
-    const adminWrite = await adminApi.put('/backend/api/configuration/empresa', {
+    const adminWrite = await adminApi.put('/api/configuration/empresa', {
       data: {
         pais: empresaBody.data.pais,
         pais_id: empresaBody.data.pais_id,
@@ -267,7 +302,7 @@ test.describe('Auth, sesión, país/empresa, wizard y permisos', () => {
     await adminApi.dispose();
 
     const standardApi = await loginApi(baseURL, standardUser.email, standardUser.password);
-    const standardWrite = await standardApi.put('/backend/api/configuration/empresa', {
+    const standardWrite = await standardApi.put('/api/configuration/empresa', {
       data: {
         pais: empresaBody.data.pais,
         pais_id: empresaBody.data.pais_id,

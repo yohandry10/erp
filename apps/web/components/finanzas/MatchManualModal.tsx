@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format-utils';
+import { fetchApi } from '@/lib/api-fetch';
 
 interface MovimientoBancario {
   id: string;
@@ -44,8 +45,6 @@ export default function MatchManualModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = '/backend';
-
   const loadMovimientos = useCallback(async () => {
     if (!conciliacionId) return;
 
@@ -53,8 +52,8 @@ export default function MatchManualModal({
     setError(null);
     try {
       // Get conciliación details to get cuenta_bancaria_id
-      const conciliacionResponse = await fetch(
-        `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}`,
+      const conciliacionResponse = await fetchApi(
+        `/api/finanzas/conciliacion/${conciliacionId}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -73,8 +72,8 @@ export default function MatchManualModal({
       const fechaHasta = conciliacionData.data.fecha_hasta;
 
       // Load movimientos del sistema (no conciliados)
-      const sistemaResponse = await fetch(
-        `${API_BASE_URL}/api/finanzas/bancos/cuentas/${cuentaBancariaId}/movimientos?` +
+      const sistemaResponse = await fetchApi(
+        `/api/finanzas/bancos/cuentas/${cuentaBancariaId}/movimientos?` +
           `fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&conciliado=false&es_extracto=false`,
         {
           headers: {
@@ -90,8 +89,8 @@ export default function MatchManualModal({
       }
 
       // Load movimientos del extracto (no conciliados)
-      const extractoResponse = await fetch(
-        `${API_BASE_URL}/api/finanzas/bancos/cuentas/${cuentaBancariaId}/movimientos?` +
+      const extractoResponse = await fetchApi(
+        `/api/finanzas/bancos/cuentas/${cuentaBancariaId}/movimientos?` +
           `fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&conciliado=false&es_extracto=true&conciliacion_id=${conciliacionId}`,
         {
           headers: {
@@ -111,7 +110,7 @@ export default function MatchManualModal({
     } finally {
       setLoading(false);
     }
-  }, [API_BASE_URL, conciliacionId]);
+  }, [conciliacionId]);
 
   useEffect(() => {
     if (isOpen && conciliacionId) {
@@ -129,8 +128,8 @@ export default function MatchManualModal({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}/marcar-item`,
+      const response = await fetchApi(
+        `/api/finanzas/conciliacion/${conciliacionId}/marcar-item`,
         {
           method: 'POST',
           headers: {

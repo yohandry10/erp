@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { fetchApi } from '@/lib/api-fetch';
 
 const PagosPage = () => {
   const [pagos, setPagos] = useState<any[]>([]);
@@ -28,8 +29,6 @@ const PagosPage = () => {
     variant: 'default'
   });
 
-  // Definir API_BASE_URL
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
 
   const loadData = useCallback(async () => {
@@ -104,11 +103,7 @@ const PagosPage = () => {
 
   const generarComprobante = async (pagoId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/pagos/${pagoId}/comprobante`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetchApi(`/api/rrhh/pagos/${pagoId}/comprobante`);
       
       if (response.ok) {
         const blob = await response.blob();

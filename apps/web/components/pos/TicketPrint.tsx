@@ -9,6 +9,7 @@ interface TicketPrintProps {
     total: number
     subtotal: number
     impuestos: number
+    tipo_comprobante?: '01' | '03'
     cliente_nombre?: string
     fecha?: string
     items?: Array<{
@@ -33,7 +34,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
   const documentoFiscal = country.documentoFiscal || 'RUC'
   const taxLabel = country.impuesto || 'IGV (18%)'
   const currencySymbol = country.simboloMoneda || 'S/'
-  const documentoLabel = country.paisCodigo === 'PE' ? 'BOLETA' : 'TICKET'
+  const documentoLabel = getDocumentoLabel(country.paisCodigo, ventaData.tipo_comprobante)
 
   const handlePrint = useCallback(() => {
     if (!ticketRef.current) return
@@ -51,6 +52,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
       <html>
       <head>
         <title>Ticket ${ventaData.numero_ticket}</title>
+        <style>${getTicketPrintStyles()}</style>
       </head>
       <body>
         ${printContent}
@@ -160,7 +162,7 @@ export function printTicket(
   const currencySymbol = context?.currencySymbol ?? 'S/'
   const taxLabel = context?.taxLabel ?? 'IGV (18%)'
   const documentoFiscal = context?.documentoFiscal ?? 'RUC'
-  const documentoLabel = context?.documentoLabel ?? 'BOLETA'
+  const documentoLabel = context?.documentoLabel ?? getDocumentoLabel('PE', ventaData.tipo_comprobante)
   const formatMoney = (value: number) => `${currencySymbol} ${value.toFixed(2)}`
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return new Date().toLocaleString('es-PE')
@@ -196,6 +198,7 @@ export function printTicket(
     <html>
     <head>
       <title>Ticket ${ventaData.numero_ticket}</title>
+      <style>${getTicketPrintStyles()}</style>
     </head>
     <body>
       <div class="header">
@@ -226,4 +229,40 @@ export function printTicket(
     printWindow.focus()
     printWindow.print()
   }
+}
+
+function getDocumentoLabel(countryCode?: string, tipoComprobante?: string): string {
+  if (countryCode !== 'PE') return 'TICKET'
+  if (tipoComprobante === '01') return 'FACTURA'
+  if (tipoComprobante === '03') return 'BOLETA'
+  return 'TICKET'
+}
+
+function getTicketPrintStyles(): string {
+  return `
+    @page { size: 80mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      width: 80mm;
+      margin: 0;
+      padding: 3mm;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .header, .footer { text-align: center; }
+    .empresa-nombre { font-size: 13px; font-weight: 700; text-transform: uppercase; }
+    .empresa-ruc, .fecha, .cliente { margin-top: 3px; }
+    .ticket-numero { margin-top: 6px; font-weight: 700; }
+    .logo img { max-width: 38mm; max-height: 18mm; object-fit: contain; margin-bottom: 3mm; }
+    .items { margin: 8px 0; border-top: 1px dashed #333; border-bottom: 1px dashed #333; padding: 5px 0; }
+    .item, .total-row { display: flex; justify-content: space-between; gap: 6px; }
+    .item + .item, .total-row + .total-row { margin-top: 3px; }
+    .item-nombre { flex: 1; overflow-wrap: anywhere; }
+    .item-precio { white-space: nowrap; text-align: right; }
+    .totales { margin-top: 6px; }
+    .total-final { border-top: 1px solid #111; padding-top: 4px; font-weight: 700; font-size: 13px; }
+    .footer { margin-top: 8px; border-top: 1px dashed #333; padding-top: 5px; }
+  `
 }

@@ -1,4 +1,4 @@
-const API_URL = '/backend';
+import { buildApiUrl } from './api-url';
 
 // Rutas públicas donde el middleware ya garantiza que NO hay sesión válida (si la
 // hubiera, redirigiría a /dashboard antes de renderizar). Cualquier llamada a
@@ -81,7 +81,7 @@ class AuthService {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch(`${API_URL}/api/auth/profile/`, {
+    const response = await fetch(buildApiUrl('/api/auth/profile/'), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ class AuthService {
     error: Error | null;
   }> {
     try {
-      const response = await fetch(`${API_URL}/api/auth/login/`, {
+      const response = await fetch(buildApiUrl('/api/auth/login/'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ class AuthService {
 
   async signOut(): Promise<{ error: Error | null }> {
     try {
-      await fetch(`${API_URL}/api/auth/logout/`, {
+      await fetch(buildApiUrl('/api/auth/logout/'), {
         method: 'POST',
         credentials: 'include',
       });
@@ -234,7 +234,7 @@ class AuthService {
   }> {
     try {
       void session;
-      const response = await fetch(`${API_URL}/api/auth/profile/`, {
+      const response = await fetch(buildApiUrl('/api/auth/profile/'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
