@@ -64,6 +64,8 @@ El entorno local/sandbox quedo validado funcionalmente. El documento fuente vige
 
 - `docs/production-readiness/ERP_PRODUCTION_READINESS.md`
 
+Nota 2026-05-24: este estado fue superado por auditorias forenses posteriores. Antes de release real tambien revisar `docs/CODEX_HANDOFF_2026-05-24.md`, `docs/auditoria_forense_contable_2026-05.md`, `docs/auditoria_forense_inventario_logistica_costeo_2026-05.md` y `docs/auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md`. La colision local de prefijo `333__` fue resuelta renumerando tesoreria a `334__treasury_cash_bank_forensic_closure.sql`.
+
 Resumen:
 
 - API local productiva `http://localhost:3002`: type-check/build/API tests OK.
@@ -81,7 +83,7 @@ Resumen:
   - Redis real responde `PONG`.
 - Checks administrativos finales OK:
   - `git diff --check`.
-  - migraciones `312..326` sin prefijos duplicados.
+  - migraciones `312..326` sin prefijos duplicados al corte del 2026-05-16.
   - `.env.local` ignorado por Git.
 - Migraciones remotas pendientes aplicadas manualmente con `psql` el 2026-05-16.
 - Pendientes reales antes de produccion: certificado SUNAT/OSE productivo, secretos productivos y email real si aplica.
@@ -90,6 +92,7 @@ Resumen:
 
 - Confirmar que el entorno productivo objetivo contiene las migraciones aplicadas manualmente el 2026-05-16.
 - Confirmar que el entorno productivo contiene `322..326` para onboarding multi-tenant, seed RBAC operativo, hardening del wrapper RPC y reconciliacion outbox.
+- Verificar que `327..335` no tenga prefijos duplicados y documentar si fueron aplicadas en el entorno destino.
 - Cargar certificado digital SUNAT/OSE productivo.
 - Cargar secretos productivos finales.
 - Configurar proveedor real de email si se usara correo en produccion.

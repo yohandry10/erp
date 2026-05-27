@@ -9,9 +9,10 @@ import { ComprobantesFilters } from '@/components/cpe/ComprobantesFilters'
 import { ComprobantesTable } from '@/components/cpe/ComprobantesTable'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { apiSucceeded, unwrapApiArray, unwrapApiObject } from '@/lib/api-contract'
+import { fetchApi } from '@/lib/api-fetch'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { FileText, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { FileText, Plus, ShieldCheck } from 'lucide-react'
 
 interface CpeDocument {
   id: string
@@ -62,7 +63,7 @@ export default function CPEPage() {
     moneda: ''
   })
 
-  const { get, post, loading } = useApiCall<CpeDocument[]>()
+  const { get, post } = useApiCall<CpeDocument[]>()
   const { get: getStats } = useApiCall<CpeStats>()
 
   const loadDocuments = useCallback(async () => {
@@ -142,6 +143,30 @@ export default function CPEPage() {
     }
   }
 
+  const openDownloadedBlob = async (endpoint: string, fallbackName: string) => {
+    const response = await fetchApi(endpoint, { method: 'GET' })
+    if (!response.ok) {
+      alert('No se pudo descargar el archivo')
+      return
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    link.download = fallbackName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const downloadPdf = async (documentId: string) => {
+    await openDownloadedBlob(`/api/cpe/comprobantes/${encodeURIComponent(documentId)}/pdf`, `cpe-${documentId}.pdf`)
+  }
+
   const openGreModal = (cpe: CpeDocument) => {
     console.log('🚚 Abriendo modal GRE con datos de CPE:', cpe)
     setSelectedCpeForGre(cpe)
@@ -190,17 +215,6 @@ export default function CPEPage() {
 
   const handleCpeCreated = () => {
     loadData() // Reload all data when a new CPE is created
-  }
-
-  if (loading && documents.length === 0) {
-    return (
-      <div className="min-h-screen bg-slate-950 p-5 text-slate-100">
-        <div className="mx-auto flex min-h-[420px] max-w-[1600px] flex-col items-center justify-center gap-3 rounded-3xl border border-cyan-400/20 bg-slate-950/75 shadow-2xl shadow-blue-950/30">
-          <RefreshCw className="h-8 w-8 animate-spin text-cyan-200" />
-          <p className="text-sm text-slate-300">Cargando comprobantes...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -258,7 +272,7 @@ export default function CPEPage() {
                 if (f.fechaDesde) params.append('fechaDesde', f.fechaDesde)
                 if (f.fechaHasta) params.append('fechaHasta', f.fechaHasta)
                 if (f.cliente) params.append('cliente', f.cliente)
-                window.open(`/api/cpe/comprobantes/export?${params.toString()}`, '_blank')
+                openDownloadedBlob(`/api/cpe/comprobantes/export?${params.toString()}`, 'cpe-export.csv')
               }}
             />
           </CardContent>
@@ -269,6 +283,7 @@ export default function CPEPage() {
             <ComprobantesTable
               documents={documents}
               onView={viewDocument}
+              onPdf={downloadPdf}
               onSend={sendToFiscal}
               onGre={openGreModal}
               fiscalLabel={fiscalLabel}

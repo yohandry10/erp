@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsUUID, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+import { IsUUID, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 
 const toOptionalBoolean = ({ value }: { value: unknown }) => {
   if (value === undefined || value === null || value === '') return undefined;
@@ -35,6 +35,7 @@ export class MarcarItemDto {
   })
   @IsOptional()
   @IsNumber()
+  @Min(0, { message: 'La diferencia no puede ser negativa' })
   diferencia?: number;
 
   @ApiProperty({

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, MapPin, Briefcase, GraduationCap, Star } from 'lucide-react';
+import { fetchApi } from '@/lib/api-fetch';
 
 interface CandidatoModalProps {
   isOpen: boolean;
@@ -11,12 +12,12 @@ interface CandidatoModalProps {
   vacantes: any[];
 }
 
-export default function CandidatoModalSimple({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
+export default function CandidatoModalSimple({
+  isOpen,
+  onClose,
+  onSuccess,
   candidato,
-  vacantes 
+  vacantes
 }: CandidatoModalProps) {
   const [formData, setFormData] = useState({
     id_vacante: '',
@@ -36,13 +37,13 @@ export default function CandidatoModalSimple({
     estado: 'postulante',
     observaciones: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     console.log('🚀 CandidatoModalSimple - isOpen:', isOpen, 'candidato:', candidato)
-    
+
     if (!isOpen) {
       setFormData({
         id_vacante: '',
@@ -87,7 +88,7 @@ export default function CandidatoModalSimple({
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
-    
+
     if (!formData.nombres.trim()) newErrors.nombres = 'El nombre es requerido';
     if (!formData.apellidos.trim()) newErrors.apellidos = 'Los apellidos son requeridos';
     if (!formData.email.trim()) newErrors.email = 'El email es requerido';
@@ -100,9 +101,9 @@ export default function CandidatoModalSimple({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       // Calcular puntuación automática
@@ -118,7 +119,7 @@ export default function CandidatoModalSimple({
         fecha_postulacion: candidato?.fecha_postulacion || new Date().toISOString()
       };
 
-      const response = await fetch(candidato?.id ? `/api/rrhh/candidatos/${candidato.id}` : '/api/rrhh/candidatos', {
+      const response = await fetchApi(candidato?.id ? `/api/rrhh/candidatos/${candidato.id}` : '/api/rrhh/candidatos', {
         method: candidato?.id ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +144,7 @@ export default function CandidatoModalSimple({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // Limpiar error del campo
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
@@ -172,7 +173,7 @@ export default function CandidatoModalSimple({
               {candidato?.id ? 'Actualizar información del postulante' : 'Registrar nueva postulación de CV'}
             </p>
           </div>
-          
+
           <button
             onClick={onClose} className="w-10 h-10 rounded-full bg-[rgba(255,_255,_255,_0.2)] text-white border-0 cursor-pointer flex items-center justify-center font-bold text-5 transition"
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)'}
@@ -181,7 +182,7 @@ export default function CandidatoModalSimple({
             <X size={20} />
           </button>
         </div>
-        
+
         {/* Información de vacante seleccionada */}
         {vacanteSeleccionada && (
           <div className="mt-6 mr-8 mb-0 ml-8 p-4 bg-[#dbeafe] rounded-2 border">
@@ -202,7 +203,7 @@ export default function CandidatoModalSimple({
               <User size={20} className="text-blue-500" />
               Información Personal
             </h3>
-            
+
             <div className="grid grid-cols-[1fr_1fr] gap-4 mb-4">
               <div>
                 <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
@@ -327,7 +328,7 @@ export default function CandidatoModalSimple({
               <Briefcase size={20} className="text-[#16a34a]" />
               Información Profesional
             </h3>
-            
+
             <div className="grid grid-cols-[1fr] gap-4 mb-4">
               <div>
                 <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
@@ -437,7 +438,7 @@ export default function CandidatoModalSimple({
               <Star size={20} className="text-amber-500" />
               Estado del Proceso
             </h3>
-            
+
             <div className="grid grid-cols-[1fr_2fr] gap-4">
               <div>
                 <label className="block text-[0.875rem] font-semibold text-gray-700 mb-2">
@@ -508,4 +509,4 @@ export default function CandidatoModalSimple({
       </div>
     </div>
   );
-} 
+}

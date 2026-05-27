@@ -1,10 +1,14 @@
 import { expect, test, APIResponse, Page, request as playwrightRequest, APIRequestContext } from '@playwright/test';
 import { login, gotoAuthenticated } from './helpers/auth';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
 const runId = Date.now().toString().slice(-9);
-const proveedorRuc = `20${runId}`;
+// RUC válido SUNAT (módulo 11). El backend rechaza checksums inválidos —
+// generar uno random sin calcular el dígito hacía fallar el test en ~91% de
+// los runs. Helper espeja el algoritmo del backend.
+const proveedorRuc = generateValidRucFromRunId(runId);
 const ordenNumero = `OC-T06-${runId}`;
 const productoCodigo = `T06-${runId}`;
 const cantidadCompra = 6;
@@ -151,15 +155,24 @@ test.describe('T06 Compras vertical completo', () => {
     const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
     expect(detalleId, 'la orden debe devolver el detalle creado para recepcionar').toBeTruthy();
 
-    const aprobada = await parseOk<any>(
-      await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-        data: {
-          aprobador_nombre: 'Admin Auditor T06',
-          comentarios: 'Aprobación funcional T06',
-        },
-      }),
-      'aprobar orden de compra',
-    );
+    // Segregación de funciones: el creador NO puede aprobar (SEC-001 fix). El
+    // aprobador autentica con su propio JWT y aprueba; aprobador_id ya no se
+    // acepta en el body.
+    const aprobadorCtx = await apiContextAsAprobador();
+    let aprobada: any;
+    try {
+      aprobada = await parseOk<any>(
+        await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+          data: {
+            aprobador_nombre: 'Admin Auditor T06',
+            comentarios: 'Aprobación funcional T06',
+          },
+        }),
+        'aprobar orden de compra',
+      );
+    } finally {
+      await aprobadorCtx.dispose();
+    }
     expect(aprobada.estado).toBe('APROBADA');
 
     await expectStatus(
@@ -329,8 +342,7 @@ test.describe('T06 Compras vertical completo', () => {
     await expect(page.getByRole('heading', { name: new RegExp(recepcionCerrada.numero) })).toBeVisible();
 
     await gotoAuthenticated(page, `/dashboard/compras/devoluciones/${devolucion.id}`);
-    await expect(page.getByRole('heading', { name: /Devolución/ })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('heading', { name: new RegExp(devolucion.numero) })).toBeVisible();
+    await expect(page.locator('h1').filter({ hasText: new RegExp(devolucion.numero) })).toBeVisible({ timeout: 15000 });
 
     await expect(page.locator('body')).not.toContainText(/Cargando|Error fatal|Unhandled|Application error/i);
     expect(browserFailures).toEqual([]);

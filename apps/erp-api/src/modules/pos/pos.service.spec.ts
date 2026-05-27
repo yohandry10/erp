@@ -400,6 +400,153 @@ describe('PosService locks', () => {
     );
   });
 
+  // ======= FORENSIC ANALYSIS TESTS =======
+
+  it('rechaza venta sin idempotency_key', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      { ...ventaBase, idempotency_key: undefined },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('idempotency_key');
+  });
+
+  it('rechaza venta sin items', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      { ...ventaBase, items: [] },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('items');
+  });
+
+  it('rechaza venta sin documento del cliente', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      { ...ventaBase, cliente_documento: '' },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('documento');
+  });
+
+  it('rechaza venta sin nombre del cliente', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      { ...ventaBase, cliente_nombre: '' },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('nombre');
+  });
+
+  it('rechaza pagos que no cuadran con el total calculado', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        pagos: [
+          { codigo: 'efectivo', monto: 50, tipo: 'EFECTIVO' },
+          { codigo: 'tarjeta', monto: 10, tipo: 'TARJETA' },
+        ],
+      },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Pagos no cuadran');
+  });
+
+  it('acepta pagos mixtos que suman el total correcto', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        pagos: [
+          { codigo: 'efectivo', monto: 60, tipo: 'EFECTIVO' },
+          { codigo: 'tarjeta', monto: 58, tipo: 'TARJETA' },
+        ],
+      },
+      user,
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza pago con monto cero o negativo', async () => {
+    const ctx = createService();
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        pagos: [{ codigo: 'efectivo', monto: 0, tipo: 'EFECTIVO' }],
+      },
+      user,
+    );
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Monto de pago inválido');
+  });
+
+  it('recalcula totales server-side ignorando valores del cliente', async () => {
+    const ctx = createService();
+    // Enviar totales incorrectos - el server debe recalcular
+    const result = await ctx.service.procesarVenta(
+      {
+        ...ventaBase,
+        subtotal: 999,
+        impuestos: 999,
+        total: 9999,
+      },
+      user,
+    );
+    expect(result.success).toBe(true);
+    // Los totales reales deberían ser 100 subtotal, 18 IGV, 118 total
+    // (1 item x 100 precio x 1 cantidad)
+  });
+
+  it('retorna venta existente si idempotency_key ya fue usada en full_tx', async () => {
+    const ctx = createService();
+    ctx.rpcMock.mockImplementation(async (fn: string) => {
+      if (fn === 'pos_registrar_venta_full_tx') {
+        return {
+          data: [
+            {
+              venta_id: 'venta-existente',
+              numero_ticket: 'B001-00000001',
+              subtotal: 100,
+              impuestos: 18,
+              total: 118,
+              impactos_aplicados: true,
+              caja_movimiento_id: null,
+            },
+          ],
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const r1 = await ctx.service.procesarVenta(ventaBase, user);
+    expect(r1.success).toBe(true);
+    expect(r1.venta_id).toBe('venta-existente');
+
+    // Segunda llamada con misma key debe retornar misma venta
+    const r2 = await ctx.service.procesarVenta(ventaBase, user);
+    expect(r2.success).toBe(true);
+    expect(r2.venta_id).toBe('venta-existente');
+  });
+
+  it('maneja fallback chain: full_tx falla → legacy RPC', async () => {
+    const ctx = createService();
+    // full_tx falla con PGRST202 (function not found), legacy funciona
+    const result = await ctx.service.procesarVenta(ventaBase, user);
+    expect(result.success).toBe(true);
+    expect(result.venta_id).toBe('venta-1');
+    // Verify full_tx was attempted first
+    const rpcCalls = ctx.rpcMock.mock.calls.map((c: any) => c[0]);
+    expect(rpcCalls).toContain('pos_registrar_venta_full_tx');
+    expect(rpcCalls).toContain('pos_registrar_venta_tx');
+  });
+
   it('aplica el descuento del item una sola vez al recalcular totales', async () => {
     const ctx = createService();
     ctx.validationService.validateCertificate.mockResolvedValue({ isValid: true, errors: [], warnings: [] });

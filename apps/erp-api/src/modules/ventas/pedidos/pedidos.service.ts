@@ -616,7 +616,7 @@ export class PedidosService {
       // Eliminar detalle anterior solo después de INSERT exitoso
       if (detalleAnterior && detalleAnterior.length > 0) {
         const idsAnteriores = detalleAnterior.map((d) => d.id);
-        await client.from('pedidos_venta_detalle').delete().in('id', idsAnteriores);
+        await client.from('pedidos_venta_detalle').delete().eq('tenant_id', tenantId).in('id', idsAnteriores);
       }
     }
 
@@ -1278,28 +1278,41 @@ export class PedidosService {
       }
     }
 
-    await this.updateEstado(id, EstadoPedido.CONFIRMADO, tenantId);
-
     const estadoCreditoFinal = forzarConfirmacion && evaluacion.requiereAprobacion
       ? 'APROBADO_MANUAL'
       : evaluacion.estadoCredito === 'BLOQUEADO'
         ? 'BLOQUEADO'
         : 'OK';
 
-    await client
-      .from('pedidos_venta')
-      .update({
-        requiere_aprobacion: false,
-        motivo_requiere_aprobacion: null,
-        aprobado_por: forzarConfirmacion && evaluacion.requiereAprobacion ? userId ?? null : null,
-        aprobado_en: forzarConfirmacion && evaluacion.requiereAprobacion ? new Date().toISOString() : null,
-        estado_credito: estadoCreditoFinal,
-      })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
+    try {
+      await this.updateEstado(id, EstadoPedido.CONFIRMADO, tenantId);
 
-    if (forzarConfirmacion && evaluacion.requiereAprobacion) {
-      await this.registrarDecisionAprobacion(id, tenantId, 'APROBADO', evaluacion.motivos, userId);
+      const { data: pedidoConfirmado, error: confirmarError } = await client
+        .from('pedidos_venta')
+        .update({
+          requiere_aprobacion: false,
+          motivo_requiere_aprobacion: null,
+          aprobado_por: forzarConfirmacion && evaluacion.requiereAprobacion ? userId ?? null : null,
+          aprobado_en: forzarConfirmacion && evaluacion.requiereAprobacion ? new Date().toISOString() : null,
+          estado_credito: estadoCreditoFinal,
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .select('id')
+        .maybeSingle();
+
+      if (confirmarError || !pedidoConfirmado) {
+        throw new BadRequestException('No se pudo persistir la confirmación del pedido');
+      }
+
+      if (forzarConfirmacion && evaluacion.requiereAprobacion) {
+        await this.registrarDecisionAprobacion(id, tenantId, 'APROBADO', evaluacion.motivos, userId);
+      }
+    } catch (error) {
+      if (!saltarReserva) {
+        await this.revertirReservasPedidoBestEffort(id, tenantId, pedido.estado);
+      }
+      throw error;
     }
 
     await this.registrarAuditoriaAccion(id, tenantId, userId, {
@@ -1331,6 +1344,52 @@ export class PedidosService {
       warnings: stockWarnings.length > 0 ? stockWarnings : undefined,
       estado_credito: estadoCreditoFinal,
     };
+  }
+
+  private async revertirReservasPedidoBestEffort(
+    pedidoId: string,
+    tenantId: string,
+    estadoAnterior?: string,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
+
+    try {
+      const { data: reservasCreadas } = await client
+        .from('movimientos_inventario')
+        .select('producto_id, cantidad')
+        .eq('referencia_tipo', 'PEDIDO')
+        .eq('referencia_id', pedidoId)
+        .eq('tipo', 'RESERVA')
+        .eq('tenant_id', tenantId);
+
+      for (const reserva of reservasCreadas ?? []) {
+        await client.rpc('decrementar_stock_reservado', {
+          p_producto_id: reserva.producto_id,
+          p_cantidad: reserva.cantidad,
+        });
+      }
+
+      await client
+        .from('movimientos_inventario')
+        .delete()
+        .eq('referencia_tipo', 'PEDIDO')
+        .eq('referencia_id', pedidoId)
+        .eq('tipo', 'RESERVA')
+        .eq('tenant_id', tenantId);
+
+      if (estadoAnterior) {
+        await client
+          .from('pedidos_venta')
+          .update({
+            estado: estadoAnterior,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', pedidoId)
+          .eq('tenant_id', tenantId);
+      }
+    } catch (rollbackError) {
+      this.logger.error('❌ [PedidosService] Error revirtiendo reservas tras fallo de confirmación:', rollbackError);
+    }
   }
 
   /**
@@ -1585,80 +1644,9 @@ export class PedidosService {
       }
     }
 
-    // 4. Si es flujo simplificado, descontar stock ahora (idempotente)
-    if (!config.usar_flujo_logistica) {
-      for (const item of pedido.detalle) {
-        const { data: salidaExistente, error: salidaExistenteError } = await client
-          .from('movimientos_inventario')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('referencia_tipo', 'PEDIDO')
-          .eq('referencia_id', id)
-          .eq('tipo', 'SALIDA')
-          .eq('producto_id', item.producto_id)
-          .limit(1);
-
-        if (salidaExistenteError) {
-          throw new BadRequestException('No se pudo verificar si ya se registró la salida de inventario');
-        }
-
-        const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
-
-        // Crear movimiento de SALIDA
-        if (!yaTieneSalidaRegistrada) {
-          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'SALIDA',
-            cantidad: item.cantidad,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: id,
-            notas: `Salida por facturación de pedido ${pedido.numero}`,
-          });
-
-          if (movimientoError) {
-            throw new BadRequestException('No se pudo registrar el movimiento de salida de inventario');
-          }
-        }
-
-        // Descontar stock (agregado) y liberar reserva
-        if (!yaTieneSalidaRegistrada) {
-          const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
-            p_producto_id: item.producto_id,
-            p_cantidad: item.cantidad,
-          });
-
-          if (salidaError) {
-            console.error('Error descontando stock al facturar:', salidaError);
-            throw new BadRequestException('No se pudo descontar el stock al facturar');
-          }
-        }
-
-        const { error: detalleDespachoError } = await client
-          .from('pedidos_venta_detalle')
-          .update({
-            cantidad_despachada: item.cantidad,
-            estado_item: 'DESPACHADO',
-          })
-          .eq('id', item.id)
-          .eq('tenant_id', tenantId);
-
-        if (detalleDespachoError) {
-          console.warn('No se pudo actualizar el detalle con la cantidad despachada al facturar:', detalleDespachoError);
-        }
-      }
-
-      // En flujo simplificado no existen pendiente, aseguramos limpiar backorders
-      const { error: backordersError } = await client
-        .from('pedido_backorders')
-        .delete()
-        .eq('pedido_id', id)
-        .eq('tenant_id', tenantId);
-
-      if (backordersError) {
-        console.warn('No se pudo limpiar backorders al facturar pedido:', backordersError);
-      }
-    }
+    // 4. En flujo simplificado el descuento de stock ocurre después de obtener
+    // el CPE idempotente. Así un fallo de SUNAT/CPE no deja stock descontado
+    // sin factura; si falla un paso local posterior, el reintento reutiliza el CPE.
 
     // 5. Integrar con CPE real
     const cpeIdempotencyKey = `ventas.cpe.factura:${tenantId}:${pedido.id}`;
@@ -1668,6 +1656,11 @@ export class PedidosService {
       cpeIdempotencyKey,
       userId,
     );
+
+    if (!config.usar_flujo_logistica) {
+      await this.aplicarSalidaStockFacturacionSimplificada(pedido, tenantId);
+    }
+
     const facturaDocumentoId = facturaResultado.documento_id ?? null;
 
     const ajustesTributarios = this.calcularAjustesTributarios(
@@ -1683,7 +1676,7 @@ export class PedidosService {
     );
 
     // 6. Actualizar pedido con factura_id y estado
-    await client
+    const { data: pedidoFacturado, error: updatePedidoFacturadoError } = await client
       .from('pedidos_venta')
       .update({
         factura_id: facturaResultado.factura_id,
@@ -1691,7 +1684,13 @@ export class PedidosService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .select('id')
+      .maybeSingle();
+
+    if (updatePedidoFacturadoError || !pedidoFacturado) {
+      throw new BadRequestException('No se pudo asociar la factura al pedido');
+    }
 
     pedido.factura_id = facturaResultado.factura_id;
 
@@ -1797,7 +1796,8 @@ export class PedidosService {
             cantidad_facturada: this.redondearCantidad(Number(item.cantidad_facturada ?? 0) + cantidadAFacturar),
             estado_item: 'FACTURADO',
           })
-          .eq('id', item.id);
+          .eq('id', item.id)
+          .eq('tenant_id', tenantId);
 
         if (updateDetalleFactura) {
           console.warn('No se pudo actualizar cantidad_facturada del detalle', updateDetalleFactura);
@@ -1818,6 +1818,71 @@ export class PedidosService {
    * Obtener stock disponible de un producto
    * Requirements: 6.1, 6.2
    */
+  private async aplicarSalidaStockFacturacionSimplificada(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tenantId: string,
+  ): Promise<void> {
+    const client = this.supabase.getClient();
+
+    for (const item of pedido.detalle) {
+      const { data: salidaExistente, error: salidaExistenteError } = await client
+        .from('movimientos_inventario')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('referencia_tipo', 'PEDIDO')
+        .eq('referencia_id', pedido.id)
+        .eq('tipo', 'SALIDA')
+        .eq('producto_id', item.producto_id)
+        .limit(1);
+
+      if (salidaExistenteError) {
+        throw new BadRequestException('No se pudo verificar si ya se registró la salida de inventario');
+      }
+
+      const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
+
+      if (!yaTieneSalidaRegistrada) {
+        const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
+          p_producto_id: item.producto_id,
+          p_cantidad: item.cantidad,
+          p_referencia_tipo: 'PEDIDO',
+          p_referencia_id: pedido.id,
+          p_notas: `Salida por facturación de pedido ${pedido.numero}`,
+        });
+
+        if (salidaError) {
+          console.error('Error descontando stock al facturar:', salidaError);
+          throw new BadRequestException('No se pudo descontar el stock al facturar');
+        }
+      }
+
+      const { data: detalleDespachado, error: detalleDespachoError } = await client
+        .from('pedidos_venta_detalle')
+        .update({
+          cantidad_despachada: item.cantidad,
+          estado_item: 'DESPACHADO',
+        })
+        .eq('id', item.id)
+        .eq('tenant_id', tenantId)
+        .select('id')
+        .maybeSingle();
+
+      if (detalleDespachoError || !detalleDespachado) {
+        throw new BadRequestException('No se pudo actualizar el detalle con la cantidad despachada al facturar');
+      }
+    }
+
+    const { error: backordersError } = await client
+      .from('pedido_backorders')
+      .delete()
+      .eq('pedido_id', pedido.id)
+      .eq('tenant_id', tenantId);
+
+    if (backordersError) {
+      throw new BadRequestException('No se pudieron limpiar los backorders al facturar pedido');
+    }
+  }
+
   private async getStockDisponible(productoId: string, tenantId: string): Promise<number> {
     const client = this.supabase.getClient();
 
@@ -2124,23 +2189,12 @@ export class PedidosService {
         const yaTieneSalidaRegistrada = Array.isArray(salidaExistente) && salidaExistente.length > 0;
 
         if (!yaTieneSalidaRegistrada) {
-          const { error: movimientoError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'SALIDA',
-            cantidad: item.cantidad,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: pedidoId,
-            notas: `Salida por documento fiscal de pedido ${pedido.numero}`,
-          });
-
-          if (movimientoError) {
-            throw new BadRequestException('No se pudo registrar el movimiento de salida de inventario');
-          }
-
           const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
             p_producto_id: item.producto_id,
             p_cantidad: item.cantidad,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: pedidoId,
+            p_notas: `Salida por documento fiscal de pedido ${pedido.numero}`,
           });
 
           if (salidaError) {
@@ -2335,7 +2389,7 @@ export class PedidosService {
       if (detallesError) {
         this.logger.error('Error creando detalles del documento:', detallesError);
         // Rollback: eliminar documento
-        await client.from('documentos').delete().eq('id', documento.id);
+        await client.from('documentos').delete().eq('id', documento.id).eq('tenant_id', tenantId);
         throw new BadRequestException('Error al crear los detalles del documento');
       }
 

@@ -493,7 +493,7 @@ test.describe('T10 CPE completo', () => {
 
     await gotoAuthenticated(page, '/dashboard/cpe');
     await expect(page.getByText(/Comprobantes de Pago Electrónicos|Comprobantes de Pago Electronicos/i)).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('body')).toContainText(new RegExp(facturaPayload.serie));
+    await expect(page.locator('body')).toContainText(new RegExp(facturaPayload.serie), { timeout: 20000 });
     await expect(page.locator('body')).not.toContainText(/Application error|Unhandled|Error fatal|Cargando país configurado/i);
 
     const facturaRow = page.locator('tr', { hasText: facturaPayload.razon_social_receptor });

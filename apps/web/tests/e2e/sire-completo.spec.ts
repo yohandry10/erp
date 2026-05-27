@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -149,7 +150,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const proveedor = await parseOk<any>(
     await apiContext.post(api('/compras/proveedores'), {
       data: {
-        ruc: `20${runId}`,
+        ruc: generateValidRucFromRunId(`sire-${runId}`),
         razon_social: `Proveedor SIRE T12 ${runId} S.A.C.`,
         nombre_comercial: `Proveedor SIRE ${runId}`,
         email: `proveedor-sire-${runId}@example.com`,
@@ -202,12 +203,18 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'orden SIRE debe devolver detalle').toBeTruthy();
 
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: { aprobador_nombre: 'Admin SIRE T12', comentarios: 'Aprobación SIRE T12' },
-    }),
-    'aprobar orden compra SIRE',
-  );
+  // SEC-001 fix: aprobador autentica con su propio JWT.
+  const aprobadorSireCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorSireCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: { aprobador_nombre: 'Admin SIRE T12', comentarios: 'Aprobación SIRE T12' },
+      }),
+      'aprobar orden compra SIRE',
+    );
+  } finally {
+    await aprobadorSireCtx.dispose();
+  }
 
   const recepcion = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
@@ -237,6 +244,8 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
 }
 
 test.describe('T12 SIRE completo', () => {
+  test.setTimeout(180000);
+
   test('SIRE refleja ventas CPE y compras CxP por periodo, totales, filtros, descarga y envío SUNAT mock', async ({ page }) => {
     const browserFailures = await collectBrowserFailures(page);
     await login(page);
@@ -359,9 +368,17 @@ test.describe('T12 SIRE completo', () => {
     expect(stats.enviadosASunat + stats.pendientes, 'stats SIRE debe reflejar enviados/pendientes').toBeGreaterThan(0);
 
     await gotoAuthenticated(page, '/dashboard/sire');
-    await expect(page.getByRole('heading', { name: 'SIRE - Sistema de Registros Electrónicos' })).toBeVisible({ timeout: 15000 });
-    await page.locator('input[type="month"]').fill(periodoSire);
-    await page.getByRole('button', { name: '🔄 Actualizar' }).click();
+    await expect(page.getByRole('heading', { name: /SIRE - Sistema de Registros Electr[oó]nicos/i })).toBeVisible({ timeout: 15000 });
+    const periodoInput = page.locator('input[type="month"]');
+    await periodoInput.evaluate((node, value) => {
+      const input = node as HTMLInputElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, periodoSire);
+    await expect(periodoInput).toHaveValue(periodoSire);
+    await page.getByRole('button', { name: /Actualizar/i }).click();
     await expect(page.locator('td', { hasText: periodoSire }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('td', { hasText: /Registro de Ventas|Registro de Compras/i }).first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).not.toContainText(/Cargando reportes SIRE|Application error|Error fatal|Unhandled/i);

@@ -240,6 +240,43 @@ describe('TesoreriaService', () => {
       );
     });
 
+    it('should reject cash payment when operation requires bancarizacion', async () => {
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({
+        data: { ...mockCxp, total: 2500, saldo: 2500 },
+        error: null,
+      });
+
+      const dto = {
+        cxp_id: 'cxp-123',
+        monto: 2500,
+        fecha_pago: '2024-01-15',
+        metodo_pago: 'EFECTIVO',
+      };
+
+      await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
+        'supera el umbral de bancarización',
+      );
+    });
+
+    it('should require bank reference when operation requires bancarizacion', async () => {
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({
+        data: { ...mockCxp, total: 2500, saldo: 2500 },
+        error: null,
+      });
+
+      const dto = {
+        cxp_id: 'cxp-123',
+        monto: 2500,
+        fecha_pago: '2024-01-15',
+        metodo_pago: 'TRANSFERENCIA',
+        cuenta_bancaria_id: 'cuenta-123',
+      };
+
+      await expect(service.registrarPago(tenantId, dto, userId)).rejects.toThrow(
+        'requiere referencia bancaria por bancarización',
+      );
+    });
+
     it('should throw BadRequestException if cuenta bancaria does not exist', async () => {
       mockQueryBuilder.maybeSingle
         .mockResolvedValueOnce({ data: mockCxp, error: null })

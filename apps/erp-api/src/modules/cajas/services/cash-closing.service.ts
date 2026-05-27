@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CashMovementsService, MovimientoCaja } from './cash-movements.service';
@@ -483,7 +483,21 @@ export class CashClosingService {
     ): Promise<void> {
         this.logger.warn(`REABRIENDO SESIÓN CERRADA: ${sesionId}, admin=${adminId}, razón=${razon}`);
 
-        // TODO: Validar que adminId tenga rol ADMIN
+        // Validar que adminId tenga rol ADMIN
+        const { data: adminRoles } = await this.supabase
+            .getClient()
+            .from('user_roles')
+            .select('roles(nombre)')
+            .eq('usuario_sistema_id', adminId)
+            .eq('tenant_id', tenantId);
+
+        const roleNames = (adminRoles || [])
+            .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
+            .filter(Boolean);
+
+        if (!roleNames.includes('ADMIN')) {
+            throw new ForbiddenException('Solo usuarios con rol ADMIN pueden reabrir sesiones cerradas');
+        }
 
         const { data: sesion } = await this.supabase
             .getClient()

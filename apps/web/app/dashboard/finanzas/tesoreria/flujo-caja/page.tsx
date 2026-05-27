@@ -85,6 +85,56 @@ interface FlujoCajaData {
 const fieldClass =
   'border-cyan-400/20 bg-slate-950/60 text-slate-100 shadow-inner shadow-cyan-950/20 focus:ring-cyan-400/40 group-data-[erp-theme=light]/dashboard:bg-white group-data-[erp-theme=light]/dashboard:text-slate-950'
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const normalizeFlujoCajaData = (raw: any): FlujoCajaData => ({
+  periodo: {
+    fecha_desde: raw?.periodo?.fecha_desde || '',
+    fecha_hasta: raw?.periodo?.fecha_hasta || '',
+    dias: toNumber(raw?.periodo?.dias),
+  },
+  cuentas_bancarias: Array.isArray(raw?.cuentas_bancarias) ? raw.cuentas_bancarias : [],
+  resumen: Array.isArray(raw?.resumen)
+    ? raw.resumen.map((resumen: any) => ({
+        moneda: resumen?.moneda || 'PEN',
+        saldo_actual: toNumber(resumen?.saldo_actual),
+        total_ingresos: toNumber(resumen?.total_ingresos),
+        total_egresos: toNumber(resumen?.total_egresos),
+        flujo_neto: toNumber(resumen?.flujo_neto),
+        saldo_proyectado: toNumber(resumen?.saldo_proyectado),
+        alerta: resumen?.alerta ?? null,
+      }))
+    : [],
+  proyeccion: Array.isArray(raw?.proyeccion)
+    ? raw.proyeccion.map((dia: any) => ({
+        fecha: dia?.fecha || '',
+        moneda: dia?.moneda || 'PEN',
+        saldo_inicial: toNumber(dia?.saldo_inicial),
+        ingresos: toNumber(dia?.ingresos),
+        egresos: toNumber(dia?.egresos),
+        flujo_neto: toNumber(dia?.flujo_neto),
+        saldo_final: toNumber(dia?.saldo_final),
+        items: Array.isArray(dia?.items)
+          ? dia.items.map((item: any) => ({
+              tipo: item?.tipo === 'EGRESO' ? 'EGRESO' : 'INGRESO',
+              concepto: item?.concepto || 'Movimiento',
+              descripcion: item?.descripcion || '',
+              monto: toNumber(item?.monto),
+              referencia_id: item?.referencia_id || '',
+            }))
+          : [],
+      }))
+    : [],
+  estadisticas: {
+    total_cxp_pendientes: toNumber(raw?.estadisticas?.total_cxp_pendientes),
+    total_cxc_pendientes: toNumber(raw?.estadisticas?.total_cxc_pendientes),
+    total_movimientos: toNumber(raw?.estadisticas?.total_movimientos),
+  },
+})
+
 export default function FlujoCajaPage() {
   const router = useRouter()
   const { get } = useApi()
@@ -101,7 +151,7 @@ export default function FlujoCajaPage() {
       const response = await get(`/api/finanzas/tesoreria/flujo-caja?dias_proyeccion=${diasProyeccion}`)
 
       if (response?.success) {
-        setFlujoCajaData(response.data)
+        setFlujoCajaData(normalizeFlujoCajaData(response.data))
       }
     } catch (error) {
       console.error('Error loading flujo de caja:', error)
@@ -119,7 +169,7 @@ export default function FlujoCajaPage() {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency,
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   const formatDate = (dateString: string) =>

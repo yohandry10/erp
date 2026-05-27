@@ -103,7 +103,7 @@ export class AsientosGeneratorService {
           sourceEventId
         );
         if (asientoExistente) {
-          console.log(
+          this.logger.warn(
             `⚠️ [Asientos] Asiento ya existe para evento ${sourceEventId}, retornando existente`
           );
           // Si el asiento ya existe, el evento igualmente debe salir del outbox
@@ -178,7 +178,8 @@ export class AsientosGeneratorService {
           .getClient()
           .from('asientos_contables')
           .delete()
-          .eq('id', asiento.id);
+          .eq('id', asiento.id)
+          .eq('tenant_id', tenantId);
         throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
       }
 
@@ -385,6 +386,28 @@ export class AsientosGeneratorService {
    */
   async reiniciarEventoFallido(eventId: string): Promise<boolean> {
     try {
+      const MAX_RESTARTS = 3;
+
+      // Check current restart count before resetting
+      const { data: evento, error: fetchError } = await this.supabaseService
+        .getClient()
+        .from('outbox_events')
+        .select('id, retry_count, payload')
+        .eq('event_id', eventId)
+        .in('status', ['failed', 'dead_letter'])
+        .maybeSingle();
+
+      if (fetchError || !evento) {
+        console.warn(`⚠️ [Asientos] Evento ${eventId} no encontrado o no está en estado fallido`);
+        return false;
+      }
+
+      const restartCount = (evento.payload as any)?.restart_count ?? 0;
+      if (restartCount >= MAX_RESTARTS) {
+        console.error(`❌ [Asientos] Evento ${eventId} alcanzó el límite de ${MAX_RESTARTS} reinicios`);
+        return false;
+      }
+
       const { error } = await this.supabaseService
         .getClient()
         .from('outbox_events')
@@ -393,7 +416,11 @@ export class AsientosGeneratorService {
           retry_count: 0,
           error_message: null,
           processed_at: null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          payload: {
+            ...(evento.payload as object),
+            restart_count: restartCount + 1,
+          },
         })
         .eq('event_id', eventId)
         .in('status', ['failed', 'dead_letter']);
@@ -435,6 +462,10 @@ export class AsientosGeneratorService {
         .from('outbox_events')
         .select('event_type, status')
         .in('status', ['failed', 'dead_letter']);
+
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
 
       const { data, error } = await query;
 
@@ -1003,9 +1034,20 @@ export class AsientosGeneratorService {
         ['20', '40', '42']
       );
 
+      // Validar que costo + igv = total (tolerancia 0.01)
+      const sumaDebitos = costo + igv;
+      const diferenciaCompra = Math.abs(sumaDebitos - total);
+      // Si hay diferencia por redondeo, ajustar igv para que debitos = creditos
+      const igvAjustado = diferenciaCompra > 0.001 ? (total - costo) : igv;
+      if (diferenciaCompra > 0.01) {
+        console.log(
+          `COMPRA_BALANCE_ADJUST costo=${costo} + igv=${igv} = ${sumaDebitos} != total=${total}, diff=${diferenciaCompra.toFixed(4)}, igvAjustado=${igvAjustado}`,
+        );
+      }
+
       const detalles: DetalleAsiento[] = [
         { cuenta_id: cuentas.get('20')!.id, debe: costo, haber: 0, concepto: 'Mercaderías', centro_costo_id },
-        { cuenta_id: cuentas.get('40')!.id, debe: igv, haber: 0, concepto: 'IGV Crédito Fiscal' },
+        { cuenta_id: cuentas.get('40')!.id, debe: igvAjustado, haber: 0, concepto: 'IGV Crédito Fiscal' },
         { cuenta_id: cuentas.get('42')!.id, debe: 0, haber: total, concepto: 'Proveedores' }
       ];
 
@@ -1187,6 +1229,56 @@ export class AsientosGeneratorService {
         await this.marcarEventoComoFallido(
           evento.event_id,
           `Error generando asiento de planilla: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Genera asiento de pago de planilla
+   * Dr 411 Remuneraciones por Pagar [monto]
+   *   Cr 10 Bancos [monto]
+   */
+  async generarAsientoPagoPlanilla(evento: any): Promise<AsientoContable> {
+    try {
+      const { tenant_id, fecha, monto } = evento;
+      const montoNum = Number(monto ?? 0);
+      const sourceEventId = evento.source_event_id || evento.planilla_id || evento.event_id;
+
+      const cuentas = await this.planCuentasService.obtenerCuentasPorCodigos(
+        tenant_id,
+        ['411', '10'],
+      );
+
+      const detalles: DetalleAsiento[] = [
+        {
+          cuenta_id: cuentas.get('411')!.id,
+          debe: montoNum,
+          haber: 0,
+          concepto: 'Pago de remuneraciones',
+        },
+        {
+          cuenta_id: cuentas.get('10')!.id,
+          debe: 0,
+          haber: montoNum,
+          concepto: 'Bancos - Pago planilla',
+        },
+      ];
+
+      return await this.generarAsiento(
+        tenant_id,
+        new Date(fecha),
+        `Pago de planilla ${evento.referencia || ''}`.trim(),
+        detalles,
+        evento.referencia,
+        sourceEventId,
+      );
+    } catch (error) {
+      if (evento.event_id) {
+        await this.marcarEventoComoFallido(
+          evento.event_id,
+          `Error generando asiento de pago planilla: ${error.message}`,
         );
       }
       throw error;

@@ -46,15 +46,10 @@ describe('ValidationService', () => {
     const tenantId = 'tenant-123';
 
     it('debe validar RUC peruano de 11 dígitos correctamente', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '20123456789', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'PE', nombre: 'Perú' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '20123456789', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe', paises: { codigo_iso: 'PE', nombre: 'Perú' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 
@@ -63,15 +58,10 @@ describe('ValidationService', () => {
     });
 
     it('debe rechazar RUC peruano con menos de 11 dígitos', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '2012345', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'PE', nombre: 'Perú' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '2012345', razon_social: 'Test SAC', direccion_fiscal: 'Av Test 123', pais_id: 'pais-pe', paises: { codigo_iso: 'PE', nombre: 'Perú' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 
@@ -80,15 +70,10 @@ describe('ValidationService', () => {
     });
 
     it('debe validar NIT colombiano usando ColombiaValidationService', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '900123456-1', razon_social: 'Test SAS', direccion_fiscal: 'Calle 123', pais_id: 'pais-co' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'CO', nombre: 'Colombia' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '900123456-1', razon_social: 'Test SAS', direccion_fiscal: 'Calle 123', pais_id: 'pais-co', paises: { codigo_iso: 'CO', nombre: 'Colombia' } },
+        error: null,
+      });
 
       colombiaService.validateNIT.mockReturnValue({ isValid: true });
 
@@ -99,15 +84,10 @@ describe('ValidationService', () => {
     });
 
     it('debe validar RUT chileno con formato correcto', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '12345678-9', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'CL', nombre: 'Chile' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '12345678-9', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl', paises: { codigo_iso: 'CL', nombre: 'Chile' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 
@@ -115,15 +95,10 @@ describe('ValidationService', () => {
     });
 
     it('debe rechazar RUT chileno con formato incorrecto', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '123456789', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'CL', nombre: 'Chile' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '123456789', razon_social: 'Test SpA', direccion_fiscal: 'Av Chile 123', pais_id: 'pais-cl', paises: { codigo_iso: 'CL', nombre: 'Chile' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 
@@ -132,15 +107,10 @@ describe('ValidationService', () => {
     });
 
     it('debe validar RFC mexicano con formato correcto', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: 'ABC123456XYZ', razon_social: 'Test SA de CV', direccion_fiscal: 'Calle MX 123', pais_id: 'pais-mx' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'MX', nombre: 'México' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: 'ABC123456XYZ', razon_social: 'Test SA de CV', direccion_fiscal: 'Calle MX 123', pais_id: 'pais-mx', paises: { codigo_iso: 'MX', nombre: 'México' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 
@@ -148,15 +118,10 @@ describe('ValidationService', () => {
     });
 
     it('debe detectar campos faltantes', async () => {
-      mockSupabaseClient.single
-        .mockResolvedValueOnce({
-          data: { ruc: '', razon_social: '', direccion_fiscal: '', pais_id: 'pais-pe' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { codigo_iso: 'PE', nombre: 'Perú' },
-          error: null,
-        });
+      mockSupabaseClient.single.mockResolvedValueOnce({
+        data: { ruc: '', razon_social: '', direccion_fiscal: '', pais_id: 'pais-pe', paises: { codigo_iso: 'PE', nombre: 'Perú' } },
+        error: null,
+      });
 
       const result = await service.validateRucConfiguration(tenantId);
 

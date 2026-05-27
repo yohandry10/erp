@@ -84,7 +84,7 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
     try {
       const { data, error } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('generar_cxp_en, moneda_defecto')
+        .select('generar_cxp_en, moneda_defecto, aplicar_retencion, retencion_tasa, aplicar_percepcion, percepcion_tasa, aplicar_detraccion, detraccion_tasa')
         .eq('tenant_id', tenantId)
         .single();
 
@@ -158,6 +158,20 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
         data.idempotencyKey ?? `recepcion:${data.tenantId}:${data.recepcionId}`;
 
       const moneda = data.moneda || empresaConfig?.moneda_defecto || 'PEN';
+      const ajustesTributarios = this.calcularAjustesTributariosCxP(
+        montosRecepcion.total,
+        empresaConfig,
+      );
+      const saldoInicial = this.calcularSaldoConAjustes(
+        montosRecepcion.total,
+        ajustesTributarios,
+      );
+      const estadoInicial =
+        saldoInicial <= 0
+          ? 'PAGADA'
+          : saldoInicial < montosRecepcion.total
+            ? 'PARCIAL'
+            : 'PENDIENTE';
 
       // Calcular fecha de vencimiento según condiciones de pago
       const condicionesPago = data.condicionesPago || proveedor?.condiciones_pago;
@@ -196,8 +210,13 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
           subtotal: montosRecepcion.subtotal,
           igv: montosRecepcion.igv,
           total: montosRecepcion.total,
-          saldo: montosRecepcion.total,
-          estado: 'PENDIENTE',
+          saldo: saldoInicial,
+          saldo_pendiente: saldoInicial,
+          retencion_total: ajustesTributarios.retencion,
+          percepcion_total: ajustesTributarios.percepcion,
+          detraccion_total: ajustesTributarios.detraccion,
+          anticipo_total: ajustesTributarios.anticipo,
+          estado: estadoInicial,
           referencia_tipo: 'RECEPCION',
           referencia_id: data.recepcionId,
           orden_id: data.ordenId,
@@ -235,7 +254,10 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
           subtotal: montosRecepcion.subtotal,
           igv: montosRecepcion.igv,
           total: montosRecepcion.total,
-          detraccion: null,
+          retencion: ajustesTributarios.retencion,
+          percepcion: ajustesTributarios.percepcion,
+          detraccion: ajustesTributarios.detraccion,
+          anticipo: ajustesTributarios.anticipo,
           moneda,
           tipoCambio: null,
           fechaEmision: data.fechaRecepcion,
@@ -358,6 +380,42 @@ export class ComprasCxpIntegrationService implements OnModuleInit {
     }
 
     return { estado, discrepancias };
+  }
+
+  private calcularAjustesTributariosCxP(
+    total: number,
+    empresaConfig?: any,
+  ): { retencion: number; percepcion: number; detraccion: number; anticipo: number } {
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const montoTotal = round2(Number(total || 0));
+    const retencion = empresaConfig?.aplicar_retencion && Number(empresaConfig?.retencion_tasa || 0) > 0
+      ? round2(montoTotal * (Number(empresaConfig.retencion_tasa) / 100))
+      : 0;
+    const percepcion = empresaConfig?.aplicar_percepcion && Number(empresaConfig?.percepcion_tasa || 0) > 0
+      ? round2(montoTotal * (Number(empresaConfig.percepcion_tasa) / 100))
+      : 0;
+    const detraccion = empresaConfig?.aplicar_detraccion && Number(empresaConfig?.detraccion_tasa || 0) > 0
+      ? round2(montoTotal * (Number(empresaConfig.detraccion_tasa) / 100))
+      : 0;
+
+    return {
+      retencion,
+      percepcion,
+      detraccion,
+      anticipo: 0,
+    };
+  }
+
+  private calcularSaldoConAjustes(
+    total: number,
+    ajustes: { retencion: number; percepcion: number; detraccion: number; anticipo: number },
+  ): number {
+    return Math.round(
+      Math.max(
+        Number(total || 0) - ajustes.retencion - ajustes.detraccion - ajustes.anticipo + ajustes.percepcion,
+        0,
+      ) * 100,
+    ) / 100;
   }
 
   /**

@@ -85,6 +85,11 @@ Se aplicaron con `psql --set=ON_ERROR_STOP=1`:
 - `319__rrhh_asistencia_sync_without_partial_on_conflict.sql`
 - `320__rbac_operational_roles_seed.sql`
 - `321__tesoreria_cxp_payment_idempotency.sql`
+- `322__tenant_creation_operational_rbac_seed.sql`
+- `323__tenant_creation_operational_rbac_public_rpc.sql`
+- `324__tenant_creation_operational_rbac_role_whitelist.sql`
+- `325__tenant_creation_rbac_rpc_execute_hardening.sql`
+- `326__outbox_accounting_event_id_reconciliation.sql`
 
 Nota: `321__tesoreria_cxp_payment_idempotency.sql` se habia creado inicialmente como `307__tesoreria_cxp_payment_idempotency.sql`, pero se renombro para evitar conflicto con `307__runtime_accounting_inventory_purchase_accounts.sql`.
 
@@ -98,6 +103,17 @@ Checks esperados:
 - `public.ux_movimientos_bancarios_tenant_idempotency_key_307` existe.
 - Roles operativos: `10`.
 - Permisos RBAC: `195`.
+- `public.seed_operational_rbac_for_tenant(uuid, uuid)` existe, no es ejecutable por `anon`/`authenticated` y si por `service_role`.
+- `outbox_events` queda sin `dead_letter`, `failed`, `pending` ni `processing` segun `ERP_PRODUCTION_READINESS.md`.
+
+## Nota posterior 2026-05-24
+
+El repositorio local contiene migraciones posteriores `327..335`. La colision temporal de prefijo `333__` fue resuelta renumerando tesoreria a `334__treasury_cash_bank_forensic_closure.sql`; `335__descontar_stock_authoritative.sql` corrige la salida autoritativa de inventario. Antes de aplicar en remoto o reconstruir una base limpia:
+
+- verificar que no existan prefijos duplicados;
+- documentar cuales archivos `327..335` se aplican;
+- ejecutar con `psql --set=ON_ERROR_STOP=1`;
+- correr los validadores runtime/smoke indicados en las auditorias forenses recientes.
 
 ## Importante
 

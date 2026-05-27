@@ -23,18 +23,17 @@ export function SessionProvider({
   session: Session | null
 }) {
   const [session, setSession] = useState<Session | null>(initialSession)
-  const [loading, setLoading] = useState(!initialSession)
+  // AuthProvider es la fuente de verdad para el estado de sesión; este provider
+  // solo refleja cambios. Iniciamos en false para que componentes que dependan de
+  // useSession() no se queden en estado de carga indefinido en rutas públicas.
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
-      // Cargar sesión inicial
-      customAuth.getSession().then(({ data }) => {
-        setSession(data.session)
-        setLoading(false)
-      })
-
-      // Escuchar cambios en la autenticación
+      // AuthProvider (mismo singleton authService) ya dispara getSession() en el árbol.
+      // Aquí solo nos suscribimos a los cambios para evitar una segunda llamada a
+      // /auth/profile que produce un 401 duplicado en consola cuando no hay cookie.
       const { data: { subscription } } = customAuth.onAuthStateChange((event, session) => {
         setSession(session)
         setLoading(false)

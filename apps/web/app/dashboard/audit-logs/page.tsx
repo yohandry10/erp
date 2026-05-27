@@ -6,19 +6,25 @@ import { AlertCircle } from 'lucide-react'
 
 /**
  * Página de logs de auditoría
- * Accesible para: SuperAdmin y Admin del tenant
+ * Accesible únicamente para: SuperAdmin
  */
 export default function AuditLogsPage() {
-  const { isSuperAdmin, user } = useTenant()
-  
-  // Verificar si el usuario es Admin del tenant
-  const userRoles: string[] = user?.roles || []
-  const isAdmin = userRoles.includes('ADMIN')
-  
-  // SuperAdmin o Admin del tenant pueden ver los logs
-  const canViewAuditLogs = isSuperAdmin || isAdmin
+  const { isSuperAdmin, loading } = useTenant()
 
-  if (!canViewAuditLogs) {
+  if (loading) {
+    return (
+      <div className="dashboard-container">
+        <div className="activity-card">
+          <div className="loading">
+            <div className="loading-spinner" />
+            <p>Validando acceso...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isSuperAdmin) {
     return (
       <div className="dashboard-container">
         <div className="activity-card">

@@ -111,29 +111,21 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = () => {
     setLoading(true)
 
-    // Simulación de login demo
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        if (selectedCountry) {
-          localStorage.setItem('selectedCountry', selectedCountry)
-        } else {
-          localStorage.removeItem('selectedCountry')
-        }
+    if (typeof window !== 'undefined') {
+      if (selectedCountry) {
+        localStorage.setItem('selectedCountry', selectedCountry)
+      } else {
+        localStorage.removeItem('selectedCountry')
       }
-      const list = (paises as Pais[]) || []
-      const selectedPais = list.find((p) => String(p.id) === selectedCountry)
-      toast({
-        title: 'Modo Demo',
-        description: selectedPais
-          ? `Accediendo al sistema en modo demostración - ${selectedPais.nombre}`
-          : 'Accediendo al sistema en modo demostración',
-      })
-      router.push('/dashboard')
-      setLoading(false)
-    }, 1000)
+    }
+
+    // /demo crea un tenant demo (POST /api/demo/create), autentica con signIn() y
+    // setea la cookie HttpOnly. Sin esto el middleware rebota a /login al intentar
+    // entrar al dashboard porque no hay access_token.
+    router.push('/demo')
   }
 
   const paisesList = (paises as Pais[]) || []

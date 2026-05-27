@@ -197,9 +197,9 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
           const fetchPromise = (async () => {
             console.log(`[usePermission] Fetching permissions for user ${user.id}`)
             const response = await get('/usuarios-sistema/me/permissions')
-            
+
             if (!response) {
-              console.error(`[usePermission] No response from permissions API for user ${user.id}`)
+              console.warn(`[usePermission] No response from permissions API for user ${user.id}`)
               return []
             }
 
@@ -216,7 +216,7 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
           })()
 
           pendingRequests.set(cacheKey, fetchPromise)
-          
+
           try {
             userPermissions = await fetchPromise
           } finally {

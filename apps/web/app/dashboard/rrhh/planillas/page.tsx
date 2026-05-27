@@ -7,8 +7,7 @@ import PlanillaPagarModal from '@/components/modals/PlanillaPagarModal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useApi } from '@/hooks/use-api';
 import { apiSucceeded, unwrapApiArray } from '@/lib/api-contract';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+import { fetchApi } from '@/lib/api-fetch';
 
 const PlanillasPage = () => {
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true';
@@ -103,12 +102,8 @@ const PlanillasPage = () => {
       onConfirm: async () => {
         try {
           setLoading(true);
-          const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/generar-asientos`, {
+          const response = await fetchApi(`/api/rrhh/planillas/${planillaId}/generar-asientos`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            }
           });
 
           if (response.ok) {
@@ -135,11 +130,7 @@ const PlanillasPage = () => {
   const verDetallePlanilla = async (planillaId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/detalle`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetchApi(`/api/rrhh/planillas/${planillaId}/detalle`);
 
       if (response.ok) {
         const data = await response.json();
@@ -159,11 +150,7 @@ const PlanillasPage = () => {
 
   const generarReporteProfesional = async (planillaId: string, periodo: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}/detalle`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetchApi(`/api/rrhh/planillas/${planillaId}/detalle`);
 
       if (response.ok) {
         const data = await response.json();
@@ -266,12 +253,8 @@ const PlanillasPage = () => {
       variant: 'warning',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/${planillaId}`, {
+          const response = await fetchApi(`/api/rrhh/planillas/${planillaId}`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            },
             body: JSON.stringify({ estado: 'aprobada' }),
           });
 
@@ -288,11 +271,7 @@ const PlanillasPage = () => {
 
   const descargarBoleta = async (empleadoPlanillaId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/planillas/empleado/${empleadoPlanillaId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetchApi(`/api/rrhh/planillas/empleado/${empleadoPlanillaId}`);
 
       if (response.ok) {
         const data = await response.json();

@@ -151,11 +151,13 @@ export default function PedidosPage() {
       </div>
 
       {/* Stats */}
-      <div className="stats-grid grid-cols-[repeat(auto-fit,_minmax(250px,_1fr))] mb-8">
+      <div className="stats-grid ventas-stats-grid mb-8">
         <div className="stat-card">
           <div className="stat-header">
             <h3>TOTAL PEDIDOS</h3>
-            <FileText className="stat-icon text-blue-500" />
+            <span className="stat-icon stat-icon-blue">
+              <FileText />
+            </span>
           </div>
           <div className="stat-value">{pedidos.length}</div>
           <div className="stat-subtitle">Pedidos registrados</div>
@@ -163,7 +165,9 @@ export default function PedidosPage() {
         <div className="stat-card">
           <div className="stat-header">
             <h3>FILTRADOS</h3>
-            <Filter className="stat-icon text-[#10b981]" />
+            <span className="stat-icon stat-icon-emerald">
+              <Filter />
+            </span>
           </div>
           <div className="stat-value">{filteredPedidos.length}</div>
           <div className="stat-subtitle">Pedidos mostrados</div>

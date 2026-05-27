@@ -394,7 +394,7 @@ export class InventoryIntegrationService {
       
       const { data: productos, error } = await this.supabase.getClient()
         .from('productos')
-        .select('codigo, nombre, stock_actual, stock_minimo, precio, categoria, activo')
+        .select('id, codigo, nombre, stock_actual, stock_minimo, precio, categoria, activo')
         .eq('tenant_id', currentTenantId) // ✅ Filtro de tenant
         .eq('activo', true)
         .order('nombre');
@@ -402,7 +402,7 @@ export class InventoryIntegrationService {
       if (error) throw error;
 
       return productos?.map(producto => ({
-        id: producto.codigo,
+        id: producto.id,
         codigo: producto.codigo,
         nombre: producto.nombre,
         stockActual: parseFloat((producto as any).stock_actual || 0),

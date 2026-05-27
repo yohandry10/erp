@@ -3,13 +3,14 @@ import { EventBusService, ProductoStockBajoEvent, ERPEvent } from '../../shared/
 import { NotificationsService } from './notifications.service';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { NotificationType, NotificationSeverity } from './notification.types';
+import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
 
 /**
  * Listener para alertas de stock bajo
- * 
+ *
  * Este servicio escucha eventos de ProductoStockBajoEvent y genera notificaciones
  * automáticas para usuarios relevantes (administradores, gerentes de inventario).
- * 
+ *
  * Características:
  * - Evita notificaciones duplicadas verificando notificaciones recientes (últimas 24 horas)
  * - Notifica a usuarios con permisos de inventario o roles administrativos
@@ -41,7 +42,7 @@ export class InventoryStockAlertsListener implements OnModuleInit {
   private async handleProductoStockBajo(event: ERPEvent): Promise<void> {
     try {
       const data = event.data as ProductoStockBajoEvent;
-      
+
       this.logger.log(
         `📦 [InventoryStockAlertsListener] Procesando alerta de stock bajo: ${data.nombreProducto} (${data.codigoProducto})`
       );
@@ -49,7 +50,7 @@ export class InventoryStockAlertsListener implements OnModuleInit {
       // Obtener tenantId del evento o del contexto
       // Si el evento no tiene tenantId, necesitamos obtenerlo del producto
       const tenantId = await this.obtenerTenantIdDelProducto(data.productoId);
-      
+
       if (!tenantId) {
         this.logger.warn(`⚠️ No se pudo obtener tenantId para producto ${data.productoId}. Saltando notificación.`);
         return;
@@ -152,15 +153,24 @@ export class InventoryStockAlertsListener implements OnModuleInit {
       const fechaLimite = new Date();
       fechaLimite.setHours(fechaLimite.getHours() - this.NOTIFICATION_COOLDOWN_HOURS);
 
-      // Buscar notificaciones recientes que mencionen este producto
-      // Usamos el código del producto o el ID en el action_url
+      // Buscar notificaciones recientes que mencionen este producto.
+      // HARDENING: sanitizar codigoProducto y productoId antes de interpolarlos
+      // en PostgREST .or (evitar filter injection con caracteres especiales).
+      const safeCodigo = sanitizePostgrestSearch(codigoProducto, 60);
+      const safeProductoId = sanitizePostgrestSearch(productoId, 60);
+      if (safeCodigo.length === 0 && safeProductoId.length === 0) {
+        return false; // sin identificador útil, no marcamos como duplicado
+      }
+      const filters: string[] = [];
+      if (safeCodigo.length > 0) filters.push(`mensaje.ilike.%${safeCodigo}%`);
+      if (safeProductoId.length > 0) filters.push(`action_url.ilike.%producto=${safeProductoId}%`);
       const { data, error } = await this.supabase.getClient()
         .from('notificaciones')
         .select('id')
         .eq('tenant_id', tenantId)
         .eq('tipo', NotificationType.STOCK_BAJO)
         .gte('created_at', fechaLimite.toISOString())
-        .or(`mensaje.ilike.%${codigoProducto}%,action_url.ilike.%producto=${productoId}%`)
+        .or(filters.join(','))
         .limit(1);
 
       if (error) {
@@ -241,7 +251,7 @@ export class InventoryStockAlertsListener implements OnModuleInit {
       // Si no encontramos usuarios específicos, notificar a todos los administradores
       if (usuariosIds.size === 0) {
         this.logger.warn(`⚠️ No se encontraron usuarios con permisos específicos. Buscando administradores...`);
-        
+
         const { data: administradores, error: adminError } = await supabase
           .from('usuarios_sistema')
           .select('id')

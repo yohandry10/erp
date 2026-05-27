@@ -1,4 +1,5 @@
 import React from 'react'
+import { fetchApi } from '@/lib/api-fetch'
 
 interface Cotizacion {
   id: string
@@ -32,7 +33,7 @@ interface CotizacionViewModalProps {
 
 export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onActionsComplete }: CotizacionViewModalProps) {
   const [loading, setLoading] = React.useState(false)
-  
+
   if (!isOpen || !cotizacion) return null
 
   const formatCurrency = (amount: number) => {
@@ -52,7 +53,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
 
   const getStatusColor = (estado: string) => {
     const estadoNormalizado = estado?.toUpperCase().trim() || 'BORRADOR'
-    
+
     switch (estadoNormalizado) {
       case 'BORRADOR':
       case 'PENDIENTE': // Legacy - convertir a BORRADOR
@@ -83,7 +84,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
     const fechaVencimiento = new Date(cotizacion.fecha_vencimiento)
     const hoy = new Date()
     const diasParaVencer = Math.ceil((fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
-    
+
     if (diasParaVencer > 0) {
       return { texto: `Vence en ${diasParaVencer} días`, color: diasParaVencer <= 3 ? '#f59e0b' : '#10b981' }
     } else if (diasParaVencer === 0) {
@@ -96,8 +97,8 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
   const handleAprobar = async () => {
     try {
       setLoading(true)
-      
-      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/aprobar`, {
+
+      const response = await fetchApi(`/api/cotizaciones/${cotizacion.id}/aprobar`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +110,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         alert('✅ Cotización aprobada exitosamente')
         onActionsComplete?.()
@@ -128,10 +129,10 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
   const handleConvertir = async () => {
     try {
       setLoading(true)
-      
+
       const tipoDocumento = confirm('¿Generar FACTURA (Aceptar) o BOLETA (Cancelar)?') ? 'FACTURA' : 'BOLETA'
-      
-      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/convertir-en-venta`, {
+
+      const response = await fetchApi(`/api/cotizaciones/${cotizacion.id}/convertir-en-venta`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +146,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         alert(`🎉 ${result.message}`)
         onActionsComplete?.()
@@ -167,8 +168,8 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
 
     try {
       setLoading(true)
-      
-      const response = await fetch(`/api/cotizaciones/${cotizacion.id}/rechazar`, {
+
+      const response = await fetchApi(`/api/cotizaciones/${cotizacion.id}/rechazar`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
       })
 
       const result = await response.json()
-      
+
       if (result.success) {
         alert('✅ Cotización rechazada')
         onActionsComplete?.()
@@ -225,11 +226,11 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
               <h3 className="mt-0 mr-0 mb-2 ml-0 text-gray-700">Estado</h3>
               <span className="py-2 px-4 rounded-5 text-[0.875rem] font-semibold">
                 {estadoActual === 'PENDIENTE' || estadoActual === 'EN PROCESO'
-                  ? 'BORRADOR' 
+                  ? 'BORRADOR'
                   : (estadoActual || 'BORRADOR')}
               </span>
             </div>
-            
+
             <div className="bg-[#f0fdf4] p-4 rounded-3 text-center">
               <h3 className="mt-0 mr-0 mb-2 ml-0 text-gray-700">Total</h3>
               <div className="text-6 font-bold text-emerald-600">
@@ -333,7 +334,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
             <div className="text-[0.875rem] font-semibold">
               {vencimiento.texto}
             </div>
-            
+
             <div className="flex gap-3">
               {/* Botones según el estado */}
               {(estadoActual === 'BORRADOR' || estadoActual === 'ENVIADA') && (
@@ -352,7 +353,7 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
                   </button>
                 </>
               )}
-              
+
               {estadoActual === 'APROBADA' && (
                 <button
                   onClick={handleConvertir}
@@ -379,4 +380,4 @@ export default function CotizacionViewModal({ isOpen, onClose, cotizacion, onAct
       </div>
     </div>
   )
-} 
+}

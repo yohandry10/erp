@@ -46,6 +46,32 @@ interface SaldosConsolidados {
 
 const labelClass = 'text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200/70'
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const normalizeCuenta = (raw: any): CuentaBancaria => ({
+  id: raw?.id || '',
+  nombre: raw?.nombre || 'Cuenta bancaria',
+  banco: raw?.banco || 'Banco',
+  numero_cuenta: raw?.numero_cuenta || raw?.numeroCuenta || 'N/A',
+  tipo_cuenta: raw?.tipo_cuenta || 'CORRIENTE',
+  moneda: raw?.moneda || 'PEN',
+  saldo: toNumber(raw?.saldo ?? raw?.saldo_actual),
+  permite_sobregiro: Boolean(raw?.permite_sobregiro),
+  activa: raw?.activa ?? raw?.estado !== 'INACTIVA',
+  created_at: raw?.created_at || '',
+  updated_at: raw?.updated_at || '',
+})
+
+const normalizeSaldos = (raw: any): SaldosConsolidados => ({
+  por_moneda: Array.isArray(raw?.por_moneda) ? raw.por_moneda : [],
+  por_cuenta: Array.isArray(raw?.por_cuenta) ? raw.por_cuenta : [],
+  total_cuentas: toNumber(raw?.total_cuentas),
+  total_cuentas_activas: toNumber(raw?.total_cuentas_activas),
+})
+
 export default function BancosPage() {
   const router = useRouter()
   const { get } = useApi()
@@ -59,7 +85,7 @@ export default function BancosPage() {
     try {
       setLoading(true)
       const response = await get('/api/finanzas/bancos/cuentas')
-      if (response?.success) setCuentas(response.data || [])
+      if (response?.success) setCuentas((Array.isArray(response.data) ? response.data : []).map(normalizeCuenta))
     } catch (error) {
       console.error('Error loading cuentas bancarias:', error)
       alert('Error: No se pudieron cargar las cuentas bancarias')
@@ -72,7 +98,7 @@ export default function BancosPage() {
     try {
       setLoadingSaldos(true)
       const response = await get('/api/finanzas/bancos/saldos')
-      if (response?.success) setSaldosConsolidados(response.data)
+      if (response?.success) setSaldosConsolidados(normalizeSaldos(response.data))
     } catch (error) {
       console.error('Error loading saldos consolidados:', error)
     } finally {
@@ -90,7 +116,7 @@ export default function BancosPage() {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency,
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   const cuentasActivas = cuentas.filter((cuenta) => cuenta.activa)

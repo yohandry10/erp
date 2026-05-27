@@ -127,7 +127,23 @@ export class CrearCxpDto {
 
   @IsOptional()
   @IsNumber({}, { message: 'La detracción debe ser numérica' })
+  @Min(0, { message: 'La detracción no puede ser negativa' })
   detraccion?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'La retención debe ser numérica' })
+  @Min(0, { message: 'La retención no puede ser negativa' })
+  retencion?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'La percepción debe ser numérica' })
+  @Min(0, { message: 'La percepción no puede ser negativa' })
+  percepcion?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'El anticipo debe ser numérico' })
+  @Min(0, { message: 'El anticipo no puede ser negativo' })
+  anticipo?: number;
 
   @IsOptional()
   @IsString()

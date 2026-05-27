@@ -14,6 +14,7 @@ import {
 import { Badge } from '../ui/badge';
 import { Upload, FileText, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/format-utils';
+import { fetchApi } from '@/lib/api-fetch';
 
 interface MovimientoCSV {
   fecha: string;
@@ -71,8 +72,6 @@ export function ImportarExtractoCSV({
   const [error, setError] = useState<string | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_BASE_URL = '/backend';
 
   // Detectar banco automáticamente
   React.useEffect(() => {
@@ -324,8 +323,8 @@ export function ImportarExtractoCSV({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}/importar-csv`,
+      const response = await fetchApi(
+        `/api/finanzas/conciliacion/${conciliacionId}/importar-csv`,
         {
           method: 'POST',
           headers: {

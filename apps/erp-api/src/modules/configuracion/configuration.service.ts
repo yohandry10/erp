@@ -32,43 +32,49 @@ export class ConfigurationService {
     try {
       this.logger.log(`Getting configuration status for tenant: ${tenantId}`);
 
-      // Get validation results
-      const certificateValidation = await this.validationService.validateCertificate(tenantId);
-      const rucValidation = await this.validationService.validateRucConfiguration(tenantId);
-      const { data: empresaConfig, error: empresaConfigError } = await this.supabaseService
-        .getClient()
-        .from('empresa_config')
-        .select([
-          'pais',
-          'emision_cpe_modo',
-          'ose_activo',
-          'ose_url',
-          'ose_status_url',
-          'ose_username',
-          'ose_password',
-          'ose_auth_tipo',
-          'ose_api_key',
-          'ose_api_header',
-          'ose_bearer_token',
-          'dian_activo',
-          'dian_url',
-          'dian_usuario',
-          'dian_password',
-          'dian_software_id',
-          'dian_software_pin',
-          'dian_test_set_id',
-          'dian_environment',
-          'dian_regimen_fiscal',
-          'dian_tipo_contribuyente',
-          'dian_resolucion_numero',
-          'dian_resolucion_prefijo',
-          'dian_resolucion_desde',
-          'dian_resolucion_hasta',
-          'dian_resolucion_fecha_inicio',
-          'dian_resolucion_fecha_fin',
-        ].join(','))
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
+      // Las 3 fuentes de datos son independientes (Supabase remoto = ~1s por
+      // roundtrip). Antes corrían secuenciales y sumaban ~3.3s. Con Promise.all
+      // el endpoint se acota al tiempo del query más lento (~1.1s).
+      const [certificateValidation, rucValidation, empresaConfigResult] = await Promise.all([
+        this.validationService.validateCertificate(tenantId),
+        this.validationService.validateRucConfiguration(tenantId),
+        this.supabaseService
+          .getClient()
+          .from('empresa_config')
+          .select([
+            'pais',
+            'emision_cpe_modo',
+            'ose_activo',
+            'ose_url',
+            'ose_status_url',
+            'ose_username',
+            'ose_password',
+            'ose_auth_tipo',
+            'ose_api_key',
+            'ose_api_header',
+            'ose_bearer_token',
+            'dian_activo',
+            'dian_url',
+            'dian_usuario',
+            'dian_password',
+            'dian_software_id',
+            'dian_software_pin',
+            'dian_test_set_id',
+            'dian_environment',
+            'dian_regimen_fiscal',
+            'dian_tipo_contribuyente',
+            'dian_resolucion_numero',
+            'dian_resolucion_prefijo',
+            'dian_resolucion_desde',
+            'dian_resolucion_hasta',
+            'dian_resolucion_fecha_inicio',
+            'dian_resolucion_fecha_fin',
+          ].join(','))
+          .eq('tenant_id', tenantId)
+          .maybeSingle(),
+      ]);
+
+      const { data: empresaConfig, error: empresaConfigError } = empresaConfigResult;
 
       if (empresaConfigError && empresaConfigError.code !== 'PGRST116') {
         this.logger.warn(

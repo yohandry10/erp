@@ -61,6 +61,28 @@ interface ResumenAlertas {
   fecha_generacion: string
 }
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const toArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? value : [])
+
+const normalizeResumen = (raw: any): ResumenAlertas => ({
+  total_alertas: toNumber(raw?.total_alertas),
+  sobregiros: {
+    cantidad: toNumber(raw?.sobregiros?.cantidad),
+    total_excedente: toNumber(raw?.sobregiros?.total_excedente),
+    alertas: toArray<Alerta>(raw?.sobregiros?.alertas),
+  },
+  advertencias: {
+    cantidad: toNumber(raw?.advertencias?.cantidad),
+    total_en_riesgo: toNumber(raw?.advertencias?.total_en_riesgo),
+    alertas: toArray<Alerta>(raw?.advertencias?.alertas),
+  },
+  fecha_generacion: raw?.fecha_generacion || new Date().toISOString(),
+})
+
 export default function AlertasSobregirosPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -74,7 +96,7 @@ export default function AlertasSobregirosPage() {
     try {
       setError(null)
       const result = await apiCall('/contabilidad/presupuestos/alertas/resumen')
-      setResumen(result?.data || null)
+      setResumen(normalizeResumen(result?.data))
     } catch (err) {
       console.error('Error fetching alertas:', err)
       setError(err instanceof Error ? err.message : 'Error desconocido')
@@ -97,11 +119,11 @@ export default function AlertasSobregirosPage() {
     if (!resumen) return []
     
     if (filtroNivel === 'SOBREGIRO') {
-      return resumen.sobregiros.alertas
+      return resumen.sobregiros?.alertas ?? []
     } else if (filtroNivel === 'ADVERTENCIA') {
-      return resumen.advertencias.alertas
+      return resumen.advertencias?.alertas ?? []
     } else {
-      return [...resumen.sobregiros.alertas, ...resumen.advertencias.alertas]
+      return [...(resumen.sobregiros?.alertas ?? []), ...(resumen.advertencias?.alertas ?? [])]
     }
   }
 
@@ -109,7 +131,7 @@ export default function AlertasSobregirosPage() {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
       currency: 'PEN'
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   const getAlertColor = (nivel: string) => {
@@ -299,13 +321,13 @@ export default function AlertasSobregirosPage() {
                       {alerta.nivel_alerta}
                     </div>
                     <h3 className="text-[1.125rem] font-semibold text-gray-900 m-0">
-                      {alerta.centro_costo.nombre}
+                      {alerta.centro_costo?.nombre ?? 'Centro de costo'}
                     </h3>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-8 font-bold m-0 leading-[1]">
-                    {alerta.porcentaje_ejecutado.toFixed(1)}%
+                    {toNumber(alerta.porcentaje_ejecutado).toFixed(1)}%
                   </p>
                   <p className="text-3 text-gray-500 m-0">
                     Ejecutado
@@ -327,7 +349,7 @@ export default function AlertasSobregirosPage() {
                       Cuenta
                     </p>
                     <p className="text-[0.875rem] font-semibold text-gray-900 m-0">
-                      {alerta.cuenta.codigo} - {alerta.cuenta.nombre}
+                      {alerta.cuenta?.codigo ?? 'N/A'} - {alerta.cuenta?.nombre ?? 'Cuenta'}
                     </p>
                   </div>
                 </div>
@@ -338,7 +360,7 @@ export default function AlertasSobregirosPage() {
                       Período
                     </p>
                     <p className="text-[0.875rem] font-semibold text-gray-900 m-0">
-                      {alerta.periodo.descripcion}
+                      {alerta.periodo?.descripcion ?? 'Periodo no disponible'}
                     </p>
                   </div>
                 </div>

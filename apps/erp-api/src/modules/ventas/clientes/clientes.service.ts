@@ -61,7 +61,7 @@ export class ClientesService {
       ruc: createClienteDto.documento_tipo === 'RUC' ? documentoTexto : null,
       activo: true,
     };
-    
+
     const { data, error} = await client
       .from('clientes')
       .insert(insertData)
@@ -297,10 +297,13 @@ export class ClientesService {
     // Verificar que el cliente existe
     await this.findOne(id, tenantId);
 
-    // Verificar dependencias en cotizaciones
+    // HARDENING multi-tenant: dependencias deben filtrarse por tenant_id
+    // para no revelar existencia de cotizaciones/pedidos de otros tenants
+    // que casualmente referencien el mismo cliente_id (vía service_role).
     const { data: cotizaciones } = await client
       .from('cotizaciones')
       .select('id')
+      .eq('tenant_id', tenantId)
       .eq('cliente_id', id)
       .limit(1);
 
@@ -314,6 +317,7 @@ export class ClientesService {
     const { data: pedidos } = await client
       .from('pedidos_venta')
       .select('id')
+      .eq('tenant_id', tenantId)
       .eq('cliente_id', id)
       .limit(1);
 
@@ -347,9 +351,9 @@ export class ClientesService {
       // Nota: Esta es una implementación de ejemplo
       // En producción, deberías usar una API real de SUNAT o un servicio de terceros
       // Por ejemplo: https://api.apis.net.pe/v1/ruc?numero={ruc}
-      
+
       const ruc = validarRucDto.ruc;
-      
+
       // Validación de formato
       if (!/^[0-9]{11}$/.test(ruc)) {
         throw new BadRequestException('El RUC debe tener exactamente 11 dígitos');
@@ -374,7 +378,7 @@ export class ClientesService {
       // Aquí iría la integración real con SUNAT
       // Por ahora retornamos una respuesta de ejemplo
       console.log('🔍 [ClientesService] Validando RUC:', ruc);
-      
+
       // Simulación de respuesta (en producción, hacer llamada real a API)
       return {
         ruc,
@@ -387,11 +391,11 @@ export class ClientesService {
       };
     } catch (error) {
       console.error('Error validating RUC:', error);
-      
+
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       throw new BadRequestException('Error al validar el RUC con SUNAT');
     }
   }

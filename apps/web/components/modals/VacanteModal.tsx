@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Briefcase, MapPin, DollarSign, Users, Calendar, FileText } from 'lucide-react';
+import { fetchApi } from '@/lib/api-fetch';
 
 interface VacanteModalProps {
   isOpen: boolean;
@@ -10,11 +11,11 @@ interface VacanteModalProps {
   departamentos: any[];
 }
 
-export default function VacanteModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  departamentos 
+export default function VacanteModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  departamentos
 }: VacanteModalProps) {
   const [formData, setFormData] = useState({
     titulo: '',
@@ -31,7 +32,7 @@ export default function VacanteModal({
     fecha_limite: '',
     estado: 'activa'
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
@@ -58,13 +59,13 @@ export default function VacanteModal({
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
-    
+
     if (!formData.titulo.trim()) newErrors.titulo = 'El título es requerido';
     if (!formData.puesto_solicitado.trim()) newErrors.puesto_solicitado = 'El puesto es requerido';
     if (!formData.departamento_id) newErrors.departamento_id = 'El departamento es requerido';
     if (!formData.descripcion.trim()) newErrors.descripcion = 'La descripción es requerida';
     if (!formData.fecha_limite) newErrors.fecha_limite = 'La fecha límite es requerida';
-    
+
     if (formData.salario_minimo && formData.salario_maximo) {
       if (parseFloat(formData.salario_minimo) > parseFloat(formData.salario_maximo)) {
         newErrors.salario_maximo = 'El salario máximo debe ser mayor al mínimo';
@@ -77,12 +78,12 @@ export default function VacanteModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
-      const response = await fetch('/api/rrhh/vacantes', {
+      const response = await fetchApi('/api/rrhh/vacantes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +112,7 @@ export default function VacanteModal({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // Limpiar error del campo
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
@@ -141,7 +142,7 @@ export default function VacanteModal({
             <label className="block mb-2 font-semibold">
               🎯 Título de la Vacante *
             </label>
-            <input 
+            <input
               type="text"
               name="titulo"
               value={formData.titulo}
@@ -156,7 +157,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 👔 Puesto Solicitado *
               </label>
-              <input 
+              <input
                 type="text"
                 name="puesto_solicitado"
                 value={formData.puesto_solicitado}
@@ -170,7 +171,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 🏢 Departamento *
               </label>
-              <select 
+              <select
                 name="departamento_id"
                 value={formData.departamento_id}
                 onChange={handleInputChange} className="w-[100%] p-3 rounded-[4px]"
@@ -189,7 +190,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 📍 Ubicación
               </label>
-              <input 
+              <input
                 type="text"
                 name="ubicacion"
                 value={formData.ubicacion}
@@ -202,7 +203,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 📝 Tipo de Contrato
               </label>
-              <select 
+              <select
                 name="tipo_contrato"
                 value={formData.tipo_contrato}
                 onChange={handleInputChange} className="w-[100%] p-3 border rounded-[4px]"
@@ -220,7 +221,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 💰 Salario Mín (S/)
               </label>
-              <input 
+              <input
                 type="number"
                 name="salario_minimo"
                 value={formData.salario_minimo}
@@ -235,7 +236,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 💰 Salario Máx (S/)
               </label>
-              <input 
+              <input
                 type="number"
                 name="salario_maximo"
                 value={formData.salario_maximo}
@@ -251,7 +252,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 📅 Fecha Límite *
               </label>
-              <input 
+              <input
                 type="date"
                 name="fecha_limite"
                 value={formData.fecha_limite}
@@ -266,7 +267,7 @@ export default function VacanteModal({
             <label className="block mb-2 font-semibold">
               📝 Descripción del Puesto *
             </label>
-            <textarea 
+            <textarea
               name="descripcion"
               value={formData.descripcion}
               onChange={handleInputChange}
@@ -281,7 +282,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 ✅ Requisitos
               </label>
-              <textarea 
+              <textarea
                 name="requisitos"
                 value={formData.requisitos}
                 onChange={handleInputChange}
@@ -294,7 +295,7 @@ export default function VacanteModal({
               <label className="block mb-2 font-semibold">
                 🎁 Beneficios
               </label>
-              <textarea 
+              <textarea
                 name="beneficios"
                 value={formData.beneficios}
                 onChange={handleInputChange}
@@ -305,13 +306,13 @@ export default function VacanteModal({
           </div>
 
           <div className="flex justify-end gap-4 pt-4 border-t">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={onClose} className="py-3 px-6 border rounded-[6px] bg-white cursor-pointer font-medium"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               disabled={loading} className="py-3 px-6 border-0 rounded-[6px] text-white font-medium flex items-center gap-2"
             >
@@ -322,4 +323,4 @@ export default function VacanteModal({
       </div>
     </div>
   );
-} 
+}

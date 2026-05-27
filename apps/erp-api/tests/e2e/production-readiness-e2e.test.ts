@@ -22,6 +22,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || 'admin@erp.local';
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'AdminProd2026!';
+// SEC-001: aprobador requiere JWT propio para segregación de funciones.
+const TEST_APROBADOR_EMAIL = process.env.TEST_APROBADOR_EMAIL;
+const TEST_APROBADOR_PASSWORD = process.env.TEST_APROBADOR_PASSWORD;
 
 type JsonObject = Record<string, any>;
 
@@ -53,17 +56,27 @@ async function api(pathname: string, token: string, init: RequestInit = {}) {
   return body;
 }
 
-async function login() {
+async function login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD) {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: TEST_USER_EMAIL, password: TEST_USER_PASSWORD }),
+    body: JSON.stringify({ email, password }),
   });
   const body: any = await response.json().catch(() => null);
-  assert.ok(response.ok, `Login E2E fallo con HTTP ${response.status}`);
+  assert.ok(response.ok, `Login E2E fallo con HTTP ${response.status} para ${email}`);
   assert.ok(body?.access_token, 'Login E2E no devolvio access_token');
   assert.ok(body?.user?.tenant_id, 'Login E2E no devolvio tenant_id');
   return { token: body.access_token as string, user: body.user as JsonObject };
+}
+
+async function loginAprobador() {
+  if (!TEST_APROBADOR_EMAIL || !TEST_APROBADOR_PASSWORD) {
+    throw new Error(
+      'SEC-001: TEST_APROBADOR_EMAIL y TEST_APROBADOR_PASSWORD requeridos. ' +
+      'Obtener de la respuesta de POST /api/demo/create (aprobador_email, aprobador_password).',
+    );
+  }
+  return login(TEST_APROBADOR_EMAIL, TEST_APROBADOR_PASSWORD);
 }
 
 function uniqueRuc(seed: string) {
@@ -233,9 +246,11 @@ async function main() {
   assert.ok(ocId, 'La OC debe devolver id');
   assert.ok(ocDetalleId, 'La OC debe devolver detalle id');
 
-  await api(`/compras/ordenes/${ocId}/aprobar`, token, {
+  // SEC-001 fix: aprobar con el JWT del aprobador (no del creador).
+  const aprobador = await loginAprobador();
+  await api(`/compras/ordenes/${ocId}/aprobar`, aprobador.token, {
     method: 'POST',
-    body: JSON.stringify({ aprobador_id: user.id, aprobador_nombre: user.email, comentarios: 'Aprobacion E2E' }),
+    body: JSON.stringify({ aprobador_nombre: aprobador.user.email, comentarios: 'Aprobacion E2E' }),
   });
 
   const recepcion = await api(`/compras/ordenes/${ocId}/recepciones`, token, {

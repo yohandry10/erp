@@ -103,11 +103,16 @@ async fn get_macos_printers() -> Result<Vec<String>, String> {
 
 pub async fn print_pdf(pdf_data: &[u8], printer_name: Option<&str>) -> Result<(), String> {
     use std::fs;
+    use std::env;
     use uuid::Uuid;
-    
+
     // Crear archivo temporal
     let temp_id = Uuid::new_v4().to_string();
-    let temp_path = format!("/tmp/print_{}.pdf", temp_id);
+    let temp_path_buf = env::temp_dir().join(format!("print_{}.pdf", temp_id));
+    let temp_path = temp_path_buf
+        .to_str()
+        .ok_or_else(|| "Ruta temporal PDF invalida".to_string())?
+        .to_string();
     
     fs::write(&temp_path, pdf_data)
         .map_err(|e| format!("Error writing temp PDF: {}", e))?;
@@ -259,17 +264,23 @@ async fn print_raw_to_windows_printer(data: &[u8], printer_name: Option<&str>) -
     // Implementar impresión raw en Windows usando WinAPI
     // Por simplicidad, usar un archivo temporal y copy con /b
     use std::fs;
+    use std::env;
     use uuid::Uuid;
-    
+
     let temp_id = Uuid::new_v4().to_string();
-    let temp_path = format!("C:\\temp\\raw_{}.prn", temp_id);
+    let temp_path_buf = env::temp_dir().join(format!("raw_{}.prn", temp_id));
+    let temp_path = temp_path_buf
+        .to_str()
+        .ok_or_else(|| "Ruta temporal raw invalida".to_string())?
+        .to_string();
     
     fs::write(&temp_path, data)
         .map_err(|e| format!("Error writing temp file: {}", e))?;
     
     let printer = printer_name.unwrap_or("LPT1");
-    let output = Command::new("copy")
-        .args(&["/b", &temp_path, printer])
+    let copy_command = format!("copy /b \"{}\" \"{}\"", temp_path, printer);
+    let output = Command::new("cmd")
+        .args(&["/C", &copy_command])
         .output()
         .map_err(|e| format!("Error copying to printer: {}", e))?;
     

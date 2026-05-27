@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: any };
 
@@ -161,7 +162,10 @@ test.describe('T09 Inventario y logística', () => {
       expect(ordenesDisabled, 'logística deshabilitada debe devolver lista vacía controlada').toEqual([]);
 
       await gotoAuthenticated(page, '/dashboard/inventario/logistica/ordenes-pendientes');
-      await expect(page.getByText(/Flujo de logística desactivado/i)).toBeVisible({ timeout: 15000 });
+      // La UI muestra el componente LogisticsDisabledState con título
+      // "Activa logística para preparar pedidos". El test buscaba texto literal
+      // "Flujo de logística desactivado" que no existe — fix de regex.
+      await expect(page.getByText(/Activa logística|Activar flujo logístico|flujo logístico/i).first()).toBeVisible({ timeout: 15000 });
       await expect(page.locator('body')).not.toContainText(/Application error|Unhandled|Error fatal/i);
 
       await setLogisticaConfig(supabase, tenantId, {
@@ -174,7 +178,7 @@ test.describe('T09 Inventario y logística', () => {
       const proveedor = await parseOk<any>(
         await apiContext.post(api('/compras/proveedores'), {
           data: {
-            ruc: `20${runId}`,
+            ruc: generateValidRucFromRunId(`inv-${runId}`),
             razon_social: `Proveedor Inventario T09 ${runId}`,
             email: `proveedor-t09-${runId}@example.com`,
             telefono: '999111222',
@@ -227,12 +231,22 @@ test.describe('T09 Inventario y logística', () => {
       const detalleOrdenId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
       expect(detalleOrdenId, 'orden debe devolver detalle para recepción').toBeTruthy();
 
-      await parseOk<any>(
-        await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-          data: { aprobador_nombre: 'Admin T09', comentarios: 'Aprobación inventario T09' },
-        }),
-        'aprobar orden T09',
-      );
+      // Segregación de funciones (SEC-001 fix): el aprobador autentica con su
+      // propio JWT. aprobador_id ya no se acepta en el body.
+      const aprobadorCtx = await apiContextAsAprobador();
+      try {
+        await parseOk<any>(
+          await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+            data: {
+              aprobador_nombre: 'Admin T09',
+              comentarios: 'Aprobación inventario T09',
+            },
+          }),
+          'aprobar orden T09',
+        );
+      } finally {
+        await aprobadorCtx.dispose();
+      }
 
       const recepcionBorrador = await parseOk<any>(
         await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {

@@ -1,0 +1,309 @@
+{
+  "apiUrl": "http://localhost:3002",
+  "startedAt": "2026-05-26T06:22:20.746Z",
+  "finishedAt": "2026-05-26T06:23:20.747Z",
+  "durationMs": 60000,
+  "concurrency": 8,
+  "authenticated": true,
+  "requests": 589,
+  "ok": 589,
+  "errors": 0,
+  "rps": 9.82,
+  "p50Ms": 1162,
+  "p95Ms": 1490,
+  "p99Ms": 1956,
+  "maxMs": 2577,
+  "statusCounts": {
+    "200": 588,
+    "201": 1
+  },
+  "errorCounts": {},
+  "endpoints": [
+    {
+      "name": "dashboard_stats",
+      "requests": 66,
+      "ok": 66,
+      "errors": 0,
+      "p50Ms": 472,
+      "p95Ms": 547,
+      "p99Ms": 1069,
+      "maxMs": 1069,
+      "statuses": {
+        "200": 66
+      }
+    },
+    {
+      "name": "health_live",
+      "requests": 50,
+      "ok": 50,
+      "errors": 0,
+      "p50Ms": 1,
+      "p95Ms": 3,
+      "p99Ms": 3,
+      "maxMs": 3,
+      "statuses": {
+        "200": 50
+      }
+    },
+    {
+      "name": "dashboard_activities",
+      "requests": 48,
+      "ok": 48,
+      "errors": 0,
+      "p50Ms": 470,
+      "p95Ms": 594,
+      "p99Ms": 1159,
+      "maxMs": 1159,
+      "statuses": {
+        "200": 48
+      }
+    },
+    {
+      "name": "notifications_unread",
+      "requests": 38,
+      "ok": 38,
+      "errors": 0,
+      "p50Ms": 1176,
+      "p95Ms": 1247,
+      "p99Ms": 1267,
+      "maxMs": 1267,
+      "statuses": {
+        "200": 38
+      }
+    },
+    {
+      "name": "health_ready",
+      "requests": 33,
+      "ok": 33,
+      "errors": 0,
+      "p50Ms": 235,
+      "p95Ms": 309,
+      "p99Ms": 328,
+      "maxMs": 328,
+      "statuses": {
+        "200": 33
+      }
+    },
+    {
+      "name": "configuration_context_status",
+      "requests": 31,
+      "ok": 31,
+      "errors": 0,
+      "p50Ms": 471,
+      "p95Ms": 824,
+      "p99Ms": 841,
+      "maxMs": 841,
+      "statuses": {
+        "200": 31
+      }
+    },
+    {
+      "name": "finanzas_cxp",
+      "requests": 29,
+      "ok": 29,
+      "errors": 0,
+      "p50Ms": 1176,
+      "p95Ms": 1277,
+      "p99Ms": 1287,
+      "maxMs": 1287,
+      "statuses": {
+        "200": 29
+      }
+    },
+    {
+      "name": "finanzas_bancos_cuentas",
+      "requests": 28,
+      "ok": 28,
+      "errors": 0,
+      "p50Ms": 1171,
+      "p95Ms": 1309,
+      "p99Ms": 1894,
+      "maxMs": 1894,
+      "statuses": {
+        "200": 28
+      }
+    },
+    {
+      "name": "auth_profile",
+      "requests": 27,
+      "ok": 27,
+      "errors": 0,
+      "p50Ms": 468,
+      "p95Ms": 1030,
+      "p99Ms": 1105,
+      "maxMs": 1105,
+      "statuses": {
+        "200": 27
+      }
+    },
+    {
+      "name": "ventas_pedidos",
+      "requests": 25,
+      "ok": 25,
+      "errors": 0,
+      "p50Ms": 1172,
+      "p95Ms": 1263,
+      "p99Ms": 1348,
+      "maxMs": 1348,
+      "statuses": {
+        "200": 25
+      }
+    },
+    {
+      "name": "inventario_stats",
+      "requests": 24,
+      "ok": 24,
+      "errors": 0,
+      "p50Ms": 1407,
+      "p95Ms": 1490,
+      "p99Ms": 1576,
+      "maxMs": 1576,
+      "statuses": {
+        "200": 24
+      }
+    },
+    {
+      "name": "ventas_clientes",
+      "requests": 23,
+      "ok": 23,
+      "errors": 0,
+      "p50Ms": 1179,
+      "p95Ms": 1265,
+      "p99Ms": 1905,
+      "maxMs": 1905,
+      "statuses": {
+        "200": 23
+      }
+    },
+    {
+      "name": "compras_proveedores",
+      "requests": 22,
+      "ok": 22,
+      "errors": 0,
+      "p50Ms": 1175,
+      "p95Ms": 1278,
+      "p99Ms": 1606,
+      "maxMs": 1606,
+      "statuses": {
+        "200": 22
+      }
+    },
+    {
+      "name": "cpe_stats",
+      "requests": 22,
+      "ok": 22,
+      "errors": 0,
+      "p50Ms": 1883,
+      "p95Ms": 2091,
+      "p99Ms": 2577,
+      "maxMs": 2577,
+      "statuses": {
+        "200": 22
+      }
+    },
+    {
+      "name": "compras_ordenes",
+      "requests": 20,
+      "ok": 20,
+      "errors": 0,
+      "p50Ms": 1190,
+      "p95Ms": 1294,
+      "p99Ms": 1312,
+      "maxMs": 1312,
+      "statuses": {
+        "200": 20
+      }
+    },
+    {
+      "name": "cpe_list",
+      "requests": 19,
+      "ok": 19,
+      "errors": 0,
+      "p50Ms": 1422,
+      "p95Ms": 1513,
+      "p99Ms": 1513,
+      "maxMs": 1513,
+      "statuses": {
+        "200": 19
+      }
+    },
+    {
+      "name": "ventas_cotizaciones",
+      "requests": 19,
+      "ok": 19,
+      "errors": 0,
+      "p50Ms": 1179,
+      "p95Ms": 1253,
+      "p99Ms": 1253,
+      "maxMs": 1253,
+      "statuses": {
+        "200": 19
+      }
+    },
+    {
+      "name": "health_version",
+      "requests": 18,
+      "ok": 18,
+      "errors": 0,
+      "p50Ms": 1,
+      "p95Ms": 14,
+      "p99Ms": 14,
+      "maxMs": 14,
+      "statuses": {
+        "200": 18
+      }
+    },
+    {
+      "name": "inventario_productos",
+      "requests": 18,
+      "ok": 18,
+      "errors": 0,
+      "p50Ms": 1188,
+      "p95Ms": 1311,
+      "p99Ms": 1311,
+      "maxMs": 1311,
+      "statuses": {
+        "200": 18
+      }
+    },
+    {
+      "name": "finanzas_cxc",
+      "requests": 17,
+      "ok": 17,
+      "errors": 0,
+      "p50Ms": 1175,
+      "p95Ms": 1402,
+      "p99Ms": 1402,
+      "maxMs": 1402,
+      "statuses": {
+        "200": 17
+      }
+    },
+    {
+      "name": "api_info",
+      "requests": 11,
+      "ok": 11,
+      "errors": 0,
+      "p50Ms": 2,
+      "p95Ms": 13,
+      "p99Ms": 13,
+      "maxMs": 13,
+      "statuses": {
+        "200": 11
+      }
+    },
+    {
+      "name": "auth_login",
+      "requests": 1,
+      "ok": 1,
+      "errors": 0,
+      "p50Ms": 2459,
+      "p95Ms": 2459,
+      "p99Ms": 2459,
+      "maxMs": 2459,
+      "statuses": {
+        "201": 1
+      }
+    }
+  ]
+}

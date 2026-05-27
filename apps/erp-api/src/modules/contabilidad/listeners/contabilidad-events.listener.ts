@@ -16,6 +16,8 @@ import { TenantContextService } from '../../../shared/tenant/tenant-context.serv
 @Injectable()
 export class ContabilidadEventsListener implements OnModuleInit {
   private readonly logger = new Logger(ContabilidadEventsListener.name);
+  private readonly cronLockKey = 'worker:outbox:contabilidad';
+  private readonly cronLockTtlSeconds = 240;
   private static isProcessing = false;
   private readonly accountingEventTypes = new Set([
     'venta.procesada',
@@ -35,10 +37,18 @@ export class ContabilidadEventsListener implements OnModuleInit {
     'AjusteInventarioAplicado',
     'planilla.liquidada',
     'PlanillaLiquidada',
+    'planilla.pagada',
+    'PlanillaPagada',
     'depreciacion.generada',
     'DepreciacionGenerada',
     'cpe.anulado',
     'CPEAnulado',
+    // BUG-001 fix: garantiza que POST /api/cpe directo (sin pasar por
+    // /ventas/pedidos/:id/facturar) genere asiento contable. El handler tiene
+    // idempotencia por (tenant + referencia serie-numero) para evitar doble
+    // asiento cuando el flujo /ventas tambien emite venta.procesada.
+    'factura.emitida',
+    'FacturaEmitida',
     'producto.stock_bajo',
     'producto.stock.bajo',
     'ProductoStockBajo',
@@ -99,6 +109,13 @@ export class ContabilidadEventsListener implements OnModuleInit {
     // Evento de pago a proveedor
     this.eventBus.onPagoProveedorRegistrado(async (event: ERPEvent) => {
       await this.persistirEventoEnOutbox('pago.proveedor.registrado', 'pago', event.data);
+    });
+
+    // BUG-001 fix: persistir factura.emitida en outbox para que el cron genere
+    // el asiento contable. Cubre POSTs directos a /api/cpe que no pasan por
+    // /ventas/pedidos/:id/facturar (este ultimo emite venta.procesada).
+    this.eventBus.on('factura.emitida', async (event: ERPEvent) => {
+      await this.persistirEventoEnOutbox('factura.emitida', 'factura', event.data);
     });
 
     this.logger.log('✅ [ContabilidadEventsListener] Suscripciones a eventos completadas');
@@ -175,6 +192,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
         aggregateId,
         idempotencyKey,
         eventData,
+        eventId: eventData.eventId || eventData.event_id,
       });
 
       const { error } = await this.supabaseService
@@ -212,6 +230,10 @@ export class ContabilidadEventsListener implements OnModuleInit {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async procesarEventosPendientesCron() {
+    if (process.env.ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED === 'false') {
+      return;
+    }
+
     await this.procesarEventosPendientes();
   }
 
@@ -226,6 +248,7 @@ export class ContabilidadEventsListener implements OnModuleInit {
     }
 
     ContabilidadEventsListener.isProcessing = true;
+    let lockAcquired = false;
 
     try {
       const backoffMs = this.supabaseService.getNetworkBackoffRemainingMs();
@@ -233,6 +256,12 @@ export class ContabilidadEventsListener implements OnModuleInit {
         this.logger.warn(
           `⚠️ [ContabilidadEventsListener] Supabase no disponible, reintentando en ${Math.ceil(backoffMs / 1000)}s`,
         );
+        return;
+      }
+
+      lockAcquired = await this.tryAcquireJobLock();
+      if (!lockAcquired) {
+        this.logger.debug('⏭️ [ContabilidadEventsListener] Otro nodo tiene el lock distribuido, saltando...');
         return;
       }
 
@@ -266,7 +295,49 @@ export class ContabilidadEventsListener implements OnModuleInit {
         this.logger.error('❌ [ContabilidadEventsListener] Error procesando eventos pendientes:', error);
       }
     } finally {
+      if (lockAcquired) {
+        await this.releaseJobLock();
+      }
       ContabilidadEventsListener.isProcessing = false;
+    }
+  }
+
+  private async tryAcquireJobLock(): Promise<boolean> {
+    try {
+      const client = (this.supabaseService as any).getPublicClient?.();
+      const rpc = client?.rpc;
+      if (typeof rpc !== 'function') {
+        return true;
+      }
+
+      const { data, error } = await rpc('acquire_job_lock', {
+        p_lock_key: this.cronLockKey,
+        p_lock_ttl_seconds: this.cronLockTtlSeconds,
+      });
+
+      if (error) {
+        this.logger.warn(`⚠️ [ContabilidadEventsListener] No se pudo adquirir lock distribuido: ${error.message}`);
+        return false;
+      }
+
+      return data === true || data === 'true';
+    } catch (error) {
+      this.logger.warn(`⚠️ [ContabilidadEventsListener] Error adquiriendo lock distribuido: ${error?.message || error}`);
+      return false;
+    }
+  }
+
+  private async releaseJobLock(): Promise<void> {
+    try {
+      const client = (this.supabaseService as any).getPublicClient?.();
+      const rpc = client?.rpc;
+      if (typeof rpc !== 'function') {
+        return;
+      }
+
+      await rpc('release_job_lock', { p_lock_key: this.cronLockKey });
+    } catch (error) {
+      this.logger.warn(`⚠️ [ContabilidadEventsListener] Error liberando lock distribuido: ${error?.message || error}`);
     }
   }
 
@@ -436,6 +507,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
             await this.handlePlanillaLiquidada(evento);
             break;
 
+          case 'planilla.pagada':
+          case 'PlanillaPagada':
+            await this.handlePlanillaPagada(evento);
+            break;
+
       case 'depreciacion.generada':
       case 'DepreciacionGenerada':
         await this.handleDepreciacion(evento);
@@ -444,6 +520,11 @@ export class ContabilidadEventsListener implements OnModuleInit {
           case 'cpe.anulado':
           case 'CPEAnulado':
             await this.handleCpeAnulado(evento);
+            break;
+
+          case 'factura.emitida':
+          case 'FacturaEmitida':
+            await this.handleFacturaEmitida(evento);
             break;
 
           case 'producto.stock_bajo':
@@ -896,6 +977,95 @@ export class ContabilidadEventsListener implements OnModuleInit {
   }
 
   /**
+   * BUG-001 fix: handler para `factura.emitida` que cubre el caso POST /api/cpe
+   * directo (sin pasar por /ventas/pedidos/:id/facturar).
+   *
+   * Genera asiento de venta a partir del payload del evento. Es idempotente
+   * por (tenant + referencia serie-numero): si ya existe un asiento para la
+   * misma factura (por ejemplo porque el flujo de ventas tambien emitio
+   * venta.procesada), no genera duplicado.
+   */
+  private async handleFacturaEmitida(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'factura.emitida');
+
+      const serie = eventData?.serie ? String(eventData.serie) : null;
+      const numero = eventData?.numero !== undefined && eventData?.numero !== null
+        ? String(eventData.numero)
+        : null;
+      const referencia = serie && numero
+        ? `${serie}-${numero}`
+        : eventData?.cpeId || eventData?.facturaId || evento.event_id;
+
+      // Idempotencia: si ya hay asiento para esta referencia, skip.
+      const { data: asientoExistente } = await this.supabaseService
+        .getClient()
+        .from('asientos_contables')
+        .select('id, numero_asiento')
+        .eq('tenant_id', tenantId)
+        .eq('referencia', referencia)
+        .limit(1)
+        .maybeSingle();
+
+      if (asientoExistente?.id) {
+        this.logger.log(
+          `ℹ️ [ContabilidadEventsListener] factura.emitida ${referencia} ya tiene asiento ${asientoExistente.numero_asiento}, skip.`,
+        );
+        return;
+      }
+
+      const total = Number(eventData.total ?? 0);
+      const baseImponible = Number(eventData.subtotal ?? eventData.base_imponible ?? 0);
+      const igv = Number(
+        eventData.impuestos ??
+          eventData.igv ??
+          (baseImponible > 0 ? Math.max(total - baseImponible, 0) : 0),
+      );
+
+      const ventaData = {
+        tenant_id: tenantId,
+        fecha: eventData.fechaEmision || eventData.fecha || new Date().toISOString(),
+        total,
+        base_imponible: baseImponible,
+        igv,
+        costo_ventas: Number(eventData.costo_ventas ?? 0),
+        centro_costo_id: eventData.centro_costo_id,
+        referencia,
+        event_id: evento.event_id || eventData.eventId,
+      };
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoVenta(ventaData);
+
+      // Verificar como handleVentaFacturada.
+      if (ventaData.event_id) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          ventaData.event_id,
+          ventaData.referencia,
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de factura.emitida no se pudo verificar (event ${ventaData.event_id}, ref ${referencia}).`,
+          );
+        }
+        this.logger.log(
+          `✅ [ContabilidadEventsListener] Asiento ${asientoVerificado.numero_asiento} generado desde factura.emitida (${referencia}).`,
+        );
+      } else if (asientoCreado?.id) {
+        this.logger.log(
+          `✅ [ContabilidadEventsListener] Asiento ${asientoCreado.id} generado desde factura.emitida sin event_id verificable (${referencia}).`,
+        );
+      } else {
+        throw new Error('Asiento contable no retornó ID válido tras factura.emitida.');
+      }
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handleFacturaEmitida:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Handler para eventos de cobro registrado
    * Genera asiento: Dr 10 Bancos/Caja / Cr 12 Clientes
    */
@@ -1273,6 +1443,48 @@ export class ContabilidadEventsListener implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaLiquidada:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handler para eventos de planilla pagada → Asiento: Dr 411 Rem. por Pagar / Cr 10 Bancos
+   */
+  private async handlePlanillaPagada(evento: OutboxEvent): Promise<void> {
+    try {
+      const eventData = evento.event_data;
+      const tenantId = this.ensureEventTenant(eventData, 'planilla.pagada');
+
+      const pagoData = {
+        tenant_id: tenantId,
+        fecha: eventData.fechaPago || new Date().toISOString(),
+        monto: eventData.totalPagado,
+        metodo_pago: eventData.metodoPago || 'transferencia',
+        planilla_id: eventData.planillaId,
+        referencia: `PAGO-PLANILLA-${eventData.planillaId}`,
+        source_event_id: evento.event_id || eventData.eventId || eventData.planillaId || evento.aggregate_id,
+        event_id: evento.event_id || eventData.eventId,
+      };
+
+      const asientoCreado = await this.asientosGenerator.generarAsientoPagoPlanilla(pagoData);
+
+      const eventId = pagoData.event_id;
+      if (eventId) {
+        const asientoVerificado = await this.verificarAsientoCreado(
+          tenantId,
+          eventId,
+          pagoData.referencia,
+        );
+        if (!asientoVerificado) {
+          throw new Error(
+            `Asiento contable de pago planilla no se pudo verificar para evento ${eventId}`,
+          );
+        }
+      } else if (!asientoCreado?.id) {
+        throw new Error('Asiento contable de pago planilla no retornó ID válido');
+      }
+    } catch (error) {
+      this.logger.error(`❌ [ContabilidadEventsListener] Error en handlePlanillaPagada:`, error);
       throw error;
     }
   }

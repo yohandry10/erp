@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CreateProveedorDto } from '../dto/create-proveedor.dto';
 import { UpdateProveedorDto } from '../dto/update-proveedor.dto';
+import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 
 @Injectable()
 export class ProveedoresRepository {
   constructor(private readonly supabase: SupabaseService) {}
 
-  async findAll(tenantId: string, filters?: { 
-    activo?: boolean; 
+  async findAll(tenantId: string, filters?: {
+    activo?: boolean;
     search?: string;
     estado?: string;
     condiciones_pago?: string;
@@ -42,9 +43,16 @@ export class ProveedoresRepository {
       query = query.eq('ruc', filters.ruc);
     }
 
-    // Search across multiple fields (razon_social, ruc, nombre_comercial)
+    // Search across multiple fields (razon_social, ruc, nombre_comercial).
+    // HARDENING: sanitizar input para evitar PostgREST filter injection
+    // (coma o punto inyectados romperían/ampliarían el filtro dentro del tenant).
     if (filters?.search) {
-      query = query.or(`razon_social.ilike.%${filters.search}%,ruc.ilike.%${filters.search}%,nombre_comercial.ilike.%${filters.search}%`);
+      const safeSearch = sanitizePostgrestSearch(filters.search);
+      if (safeSearch.length > 0) {
+        query = query.or(
+          `razon_social.ilike.%${safeSearch}%,ruc.ilike.%${safeSearch}%,nombre_comercial.ilike.%${safeSearch}%`,
+        );
+      }
     }
 
     // Apply pagination

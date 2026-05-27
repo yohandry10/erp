@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { customAuth } from '@/lib/auth-service'
 import type { Tenant, User, TenantContextValue } from './types'
 import type { Session } from '@/lib/auth-service'
+import { useAuth } from './AuthContext'
+import { fetchApi } from '@/lib/api-fetch'
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined)
 
@@ -19,6 +21,7 @@ function buildMinimalTenantFromUser(user: User): Tenant {
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
+  const { session: authSession, loading: authLoading } = useAuth()
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,10 +29,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const fetchTenantDetails = async (tenantId: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
-        credentials: 'include',
-      })
+      const response = await fetchApi(`/api/tenants/${tenantId}`)
 
       if (!response.ok) {
         setTenant({
@@ -117,13 +117,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-      const response = await fetch(`${API_BASE_URL}/api/auth/switch-tenant`, {
+      const response = await fetchApi('/api/auth/switch-tenant', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify({ targetTenantId }),
       })
 
@@ -143,6 +138,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [user, refreshTenant])
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
+
+    if (authSession) {
+      extractFromSession(authSession)
+      return
+    }
+
     customAuth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         setLoading(false)
@@ -157,7 +162,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [extractFromSession])
+  }, [authLoading, authSession, extractFromSession])
 
   const value: TenantContextValue = {
     tenant,

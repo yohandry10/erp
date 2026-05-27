@@ -2,19 +2,27 @@
 
 Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Next.js.
 
-## ✨ Características Desktop
+## Estado vigente
 
-### 🔒 Seguridad Avanzada
-- **Firma Digital**: Soporte nativo para certificados .pfx de SUNAT
-- **Almacenamiento Local**: Base de datos SQLite embebida
-- **Modo Offline**: Funciona sin conexión a internet
-- **Certificados**: Validación y gestión de certificados digitales
+La app desktop es **online-first con soporte offline local**: empaqueta la UI web como cliente Tauri y consume el backend API real mediante `NEXT_PUBLIC_API_URL`. Cuando no hay conexión o el usuario activa `offline_mode`, las lecturas pueden usar cache local reciente y las escrituras JSON se guardan en una cola local durable para sincronizarse después.
+
+La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNAT/OSE y generación fiscal autoritativa viven en el backend. En offline, esos flujos quedan en estado pendiente/local; no se declara aceptación SUNAT/CDR hasta que el backend procese la cola.
+
+## Características Desktop
+
+### Seguridad y configuración
+- **Cliente nativo Tauri** para operar contra el API del ERP.
+- **Configuración local mínima** para preferencias desktop; no reemplaza la configuración fiscal del backend.
+- **Certificados y credenciales fiscales**: se gestionan en el backend/wizard del ERP.
+- **Outbox offline durable** en desktop para operaciones pendientes.
+- **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
+- **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
 
 ### 📄 Procesamiento de Documentos
 - **CPE**: Facturas, Boletas, Notas de Crédito/Débito
 - **GRE**: Guías de Remisión Electrónicas
-- **Firma XML**: Firma digital según estándares SUNAT
-- **Generación PDF**: Representación impresa automática
+- **Firma XML y envío fiscal**: ejecutados por el backend API.
+- **Generación PDF**: ejecutada por el backend API.
 
 ### 🖨️ Impresión Directa
 - **Impresoras Fiscales**: Soporte para impresoras térmicas
@@ -25,6 +33,7 @@ Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Ne
 - **Formato SUNAT**: Exportación directa para SIRE
 - **Validación**: Verificación de datos antes de exportar
 - **Períodos**: Exportación por rangos de fechas
+- **Ejecución autoritativa**: backend API.
 
 ## 🚀 Instalación y Desarrollo
 
@@ -57,6 +66,9 @@ pnpm run dev
 # Build completo desktop
 pnpm run desktop:build
 
+# Prueba de cache/outbox/sync offline
+pnpm run test:offline
+
 # Los ejecutables estarán en:
 # Windows: apps/web/src-tauri/target/release/erp-suite-desktop.exe
 # Linux: apps/web/src-tauri/target/release/erp-suite-desktop
@@ -71,10 +83,10 @@ apps/web/
 │   ├── src/
 │   │   ├── main.rs      # Entry point
 │   │   ├── lib.rs       # Comandos Tauri
-│   │   ├── database.rs  # SQLite local
-│   │   ├── crypto.rs    # Firma digital
-│   │   ├── sunat.rs     # Integración SUNAT
-│   │   ├── pdf.rs       # Generación PDF
+│   │   ├── database.rs  # Prototipo legacy no autoritativo
+│   │   ├── crypto.rs    # Prototipo legacy no conectado
+│   │   ├── sunat.rs     # Prototipo legacy no conectado
+│   │   ├── pdf.rs       # Prototipo legacy no conectado
 │   │   └── printer.rs   # Impresión directa
 │   ├── Cargo.toml       # Dependencias Rust
 │   └── tauri.conf.json  # Configuración Tauri
@@ -109,8 +121,8 @@ apps/web/
 %APPDATA%/com.erpsuite.desktop/     # Windows
 ~/.config/com.erpsuite.desktop/     # Linux
 ~/Library/Application Support/com.erpsuite.desktop/  # macOS
-├── config.json          # Configuración general
-├── erp_suite.db         # Base de datos SQLite
+├── config.json          # Preferencias locales desktop
+├── offline_outbox.json  # Operaciones pendientes/sincronizadas offline
 └── logs/                # Logs de la aplicación
 ```
 
@@ -119,19 +131,45 @@ apps/web/
 ### Configuración
 - `load_config()` - Cargar configuración
 - `save_config(config)` - Guardar configuración
+- `get_offline_status()` - Resumen de cola offline
+- `enqueue_offline_request(request)` - Guardar operación local pendiente
+- `list_offline_requests()` - Listar operaciones locales
+- `mark_offline_request_synced(id, responseStatus, responseBody)` - Marcar operación sincronizada
+- `mark_offline_request_failed(id, error)` - Marcar operación fallida
+- `delete_offline_request(id)` - Eliminar operación local
 
 ### Procesamiento de Documentos
-- `sign_xml(xmlContent)` - Firmar XML con certificado
-- `send_to_sunat(signedXml)` - Enviar a SUNAT
-- `generate_pdf(xmlContent, template)` - Generar PDF
+- `sign_xml(xmlContent)` - Existe para compatibilidad, pero responde que la firma se hace en backend.
+- `send_to_sunat(signedXml)` - Existe para compatibilidad, pero responde que el envío fiscal se hace en backend.
+- `generate_pdf(xmlContent, template)` - Existe para compatibilidad, pero responde que el PDF fiscal se hace en backend.
 
 ### Impresión
 - `get_printers()` - Obtener impresoras disponibles
 - `print_document(pdfData, printerName)` - Imprimir documento
 
 ### Base de Datos
-- `backup_database(backupPath)` - Crear backup
-- `export_sire_data(periodo)` - Exportar datos SIRE
+- `backup_database(backupPath)` - Exporta backup JSON de configuración desktop y cola offline; la BD autoritativa sigue en backend/BD.
+- `export_sire_data(periodo)` - Existe para compatibilidad, pero la exportación se hace en backend.
+
+## Modo Offline
+
+El modo offline soportado es de continuidad operativa, no una segunda base autoritativa:
+
+- `GET`: si la red falla, se devuelve la última respuesta JSON/text cacheada para esa URL.
+- `POST/PUT/PATCH/DELETE`: si la red falla y el body es serializable, se guarda en `offline_outbox.json` y la UI recibe una respuesta `202` con `offline_queue_id`.
+- `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
+- `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, sincronizados y permite reintentar.
+- El indicador superior muestra `Offline` y el número de operaciones pendientes.
+- Al reconectar, la cola se puede sincronizar contra el backend API real vigente en `NEXT_PUBLIC_API_URL`.
+- `pnpm run test:offline` verifica cache de lectura, cola de escritura, sincronización exitosa y fallo persistido.
+- La matriz de smoke desktop/static export del 2026-05-25 cubrio 108 rutas exportadas con API simulada: 108/108 OK.
+
+Restricciones deliberadas:
+
+- No se cachean PDFs/binarios ni `FormData`.
+- El cache de respuestas tiene limite por entrada y falla suave si el almacenamiento local esta lleno; la respuesta online no se invalida por un fallo de cache.
+- Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
+- Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
 
 ## 🛠️ Desarrollo de Funcionalidades
 
@@ -169,11 +207,11 @@ import { useTauri } from '@/hooks/useTauri';
 
 export default function MiComponente() {
     const { isDesktop, miComando } = useTauri();
-    
+
     if (!isDesktop) {
         return <div>Solo disponible en desktop</div>;
     }
-    
+
     return (
         <button onClick={() => miComando('test')}>
             Ejecutar Comando
@@ -196,7 +234,7 @@ TAURI_DEBUG=1 pnpm run desktop:dev
 ### DevTools
 - **Frontend**: DevTools de Chrome integradas
 - **Backend**: Logs en consola de Rust
-- **Base de datos**: SQLite browser o DBeaver
+- **Datos locales desktop**: inspeccionar `config.json` y `offline_outbox.json`; la base autoritativa se revisa en Supabase/Postgres.
 
 ## 📦 Distribución
 

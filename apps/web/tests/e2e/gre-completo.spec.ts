@@ -322,7 +322,11 @@ test.describe('T11 GRE completo', () => {
 
     await gotoAuthenticated(page, '/dashboard/gre');
     await expect(page.getByText(/Guías de Remisión Electrónica|Guias de Remision Electronica/i)).toBeVisible({ timeout: 20000 });
-    await expect(page.locator('body')).toContainText(gre.numero);
+    // El listado se hidrata async desde el backend; el spinner "Cargando guias
+    // de remision..." puede aparecer 3-5s. Esperamos primero a que termine
+    // antes de buscar el número de GRE (default timeout 5s no alcanza).
+    await expect(page.locator('body')).not.toContainText(/Cargando guias de remision|Cargando guías de remisión/i, { timeout: 30000 });
+    await expect(page.locator('body')).toContainText(gre.numero, { timeout: 15000 });
     const greRow = page.locator('tr').filter({ hasText: gre.numero });
     await expect(greRow, 'La GRE creada debe aparecer en el listado').toBeVisible({ timeout: 20000 });
     await greRow.getByRole('button', { name: 'Ver' }).click();
