@@ -52,6 +52,7 @@ import { CacheModule } from './shared/cache/cache.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { TaxCalculatorModule } from './shared/utils/tax-calculator.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
+import { MigrationModule } from './modules/migration/migration.module';
 import { HelpModule } from './modules/help/help.module';
 import { CajasModule } from './modules/cajas/cajas.module';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -120,6 +121,7 @@ import { envSchema } from './config/env.schema';
     SunatRetryModule, // 🔴 CRÍTICO: Módulo de reintentos automáticos para comunicación con SUNAT
     MetricsModule, // 📊 Módulo de métricas para Prometheus y Grafana
     ImportExportModule,
+    MigrationModule,
     HelpModule,
     CajasModule,
     JobsModule,

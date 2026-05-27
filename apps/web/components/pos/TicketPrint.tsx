@@ -51,7 +51,7 @@ export default function TicketPrint({ ventaData, empresaData, onPrintComplete }:
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Ticket ${ventaData.numero_ticket}</title>
+        <title>Ticket ${escapeHtml(ventaData.numero_ticket)}</title>
         <style>${getTicketPrintStyles()}</style>
       </head>
       <body>
@@ -172,13 +172,13 @@ export function printTicket(
   const itemsHtml = ventaData.items && ventaData.items.length > 0
     ? ventaData.items.map(item => `
         <div class="item">
-          <span class="item-nombre">${item.cantidad}x ${item.nombre}</span>
-          <span class="item-precio">${formatMoney(item.subtotal)}</span>
+          <span class="item-nombre">${escapeHtml(item.cantidad)}x ${escapeHtml(item.nombre)}</span>
+          <span class="item-precio">${escapeHtml(formatMoney(item.subtotal))}</span>
         </div>
       `).join('')
     : `<div class="item">
         <span class="item-nombre">Productos</span>
-        <span class="item-precio">${formatMoney(ventaData.subtotal)}</span>
+        <span class="item-precio">${escapeHtml(formatMoney(ventaData.subtotal))}</span>
        </div>`
 
   const printWindow = window.open('', '_blank', 'width=350,height=500')
@@ -189,32 +189,33 @@ export function printTicket(
   }
 
   // Generar HTML del logo si existe
-  const logoHtml = empresaData?.logo_url 
-    ? `<img src="${empresaData.logo_url}" alt="Logo" />`
+  const logoUrl = safeImageUrl(empresaData?.logo_url)
+  const logoHtml = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`
     : ''
 
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Ticket ${ventaData.numero_ticket}</title>
+      <title>Ticket ${escapeHtml(ventaData.numero_ticket)}</title>
       <style>${getTicketPrintStyles()}</style>
     </head>
     <body>
       <div class="header">
         ${logoHtml ? `<div class="logo">${logoHtml}</div>` : ''}
-        <div class="empresa-nombre">${empresaData?.nombre || 'NEON SYSTEM'}</div>
-        <div class="empresa-ruc">${documentoFiscal}: ${empresaData?.ruc || '20000000001'}</div>
-        ${empresaData?.direccion ? `<div>${empresaData.direccion}</div>` : ''}
-        <div class="ticket-numero">${documentoLabel}: ${ventaData.numero_ticket}</div>
-        <div class="fecha">${formatDate(ventaData.fecha)}</div>
+        <div class="empresa-nombre">${escapeHtml(empresaData?.nombre || 'NEON SYSTEM')}</div>
+        <div class="empresa-ruc">${escapeHtml(documentoFiscal)}: ${escapeHtml(empresaData?.ruc || '20000000001')}</div>
+        ${empresaData?.direccion ? `<div>${escapeHtml(empresaData.direccion)}</div>` : ''}
+        <div class="ticket-numero">${escapeHtml(documentoLabel)}: ${escapeHtml(ventaData.numero_ticket)}</div>
+        <div class="fecha">${escapeHtml(formatDate(ventaData.fecha))}</div>
       </div>
-      <div class="cliente"><strong>Cliente:</strong> ${ventaData.cliente_nombre || 'Cliente General'}</div>
+      <div class="cliente"><strong>Cliente:</strong> ${escapeHtml(ventaData.cliente_nombre || 'Cliente General')}</div>
       <div class="items">${itemsHtml}</div>
       <div class="totales">
-        <div class="total-row"><span>Subtotal:</span><span>${formatMoney(ventaData.subtotal)}</span></div>
-        <div class="total-row"><span>${taxLabel}:</span><span>${formatMoney(ventaData.impuestos)}</span></div>
-        <div class="total-row total-final"><span>TOTAL:</span><span>${formatMoney(ventaData.total)}</span></div>
+        <div class="total-row"><span>Subtotal:</span><span>${escapeHtml(formatMoney(ventaData.subtotal))}</span></div>
+        <div class="total-row"><span>${escapeHtml(taxLabel)}:</span><span>${escapeHtml(formatMoney(ventaData.impuestos))}</span></div>
+        <div class="total-row total-final"><span>TOTAL:</span><span>${escapeHtml(formatMoney(ventaData.total))}</span></div>
       </div>
       <div class="footer">
         <div>¡Gracias por su compra!</div>
@@ -236,6 +237,31 @@ function getDocumentoLabel(countryCode?: string, tipoComprobante?: string): stri
   if (tipoComprobante === '01') return 'FACTURA'
   if (tipoComprobante === '03') return 'BOLETA'
   return 'TICKET'
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[char]
+  })
+}
+
+function safeImageUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value, window.location.origin)
+    if (!['http:', 'https:', 'data:'].includes(url.protocol)) return null
+    if (url.protocol === 'data:' && !/^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url.href)) return null
+    return url.href
+  } catch {
+    return null
+  }
 }
 
 function getTicketPrintStyles(): string {

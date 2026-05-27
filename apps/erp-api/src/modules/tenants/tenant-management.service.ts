@@ -5,6 +5,7 @@ import { UserManagementService } from '../usuarios/user-management.service';
 import { CreateTenantDto, UpdateTenantDto, TenantFiltersDto, ActivateDemoTenantDto } from './dto';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
 
 @Injectable()
 export class TenantManagementService {
@@ -329,7 +330,13 @@ export class TenantManagementService {
         .select('tenant_id, razon_social, nombre_comercial, ruc, email, direccion_fiscal, telefono, pais, moneda_defecto, estado, plan, fecha_inicio, fecha_fin, created_at, updated_at, is_demo, demo_expires_at, demo_created_at', { count: 'exact' });
 
       if (filters?.search) {
-        query = query.or(`razon_social.ilike.%${filters.search}%,nombre_comercial.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+        // HARDENING: sanitizar para evitar PostgREST filter injection.
+        const safe = sanitizePostgrestSearch(filters.search);
+        if (safe.length > 0) {
+          query = query.or(
+            `razon_social.ilike.%${safe}%,nombre_comercial.ilike.%${safe}%,email.ilike.%${safe}%`,
+          );
+        }
       }
 
       if (filters?.estado) {
@@ -410,30 +417,30 @@ export class TenantManagementService {
     }
 
     console.log(`[TenantService] Buscando tenant ${tenantId} en empresa_config...`);
-    
+
     // Intentar primero con select('*') - a veces PostgREST tiene problemas con campos específicos
     let { data: tenants, error } = await client
       .from('empresa_config')
       .select('*')
       .eq('tenant_id', tenantId);
-    
+
     // Si hay error PGRST301, intentar con cliente público directamente
     if (error && error.code === 'PGRST301') {
       console.warn(`[TenantService] ⚠️ Error PGRST301 detectado, intentando con cliente público...`);
-      
+
       const publicClient = this.supabase.getPublicClient();
       const altQuery = await publicClient
         .from('empresa_config')
         .select('*')
         .eq('tenant_id', tenantId);
-      
+
       if (!altQuery.error && altQuery.data) {
         console.log(`[TenantService] ✅ Query alternativa exitosa con cliente público`);
         tenants = altQuery.data;
         error = null;
       }
     }
-    
+
     // Extraer el primer elemento del array (o null si no hay resultados)
     let tenant = tenants && tenants.length > 0 ? tenants[0] : null;
 
@@ -442,16 +449,16 @@ export class TenantManagementService {
     if (error && (error.code === '42501' || error.code === 'P0001' || error.message?.includes('policy') || error.message?.includes('permission') || error.message?.includes('RLS'))) {
       console.warn(`[TenantService] ⚠️ RLS bloqueó acceso (${error.code}), intentando con cliente público como fallback...`);
       console.warn(`[TenantService] Error original: ${error.message}`);
-      
+
       const publicClient = this.supabase.getPublicClient();
       const fallbackResult = await publicClient
         .from('empresa_config')
         .select('*')
         .eq('tenant_id', tenantId);
-      
+
       // Extraer el primer elemento del array del fallback
       const fallbackTenant = fallbackResult.data && fallbackResult.data.length > 0 ? fallbackResult.data[0] : null;
-      
+
       if (!fallbackResult.error && fallbackTenant) {
         console.log(`[TenantService] ✅ Fallback exitoso - usando cliente público (SERVICE_ROLE_KEY bypass RLS)`);
         tenant = fallbackTenant;
@@ -467,18 +474,18 @@ export class TenantManagementService {
       console.error('[TenantService] ❌ Error message:', error.message);
       console.error('[TenantService] ❌ Error details:', JSON.stringify(error, null, 2));
       console.error('[TenantService] ❌ Error hint:', error.hint);
-      
+
       // Si es error de RLS o permiso, dar mensaje más específico
       if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('policy')) {
         console.error('[TenantService] ⚠️ ERROR DE RLS: La política RLS está bloqueando el acceso');
         throw new NotFoundException(`Tenant no encontrado: Acceso bloqueado por RLS. Verificar políticas RLS en empresa_config. Error: ${error.message}`);
       }
-      
+
       throw new NotFoundException(`Tenant no encontrado: ${error.message || 'Error desconocido'}`);
     }
 
     console.log(`[TenantService] ✅ Query exitosa. Tenant encontrado:`, tenant ? 'SÍ' : 'NO');
-    
+
     if (!tenant) {
       console.error(`[TenantService] ⚠️ No existe registro en empresa_config con tenant_id: ${tenantId}`);
       console.error(`[TenantService] 💡 Esto puede indicar que:`);
@@ -757,9 +764,9 @@ export class TenantManagementService {
     // Filtrar usuarios activos del tenant con rol ADMIN
     const activeAdmins = (adminUserRoles || [])
       .map(ur => ur.usuarios_sistema)
-      .filter((user: any) => 
-        user && 
-        user.tenant_id === tenantId && 
+      .filter((user: any) =>
+        user &&
+        user.tenant_id === tenantId &&
         user.estado === 'ACTIVO'
       );
 

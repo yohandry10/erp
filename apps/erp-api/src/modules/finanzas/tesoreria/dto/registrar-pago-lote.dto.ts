@@ -1,6 +1,8 @@
-import { IsNotEmpty, IsArray, IsString, IsOptional, IsUUID, IsDateString, ValidateNested, ArrayMinSize } from 'class-validator';
+import { IsIn, IsNotEmpty, IsArray, IsString, IsOptional, IsUUID, IsDateString, MaxLength, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const METODOS_PAGO_TESORERIA = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'] as const;
 
 export class PagoLoteItemDto {
   @ApiProperty({
@@ -46,10 +48,11 @@ export class RegistrarPagoLoteDto {
   @ApiProperty({
     description: 'Método de pago utilizado',
     example: 'TRANSFERENCIA',
-    enum: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
+    enum: METODOS_PAGO_TESORERIA,
   })
   @IsNotEmpty({ message: 'El método de pago es requerido' })
   @IsString({ message: 'El método de pago debe ser un texto' })
+  @IsIn(METODOS_PAGO_TESORERIA, { message: 'Método de pago inválido' })
   metodo_pago: string;
 
   @ApiProperty({
@@ -66,6 +69,7 @@ export class RegistrarPagoLoteDto {
   })
   @IsOptional()
   @IsString({ message: 'La referencia debe ser un texto' })
+  @MaxLength(120, { message: 'La referencia del lote no puede exceder 120 caracteres' })
   referencia_lote?: string;
 
   @ApiPropertyOptional({
@@ -74,5 +78,6 @@ export class RegistrarPagoLoteDto {
   })
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser un texto' })
+  @MaxLength(1000, { message: 'Las observaciones no pueden exceder 1000 caracteres' })
   observaciones?: string;
 }

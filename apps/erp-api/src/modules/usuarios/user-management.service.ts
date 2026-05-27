@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../../shared/email/email.service';
 import { PermissionService } from '../permissions/permission.service';
+import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
 
 @Injectable()
 export class UserManagementService {
@@ -262,9 +263,12 @@ export class UserManagementService {
       .select('*, user_roles(role_id, roles(id, nombre))', { count: 'exact' })
       .eq('tenant_id', tenantId);
 
-    // Apply search filter
+    // Apply search filter (HARDENING: sanitizar para evitar filter injection).
     if (filters?.search) {
-      query = query.or(`nombre.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+      const safe = sanitizePostgrestSearch(filters.search);
+      if (safe.length > 0) {
+        query = query.or(`nombre.ilike.%${safe}%,email.ilike.%${safe}%`);
+      }
     }
 
     // Apply estado filter

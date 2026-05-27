@@ -1,5 +1,7 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsUUID, IsDateString, Min } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsString, IsOptional, IsUUID, IsDateString, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const METODOS_PAGO_TESORERIA = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'] as const;
 
 export class RegistrarPagoDto {
   @ApiProperty({
@@ -31,10 +33,11 @@ export class RegistrarPagoDto {
   @ApiProperty({
     description: 'Método de pago utilizado',
     example: 'TRANSFERENCIA',
-    enum: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
+    enum: METODOS_PAGO_TESORERIA,
   })
   @IsNotEmpty({ message: 'El método de pago es requerido' })
   @IsString({ message: 'El método de pago debe ser un texto' })
+  @IsIn(METODOS_PAGO_TESORERIA, { message: 'Método de pago inválido' })
   metodo_pago: string;
 
   @ApiPropertyOptional({
@@ -51,6 +54,7 @@ export class RegistrarPagoDto {
   })
   @IsOptional()
   @IsString({ message: 'La referencia debe ser un texto' })
+  @MaxLength(120, { message: 'La referencia no puede exceder 120 caracteres' })
   referencia?: string;
 
   @ApiPropertyOptional({
@@ -59,6 +63,7 @@ export class RegistrarPagoDto {
   })
   @IsOptional()
   @IsString({ message: 'Las observaciones deben ser un texto' })
+  @MaxLength(1000, { message: 'Las observaciones no pueden exceder 1000 caracteres' })
   observaciones?: string;
 
   @ApiPropertyOptional({
@@ -67,5 +72,6 @@ export class RegistrarPagoDto {
   })
   @IsOptional()
   @IsString({ message: 'La llave de idempotencia debe ser un texto' })
+  @MaxLength(200, { message: 'La llave de idempotencia no puede exceder 200 caracteres' })
   idempotency_key?: string;
 }

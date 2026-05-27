@@ -1,6 +1,8 @@
-import { IsOptional, IsDateString, IsUUID, IsString, IsBoolean, IsInt, Min } from 'class-validator';
+import { IsIn, IsOptional, IsDateString, IsUUID, IsString, IsBoolean, IsInt, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+
+const METODOS_PAGO_TESORERIA = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'] as const;
 
 export class ListarPagosQueryDto {
   @ApiPropertyOptional({
@@ -38,10 +40,11 @@ export class ListarPagosQueryDto {
   @ApiPropertyOptional({
     description: 'Método de pago para filtrar',
     example: 'TRANSFERENCIA',
-    enum: ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'],
+    enum: METODOS_PAGO_TESORERIA,
   })
   @IsOptional()
   @IsString({ message: 'El método de pago debe ser un texto' })
+  @IsIn(METODOS_PAGO_TESORERIA, { message: 'Método de pago inválido' })
   metodo_pago?: string;
 
   @ApiPropertyOptional({

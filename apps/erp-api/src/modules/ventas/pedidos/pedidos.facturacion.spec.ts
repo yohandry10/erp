@@ -14,6 +14,7 @@ import { DocumentosService } from '../../documentos.service';
 type SupabaseResponse<T> = { data: T; error: any };
 
 type TableResponses = Partial<{
+  maybeSingle: SupabaseResponse<any>[];
   single: SupabaseResponse<any>[];
   limit: SupabaseResponse<any[]>[];
   insert: SupabaseResponse<any>[];
@@ -49,6 +50,11 @@ class MockQueryBuilder {
 
   single() {
     const next = this.responses.single?.shift() ?? { data: null, error: null };
+    return Promise.resolve(next);
+  }
+
+  maybeSingle() {
+    const next = this.responses.maybeSingle?.shift() ?? { data: null, error: null };
     return Promise.resolve(next);
   }
 
@@ -184,7 +190,7 @@ describe('PedidosService (facturación)', () => {
     await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(Error);
   });
 
-  it('debe ser idempotente en el descuento de stock (flujo simplificado) si se reintenta tras fallo de CPE', async () => {
+  it('no debe descontar stock (flujo simplificado) si falla la generación de CPE', async () => {
     mockSupabaseClient = createMockSupabaseClient({
       empresa_config: {
         single: [
@@ -255,7 +261,90 @@ describe('PedidosService (facturación)', () => {
     await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(BadRequestException);
     await expect(service.generarFactura('pedido-1', 'tenant-1')).rejects.toBeInstanceOf(BadRequestException);
 
-    expect(mockSupabaseClient.rpc).toHaveBeenCalledTimes(1);
+    expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+  });
+
+  it('descuenta stock después de obtener CPE idempotente en flujo simplificado', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [
+          {
+            data: {
+              ruc: '20123456789',
+              razon_social: 'Empresa Test SAC',
+              direccion_fiscal: 'Av. Test 123',
+              certificado_pfx: 'base64-pfx',
+              certificado_password: 'secret',
+            },
+            error: null,
+          },
+        ],
+      },
+      movimientos_inventario: {
+        limit: [{ data: [], error: null }],
+      },
+      pedidos_venta_detalle: {
+        maybeSingle: [{ data: { id: 'det-1' }, error: null }],
+        update: [{ data: null, error: null }],
+      },
+      pedido_backorders: {
+        delete: [{ data: null, error: null }],
+      },
+      pedidos_venta: {
+        maybeSingle: [{ data: { id: 'pedido-1' }, error: null }],
+      },
+    });
+
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    (service as any).eventBus = {
+      emitFacturaEmitidaEvent: jest.fn(),
+      emitVentaProcessed: jest.fn(),
+    };
+    (service as any).greIntegrationService.verificarSugerenciaGRE.mockResolvedValue({ sugerir: false });
+
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({
+      usar_flujo_logistica: false,
+      dias_vencimiento_factura: 30,
+    });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1',
+      estado: 'LISTO_FACTURAR',
+      numero: 'PV-0001',
+      cliente_id: 'cliente-1',
+      subtotal: 100,
+      igv: 18,
+      total: 118,
+      detalle: [
+        {
+          id: 'det-1',
+          producto_id: 'prod-1',
+          cantidad: 2,
+          precio_unitario: 50,
+          subtotal: 100,
+        },
+      ],
+      factura_id: null,
+    });
+
+    mockSupabaseClient.rpc.mockResolvedValue({ data: null, error: null });
+    cpeIntegrationService.generarFacturaDesdePedido.mockResolvedValue({
+      factura_id: 'cpe-1',
+      documento_id: 'doc-1',
+      total: 118,
+      estado: 'EMITIDO',
+      serie: 'F001',
+      numero: 1,
+      fecha_emision: '2026-05-27',
+      moneda: 'PEN',
+    });
+
+    const result = await service.generarFactura('pedido-1', 'tenant-1', 'user-1');
+
+    expect(result).toEqual({ success: true, factura_id: 'cpe-1', sugerir_gre: false });
+    expect(mockSupabaseClient.rpc).toHaveBeenCalledWith('descontar_stock_y_liberar_reserva', expect.any(Object));
+    expect(
+      cpeIntegrationService.generarFacturaDesdePedido.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockSupabaseClient.rpc.mock.invocationCallOrder[0]);
   });
 });
 
@@ -263,4 +352,3 @@ function moduleRefSupabase(service: PedidosService) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (service as any).supabase as SupabaseService;
 }
-

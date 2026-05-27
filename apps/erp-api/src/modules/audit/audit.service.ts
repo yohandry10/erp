@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { AuditLogDto, AuditFiltersDto } from './dto';
+import { sanitizePostgrestSearch } from '../../common/util/postgrest.util';
 
 export interface AuditLog {
   id?: string;
@@ -452,6 +453,11 @@ export class AuditService {
    */
   async getResourceAuditLogs(tenantId: string, tableName: string, resourceId: string) {
     const client = this.supabase.getClient();
+    const safeResourceId = sanitizePostgrestSearch(resourceId, 100);
+
+    if (!safeResourceId) {
+      throw new BadRequestException('Identificador de recurso inválido');
+    }
 
     // Query audit_log for specific resource
     // We need to check both old_values and new_values for the resource ID
@@ -460,7 +466,7 @@ export class AuditService {
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('table_name', tableName)
-      .or(`old_values->>id.eq.${resourceId},new_values->>id.eq.${resourceId}`)
+      .or(`old_values->>id.eq.${safeResourceId},new_values->>id.eq.${safeResourceId}`)
       .order('timestamp', { ascending: false });
 
     if (error) {

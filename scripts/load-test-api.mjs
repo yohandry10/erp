@@ -83,6 +83,7 @@ async function login() {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok || !body?.access_token) {
+    increment(statusCounts, response.status || 'login_failed');
     samples.push({
       name: 'auth_login',
       method: 'POST',
@@ -95,6 +96,7 @@ async function login() {
     return;
   }
 
+  increment(statusCounts, response.status);
   token = body.access_token;
   authenticated = true;
   samples.push({

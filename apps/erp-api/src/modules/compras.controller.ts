@@ -9,6 +9,7 @@ import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { PermissionGuard } from '../common/guards/permission.guard';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { TenantContextService } from '../shared/tenant/tenant-context.service';
+import { CreateProveedorDto } from './compras/dto/create-proveedor.dto';
 import { v4 as uuidv4 } from 'uuid';
 
 @ApiTags('compras')
@@ -31,7 +32,7 @@ export class ComprasController {
     }
     return tenantId;
   }
-  
+
   @Get('stats')
   @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ summary: 'Obtener estadísticas de compras' })
@@ -57,10 +58,10 @@ export class ComprasController {
 
       console.log('🔍 [Compras Stats] DEBUG - Datos obtenidos:', {
         totalComprasEncontradas: todasLasCompras?.length,
-        primerasTresCompras: todasLasCompras?.slice(0, 3)?.map(c => ({ 
-          total: c.total, 
-          estado: c.estado, 
-          fecha: c.fecha_orden 
+        primerasTresCompras: todasLasCompras?.slice(0, 3)?.map(c => ({
+          total: c.total,
+          estado: c.estado,
+          fecha: c.fecha_orden
         }))
       });
 
@@ -70,7 +71,7 @@ export class ComprasController {
         console.log(`💰 Sumando orden ${orden.numero}: ${total}`);
         return sum + total;
       }, 0) || 0;
-      
+
       const cantidadCompras = todasLasCompras?.length || 0;
       const ordenesActivas = todasLasCompras?.filter(o => ['PENDIENTE', 'ENTREGADO'].includes(o.estado)).length || 0;
       const ordenesVencidas = todasLasCompras?.filter(o => o.estado === 'PENDIENTE' && new Date(o.fecha_entrega) < new Date()).length || 0;
@@ -112,7 +113,7 @@ export class ComprasController {
         hint: error.hint || '',
         code: error.code || ''
       });
-      
+
       // Devolver datos por defecto si hay error
       return {
         success: true,
@@ -180,7 +181,7 @@ export class ComprasController {
     try {
       const tenantId = this.resolveTenant(); // HARDENING: usar tenant del contexto.
       const supabase = this.supabase.getClient();
-      
+
       // Obtener el último número de orden
       const { data, error } = await supabase
         .from('ordenes_compra')
@@ -227,9 +228,9 @@ export class ComprasController {
       console.log(`🛒 Creando nueva orden de compra para tenant: ${tenantId}`);
 
       // Calcular totales
-      const subtotal = ordenData.items.reduce((sum, item) => 
+      const subtotal = ordenData.items.reduce((sum, item) =>
         sum + (item.cantidad * item.precio_unitario), 0);
-      
+
       // ✅ CORRECCIÓN: Usar TaxCalculatorService en lugar de hardcodear IGV
       const taxResult = await this.taxCalculator.calcularImpuestos({
         subtotal,
@@ -486,7 +487,7 @@ export class ComprasController {
       }
 
       console.log(`✅ [Proveedores API] DATOS OBTENIDOS: ${data?.length || 0} proveedores`);
-      
+
       if (data && data.length > 0) {
         console.log('🔍 [Proveedores API] PRIMER PROVEEDOR:', JSON.stringify(data[0], null, 2));
       }
@@ -504,7 +505,7 @@ export class ComprasController {
           estado: proveedor.estado || 'ACTIVO',
           activo: proveedor.activo
         };
-        
+
         console.log(`🔄 [Proveedores API] MAPEADO: ${mapped.ruc} - ${mapped.nombre}`);
         return mapped;
       });
@@ -533,26 +534,25 @@ export class ComprasController {
   @RequirePermission('compras.proveedores.crear')
   @ApiOperation({ summary: 'Crear nuevo proveedor' })
   @ApiResponse({ status: 201, description: 'Proveedor creado exitosamente' })
-  async crearProveedor(@Body() proveedorData: any) {
+  async crearProveedor(
+    @Body() proveedorData: CreateProveedorDto,
+    @CurrentTenant() tenantId: string,
+  ) {
     try {
-      console.log('📝 [Proveedores] Creando nuevo proveedor:', proveedorData);
+      // HARDENING multi-tenant: tenant_id SIEMPRE viene del JWT, nunca del body.
+      // Antes: el método aceptaba @Body() any y caía al primer tenant si el body
+      // no traía tenant_id. Eso permitía writes cross-tenant a cualquier usuario
+      // con permiso compras.proveedores.crear.
 
-      // Validación básica
-      if (!proveedorData.ruc || !proveedorData.razon_social) {
-        return {
-          success: false,
-          error: 'RUC y Razón Social son obligatorios'
-        };
-      }
-
-      // Verificar si ya existe un proveedor con el mismo RUC
+      // Verificar si ya existe un proveedor con el mismo RUC EN ESTE TENANT
       const { data: existente, error: checkError } = await this.supabase.getClient()
         .from('proveedores')
         .select('id, ruc')
+        .eq('tenant_id', tenantId)
         .eq('ruc', proveedorData.ruc)
-        .single();
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = No rows found
+      if (checkError) {
         throw checkError;
       }
 
@@ -563,28 +563,10 @@ export class ComprasController {
         };
       }
 
-      // Obtener tenant_id automáticamente si no se proporciona
-      let tenant_id = proveedorData.tenant_id;
-      if (!tenant_id) {
-        const { data: tenant, error: tenantError } = await this.supabase.getClient()
-          .from('tenants')
-          .select('id')
-          .limit(1)
-          .single();
-        
-        if (tenantError || !tenant) {
-          return {
-            success: false,
-            error: 'No se pudo obtener tenant_id. Verifique la configuración.'
-          };
-        }
-        tenant_id = tenant.id;
-      }
-
       const { data: proveedor, error } = await this.supabase.getClient()
         .from('proveedores')
         .insert({
-          tenant_id: tenant_id,
+          tenant_id: tenantId,
           ruc: proveedorData.ruc.trim(),
           razon_social: proveedorData.razon_social.trim(),
           nombre_comercial: proveedorData.nombre_comercial?.trim() || proveedorData.razon_social.trim(),
@@ -635,7 +617,7 @@ export class ComprasController {
 
       const tenantId = this.resolveTenant(); // HARDENING: tenant tomado del contexto.
       proveedorData.tenant_id = tenantId;
-      
+
       // Verificar si existe otro proveedor con el mismo RUC (excepto el actual)
       const { data: existente, error: checkError } = await this.supabase.getClient()
         .from('proveedores')
@@ -859,7 +841,7 @@ export class ComprasController {
   @RequirePermission('compras.ordenes.ver')
   @ApiOperation({ summary: 'Obtener orden específica por ID' })
   @ApiResponse({ status: 200, description: 'Orden obtenida exitosamente' })
-  async getOrden(@Param('id') ordenId: string) {
+  async getOrden(@Param('id') ordenId: string, @CurrentTenant() tenantId: string) {
     try {
       const { data: orden, error } = await this.supabase.getClient()
         .from('ordenes_compra')
@@ -868,6 +850,7 @@ export class ComprasController {
           proveedor:proveedores(*),
           orden_compra_detalles:orden_compra_detalles!fk_orden_compra_detalles_orden_id(*)
         `)
+        .eq('tenant_id', tenantId)
         .eq('id', ordenId)
         .single();
 
@@ -887,4 +870,4 @@ export class ComprasController {
     }
   }
 }
- 
+

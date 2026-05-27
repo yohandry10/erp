@@ -374,7 +374,7 @@ describe('RecepcionesService', () => {
       });
 
       // Mock detalle update
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'detalle-1' }, error: null });
 
       // Mock orden detalles query for estado update
       Object.assign(mockQueryBuilder, {
@@ -383,10 +383,10 @@ describe('RecepcionesService', () => {
       });
 
       // Mock orden update
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'orden-1' }, error: null });
 
       // Mock recepcion update (cerrar)
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'rec-1' }, error: null });
 
       // Mock orden query for event
       mockQueryBuilder.single.mockResolvedValueOnce({
@@ -531,7 +531,7 @@ describe('RecepcionesService', () => {
       });
 
       // Mock detalle update
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'detalle-1' }, error: null });
 
       // Mock orden detalles query
       Object.assign(mockQueryBuilder, {
@@ -540,10 +540,10 @@ describe('RecepcionesService', () => {
       });
 
       // Mock orden update
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'orden-1' }, error: null });
 
       // Mock recepcion update
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null });
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'rec-1' }, error: null });
 
       // Mock orden query for event
       mockQueryBuilder.single.mockResolvedValueOnce({
@@ -605,7 +605,7 @@ describe('RecepcionesService', () => {
         return mockQueryBuilder;
       });
 
-      mockQueryBuilder.single.mockResolvedValueOnce({ data: null, error: null }); // recepciones.update
+      mockQueryBuilder.maybeSingle.mockResolvedValueOnce({ data: { id: 'rec-1' }, error: null }); // recepciones.update
 
       const cerrarDto: CerrarRecepcionDto = { observaciones: 'Retry close' };
       const result = await service.cerrarRecepcion('rec-1', 'tenant-1', cerrarDto, 'user-1');
