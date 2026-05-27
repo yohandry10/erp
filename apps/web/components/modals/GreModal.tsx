@@ -3,6 +3,21 @@
 import { useState, useEffect } from 'react'
 import { useApiCall } from '@/hooks/use-api'
 
+function showToast(message: string) {
+  if (typeof window === 'undefined') return
+
+  const toast = document.createElement('div')
+  const content = document.createElement('div')
+  content.textContent = message
+  toast.appendChild(content)
+  document.body.appendChild(toast)
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast)
+    }
+  }, 3000)
+}
+
 interface CpeData {
   id: string
   tipoDocumento?: string
@@ -114,18 +129,7 @@ export default function GreModal({
         console.log('✅ GRE creada exitosamente:', result.data)
         
         // Mostrar toast de éxito
-        if (typeof window !== 'undefined') {
-          const successToast = document.createElement('div')
-          successToast.innerHTML = `
-            <div>
-              ✅ ${result.message || 'Guía de remisión creada exitosamente'}
-            </div>
-          `
-          document.body.appendChild(successToast)
-          setTimeout(() => {
-            document.body.removeChild(successToast)
-          }, 3000)
-        }
+        showToast(`✅ ${result.message || 'Guía de remisión creada exitosamente'}`)
         
         onSuccess(result.data)
         onClose()

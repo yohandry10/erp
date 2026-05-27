@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useApi } from '@/hooks/use-api'
 import { useEmpresaConfig } from '@/hooks/use-empresa-config'
-import { PedidoVenta, EstadoPedido } from '@/types/ventas'
+import { PedidoVenta } from '@/types/ventas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Truck, RefreshCw, Eye } from 'lucide-react'
@@ -12,6 +12,7 @@ import { toast } from '@/components/ui/use-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ConfirmarDespachoButton } from '@/components/ventas/ConfirmarDespachoButton'
+import { LogisticsDisabledState } from '../LogisticsDisabledState'
 
 export default function ListoDespachoPage() {
   const router = useRouter()
@@ -77,13 +78,11 @@ export default function ListoDespachoPage() {
 
   if (!isFlujologistica) {
     return (
-      <div className="dashboard-container">
-        <div className="activity-empty">
-          <Truck />
-          <h3>Flujo de logística desactivado</h3>
-          <p>Activa el flujo de logística en configuración para gestionar despachos.</p>
-        </div>
-      </div>
+      <LogisticsDisabledState
+        icon={Truck}
+        title="Activa logística para despachar pedidos"
+        description="Esta pantalla muestra pedidos preparados y listos para salir de almacén. Para usarla, activa el flujo logístico una sola vez; después el sistema habilitará preparación, despacho y facturación en el orden correcto."
+      />
     )
   }
 

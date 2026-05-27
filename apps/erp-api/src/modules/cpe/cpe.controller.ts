@@ -133,6 +133,18 @@ export class CpeController {
     }
   }
 
+  @Post('comprobantes')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({ summary: 'Crear comprobante CPE desde UI' })
+  async createComprobante(
+    @Body() payload: any,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ): Promise<FacturaDto> {
+    return this.cpeService.createFromComprobantePayload(payload, tenantId, userId);
+  }
+
   @Get('comprobantes')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')

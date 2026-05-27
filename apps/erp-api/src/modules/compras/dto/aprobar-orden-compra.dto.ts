@@ -1,17 +1,13 @@
-import { IsString, IsOptional, IsUUID, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
+// SEC-001 FIX: aprobador_id removido del contrato — el aprobador se identifica
+// SIEMPRE por el JWT (controller pasa user.id al service). El body solo lleva
+// metadata del acto de aprobacion. Con ValidationPipe global whitelist + forbidNonWhitelisted,
+// si un cliente envia aprobador_id la API responde 400.
 export class AprobarOrdenCompraDto {
   @ApiPropertyOptional({
-    description: 'ID del usuario aprobador',
-    example: '550e8400-e29b-41d4-a716-446655440001'
-  })
-  @IsOptional()
-  @IsUUID()
-  aprobador_id?: string;
-
-  @ApiPropertyOptional({
-    description: 'Nombre del usuario aprobador',
+    description: 'Nombre opcional para overridear el nombre derivado del aprobador (uso administrativo).',
     example: 'Juan Pérez'
   })
   @IsOptional()

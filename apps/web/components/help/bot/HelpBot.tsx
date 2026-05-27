@@ -5,6 +5,7 @@ import { HelpBotTrigger } from './HelpBotTrigger'
 import { HelpBotModal } from './HelpBotModal'
 import { HelpBotMessage, HelpSearchResult, HelpSuggestion } from './types'
 import { useTenant } from '@/contexts/TenantContext'
+import { fetchApi } from '@/lib/api-fetch'
 
 export function HelpBot() {
   const [isOpen, setIsOpen] = useState(false)
@@ -24,9 +25,7 @@ export function HelpBot() {
       if (userRole) params.append('rol', userRole)
       params.append('limite', '5')
 
-      const response = await fetch(`/backend/api/help/sugerencias?${params}`, {
-        credentials: 'include',
-      })
+      const response = await fetchApi(`/api/help/sugerencias?${params}`)
       if (response.ok) {
         const data = await response.json()
         setSuggestions(data.sugerencias || [])
@@ -50,9 +49,7 @@ export function HelpBot() {
       const params = new URLSearchParams({ q: searchQuery })
       if (userRole) params.append('rol', userRole)
 
-      const response = await fetch(`/backend/api/help/search?${params}`, {
-        credentials: 'include',
-      })
+      const response = await fetchApi(`/api/help/search?${params}`)
       if (response.ok) {
         const data = await response.json()
         return data.resultado || null

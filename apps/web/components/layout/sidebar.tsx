@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { customAuth } from '@/lib/auth-service'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,8 @@ import {
   ChevronRight,
   CheckCircle,
   DollarSign,
-  HelpCircle
+  HelpCircle,
+  WifiOff
 } from 'lucide-react'
 import { useCountryContext } from '@/hooks/use-country-context'
 
@@ -311,14 +312,15 @@ const menuItems: MenuItem[] = [
     }
   },
   {
+    title: 'Offline',
+    href: '/dashboard/offline',
+    icon: WifiOff
+  },
+  {
     title: 'Auditoría',
     href: '/dashboard/audit-logs',
     icon: Shield,
-    permission: {
-      modulo: 'configuracion',
-      accion: 'ver',
-      recurso: 'usuarios'
-    }
+    superAdminOnly: true
   },
   {
     title: 'Ayuda',
@@ -331,15 +333,97 @@ const menuItems: MenuItem[] = [
 import { useTenant } from '@/contexts/TenantContext'
 import { usePermission } from '@/hooks/use-permission'
 
-// Component to render a single menu item with permission check
-function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
+const getDataTour = (title: string): string => {
+  const tourMap: Record<string, string> = {
+    Dashboard: 'menu-dashboard',
+    POS: 'menu-pos',
+    Ventas: 'menu-ventas',
+    Clientes: 'menu-clientes',
+    Cotizaciones: 'menu-cotizaciones',
+    Pedidos: 'menu-pedidos',
+    Inventario: 'menu-inventario',
+    Finanzas: 'menu-finanzas',
+    Configuración: 'menu-configuracion',
+    Usuarios: 'menu-usuarios',
+    'Reportes SIRE': 'menu-reportes',
+    Analytics: 'menu-reportes',
+    Compras: 'menu-compras',
+    RRHH: 'menu-rrhh',
+    Contabilidad: 'menu-contabilidad',
+  }
+  return tourMap[title] || `menu-${title.toLowerCase().replace(/\s+/g, '-')}`
+}
+
+const collectMenuHrefs = (items: MenuItem[]): string[] =>
+  items.flatMap((item) => [
+    ...(item.href ? [item.href] : []),
+    ...(item.submenu ? collectMenuHrefs(item.submenu) : []),
+  ])
+
+const IDLE_PREFETCH_LIMIT = 8
+const IDLE_PREFETCH_DELAY_MS = 120
+
+function PermissionMenuItem({
+  item,
+  pathname,
+  isTablet,
+  isMobile,
+  onClose,
+  onPrefetch,
+}: MenuItemProps) {
+  const permissionResult = usePermission(
+    item.permission?.modulo ?? '',
+    item.permission?.accion ?? '',
+    item.permission?.recurso ?? '',
+  )
+
+  if (permissionResult.loading) {
+    const Icon = item.icon
+    return (
+      <div className={cn('my-1 flex min-h-11 items-center rounded-xl text-slate-400 opacity-50 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm')}>
+        <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
+        <span className="min-w-0 truncate whitespace-nowrap">{item.title}</span>
+      </div>
+    )
+  }
+
+  if (!permissionResult.hasPermission) {
+    return null
+  }
+
+  return (
+    <MenuItemContent
+      item={item}
+      pathname={pathname}
+      isTablet={isTablet}
+      isMobile={isMobile}
+      onClose={onClose}
+      onPrefetch={onPrefetch}
+    />
+  )
+}
+
+interface MenuItemProps {
   item: MenuItem
   pathname: string
   isTablet: boolean
   isMobile: boolean
   onClose: () => void
-}) {
-  const { isSuperAdmin, user } = useTenant()
+  onPrefetch: (href?: string) => void
+  isSuperAdmin?: boolean
+  bypassPermissions?: boolean
+}
+
+const MenuItemContent = memo(function MenuItemContent({
+  item,
+  pathname,
+  isTablet,
+  isMobile,
+  onClose,
+  onPrefetch,
+  isSuperAdmin = false,
+  bypassPermissions = false,
+}: MenuItemProps) {
   const Icon = item.icon
 
   // Check if any submenu item is active
@@ -356,50 +440,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     }
   }, [isSubmenuActive])
 
-  // El Admin del tenant tiene acceso a todo el menú
-  // Los roles vienen del JWT como array de strings: ['ADMIN', 'VENDEDOR', etc]
-  const userRoles: string[] = user?.roles || []
-  const isAdmin = userRoles.includes('ADMIN')
-
-  // Si es Admin o SuperAdmin, mostrar todo sin verificar permisos
-  const bypassPermissions = isSuperAdmin || isAdmin
-
-  // Check permission if required (only for items WITHOUT submenu)
-  // Always call hook to maintain stable hook order per Rules of Hooks.
-  const permissionResult = usePermission(
-    item.permission?.modulo ?? '',
-    item.permission?.accion ?? '',
-    item.permission?.recurso ?? '',
-  )
-  const shouldCheckPermission = !!item.permission && !item.submenu
-  const hasPermission = bypassPermissions || !shouldCheckPermission ? true : permissionResult.hasPermission
-  const loading = bypassPermissions || !shouldCheckPermission ? false : permissionResult.loading
-
   // Filter super-admin only items
   if (item.superAdminOnly && !isSuperAdmin) {
     return null
-  }
-
-  // For items WITHOUT submenu, filter based on permissions
-  // Admin/SuperAdmin users bypass permission checks
-  if (!item.submenu && item.permission && !bypassPermissions && !loading && !hasPermission) {
-    return null
-  }
-
-  // For items WITH submenu, always show the parent
-  // The submenu items will handle their own permission checks
-  // If all submenu items are hidden, the parent will still show (acceptable UX)
-
-  // Show loading state for items being checked
-  if (loading && item.permission) {
-    return (
-      <div className={cn('my-1 flex min-h-11 items-center rounded-xl text-slate-400 opacity-50 group-data-[erp-theme=light]/dashboard:text-slate-500', isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm')}>
-        <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
-        <span className="min-w-0 truncate whitespace-nowrap">
-          {item.title}
-        </span>
-      </div>
-    )
   }
 
   // If item has submenu, render as expandable
@@ -439,6 +482,9 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
                 isTablet={isTablet}
                 isMobile={isMobile}
                 onClose={onClose}
+                onPrefetch={onPrefetch}
+                isSuperAdmin={isSuperAdmin}
+                bypassPermissions={bypassPermissions}
               />
             ))}
           </div>
@@ -447,33 +493,12 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
     )
   }
 
-  // Generar data-tour basado en el título del item
-  const getDataTour = (title: string): string => {
-    const tourMap: Record<string, string> = {
-      'Dashboard': 'menu-dashboard',
-      'POS': 'menu-pos',
-      'Ventas': 'menu-ventas',
-      'Clientes': 'menu-clientes',
-      'Cotizaciones': 'menu-cotizaciones',
-      'Pedidos': 'menu-pedidos',
-      'Inventario': 'menu-inventario',
-      'Finanzas': 'menu-finanzas',
-      'Configuración': 'menu-configuracion',
-      'Usuarios': 'menu-usuarios',
-      'Reportes SIRE': 'menu-reportes',
-      'Analytics': 'menu-reportes',
-      'Compras': 'menu-compras',
-      'RRHH': 'menu-rrhh',
-      'Contabilidad': 'menu-contabilidad',
-    }
-    return tourMap[title] || `menu-${title.toLowerCase().replace(/\s+/g, '-')}`
-  }
-
   // Regular menu item with link
   return (
     <Link
       key={item.href}
       href={item.href!}
+      prefetch
       className={cn(
         'nav-item my-1 flex min-h-11 items-center rounded-xl border transition duration-300',
         isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
@@ -482,6 +507,8 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
           : 'border-transparent font-semibold text-slate-300 hover:border-cyan-300/20 hover:bg-cyan-400/10 hover:text-cyan-50 group-data-[erp-theme=light]/dashboard:text-slate-600 group-data-[erp-theme=light]/dashboard:hover:border-blue-200 group-data-[erp-theme=light]/dashboard:hover:bg-blue-50 group-data-[erp-theme=light]/dashboard:hover:text-blue-700',
       )}
       data-tour={getDataTour(item.title)}
+      onPointerEnter={() => onPrefetch(item.href)}
+      onFocus={() => onPrefetch(item.href)}
       onClick={onClose}
     >
       <Icon className={cn('shrink-0', isTablet ? 'mr-2 h-[18px] w-[18px]' : 'mr-3 h-5 w-5')} />
@@ -490,14 +517,49 @@ function MenuItem({ item, pathname, isTablet, isMobile, onClose }: {
       </span>
     </Link>
   )
+})
+
+function MenuItem(props: MenuItemProps) {
+  const shouldCheckPermission = !!props.item.permission && !props.item.submenu && !props.bypassPermissions
+
+  if (shouldCheckPermission) {
+    return <PermissionMenuItem {...props} />
+  }
+
+  return <MenuItemContent {...props} />
+}
+
+function SidebarMenuLoading({ isTablet }: { isTablet: boolean }) {
+  const rows = ['Dashboard', 'Módulos', 'Operación', 'Administración', 'Ayuda']
+
+  return (
+    <div className="space-y-2" aria-label="Cargando menú">
+      {rows.map((row, index) => (
+        <div
+          key={row}
+          className={cn(
+            'flex min-h-11 animate-pulse items-center rounded-xl border border-cyan-300/10 bg-cyan-400/5 text-slate-500',
+            isTablet ? 'px-4 py-3 text-[0.85rem]' : 'px-6 py-4 text-sm',
+          )}
+        >
+          <span className={cn('mr-3 shrink-0 rounded bg-cyan-300/20', isTablet ? 'h-[18px] w-[18px]' : 'h-5 w-5')} />
+          <span
+            className="h-3 rounded bg-cyan-300/15"
+            style={{ width: `${index === 0 ? 72 : 96 + (index % 2) * 32}px` }}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { toast } = useToast()
-  const { isSuperAdmin, user } = useTenant()
+  const { isSuperAdmin, user, loading: tenantLoading } = useTenant()
   const country = useCountryContext()
+  const prefetchedRoutes = useRef<Set<string>>(new Set())
   const isPeru = country.paisCodigo === 'PE'
   const posEnabled = process.env.NEXT_PUBLIC_FEATURE_POS_ENABLED === 'true'
   const rrhhEnabled = process.env.NEXT_PUBLIC_FEATURE_RRHH_ENABLED === 'true'
@@ -506,24 +568,58 @@ export default function Sidebar() {
       ? true
       : process.env.NEXT_PUBLIC_FEATURE_INVENTARIO_ENABLED === 'true'
 
-  const filteredMenuItems = menuItems
-    .filter((item) => {
-      // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
-      if (!posEnabled && item.href === '/dashboard/pos') return false
-      if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
-      if (!inventarioEnabled && item.title === 'Inventario') return false
-      if (!isPeru && (item.href === '/dashboard/sire' || item.title === 'Reportes SIRE')) return false
-      return true
-    })
-    .map((item) => {
-      if (!rrhhEnabled && item.submenu) {
-        return {
-          ...item,
-          submenu: item.submenu?.filter((subItem) => !subItem.href?.startsWith('/dashboard/rrhh'))
-        }
-      }
-      return item
-    })
+  // El Admin del tenant tiene acceso a todo el menú.
+  // Los roles pueden venir como string[] o como objetos en snapshots antiguos.
+  const userRoles: string[] = useMemo(
+    () => {
+      const rawRoles = Array.isArray(user?.roles) ? user.roles : []
+      return (
+      rawRoles
+        .map((role: any) => (typeof role === 'string' ? role : role?.nombre))
+        .filter((role: any): role is string => typeof role === 'string' && role.length > 0)
+      )
+    },
+    [user?.roles],
+  )
+  const isAdmin = useMemo(
+    () => userRoles.some((role) => ['ADMIN', 'ADMIN_DEMO'].includes(role.toUpperCase())),
+    [userRoles],
+  )
+  const bypassPermissions = isSuperAdmin || isAdmin
+
+  const filteredMenuItems = useMemo(
+    () =>
+      menuItems
+        .filter((item) => {
+          // HARDENING: ocultar módulos deshabilitados por feature flags en el menú.
+          if (!posEnabled && item.href === '/dashboard/pos') return false
+          if (!rrhhEnabled && item.href === '/dashboard/rrhh') return false
+          if (!inventarioEnabled && item.title === 'Inventario') return false
+          if (!isPeru && (item.href === '/dashboard/sire' || item.title === 'Reportes SIRE')) return false
+          return true
+        })
+        .map((item) => {
+          if (!rrhhEnabled && item.submenu) {
+            return {
+              ...item,
+              submenu: item.submenu?.filter((subItem) => !subItem.href?.startsWith('/dashboard/rrhh')),
+            }
+          }
+          return item
+        }),
+    [inventarioEnabled, isPeru, posEnabled, rrhhEnabled],
+  )
+
+  const menuHrefs = useMemo(() => collectMenuHrefs(filteredMenuItems), [filteredMenuItems])
+
+  const prefetchRoute = useCallback(
+    (href?: string) => {
+      if (!href || href === pathname || prefetchedRoutes.current.has(href)) return
+      prefetchedRoutes.current.add(href)
+      router.prefetch(href)
+    },
+    [pathname, router],
+  )
 
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -546,6 +642,51 @@ export default function Sidebar() {
     if (!isMobile) {
       setIsOpen(false)
     }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (tenantLoading) return
+
+    let cancelled = false
+    const timers: Array<ReturnType<typeof globalThis.setTimeout>> = []
+
+    const prefetchVisibleRoutes = () => {
+      const hrefs = menuHrefs
+        .filter((href) => href !== pathname)
+        .slice(0, IDLE_PREFETCH_LIMIT)
+      let index = 0
+
+      const prefetchNext = () => {
+        if (cancelled || index >= hrefs.length) return
+        prefetchRoute(hrefs[index])
+        index += 1
+        if (index < hrefs.length) {
+          timers.push(globalThis.setTimeout(prefetchNext, IDLE_PREFETCH_DELAY_MS))
+        }
+      }
+
+      prefetchNext()
+    }
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(prefetchVisibleRoutes, { timeout: 1200 })
+      return () => {
+        cancelled = true
+        window.cancelIdleCallback(idleId)
+        timers.forEach((timer) => globalThis.clearTimeout(timer))
+      }
+    }
+
+    const timeoutId = globalThis.setTimeout(prefetchVisibleRoutes, 250)
+    return () => {
+      cancelled = true
+      globalThis.clearTimeout(timeoutId)
+      timers.forEach((timer) => globalThis.clearTimeout(timer))
+    }
+  }, [menuHrefs, pathname, prefetchRoute, tenantLoading])
+
+  const closeMobileSidebar = useCallback(() => {
+    if (isMobile) setIsOpen(false)
   }, [isMobile])
 
   const handleLogout = async () => {
@@ -622,16 +763,23 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className={cn('flex-1 overflow-y-auto', isTablet ? 'px-3 py-6' : 'px-4 py-8')}>
-          {filteredMenuItems.map((item) => (
-            <MenuItem
-              key={item.href || item.title}
-              item={item}
-              pathname={pathname}
-              isTablet={isTablet}
-              isMobile={isMobile}
-              onClose={() => isMobile && setIsOpen(false)}
-            />
-          ))}
+          {tenantLoading ? (
+            <SidebarMenuLoading isTablet={isTablet} />
+          ) : (
+            filteredMenuItems.map((item) => (
+              <MenuItem
+                key={item.href || item.title}
+                item={item}
+                pathname={pathname}
+                isTablet={isTablet}
+                isMobile={isMobile}
+                onClose={closeMobileSidebar}
+                onPrefetch={prefetchRoute}
+                isSuperAdmin={isSuperAdmin}
+                bypassPermissions={bypassPermissions}
+              />
+            ))
+          )}
         </nav>
 
         {/* User Section */}

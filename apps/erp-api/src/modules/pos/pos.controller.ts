@@ -7,6 +7,7 @@ import { RequireFeatureFlag } from '../../common/decorators/feature-flag.decorat
 import { PosService } from './pos.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { WorkerAuthGuard } from '../../shared/guards/worker-auth.guard';
+import { CreateVentaPosDto } from './dto/create-venta-pos.dto';
 
 @Controller('pos')
 export class PosController {
@@ -66,7 +67,7 @@ export class PosController {
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.vender') // HARDENING: venta rápida requiere permiso.
-  async procesarVenta(@Body() ventaData: any, @Req() req: any) {
+  async procesarVenta(@Body() ventaData: CreateVentaPosDto, @Req() req: any) {
     return this.posService.procesarVenta(ventaData, req.user);
   }
 
@@ -101,7 +102,7 @@ export class PosController {
     return this.posService.cerrarCaja(data, req.user);
   }
 
-  @Post('detalles-venta/:id')
+  @Get('detalles-venta/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard, FeatureFlagGuard)
   @RequireFeatureFlag('pos')
   @RequirePermission('pos.read') // HARDENING: consultar detalle de venta.

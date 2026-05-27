@@ -12,6 +12,8 @@ import { TenantContextService } from '../tenant/tenant-context.service';
 @Injectable()
 export class OutboxWorker implements OnModuleInit {
   private readonly logger = new Logger(OutboxWorker.name);
+  private readonly cronLockKey = 'worker:outbox:shared';
+  private readonly cronLockTtlSeconds = 240;
   private isProcessing = false;
   private readonly accountingOwnedEvents = new Set([
     'venta.procesada',
@@ -31,6 +33,8 @@ export class OutboxWorker implements OnModuleInit {
     'AjusteInventarioAplicado',
     'planilla.liquidada',
     'PlanillaLiquidada',
+    'planilla.pagada',
+    'PlanillaPagada',
     'depreciacion.generada',
     'DepreciacionGenerada',
     'cpe.anulado',
@@ -61,12 +65,17 @@ export class OutboxWorker implements OnModuleInit {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async processPendingEvents(): Promise<void> {
+    if (process.env.OUTBOX_WORKER_CRON_ENABLED === 'false') {
+      return;
+    }
+
     if (this.isProcessing) {
       this.logger.debug('⏳ [OutboxWorker] Ya hay un proceso en ejecución, saltando...');
       return;
     }
 
     this.isProcessing = true;
+    let lockAcquired = false;
 
     try {
       const backoffMs = this.supabase.getNetworkBackoffRemainingMs();
@@ -74,6 +83,12 @@ export class OutboxWorker implements OnModuleInit {
         this.logger.warn(
           `⚠️ [OutboxWorker] Supabase no disponible, reintentando en ${Math.ceil(backoffMs / 1000)}s`,
         );
+        return;
+      }
+
+      lockAcquired = await this.tryAcquireJobLock();
+      if (!lockAcquired) {
+        this.logger.debug('⏭️ [OutboxWorker] Otro nodo tiene el lock distribuido, saltando...');
         return;
       }
 
@@ -161,7 +176,49 @@ export class OutboxWorker implements OnModuleInit {
         this.logger.error('❌ [OutboxWorker] Error general procesando eventos pendientes:', error);
       }
     } finally {
+      if (lockAcquired) {
+        await this.releaseJobLock();
+      }
       this.isProcessing = false;
+    }
+  }
+
+  private async tryAcquireJobLock(): Promise<boolean> {
+    try {
+      const client = this.supabase.getPublicClient();
+      const rpc = (client as any)?.rpc;
+      if (typeof rpc !== 'function') {
+        return true;
+      }
+
+      const { data, error } = await rpc('acquire_job_lock', {
+        p_lock_key: this.cronLockKey,
+        p_lock_ttl_seconds: this.cronLockTtlSeconds,
+      });
+
+      if (error) {
+        this.logger.warn(`⚠️ [OutboxWorker] No se pudo adquirir lock distribuido: ${error.message}`);
+        return false;
+      }
+
+      return data === true || data === 'true';
+    } catch (error) {
+      this.logger.warn(`⚠️ [OutboxWorker] Error adquiriendo lock distribuido: ${error?.message || error}`);
+      return false;
+    }
+  }
+
+  private async releaseJobLock(): Promise<void> {
+    try {
+      const client = this.supabase.getPublicClient();
+      const rpc = (client as any)?.rpc;
+      if (typeof rpc !== 'function') {
+        return;
+      }
+
+      await rpc('release_job_lock', { p_lock_key: this.cronLockKey });
+    } catch (error) {
+      this.logger.warn(`⚠️ [OutboxWorker] Error liberando lock distribuido: ${error?.message || error}`);
     }
   }
 
@@ -234,4 +291,3 @@ export class OutboxWorker implements OnModuleInit {
     );
   }
 }
-

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import {
   formatBalanceComprobacionItem,
@@ -85,6 +85,7 @@ interface CacheEntry<T> {
 
 @Injectable()
 export class EstadosFinancierosService {
+  private readonly logger = new Logger(EstadosFinancierosService.name);
   private cache: Map<string, CacheEntry<any>> = new Map();
   private readonly CACHE_TTL = 60 * 60 * 1000; // 1 hora en milisegundos
   private cacheCleanupInterval?: NodeJS.Timeout;
@@ -132,13 +133,13 @@ export class EstadosFinancierosService {
   /**
    * Guarda datos en el cache con TTL de 1 hora
    */
-  private setCache<T>(key: string, data: T): void {
+  private setCache<T>(key: string, data: T, ttlMs?: number): void {
+    const ttl = ttlMs ?? this.CACHE_TTL;
     const entry: CacheEntry<T> = {
       data,
-      expiresAt: Date.now() + this.CACHE_TTL,
+      expiresAt: Date.now() + ttl,
     };
     this.cache.set(key, entry);
-    console.log(`💾 [Cache] Guardado: ${key} (expira en 1 hora)`);
   }
 
   /**
@@ -159,7 +160,14 @@ export class EstadosFinancierosService {
   }
 
   private isMaterializedViewUnavailable(error: any): boolean {
-    return error?.code === '55000' || error?.code === 'PGRST116';
+    // PGRST116: PostgREST "no rows found" — view empty or not populated
+    if (error?.code === 'PGRST116') return true;
+    // 55000: PostgreSQL "object not in prerequisite state" — view may not exist
+    if (error?.code === '55000') {
+      this.logger.warn(`Vista materializada no disponible (55000): ${error.message}`);
+      return true;
+    }
+    return false;
   }
 
   private getPeriodoRange(anio: number, mes: number): { inicio: string; fin: string } {
@@ -217,6 +225,12 @@ export class EstadosFinancierosService {
     const porCuenta = new Map<string, BalanceComprobacionItem>();
 
     for (const detalle of detalles || []) {
+      // Skip rows where the asientos_contables JOIN didn't match (cross-tenant safety)
+      const asiento = Array.isArray((detalle as any).asientos_contables)
+        ? (detalle as any).asientos_contables[0]
+        : (detalle as any).asientos_contables;
+      if (!asiento?.tenant_id) continue;
+
       const cuenta = Array.isArray((detalle as any).plan_cuentas)
         ? (detalle as any).plan_cuentas[0]
         : (detalle as any).plan_cuentas;
@@ -498,7 +512,7 @@ export class EstadosFinancierosService {
         if (this.isMaterializedViewUnavailable(error)) {
           console.warn('⚠️ Estado de resultados sin MV poblada o sin filas, retornando valores en cero');
           const emptyResult = this.getEmptyEstadoResultados();
-          this.setCache(cacheKey, emptyResult);
+          this.setCache(cacheKey, emptyResult, 5 * 60 * 1000); // 5 min para vacíos
           return emptyResult;
         }
         console.error('❌ Error consultando vista materializada:', error);
@@ -508,8 +522,7 @@ export class EstadosFinancierosService {
       if (!resultado) {
         console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
         const emptyResult = this.getEmptyEstadoResultados();
-        // Guardar en cache incluso si está vacío
-        this.setCache(cacheKey, emptyResult);
+        this.setCache(cacheKey, emptyResult, 5 * 60 * 1000); // 5 min para vacíos
         return emptyResult;
       }
 
@@ -613,7 +626,7 @@ export class EstadosFinancierosService {
           console.warn('⚠️ Balance general sin MV poblada o sin filas, retornando valores en cero');
           const estadoResultados = await this.getEstadoResultados(tenantId, anio, mes);
           const emptyBalance = this.getEmptyBalanceGeneral(estadoResultados.utilidad_neta);
-          this.setCache(cacheKey, emptyBalance);
+          this.setCache(cacheKey, emptyBalance, 5 * 60 * 1000); // 5 min para vacíos
           return emptyBalance;
         }
         console.error('❌ Error consultando vista materializada:', error);
@@ -627,8 +640,7 @@ export class EstadosFinancierosService {
       if (!balance) {
         console.log('⚠️ No se encontraron datos para el período especificado, retornando valores en cero');
         const emptyBalance = this.getEmptyBalanceGeneral(resultadoEjercicio);
-        // Guardar en cache incluso si está vacío
-        this.setCache(cacheKey, emptyBalance);
+        this.setCache(cacheKey, emptyBalance, 5 * 60 * 1000); // 5 min para vacíos
         return emptyBalance;
       }
 

@@ -342,6 +342,19 @@ export class RrhhService {
     }
     const currentTenantId = tenantId;
 
+    // Verificar que el empleado pertenece al tenant
+    const { data: empleado, error: empError } = await this.supabaseService
+      .getClient()
+      .from('empleados')
+      .select('id')
+      .eq('id', empleadoId)
+      .eq('tenant_id', currentTenantId)
+      .single();
+
+    if (empError || !empleado) {
+      throw new NotFoundException('Empleado no encontrado en este tenant');
+    }
+
     const hoy = new Date().toISOString().split('T')[0];
     const horaActual = new Date().toTimeString().split(' ')[0];
 
@@ -855,7 +868,10 @@ export class RrhhService {
 
     const vacacionesPendientes = Math.max(0, 30 - vacacionesUsadas);
     const diasCts = this.calcularDiasCts(fechaIngreso, fechaTerminacionDate);
-    const montoCts = (sueldoMensual / 30) * diasCts;
+    // CTS según D.S. 001-97-TR: base = sueldo + 1/6 de última gratificación
+    const gratificacion = sueldoMensual; // Gratificación = 1 sueldo
+    const remuneracionComputableCts = sueldoMensual + (gratificacion / 6);
+    const montoCts = (remuneracionComputableCts / 360) * diasCts;
 
     let indemnizacion = 0;
     if (motivoTerminacion === 'despido') {

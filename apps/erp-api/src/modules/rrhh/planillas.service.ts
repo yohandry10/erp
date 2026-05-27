@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EventBusService, PlanillaCalculadaEvent, PlanillaPagadaEvent } from '../../shared/events/event-bus.service';
 import Decimal from 'decimal.js';
@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '001', nombre: 'Sueldo basico', tipo: 'ingreso' },
+  { codigo: '002', nombre: 'Asignacion familiar', tipo: 'ingreso' },
   { codigo: '003', nombre: 'Horas extras 25%', tipo: 'ingreso' },
   { codigo: '004', nombre: 'Horas extras 35%', tipo: 'ingreso' },
   { codigo: '005', nombre: 'Bono adicional', tipo: 'ingreso' },
@@ -14,12 +15,48 @@ const CONCEPTOS_PLANILLA_BASE = [
   { codigo: '102', nombre: 'Comision AFP', tipo: 'descuento' },
   { codigo: '103', nombre: 'Seguro AFP', tipo: 'descuento' },
   { codigo: '104', nombre: 'Aporte ONP', tipo: 'descuento' },
+  { codigo: '105', nombre: 'Impuesto a la renta quinta categoria', tipo: 'descuento' },
   { codigo: '106', nombre: 'Tardanzas', tipo: 'descuento' },
   { codigo: '107', nombre: 'Faltas', tipo: 'descuento' },
+  { codigo: '201', nombre: 'Aporte EsSalud', tipo: 'aporte_empleador' },
 ];
+
+type NormativaPeruPeriodo = {
+  uit: number;
+  rmv: number;
+  asignacionFamiliar: number;
+  afpAporte: number;
+  afpPrimaSeguro: number;
+  afpComisionFlujoDefault: number;
+  onpAporte: number;
+  essaludAporte: number;
+  quintaDeduccionUit: number;
+};
+
+const NORMATIVA_PERU_2026_DEFAULT: NormativaPeruPeriodo = {
+  uit: 5500,
+  rmv: 1130,
+  asignacionFamiliar: 113,
+  afpAporte: 0.10,
+  afpPrimaSeguro: 0.0137,
+  afpComisionFlujoDefault: 0.0155,
+  onpAporte: 0.13,
+  essaludAporte: 0.09,
+  quintaDeduccionUit: 7,
+};
+const RRHH_CUENTAS_PLANILLA_DEFAULT: Record<string, { nombre: string; tipo: string; tipo_cuenta: string; nivel: number }> = {
+  '401': { nombre: 'Gobierno central', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
+  '403': { nombre: 'Instituciones publicas', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
+  '407': { nombre: 'Administradoras de fondos y aportes por pagar', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
+  '411': { nombre: 'Remuneraciones por pagar', tipo: 'PASIVO', tipo_cuenta: 'PASIVO', nivel: 3 },
+  '621': { nombre: 'Remuneraciones', tipo: 'GASTO', tipo_cuenta: 'GASTO', nivel: 3 },
+  '627': { nombre: 'Seguridad, prevision social y otras contribuciones', tipo: 'GASTO', tipo_cuenta: 'GASTO', nivel: 3 },
+};
 
 @Injectable()
 export class PlanillasService {
+  private readonly logger = new Logger(PlanillasService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly eventBus: EventBusService
@@ -104,15 +141,18 @@ export class PlanillasService {
   // Calcular planilla mensual para todos los empleados activos
   // ✅ FIX: Agregar soporte multi-tenant
   async calcularPlanillaMensual(planillaId: string, tenantId?: string) {
-    console.log(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
+    this.logger.debug(`🧮 Iniciando cálculo de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
 
     // Idempotencia: verificar que la planilla no esté ya calculada o pagada
-    const { data: planillaEstado } = await client
+    let planillaEstadoQuery = client
       .from('planillas')
-      .select('estado')
-      .eq('id', planillaId)
-      .single();
+      .select('estado, periodo')
+      .eq('id', planillaId);
+    if (tenantId) {
+      planillaEstadoQuery = planillaEstadoQuery.eq('tenant_id', tenantId);
+    }
+    const { data: planillaEstado } = await planillaEstadoQuery.single();
 
     if (planillaEstado?.estado === 'calculada' || planillaEstado?.estado === 'pagada') {
       throw new Error(
@@ -138,28 +178,26 @@ export class PlanillasService {
       throw empleadosError;
     }
 
-    console.log(`👥 Empleados activos encontrados: ${empleados?.length || 0}`);
+    this.logger.debug(`👥 Empleados activos encontrados: ${empleados?.length || 0}`);
 
     if (!empleados || empleados.length === 0) {
       throw new Error('No se encontraron empleados activos para procesar');
     }
 
-    // Obtener conceptos de planilla
-    const { data: conceptos, error: conceptosError } = await client
-      .from('conceptos_planilla')
-      .select('*')
-      .eq('activo', true);
+    const conceptosResult = await this.getConceptos(tenantId);
+    const conceptos = conceptosResult.data;
 
-    if (conceptosError) {
-      console.error('❌ Error obteniendo conceptos:', conceptosError);
-      throw conceptosError;
-    }
-
-    console.log(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
+    this.logger.debug(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
 
     if (!conceptos || conceptos.length === 0) {
       throw new Error('No se encontraron conceptos de planilla configurados');
     }
+
+    if (!planillaEstado?.periodo) {
+      throw new Error('Planilla sin periodo; no se puede resolver normativa laboral/tributaria');
+    }
+
+    const normativa = await this.obtenerNormativaPeruPeriodo(planillaEstado.periodo, tenantId);
 
     let totalIngresos = 0;
     let totalDescuentos = 0;
@@ -167,30 +205,20 @@ export class PlanillasService {
     let totalNeto = 0;
     const empleadosCalculados = [];
 
-    // Obtener información de la planilla para el evento
-    const { data: planillaInfo, error: planillaError } = await client
-      .from('planillas')
-      .select('periodo')
-      .eq('id', planillaId)
-      .single();
-
-    if (planillaError) {
-      console.error('❌ Error obteniendo información de planilla:', planillaError);
-      throw planillaError;
-    }
+    const planillaInfo = planillaEstado;
 
     // Procesar cada empleado
     for (const empleado of empleados) {
       const contratoActual = empleado.contratos?.find(c => c.estado === 'vigente');
       if (!contratoActual) {
-        console.log(`⚠️ Empleado sin contrato vigente: ${empleado.nombres} ${empleado.apellidos}`);
+        this.logger.debug(`Empleado sin contrato vigente: ID=${empleado.id}`);
         continue;
       }
 
       const sueldoBasico = parseFloat(contratoActual.sueldo_bruto) || 0;
-      console.log(`💰 Procesando: ${empleado.nombres} ${empleado.apellidos} - Sueldo: S/ ${sueldoBasico}`);
+      this.logger.debug(`Procesando empleado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleado(empleado, sueldoBasico, conceptos);
+      const calculoEmpleado = this.calcularEmpleado(empleado, sueldoBasico, conceptos, normativa);
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -211,10 +239,10 @@ export class PlanillasService {
         throw empError;
       }
 
-      console.log(`✅ Empleado insertado: ${empleado.nombres} ${empleado.apellidos} - ID: ${empleadoPlanilla[0].id}`);
+      this.logger.debug(`Empleado insertado: ID=${empleadoPlanilla[0].id}`);
 
       // Insertar conceptos detallados
-      console.log(`📝 Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ${empleado.nombres}`);
+      this.logger.debug(`Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ID=${empleado.id}`);
       for (const concepto of calculoEmpleado.conceptosDetalle) {
         const { error: conceptoError } = await client
           .from('empleado_planilla_conceptos')
@@ -266,14 +294,14 @@ export class PlanillasService {
       throw updateError;
     }
 
-    console.log(`✅ Planilla calculada exitosamente:`);
-    console.log(`   - Empleados procesados: ${empleados.length}`);
-    console.log(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
-    console.log(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
-    console.log(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
+    this.logger.debug(`✅ Planilla calculada exitosamente:`);
+    this.logger.debug(`   - Empleados procesados: ${empleados.length}`);
+    this.logger.debug(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
+    this.logger.debug(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
+    this.logger.debug(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
 
     // 🎯 EMITIR EVENTO PARA INTEGRACIÓN CONTABLE
-    console.log('🎯 [RRHH] Emitiendo evento de planilla calculada para contabilidad...');
+    this.logger.debug('🎯 [RRHH] Emitiendo evento de planilla calculada para contabilidad...');
 
     const eventoplanilla: PlanillaCalculadaEvent = {
       planillaId: planillaId,
@@ -287,7 +315,7 @@ export class PlanillasService {
     };
 
     this.eventBus.emitPlanillaCalculada(eventoplanilla);
-    console.log('✅ [RRHH] Evento de planilla calculada emitido exitosamente');
+    this.logger.debug('✅ [RRHH] Evento de planilla calculada emitido exitosamente');
 
     return {
       success: true,
@@ -298,8 +326,79 @@ export class PlanillasService {
     };
   }
 
+  private async obtenerNormativaPeruPeriodo(
+    periodo?: string,
+    tenantId?: string,
+  ): Promise<NormativaPeruPeriodo> {
+    const periodoNormalizado = /^\d{4}-\d{2}$/.test(String(periodo || ''))
+      ? String(periodo)
+      : '2026-05';
+    const client = this.supabaseService.getClient();
+
+    const mapNormativa = (data: any): NormativaPeruPeriodo => ({
+      uit: Number(data?.uit ?? NORMATIVA_PERU_2026_DEFAULT.uit),
+      rmv: Number(data?.rmv ?? NORMATIVA_PERU_2026_DEFAULT.rmv),
+      asignacionFamiliar: Number(data?.asignacion_familiar ?? NORMATIVA_PERU_2026_DEFAULT.asignacionFamiliar),
+      afpAporte: Number(data?.afp_aporte ?? NORMATIVA_PERU_2026_DEFAULT.afpAporte),
+      afpPrimaSeguro: Number(data?.afp_prima_seguro ?? NORMATIVA_PERU_2026_DEFAULT.afpPrimaSeguro),
+      afpComisionFlujoDefault: Number(
+        data?.afp_comision_flujo_default ?? NORMATIVA_PERU_2026_DEFAULT.afpComisionFlujoDefault,
+      ),
+      onpAporte: Number(data?.onp_aporte ?? NORMATIVA_PERU_2026_DEFAULT.onpAporte),
+      essaludAporte: Number(data?.essalud_aporte ?? NORMATIVA_PERU_2026_DEFAULT.essaludAporte),
+      quintaDeduccionUit: Number(
+        data?.quinta_deduccion_uit ?? NORMATIVA_PERU_2026_DEFAULT.quintaDeduccionUit,
+      ),
+    });
+
+    try {
+      if (tenantId) {
+        const { data, error } = await client
+          .from('normativa_peru_periodos')
+          .select(
+            'uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit',
+          )
+          .eq('tenant_id', tenantId)
+          .eq('periodo', periodoNormalizado)
+          .eq('activo', true)
+          .maybeSingle();
+
+        if (!error && data) {
+          return mapNormativa(data);
+        }
+      }
+
+      const { data, error } = await client
+        .from('normativa_peru_periodos')
+        .select(
+          'uit, rmv, asignacion_familiar, afp_aporte, afp_prima_seguro, afp_comision_flujo_default, onp_aporte, essalud_aporte, quinta_deduccion_uit',
+        )
+        .is('tenant_id', null)
+        .eq('periodo', periodoNormalizado)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (!error && data) {
+        return mapNormativa(data);
+      }
+
+      if (error) {
+        this.logger.warn(`No se pudo cargar normativa Perú ${periodoNormalizado}: ${error.message}`);
+      }
+    } catch (error: any) {
+      this.logger.warn(`Normativa Perú no disponible para ${periodoNormalizado}; usando fallback 2026: ${error?.message ?? error}`);
+    }
+
+    return { ...NORMATIVA_PERU_2026_DEFAULT };
+  }
+
   // Lógica de cálculo por empleado
-  private calcularEmpleado(empleado: any, sueldoBasico: number, conceptos: any[]) {
+  private calcularEmpleado(
+    empleado: any,
+    sueldoBasico: number,
+    conceptos: any[],
+    normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
+  ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
     let totalDescuentos = 0;
@@ -318,10 +417,10 @@ export class PlanillasService {
       totalIngresos += sueldoBasico;
     }
 
-    // Asignación familiar (S/ 102.50 si tiene hijos)
+    // Asignación familiar: 10% de la RMV vigente.
     const conceptoAsigFam = conceptos.find(c => c.codigo === '002');
     if (conceptoAsigFam && this.tieneHijos(empleado)) {
-      const asignacionFamiliar = 102.50;
+      const asignacionFamiliar = new Decimal(normativa.asignacionFamiliar).toDecimalPlaces(2).toNumber();
       conceptosDetalle.push({
         id: conceptoAsigFam.id,
         monto: asignacionFamiliar,
@@ -338,7 +437,7 @@ export class PlanillasService {
     if (regimenPensionario === 'AFP') {
       // AFP - Aporte obligatorio (10%)
       // ✅ FIX: Usar Decimal.js para cálculos de nómina
-      const aporteAFP = new Decimal(sueldoBasico).times(0.10).toDecimalPlaces(2).toNumber();
+      const aporteAFP = new Decimal(sueldoBasico).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
       const conceptoAporteAFP = conceptos.find(c => c.codigo === '101');
       if (conceptoAporteAFP) {
         conceptosDetalle.push({
@@ -352,7 +451,7 @@ export class PlanillasService {
       // AFP - Comisión (varía por AFP — usar tasas vigentes SBS)
       // TODO: Estas tasas deben ser configurables por tenant y AFP del empleado
       // Tasa por defecto: AFP Integra comisión flujo 1.55% (vigente 2024-2025)
-      const tasaComisionAFP = contratoActual?.tasa_comision_afp ?? 0.0155;
+      const tasaComisionAFP = contratoActual?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
       const comisionAFP = new Decimal(sueldoBasico).times(tasaComisionAFP).toDecimalPlaces(2).toNumber();
       const conceptoComisionAFP = conceptos.find(c => c.codigo === '102');
       if (conceptoComisionAFP) {
@@ -364,8 +463,8 @@ export class PlanillasService {
         totalDescuentos += comisionAFP;
       }
 
-      // AFP - Seguro de invalidez (prima de seguro vigente SBS: 1.84%)
-      const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ?? 0.0184;
+      // AFP - Seguro de invalidez vigente SBS 2026: 1.37%.
+      const tasaSeguroAFP = contratoActual?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
       const seguroAFP = new Decimal(sueldoBasico).times(tasaSeguroAFP).toDecimalPlaces(2).toNumber();
       const conceptoSeguroAFP = conceptos.find(c => c.codigo === '103');
       if (conceptoSeguroAFP) {
@@ -378,7 +477,7 @@ export class PlanillasService {
       }
     } else if (regimenPensionario === 'ONP') {
       // ONP (13%)
-      const aporteONP = new Decimal(sueldoBasico).times(0.13).toDecimalPlaces(2).toNumber();
+      const aporteONP = new Decimal(sueldoBasico).times(normativa.onpAporte).toDecimalPlaces(2).toNumber();
       const conceptoONP = conceptos.find(c => c.codigo === '104');
       if (conceptoONP) {
         conceptosDetalle.push({
@@ -391,7 +490,7 @@ export class PlanillasService {
     }
 
     // Impuesto a la Renta (solo si supera las 7 UIT anuales)
-    const impuestoRenta = this.calcularImpuestoRenta(totalIngresos);
+    const impuestoRenta = this.calcularImpuestoRenta(totalIngresos, normativa);
     if (impuestoRenta > 0) {
       const conceptoImpuesto = conceptos.find(c => c.codigo === '105');
       if (conceptoImpuesto) {
@@ -407,7 +506,7 @@ export class PlanillasService {
     // 3. APORTES DEL EMPLEADOR
 
     // ESSALUD (9%)
-    const aporteESSALUD = new Decimal(sueldoBasico).times(0.09).toDecimalPlaces(2).toNumber();
+    const aporteESSALUD = new Decimal(sueldoBasico).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
     const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
     if (conceptoESSALUD) {
       conceptosDetalle.push({
@@ -442,13 +541,16 @@ export class PlanillasService {
     return false;
   }
 
-  // Calcular impuesto a la renta 5ta categoría (Perú 2024-2025)
-  private calcularImpuestoRenta(ingresoMensual: number): number {
+  // Calcular impuesto a la renta 5ta categoría (Perú 2026).
+  private calcularImpuestoRenta(
+    ingresoMensual: number,
+    normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
+  ): number {
     // ✅ FIX: Usar Decimal.js para precisión en cálculos tributarios
     const ingreso = new Decimal(ingresoMensual);
     const ingresoAnual = ingreso.times(12);
-    const UIT_2025 = new Decimal(5350); // UIT para 2025
-    const limite = UIT_2025.times(7); // 7 UIT exoneradas
+    const uit = new Decimal(normativa.uit);
+    const limite = uit.times(normativa.quintaDeduccionUit); // 7 UIT exoneradas
 
     if (ingresoAnual.lte(limite)) {
       return 0; // No paga impuesto
@@ -458,10 +560,10 @@ export class PlanillasService {
     const exceso = ingresoAnual.minus(limite);
     let impuestoAnual = new Decimal(0);
 
-    const tramo1 = UIT_2025.times(5);  // Hasta 5 UIT: 8%
-    const tramo2 = UIT_2025.times(20); // De 5 a 20 UIT: 14%
-    const tramo3 = UIT_2025.times(35); // De 20 a 35 UIT: 17%
-    const tramo4 = UIT_2025.times(45); // De 35 a 45 UIT: 20%
+    const tramo1 = uit.times(5);  // Hasta 5 UIT: 8%
+    const tramo2 = uit.times(20); // De 5 a 20 UIT: 14%
+    const tramo3 = uit.times(35); // De 20 a 35 UIT: 17%
+    const tramo4 = uit.times(45); // De 35 a 45 UIT: 20%
     // Más de 45 UIT: 30%
 
     if (exceso.lte(tramo1)) {
@@ -490,10 +592,10 @@ export class PlanillasService {
   }
 
   // Obtener detalle de planilla por empleado
-  async getDetallePlanilla(planillaId: string, tenantId?: string) {
-    console.log(`📊 Obteniendo detalle de planilla: ${planillaId}`);
+  async getDetallePlanilla(planillaId: string, tenantId: string) {
+    this.logger.debug(`📊 Obteniendo detalle de planilla: ${planillaId}`);
 
-    const query = this.supabaseService.getClient()
+    const { data, error } = await this.supabaseService.getClient()
       .from('empleado_planilla')
       .select(`
         *,
@@ -504,20 +606,15 @@ export class PlanillasService {
           conceptos_planilla(codigo, nombre, metadata)
         )
       `)
-      .eq('id_planilla', planillaId);
-
-    if (tenantId) {
-      query.eq('tenant_id', tenantId);
-    }
-
-    const { data, error } = await query;
+      .eq('id_planilla', planillaId)
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('❌ Error obteniendo detalle de planilla:', error);
       throw error;
     }
 
-    console.log(`📋 Detalle obtenido: ${data?.length || 0} empleados`);
+    this.logger.debug(`📋 Detalle obtenido: ${data?.length || 0} empleados`);
     return (data || []).map((empleadoPlanilla: any) => ({
       ...empleadoPlanilla,
       empleado_planilla_conceptos: (empleadoPlanilla.empleado_planilla_conceptos || []).map((concepto: any) => ({
@@ -533,8 +630,8 @@ export class PlanillasService {
   }
 
   // Generar boleta de pago individual
-  async getBoleta(empleadoPlanillaId: string, tenantId?: string) {
-    const query = this.supabaseService.getClient()
+  async getBoleta(empleadoPlanillaId: string, tenantId: string) {
+    const { data, error } = await this.supabaseService.getClient()
       .from('empleado_planilla')
       .select(`
         *,
@@ -546,13 +643,9 @@ export class PlanillasService {
           conceptos_planilla(codigo, nombre, metadata)
         )
       `)
-      .eq('id', empleadoPlanillaId);
-
-    if (tenantId) {
-      query.eq('tenant_id', tenantId);
-    }
-
-    const { data, error } = await query.single();
+      .eq('id', empleadoPlanillaId)
+      .eq('tenant_id', tenantId)
+      .single();
 
     if (error) throw error;
     return {
@@ -588,18 +681,18 @@ export class PlanillasService {
 
   // Eliminar planilla y todos sus datos asociados
   async deletePlanilla(planillaId: string, tenantId?: string) {
-    console.log(`🗑️ Iniciando eliminación de planilla: ${planillaId}`);
+    this.logger.debug(`🗑️ Iniciando eliminación de planilla: ${planillaId}`);
     const client = this.supabaseService.getClient();
 
     try {
       // 1. Eliminar conceptos de empleados en planilla (cascada automática por FK)
-      console.log('🧹 Eliminando conceptos de empleados...');
+      this.logger.debug('🧹 Eliminando conceptos de empleados...');
 
       // 2. Eliminar empleados de planilla (cascada automática por FK)
-      console.log('🧹 Eliminando empleados de planilla...');
+      this.logger.debug('🧹 Eliminando empleados de planilla...');
 
       // 3. Eliminar la planilla principal
-      console.log('🧹 Eliminando planilla principal...');
+      this.logger.debug('🧹 Eliminando planilla principal...');
       const query = client
         .from('planillas')
         .delete()
@@ -616,7 +709,7 @@ export class PlanillasService {
         throw error;
       }
 
-      console.log('✅ Planilla eliminada exitosamente');
+      this.logger.debug('✅ Planilla eliminada exitosamente');
       return {
         success: true,
         message: 'Planilla eliminada exitosamente',
@@ -632,13 +725,24 @@ export class PlanillasService {
   // ✅ FIX: Agregar soporte multi-tenant
   async getConceptos(tenantId?: string) {
     const client = this.supabaseService.getClient();
+    const buildConceptosBase = (existingCodes: Set<string> = new Set<string>()) =>
+      CONCEPTOS_PLANILLA_BASE
+        .filter((concepto) => !existingCodes.has(concepto.codigo))
+        .map((concepto) => ({
+          tenant_id: tenantId,
+          codigo: concepto.codigo,
+          nombre: concepto.nombre,
+          estado: 'ACTIVO',
+          activo: true,
+          metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
+        }));
+
     let query = client
       .from('conceptos_planilla')
       .select('*')
       .eq('activo', true)
       .order('codigo', { ascending: true });
-    
-    // ✅ Filtrar por tenant si se proporciona
+
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
     }
@@ -646,25 +750,43 @@ export class PlanillasService {
     const { data, error } = await query;
     if (error) throw error;
 
-    if (tenantId && (!data || data.length === 0)) {
-      const conceptosBase = CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
-        tenant_id: tenantId,
-        codigo: concepto.codigo,
-        nombre: concepto.nombre,
-        estado: 'ACTIVO',
-        activo: true,
-        metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
-      }));
-      const { data: seeded, error: seedError } = await client
-        .from('conceptos_planilla')
-        .insert(conceptosBase)
-        .select('*')
-        .order('codigo', { ascending: true });
+    if (tenantId) {
+      const existingCodes = new Set<string>((data || []).map((concepto: any) => String(concepto.codigo || '').trim()));
+      const missingConceptos = buildConceptosBase(existingCodes);
 
-      if (seedError) throw seedError;
+      if (missingConceptos.length > 0) {
+        const { error: seedError } = await client
+          .from('conceptos_planilla')
+          .insert(missingConceptos);
+
+        if (seedError && (seedError as any)?.code !== '23505') {
+          throw seedError;
+        }
+
+        const { data: seeded, error: reloadError } = await client
+          .from('conceptos_planilla')
+          .select('*')
+          .eq('activo', true)
+          .eq('tenant_id', tenantId)
+          .order('codigo', { ascending: true });
+
+        if (reloadError) throw reloadError;
+        return {
+          success: true,
+          data: seeded || []
+        };
+      }
+    }
+
+    if (!tenantId && (!data || data.length === 0)) {
       return {
         success: true,
-        data: seeded || []
+        data: CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
+          ...concepto,
+          activo: true,
+          estado: 'ACTIVO',
+          metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default_readonly' },
+        }))
       };
     }
 
@@ -674,16 +796,53 @@ export class PlanillasService {
     };
   }
 
+  async seedConceptosPlanillaTenant(tenantId: string) {
+    const client = this.supabaseService.getClient();
+    const conceptosBase = CONCEPTOS_PLANILLA_BASE.map((concepto) => ({
+      tenant_id: tenantId,
+      codigo: concepto.codigo,
+      nombre: concepto.nombre,
+      estado: 'ACTIVO',
+      activo: true,
+      metadata: { tipo: concepto.tipo, seed: 'rrhh_runtime_default' },
+    }));
+
+    const { data, error } = await client
+        .from('conceptos_planilla')
+        .upsert(conceptosBase, { onConflict: 'tenant_id,codigo', ignoreDuplicates: true })
+        .select('*')
+        .order('codigo', { ascending: true });
+
+    if (error) throw error;
+    return {
+      success: true,
+      data: data || []
+    };
+  }
+
   async calcularPlanillaPersonalizada(planillaId: string, empleadosPersonalizados: any[], tenantId?: string) {
-    console.log(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
-    console.log(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
+    this.logger.debug(`🧮 Iniciando cálculo personalizado de planilla: ${planillaId}`);
+    this.logger.debug(`👥 Empleados personalizados: ${empleadosPersonalizados.length}`);
 
     const client = this.supabaseService.getClient();
+
+    let planillaQuery = client
+      .from('planillas')
+      .select('periodo')
+      .eq('id', planillaId);
+    if (tenantId) {
+      planillaQuery = planillaQuery.eq('tenant_id', tenantId);
+    }
+    const { data: planillaInfo, error: planillaError } = await planillaQuery.maybeSingle();
+    if (planillaError) {
+      throw planillaError;
+    }
+    const normativa = await this.obtenerNormativaPeruPeriodo(planillaInfo?.periodo, tenantId);
 
     const conceptosResult = await this.getConceptos(tenantId);
     const conceptos = conceptosResult.data;
 
-    console.log(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
+    this.logger.debug(`📋 Conceptos de planilla encontrados: ${conceptos?.length || 0}`);
 
     if (!conceptos || conceptos.length === 0) {
       throw new Error('No se encontraron conceptos de planilla configurados');
@@ -696,9 +855,9 @@ export class PlanillasService {
 
     // Procesar cada empleado personalizado
     for (const empleado of empleadosPersonalizados) {
-      console.log(`💰 Procesando empleado personalizado: ${empleado.nombres} ${empleado.apellidos} - Sueldo: S/ ${empleado.sueldo_base}`);
+      this.logger.debug(`Procesando empleado personalizado ID=${empleado.id}`);
 
-      const calculoEmpleado = this.calcularEmpleadoPersonalizado(empleado, conceptos);
+      const calculoEmpleado = this.calcularEmpleadoPersonalizado(empleado, conceptos, normativa);
 
       // Insertar empleado en planilla
       const { data: empleadoPlanilla, error: empError } = await client
@@ -723,10 +882,10 @@ export class PlanillasService {
         throw empError;
       }
 
-      console.log(`✅ Empleado insertado: ${empleado.nombres} ${empleado.apellidos} - ID: ${empleadoPlanilla[0].id}`);
+      this.logger.debug(`Empleado insertado: ID=${empleadoPlanilla[0].id}`);
 
       // Insertar conceptos detallados
-      console.log(`📝 Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ${empleado.nombres || 'Sin nombre'}`);
+      this.logger.debug(`Insertando ${calculoEmpleado.conceptosDetalle.length} conceptos para empleado ID=${empleado.id}`);
       for (const concepto of calculoEmpleado.conceptosDetalle) {
         // Validar que el concepto tenga monto válido
         if (!concepto.monto || concepto.monto <= 0) {
@@ -771,11 +930,11 @@ export class PlanillasService {
       throw updateError;
     }
 
-    console.log(`✅ Planilla personalizada calculada exitosamente:`);
-    console.log(`   - Empleados procesados: ${empleadosPersonalizados.length}`);
-    console.log(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
-    console.log(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
-    console.log(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
+    this.logger.debug(`✅ Planilla personalizada calculada exitosamente:`);
+    this.logger.debug(`   - Empleados procesados: ${empleadosPersonalizados.length}`);
+    this.logger.debug(`   - Total ingresos: S/ ${totalIngresos.toFixed(2)}`);
+    this.logger.debug(`   - Total descuentos: S/ ${totalDescuentos.toFixed(2)}`);
+    this.logger.debug(`   - Total neto: S/ ${totalNeto.toFixed(2)}`);
 
     return {
       success: true,
@@ -787,7 +946,11 @@ export class PlanillasService {
   }
 
   // Lógica de cálculo personalizada por empleado
-  private calcularEmpleadoPersonalizado(empleado: any, conceptos: any[]) {
+  private calcularEmpleadoPersonalizado(
+    empleado: any,
+    conceptos: any[],
+    normativa: NormativaPeruPeriodo = NORMATIVA_PERU_2026_DEFAULT,
+  ) {
     const conceptosDetalle = [];
     let totalIngresos = 0;
     let totalDescuentos = 0;
@@ -807,7 +970,7 @@ export class PlanillasService {
     const faltas = parseInt(empleado.faltas) || 0;
     const bonosAdicionales = parseFloat(empleado.bonos_adicionales) || 0;
 
-    console.log(`💰 Calculando empleado: ${empleado.nombres || 'Sin nombre'} ${empleado.apellidos || 'Sin apellido'} - Sueldo: S/ ${sueldoBasico}`);
+    this.logger.debug(`Calculando empleado ID=${empleado.id}`);
 
     if (sueldoBasico <= 0) {
       console.warn(`⚠️ Sueldo básico inválido para empleado ${empleado.nombres || 'Sin nombre'}: ${sueldoBasico}`);
@@ -916,9 +1079,9 @@ export class PlanillasService {
     if (regimenPensionario === 'AFP') {
       // TODO: Tasas AFP deben ser configurables por tenant y AFP del empleado
       const contratoEmpleado = empleado.contratos?.[0];
-      const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ?? 0.0155;
-      const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ?? 0.0184;
-      const aporteAFP = new Decimal(totalIngresos).times(0.10).toDecimalPlaces(2).toNumber();
+      const tasaComisionAFP2 = contratoEmpleado?.tasa_comision_afp ?? normativa.afpComisionFlujoDefault;
+      const tasaSeguroAFP2 = contratoEmpleado?.tasa_seguro_afp ?? normativa.afpPrimaSeguro;
+      const aporteAFP = new Decimal(totalIngresos).times(normativa.afpAporte).toDecimalPlaces(2).toNumber();
       const comisionAFP = new Decimal(totalIngresos).times(tasaComisionAFP2).toDecimalPlaces(2).toNumber();
       const seguroAFP = new Decimal(totalIngresos).times(tasaSeguroAFP2).toDecimalPlaces(2).toNumber();
 
@@ -952,7 +1115,7 @@ export class PlanillasService {
         totalDescuentos += seguroAFP;
       }
     } else if (regimenPensionario === 'ONP') {
-      const aporteONP = new Decimal(totalIngresos).times(0.13).toDecimalPlaces(2).toNumber();
+      const aporteONP = new Decimal(totalIngresos).times(normativa.onpAporte).toDecimalPlaces(2).toNumber();
       const conceptoONP = conceptos.find(c => c.codigo === '104');
       if (conceptoONP) {
         conceptosDetalle.push({
@@ -962,6 +1125,17 @@ export class PlanillasService {
         });
         totalDescuentos += aporteONP;
       }
+    }
+
+    const aporteESSALUD = new Decimal(totalIngresos).times(normativa.essaludAporte).toDecimalPlaces(2).toNumber();
+    const conceptoESSALUD = conceptos.find(c => c.codigo === '201');
+    if (conceptoESSALUD && aporteESSALUD > 0) {
+      conceptosDetalle.push({
+        id: conceptoESSALUD.id,
+        monto: aporteESSALUD,
+        observaciones: `ESSALUD ${(normativa.essaludAporte * 100).toFixed(2)}%`
+      });
+      totalAportes += aporteESSALUD;
     }
 
     const netoPagar = totalIngresos - totalDescuentos;
@@ -980,7 +1154,7 @@ export class PlanillasService {
    */
   async pagarPlanillaCompleta(planillaId: string, metodoPago: 'efectivo' | 'transferencia', tenantId?: string) {
     try {
-      console.log(`💰 [RRHH] Iniciando pago de planilla ${planillaId} por ${metodoPago}`);
+      this.logger.debug(`💰 [RRHH] Iniciando pago de planilla ${planillaId} por ${metodoPago}`);
 
       // 1. Obtener planilla con detalles
       let planillaQuery = this.supabaseService.getClient()
@@ -1077,9 +1251,13 @@ export class PlanillasService {
       }
 
       // 4. 🎯 EMITIR EVENTO PARA CONTABILIDAD
-      console.log('🎯 [RRHH] Emitiendo evento de planilla pagada para contabilidad...');
+      this.logger.debug('🎯 [RRHH] Emitiendo evento de planilla pagada para contabilidad...');
 
+      const effectiveTenantId = tenantId || planilla.tenant_id;
       const eventoPago: PlanillaPagadaEvent = {
+        eventId: uuidv4(),
+        tenantId: effectiveTenantId,
+        idempotencyKey: `planilla.pagada:${effectiveTenantId}:${planillaId}`,
         planillaId: planillaId,
         periodo: planilla.periodo,
         totalPagado: totalPagado,
@@ -1089,12 +1267,12 @@ export class PlanillasService {
       };
 
       this.eventBus.emitPlanillaPagada(eventoPago);
-      console.log('✅ [RRHH] Evento de planilla pagada emitido exitosamente');
+      this.logger.debug('✅ [RRHH] Evento de planilla pagada emitido exitosamente');
 
-      console.log(`✅ Planilla ${planilla.periodo} pagada exitosamente`);
-      console.log(`   💰 Total pagado: S/ ${totalPagado}`);
-      console.log(`   👥 Empleados pagados: ${pagosCreados.length}`);
-      console.log(`   💳 Método: ${metodoPago}`);
+      this.logger.debug(`✅ Planilla ${planilla.periodo} pagada exitosamente`);
+      this.logger.debug(`   💰 Total pagado: S/ ${totalPagado}`);
+      this.logger.debug(`   👥 Empleados pagados: ${pagosCreados.length}`);
+      this.logger.debug(`   💳 Método: ${metodoPago}`);
 
       return {
         success: true,
@@ -1120,7 +1298,7 @@ export class PlanillasService {
    */
   async pagarEmpleadosSeleccionados(planillaId: string, pagoData: any, tenantId?: string) {
     try {
-      console.log(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId}`);
+      this.logger.debug(`💰 [RRHH] Pagando empleados seleccionados de planilla ${planillaId}`);
 
       const { empleados_ids, metodo_pago, numero_operacion, observaciones } = pagoData;
 
@@ -1217,11 +1395,11 @@ export class PlanillasService {
 
       const periodoDisplay = planillaInfo?.periodo || new Date().toISOString().substring(0, 7);
 
-      console.log(`🔄 [RRHH] Sincronizando ${empleadosPagados.length} pagos con tabla rrhh_pagos...`);
+      this.logger.debug(`🔄 [RRHH] Sincronizando ${empleadosPagados.length} pagos con tabla rrhh_pagos...`);
 
       for (const empleadoPlanilla of empleadosPagados) {
         const empleadoId = empleadoPlanilla.id_empleado || empleadoPlanilla.empleado_id;
-        console.log(`📝 [RRHH] Insertando pago para empleado ${empleadoId}:`, {
+        this.logger.debug(`📝 [RRHH] Insertando pago para empleado ${empleadoId}:`, {
           empleado_id: empleadoId,
           planilla_id: planillaId,
           periodo: periodoDisplay,
@@ -1251,17 +1429,17 @@ export class PlanillasService {
           console.error('❌ Error sincronizando con rrhh_pagos:', rrhhPagoError);
           throw new Error(`No se pudo registrar pago RRHH: ${rrhhPagoError.message}`);
         } else {
-          console.log(`✅ Pago sincronizado para empleado ${empleadoId}`);
+          this.logger.debug(`✅ Pago sincronizado para empleado ${empleadoId}`);
         }
       }
 
-      console.log(`✅ [RRHH] Sincronización completada - ${empleadosPagados.length} registros en rrhh_pagos`)
+      this.logger.debug(`✅ [RRHH] Sincronización completada - ${empleadosPagados.length} registros en rrhh_pagos`)
 
       // 🎯 GENERAR ASIENTOS CONTABLES AUTOMÁTICAMENTE
       try {
-        console.log('📊 [RRHH] Generando asientos contables automáticamente...');
+        this.logger.debug('📊 [RRHH] Generando asientos contables automáticamente...');
         await this.generarAsientosContables(planillaId, planillaInfo?.tenant_id);
-        console.log('✅ [RRHH] Asientos contables generados automáticamente');
+        this.logger.debug('✅ [RRHH] Asientos contables generados automáticamente');
       } catch (asientosError) {
         console.warn('⚠️ [RRHH] Error generando asientos automáticos (no crítico):', asientosError);
       }
@@ -1297,6 +1475,49 @@ export class PlanillasService {
         .maybeSingle();
 
       if (error || !data) {
+        const cuentaDefault = RRHH_CUENTAS_PLANILLA_DEFAULT[codigo];
+        if (!cuentaDefault) {
+          throw new Error(`Cuenta contable ${codigo} no encontrada para el tenant`);
+        }
+
+        const { data: creada, error: crearError } = await this.supabaseService.getClient()
+          .from('plan_cuentas')
+          .insert({
+            tenant_id: tenantId,
+            codigo,
+            nombre: cuentaDefault.nombre,
+            tipo: cuentaDefault.tipo,
+            tipo_cuenta: cuentaDefault.tipo_cuenta,
+            nivel: cuentaDefault.nivel,
+            acepta_movimiento: true,
+            activo: true,
+            estado: 'ACTIVO',
+            metadata: { source: 'rrhh_runtime_account_seed' },
+          })
+          .select('id')
+          .single();
+
+        if (!crearError && creada?.id) {
+          this.logger.warn(`Cuenta contable ${codigo} fue creada automáticamente para tenant ${tenantId}`);
+          return creada.id;
+        }
+
+        const isDuplicate = (crearError as any)?.code === '23505' ||
+          String((crearError as any)?.message || '').toLowerCase().includes('duplicate key');
+        if (isDuplicate) {
+          const { data: existente, error: existenteError } = await this.supabaseService.getClient()
+            .from('plan_cuentas')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .eq('codigo', codigo)
+            .eq('activo', true)
+            .maybeSingle();
+
+          if (!existenteError && existente?.id) {
+            return existente.id;
+          }
+        }
+
         throw new Error(`Cuenta contable ${codigo} no encontrada para el tenant`);
       }
 
@@ -1329,7 +1550,7 @@ export class PlanillasService {
    */
   async generarAsientosContables(planillaId: string, tenantId?: string) {
     try {
-      console.log(`📊 [RRHH] Generando asientos contables para planilla ${planillaId}`);
+      this.logger.debug(`📊 [RRHH] Generando asientos contables para planilla ${planillaId}`);
 
       // Obtener planilla con empleados
       let planillaQuery = this.supabaseService.getClient()
@@ -1400,8 +1621,8 @@ export class PlanillasService {
 
       // ✅ FIX: Normalizar comparación de estados (case-insensitive)
       const estadoNormalizado = (planilla.estado || '').toUpperCase();
-      console.log(`🔍 [RRHH] Estado de la planilla: ${planilla.estado} (normalizado: ${estadoNormalizado})`);
-      console.log(`🔍 [RRHH] Empleados en planilla: ${planilla.empleado_planilla?.length || 0}`);
+      this.logger.debug(`🔍 [RRHH] Estado de la planilla: ${planilla.estado} (normalizado: ${estadoNormalizado})`);
+      this.logger.debug(`🔍 [RRHH] Empleados en planilla: ${planilla.empleado_planilla?.length || 0}`);
 
       if (estadoNormalizado !== 'CALCULADA' && (!planilla.empleado_planilla || planilla.empleado_planilla.length === 0)) {
         throw new Error(`No se pueden generar asientos - Estado: ${planilla.estado}, Empleados: ${planilla.empleado_planilla?.length || 0}`);
@@ -1441,7 +1662,7 @@ export class PlanillasService {
 
         const eventoPrevio = await buscarEventoExistente();
         if (eventoPrevio?.event_id) {
-          console.log(
+          this.logger.debug(
             `♻️ [RRHH] Evento planilla.liquidada ya estaba encolado (${eventoPrevio.event_id}); se garantiza asiento sincronico por idempotencia`
           );
         } else {
@@ -1475,7 +1696,7 @@ export class PlanillasService {
             if (isDuplicateOutbox) {
               const eventoDuplicado = await buscarEventoExistente();
               if (eventoDuplicado?.event_id) {
-                console.log(
+                this.logger.debug(
                   `♻️ [RRHH] Insercion idempotente detecto evento planilla.liquidada existente (${eventoDuplicado.event_id}); se garantiza asiento sincronico`
                 );
               } else {
@@ -1485,7 +1706,7 @@ export class PlanillasService {
               throw new Error(`No se pudo encolar evento contable de planilla: ${outboxError.message}`);
             }
           } else {
-            console.log(
+            this.logger.debug(
               `✅ [RRHH] Evento planilla.liquidada encolado; se crea asiento sincronico para cumplir contrato del endpoint`
             );
           }
@@ -1493,23 +1714,27 @@ export class PlanillasService {
       }
 
       // 🎯 CREAR ASIENTOS EN SISTEMA PRINCIPAL DIRECTAMENTE
-      console.log('📝 [RRHH] Creando asientos contables en sistema principal...');
+      this.logger.debug('📝 [RRHH] Creando asientos contables en sistema principal...');
 
       // 1. Obtener IDs reales de las cuentas del plan contable
       const cuentaGastos = await this.getCuentaIdPorCodigo('621', tenantIdPlanilla);
       const cuentaRemuneraciones = await this.getCuentaIdPorCodigo('411', tenantIdPlanilla);
       const cuentaInstituciones = await this.getCuentaIdPorCodigo('403', tenantIdPlanilla);
+      const cuentaSeguridadSocial = totalAportes > 0 ? await this.getCuentaIdPorCodigo('627', tenantIdPlanilla) : null;
+      const cuentaEssalud = totalAportes > 0 ? await this.getCuentaIdPorCodigo('407', tenantIdPlanilla) : null;
 
-      console.log(`🔍 [RRHH] IDs de cuentas obtenidos:`);
-      console.log(`   - Gastos (621): ${cuentaGastos}`);
-      console.log(`   - Remuneraciones (411): ${cuentaRemuneraciones}`);
-      console.log(`   - Instituciones (403): ${cuentaInstituciones}`);
+      this.logger.debug(`🔍 [RRHH] IDs de cuentas obtenidos:`);
+      this.logger.debug(`   - Gastos (621): ${cuentaGastos}`);
+      this.logger.debug(`   - Remuneraciones (411): ${cuentaRemuneraciones}`);
+      this.logger.debug(`   - Instituciones (403): ${cuentaInstituciones}`);
+      if (cuentaSeguridadSocial) this.logger.debug(`   - Seguridad Social (627): ${cuentaSeguridadSocial}`);
+      if (cuentaEssalud) this.logger.debug(`   - ESSALUD (407): ${cuentaEssalud}`);
 
       // 2. Crear cabecera del asiento en tabla principal
       const numeroAsiento = await this.getSiguienteNumeroAsiento(tenantIdPlanilla);
       const codigoAsiento = `RRHH-${planilla.periodo}-${numeroAsiento.toString().padStart(6, '0')}`;
 
-      console.log(`📊 [RRHH] Creando cabecera del asiento: ${codigoAsiento}`);
+      this.logger.debug(`📊 [RRHH] Creando cabecera del asiento: ${codigoAsiento}`);
 
       const { data: asientoCreado, error: asientoError } = await this.supabaseService.getClient()
         .from('asientos_contables')
@@ -1522,8 +1747,8 @@ export class PlanillasService {
           origen: 'RRHH',
           concepto: `Planilla de sueldos ${planilla.periodo}`,
           referencia: referenciaPlanilla,
-          total_debe: totalIngresos,
-          total_haber: totalIngresos,
+          total_debe: totalIngresos + totalAportes,
+          total_haber: totalIngresos + totalAportes,
           estado: 'CONFIRMADO',
           source_event_id: sourceEventId,
           usuario_id: null
@@ -1536,7 +1761,7 @@ export class PlanillasService {
         throw new Error(`Error creando asiento contable: ${asientoError.message}`);
       }
 
-      console.log('✅ [RRHH] Cabecera del asiento creada:', asientoCreado.id);
+      this.logger.debug('✅ [RRHH] Cabecera del asiento creada:', asientoCreado.id);
 
       // 3. Crear detalles del asiento
       const detallesAsiento = [
@@ -1569,7 +1794,31 @@ export class PlanillasService {
         }
       ];
 
-      console.log(`📝 [RRHH] Insertando ${detallesAsiento.length} detalles del asiento...`);
+      // ESSALUD patronal (9%): DEBE 627, HABER 407
+      if (totalAportes > 0 && cuentaSeguridadSocial && cuentaEssalud) {
+        detallesAsiento.push(
+          {
+            tenant_id: tenantIdPlanilla,
+            asiento_id: asientoCreado.id,
+            cuenta_id: cuentaSeguridadSocial,
+            debe: totalAportes,
+            haber: 0,
+            fecha: fechaAsiento,
+            nombre: `ESSALUD patronal ${planilla.periodo}`
+          },
+          {
+            tenant_id: tenantIdPlanilla,
+            asiento_id: asientoCreado.id,
+            cuenta_id: cuentaEssalud,
+            debe: 0,
+            haber: totalAportes,
+            fecha: fechaAsiento,
+            nombre: `ESSALUD por pagar ${planilla.periodo}`
+          }
+        );
+      }
+
+      this.logger.debug(`📝 [RRHH] Insertando ${detallesAsiento.length} detalles del asiento...`);
 
       // 4. Insertar detalles
       const { error: detallesError } = await this.supabaseService.getClient()
@@ -1586,7 +1835,7 @@ export class PlanillasService {
         throw new Error(`Error creando detalles del asiento: ${detallesError.message}`);
       }
 
-      console.log('✅ [RRHH] Asiento contable completo creado exitosamente:', numeroAsiento);
+      this.logger.debug('✅ [RRHH] Asiento contable completo creado exitosamente:', numeroAsiento);
 
       // Marcar planilla como con asientos generados
       try {
@@ -1598,7 +1847,7 @@ export class PlanillasService {
           })
           .eq('id', planillaId)
           .eq('tenant_id', tenantIdPlanilla);
-        console.log('✅ Planilla marcada con asientos generados');
+        this.logger.debug('✅ Planilla marcada con asientos generados');
       } catch (updateError) {
         console.warn('⚠️ Error actualizando flag de asientos:', updateError);
       }
@@ -1611,7 +1860,7 @@ export class PlanillasService {
           codigo_asiento: codigoAsiento,
           asiento_id: asientoCreado.id,
           registros: detallesAsiento.length,
-          monto_total: totalIngresos,
+          monto_total: totalIngresos + totalAportes,
           planilla_periodo: planilla.periodo,
           tablas_utilizadas: ['asientos_contables', 'detalle_asientos']
         }
@@ -1626,18 +1875,14 @@ export class PlanillasService {
   /**
    * Obtener historial de pagos de una planilla
    */
-  async getHistorialPagos(planillaId: string, tenantId?: string) {
+  async getHistorialPagos(planillaId: string, tenantId: string) {
     try {
-      const query = this.supabaseService.getClient()
+      const { data, error } = await this.supabaseService.getClient()
         .from('historial_pagos_planilla')
         .select('*')
-        .eq('planilla_id', planillaId);
-
-      if (tenantId) {
-        query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query.order('fecha', { ascending: false });
+        .eq('planilla_id', planillaId)
+        .eq('tenant_id', tenantId)
+        .order('fecha', { ascending: false });
 
       if (error) {
         console.warn('Tabla historial_pagos_planilla no existe:', error);

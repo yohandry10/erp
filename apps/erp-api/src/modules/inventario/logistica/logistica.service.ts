@@ -480,24 +480,12 @@ export class LogisticaService {
             throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
           }
         } else {
-          const { error: movimientoInsertError } = await client.from('movimientos_inventario').insert({
-            tenant_id: tenantId,
-            producto_id: item.producto_id,
-            tipo: 'SALIDA',
-            cantidad: cantidadSolicitada,
-            referencia_tipo: 'PEDIDO',
-            referencia_id: pedidoId,
-            notas: `Salida por despacho de pedido ${pedido.numero}`,
-          });
-
-          if (movimientoInsertError) {
-            console.error('Error registrando movimiento de inventario:', movimientoInsertError);
-            throw new BadRequestException('No se pudo confirmar el despacho por error de inventario');
-          }
-
           const { error: salidaError } = await client.rpc('descontar_stock_y_liberar_reserva', {
             p_producto_id: item.producto_id,
             p_cantidad: cantidadSolicitada,
+            p_referencia_tipo: 'PEDIDO',
+            p_referencia_id: pedidoId,
+            p_notas: `Salida por despacho de pedido ${pedido.numero}`,
           });
 
           if (salidaError) {

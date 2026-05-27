@@ -1,8 +1,21 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { customAuth, Session, User } from '@/lib/auth-service'
 import { clearPermissionCache } from '@/hooks/use-permission'
+
+const PUBLIC_PATHS = new Set(['/login', '/demo', '/'])
+
+function isPublicPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  // next.config.js usa trailingSlash: true, así que el pathname puede llegar como
+  // "/login/" en vez de "/login". Normalizamos quitando la barra final.
+  const normalized = pathname.length > 1 && pathname.endsWith('/')
+    ? pathname.slice(0, -1)
+    : pathname
+  return PUBLIC_PATHS.has(normalized)
+}
 
 interface AuthContextType {
   session: Session | null
@@ -39,8 +52,20 @@ function storeSessionSnapshot(session: Session | null) {
 
   try {
     if (session?.user?.id) {
-      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
-      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
+      // This snapshot is only for optimistic UI hydration. The HttpOnly cookie and
+      // /auth/profile remain the source of truth for authorization.
+      const sanitized = {
+        ...session,
+        access_token: session.access_token,
+        user: {
+          ...session.user,
+          roles: Array.isArray(session.user.roles) ? session.user.roles : [],
+          is_super_admin: session.user.is_super_admin === true,
+        },
+      }
+      const json = JSON.stringify(sanitized)
+      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, json)
+      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, json)
     } else {
       window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
       window.sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
@@ -51,11 +76,24 @@ function storeSessionSnapshot(session: Session | null) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
   const [session, setSession] = useState<Session | null>(() => readStoredSession())
   const [user, setUser] = useState<User | null>(() => readStoredSession()?.user ?? null)
-  const [loading, setLoading] = useState(() => !readStoredSession())
+  const [loading, setLoading] = useState(() => readStoredSession() === null)
 
   const loadSession = async () => {
+    // En rutas públicas (/login, /demo, /) el middleware ya garantiza que no hay
+    // sesión válida: si la hubiera, habría redirigido a /dashboard antes de
+    // renderizar. Saltamos el fetch a /auth/profile para evitar el 401 esperado
+    // en consola.
+    if (isPublicPath(pathname)) {
+      setSession(null)
+      setUser(null)
+      storeSessionSnapshot(null)
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error } = await customAuth.getSession()
 
@@ -85,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const signIn = async (email: string, password: string) => {

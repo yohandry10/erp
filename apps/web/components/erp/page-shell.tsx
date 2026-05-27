@@ -25,7 +25,7 @@ export function PageShell({
       )}
     >
       <header className="rounded-3xl border border-cyan-400/20 bg-slate-950/80 p-5 shadow-2xl shadow-blue-950/30 group-data-[erp-theme=light]/dashboard:border-slate-200 group-data-[erp-theme=light]/dashboard:bg-white/90 group-data-[erp-theme=light]/dashboard:shadow-slate-200/70">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-black tracking-normal text-white group-data-[erp-theme=light]/dashboard:text-slate-950 md:text-3xl">
               {title}
@@ -36,7 +36,7 @@ export function PageShell({
               </p>
             ) : null}
           </div>
-          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="w-full">{actions}</div> : null}
         </div>
       </header>
       {children}

@@ -137,71 +137,74 @@ export default function AlmacenesPage() {
         fallback={<NoPermission />}
       >
         <div className="flex flex-col gap-5">
-          {loading ? (
-            <div className="flex justify-center items-center py-12 px-0 text-blue-600 font-semibold"
+          {/* Fix CLS: la estructura (header + 3 cards KPI + sección catálogo)
+              se renderiza SIEMPRE para que el alto reservado sea estable entre
+              loading y data cargada. Antes el estado loading mostraba solo
+              "Cargando..." (~50px) y al llegar la data todo bajaba ~400px+,
+              produciendo CLS ~0.32. Ahora los cards arrancan en 0 (estado
+              natural) y el catálogo mantiene un min-height fijo. */}
+          {error && (
+            <div className="border bg-[rgba(254,_226,_226,_0.65)] rounded-3 py-4 px-5 text-red-700 font-semibold"
             >
-              Cargando almacenes…
+              {error}
             </div>
-          ) : (
-            <>
-              {error && (
-                <div className="border bg-[rgba(254,_226,_226,_0.65)] rounded-3 py-4 px-5 text-red-700 font-semibold"
-                >
-                  {error}
-                </div>
-              )}
+          )}
 
-              <section className="grid gap-3 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]"
-              >
-                <div className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 flex items-center gap-3"
-                >
-                  <Warehouse size={22} color="#1d4ed8" />
-                  <div>
-                    <div className="text-3 text-blue-700 font-bold">
-                      Almacenes
-                    </div>
-                    <div className="text-6 font-bold text-slate-950">
-                      {stats.total.toLocaleString('es-PE')}
-                    </div>
-                  </div>
+          <section className="grid gap-3 grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))]"
+          >
+            <div className="rounded-3.5 border bg-[rgba(191,_219,_254,_0.35)] p-4 flex items-center gap-3"
+            >
+              <Warehouse size={22} color="#1d4ed8" />
+              <div>
+                <div className="text-3 text-blue-700 font-bold">
+                  Almacenes
                 </div>
-                <div className="rounded-3.5 border bg-[rgba(187,_247,_208,_0.45)] p-4 flex items-center gap-3"
-                >
-                  <Building2 size={22} color="#047857" />
-                  <div>
-                    <div className="text-3 text-emerald-700 font-bold">
-                      Activos
-                    </div>
-                    <div className="text-6 font-bold text-[#065f46]">
-                      {stats.activos.toLocaleString('es-PE')}
-                    </div>
-                  </div>
+                <div className="text-6 font-bold text-slate-950">
+                  {stats.total.toLocaleString('es-PE')}
                 </div>
-                <div className="rounded-3.5 border bg-[rgba(254,_226,_226,_0.55)] p-4 flex items-center gap-3"
-                >
-                  <MapPin size={22} color="#b91c1c" />
-                  <div>
-                    <div className="text-3 text-red-700 font-bold">
-                      Inactivos
-                    </div>
-                    <div className="text-6 font-bold text-red-800">
-                      {stats.inactivos.toLocaleString('es-PE')}
-                    </div>
-                  </div>
+              </div>
+            </div>
+            <div className="rounded-3.5 border bg-[rgba(187,_247,_208,_0.45)] p-4 flex items-center gap-3"
+            >
+              <Building2 size={22} color="#047857" />
+              <div>
+                <div className="text-3 text-emerald-700 font-bold">
+                  Activos
                 </div>
-              </section>
+                <div className="text-6 font-bold text-[#065f46]">
+                  {stats.activos.toLocaleString('es-PE')}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-3.5 border bg-[rgba(254,_226,_226,_0.55)] p-4 flex items-center gap-3"
+            >
+              <MapPin size={22} color="#b91c1c" />
+              <div>
+                <div className="text-3 text-red-700 font-bold">
+                  Inactivos
+                </div>
+                <div className="text-6 font-bold text-red-800">
+                  {stats.inactivos.toLocaleString('es-PE')}
+                </div>
+              </div>
+            </div>
+          </section>
 
-              <section className="border rounded-4 p-5 bg-white flex flex-col gap-4"
-              >
-                <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">
-                  Catálogo de almacenes
-                </h2>
+          <section className="border rounded-4 p-5 bg-white flex flex-col gap-4 min-h-[180px]"
+          >
+            <h2 className="m-0 text-[1.15rem] font-bold text-slate-950">
+              Catálogo de almacenes
+            </h2>
 
-                {almacenes.length === 0 ? (
-                  <div className="text-slate-400 text-3.5">
-                    No hay almacenes registrados. Crea uno desde el módulo de configuración o mediante Supabase Studio.
-                  </div>
-                ) : (
+            {loading ? (
+              <div className="text-blue-600 font-semibold text-3.5">
+                Cargando almacenes…
+              </div>
+            ) : almacenes.length === 0 ? (
+              <div className="text-slate-400 text-3.5">
+                No hay almacenes registrados. Crea uno desde el módulo de configuración o mediante Supabase Studio.
+              </div>
+            ) : (
                   <ul className="list-none m-0 p-0 grid gap-3">
                     {almacenes.map((almacen) => {
                       const isExpanded = expanded === almacen.id
@@ -281,8 +284,6 @@ export default function AlmacenesPage() {
                   </ul>
                 )}
               </section>
-            </>
-          )}
         </div>
       </ProtectedComponent>
     </div>

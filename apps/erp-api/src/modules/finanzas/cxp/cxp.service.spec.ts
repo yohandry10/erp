@@ -10,6 +10,7 @@ describe('CxpService', () => {
   let service: CxpService;
   let supabaseService: SupabaseService;
   let eventBusService: EventBusService;
+  let retencionesValidation: jest.Mocked<RetencionesValidationService>;
 
   const mockSupabaseClient = {
     from: jest.fn().mockReturnThis(),
@@ -61,6 +62,7 @@ describe('CxpService', () => {
     service = module.get<CxpService>(CxpService);
     supabaseService = module.get<SupabaseService>(SupabaseService);
     eventBusService = module.get<EventBusService>(EventBusService);
+    retencionesValidation = module.get(RetencionesValidationService) as jest.Mocked<RetencionesValidationService>;
   });
 
   afterEach(() => {
@@ -165,6 +167,71 @@ describe('CxpService', () => {
 
       await expect(service.crearCuentaPorPagar(tenantId, dto, userId)).rejects.toThrow(BadRequestException);
     });
+
+    it('should validate and persist fiscal adjustments for CxP', async () => {
+      const dto = {
+        proveedor_id: 'prov-001',
+        numero_documento: 'F001-00002',
+        fecha_emision: '2025-10-25',
+        subtotal: 1000,
+        igv: 180,
+        total: 1180,
+        retencion: 70.8,
+        percepcion: 0,
+        detraccion: 47.2,
+        anticipo: 0,
+      };
+
+      const mockProveedor = {
+        id: 'prov-001',
+        razon_social: 'Proveedor Test',
+      };
+      const mockCxp = {
+        id: 'cxp-002',
+        ...dto,
+        tenant_id: tenantId,
+        saldo: 1062,
+        retencion_total: 70.8,
+        percepcion_total: 0,
+        detraccion_total: 47.2,
+        anticipo_total: 0,
+        estado: 'PARCIAL',
+        moneda: 'PEN',
+      };
+
+      retencionesValidation.obtenerConfiguracionEmpresa.mockResolvedValueOnce({
+        aplicar_retencion: true,
+        retencion_tasa: 6,
+        aplicar_detraccion: true,
+        detraccion_tasa: 4,
+      });
+      retencionesValidation.validarMontoPendiente.mockReturnValue({
+        valido: true,
+        montoEsperado: 1062,
+      });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockProveedor, error: null });
+      mockSupabaseClient.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      mockSupabaseClient.single.mockResolvedValueOnce({ data: mockCxp, error: null });
+
+      const result = await service.crearCuentaPorPagar(tenantId, dto, userId);
+
+      expect(result.success).toBe(true);
+      expect(retencionesValidation.validarCalculoAjustes).toHaveBeenCalledWith(
+        dto.total,
+        expect.objectContaining({ retencion: 70.8, detraccion: 47.2 }),
+        undefined,
+        expect.objectContaining({ aplicar_retencion: true }),
+      );
+      expect(mockSupabaseClient.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          saldo: 1062,
+          saldo_pendiente: 1062,
+          retencion_total: 70.8,
+          detraccion_total: 47.2,
+          estado: 'PARCIAL',
+        }),
+      );
+    });
   });
 
   describe('obtenerCuentaPorPagar', () => {
@@ -207,7 +274,8 @@ describe('CxpService', () => {
 
       const mockQuery = {
         eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValueOnce({ data: mockCxps, error: null }),
+        order: jest.fn().mockReturnThis(),
+        range: jest.fn().mockResolvedValueOnce({ data: mockCxps, error: null, count: mockCxps.length }),
       };
 
       mockSupabaseClient.from.mockReturnValueOnce({
@@ -218,6 +286,13 @@ describe('CxpService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockCxps);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 50,
+        total: 2,
+        totalPages: 1,
+      });
+      expect(mockQuery.range).toHaveBeenCalledWith(0, 49);
     });
 
     // Note: Filtering test is covered by integration tests

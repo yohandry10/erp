@@ -263,7 +263,7 @@ erp/
 │   └── 📂 infra/                # Infraestructura
 │
 ├── 📂 supabase/
-│   ├── 📂 migrations/           # Migraciones activas 000..302
+│   ├── 📂 migrations/           # Migraciones activas; ver docs/README.md antes de aplicar
 │   ├── 📂 seeds/                # Datos iniciales
 │   └── 📂 verify/               # Scripts de verificación
 │
@@ -305,7 +305,7 @@ erp/
 
 **Estados del Pedido**:
 ```
-BORRADOR → PENDIENTE → CONFIRMADO → EN_PREPARACION → 
+BORRADOR → PENDIENTE → CONFIRMADO → EN_PREPARACION →
 LISTO_DESPACHO → DESPACHADO → FACTURADO → COMPLETADO
 ```
 
@@ -508,8 +508,10 @@ docker compose ps
 # Validar primero el estado vigente
 cat docs/db_rebuild_status.md
 
-# Con Supabase CLI y entorno local disponible, aplicar 000..302 en orden
-supabase db reset
+# Flujo operativo vigente: aplicar/validar con psql y gates runtime.
+# No usar Supabase CLI como requisito del proyecto.
+# Antes de reconstruir una BD limpia, resolver cualquier prefijo duplicado
+# en supabase/migrations y confirmar el rango documentado en docs/README.md.
 ```
 
 ### 5. Iniciar en Desarrollo
@@ -601,7 +603,7 @@ Plantillas vigentes:
 
 ### Esquema Principal
 
-El sistema utiliza **PostgreSQL 15** via Supabase. La fuente vigente de reconstruccion indica migraciones activas `000..302` y 299 archivos SQL; ver `docs/db_rebuild_status.md` antes de aplicar o reconstruir BD.
+El sistema utiliza **PostgreSQL 15** via Supabase. La reconstruccion base documentada llega a `000..305`; luego se aplicaron gates remotos `312..326` y auditorias posteriores agregaron `327..335`. Al 2026-05-24 la colision local de prefijo `333__` quedo resuelta renumerando el cierre de tesoreria a `334__treasury_cash_bank_forensic_closure.sql`; `335__descontar_stock_authoritative.sql` corrige la salida autoritativa de inventario posterior al cierre `333`. Verificar siempre que no existan prefijos duplicados antes de aplicar o reconstruir BD. Ver `docs/README.md`, `docs/db_rebuild_status.md`, `docs/production-readiness/ERP_PRODUCTION_READINESS.md` y `docs/CODEX_HANDOFF_2026-05-24.md`.
 
 | Categoría | Tablas Principales |
 |-----------|-------------------|
@@ -636,11 +638,8 @@ crear_pedido_completo(...)
 ### Ejecutar Migraciones
 
 ```bash
-# Usando Supabase CLI sobre una BD local/limpia
-supabase db reset
-
-# Verificar estado
-supabase db status
+# Cargar DATABASE_URL desde .env.local y aplicar con psql, segun docs/ops/supabase-connection.md.
+# Verificar despues con validadores runtime/smoke documentados.
 ```
 
 No ejecutar SQL sueltos de raiz sin convertirlos antes en migraciones/seeds idempotentes. Algunos archivos estan marcados como forenses en `docs/DOCUMENTATION_QUARANTINE.md`.
@@ -872,16 +871,16 @@ pnpm k8s:deploy
 
 | Documento | Descripción |
 |-----------|-------------|
-| [PROJECT_STATUS.md](PROJECT_STATUS.md) | Estado operativo vigente, gates ejecutados, riesgos y bloqueantes |
-| [PROJECT_REVIEW_INDEX.md](PROJECT_REVIEW_INDEX.md) | Índice maestro de revisión exhaustiva por rondas |
-| [docs/db_rebuild_status.md](docs/db_rebuild_status.md) | Fuente vigente de reconstrucción BD `000..302` |
+| [x_doc/PROJECT_STATUS.md](x_doc/PROJECT_STATUS.md) | Estado operativo histórico de estabilización, gates ejecutados, riesgos y bloqueantes |
+| [x_doc/PROJECT_REVIEW_INDEX.md](x_doc/PROJECT_REVIEW_INDEX.md) | Índice maestro histórico de revisión exhaustiva por rondas |
+| [docs/CODEX_HANDOFF_2026-05-24.md](docs/CODEX_HANDOFF_2026-05-24.md) | Handoff más reciente de tesorería/caja/bancos/CxC/CxP |
+| [docs/db_rebuild_status.md](docs/db_rebuild_status.md) | Fuente base histórica de reconstrucción BD `000..305` |
 | [docs/DOCUMENTATION_QUARANTINE.md](docs/DOCUMENTATION_QUARANTINE.md) | Clasificación de docs/artefactos obsoletos antes de borrar |
-| [VENTAS_POS_FISCAL.md](docs/manuals/modules/VENTAS_POS_FISCAL.md) | Módulos comerciales y fiscales (~600 líneas) |
-| [COMPRAS_INVENTARIO.md](docs/manuals/modules/COMPRAS_INVENTARIO.md) | Compras, inventario y logística (~500 líneas) |
-| [FINANZAS_CONTABILIDAD.md](docs/manuals/modules/FINANZAS_CONTABILIDAD.md) | Finanzas y contabilidad (~500 líneas) |
-| [SYSTEM_ARCHITECTURE.md](docs/manuals/SYSTEM_ARCHITECTURE.md) | Arquitectura general histórica; validar contra el índice vigente |
-| [DATABASE_REFERENCE.md](docs/manuals/DATABASE_REFERENCE.md) | Referencia histórica; usar `docs/db_rebuild_status.md` como fuente BD |
-| [DEVELOPER_GUIDE.md](docs/manuals/DEVELOPER_GUIDE.md) | Guía histórica; validar comandos contra este README y docs ops |
+| [docs/README.md](docs/README.md) | Hub de documentación · navegación por dominio |
+| [VENTAS_POS_FISCAL.md](docs/manuals/modules/VENTAS_POS_FISCAL.md) | Módulos comerciales y fiscales |
+| [COMPRAS_INVENTARIO.md](docs/manuals/modules/COMPRAS_INVENTARIO.md) | Compras, inventario y logística |
+| [FINANZAS_CONTABILIDAD.md](docs/manuals/modules/FINANZAS_CONTABILIDAD.md) | Finanzas y contabilidad |
+| [configuration.md](docs/configuration.md) | Variables de entorno backend (`env.schema.ts`) |
 
 ### Documentación de Seguridad
 
@@ -891,7 +890,6 @@ pnpm k8s:deploy
 | [session-auth.md](docs/security/session-auth.md) | Sesión por cookie HttpOnly y auth actual |
 | [rate-limiting.md](docs/security/rate-limiting.md) | Rate limiting global y configuración |
 | [supabase-access-audit.md](docs/security/supabase-access-audit.md) | Auditoría de acceso Supabase/service role |
-| [security-dashboard.md](docs/security/security-dashboard.md) | Dashboard de monitoreo; revisar junto con cuarentena |
 
 ---
 

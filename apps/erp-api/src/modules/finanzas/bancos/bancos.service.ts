@@ -509,7 +509,22 @@ export class BancosService {
 
     if (errorOutbox) {
       console.error('Error insertando evento en outbox:', errorOutbox);
-      // No fallar la operación si el evento no se pudo insertar
+      await client
+        .from('cuentas_bancarias')
+        .update({
+          saldo: cuenta.saldo,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', tenantId)
+        .eq('id', dto.cuenta_bancaria_id);
+
+      await client
+        .from('movimientos_bancarios')
+        .delete()
+        .eq('id', movimiento.id)
+        .eq('tenant_id', tenantId);
+
+      throw new BadRequestException('No se pudo registrar el evento contable del movimiento bancario');
     }
 
     return {

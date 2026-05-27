@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useApiCall } from '@/hooks/use-api'
 import { usePaises } from '@/hooks/use-paises'
-import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle } from 'lucide-react'
+import { Building2, Mail, Phone, MapPin, Settings, FileText, X, AlertCircle, Eye, EyeOff, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const sectionClass = 'mb-8'
@@ -88,6 +88,7 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [credentials, setCredentials] = useState<{
     email: string
     temporaryPassword: string
@@ -190,6 +191,12 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
     try {
       if (!formData.pais_id) {
         setError('Debes seleccionar un país válido')
+        setIsLoading(false)
+        return
+      }
+
+      if (formData.ruc && !/^\d{11}$/.test(formData.ruc)) {
+        setError('El RUC debe tener exactamente 11 dígitos numéricos')
         setIsLoading(false)
         return
       }
@@ -739,8 +746,26 @@ export default function CrearTenantModal({ isOpen, onClose, onSuccess, tenant }:
                 <label className="mb-1 block text-xs font-semibold text-slate-500">
                   CONTRASEÑA TEMPORAL
                 </label>
-                <div className="rounded-lg border border-slate-200 bg-white p-3 font-mono text-[0.9rem] font-bold text-slate-800">
-                  {credentials.temporaryPassword}
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
+                  <span className="flex-1 font-mono text-[0.9rem] font-bold text-slate-800">
+                    {showPassword ? credentials.temporaryPassword : '••••••••••••'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-slate-400 hover:text-slate-600 transition"
+                    title={showPassword ? 'Ocultar' : 'Mostrar'}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(credentials.temporaryPassword)}
+                    className="text-slate-400 hover:text-slate-600 transition"
+                    title="Copiar"
+                  >
+                    <Copy className="size-4" />
+                  </button>
                 </div>
               </div>
             </div>

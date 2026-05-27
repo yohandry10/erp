@@ -20,6 +20,7 @@ interface CpeDocument {
 interface Props {
   documents: CpeDocument[]
   onView: (id: string, tipo: string) => void
+  onPdf?: (id: string) => void
   onSend: (id: string) => void
   onGre: (doc: CpeDocument) => void
   fiscalLabel: string
@@ -35,7 +36,7 @@ const estadoColor: Record<string, string> = {
   BORRADOR: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
 }
 
-export function ComprobantesTable({ documents, onView, onSend, onGre, fiscalLabel, canSend }: Props) {
+export function ComprobantesTable({ documents, onView, onPdf, onSend, onGre, fiscalLabel, canSend }: Props) {
   return (
     <div className="overflow-auto rounded-2xl border border-cyan-400/10">
       <table className="min-w-full !bg-slate-950/80 text-sm">
@@ -75,6 +76,7 @@ export function ComprobantesTable({ documents, onView, onSend, onGre, fiscalLabe
               <td className="p-3">
                 <div className="flex flex-wrap justify-end gap-2">
                 <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-400/15" onClick={() => onView(doc.id, doc.tipoDocumento || doc.tipoComprobante)}>Ver</button>
+                <button className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-400/15" onClick={() => onPdf?.(doc.id)}>PDF</button>
                 <button
                   className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-500/15 disabled:opacity-40"
                   onClick={() => canSend && onSend(doc.id)}

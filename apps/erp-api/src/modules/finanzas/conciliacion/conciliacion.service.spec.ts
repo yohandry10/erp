@@ -451,6 +451,9 @@ describe('ConciliacionService - Validación de Cierre', () => {
       // Mock: Obtener conciliación
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
 
+      // Mock: Count existing extracto (re-import guard)
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
+
       // Mock: CSV parser
       mockCsvParserService.parsearExtractoBancario.mockReturnValue({
         movimientos: [
@@ -504,6 +507,9 @@ describe('ConciliacionService - Validación de Cierre', () => {
 
     it('debe rechazar si no hay movimientos válidos en el CSV', async () => {
       mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(mockConciliacion));
+
+      // Mock: Count existing extracto (re-import guard)
+      mockSupabaseClient.from.mockReturnValueOnce(createMockQueryBuilder(null));
 
       mockCsvParserService.parsearExtractoBancario.mockReturnValue({
         movimientos: [],

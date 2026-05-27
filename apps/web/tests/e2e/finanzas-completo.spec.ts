@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -163,7 +164,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const proveedor = await parseOk<any>(
     await apiContext.post(api('/compras/proveedores'), {
       data: {
-        ruc: `20${runId}`,
+        ruc: generateValidRucFromRunId(runId, '20'),
         razon_social: `Proveedor Finanzas T13 ${runId} S.A.C.`,
         nombre_comercial: `Proveedor Finanzas ${runId}`,
         email: `proveedor-finanzas-${runId}@example.com`,
@@ -211,12 +212,18 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'orden compra T13 debe devolver detalle').toBeTruthy();
 
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: { aprobador_nombre: 'Admin Finanzas T13', comentarios: 'Aprobacion T13' },
-    }),
-    'aprobar orden compra T13',
-  );
+  // SEC-001 fix: aprobador autentica con su propio JWT.
+  const aprobadorCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: { aprobador_nombre: 'Admin Finanzas T13', comentarios: 'Aprobacion T13' },
+      }),
+      'aprobar orden compra T13',
+    );
+  } finally {
+    await aprobadorCtx.dispose();
+  }
 
   const recepcion = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
@@ -545,10 +552,15 @@ test.describe('T13 Finanzas completo', () => {
       await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/importar-csv`), {
         data: {
           banco: 'GENERICO',
-          contenidoCsv: `Fecha,Descripcion,Referencia,Tipo,Monto\n${today()},Movimiento auto T13,AUTO-${runId},ABONO,77.77`,
+          contenidoCsv: [
+            'Fecha,Descripcion,Referencia,Tipo,Monto',
+            `${today()},Movimiento auto T13,AUTO-${runId},ABONO,77.77`,
+            `${today()},Movimiento manual T13,MAN-EXT-${runId},CARGO,33.33`,
+            `${today()},Movimiento mismatch T13,MISMATCH-EXT-${runId},ABONO,44.45`,
+          ].join('\n'),
         },
       }),
-      'importar extracto automatico T13',
+      'importar extracto T13',
     );
     const matchAuto = await parseOk<any>(
       await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/match-automatico`), { data: { tolerancia_dias: 0 } }),
@@ -561,15 +573,6 @@ test.describe('T13 Finanzas completo', () => {
         data: { cuenta_bancaria_id: cuenta.id, tipo: 'CARGO', monto: 33.33, fecha: today(), descripcion: 'Movimiento manual T13', referencia: `MAN-SYS-${runId}` },
       }),
       'crear movimiento manual T13',
-    );
-    await parseOk<any>(
-      await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/importar-csv`), {
-        data: {
-          banco: 'GENERICO',
-          contenidoCsv: `Fecha,Descripcion,Referencia,Tipo,Monto\n${today()},Movimiento manual T13,MAN-EXT-${runId},CARGO,33.33`,
-        },
-      }),
-      'importar extracto manual T13',
     );
     const extractosPendientes = await parseOk<any[]>(
       await apiContext.get(api(`/finanzas/bancos/cuentas/${cuenta.id}/movimientos?conciliado=false&es_extracto=true&conciliacion_id=${conciliacion.id}&limit=100`)),
@@ -604,15 +607,6 @@ test.describe('T13 Finanzas completo', () => {
         },
       }),
       'crear movimiento mismatch T13',
-    );
-    await parseOk<any>(
-      await apiContext.post(api(`/finanzas/conciliacion/${conciliacion.id}/importar-csv`), {
-        data: {
-          banco: 'GENERICO',
-          contenidoCsv: `Fecha,Descripcion,Referencia,Tipo,Monto\n${today()},Movimiento mismatch T13,MISMATCH-EXT-${runId},ABONO,44.45`,
-        },
-      }),
-      'importar extracto mismatch T13',
     );
     const extractosMismatch = await parseOk<any[]>(
       await apiContext.get(api(`/finanzas/bancos/cuentas/${cuenta.id}/movimientos?conciliado=false&es_extracto=true&conciliacion_id=${conciliacion.id}&limit=100`)),

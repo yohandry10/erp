@@ -9,6 +9,7 @@
  */
 
 import { useEmpresaConfig } from './use-empresa-config'
+import { fetchApi } from '@/lib/api-fetch'
 
 // ============================================================================
 // Example 1: Basic Usage - Accessing Configuration
@@ -100,7 +101,7 @@ export function RefreshConfigExample() {
 
   const handleUpdateConfig = async () => {
     // Update configuration via API
-    await fetch('/api/configuracion/empresa', {
+    await fetchApi('/api/configuracion/empresa', {
       method: 'PUT',
       body: JSON.stringify({
         usar_flujo_logistica: true,
@@ -184,7 +185,7 @@ export function ApiCallExample() {
   const { config } = useEmpresaConfig()
 
   const handleGenerateInvoice = async (pedidoId: string) => {
-    const response = await fetch(`/api/ventas/pedidos/${pedidoId}/generar-factura`, {
+    const response = await fetchApi(`/api/ventas/pedidos/${pedidoId}/generar-factura`, {
       method: 'POST',
       body: JSON.stringify({
         // Pass config to backend if needed

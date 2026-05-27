@@ -14,23 +14,25 @@ export function useErrorHandler() {
    * Maneja errores de operaciones asíncronas
    */
   const handleError = useCallback((err: unknown, customMessage?: string) => {
-    let errorMessage = customMessage || 'Ha ocurrido un error'
-    
+    // En producción, usar mensaje genérico para no exponer detalles internos
+    const genericMessage = customMessage || 'Ha ocurrido un error'
+    let rawMessage = genericMessage
+
     if (err instanceof Error) {
-      errorMessage = err.message
+      rawMessage = err.message
     } else if (typeof err === 'string') {
-      errorMessage = err
+      rawMessage = err
     } else if (err && typeof err === 'object' && 'message' in err) {
-      errorMessage = String(err.message)
+      rawMessage = String(err.message)
     }
 
-    const errorObj = err instanceof Error ? err : new Error(errorMessage)
-    setError(errorObj)
+    const safeMessage = process.env.NODE_ENV === 'development' ? rawMessage : genericMessage
+    const errorObj = err instanceof Error ? err : new Error(safeMessage)
+    setError(new Error(safeMessage))
 
-    // Log del error
-    console.error('🚨 Error manejado:', errorObj)
+    console.error('[Error]', errorObj)
 
-    return errorMessage
+    return safeMessage
   }, [])
 
   /**

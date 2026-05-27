@@ -5,6 +5,8 @@ import { useToast } from '@/components/ui/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { customAuth } from '@/lib/auth-service'
 import { apiSucceeded, getApiErrorMessage, unwrapApiArray, unwrapApiData, unwrapApiObject } from '@/lib/api-contract'
+import { buildApiUrl, normalizeApiEndpoint, withTrailingSlash } from '@/lib/api-url'
+import { fetchWithOfflineSupport, isOfflineCachedResponse, isOfflineQueuedResponse } from '@/lib/offline-store'
 
 interface ApiResponse<T> {
   data?: T
@@ -28,6 +30,18 @@ interface ApiRequestOptions extends RequestInit {
   params?: QueryParams
 }
 
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+function resolveMethod(options: ApiRequestOptions): string {
+  return String(options.method || 'GET').toUpperCase()
+}
+
+function resolveAttempts(method: string, retries: number): number {
+  // No reintentamos escrituras por defecto: si el servidor proceso la request
+  // pero el cliente aborto por timeout, reintentar puede duplicar CPE/ventas/pagos.
+  return IDEMPOTENT_METHODS.has(method) ? Math.max(1, retries) : 1
+}
+
 export function useApi<T = any>(options: UseApiOptions = {}) {
   const [state, setState] = useState<ApiResponse<T>>({
     success: false,
@@ -36,7 +50,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
   const [loading, setLoading] = useState(false)
   
   const { toast } = useToast()
-  const { loading: authLoading } = useAuth()
+  const { loading: authLoading, session } = useAuth()
   const {
     showErrorToast = true,
     showSuccessToast = false,
@@ -60,19 +74,16 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      if (authLoading) {
+      let resolvedSession = session
+
+      if (authLoading || !resolvedSession?.access_token) {
         await new Promise(resolve => setTimeout(resolve, 100))
+        const { data } = await customAuth.getSession()
+        resolvedSession = data.session || resolvedSession
       }
       
-      const API_BASE_URL = '/backend'
       // Agregar prefijo /api si el endpoint no lo tiene
-      const normalizedEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`
-
-      const withTrailingSlash = (base: string) => {
-        const [path, query] = base.split('?')
-        const normalizedPath = path.endsWith('/') ? path : `${path}/`
-        return query === undefined ? normalizedPath : `${normalizedPath}?${query}`
-      }
+      const normalizedEndpoint = normalizeApiEndpoint(endpoint)
 
       const buildUrl = (base: string, params?: QueryParams) => {
         const normalizedBase = withTrailingSlash(base)
@@ -86,7 +97,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         return suffix ? `${normalizedBase}?${suffix}` : normalizedBase
       }
 
-      const baseUrl = `${API_BASE_URL}${normalizedEndpoint}`
+      const baseUrl = buildApiUrl(normalizedEndpoint)
       const url = buildUrl(baseUrl, options.params)
       
       // Headers base - convertir options.headers a objeto plano si es necesario
@@ -103,6 +114,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        ...(resolvedSession?.access_token ? { Authorization: `Bearer ${resolvedSession.access_token}` } : {}),
         ...optionsHeaders,
       }
 
@@ -124,15 +136,17 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       // Excluir headers/params de options para evitar conflictos
       const { headers: _, params: __, ...restOptions } = options
       
+      const method = resolveMethod(options)
+      const maxAttempts = resolveAttempts(method, retries)
       let attempt = 0
       let lastError: any = null
-      while (attempt < Math.max(1, retries)) {
+      while (attempt < maxAttempts) {
         attempt++
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), timeoutMs)
 
         try {
-          const response = await fetch(url, {
+          const response = await fetchWithOfflineSupport(url, {
             cache: 'no-store', // evita servir 304/ETag y trae estado fresco
             ...restOptions,
             headers: {
@@ -142,15 +156,24 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
             credentials: 'include',
             mode: 'cors',
             signal: controller.signal,
+          }, {
+            endpoint: normalizedEndpoint,
+            tenantId: resolvedSession?.user?.tenant_id,
+            userId: resolvedSession?.user?.id,
           })
           clearTimeout(timer)
 
-          // Handle 401 Unauthorized - redirect to login
+          // Handle 401 Unauthorized. Some module endpoints can return 401 for
+          // permission gaps; only close the whole session if auth/profile also fails.
           if (response.status === 401) {
-        // Limpiar sesión y redirigir al login
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          await customAuth.signOut()
-          window.location.href = '/login'
+            const { data } = await customAuth.getSession()
+            if (data.session) {
+              throw new Error('No autorizado para consultar este recurso')
+            }
+
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              await customAuth.signOut()
+              window.location.href = '/login'
             }
             throw new Error('Unauthorized - Session expired')
           }
@@ -213,7 +236,11 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           if (showSuccessToast) {
             toast({
               title: 'Éxito',
-              description: result?.message || 'Operación completada exitosamente',
+              description: isOfflineQueuedResponse(response)
+                ? 'Sin conexión: operación guardada para sincronizar.'
+                : isOfflineCachedResponse(response)
+                  ? 'Mostrando datos locales cacheados.'
+                  : result?.message || 'Operación completada exitosamente',
             })
           }
 
@@ -221,7 +248,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
         } catch (err) {
           clearTimeout(timer)
           lastError = err
-          if (attempt >= Math.max(1, retries)) {
+          if (attempt >= maxAttempts) {
             throw err
           }
           // backoff simple
@@ -251,7 +278,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     } finally {
       setLoading(false)
     }
-  }, [toast, authLoading, showErrorToast, showSuccessToast])
+  }, [toast, authLoading, session?.access_token, showErrorToast, showSuccessToast, retries, timeoutMs, throwOnError])
 
   // Métodos helper
   const get = useCallback((endpoint: string, reqOptions?: ApiRequestOptions) => {

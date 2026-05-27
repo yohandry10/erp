@@ -3,8 +3,16 @@ import { JwtService } from '@nestjs/jwt';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { EmailService } from '../../shared/email/email.service';
 import { PermissionService } from '../permissions/permission.service';
+import { CacheService } from '../../shared/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+
+// TTL del cache de validación de sesión. Cada request autenticado pasa por
+// validateSession() y antes hacía 2 queries Supabase (~1.4s). Con cache, los
+// hits son <5ms. Tradeoff: una sesión revocada (logout, expulsión admin) puede
+// seguir aceptándose hasta SESSION_CACHE_TTL segundos. revokeSession() invalida
+// la entrada para mitigar el caso de logout explícito.
+const SESSION_CACHE_TTL = 60;
 
 export interface LoginDto {
   email: string;
@@ -42,9 +50,14 @@ export class AuthService {
     private readonly supabaseService: SupabaseService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly cacheService: CacheService,
     @Inject(forwardRef(() => PermissionService))
     private readonly permissionService?: PermissionService,
   ) {}
+
+  private sessionCacheKey(token: string): string {
+    return `auth:session:${token}`;
+  }
 
   async validateUser(email: string, password: string): Promise<any> {
     try {
@@ -737,6 +750,13 @@ export class AuthService {
   }
 
   async validateSession(sessionToken: string): Promise<boolean> {
+    // Fast path: cache hit (positivo solo — los miss/false NUNCA se cachean
+    // para que un logout posterior no quede atrapado en cache).
+    const cached = await this.cacheService.get<boolean>(this.sessionCacheKey(sessionToken));
+    if (cached === true) {
+      return true;
+    }
+
     try {
       const client = this.supabaseService.getAdminClient();
       const { data: session, error } = await client
@@ -755,11 +775,18 @@ export class AuthService {
         return false;
       }
 
-      // Update last activity
-      await client
+      // Cache positivo por SESSION_CACHE_TTL segundos.
+      await this.cacheService.set(this.sessionCacheKey(sessionToken), true, SESSION_CACHE_TTL);
+
+      // Update last_activity en fire-and-forget para no bloquear el response.
+      // Si falla, no afecta la validez de la sesión que ya confirmamos arriba.
+      const updateBuilder: any = client
         .from('user_sessions')
         .update({ last_activity: new Date().toISOString() })
         .eq('session_token', sessionToken);
+      if (updateBuilder && typeof updateBuilder.then === 'function') {
+        updateBuilder.then(() => undefined, () => undefined);
+      }
 
       return true;
     } catch (error) {
@@ -770,6 +797,10 @@ export class AuthService {
 
   async revokeSession(sessionToken: string): Promise<void> {
     try {
+      // Invalidamos cache PRIMERO para que requests in-flight con cache
+      // positivo no sigan pasando después del revoke.
+      await this.cacheService.del(this.sessionCacheKey(sessionToken));
+
       const client = this.supabaseService.getAdminClient();
       await client
         .from('user_sessions')

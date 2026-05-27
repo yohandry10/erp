@@ -6,6 +6,8 @@ import { SupabaseService } from '../../shared/supabase/supabase.service';
 @Injectable()
 export class PosWorkerScheduler {
   private readonly logger = new Logger(PosWorkerScheduler.name);
+  private readonly cronLockKey = 'worker:pos:pendientes';
+  private readonly cronLockTtlSeconds = 600;
 
   constructor(
     private readonly posService: PosService,
@@ -16,7 +18,8 @@ export class PosWorkerScheduler {
     try {
       const { data, error } = await this.supabase.getPublicClient()
         .from('tenants')
-        .select('id');
+        .select('id')
+        .eq('estado', 'ACTIVO');
 
       if (error) {
         this.logger.error(`❌ [POS Worker] Error obteniendo tenants: ${error.message}`);
@@ -39,33 +42,72 @@ export class PosWorkerScheduler {
 
     this.logger.log('🔄 [POS Worker] Inicio de procesamiento automático de ventas pendientes');
 
-    const tenants = await this.fetchTenants();
-    if (!tenants.length) {
-      this.logger.warn('⚠️ [POS Worker] No se encontraron tenants para procesar');
+    const lockAcquired = await this.tryAcquireJobLock();
+    if (!lockAcquired) {
+      this.logger.debug('⏭️ [POS Worker] Otro nodo tiene el lock distribuido, saltando...');
       return;
     }
 
-    let totalProcesadas = 0;
-    let totalErrores = 0;
-
-    for (const tenantId of tenants) {
-      try {
-        const result = await this.posService.procesarVentasPendientesFacturacion(tenantId, 50);
-        totalProcesadas += result?.procesadas || 0;
-        totalErrores += result?.errores || 0;
-        this.logger.log(
-          `✅ [POS Worker] Tenant ${tenantId}: procesadas=${result?.procesadas || 0}, errores=${result?.errores || 0}`,
-        );
-      } catch (err: any) {
-        totalErrores += 1;
-        this.logger.error(
-          `❌ [POS Worker] Error procesando tenant ${tenantId}: ${err?.message || err}`,
-        );
+    const tenants = await this.fetchTenants();
+    try {
+      if (!tenants.length) {
+        this.logger.warn('⚠️ [POS Worker] No se encontraron tenants para procesar');
+        return;
       }
-    }
 
-    this.logger.log(
-      `🏁 [POS Worker] Finalizado. Tenants=${tenants.length}, procesadas=${totalProcesadas}, errores=${totalErrores}`,
-    );
+      let totalProcesadas = 0;
+      let totalErrores = 0;
+
+      for (const tenantId of tenants) {
+        try {
+          const result = await this.posService.procesarVentasPendientesFacturacion(tenantId, 50);
+          totalProcesadas += result?.procesadas || 0;
+          totalErrores += result?.errores || 0;
+          this.logger.log(
+            `✅ [POS Worker] Tenant ${tenantId}: procesadas=${result?.procesadas || 0}, errores=${result?.errores || 0}`,
+          );
+        } catch (err: any) {
+          totalErrores += 1;
+          this.logger.error(
+            `❌ [POS Worker] Error procesando tenant ${tenantId}: ${err?.message || err}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `🏁 [POS Worker] Finalizado. Tenants=${tenants.length}, procesadas=${totalProcesadas}, errores=${totalErrores}`,
+      );
+    } finally {
+      await this.releaseJobLock();
+    }
+  }
+
+  private async tryAcquireJobLock(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase.getPublicClient().rpc('acquire_job_lock', {
+        p_lock_key: this.cronLockKey,
+        p_lock_ttl_seconds: this.cronLockTtlSeconds,
+      });
+
+      if (error) {
+        this.logger.warn(`⚠️ [POS Worker] No se pudo adquirir lock distribuido: ${error.message}`);
+        return false;
+      }
+
+      return data === true || data === 'true';
+    } catch (err: any) {
+      this.logger.warn(`⚠️ [POS Worker] Error adquiriendo lock distribuido: ${err?.message || err}`);
+      return false;
+    }
+  }
+
+  private async releaseJobLock(): Promise<void> {
+    try {
+      await this.supabase.getPublicClient().rpc('release_job_lock', {
+        p_lock_key: this.cronLockKey,
+      });
+    } catch (err: any) {
+      this.logger.warn(`⚠️ [POS Worker] Error liberando lock distribuido: ${err?.message || err}`);
+    }
   }
 }

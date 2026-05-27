@@ -82,6 +82,74 @@ interface ComparacionData {
   }
 }
 
+const toNumber = (value: unknown) => {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+const normalizeComparacionData = (raw: any): ComparacionData => ({
+  periodo: {
+    id: raw?.periodo?.id || '',
+    anio: toNumber(raw?.periodo?.anio) || new Date().getFullYear(),
+    mes: toNumber(raw?.periodo?.mes) || new Date().getMonth() + 1,
+    estado: raw?.periodo?.estado || 'N/A',
+    descripcion: raw?.periodo?.descripcion || 'Periodo no disponible',
+  },
+  centros_costo: Array.isArray(raw?.centros_costo)
+    ? raw.centros_costo.map((centro: any, index: number) => ({
+        centro_costo: {
+          id: centro?.centro_costo?.id || `centro-${index}`,
+          codigo: centro?.centro_costo?.codigo || 'N/A',
+          nombre: centro?.centro_costo?.nombre || 'Centro de costo',
+          descripcion: centro?.centro_costo?.descripcion || '',
+        },
+        cuentas: Array.isArray(centro?.cuentas)
+          ? centro.cuentas.map((cuenta: any) => ({
+              cuenta: {
+                id: cuenta?.cuenta?.id || '',
+                codigo: cuenta?.cuenta?.codigo || 'N/A',
+                nombre: cuenta?.cuenta?.nombre || 'Cuenta',
+              },
+              monto_presupuestado: toNumber(cuenta?.monto_presupuestado),
+              monto_ejecutado: toNumber(cuenta?.monto_ejecutado),
+              monto_comprometido: toNumber(cuenta?.monto_comprometido),
+              monto_disponible: toNumber(cuenta?.monto_disponible),
+              porcentaje_ejecutado: toNumber(cuenta?.porcentaje_ejecutado),
+              variacion: toNumber(cuenta?.variacion),
+              variacion_porcentaje: toNumber(cuenta?.variacion_porcentaje),
+              alerta: cuenta?.alerta || 'NORMAL',
+            }))
+          : [],
+        totales: {
+          presupuestado: toNumber(centro?.totales?.presupuestado),
+          ejecutado: toNumber(centro?.totales?.ejecutado),
+          comprometido: toNumber(centro?.totales?.comprometido),
+          disponible: toNumber(centro?.totales?.disponible),
+          variacion: toNumber(centro?.totales?.variacion),
+          porcentaje_ejecucion: toNumber(centro?.totales?.porcentaje_ejecucion),
+          variacion_porcentaje: toNumber(centro?.totales?.variacion_porcentaje),
+          alerta: centro?.totales?.alerta || 'NORMAL',
+        },
+      }))
+    : [],
+  resumen_global: {
+    total_presupuestado: toNumber(raw?.resumen_global?.total_presupuestado),
+    total_ejecutado: toNumber(raw?.resumen_global?.total_ejecutado),
+    total_comprometido: toNumber(raw?.resumen_global?.total_comprometido),
+    total_disponible: toNumber(raw?.resumen_global?.total_disponible),
+    total_variacion: toNumber(raw?.resumen_global?.total_variacion),
+    porcentaje_ejecucion: toNumber(raw?.resumen_global?.porcentaje_ejecucion),
+    variacion_porcentaje: toNumber(raw?.resumen_global?.variacion_porcentaje),
+    total_centros: toNumber(raw?.resumen_global?.total_centros),
+    total_cuentas: toNumber(raw?.resumen_global?.total_cuentas),
+    alertas: {
+      sobregiros: toNumber(raw?.resumen_global?.alertas?.sobregiros),
+      advertencias: toNumber(raw?.resumen_global?.alertas?.advertencias),
+      normales: toNumber(raw?.resumen_global?.alertas?.normales),
+    },
+  },
+})
+
 export default function PresupuestoVsRealChart({ periodoId, centroId }: PresupuestoVsRealChartProps) {
   const [data, setData] = useState<ComparacionData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -95,7 +163,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
       setError(null)
 
       const result = await apiCall(`/contabilidad/presupuestos/comparacion/${periodoId}`)
-      setData(result.data)
+      setData(normalizeComparacionData(result?.data))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
@@ -128,7 +196,7 @@ export default function PresupuestoVsRealChart({ periodoId, centroId }: Presupue
       style: 'currency',
       currency: 'PEN',
       minimumFractionDigits: 2
-    }).format(amount)
+    }).format(toNumber(amount))
   }
 
   const getAlertaLabel = (alerta: string) => {

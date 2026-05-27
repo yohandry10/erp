@@ -364,8 +364,10 @@ test.describe('T08 POS vertical completo', () => {
     );
     expect(ventaDuplicada.venta_id).toBe(venta.venta_id);
 
+    // El endpoint es GET (consulta los detalles de una venta por id), no POST.
+    // El test tenía POST con body redundante — error de método HTTP.
     const detalles = await parseOk<any[]>(
-      await apiContext.post(api(`/pos/detalles-venta/${venta.venta_id}`), { data: { venta_id: venta.venta_id } }),
+      await apiContext.get(api(`/pos/detalles-venta/${venta.venta_id}`)),
       'detalle POS persistido',
     );
     expect(detalles).toHaveLength(1);
@@ -441,7 +443,9 @@ test.describe('T08 POS vertical completo', () => {
     }).toBeGreaterThan(0);
 
     await gotoAuthenticated(page, '/dashboard/pos');
-    await expect(page.getByText(venta.numero_ticket, { exact: false })).toBeVisible({ timeout: 20000 });
+    // .first() evita strict mode violation: el número de ticket aparece
+    // varias veces en la página (lista + detalle expandido).
+    await expect(page.getByText(venta.numero_ticket, { exact: false }).first()).toBeVisible({ timeout: 20000 });
     await gotoAuthenticated(page, '/dashboard/inventario/kardex');
     await expect(page.locator('body')).toContainText(/Kardex|Movimientos/i, { timeout: 20000 });
     await gotoAuthenticated(page, '/dashboard/cpe');

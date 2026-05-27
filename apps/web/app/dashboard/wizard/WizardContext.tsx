@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
+import React, { createContext, useCallback, useContext, useReducer, ReactNode } from 'react'
 import { WizardState, WizardConfiguration, WizardValidationResults } from './types'
 
 interface WizardContextType {
@@ -211,45 +211,50 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
 export function WizardProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(wizardReducer, initialState)
 
-  const goToStep = (step: number) => {
+  // Todos los wrappers se memoizan con useCallback (deps vacías porque dispatch
+  // de useReducer es estable). Sin esto, cualquier useEffect en un step que use
+  // estas funciones en su array de dependencias entra en bucle infinito:
+  // render → nueva referencia → effect re-corre → setState → render → ...
+  // (Caso real: CompanyTypeStep.useEffect disparaba "Maximum update depth").
+  const goToStep = useCallback((step: number) => {
     dispatch({ type: 'GO_TO_STEP', payload: step })
-  }
+  }, [])
 
-  const nextStep = () => {
+  const nextStep = useCallback(() => {
     dispatch({ type: 'NEXT_STEP' })
-  }
+  }, [])
 
-  const previousStep = () => {
+  const previousStep = useCallback(() => {
     dispatch({ type: 'PREVIOUS_STEP' })
-  }
+  }, [])
 
-  const updateConfiguration = (config: Partial<WizardConfiguration>) => {
+  const updateConfiguration = useCallback((config: Partial<WizardConfiguration>) => {
     dispatch({ type: 'UPDATE_CONFIGURATION', payload: config })
-  }
+  }, [])
 
-  const updateValidationResults = (results: Partial<WizardValidationResults>) => {
+  const updateValidationResults = useCallback((results: Partial<WizardValidationResults>) => {
     dispatch({ type: 'UPDATE_VALIDATION_RESULTS', payload: results })
-  }
+  }, [])
 
-  const markStepComplete = (stepIndex: number) => {
+  const markStepComplete = useCallback((stepIndex: number) => {
     dispatch({ type: 'MARK_STEP_COMPLETE', payload: stepIndex })
-  }
+  }, [])
 
-  const setLoading = (loading: boolean) => {
+  const setLoading = useCallback((loading: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: loading })
-  }
+  }, [])
 
-  const setError = (error: string | null) => {
+  const setError = useCallback((error: string | null) => {
     dispatch({ type: 'SET_ERROR', payload: error })
-  }
+  }, [])
 
-  const resetWizardState = () => {
+  const resetWizardState = useCallback(() => {
     dispatch({ type: 'RESET' })
-  }
+  }, [])
 
-  const setPersistedConfiguration = (value: boolean) => {
+  const setPersistedConfiguration = useCallback((value: boolean) => {
     dispatch({ type: 'SET_PERSISTED', payload: value })
-  }
+  }, [])
 
   return (
     <WizardContext.Provider

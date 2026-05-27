@@ -29,6 +29,17 @@ describe('UsuariosController security', () => {
   });
 
   it('remueve campos sensibles del payload al actualizar usuarios', async () => {
+    // getDemoContext() corre al inicio de actualizarUsuario: lee empresa_config
+    // con cadena from.select.eq.single (1 sola eq). Si no se mockea, el chain
+    // explota cuando el controller llega al SELECT real de usuarios_sistema
+    // porque el "primer from()" devuelve un objeto sin el shape correcto.
+    const demoSingle = jest.fn().mockResolvedValue({
+      data: { is_demo: false, demo_expires_at: null },
+      error: null,
+    });
+    const demoEqTenant = jest.fn().mockReturnValue({ single: demoSingle });
+    const demoSelect = jest.fn().mockReturnValue({ eq: demoEqTenant });
+
     const fetchSingle = jest.fn().mockResolvedValue({ data: { id: 'user-1' }, error: null });
     const fetchEqTenant = jest.fn().mockReturnValue({ single: fetchSingle });
     const fetchEqId = jest.fn().mockReturnValue({ eq: fetchEqTenant });
@@ -46,8 +57,9 @@ describe('UsuariosController security', () => {
     const client = {
       from: jest
         .fn()
-        .mockReturnValueOnce({ select: fetchSelect })
-        .mockReturnValueOnce({ update }),
+        .mockReturnValueOnce({ select: demoSelect })   // 1° empresa_config (getDemoContext)
+        .mockReturnValueOnce({ select: fetchSelect })  // 2° usuarios_sistema (fetch)
+        .mockReturnValueOnce({ update }),              // 3° usuarios_sistema (update)
     };
     const controller = createController(client);
 

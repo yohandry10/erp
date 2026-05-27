@@ -5,6 +5,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 import { sendNotification } from '@tauri-apps/plugin-notification';
+import {
+  getOfflineStatus,
+  listOfflineRequests,
+  syncOfflineQueue,
+  type OfflineQueueItem,
+  type OfflineStatus,
+} from '@/lib/offline-store';
 
 export interface AppConfig {
   ruc: string;
@@ -35,12 +42,14 @@ export const useTauri = () => {
   const [isDesktop, setIsDesktop] = useState(false);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(false);
+  const [offlineStatus, setOfflineStatus] = useState<OfflineStatus | null>(null);
 
   useEffect(() => {
     // Detectar si estamos en Tauri
     if (typeof window !== 'undefined' && window.__TAURI__) {
       setIsDesktop(true);
       loadConfig();
+      refreshOfflineStatus();
     }
   }, []);
 
@@ -63,6 +72,7 @@ export const useTauri = () => {
     try {
       await invoke('save_config', { config: newConfig });
       setConfig(newConfig);
+      setOfflineStatus((current) => current ? { ...current, offline_mode: newConfig.offline_mode } : current);
       await sendNotification({
         title: 'Configuración guardada',
         body: 'La configuración se ha guardado correctamente'
@@ -231,10 +241,10 @@ export const useTauri = () => {
     
     try {
       const backupPath = await save({
-        defaultPath: `erp_backup_${new Date().toISOString().split('T')[0]}.db`,
+        defaultPath: `erp_desktop_backup_${new Date().toISOString().split('T')[0]}.json`,
         filters: [{
-          name: 'Database',
-          extensions: ['db']
+          name: 'JSON',
+          extensions: ['json']
         }]
       });
       
@@ -293,12 +303,61 @@ export const useTauri = () => {
     }
   };
 
+  const refreshOfflineStatus = async (): Promise<OfflineStatus | null> => {
+    try {
+      const status = await getOfflineStatus();
+      setOfflineStatus(status);
+      return status;
+    } catch (error) {
+      console.error('Error loading offline status:', error);
+      return null;
+    }
+  };
+
+  const getOfflineQueue = async (): Promise<OfflineQueueItem[]> => {
+    try {
+      return await listOfflineRequests();
+    } catch (error) {
+      console.error('Error loading offline queue:', error);
+      return [];
+    }
+  };
+
+  const synchronizeOfflineQueue = async (): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const results = await syncOfflineQueue();
+      await refreshOfflineStatus();
+      const failed = results.filter((result) => !result.ok).length;
+      await sendNotification({
+        title: failed ? 'Sincronización parcial' : 'Sincronización completada',
+        body: failed
+          ? `${failed} operación(es) siguen pendientes o fallaron`
+          : `${results.length} operación(es) sincronizadas`,
+      });
+      return failed === 0;
+    } catch (error) {
+      console.error('Error syncing offline queue:', error);
+      await sendNotification({
+        title: 'Error de sincronización',
+        body: `No se pudo sincronizar la cola offline: ${error}`,
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     isDesktop,
     config,
+    offlineStatus,
     loading,
     loadConfig,
     saveConfig,
+    refreshOfflineStatus,
+    getOfflineQueue,
+    synchronizeOfflineQueue,
     selectCertificate,
     signXML,
     sendToSUNAT,

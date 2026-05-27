@@ -1,12 +1,11 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
-import { OnboardingState, OnboardingContextValue, OnboardingTour } from './types'
-import { getTourById, getTourByRole } from './tours'
+import { OnboardingState, OnboardingContextValue } from './types'
+import { getTourById } from './tours'
 import { OnboardingOverlay } from './OnboardingOverlay'
 import { OnboardingSpotlight } from './OnboardingSpotlight'
 import { OnboardingTooltip } from './OnboardingTooltip'
-import { useTenant } from '@/contexts/TenantContext'
 
 const STORAGE_KEY = 'erp_onboarding_completed'
 
@@ -21,7 +20,6 @@ const OnboardingContext = createContext<OnboardingContextValue | null>(null)
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<OnboardingState>(initialState)
-  const { user } = useTenant()
 
   // Cargar tours completados del localStorage
   useEffect(() => {
@@ -51,29 +49,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  // Auto-iniciar tour para usuarios nuevos
-  useEffect(() => {
-    if (!user || state.isActive) return
-
-    const rawRole = user.roles?.[0] as unknown
-    const roleName = typeof rawRole === 'string'
-      ? rawRole
-      : rawRole && typeof rawRole === 'object' && 'nombre' in rawRole
-        ? String(rawRole.nombre)
-        : user.is_super_admin
-          ? 'superadmin'
-          : 'user'
-    const userRole = roleName.toLowerCase()
-    const tour = getTourByRole(userRole)
-    
-    if (tour && !state.completedTours.includes(tour.id)) {
-      // Pequeño delay para que la UI se cargue
-      const timer = setTimeout(() => {
-        startTour(tour.id)
-      }, 1500)
-      return () => clearTimeout(timer)
-    }
-  }, [user, state.completedTours, state.isActive, startTour])
+  // Auto-arranque DESHABILITADO. Antes, 1.5s después de cargar el dashboard se
+  // disparaba startTour() → renderiza OnboardingOverlay (capa negra al 50% sobre
+  // toda la pantalla) y un tooltip. Resultaba molesto, especialmente al entrar
+  // al demo, porque la app se "opacaba" sin acción del usuario. Los tours
+  // siguen disponibles bajo demanda vía OnboardingSettings.
 
   const saveCompletedTours = useCallback((tours: string[]) => {
     try {

@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gotoAuthenticated, login } from './helpers/auth';
+import { generateValidRucFromRunId, apiContextAsAprobador } from './helpers/test-data';
 
 type ApiEnvelope<T> = { success?: boolean; data?: T; message?: string; error?: string };
 
@@ -232,7 +233,7 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const proveedor = await parseOk<any>(
     await apiContext.post(api('/compras/proveedores'), {
       data: {
-        ruc: `20${runId}`,
+        ruc: generateValidRucFromRunId(`conta-proveedor-${runId}`),
         razon_social: `${qaPrefix} Proveedor Contabilidad S.A.C.`,
         nombre_comercial: `${qaPrefix} Proveedor Conta`,
         email: `proveedor-conta-${runId}@example.com`,
@@ -280,12 +281,18 @@ async function createPurchaseWithCxp(apiContext: APIRequestContext) {
   const detalleId = orden.detalles?.[0]?.id ?? orden.detalle?.[0]?.id;
   expect(detalleId, 'orden compra T14 debe devolver detalle').toBeTruthy();
 
-  await parseOk<any>(
-    await apiContext.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
-      data: { aprobador_nombre: 'Admin Contabilidad T14', comentarios: 'Aprobacion T14' },
-    }),
-    'aprobar orden compra T14',
-  );
+  // SEC-001 fix: aprobador autentica con su propio JWT.
+  const aprobadorContaCtx = await apiContextAsAprobador();
+  try {
+    await parseOk<any>(
+      await aprobadorContaCtx.post(api(`/compras/ordenes/${orden.id}/aprobar`), {
+        data: { aprobador_nombre: 'Admin Contabilidad T14', comentarios: 'Aprobacion T14' },
+      }),
+      'aprobar orden compra T14',
+    );
+  } finally {
+    await aprobadorContaCtx.dispose();
+  }
 
   const recepcion = await parseOk<any>(
     await apiContext.post(api(`/compras/recepciones/ordenes/${orden.id}`), {
@@ -344,7 +351,7 @@ async function ensureMetodoPago(supabase: SupabaseClient, tenantId: string) {
 async function createPosSale(apiContext: APIRequestContext, supabase: SupabaseClient, tenantId: string) {
   await supabase.from('empresa_config').upsert({
     tenant_id: tenantId,
-    ruc: `20${runId.padStart(9, '0').slice(-9)}`,
+    ruc: generateValidRucFromRunId(`conta-empresa-${runId}`),
     razon_social: `${qaPrefix} ERP Contabilidad E2E SAC`,
     nombre_comercial: `${qaPrefix} ERP Contabilidad E2E`,
     email: `contabilidad-e2e-${runId}@example.com`,

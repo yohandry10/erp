@@ -438,11 +438,12 @@ describe('OrdenesCompraService', () => {
   });
 
   describe('aprobar', () => {
+    // SEC-001 FIX: aprobador_id ya no se acepta en el DTO; el JWT user es la identidad.
     const aprobarDto: AprobarOrdenCompraDto = {
-      aprobador_id: 'user-123',
       aprobador_nombre: 'Juan Perez',
       comentarios: 'Aprobado'
     };
+    const APROBADOR_JWT_ID = 'user-123';
 
     it('should approve an orden in APROBACION state', async () => {
       const ordenEnAprobacion = { ...mockOrdenCompra, estado: 'APROBACION' };
@@ -458,7 +459,7 @@ describe('OrdenesCompraService', () => {
       });
 
 
-      const result = await service.aprobar('orden-123', aprobarDto, 'tenant-123');
+      const result = await service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID);
 
       expect(result.estado).toBe('APROBADA');
       expect(ocAprobacionesRepository.create).toHaveBeenCalled();
@@ -475,14 +476,14 @@ describe('OrdenesCompraService', () => {
     it('should throw NotFoundException when orden not found', async () => {
       ordenesRepository.findById.mockResolvedValue(null);
 
-      await expect(service.aprobar('non-existent', aprobarDto, 'tenant-123'))
+      await expect(service.aprobar('non-existent', aprobarDto, 'tenant-123', APROBADOR_JWT_ID))
         .rejects.toThrow(NotFoundException);
     });
 
     it('should throw BadRequestException when orden is not in approvable state', async () => {
       ordenesRepository.findById.mockResolvedValue({ ...mockOrdenCompra, estado: 'RECIBIDA' });
 
-      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123'))
+      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID))
         .rejects.toThrow(BadRequestException);
     });
 
@@ -497,7 +498,7 @@ describe('OrdenesCompraService', () => {
         }
       ] as any);
 
-      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123'))
+      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID))
         .rejects.toThrow(BadRequestException);
     });
 
@@ -508,7 +509,7 @@ describe('OrdenesCompraService', () => {
       ocAprobacionesRepository.countPendingByOrdenId.mockResolvedValue(0);
       ocAprobacionesRepository.hasRejectedApprovals.mockResolvedValue(true);
 
-      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123'))
+      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID))
         .rejects.toThrow(BadRequestException);
     });
 
@@ -520,10 +521,28 @@ describe('OrdenesCompraService', () => {
       ocAprobacionesRepository.hasRejectedApprovals.mockResolvedValue(false);
       ordenesRepository.updateEstado.mockResolvedValue({ ...mockOrdenCompra, estado: 'APROBACION' });
 
-      const result = await service.aprobar('orden-123', aprobarDto, 'tenant-123');
+      const result = await service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID);
 
       expect(result.estado).toBe('APROBACION');
       expect(eventBusService.emitOrdenCompraAprobada).not.toHaveBeenCalled();
+    });
+
+    it('SEC-001: should throw BadRequestException when userId (JWT) is undefined', async () => {
+      ordenesRepository.findById.mockResolvedValue({ ...mockOrdenCompra, estado: 'APROBACION' });
+
+      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123', undefined))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('SEC-001: should throw BadRequestException when JWT user is the orden creator (self-approval)', async () => {
+      ordenesRepository.findById.mockResolvedValue({
+        ...mockOrdenCompra,
+        estado: 'APROBACION',
+        created_by: APROBADOR_JWT_ID,
+      });
+
+      await expect(service.aprobar('orden-123', aprobarDto, 'tenant-123', APROBADOR_JWT_ID))
+        .rejects.toThrow(/no puede aprobar su propia orden/);
     });
   });
 

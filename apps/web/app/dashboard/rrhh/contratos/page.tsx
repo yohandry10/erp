@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useApi } from '@/hooks/use-api';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PromptDialog from '@/components/ui/PromptDialog';
+import { fetchApi } from '@/lib/api-fetch';
 
 const ContratosPage = () => {
   const [contratos, setContratos] = useState<any[]>([]);
@@ -128,12 +129,7 @@ const ContratosPage = () => {
 
   const generarContrato = async (contratoId: string) => {
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${API_BASE_URL}/api/rrhh/contratos/${contratoId}/generar`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await fetchApi(`/api/rrhh/contratos/${contratoId}/generar`);
       
       if (response.ok) {
         const blob = await response.blob();

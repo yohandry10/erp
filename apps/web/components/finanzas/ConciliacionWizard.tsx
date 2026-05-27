@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Upload,
 } from 'lucide-react'
+import { fetchApi } from '@/lib/api-fetch'
 
 interface WizardStep {
   id: number
@@ -74,8 +75,6 @@ export default function ConciliacionWizard({
   const [matchAutomaticoEjecutado, setMatchAutomaticoEjecutado] = useState(false)
   const [estadisticas, setEstadisticas] = useState<any>(null)
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-
   const steps: WizardStep[] = [
     { id: 1, title: 'Importar Extracto', description: 'Sube el archivo CSV del banco', status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending' },
     { id: 2, title: 'Match Automatico', description: 'Ejecuta la conciliacion automatica', status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending' },
@@ -86,13 +85,7 @@ export default function ConciliacionWizard({
 
   const loadEstadisticas = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}/diferencias`,
-        {
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        },
-      )
+      const response = await fetchApi(`/api/finanzas/conciliacion/${conciliacionId}/diferencias`)
       if (response.ok) {
         const data = await response.json()
         setEstadisticas(data.data)
@@ -100,7 +93,7 @@ export default function ConciliacionWizard({
     } catch (error) {
       console.error('Error loading estadisticas:', error)
     }
-  }, [API_BASE_URL, conciliacionId])
+  }, [conciliacionId])
 
   useEffect(() => {
     loadEstadisticas()
@@ -109,14 +102,9 @@ export default function ConciliacionWizard({
   const handleMatchAutomatico = async () => {
     setLoading(true)
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/finanzas/conciliacion/${conciliacionId}/match-automatico`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        },
-      )
+      const response = await fetchApi(`/api/finanzas/conciliacion/${conciliacionId}/match-automatico`, {
+        method: 'POST',
+      })
 
       if (response.ok) {
         setMatchAutomaticoEjecutado(true)

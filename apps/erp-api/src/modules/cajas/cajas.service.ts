@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CreateCajaDto } from './dto/create-caja.dto';
 import { UpdateCajaDto } from './dto/update-caja.dto';
@@ -114,6 +114,7 @@ export class CajasService {
     cajaId: string,
     dto: AbrirCajaDto,
     userId?: string,
+    ipAddress?: string,
   ) {
     // Validación 1: Caja existe y está activa
     const { data: caja, error: findError } = await this.supabase
@@ -326,8 +327,23 @@ export class CajasService {
         );
       }
 
-      // TODO: Verificar que el supervisor tenga rol apropiado (SUPERVISOR o ADMIN)
-      // Esta validación podría hacerse con PermissionGuard o servicio de roles
+      // Verificar que el supervisor tenga rol apropiado (SUPERVISOR o ADMIN)
+      const { data: supervisorRoles } = await this.supabase
+        .getClient()
+        .from('user_roles')
+        .select('roles(nombre)')
+        .eq('usuario_sistema_id', dto.supervisor_id)
+        .eq('tenant_id', tenantId);
+
+      const roleNames = (supervisorRoles || [])
+        .map((ur: any) => (ur.roles as any)?.nombre?.toUpperCase())
+        .filter(Boolean);
+
+      if (!roleNames.some((r: string) => ['ADMIN', 'SUPERVISOR'].includes(r))) {
+        throw new ForbiddenException(
+          'El usuario indicado no tiene rol de SUPERVISOR o ADMIN',
+        );
+      }
 
       // Marcar que se requirió autorización
       requirioAutorizacion = true;
@@ -393,6 +409,12 @@ export class CajasService {
       .single();
 
     if (error) {
+      // TOCTOU guard: unique partial index prevents duplicate ABIERTA sessions
+      if (error.code === '23505') {
+        throw new BadRequestException(
+          'Conflicto de concurrencia: otra sesión fue abierta simultáneamente para esta caja o cajero. Intente de nuevo.',
+        );
+      }
       this.logger.error(`Error al abrir sesión de caja: ${error.message}`, error);
       throw new BadRequestException(`Error al abrir caja: ${error.message}`);
     }
@@ -412,7 +434,7 @@ export class CajasService {
           supervisor_id: supervisorIdFinal,
           solicitante_id: cajeroId || userId || supervisorIdFinal,
           razon_autorizacion: razonAutorizacionFinal,
-          ip_address: null, // TODO: Extraer de request
+          ip_address: ipAddress || null,
           dispositivo: dto.dispositivo || null,
         });
 
@@ -568,14 +590,18 @@ export class CajasService {
     if (error) throw error;
 
     // Registrar corte y asiento contable de cierre (no bloquea el cierre si falla)
+    let advertenciaCierre: string | null = null;
     try {
       await this.cashReportsService.registrarCorte(tenantId, data.id);
       await this.cashReportsService.registrarAsientoCierre(tenantId, data.id);
     } catch (registrarError) {
-      this.logger.error(`No se pudo registrar corte/asiento de cierre: ${registrarError.message}`);
+      advertenciaCierre = `Corte/asiento de cierre no registrado: ${registrarError?.message}`;
+      this.logger.error(
+        `CIERRE_CORTE_FALLIDO sesion=${data.id} tenant=${tenantId}: ${registrarError?.message}. Requiere registro manual.`,
+      );
     }
 
-    return data;
+    return { ...data, ...(advertenciaCierre ? { advertencia: advertenciaCierre } : {}) };
   }
 
   private async resolveMontoEsperadoCierre(tenantId: string, sesion: any): Promise<number> {

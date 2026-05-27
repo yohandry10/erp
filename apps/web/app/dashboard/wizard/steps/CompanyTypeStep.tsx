@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React from 'react'
 import { useWizard } from '../useWizard'
 import { useCountryContext } from '@/hooks/use-country-context'
 import { Label } from '@/components/ui/label'
@@ -57,16 +57,11 @@ export function CompanyTypeStep() {
     })
   }
 
-  // Set default values on mount if not set
-  useEffect(() => {
-    if (!state.configuration.tipo_empresa) {
-      updateConfiguration({
-        gre_obligatorio: false,
-        gre_automatico_habilitado: true,
-        umbral_gre_automatico: 700,
-      })
-    }
-  }, [state.configuration.tipo_empresa, updateConfiguration])
+  // Los defaults (gre_obligatorio, gre_automatico_habilitado, umbral_gre_automatico)
+  // ya están seteados en createInitialState() de WizardContext, no hace falta
+  // dispatchearlos aquí. El effect anterior además entraba en bucle porque
+  // dispatcheaba sin setear tipo_empresa, dejando su propia condición siempre
+  // true.
 
   return (
     <div className="py-4 px-0">

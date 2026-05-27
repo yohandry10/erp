@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useApi } from './use-api'
 import { apiSucceeded, unwrapApiArray, unwrapApiData } from '@/lib/api-contract'
+import { fetchApi } from '@/lib/api-fetch'
 
 // Interfaces actualizadas para coincidir con la API
 export interface Pais {
@@ -52,12 +53,9 @@ export function usePaises() {
       setLoading(true)
       setError(null)
       
-      // Endpoint público same-origin: login debe cargar países antes de tener sesión.
-      const response = await fetch('/api/public/paises/', {
+      // Endpoint público del API: login debe cargar países antes de tener sesión.
+      const response = await fetchApi('/api/paises/', {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         signal: requestController.signal,
       })
       
