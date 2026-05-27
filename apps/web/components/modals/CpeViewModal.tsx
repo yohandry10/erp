@@ -102,8 +102,8 @@ export default function CpeViewModal({
           const unit = item.precio_unitario ?? 0
           return `
             <div>
-              <span>${qty}x ${item.nombre_producto || item.descripcion || 'Producto'}</span>
-              <span>${formatMoney(qty * unit)}</span>
+              <span>${escapeHtml(qty)}x ${escapeHtml(item.nombre_producto || item.descripcion || 'Producto')}</span>
+              <span>${escapeHtml(formatMoney(qty * unit))}</span>
             </div>
           `
         }).join('')
@@ -119,31 +119,33 @@ export default function CpeViewModal({
     const numeroFormateado = `${cpeData.serie}-${(typeof cpeData.numero === 'number' ? cpeData.numero : parseInt(String(cpeData.numero || '0'), 10)).toString().padStart(8, '0')}`
 
     // Generar HTML del logo si existe
-    const logoHtml = cpeData.logo_url 
-      ? `<img src="${cpeData.logo_url}" alt="Logo" />`
+    const logoUrl = safeImageUrl(cpeData.logo_url)
+    const logoHtml = logoUrl
+      ? `<img src="${escapeHtml(logoUrl)}" alt="Logo" />`
       : ''
+    const documentTypeName = getDocumentTypeName()
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${getDocumentTypeName()} ${numeroFormateado}</title>
+        <title>${escapeHtml(documentTypeName)} ${escapeHtml(numeroFormateado)}</title>
         <style>${getThermalPrintStyles()}</style>
       </head>
       <body>
         <div class="header">
           ${logoHtml ? `<div class="logo">${logoHtml}</div>` : ''}
-          <div class="empresa">${cpeData.razon_social_emisor || 'NEON SYSTEM'}</div>
-          <div class="ruc">RUC: ${cpeData.ruc_emisor || '20000000001'}</div>
-          <div class="tipo-doc">${getDocumentTypeName()}</div>
-          <div class="numero">${numeroFormateado}</div>
-          <div class="fecha">${formatDate(cpeData.created_at)}</div>
+          <div class="empresa">${escapeHtml(cpeData.razon_social_emisor || 'NEON SYSTEM')}</div>
+          <div class="ruc">RUC: ${escapeHtml(cpeData.ruc_emisor || '20000000001')}</div>
+          <div class="tipo-doc">${escapeHtml(documentTypeName)}</div>
+          <div class="numero">${escapeHtml(numeroFormateado)}</div>
+          <div class="fecha">${escapeHtml(formatDate(cpeData.created_at))}</div>
         </div>
         
         <div class="seccion">
           <div class="label">CLIENTE:</div>
-          <div class="valor">${cpeData.razon_social_receptor || 'Cliente General'}</div>
-          <div class="valor">${cpeData.tipo_documento_receptor === '6' ? 'RUC' : 'DNI'}: ${cpeData.documento_receptor || '-'}</div>
+          <div class="valor">${escapeHtml(cpeData.razon_social_receptor || 'Cliente General')}</div>
+          <div class="valor">${cpeData.tipo_documento_receptor === '6' ? 'RUC' : 'DNI'}: ${escapeHtml(cpeData.documento_receptor || '-')}</div>
         </div>
         
         <div class="items">
@@ -155,13 +157,13 @@ export default function CpeViewModal({
         </div>
         
         <div class="totales">
-          <div class="total-row"><span>Subtotal:</span><span>${formatMoney(cpeData.total_gravadas || 0)}</span></div>
-          <div class="total-row"><span>${taxLabel}:</span><span>${formatMoney(cpeData.total_igv || 0)}</span></div>
-          <div class="total-row total-final"><span>TOTAL:</span><span>${formatMoney(cpeData.total_venta || 0)}</span></div>
+          <div class="total-row"><span>Subtotal:</span><span>${escapeHtml(formatMoney(cpeData.total_gravadas || 0))}</span></div>
+          <div class="total-row"><span>${escapeHtml(taxLabel)}:</span><span>${escapeHtml(formatMoney(cpeData.total_igv || 0))}</span></div>
+          <div class="total-row total-final"><span>TOTAL:</span><span>${escapeHtml(formatMoney(cpeData.total_venta || 0))}</span></div>
         </div>
         
         <div class="footer">
-          <div class="hash">Hash: ${cpeData.hash || 'N/A'}</div>
+          <div class="hash">Hash: ${escapeHtml(cpeData.hash || 'N/A')}</div>
           <div>Representación impresa del CPE</div>
           <div>¡Gracias por su compra!</div>
         </div>
@@ -439,4 +441,29 @@ function TotalRow({ label, value }: { label: string; value: string }) {
       <span className="font-semibold text-slate-100">{value}</span>
     </div>
   )
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[char]
+  })
+}
+
+function safeImageUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value, window.location.origin)
+    if (!['http:', 'https:', 'data:'].includes(url.protocol)) return null
+    if (url.protocol === 'data:' && !/^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url.href)) return null
+    return url.href
+  } catch {
+    return null
+  }
 }

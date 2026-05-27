@@ -146,7 +146,7 @@ export class AccountingEntriesService {
 
   async procesarAsientoVenta(venta: VentaProcessedEvent): Promise<string | null> {
     try {
-      const costoVentas = await this.calcularCostoVentas(venta.items);
+      const costoVentas = await this.calcularCostoVentas(venta.items, venta.tenantId);
 
       const cuentaCobro = this.resolveCuentaCobro(venta.metodoPago);
 
@@ -483,16 +483,19 @@ export class AccountingEntriesService {
     return { codigo: '104', nombre: 'Cuentas Corrientes' };
   }
 
-  private async calcularCostoVentas(items: any[]): Promise<number> {
+  private async calcularCostoVentas(items: any[], tenantId: string): Promise<number> {
     let costoTotal = 0;
 
     for (const item of items) {
       try {
+        // HARDENING multi-tenant: filtrar producto por tenant_id para evitar
+        // que un evento con productoId cross-tenant retorne costo de otro tenant.
         const { data: producto, error } = await this.supabase
           .getClient()
           .from('productos')
           .select('precio_compra')
           .eq('id', item.productoId)
+          .eq('tenant_id', tenantId)
           .single();
 
         if (!error && producto && producto.precio_compra) {

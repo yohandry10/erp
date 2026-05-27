@@ -6,7 +6,9 @@ Fecha: 2026-05-26
 
 Se corrigieron riesgos de concurrencia y carga que podian aparecer al operar con multiples usuarios o varias instancias API: reintentos no idempotentes desde frontend, polling sincronizado/solapado en dashboard y notificaciones, y crons backend que podian ejecutarse en paralelo en mas de un nodo.
 
-No reemplaza una prueba de carga real. El cierre tecnico vigente valida compilacion, tests unitarios focalizados y build; falta medir p95/p99 contra API y Supabase reales con usuarios concurrentes.
+El 2026-05-26 se ejecuto una prueba de carga autenticada, read-only y moderada contra el API local apuntando al Supabase real configurado en `apps/erp-api/.env`, con workers de fondo apagados para evitar escrituras colaterales. Resultado final: 589/589 requests OK, 0 errores, 0 HTTP 429, 0 HTTP 5xx, p95 1490 ms, p99 1956 ms.
+
+Esto no reemplaza una prueba de capacidad productiva completa con POS/escrituras controladas y observabilidad de infraestructura, pero ya cubre el riesgo inmediato de polling/read-only multiusuario en los modulos principales.
 
 ## Problemas encontrados y remediados
 
@@ -48,6 +50,73 @@ Remediacion:
 - `OutboxWorker` usa `acquire_job_lock`/`release_job_lock` con lock distribuido `worker:outbox:shared`.
 - `ContabilidadEventsListener` usa lock distribuido `worker:outbox:contabilidad`.
 - `PosWorkerScheduler` usa lock distribuido `worker:pos:pendientes` y filtra tenants activos.
+- `OutboxWorker` se puede desactivar por proceso con `OUTBOX_WORKER_CRON_ENABLED=false`.
+- `ContabilidadEventsListener` se puede desactivar por proceso con `ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED=false`.
+
+### 5. Contrato inconsistente de CxP con paginacion estandar
+
+Problema: `GET /api/finanzas/cxp?limit=10&page=1` devolvia `400` porque `FiltrarCxpDto` no declaraba `page/limit`, mientras otros listados financieros si aceptaban paginacion.
+
+Remediacion:
+
+- `FiltrarCxpDto` acepta `page` y `limit` con validacion numerica.
+- `CxpService.listarCuentasPorPagar` aplica `range(...)`, pide `count: exact` y devuelve `pagination`.
+- La UI actual sigue funcionando porque ignora `pagination` si no la necesita.
+
+## Prueba de carga read-only 2026-05-26
+
+Condiciones:
+
+- API local: `http://localhost:3002`.
+- Supabase real segun `apps/erp-api/.env`.
+- Duracion: 60 s.
+- Concurrencia: 8 workers.
+- Credenciales: usuario de prueba desde `apps/web/.env.local`.
+- Escrituras: no se ejecutaron POST funcionales salvo login unico.
+- Workers apagados: `POS_WORKER_CRON_ENABLED=false`, `OUTBOX_WORKER_CRON_ENABLED=false`, `ACCOUNTING_OUTBOX_WORKER_CRON_ENABLED=false`, `BACKGROUND_JOBS_ENABLED=false`.
+
+Resumen final:
+
+| Metrica | Resultado |
+|---|---:|
+| Requests | 589 |
+| OK | 589 |
+| Errores | 0 |
+| RPS | 9.82 |
+| p50 | 1162 ms |
+| p95 | 1490 ms |
+| p99 | 1956 ms |
+| Max | 2577 ms |
+| HTTP 429 | 0 |
+| HTTP 5xx | 0 |
+
+Endpoints mas lentos por p95:
+
+| Endpoint | Requests | p95 |
+|---|---:|---:|
+| `cpe/stats` | 22 | 2091 ms |
+| `cpe` | 19 | 1513 ms |
+| `inventario/stats` | 24 | 1490 ms |
+| `finanzas/cxc` | 17 | 1402 ms |
+| `finanzas/bancos/cuentas` | 28 | 1309 ms |
+
+Backlog `outbox_events` post-cierre:
+
+| Estado | Total |
+|---|---:|
+| `completed` | 3985 |
+| `dead_letter` | 0 |
+| `pending` | 0 |
+| `processing` | 0 |
+| `failed` | 0 |
+
+El unico `dead_letter` preexistente fue cerrado el 2026-05-26 como reconciliado, sin reprocesarlo, porque ya existia asiento confirmado y cuadrado para la misma referencia `B001-00000001` por flujo fiscal/CxC (`source_event_id=6cfb9a36-76f2-43de-807e-f0e42ccd72b2`). La validacion posterior dejo `pending=0`, `processing=0`, `failed=0`, `dead_letter=0` y un solo asiento para esa referencia.
+
+Artefactos:
+
+- Harness: `scripts/load-test-api.mjs`.
+- Resultado inicial con bug CxP: `docs/load-tests/api_readonly_multiuser_2026-05-26.json`.
+- Resultado final consistente: `docs/load-tests/api_readonly_multiuser_2026-05-26-final.json`.
 
 ## Evidencia
 
@@ -55,12 +124,15 @@ Remediacion:
 - `pnpm --filter @erp-suite/erp-api type-check`: OK.
 - `pnpm exec jest src/shared/outbox/outbox-worker.service.spec.ts --runInBand`: OK, 2/2.
 - `pnpm exec jest src/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts --runInBand`: OK, 21/21.
+- `pnpm --filter @erp-suite/erp-api exec jest src/modules/finanzas/cxp/cxp.service.spec.ts --runInBand`: OK, 25/25.
+- `pnpm --filter @erp-suite/erp-api exec jest src/shared/outbox/outbox-worker.service.spec.ts src/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts --runInBand`: OK, 23/23.
+- `pnpm --filter @erp-suite/erp-api exec jest src/modules/finanzas/cxp/cxp.service.spec.ts src/shared/outbox/outbox-worker.service.spec.ts src/modules/contabilidad/listeners/contabilidad-events.listener.spec.ts --runInBand`: OK, 48/48.
+- `node --check scripts/load-test-api.mjs`: OK.
 - `pnpm --filter @erp-suite/web run build`: OK, 111 paginas generadas.
 - `pnpm --filter @erp-suite/erp-api build`: OK.
 
 ## Pendientes reales
 
-- Ejecutar prueba de carga contra API real y Supabase real con perfiles por modulo: login, dashboard, POS, ventas, compras, CPE, inventario y finanzas.
-- Medir p95/p99, tasa de 429/5xx, saturacion Supabase/PostgREST y colas `outbox_events`.
+- Ejecutar prueba de capacidad productiva completa con observabilidad externa, mas concurrencia y escenarios controlados de escritura/idempotencia: POS, ventas, compras, CPE, inventario y finanzas.
 - Revisar si se necesita claim atomico por fila en `outbox_events` si se habilitan workers paralelos por lote; los locks actuales serializan por tipo de worker para evitar duplicados en multi-nodo.
 - Definir presupuestos de polling por rol/modulo para produccion.

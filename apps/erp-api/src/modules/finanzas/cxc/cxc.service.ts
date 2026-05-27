@@ -7,6 +7,7 @@ import { AuditService } from '../../audit/audit.service';
 import { RetencionesValidationService } from '../shared/retenciones-validation.service';
 import { OutboxEventBuilder } from '../../../shared/outbox/outbox-event.interface';
 import { DocumentoFiscal } from '../../documentos/interfaces/documento-fiscal.interface';
+import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 import Decimal from 'decimal.js';
 
 interface ListarCxcFilters {
@@ -112,11 +113,21 @@ export class CxcService {
     }
 
     if (filters.search) {
-      const sanitized = filters.search.replace(/[%_]/g, '');
-      const term = `%${sanitized}%`;
-      query = query.or(
-        `serie.ilike.${term},numero.ilike.${term},clientes.razon_social.ilike.${term},cliente_id.eq.${filters.search}`,
-      );
+      const safeSearch = sanitizePostgrestSearch(filters.search, 100);
+      if (safeSearch.length > 0) {
+        const term = `%${safeSearch}%`;
+        const searchFilters = [
+          `serie.ilike.${term}`,
+          `numero.ilike.${term}`,
+          `clientes.razon_social.ilike.${term}`,
+        ];
+
+        if (this.isUuid(filters.search)) {
+          searchFilters.push(`cliente_id.eq.${filters.search}`);
+        }
+
+        query = query.or(searchFilters.join(','));
+      }
     }
 
     query = query
@@ -1825,8 +1836,13 @@ export class CxcService {
     };
 
     const lookupByDocumento = async (documento: string): Promise<ClienteReferenciaInfo | null> => {
-      const documentoEnteroSeguro = this.toSafeIntegerDocument(documento);
-      const filters = [`ruc.eq.${documento}`, `codigo.eq.${documento}`];
+      const documentoSeguro = sanitizePostgrestSearch(documento, 30);
+      if (!documentoSeguro) {
+        return null;
+      }
+
+      const documentoEnteroSeguro = this.toSafeIntegerDocument(documentoSeguro);
+      const filters = [`ruc.eq.${documentoSeguro}`, `codigo.eq.${documentoSeguro}`];
       if (documentoEnteroSeguro !== null) {
         filters.push(
           `numero_documento.eq.${documentoEnteroSeguro}`,

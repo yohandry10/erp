@@ -1,5 +1,7 @@
-import { IsNotEmpty, IsString, IsNumber, IsDateString, IsOptional, IsEnum, IsUUID, Min } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString, IsNumber, IsDateString, IsOptional, IsEnum, IsUUID, MaxLength, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const METODOS_PAGO_BANCOS = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA'] as const;
 
 export class CrearMovimientoBancarioDto {
   @ApiProperty({
@@ -43,6 +45,7 @@ export class CrearMovimientoBancarioDto {
   })
   @IsNotEmpty({ message: 'La descripción es requerida' })
   @IsString({ message: 'La descripción debe ser un texto' })
+  @MaxLength(300, { message: 'La descripción no puede exceder 300 caracteres' })
   descripcion: string;
 
   @ApiPropertyOptional({
@@ -51,14 +54,17 @@ export class CrearMovimientoBancarioDto {
   })
   @IsOptional()
   @IsString({ message: 'La referencia debe ser un texto' })
+  @MaxLength(120, { message: 'La referencia no puede exceder 120 caracteres' })
   referencia?: string;
 
   @ApiPropertyOptional({
     description: 'Método de pago utilizado',
     example: 'TRANSFERENCIA',
+    enum: METODOS_PAGO_BANCOS,
   })
   @IsOptional()
   @IsString({ message: 'El método de pago debe ser un texto' })
+  @IsIn(METODOS_PAGO_BANCOS, { message: 'Método de pago inválido' })
   metodo_pago?: string;
 
   @ApiPropertyOptional({

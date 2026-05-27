@@ -26,16 +26,25 @@ export class DocumentosService {
     private readonly cxcService: CxcService,
   ) {}
 
+  private requireTenantId(tenantId?: string): string {
+    if (!tenantId) {
+      throw new BadRequestException('tenantId requerido para operación de documentos');
+    }
+    return tenantId;
+  }
+
   // ========== ESTADÍSTICAS ==========
   async getStats(tenantId?: string) {
     try {
-      console.log('📊 Calculando estadísticas documentos para tenant:', tenantId);
+      const tenant = this.requireTenantId(tenantId);
+      console.log('📊 Calculando estadísticas documentos para tenant:', tenant);
       
       // Primero, intentar una consulta simple para verificar conectividad
       const { data: testData, error: testError } = await this.supabaseService
         .getClient()
         .from('documentos')
         .select('id')
+        .eq('tenant_id', tenant)
         .limit(1);
 
       if (testError) {
@@ -49,12 +58,8 @@ export class DocumentosService {
       let queryTotal = this.supabaseService
         .getClient()
         .from('documentos')
-        .select('*', { count: 'exact', head: true });
-
-      if (tenantId) {
-        console.log('🔍 Filtrando por tenant_id:', tenantId);
-        queryTotal = queryTotal.eq('tenant_id', tenantId);
-      }
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenant);
 
       const { count: totalDocumentos, error: errorTotal } = await queryTotal;
       
@@ -65,10 +70,10 @@ export class DocumentosService {
 
       // Contar por tipo de documento
       const tiposConteo = await Promise.all([
-        this.contarPorTipo('FACTURA', tenantId),
-        this.contarPorTipo('BOLETA', tenantId),
-        this.contarPorTipo('NOTA_CREDITO', tenantId),
-        this.contarPorTipo('CONTRATO', tenantId)
+        this.contarPorTipo('FACTURA', tenant),
+        this.contarPorTipo('BOLETA', tenant),
+        this.contarPorTipo('NOTA_CREDITO', tenant),
+        this.contarPorTipo('CONTRATO', tenant)
       ]);
 
       // Contar pendientes de envío
@@ -76,11 +81,8 @@ export class DocumentosService {
         .getClient()
         .from('documentos')
         .select('*', { count: 'exact', head: true })
-        .in('estado', ['BORRADOR', 'EMITIDO']);
-
-      if (tenantId) {
-        queryPendientes = queryPendientes.eq('tenant_id', tenantId);
-      }
+        .in('estado', ['BORRADOR', 'EMITIDO'])
+        .eq('tenant_id', tenant);
 
       const { count: pendientesEnvio } = await queryPendientes;
 
@@ -116,17 +118,15 @@ export class DocumentosService {
     }
   }
 
-  private async contarPorTipo(tipo: string, tenantId?: string): Promise<number> {
+  private async contarPorTipo(tipo: string, tenantId: string): Promise<number> {
     try {
+      const tenant = this.requireTenantId(tenantId);
       let query = this.supabaseService
         .getClient()
         .from('documentos')
         .select('*', { count: 'exact', head: true })
-        .eq('tipo_documento', tipo);
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+        .eq('tipo_documento', tipo)
+        .eq('tenant_id', tenant);
 
       const { count, error } = await query;
       
@@ -146,7 +146,8 @@ export class DocumentosService {
   // ========== GESTIÓN DE DOCUMENTOS ==========
   async getDocumentos(filters: any, tenantId?: string) {
     try {
-      console.log('📄 Consultando documentos para tenant:', tenantId, 'filters:', filters);
+      const tenant = this.requireTenantId(tenantId);
+      console.log('📄 Consultando documentos para tenant:', tenant, 'filters:', filters);
       
       let query = this.supabaseService
         .getClient()
@@ -155,12 +156,8 @@ export class DocumentosService {
           *,
           documento_detalles(*)
         `)
+        .eq('tenant_id', tenant)
         .order('created_at', { ascending: false });
-
-      // Filter by tenant
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
 
       // Apply filters
       if (filters.tipo_documento) {
@@ -207,6 +204,7 @@ export class DocumentosService {
 
   async getDocumento(id: string, tenantId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       console.log('📄 Obteniendo documento:', id);
       
       let query = this.supabaseService
@@ -217,11 +215,8 @@ export class DocumentosService {
           documento_detalles(*),
           documento_archivos(*)
         `)
-        .eq('id', id);
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+        .eq('id', id)
+        .eq('tenant_id', tenant);
 
       const { data: documento, error } = await query.single();
 
@@ -244,6 +239,7 @@ export class DocumentosService {
 
   async crearDocumento(documentoData: any, tenantId?: string, userId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       console.log('📝 Creando nuevo documento:', documentoData.tipo_documento);
 
       // Validar datos requeridos
@@ -255,14 +251,14 @@ export class DocumentosService {
       const siguienteNumero = await this.obtenerSiguienteNumero(
         documentoData.tipo_documento, 
         documentoData.serie || this.getSerieDefault(documentoData.tipo_documento),
-        tenantId
+        tenant
       );
 
       // Obtener datos de la empresa
-      const empresaConfig = await this.obtenerConfigEmpresa(tenantId);
+      const empresaConfig = await this.obtenerConfigEmpresa(tenant);
 
       const nuevoDocumento = {
-        tenant_id: tenantId,
+        tenant_id: tenant,
         tipo_documento: documentoData.tipo_documento,
         serie: documentoData.serie || this.getSerieDefault(documentoData.tipo_documento),
         numero: siguienteNumero,
@@ -315,21 +311,19 @@ export class DocumentosService {
 
       // Crear detalles si existen
       if (documentoData.detalles && Array.isArray(documentoData.detalles)) {
-        await this.crearDetallesDocumento(documento.id, documentoData.detalles, tenantId);
+        await this.crearDetallesDocumento(documento.id, documentoData.detalles, tenant);
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(documento.id, 'CREADO', userId, 'Documento creado', tenantId);
+      await this.registrarAuditoria(documento.id, 'CREADO', userId, 'Documento creado', tenant);
 
       console.log('✅ Documento creado exitosamente:', documento.id);
 
       // Invalidar cache del dashboard automáticamente
-      if (tenantId) {
-        try {
-          await this.cacheInvalidation.onDocumentoCreated(tenantId);
-        } catch (error) {
-          console.warn('⚠️ No se pudo invalidar cache después de crear documento:', error);
-        }
+      try {
+        await this.cacheInvalidation.onDocumentoCreated(tenant);
+      } catch (error) {
+        console.warn('⚠️ No se pudo invalidar cache después de crear documento:', error);
       }
 
       return {
@@ -513,10 +507,11 @@ export class DocumentosService {
     }
   }
 
-  private async crearDetallesDocumento(documentoId: string, detalles: any[], tenantId?: string) {
+  private async crearDetallesDocumento(documentoId: string, detalles: any[], tenantId: string) {
+    const tenant = this.requireTenantId(tenantId);
     const detallesConId = detalles.map((detalle, index) => ({
       documento_id: documentoId,
-      tenant_id: tenantId,
+      tenant_id: tenant,
       orden: index + 1,
       codigo_producto: detalle.codigo_producto,
       descripcion: detalle.descripcion,
@@ -675,9 +670,10 @@ export class DocumentosService {
   // ========== FACTURACIÓN ELECTRÓNICA ==========
   async generarXML(id: string, tenantId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       console.log('🔧 Generando XML para documento:', id);
 
-      const documento = await this.getDocumento(id, tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -716,14 +712,15 @@ export class DocumentosService {
           estado: 'EMITIDO',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('tenant_id', tenant);
 
       if (error) {
         throw new BadRequestException('Error actualizando documento con XML');
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'XML_GENERADO', null, 'XML generado exitosamente', tenantId);
+      await this.registrarAuditoria(id, 'XML_GENERADO', null, 'XML generado exitosamente', tenant);
 
       return {
         success: true,
@@ -744,9 +741,10 @@ export class DocumentosService {
 
   async enviarSUNAT(id: string, tenantId?: string, userId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       console.log('📡 Enviando documento a SUNAT:', id);
 
-      const documento = await this.getDocumento(id, tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -766,7 +764,7 @@ export class DocumentosService {
         .from('cpe')
         .select('id')
         .eq('documento_id', id)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenant)
         .maybeSingle();
 
       if (cpeError) {
@@ -777,7 +775,7 @@ export class DocumentosService {
         throw new BadRequestException('El envio SUNAT legacy esta deshabilitado. Cree/envie el CPE asociado desde el modulo CPE.');
       }
 
-      await this.cpeService.resendToOse(cpe.id, tenantId || doc.tenant_id);
+      await this.cpeService.resendToOse(cpe.id, tenant);
 
       // Actualizar estado del documento
       const { error } = await this.supabaseService
@@ -788,7 +786,8 @@ export class DocumentosService {
           estado_sunat: 'ENVIADO_DESDE_CPE',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('tenant_id', tenant);
 
       if (error) {
         throw new BadRequestException('Error actualizando estado del documento');
@@ -800,7 +799,7 @@ export class DocumentosService {
         'ENVIADO_SUNAT', 
         userId, 
         `Enviado a autoridad fiscal desde CPE ${cpe.id}`,
-        tenantId
+        tenant
       );
 
       return {
@@ -914,10 +913,9 @@ export class DocumentosService {
     return series[tipoDocumento] || 'DOC1';
   }
 
-  private async obtenerSiguienteNumero(tipoDocumento: string, serie: string, tenantId?: string): Promise<string> {
+  private async obtenerSiguienteNumero(tipoDocumento: string, serie: string, tenantId: string): Promise<string> {
+    const tenant = this.requireTenantId(tenantId);
     try {
-      const tenant = tenantId;
-      
       // Usar la función SQL optimizada con lock para concurrencia
       const { data, error } = await this.supabaseService
         .getClient()
@@ -937,7 +935,7 @@ export class DocumentosService {
     } catch (error) {
       console.error('❌ Error en obtenerSiguienteNumero:', error);
       // Fallback al método manual
-      return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenantId);
+      return await this.obtenerSiguienteNumeroManual(tipoDocumento, serie, tenant);
     }
   }
 
@@ -975,15 +973,13 @@ export class DocumentosService {
     return siguienteCorrelativo.toString().padStart(8, '0');
   }
 
-  private async obtenerConfigEmpresa(tenantId?: string) {
+  private async obtenerConfigEmpresa(tenantId: string) {
+    const tenant = this.requireTenantId(tenantId);
     let query = this.supabaseService
       .getClient()
       .from('fe_configuracion')
-      .select('*');
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
+      .select('*')
+      .eq('tenant_id', tenant);
 
     const { data } = await query.single();
     return data || {
@@ -1069,12 +1065,13 @@ export class DocumentosService {
   }
 
   private async registrarAuditoria(documentoId: string, accion: string, usuarioId?: string, detalles?: string, tenantId?: string) {
+    const tenant = this.requireTenantId(tenantId);
     await this.supabaseService
       .getClient()
       .from('documento_auditoria')
       .insert({
         documento_id: documentoId,
-        tenant_id: tenantId,
+        tenant_id: tenant,
         accion: accion,
         usuario_id: usuarioId,
         detalles_cambio: detalles,
@@ -1085,15 +1082,13 @@ export class DocumentosService {
   // ========== MÉTODOS ADICIONALES ==========
   async getSeries(tenantId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       let query = this.supabaseService
         .getClient()
         .from('documento_series')
         .select('*')
-        .eq('activo', true);
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
+        .eq('activo', true)
+        .eq('tenant_id', tenant);
 
       const { data, error } = await query;
 
@@ -1117,8 +1112,9 @@ export class DocumentosService {
 
   async crearSerie(serieData: any, tenantId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       const nuevaSerie = {
-        tenant_id: tenantId,
+        tenant_id: tenant,
         tipo_documento: serieData.tipo_documento,
         serie: serieData.serie,
         correlativo_actual: 0,
@@ -1154,16 +1150,14 @@ export class DocumentosService {
 
   async getAuditoria(documentoId: string, tenantId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       let query = this.supabaseService
         .getClient()
         .from('documento_auditoria')
         .select('*')
         .eq('documento_id', documentoId)
+        .eq('tenant_id', tenant)
         .order('timestamp', { ascending: false });
-
-      if (tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
 
       const { data, error } = await query;
 
@@ -1187,8 +1181,9 @@ export class DocumentosService {
 
   async actualizarDocumento(id: string, documentoData: any, tenantId?: string, userId?: string) {
     try {
+      const tenant = this.requireTenantId(tenantId);
       // Verificar que el documento existe y se puede modificar
-      const documento = await this.getDocumento(id, tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -1204,14 +1199,15 @@ export class DocumentosService {
           ...documentoData,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('tenant_id', tenant);
 
       if (error) {
         throw new BadRequestException('Error actualizando documento: ' + error.message);
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'MODIFICADO', userId, 'Documento actualizado', tenantId);
+      await this.registrarAuditoria(id, 'MODIFICADO', userId, 'Documento actualizado', tenant);
 
       return {
         success: true,
@@ -1229,7 +1225,8 @@ export class DocumentosService {
 
   async anularDocumento(id: string, motivo: string, tenantId?: string, userId?: string) {
     try {
-      const documento = await this.getDocumento(id, tenantId);
+      const tenant = this.requireTenantId(tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -1246,14 +1243,15 @@ export class DocumentosService {
           motivo_anulacion: motivo,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('tenant_id', tenant);
 
       if (error) {
         throw new BadRequestException('Error anulando documento: ' + error.message);
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'ANULADO', userId, `Documento anulado: ${motivo}`, tenantId);
+      await this.registrarAuditoria(id, 'ANULADO', userId, `Documento anulado: ${motivo}`, tenant);
 
       return {
         success: true,
@@ -1271,7 +1269,8 @@ export class DocumentosService {
 
   async generarPDF(id: string, tenantId?: string) {
     try {
-      const documento = await this.getDocumento(id, tenantId);
+      const tenant = this.requireTenantId(tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -1281,7 +1280,7 @@ export class DocumentosService {
         .from('cpe')
         .select('id')
         .eq('documento_id', id)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', tenant)
         .maybeSingle();
 
       if (cpeError) {
@@ -1293,7 +1292,7 @@ export class DocumentosService {
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'DESCARGADO', null, `PDF CPE solicitado: ${cpe.id}`, tenantId);
+      await this.registrarAuditoria(id, 'DESCARGADO', null, `PDF CPE solicitado: ${cpe.id}`, tenant);
 
       return {
         success: true,
@@ -1314,7 +1313,8 @@ export class DocumentosService {
 
   async descargarXML(id: string, tenantId?: string) {
     try {
-      const documento = await this.getDocumento(id, tenantId);
+      const tenant = this.requireTenantId(tenantId);
+      const documento = await this.getDocumento(id, tenant);
       if (!documento.success) {
         throw new NotFoundException('Documento no encontrado');
       }
@@ -1324,7 +1324,7 @@ export class DocumentosService {
       }
 
       // Registrar auditoría
-      await this.registrarAuditoria(id, 'DESCARGADO', null, 'XML descargado', tenantId);
+      await this.registrarAuditoria(id, 'DESCARGADO', null, 'XML descargado', tenant);
 
       return {
         success: true,

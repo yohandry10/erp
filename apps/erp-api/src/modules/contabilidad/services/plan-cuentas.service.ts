@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
+import { sanitizePostgrestSearch } from '../../../common/util/postgrest.util';
 
 export interface PlanCuenta {
   id: string;
@@ -365,13 +366,18 @@ export class PlanCuentasService {
     tenantId: string,
     termino: string
   ): Promise<PlanCuenta[]> {
+    // HARDENING: sanitizar termino para evitar PostgREST filter injection.
+    const safe = sanitizePostgrestSearch(termino);
+    if (safe.length === 0) {
+      return [];
+    }
     const { data, error } = await this.supabaseService
       .getClient()
       .from('plan_cuentas')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('estado', 'ACTIVO')
-      .or(`codigo.ilike.%${termino}%,nombre.ilike.%${termino}%`)
+      .or(`codigo.ilike.%${safe}%,nombre.ilike.%${safe}%`)
       .order('codigo', { ascending: true })
       .limit(20);
 

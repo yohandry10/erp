@@ -5,6 +5,21 @@ import { useApiCall } from '@/hooks/use-api'
 
 const getCurrentPeriod = () => new Date().toISOString().slice(0, 7)
 
+function showToast(message: string) {
+  if (typeof window === 'undefined') return
+
+  const toast = document.createElement('div')
+  const content = document.createElement('div')
+  content.textContent = message
+  toast.appendChild(content)
+  document.body.appendChild(toast)
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast)
+    }
+  }, 3000)
+}
+
 interface SireReportModalProps {
   isOpen: boolean
   onClose: () => void
@@ -33,18 +48,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
       console.log('✅ Reporte SIRE generado exitosamente:', response.data)
       
       // Mostrar toast de éxito
-      if (typeof window !== 'undefined') {
-        const successToast = document.createElement('div')
-        successToast.innerHTML = `
-          <div>
-            ✅ ${response.message || 'Reporte SIRE generado exitosamente'}
-          </div>
-        `
-        document.body.appendChild(successToast)
-        setTimeout(() => {
-          document.body.removeChild(successToast)
-        }, 3000)
-      }
+      showToast(`✅ ${response.message || 'Reporte SIRE generado exitosamente'}`)
       
       onSuccess()
       onClose()
@@ -66,18 +70,7 @@ export default function SireReportModal({ isOpen, onClose, onSuccess }: SireRepo
       console.log('❌ Error al generar reporte SIRE:', response)
       
       // Mostrar error
-      if (typeof window !== 'undefined') {
-        const errorToast = document.createElement('div')
-        errorToast.innerHTML = `
-          <div>
-            ❌ ${response?.message || 'Error al generar reporte SIRE'}
-          </div>
-        `
-        document.body.appendChild(errorToast)
-        setTimeout(() => {
-          document.body.removeChild(errorToast)
-        }, 3000)
-      }
+      showToast(`❌ ${response?.message || 'Error al generar reporte SIRE'}`)
     }
   }
 

@@ -539,7 +539,7 @@ export class RecepcionesService {
 
         // Optimistic concurrency: verify cantidad_recibida hasn't changed since we read it
         const cantidadRecibidaAnterior = Number(detalle.cantidad_recibida || 0);
-        const { error: updateDetalleError } = await this.supabase.getClient()
+        const { data: detalleActualizado, error: updateDetalleError } = await this.supabase.getClient()
           .from('orden_compra_detalles')
           .update({
             cantidad_recibida: nuevaCantidadRecibida,
@@ -547,10 +547,18 @@ export class RecepcionesService {
           })
           .eq('tenant_id', tenantId)
           .eq('id', item.detalle_id)
-          .eq('cantidad_recibida', cantidadRecibidaAnterior);
+          .eq('cantidad_recibida', cantidadRecibidaAnterior)
+          .select('id')
+          .maybeSingle();
 
         if (updateDetalleError) {
           throw new BadRequestException(`Error al actualizar detalle de orden: ${updateDetalleError.message}`);
+        }
+
+        if (!detalleActualizado) {
+          throw new BadRequestException(
+            `No se pudo actualizar el detalle ${item.detalle_id}; la cantidad recibida cambió concurrentemente`,
+          );
         }
 
         this.logger.log(`✅ Detalle de orden actualizado: ${item.detalle_id}`);
@@ -583,7 +591,7 @@ export class RecepcionesService {
       const cerradoEn = new Date().toISOString();
       const observaciones = dto.observaciones || recepcion.observaciones;
 
-      const { error: cerrarError } = await this.supabase.getClient()
+      const { data: recepcionCerrada, error: cerrarError } = await this.supabase.getClient()
         .from('recepciones')
         .update({
           estado: 'CERRADA',
@@ -593,10 +601,17 @@ export class RecepcionesService {
           updated_at: cerradoEn,
         })
         .eq('id', recepcionId)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', tenantId)
+        .eq('estado', 'BORRADOR')
+        .select('id')
+        .maybeSingle();
 
       if (cerrarError) {
         throw new BadRequestException(`Error al cerrar recepción: ${cerrarError.message}`);
+      }
+
+      if (!recepcionCerrada) {
+        throw new BadRequestException('No se pudo cerrar la recepción; el estado cambió concurrentemente');
       }
 
       this.logger.log(`✅ Recepción cerrada: ${recepcion.numero}`);
@@ -682,17 +697,23 @@ export class RecepcionesService {
       }
 
       // Actualizar estado de la orden
-      const { error: updateError } = await this.supabase.getClient()
+      const { data: ordenActualizada, error: updateError } = await this.supabase.getClient()
         .from('ordenes_compra')
         .update({
           estado: nuevoEstado,
           updated_at: new Date().toISOString(),
         })
         .eq('id', ordenId)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', tenantId)
+        .select('id')
+        .maybeSingle();
 
       if (updateError) {
         throw new BadRequestException(`Error al actualizar estado de orden: ${updateError.message}`);
+      }
+
+      if (!ordenActualizada) {
+        throw new BadRequestException('No se pudo actualizar el estado de la orden de compra');
       }
 
       this.logger.log(`✅ Estado de orden actualizado a: ${nuevoEstado}`);

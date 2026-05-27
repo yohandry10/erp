@@ -81,7 +81,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
     if (!greData) return
 
     const printWindow = window.open('', '_blank', 'width=350,height=600')
-    
+
     if (!printWindow) {
       alert('Por favor permite las ventanas emergentes para imprimir')
       return
@@ -91,43 +91,43 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       <!DOCTYPE html>
       <html>
       <head>
-        <title>GRE ${greData.numero}</title>
+        <title>GRE ${escapeHtml(greData.numero)}</title>
       </head>
       <body>
         <div class="header">
           <div class="empresa">NEON SYSTEM</div>
           <div class="ruc">RUC: 12345678901</div>
           <div class="tipo-doc">GUÍA DE REMISIÓN ELECTRÓNICA</div>
-          <div class="numero">${greData.numero}</div>
-          <div class="fecha">Emisión: ${new Date(greData.fechaCreacion).toLocaleDateString('es-PE')}</div>
+          <div class="numero">${escapeHtml(greData.numero)}</div>
+          <div class="fecha">Emisión: ${escapeHtml(new Date(greData.fechaCreacion).toLocaleDateString('es-PE'))}</div>
         </div>
-        
+
         <div class="seccion">
           <div><span class="label">DESTINATARIO:</span></div>
-          <div class="valor">${greData.destinatario}</div>
+          <div class="valor">${escapeHtml(greData.destinatario)}</div>
           <div><span class="label">DIRECCIÓN:</span></div>
-          <div class="valor">${greData.direccionDestino}</div>
+          <div class="valor">${escapeHtml(greData.direccionDestino)}</div>
         </div>
-        
+
         <div class="seccion">
-          <div><span class="label">MOTIVO:</span><span class="valor">${getMotivoText(greData.motivo)}</span></div>
-          <div><span class="label">MODALIDAD:</span><span class="valor">${getModalidadText(greData.modalidad)}</span></div>
-          <div><span class="label">PESO:</span><span class="valor">${greData.pesoTotal} Kg</span></div>
-          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${new Date(greData.fechaTraslado).toLocaleDateString('es-PE')}</span></div>
+          <div><span class="label">MOTIVO:</span><span class="valor">${escapeHtml(getMotivoText(greData.motivo))}</span></div>
+          <div><span class="label">MODALIDAD:</span><span class="valor">${escapeHtml(getModalidadText(greData.modalidad))}</span></div>
+          <div><span class="label">PESO:</span><span class="valor">${escapeHtml(greData.pesoTotal)} Kg</span></div>
+          <div><span class="label">FECHA TRASLADO:</span><span class="valor">${escapeHtml(new Date(greData.fechaTraslado).toLocaleDateString('es-PE'))}</span></div>
         </div>
-        
+
         ${greData.transportista || greData.placaVehiculo ? `
         <div class="seccion">
-          ${greData.transportista ? `<div><span class="label">TRANSPORTISTA:</span><span class="valor">${greData.transportista}</span></div>` : ''}
-          ${greData.placaVehiculo ? `<div><span class="label">PLACA:</span><span class="valor">${greData.placaVehiculo}</span></div>` : ''}
-          ${greData.licenciaConducir ? `<div><span class="label">LICENCIA:</span><span class="valor">${greData.licenciaConducir}</span></div>` : ''}
+          ${greData.transportista ? `<div><span class="label">TRANSPORTISTA:</span><span class="valor">${escapeHtml(greData.transportista)}</span></div>` : ''}
+          ${greData.placaVehiculo ? `<div><span class="label">PLACA:</span><span class="valor">${escapeHtml(greData.placaVehiculo)}</span></div>` : ''}
+          ${greData.licenciaConducir ? `<div><span class="label">LICENCIA:</span><span class="valor">${escapeHtml(greData.licenciaConducir)}</span></div>` : ''}
         </div>
         ` : ''}
-        
+
         <div class="seccion">
-          <div><span class="label">ESTADO:</span><span class="valor">${greData.estado}</span></div>
+          <div><span class="label">ESTADO:</span><span class="valor">${escapeHtml(greData.estado)}</span></div>
         </div>
-        
+
         <div class="footer">
           <div>Representación impresa de GRE</div>
           <div>Sistema certificado por SUNAT</div>
@@ -168,7 +168,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
 
   const getStatusColor = () => {
     if (!greData) return '#2563eb'
-    
+
     switch (greData.estado) {
       case 'ACEPTADO':
         return '#10b981'
@@ -238,7 +238,7 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
             </div>
           ) : greData ? (
             <div className="text-3.5 leading-6 text-[#000] bg-white">
-              
+
               {/* ENCABEZADO EMPRESARIAL */}
               <div className="mb-6">
                 <table className="w-[100%]">
@@ -428,4 +428,17 @@ export default function GreViewModal({ isOpen, onClose, documentId }: GreViewMod
       {/* CSS para animación */}
     </div>
   )
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[char]
+  })
 }

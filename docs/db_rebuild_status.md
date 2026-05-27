@@ -5,6 +5,10 @@
 > Las migraciones nuevas `312..326` fueron aplicadas manualmente en Supabase remoto el 2026-05-16 con `psql`. No usar este archivo como unica fuente para declarar produccion real.
 >
 > Nota 2026-05-24: el directorio local de migraciones ya contiene cambios posteriores `327..335`. La colision inicial de prefijo `333__` quedo resuelta dejando `333__inventory_stock_reconciliation_hardening.sql` y renumerando tesoreria a `334__treasury_cash_bank_forensic_closure.sql`; luego `335__descontar_stock_authoritative.sql` corrigio la salida autoritativa de inventario. Antes de reconstruir desde cero o declarar una linea limpia, verificar nuevamente que no existan prefijos duplicados.
+>
+> Nota 2026-05-26: linea canonica extendida a `336__client_data_migration_external_id_and_audit.sql` (soporte de migracion de data desde ERP externo: `external_id` UNIQUE(tenant_id, external_id) en 8 maestros/documentos, tablas `migration_runs`/`migration_run_rows`, funcion `validar_migracion_apertura`, permisos `migration.*` para rol ADMIN). Detalle del flujo y endpoints CSV en `docs/migration/CLIENT_MIGRATION_RUNBOOK.md`.
+>
+> Nota 2026-05-27: repo local extendido a `337__client_migration_rls_rpc_hardening.sql` para forzar RLS en auditoria de migracion, corregir politicas a `app.current_tenant_id()` y restringir `validar_migracion_apertura` a `service_role`. Pendiente aplicar y validar en entornos remotos.
 
 Fecha de corte: 2026-05-08 (actualizado)
 
