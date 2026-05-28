@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../../shared/supabase/supabase.service';
-import { InventarioService } from '../../inventario/inventario.service';
-import { CreateRecepcionDto, CerrarRecepcionDto, CalidadRecepcion } from '../dto';
+import { CreateRecepcionDto, CerrarRecepcionDto } from '../dto';
 import { EventBusService, RecepcionRegistradaEvent, CompraEntregadaEvent } from '../../../shared/events/event-bus.service';
 import { EventEmitterService } from '../../../shared/events/event-emitter.service';
 import { AuditService } from '../../audit/audit.service';
@@ -13,7 +12,6 @@ export class RecepcionesService {
 
   constructor(
     private readonly supabase: SupabaseService,
-    private readonly inventarioService: InventarioService,
     private readonly eventBus: EventBusService,
     private readonly eventEmitter: EventEmitterService,
     private readonly auditService: AuditService,
@@ -463,111 +461,35 @@ export class RecepcionesService {
         throw new BadRequestException('La recepción debe tener al menos un item');
       }
 
-      // Procesar cada item de la recepción
-      for (const item of recepcion.items) {
-        // HARDENING (idempotencia best-effort):
-        // si un intento previo ya registró la entrada (movimiento inventario) para este recepcionId+producto,
-        // evitamos duplicar tanto inventario como el incremento de cantidad_recibida en la OC.
-        const { data: movimientoExistente, error: movimientoExistenteError } = await this.supabase
-          .getClient()
-          .from('movimientos_inventario')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .eq('referencia_tipo', 'RECEPCION')
-          .eq('referencia_id', recepcionId)
-          .eq('tipo', 'ENTRADA')
-          .eq('producto_id', item.producto_id)
-          .limit(1);
+      // ATOMICIDAD (C-004): el cierre completo (entradas de stock por item +
+      // cantidad_recibida en detalles + estado de OC + estado de recepción) se
+      // ejecuta en una sola transacción vía RPC `cerrar_recepcion_tx`. Si algo
+      // falla a mitad, ROLLBACK total — sin stock movido parcialmente.
+      // La RPC reusa `registrar_movimiento_almacen` y mantiene la idempotencia
+      // (omite items con movimiento ENTRADA ya registrado para esta recepción).
+      const observaciones = dto.observaciones || recepcion.observaciones;
+      const { data: rpcResult, error: rpcError } = await this.supabase.getClient()
+        .rpc('cerrar_recepcion_tx', {
+          p_recepcion_id: recepcionId,
+          p_tenant_id: tenantId,
+          p_user_id: userId ?? null,
+          p_observaciones: observaciones ?? null,
+        });
 
-        if (movimientoExistenteError) {
-          throw new BadRequestException('Error al verificar si el item ya fue procesado en inventario');
-        }
-
-        const itemYaProcesado =
-          Array.isArray(movimientoExistente) && movimientoExistente.length > 0;
-
-        if (itemYaProcesado) {
-          this.logger.warn(
-            `⚠️ [Recepciones] Item ya procesado (inventario) para recepcion ${recepcionId} producto ${item.producto_id}. Omitiendo re-proceso.`,
-          );
-          continue;
-        }
-
-        // Solo procesar items con calidad OK u OBSERVADO
-        if (item.calidad === CalidadRecepcion.OK || item.calidad === CalidadRecepcion.OBSERVADO) {
-          // 🔴 CRÍTICO FIX (Tarea 14): Usar función atómica que garantiza que el stock se actualice correctamente
-          // Esta función RPC hace todo en una transacción: registra movimiento + actualiza stock + valida
-          const movimientoId = await this.inventarioService.registrarEntradaStockAtomico({
-            tenantId,
-            productoId: item.producto_id,
-            almacenId: item.almacen_id,
-            tipo: 'ENTRADA',
-            cantidad: item.cantidad_recibida,
-            referenciaTipo: 'RECEPCION',
-            referenciaId: recepcionId,
-            notas: `Recepción ${recepcion.numero} - OC ${recepcion.orden.numero}`,
-            ubicacionId: item.ubicacion_id,
-            lote: item.lote,
-            fechaExpiracion: item.fecha_expiracion,
-          });
-
-          this.logger.log(
-            `✅ Movimiento de inventario creado atómicamente para producto ${item.producto_id} (Movimiento ID: ${movimientoId})`,
-          );
-        }
-
-        // Actualizar cantidad_recibida en orden_compra_detalles
-        const { data: detalle, error: detalleError } = await this.supabase.getClient()
-          .from('orden_compra_detalles')
-          .select('cantidad, cantidad_recibida')
-          .eq('tenant_id', tenantId)
-          .eq('id', item.detalle_id)
-          .single();
-
-        if (detalleError) {
-          throw new BadRequestException(`Error al obtener detalle de orden: ${detalleError.message}`);
-        }
-
-        const nuevaCantidadRecibida = Number(detalle.cantidad_recibida || 0) + Number(item.cantidad_recibida);
-
-        const cantidadOrdenada = Number(detalle.cantidad ?? 0);
-        if (nuevaCantidadRecibida > cantidadOrdenada) {
-          throw new BadRequestException(
-            `La cantidad recibida acumulada (${nuevaCantidadRecibida}) excede la cantidad ordenada (${cantidadOrdenada}) para el detalle ${item.detalle_id}`,
-          );
-        }
-
-        // Optimistic concurrency: verify cantidad_recibida hasn't changed since we read it
-        const cantidadRecibidaAnterior = Number(detalle.cantidad_recibida || 0);
-        const { data: detalleActualizado, error: updateDetalleError } = await this.supabase.getClient()
-          .from('orden_compra_detalles')
-          .update({
-            cantidad_recibida: nuevaCantidadRecibida,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('tenant_id', tenantId)
-          .eq('id', item.detalle_id)
-          .eq('cantidad_recibida', cantidadRecibidaAnterior)
-          .select('id')
-          .maybeSingle();
-
-        if (updateDetalleError) {
-          throw new BadRequestException(`Error al actualizar detalle de orden: ${updateDetalleError.message}`);
-        }
-
-        if (!detalleActualizado) {
-          throw new BadRequestException(
-            `No se pudo actualizar el detalle ${item.detalle_id}; la cantidad recibida cambió concurrentemente`,
-          );
-        }
-
-        this.logger.log(`✅ Detalle de orden actualizado: ${item.detalle_id}`);
+      if (rpcError) {
+        throw new BadRequestException(`Error al cerrar recepción: ${rpcError.message}`);
       }
 
-      // Actualizar estado de la orden de compra
-      await this.actualizarEstadoOrden(recepcion.orden_id, tenantId);
+      const movimientosCreados = ((rpcResult as any)?.movimientos ?? []) as Array<{
+        movimiento_id: string;
+        producto_id: string;
+        almacen_id: string;
+        cantidad: number;
+      }>;
 
-      // Obtener orden completa para eventos
+      this.logger.log(`✅ Recepción cerrada atómicamente: ${recepcion.numero} (${movimientosCreados.length} movimientos)`);
+
+      // Obtener orden completa (ya con estado actualizado por la RPC) para el evento canónico.
       const { data: orden, error: ordenError } = await this.supabase.getClient()
         .from('ordenes_compra')
         .select(`
@@ -587,34 +509,11 @@ export class RecepcionesService {
         // No bloquear el cierre de recepción si falla obtener orden
       }
 
-      // Cerrar la recepción
-      const cerradoEn = new Date().toISOString();
-      const observaciones = dto.observaciones || recepcion.observaciones;
-
-      const { data: recepcionCerrada, error: cerrarError } = await this.supabase.getClient()
-        .from('recepciones')
-        .update({
-          estado: 'CERRADA',
-          observaciones,
-          cerrado_por: userId || null,
-          cerrado_at: cerradoEn,
-          updated_at: cerradoEn,
-        })
-        .eq('id', recepcionId)
-        .eq('tenant_id', tenantId)
-        .eq('estado', 'BORRADOR')
-        .select('id')
-        .maybeSingle();
-
-      if (cerrarError) {
-        throw new BadRequestException(`Error al cerrar recepción: ${cerrarError.message}`);
-      }
-
-      if (!recepcionCerrada) {
-        throw new BadRequestException('No se pudo cerrar la recepción; el estado cambió concurrentemente');
-      }
-
-      this.logger.log(`✅ Recepción cerrada: ${recepcion.numero}`);
+      // POST-COMMIT: re-emitir MovimientoStockEvent por cada entrada creada.
+      // Preserva el asiento contable de entrada (Mercaderías/Cargas) que antes
+      // emitía `registrarEntradaStockAtomico`. Ahora se publica DESPUÉS de que la
+      // transacción quedó committeada (orden correcto para el patrón outbox).
+      await this.emitirEventosMovimientoEntrada(movimientosCreados, recepcion, tenantId);
 
       const auditor = userId ?? 'system';
       try {
@@ -671,57 +570,59 @@ export class RecepcionesService {
   /**
    * Actualiza el estado de la orden de compra según las cantidades recibidas
    */
-  private async actualizarEstadoOrden(ordenId: string, tenantId: string): Promise<void> {
-    try {
-      // Obtener todos los detalles de la orden
-      const { data: detalles, error: detallesError } = await this.supabase.getClient()
-        .from('orden_compra_detalles')
-        .select('cantidad, cantidad_recibida')
-        .eq('tenant_id', tenantId)
-        .eq('orden_id', ordenId);
+  /**
+   * Re-emite MovimientoStockEvent por cada entrada de stock creada por la RPC
+   * `cerrar_recepcion_tx`. Preserva el asiento contable de entrada que antes
+   * generaba `InventarioService.registrarEntradaStockAtomico`. Best-effort:
+   * la data ya está committeada, un fallo aquí no revierte el cierre.
+   */
+  private async emitirEventosMovimientoEntrada(
+    movimientos: Array<{ producto_id: string; almacen_id: string; cantidad: number }>,
+    recepcion: any,
+    tenantId: string,
+  ): Promise<void> {
+    for (const mov of movimientos) {
+      try {
+        const { data: producto } = await this.supabase.getClient()
+          .from('productos')
+          .select('stock_actual, precio_compra')
+          .eq('id', mov.producto_id)
+          .eq('tenant_id', tenantId)
+          .single();
 
-      if (detallesError) {
-        throw new BadRequestException(`Error al obtener detalles de orden: ${detallesError.message}`);
+        if (!producto) {
+          continue;
+        }
+
+        const cantidad = Number(mov.cantidad);
+        const stockNuevo = Number((producto as any).stock_actual || 0);
+        const stockAnterior = stockNuevo - cantidad;
+        const precioCompra = Number((producto as any).precio_compra || 0);
+
+        await this.eventBus.emitMovimientoStock(
+          {
+            productoId: mov.producto_id,
+            tipoMovimiento: 'ENTRADA',
+            cantidad,
+            stockAnterior,
+            stockNuevo,
+            motivo: `Recepción ${recepcion.numero ?? ''}${recepcion.orden?.numero ? ` - OC ${recepcion.orden.numero}` : ''}`.trim(),
+            valor: precioCompra * cantidad,
+            ventaId: undefined,
+            tenantId,
+          },
+          tenantId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `❌ [Recepciones] Error emitiendo MovimientoStockEvent para producto ${mov.producto_id}:`,
+          error,
+        );
+        // No bloquear: el cierre ya está committeado; el evento es best-effort.
       }
-
-      // Calcular totales
-      const totalPedido = detalles.reduce((sum, d) => sum + Number(d.cantidad), 0);
-      const totalRecibido = detalles.reduce((sum, d) => sum + Number(d.cantidad_recibida || 0), 0);
-
-      // Determinar nuevo estado
-      let nuevoEstado = 'APROBADA';
-      if (totalRecibido >= totalPedido) {
-        nuevoEstado = 'RECIBIDA';
-      } else if (totalRecibido > 0) {
-        nuevoEstado = 'PARCIAL';
-      }
-
-      // Actualizar estado de la orden
-      const { data: ordenActualizada, error: updateError } = await this.supabase.getClient()
-        .from('ordenes_compra')
-        .update({
-          estado: nuevoEstado,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', ordenId)
-        .eq('tenant_id', tenantId)
-        .select('id')
-        .maybeSingle();
-
-      if (updateError) {
-        throw new BadRequestException(`Error al actualizar estado de orden: ${updateError.message}`);
-      }
-
-      if (!ordenActualizada) {
-        throw new BadRequestException('No se pudo actualizar el estado de la orden de compra');
-      }
-
-      this.logger.log(`✅ Estado de orden actualizado a: ${nuevoEstado}`);
-    } catch (error) {
-      this.logger.error('❌ Error en actualizarEstadoOrden:', error);
-      throw error;
     }
   }
+
 
   /**
    * Genera el siguiente número de recepción
