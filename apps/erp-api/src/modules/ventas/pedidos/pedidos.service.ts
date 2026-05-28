@@ -1194,88 +1194,28 @@ export class PedidosService {
       });
     }
 
-    // Evitar reservas duplicadas pero permitir avanzar el estado si ya hay reservas previas
-    const { data: reservasExistentes } = await client
-      .from('movimientos_inventario')
-      .select('id')
-      .eq('referencia_tipo', 'PEDIDO')
-      .eq('referencia_id', id)
-      .eq('tipo', 'RESERVA')
-      .limit(1);
+    // HARDENING H-003: reserva atómica de TODOS los items del pedido en una sola
+    // transacción vía `reservar_pedido_stock_tx`. Reusa `reservar_stock_atomico`
+    // por item; si alguno no tiene stock, la RPC hace ROLLBACK total (libera las
+    // reservas ya creadas automáticamente, sin el rollback manual frágil anterior
+    // que podía dejar el pedido CONFIRMADO con reserva parcial). Idempotente: si
+    // el pedido ya tiene reservas, retorna skipped=true y se continúa la confirmación.
+    const { data: reservaResult, error: reservaError } = await client.rpc('reservar_pedido_stock_tx', {
+      p_pedido_id: id,
+      p_tenant_id: tenantId,
+    });
 
-    const saltarReserva = Boolean(reservasExistentes && reservasExistentes.length > 0);
-    if (saltarReserva) {
-      this.logger.log(`ℹ️ [PedidosService] Pedido ${id} ya cuenta con reservas registradas, se omite crear nuevas pero se continúa con confirmación.`);
+    if (reservaError) {
+      const msg = reservaError.message ?? '';
+      if (msg.includes('Stock insuficiente') || msg.includes('insufficient')) {
+        throw new BadRequestException(`Stock insuficiente para confirmar el pedido. ${msg}`);
+      }
+      throw new BadRequestException(`No se pudo reservar stock para el pedido: ${msg}`);
     }
 
-    // HARDENING C1: Crear reservas usando función atómica con locks (solo si no existen reservas previas)
-    if (!saltarReserva) {
-      for (const item of pedido.detalle) {
-        const cantidad = this.redondearCantidad(Number(item.cantidad ?? 0));
-        try {
-          const { data: movimientoId, error: reservaError } = await client.rpc('reservar_stock_atomico', {
-            p_producto_id: item.producto_id,
-            p_cantidad: cantidad,
-            p_referencia_tipo: 'PEDIDO',
-            p_referencia_id: id,
-            p_notas: `Reserva atómica para pedido ${pedido.numero}`,
-          });
-
-          if (reservaError) {
-            console.error('❌ Error en reserva atómica de stock:', reservaError);
-
-            // Si es error de stock insuficiente, retornar warning específico
-            if (reservaError.message?.includes('Stock insuficiente') || reservaError.message?.includes('insufficient')) {
-              throw new BadRequestException(
-                `Stock insuficiente para producto ${item.descripcion}. ${reservaError.message}`,
-              );
-            }
-
-            throw new BadRequestException(
-              `No se pudo reservar stock para el producto ${item.descripcion}: ${reservaError.message}`,
-            );
-          }
-
-          console.log(`✅ [PedidosService] Stock reservado atómicamente - Movimiento: ${movimientoId}`);
-        } catch (error) {
-          // Si falla alguna reserva, hacer rollback de las ya creadas
-          console.error('❌ Error reservando stock, iniciando rollback...', error);
-
-          // Intentar liberar reservas ya creadas para este pedido
-          try {
-            const { data: reservasCreadas } = await client
-              .from('movimientos_inventario')
-              .select('producto_id, cantidad')
-              .eq('referencia_tipo', 'PEDIDO')
-              .eq('referencia_id', id)
-              .eq('tipo', 'RESERVA')
-              .eq('tenant_id', tenantId);
-
-            if (reservasCreadas && reservasCreadas.length > 0) {
-              for (const reserva of reservasCreadas) {
-                await client.rpc('decrementar_stock_reservado', {
-                  p_producto_id: reserva.producto_id,
-                  p_cantidad: reserva.cantidad,
-                });
-              }
-
-              // Eliminar movimientos creados
-              await client
-                .from('movimientos_inventario')
-                .delete()
-                .eq('referencia_tipo', 'PEDIDO')
-                .eq('referencia_id', id)
-                .eq('tipo', 'RESERVA')
-                .eq('tenant_id', tenantId);
-            }
-          } catch (rollbackError) {
-            console.error('❌ Error en rollback de reservas:', rollbackError);
-            // Continuar con el error original
-          }
-
-          throw error;
-        }
-      }
+    const saltarReserva = Boolean((reservaResult as any)?.skipped);
+    if (saltarReserva) {
+      this.logger.log(`ℹ️ [PedidosService] Pedido ${id} ya contaba con reservas; se omitió crear nuevas y se continúa la confirmación.`);
     }
 
     const estadoCreditoFinal = forzarConfirmacion && evaluacion.requiereAprobacion
