@@ -1,6 +1,6 @@
 # Estado Actual del ERP
 
-Fecha de actualizacion: 2026-05-26 (entornos dev/prod separados)
+Fecha de actualizacion: 2026-05-29 (auditoria de seguridad: hardening RPC SECURITY DEFINER + auth cross-subdominio)
 
 Este documento es la entrada canonica para recuperar contexto al iniciar una sesion nueva. No reemplaza las auditorias, manuales ni reportes; solo indica que leer primero y cual es la linea vigente.
 
@@ -18,7 +18,7 @@ Si la sesion toca base de datos, tambien consultar los artefactos baseline lista
 
 - ERP validado tecnicamente en entorno local/sandbox; no declarar produccion real absoluta sin certificado SUNAT/OSE productivo, secretos productivos, email real si aplica y smoke externo autorizado.
 - Readiness base: Gate 21/22 documentado al 2026-05-16 en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
-- Despues del corte de readiness existen auditorias forenses y migraciones posteriores. El head documental actual debe considerar `327..335`.
+- Despues del corte de readiness existen auditorias forenses y migraciones posteriores. El head documental actual debe considerar `327..340`.
 - Auditoria multiusuario/performance aplicada el 2026-05-26: retries frontend no idempotentes desactivados para escrituras, polling visible/sin solapes, banners de configuracion cacheados, workers cron protegidos con locks distribuidos y banderas de apagado para pruebas read-only. Prueba autenticada read-only contra API local + Supabase real: 589/589 OK, 0 errores, 0 HTTP 429/5xx, p95 1490 ms, p99 1956 ms. Se corrigio `GET /api/finanzas/cxp?limit=10&page=1` para aceptar paginacion. Outbox remoto quedo limpio: `completed=3985`, `pending=0`, `processing=0`, `failed=0`, `dead_letter=0`.
 - El worktree contiene muchos cambios previos del usuario/de sesiones anteriores. No revertir ni stagear archivos por inercia.
 - Fase 1A de hardening pre-prod aplicada el 2026-05-26 sobre el reporte forense `docs/audits/2026-05-26-forensic-audit-pre-prod.md` (post-triage con Codex):
@@ -35,13 +35,22 @@ Si la sesion toca base de datos, tambien consultar los artefactos baseline lista
 - **H-003 (confirmar pedido) — CERRADO 2026-05-27**: nueva migración `339__reservar_pedido_stock_transaccional.sql` con RPC `reservar_pedido_stock_tx(p_pedido_id, p_tenant_id)`. Reserva el stock de TODOS los items del pedido en una sola transacción reusando `reservar_stock_atomico` por item; si un item no tiene stock, la excepción aborta el statement y Postgres hace ROLLBACK total (libera las reservas ya creadas automáticamente) — elimina el rollback manual frágil que podía dejar el pedido CONFIRMADO con reserva parcial. Idempotente: si ya hay reservas para el pedido, retorna `skipped=true`. `pedidos.service.ts:confirmarPedido` refactorizado: reemplaza el bloque loop+rollback-manual (~80 líneas) por una llamada a la RPC, preservando la semántica de `saltarReserva` (ahora = `reservaResult.skipped`) para el revert best-effort posterior. Verificación: migración aplicada a DEV; smoke SQL real en 3 escenarios — (1) stock insuficiente en item 2 → excepción + 0 reservas en item 1 (rollback total OK, sin reserva parcial), (2) stock suficiente → ambos reservados + 2 movimientos, (3) idempotencia → 2da llamada skipped sin duplicar. tsc limpio; suite backend 991/992 (único fallo `cpe-integration.verify.spec.ts` pre-existente). Migración 339 aplicada SOLO a DEV; falta PROD.
 - **Fase 1B COMPLETA**: C-004 (recepción, mig 338) + H-003 (confirmar pedido, mig 339) con RPC transaccional; H-002 (facturar) verificado como ya-resiliente sin RPC. Migraciones 337/338/339 aplicadas a DEV; **pendiente aplicarlas a PROD**.
 - Auditoria forense full-scope adicional 2026-05-26 anexada al prompt `SISTEM-ANALITICS-COMPLETED.md` (raiz del repo): mapa del sistema, hallazgos por severidad post-triage, matriz de integracion modulo-a-modulo, checklist preproduccion y 15 falsos positivos descartados con evidencia (`.env` NO esta en git, axios 1.16 no es vulnerable, Stripe SI valida HMAC, indices CxC/CxP SI existen, etc.). H-002/H-003 (facturar/confirmar pedido sin RPC atomica) siguen abiertos.
+- **Auditoria de seguridad 2026-05-29 (rama `codex/accounting-production-closure`, diff completo vs `main`; foco auth/RLS/RPC SECURITY DEFINER):**
+  - **H-1 (cross-tenant via RPC directa) — CERRADO:** `334` concedio `registrar_cxc_pago_tx`, `conciliar_movimientos_bancarios_tx` y `validar_tesoreria_caja_bancos_runtime` a `authenticated`; las 3 son `SECURITY DEFINER` y confian en el `p_tenant_id` del caller sin contrastarlo con `app.current_tenant_id()`. Pre-estado PROD confirmaba `authenticated=EXECUTE` (exposicion real explotable por RPC PostgREST directa). Cerrado con nueva migracion `340__securitydefiner_rpc_grant_hardening.sql`: `REVOKE` de `PUBLIC/anon/authenticated` + `GRANT` solo a `service_role` (alineado con 337/338/339). El backend ya invoca las 4 con `service_role`, no se rompe ningun flujo.
+  - **H-2 (menor) — CERRADO:** `descontar_stock_y_liberar_reserva` (333/335) quedo `SECURITY DEFINER` sin GRANT explicito; pre-estado PROD ya tenia `authenticated=false` (defaults de Supabase revocan PUBLIC), exposicion practica nula. La `340` lo hace explicito/consistente. No deriva de `p_tenant_id` (toma el tenant del producto).
+  - **Migracion 340 APLICADA Y VERIFICADA en DEV y PROD** (unica de la tanda 337..340 aplicada a PROD): las 4 funciones quedan `authenticated=f, anon=f, service_role=t` (verificado via `has_function_privilege`).
+  - **Topologia auth (decidida con el usuario): web (Vercel) + API (Render/VPS) como SUBDOMINIOS del mismo root** (`app.<root>`/`api.<root>`, cookie `Domain=.<root>`) -> same-site, la cookie HttpOnly autentica los fetch y el middleware SSR funciona. Stage 1 en codigo: `auth.controller.ts` `setAuthCookie`/`clearAuthCookie` honran `AUTH_COOKIE_DOMAIN` (sin la env -> host-only, no-op en dev/desktop).
+  - **M-1 (JWT en localStorage) — NO es regresion; es LOAD-BEARING para el desktop Tauri** (origin propio `tauri://localhost`, cross-site al API, sin cookie -> Bearer obligatorio). Stage 3 en codigo: persistencia del token gated por `NEXT_PUBLIC_COOKIE_AUTH` (OFF por defecto = comportamiento actual; Tauri siempre persiste). **Solo encender el flag DESPUES de que la infra de subdominios este viva**, o la web pierde auth.
+  - **Middleware SSR no es frontera de control de acceso** (en cross-domain ni veria la cookie; en build Tauri/static-export ni corre). Frontera real = guards globales del backend (`JwtAuthGuard` default-deny + `PermissionGuard` + interceptores de tenant). Sin token/permiso valido no se sirve dato (401/403).
+  - Verificacion: `tsc --noEmit` limpio en backend y frontend. Commit `e94ec68` pusheado a `codex/accounting-production-closure`. Pendiente: infra manual de subdominios + flip de `NEXT_PUBLIC_COOKIE_AUTH=true` (ver "Pendientes reales").
 
 ## Migraciones vigentes
 
 - Reconstruccion base documentada: `000..305`.
 - Gates remotos/manuales aplicados el 2026-05-16: `312..326`.
-- Auditorias y cierres posteriores en repo local: `327..339`.
+- Auditorias y cierres posteriores en repo local: `327..340`.
 - `337__client_migration_rls_rpc_hardening.sql` (Codex), `338__cerrar_recepcion_transaccional.sql` (C-004) y `339__reservar_pedido_stock_transaccional.sql` (H-003) aplicadas SOLO a DEV; pendientes en PROD.
+- `340__securitydefiner_rpc_grant_hardening.sql` (auditoria seguridad 2026-05-29): restringe `EXECUTE` a `service_role` en las 3 RPC de tesoreria de `334` (H-1) y en `descontar_stock_y_liberar_reserva` (H-2). **Aplicada y verificada en DEV y PROD** (`authenticated=f, anon=f, service_role=t`) — unica de la tanda 337..340 ya aplicada a PROD.
 - La colision local de prefijo `333__` fue resuelta:
   - `333__inventory_stock_reconciliation_hardening.sql`: inventario/logistica/costeo.
   - `334__treasury_cash_bank_forensic_closure.sql`: tesoreria/caja/bancos/CxC/CxP.
@@ -107,7 +116,7 @@ Bloqueados por dependencias externas (no estan en alcance de codigo; ver `docs/r
 - Ejecutar smoke fiscal externo con CPE/GRE/SIRE/PLE/PLAME segun alcance del contribuyente.
 - Crear proyecto Supabase productivo dedicado y aplicarle `000..335` con los pre-requisitos no-Supabase de `1.1` del runbook.
 - Ejecutar prueba de capacidad productiva completa con mas concurrencia y escrituras controladas/idempotentes contra API/Supabase reales: POS, ventas, compras, CPE, inventario y finanzas.
-Operacionales continuos:
+- Auth cross-subdominio (decidido 2026-05-29, codigo ya listo en commit `e94ec68`, gated y no-op por defecto): configurar custom domains `app.<root>` (Vercel) + `api.<root>` (Render/VPS); envs API `ALLOWED_ORIGINS=https://app.<root>` y `AUTH_COOKIE_DOMAIN=.<root>`; env web `NEXT_PUBLIC_API_URL=https://api.<root>` y `JWT_SECRET` IDENTICO al del API (el middleware verifica firma con jose; si difieren redirige todo a /login). Verificar que la cookie `.<root>` autentique los fetch (probar sin header Bearer); SOLO entonces encender `NEXT_PUBLIC_COOKIE_AUTH=true` en Vercel (la web deja de persistir el JWT en localStorage; el desktop Tauri lo conserva siempre). El flag es reversible.
 
 - Mantener monitoreo de outbox, CPE sin asiento, SIRE/PLE vs mayor, pagos sujetos a bancarizacion y divergencias de inventario.
 
