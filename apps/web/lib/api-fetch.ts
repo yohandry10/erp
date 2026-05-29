@@ -6,15 +6,18 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers)
   const hasBody = options.body !== undefined && options.body !== null
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
-  const { data } = await customAuth.getSession()
+  // Lectura sincrónica del token/sesión cacheada: NO dispara /auth/profile por request.
+  // La validación/refresh de sesión vive en AuthContext.loadSession y use-api.
+  const { session, accessToken } = customAuth.getCachedSession()
+  const token = accessToken ?? session?.access_token
 
   if (hasBody && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
   if (!headers.has('Authorization')) {
-    if (data.session?.access_token) {
-      headers.set('Authorization', `Bearer ${data.session.access_token}`)
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
     }
   }
 
@@ -26,7 +29,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers,
   }, {
     endpoint,
-    tenantId: data.session?.user?.tenant_id,
-    userId: data.session?.user?.id,
+    tenantId: session?.user?.tenant_id,
+    userId: session?.user?.id,
   })
 }

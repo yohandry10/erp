@@ -199,6 +199,32 @@ class AuthService {
     }
   }
 
+  // Sesión cacheada SIN red: hidrata desde memoria o snapshot (localStorage/sessionStorage)
+  // pero NUNCA llama a /auth/profile. La usa fetchApi en cada request (solo necesita token +
+  // tenant/user para headers/meta). El refresh/validación real de sesión lo hacen
+  // AuthContext.loadSession y use-api (cuando falta user) vía getSession(). Reduce 1 round-trip
+  // de perfil por cada request basada en fetchApi contra el API remoto.
+  getCachedSession(): { session: Session | null; accessToken: string | null } {
+    if (!this.session && typeof window !== 'undefined') {
+      try {
+        const raw =
+          window.localStorage.getItem('erp.auth.session.snapshot') ||
+          window.sessionStorage.getItem('erp.auth.session.snapshot');
+        const stored = raw ? (JSON.parse(raw) as Session) : null;
+        if (stored?.access_token) {
+          this.accessToken = stored.access_token;
+        }
+        if (stored?.user?.id) {
+          // Hidratación silenciosa (sin notifyListeners): es una lectura, no un cambio de sesión.
+          this.session = stored;
+        }
+      } catch {
+        /* hidratación optimista; sin red */
+      }
+    }
+    return { session: this.session, accessToken: this.accessToken };
+  }
+
   async getSession(): Promise<{ data: { session: Session | null }; error: Error | null }> {
     let storedSession: Session | null = null;
 
@@ -314,6 +340,7 @@ export const customAuth = {
   signInWithPassword: authService.signInWithPassword.bind(authService),
   signOut: authService.signOut.bind(authService),
   getSession: authService.getSession.bind(authService),
+  getCachedSession: authService.getCachedSession.bind(authService),
   setSession: authService.setSession.bind(authService),
   onAuthStateChange: authService.onAuthStateChange.bind(authService),
 };
