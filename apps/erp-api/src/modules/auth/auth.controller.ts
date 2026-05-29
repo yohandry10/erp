@@ -41,11 +41,15 @@ export class AuthController {
       (this.configService.get<string>('AUTH_COOKIE_SAME_SITE') ?? 'lax').toLowerCase() === 'strict'
         ? 'strict'
         : 'lax';
+    // Cross-subdominio (app.* + api.* bajo el mismo root): comparte la cookie entre
+    // web y API. Sin AUTH_COOKIE_DOMAIN -> cookie host-only (dev/localhost/desktop).
+    const domain = this.configService.get<string>('AUTH_COOKIE_DOMAIN') || undefined;
 
     response.cookie('access_token', token, {
       httpOnly: true,
       secure: isProduction,
       sameSite,
+      domain,
       path: '/',
       maxAge: 8 * 60 * 60 * 1000,
     });
@@ -56,12 +60,16 @@ export class AuthController {
       (this.configService.get<string>('AUTH_COOKIE_SAME_SITE') ?? 'lax').toLowerCase() === 'strict'
         ? 'strict'
         : 'lax';
+    // Debe coincidir con setAuthCookie (domain/path/sameSite/secure) o el navegador
+    // no elimina la cookie y la sesion queda "pegada".
+    const domain = this.configService.get<string>('AUTH_COOKIE_DOMAIN') || undefined;
 
     response.clearCookie('access_token', {
       path: '/',
       httpOnly: true,
       secure: this.configService.get<string>('NODE_ENV') === 'production',
       sameSite,
+      domain,
     });
   }
 
