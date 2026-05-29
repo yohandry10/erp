@@ -40,6 +40,7 @@ class AuthService {
   private session: Session | null = null;
   private accessToken: string | null = null;
   private listeners: ((session: Session | null) => void)[] = [];
+  private profileInFlight: Promise<User | null> | null = null;
 
   constructor() {
     // Persistencia en memoria únicamente. El token real vive en cookie HttpOnly.
@@ -68,7 +69,19 @@ class AuthService {
     };
   }
 
-  private async fetchProfile() {
+  private async fetchProfile(): Promise<User | null> {
+    // Coalescer llamadas concurrentes: un burst de fetchApi/getSession en una misma
+    // navegación comparte una sola request a /auth/profile en vuelo, evitando N
+    // round-trips redundantes contra el API remoto. Sin TTL → cero staleness: solo
+    // se deduplica el vuelo activo; llamadas posteriores vuelven a consultar.
+    if (this.profileInFlight) return this.profileInFlight;
+    this.profileInFlight = this.doFetchProfile().finally(() => {
+      this.profileInFlight = null;
+    });
+    return this.profileInFlight;
+  }
+
+  private async doFetchProfile(): Promise<User | null> {
     // Corto-circuito: en /login y /demo el middleware garantiza ausencia de
     // sesión EN EL MOMENTO INICIAL. Pero después de signInWithPassword (login
     // exitoso desde /demo o /login) ya tenemos accessToken en memoria y SÍ
