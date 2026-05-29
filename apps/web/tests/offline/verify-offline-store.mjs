@@ -93,7 +93,9 @@ const assert = (condition, message) => {
   assert((await cachedGet.json()).data[0].id === 1, 'cache debe preservar payload')
 
   online = false
-  await new Promise((resolve) => setTimeout(resolve, 1100))
+  // Modela el evento 'offline' que en la app invalida el cache de offline_mode.
+  // (Antes se esperaba el TTL de 1s; ahora la deteccion es por evento + TTL ampliado a 5s.)
+  mod.invalidateOfflineModeCache()
   const queuedPost = await mod.fetchWithOfflineSupport(
     'http://api.test/api/orders',
     {

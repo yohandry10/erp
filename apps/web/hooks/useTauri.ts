@@ -9,6 +9,7 @@ import {
   getOfflineStatus,
   listOfflineRequests,
   syncOfflineQueue,
+  invalidateOfflineModeCache,
   type OfflineQueueItem,
   type OfflineStatus,
 } from '@/lib/offline-store';
@@ -72,6 +73,8 @@ export const useTauri = () => {
     try {
       await invoke('save_config', { config: newConfig });
       setConfig(newConfig);
+      // El toggle de offline_mode debe reflejarse de inmediato pese al TTL del cache.
+      invalidateOfflineModeCache();
       setOfflineStatus((current) => current ? { ...current, offline_mode: newConfig.offline_mode } : current);
       await sendNotification({
         title: 'Configuración guardada',

@@ -51,9 +51,21 @@ const OUTBOX_KEY = 'erp.desktop.offline.outbox'
 const CACHE_KEY = 'erp.desktop.offline.cache'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
-const OFFLINE_MODE_CACHE_TTL = 1000
+const OFFLINE_MODE_CACHE_TTL = 5000
 
 let offlineModeCache: { value: boolean; expiresAt: number } | null = null
+
+// Invalida el cache de offline_mode para que el siguiente fetch lo recompute.
+// Se llama en cambios de conectividad y cuando el usuario togglea offline_mode,
+// para que el TTL ampliado (5s) no retrase la reaccion a esos eventos.
+export function invalidateOfflineModeCache() {
+  offlineModeCache = null
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('online', invalidateOfflineModeCache)
+  window.addEventListener('offline', invalidateOfflineModeCache)
+}
 
 export function isDesktopRuntime() {
   return typeof window !== 'undefined' && Boolean(window.__TAURI__)

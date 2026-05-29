@@ -67,21 +67,19 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
     setLoading(true)
 
     try {
-      // ✅ CRÍTICO: Esperar a que AuthContext termine de cargar
-      if (authLoading) {
-        console.log('⏳ [useApi] Esperando a que AuthContext termine de cargar...')
-        // Esperar un momento para que el contexto se inicialice
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-
       let resolvedSession = session
 
       // Señal de "sesión lista" = presencia de user (hidratado del snapshot), NO del
       // access_token. Con auth por cookie de subdominio el token puede no estar en
       // memoria/snapshot y aún así la sesión es válida vía cookie HttpOnly. Usar user
       // preserva el fast-path en cold-load tanto en modo token como en modo cookie.
-      if (authLoading || !resolvedSession?.user) {
-        await new Promise(resolve => setTimeout(resolve, 100))
+      // Si ya hay user hidratado procedemos sin esperar a AuthContext (la cookie/token
+      // autentican igual); solo resolvemos vía getSession() cuando falta. Esto elimina
+      // los sleeps fijos y el fetch redundante a /auth/profile en el arranque.
+      if (!resolvedSession?.user) {
+        if (authLoading) {
+          console.log('⏳ [useApi] Esperando a que AuthContext termine de cargar...')
+        }
         const { data } = await customAuth.getSession()
         resolvedSession = data.session || resolvedSession
       }
