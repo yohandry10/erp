@@ -76,7 +76,11 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
 
       let resolvedSession = session
 
-      if (authLoading || !resolvedSession?.access_token) {
+      // Señal de "sesión lista" = presencia de user (hidratado del snapshot), NO del
+      // access_token. Con auth por cookie de subdominio el token puede no estar en
+      // memoria/snapshot y aún así la sesión es válida vía cookie HttpOnly. Usar user
+      // preserva el fast-path en cold-load tanto en modo token como en modo cookie.
+      if (authLoading || !resolvedSession?.user) {
         await new Promise(resolve => setTimeout(resolve, 100))
         const { data } = await customAuth.getSession()
         resolvedSession = data.session || resolvedSession

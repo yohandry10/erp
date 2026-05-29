@@ -47,6 +47,21 @@ function readStoredSession(): Session | null {
   }
 }
 
+// ¿Persistir el access_token en el snapshot de localStorage/sessionStorage?
+// - Desktop (Tauri): SIEMPRE. Corre en origin propio (tauri://localhost), cross-site
+//   respecto al API → la cookie de subdominio no se le envía → autentica con Bearer.
+// - Web navegador: solo si la auth por cookie de subdominio NO está activa. Con
+//   NEXT_PUBLIC_COOKIE_AUTH=true (topología app.<root> + api.<root> ya viva) la cookie
+//   HttpOnly autentica los fetch, así que NO persistimos el JWT (reduce superficie XSS).
+//   Flag ausente/false → comportamiento actual (token persistido). NO encender el flag
+//   hasta que la infra de subdominios esté desplegada, o la web se queda sin auth.
+function shouldPersistAccessToken(): boolean {
+  if (typeof window === 'undefined') return false
+  const isTauri = !!window.__TAURI__
+  const cookieAuthWeb = process.env.NEXT_PUBLIC_COOKIE_AUTH === 'true'
+  return isTauri || !cookieAuthWeb
+}
+
 function storeSessionSnapshot(session: Session | null) {
   if (typeof window === 'undefined') return
 
@@ -56,7 +71,7 @@ function storeSessionSnapshot(session: Session | null) {
       // /auth/profile remain the source of truth for authorization.
       const sanitized = {
         ...session,
-        access_token: session.access_token,
+        access_token: shouldPersistAccessToken() ? session.access_token : undefined,
         user: {
           ...session.user,
           roles: Array.isArray(session.user.roles) ? session.user.roles : [],
