@@ -66,11 +66,20 @@ const LOCAL_FIRST_GET_ENDPOINTS = new Set([
   '/api/pos/ventas-recientes',
   '/api/pos/sesion-caja',
   '/api/cajas',
+  '/api/inventario/productos',
+  '/api/inventario/almacenes',
+  '/api/inventario/movimientos',
+  '/api/inventario/stats',
+  '/api/ventas/clientes',
 ])
 const LOCAL_FIRST_WRITE_ENDPOINTS = [
   /^\/api\/pos\/venta$/,
   /^\/api\/cajas\/[^/]+\/apertura$/,
   /^\/api\/cajas\/[^/]+\/cierre$/,
+  /^\/api\/inventario\/productos$/,
+  /^\/api\/inventario\/productos\/[^/]+$/,
+  /^\/api\/ventas\/clientes$/,
+  /^\/api\/ventas\/clientes\/[^/]+$/,
 ]
 
 let offlineModeCache: { value: boolean; expiresAt: number } | null = null
@@ -142,13 +151,22 @@ function pairsToHeaders(pairs: HeaderPair[]) {
   return headers
 }
 
+function localFirstEndpoint(endpoint: string) {
+  const [path] = endpoint.split('?')
+  return path.replace(/\/+$/, '')
+}
+
 function isLocalFirstGetEndpoint(endpoint: string) {
-  return LOCAL_FIRST_GET_ENDPOINTS.has(endpoint)
+  const normalized = localFirstEndpoint(endpoint)
+  return LOCAL_FIRST_GET_ENDPOINTS.has(normalized)
+    || /^\/api\/inventario\/productos\/[^/]+$/.test(normalized)
+    || /^\/api\/ventas\/clientes\/[^/]+$/.test(normalized)
 }
 
 function isLocalFirstWriteEndpoint(endpoint: string, method: string) {
-  if (method !== 'POST') return false
-  return LOCAL_FIRST_WRITE_ENDPOINTS.some((pattern) => pattern.test(endpoint))
+  const normalized = localFirstEndpoint(endpoint)
+  if (!['POST', 'PUT', 'DELETE'].includes(method)) return false
+  return LOCAL_FIRST_WRITE_ENDPOINTS.some((pattern) => pattern.test(normalized))
 }
 
 function responseFromLocalFirst(local: LocalFirstResponse) {
@@ -164,8 +182,9 @@ function responseFromLocalFirst(local: LocalFirstResponse) {
 
 async function readLocalFirstResponse(endpoint: string, url: string) {
   if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return null
+  const normalizedEndpoint = localFirstEndpoint(endpoint)
   try {
-    const local = await invoke<LocalFirstResponse | null>('get_local_first_response', { endpoint, url })
+    const local = await invoke<LocalFirstResponse | null>('get_local_first_response', { endpoint: normalizedEndpoint, url })
     return local ? responseFromLocalFirst(local) : null
   } catch (error) {
     console.warn('[offline-store] No se pudo leer respuesta local-first:', error)
@@ -185,7 +204,7 @@ async function hydrateLocalFirstResponse(url: string, endpoint: string, response
 
   try {
     await invoke('hydrate_local_first_response', {
-      endpoint,
+      endpoint: localFirstEndpoint(endpoint),
       url,
       status: response.status,
       headers: headersToPairs(response.headers),
@@ -208,7 +227,7 @@ async function processLocalFirstWrite(
 
   const local = await invoke<LocalFirstResponse>('process_local_first_write', {
     request: {
-      endpoint: meta.endpoint,
+      endpoint: localFirstEndpoint(meta.endpoint),
       method,
       url,
       headers: headersToPairs(init.headers),

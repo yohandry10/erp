@@ -178,18 +178,29 @@ const assert = (condition, message) => {
       return { offline_mode: true, total: 0, pending: 0, failed: 0, synced: 0 }
     }
     if (command === 'get_local_first_response') {
-      assert(args.endpoint === '/api/pos/productos', 'GET local-first debe pedir endpoint POS')
+      assert(
+        ['/api/pos/productos', '/api/inventario/productos', '/api/ventas/clientes'].includes(args.endpoint),
+        'GET local-first debe pedir endpoint soportado',
+      )
       return {
         status: 200,
-        body: JSON.stringify({ success: true, data: [{ id: 'p1', stock_actual: 4 }] }),
+        body: JSON.stringify({ success: true, data: [{ id: args.endpoint.includes('clientes') ? 'c1' : 'p1', stock_actual: 4 }] }),
         headers: [{ name: 'Content-Type', value: 'application/json' }],
       }
     }
     if (command === 'process_local_first_write') {
-      assert(args.request.endpoint === '/api/pos/venta', 'venta POS debe procesarse local-first')
+      assert(
+        ['/api/pos/venta', '/api/inventario/productos', '/api/ventas/clientes'].includes(args.request.endpoint),
+        'escritura debe procesarse local-first',
+      )
       return {
         status: 200,
-        body: JSON.stringify({ success: true, data: { venta_id: 'local-sale-1', estado: 'PENDIENTE_SYNC' } }),
+        body: JSON.stringify({
+          success: true,
+          data: args.request.endpoint === '/api/pos/venta'
+            ? { venta_id: 'local-sale-1', estado: 'PENDIENTE_SYNC' }
+            : { id: 'local-entity-1', sync_status: 'pending' },
+        }),
         headers: [{ name: 'Content-Type', value: 'application/json' }],
       }
     }
@@ -217,6 +228,35 @@ const assert = (condition, message) => {
   assert(localSale.status === 200, 'venta POS local-first debe responder 200 al POS')
   assert(localSalePayload.data.venta_id === 'local-sale-1', 'venta POS local-first debe devolver venta local')
   assert(invokeCalls.some((call) => call.command === 'process_local_first_write'), 'venta local-first debe invocar Tauri')
+
+  const localInventory = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/inventario/productos?search=abc',
+    { method: 'GET' },
+    { endpoint: '/api/inventario/productos?search=abc' },
+  )
+  assert(localInventory.headers.get('x-erp-local-first') === 'true', 'inventario offline debe leer SQLite')
+
+  const localProductCreate = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/inventario/productos',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo: 'P1', nombre: 'Producto 1' }),
+    },
+    { endpoint: '/api/inventario/productos' },
+  )
+  assert((await localProductCreate.json()).data.sync_status === 'pending', 'producto offline debe quedar pending')
+
+  const localCustomerCreate = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/ventas/clientes',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ razon_social: 'Cliente 1', ruc: '20123456789' }),
+    },
+    { endpoint: '/api/ventas/clientes' },
+  )
+  assert((await localCustomerCreate.json()).data.sync_status === 'pending', 'cliente offline debe quedar pending')
 
   console.log(JSON.stringify({ ok: true, fetchCalls, syncCall, status }, null, 2))
 })().catch((error) => {

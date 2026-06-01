@@ -238,6 +238,20 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             ON pos_sales(sesion_caja_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_pos_sales_sync_status
             ON pos_sales(sync_status, updated_at);
+
+        CREATE TABLE IF NOT EXISTS local_customers (
+            id TEXT PRIMARY KEY,
+            documento TEXT,
+            razon_social TEXT NOT NULL,
+            data_json TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_customers_documento
+            ON local_customers(documento);
+        CREATE INDEX IF NOT EXISTS idx_local_customers_updated
+            ON local_customers(updated_at);
         "#,
     )
     .map_err(|e| format!("No se pudo inicializar SQLite local: {e}"))?;
@@ -375,6 +389,56 @@ fn hydrate_pos_products(conn: &Connection, body: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn hydrate_local_customers(conn: &Connection, body: &str) -> Result<(), String> {
+    let Some(data) = extract_response_data(body) else {
+        return Ok(());
+    };
+    let customers = match data {
+        Value::Array(items) => items,
+        Value::Object(ref obj) => obj
+            .get("data")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("No se pudo iniciar hidratacion clientes: {e}"))?;
+    for customer in customers {
+        let Some(id) = value_string(&customer, "id") else {
+            continue;
+        };
+        let documento = value_string(&customer, "ruc")
+            .or_else(|| value_string(&customer, "codigo"))
+            .or_else(|| value_string(&customer, "documento_numero"))
+            .or_else(|| value_string(&customer, "numero_documento"));
+        let razon_social = value_string(&customer, "razon_social")
+            .or_else(|| value_string(&customer, "nombre_comercial"))
+            .unwrap_or_else(|| "Cliente".to_string());
+        tx.execute(
+            r#"
+            INSERT OR REPLACE INTO local_customers
+                (id, documento, razon_social, data_json, deleted, updated_at)
+            VALUES (?1, ?2, ?3, ?4, 0, ?5)
+            "#,
+            params![
+                id,
+                documento,
+                razon_social,
+                serde_json::to_string(&customer)
+                    .map_err(|e| format!("Cliente invalido para cache local: {e}"))?,
+                now_ms(),
+            ],
+        )
+        .map_err(|e| format!("No se pudo hidratar cliente local: {e}"))?;
+    }
+    tx.commit()
+        .map_err(|e| format!("No se pudo confirmar hidratacion clientes: {e}"))?;
+    Ok(())
+}
+
 fn hydrate_cash_session(conn: &Connection, body: &str) -> Result<(), String> {
     let Some(session) = extract_response_data(body) else {
         return Ok(());
@@ -480,6 +544,92 @@ fn build_products_snapshot(conn: &Connection) -> Result<LocalFirstResponse, Stri
         }
     }
     json_success_response(Value::Array(products), "Productos POS locales")
+}
+
+fn build_product_detail_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+) -> Result<Option<LocalFirstResponse>, String> {
+    let id = endpoint.trim_start_matches("/api/inventario/productos/");
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM pos_products WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let product: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    Ok(Some(json_success_response(product, "Producto local")?))
+}
+
+fn build_customers_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
+    let mut stmt = conn
+        .prepare("SELECT data_json FROM local_customers WHERE deleted = 0 ORDER BY razon_social ASC")
+        .map_err(|e| format!("No se pudo preparar clientes locales: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let raw: String = row.get(0)?;
+            Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
+        })
+        .map_err(|e| format!("No se pudo leer clientes locales: {e}"))?;
+    let mut customers = Vec::new();
+    for row in rows {
+        let value = row.map_err(|e| format!("Cliente local invalido: {e}"))?;
+        if !value.is_null() {
+            customers.push(value);
+        }
+    }
+    let total = customers.len();
+    let body = serde_json::json!({
+        "success": true,
+        "offline": true,
+        "local_first": true,
+        "data": customers,
+        "pagination": {
+            "total": total,
+            "page": 1,
+            "limit": total,
+            "totalPages": 1
+        },
+        "message": "Clientes locales"
+    });
+    Ok(LocalFirstResponse {
+        status: 200,
+        body: serde_json::to_string(&body)
+            .map_err(|e| format!("No se pudo serializar clientes locales: {e}"))?,
+        headers: vec![
+            HeaderPair {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HeaderPair {
+                name: "x-erp-local-first".to_string(),
+                value: "true".to_string(),
+            },
+        ],
+    })
+}
+
+fn build_customer_detail_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+) -> Result<Option<LocalFirstResponse>, String> {
+    let id = endpoint.trim_start_matches("/api/ventas/clientes/");
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM local_customers WHERE id = ?1 AND deleted = 0",
+            params![id],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let customer: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    Ok(Some(json_success_response(customer, "Cliente local")?))
 }
 
 fn build_open_session_snapshot(conn: &Connection) -> Result<Option<LocalFirstResponse>, String> {
@@ -790,6 +940,198 @@ fn process_local_pos_sale(conn: &Connection, input: &LocalFirstWriteInput) -> Re
     json_success_response(data, "Venta guardada localmente; pendiente de sincronizacion")
 }
 
+fn normalize_product_payload(payload: &Value, id: String, deleted: bool) -> Value {
+    let mut product = payload.clone();
+    if let Some(obj) = product.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(id));
+        obj.insert(
+            "codigo".to_string(),
+            serde_json::json!(
+                value_string(payload, "codigo").unwrap_or_else(|| format!("LOCAL-{}", now_ms()))
+            ),
+        );
+        obj.insert(
+            "nombre".to_string(),
+            serde_json::json!(value_string(payload, "nombre").unwrap_or_else(|| "Producto local".to_string())),
+        );
+        let stock = payload
+            .get("stock_actual")
+            .or_else(|| payload.get("stock"))
+            .and_then(Value::as_f64)
+            .unwrap_or_else(|| value_number(payload, "stock"));
+        obj.insert("stock_actual".to_string(), serde_json::json!(stock));
+        obj.insert("stock_disponible".to_string(), serde_json::json!(stock));
+        obj.insert(
+            "stock_minimo".to_string(),
+            serde_json::json!(
+                payload
+                    .get("stock_minimo")
+                    .or_else(|| payload.get("stockMinimo"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+            ),
+        );
+        obj.insert(
+            "precio_venta".to_string(),
+            serde_json::json!(
+                payload
+                    .get("precio_venta")
+                    .or_else(|| payload.get("precioVenta"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+            ),
+        );
+        obj.insert(
+            "precio_compra".to_string(),
+            serde_json::json!(
+                payload
+                    .get("precio_compra")
+                    .or_else(|| payload.get("precioCompra"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
+            ),
+        );
+        obj.insert("activo".to_string(), serde_json::json!(!deleted));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+    }
+    product
+}
+
+fn process_local_inventory_product(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let method = input.method.to_uppercase();
+    let timestamp = now_ms();
+    let id = if method == "POST" {
+        format!("local-product-{}", Uuid::new_v4())
+    } else {
+        input
+            .endpoint
+            .trim_start_matches("/api/inventario/productos/")
+            .to_string()
+    };
+
+    let payload = if method == "DELETE" {
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT data_json FROM pos_products WHERE id = ?1",
+                params![&id],
+                |row| row.get(0),
+            )
+            .ok();
+        existing
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .unwrap_or_else(|| serde_json::json!({ "id": id.clone() }))
+    } else {
+        parse_json_body(&input.body)?
+    };
+
+    let product = normalize_product_payload(&payload, id.clone(), method == "DELETE");
+    let codigo = value_string(&product, "codigo");
+    let nombre = value_string(&product, "nombre").unwrap_or_else(|| "Producto local".to_string());
+    let stock = product
+        .get("stock_actual")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO pos_products
+            (id, codigo, nombre, stock_actual, stock_disponible, data_json, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6)
+        "#,
+        params![
+            id,
+            codigo,
+            nombre,
+            stock,
+            serde_json::to_string(&product)
+                .map_err(|e| format!("No se pudo serializar producto local: {e}"))?,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar producto local: {e}"))?;
+    enqueue_offline_request_with_conn(conn, input)?;
+    json_success_response(product, "Producto guardado localmente; pendiente de sincronizacion")
+}
+
+fn normalize_customer_payload(payload: &Value, id: String, deleted: bool) -> Value {
+    let mut customer = payload.clone();
+    if let Some(obj) = customer.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(id));
+        obj.insert(
+            "razon_social".to_string(),
+            serde_json::json!(
+                value_string(payload, "razon_social")
+                    .or_else(|| value_string(payload, "nombre_comercial"))
+                    .unwrap_or_else(|| "Cliente local".to_string())
+            ),
+        );
+        obj.insert("activo".to_string(), serde_json::json!(!deleted));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+    }
+    customer
+}
+
+fn process_local_customer(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let method = input.method.to_uppercase();
+    let timestamp = now_ms();
+    let id = if method == "POST" {
+        format!("local-customer-{}", Uuid::new_v4())
+    } else {
+        input
+            .endpoint
+            .trim_start_matches("/api/ventas/clientes/")
+            .to_string()
+    };
+
+    let payload = if method == "DELETE" {
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT data_json FROM local_customers WHERE id = ?1",
+                params![&id],
+                |row| row.get(0),
+            )
+            .ok();
+        existing
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .unwrap_or_else(|| serde_json::json!({ "id": id.clone() }))
+    } else {
+        parse_json_body(&input.body)?
+    };
+
+    let customer = normalize_customer_payload(&payload, id.clone(), method == "DELETE");
+    let documento = value_string(&customer, "ruc")
+        .or_else(|| value_string(&customer, "codigo"))
+        .or_else(|| value_string(&customer, "documento_numero"))
+        .or_else(|| value_string(&customer, "numero_documento"));
+    let razon_social = value_string(&customer, "razon_social").unwrap_or_else(|| "Cliente local".to_string());
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_customers
+            (id, documento, razon_social, data_json, deleted, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        params![
+            id,
+            documento,
+            razon_social,
+            serde_json::to_string(&customer)
+                .map_err(|e| format!("No se pudo serializar cliente local: {e}"))?,
+            if method == "DELETE" { 1 } else { 0 },
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar cliente local: {e}"))?;
+    enqueue_offline_request_with_conn(conn, input)?;
+    json_success_response(customer, "Cliente guardado localmente; pendiente de sincronizacion")
+}
+
 #[tauri::command]
 fn hydrate_local_first_response(
     app: AppHandle,
@@ -804,7 +1146,8 @@ fn hydrate_local_first_response(
     upsert_snapshot(&conn, &endpoint, &url, status, &headers, &body)?;
 
     match endpoint.as_str() {
-        "/api/pos/productos" => hydrate_pos_products(&conn, &body)?,
+        "/api/pos/productos" | "/api/inventario/productos" => hydrate_pos_products(&conn, &body)?,
+        "/api/pos/clientes" | "/api/ventas/clientes" => hydrate_local_customers(&conn, &body)?,
         "/api/pos/sesion-caja" => hydrate_cash_session(&conn, &body)?,
         _ => {}
     }
@@ -822,10 +1165,22 @@ fn get_local_first_response(
     let conn = open_local_db(&app)?;
 
     match endpoint.as_str() {
-        "/api/pos/productos" => return Ok(Some(build_products_snapshot(&conn)?)),
+        "/api/pos/productos" | "/api/inventario/productos" => {
+            return Ok(Some(build_products_snapshot(&conn)?))
+        }
+        "/api/pos/clientes" | "/api/ventas/clientes" => {
+            return Ok(Some(build_customers_snapshot(&conn)?))
+        }
         "/api/pos/sesion-caja" => return build_open_session_snapshot(&conn),
         "/api/pos/ventas-recientes" => return Ok(Some(build_recent_sales_snapshot(&conn)?)),
         _ => {}
+    }
+
+    if endpoint.starts_with("/api/inventario/productos/") {
+        return build_product_detail_snapshot(&conn, &endpoint);
+    }
+    if endpoint.starts_with("/api/ventas/clientes/") {
+        return build_customer_detail_snapshot(&conn, &endpoint);
     }
 
     read_local_snapshot(&conn, &endpoint, &url)
@@ -856,6 +1211,14 @@ fn process_local_first_write(
         && request.endpoint.ends_with("/cierre")
     {
         process_local_cash_close(&tx, &request)
+    } else if request.endpoint == "/api/inventario/productos"
+        || request.endpoint.starts_with("/api/inventario/productos/")
+    {
+        process_local_inventory_product(&tx, &request)
+    } else if request.endpoint == "/api/ventas/clientes"
+        || request.endpoint.starts_with("/api/ventas/clientes/")
+    {
+        process_local_customer(&tx, &request)
     } else {
         Err(format!(
             "Endpoint no soportado por local-first: {} {}",
