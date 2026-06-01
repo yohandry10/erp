@@ -42,7 +42,7 @@ Documentación técnica del ERP, organizada por dominio. Solo se listan document
 | [auditoria_forense_inventario_logistica_costeo_2026-05.md](auditoria_forense_inventario_logistica_costeo_2026-05.md) | Inventario/logística/kardex/costeo, remediación `333__inventory...` + ajuste `335__descontar_stock_authoritative.sql` |
 | [auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md](auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md) | Tesorería/caja/bancos/CxC/CxP, remediación `334__treasury...` |
 | [audits/2026-05-26-forensic-audit-pre-prod.md](audits/2026-05-26-forensic-audit-pre-prod.md) | Auditoría forense pre-producción 2026-05-26: 60+ hallazgos (multi-tenant leaks, PostgREST filter injection, atomicidad facturación/recepción, RBAC observability/metrics/webhook Stripe, frontend re-renders/virtualización, N+1, índices). Triage post-Codex aplicado: 4 falsos positivos retirados, 11 reseverizados. Fase 1A implementada (ver `00_coordination/CURRENT_STATE.md`). |
-| [../SISTEM-ANALITICS-COMPLETED.md](../SISTEM-ANALITICS-COMPLETED.md) | Auditoría full-scope 2026-05-26 (raíz del repo): prompt original + resultado anexado. Mapa del sistema, hallazgos por severidad verificados archivo:línea, matriz de integración módulo-a-módulo, checklist preproducción, respuestas a preguntas críticas y 15 **falsos positivos descartados con evidencia** (transparencia de la auditoría). |
+| [../SISTEM-ANALITICS-COMPLETED.md](../SISTEM-ANALITICS-COMPLETED.md) | Auditoría full-scope 2026-05-26 + cierre Codex 2026-06-01: C-004/H-002/H-003, Redis, dependencias y `341` cerrados/verificados; código en estado release-candidate, sujeto a SUNAT/OSE/secretos/smoke externo. |
 
 ## ⚙️ Configuración y operación
 

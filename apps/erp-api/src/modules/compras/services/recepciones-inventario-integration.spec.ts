@@ -140,6 +140,7 @@ describe('RecepcionesService - Inventario Integration (RPC cerrar_recepcion_tx)'
     expect(eventBusService.emitMovimientoStock).toHaveBeenCalledTimes(1);
     expect(eventBusService.emitMovimientoStock).toHaveBeenCalledWith(
       expect.objectContaining({
+        movimientoId: 'mov-1',
         productoId: mockProductoId,
         tipoMovimiento: 'ENTRADA',
         cantidad: 10,

@@ -1587,3 +1587,13 @@ Interpretacion:
 - Build Docker de Web optimizado: `.dockerignore` excluye `target`, `.next`, `dist`, logs y artefactos locales; contexto Web medido en `10.82 MB`.
 - Validaciones: Compose config OK, promtool OK, dashboards JSON OK, API/Web/Worker Docker build OK, stack Docker up, API/Web/Worker/Redis healthy, Prometheus targets UP, Grafana dashboard API OK y datasource query `up{job=~"erp-api|erp-worker|redis|node|prometheus"}` con todos los valores en `1`.
 - GPT Pro acepto `Infra Gate 22` como infraestructura local/sandbox lista. Pendiente no bloqueante: primera corrida remota de GitHub Actions para confirmar runner real.
+
+## 14) Cierre pre-produccion de codigo 2026-06-01
+
+- Migracion `341__transactional_idempotency_coverage_hardening.sql` aplicada y verificada en DEV y PROD por `psql --set=ON_ERROR_STOP=1`.
+- `cerrar_recepcion_tx(uuid,uuid,text,text)` queda idempotente por `recepcion_item_id`; ante movimientos legacy ambiguos sin metadata de item falla explicitamente para evitar doble stock o descuadre silencioso.
+- `reservar_pedido_stock_tx(uuid,uuid)` valida cobertura completa por `pedido_detalle_id`; si existen reservas parciales o ambiguas falla en lugar de retornar `skipped=true`.
+- Verificacion remota DEV/PROD: `anon=false`, `authenticated=false`, `service_role=true` para ambas RPC; comentarios de funcion presentes.
+- Backend reforzado: `stock.movimiento` persiste en outbox con `movimientoId`, `eventId` e `idempotencyKey` deterministico; `generarFactura` repara `cantidad_facturada` al reintentar un pedido que ya tiene `factura_id`.
+- Gate de codigo: tests focales backend 64/64 OK, `pnpm type-check` monorepo OK, `pnpm audit --prod --json` con 0 vulnerabilidades, `git diff --check` OK.
+- Docker: Redis ya no usa password default conocido; `REDIS_PASSWORD` es obligatorio al levantar el stack.

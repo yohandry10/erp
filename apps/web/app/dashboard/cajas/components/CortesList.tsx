@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils'
 import { useApi } from '@/hooks/use-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchApi } from '@/lib/api-fetch';
 
 type Corte = {
   id: string;
@@ -63,11 +64,7 @@ export function CortesList({ className = '', id }: Props) {
   const descargarArchivo = async (corteId: string, formato: 'pdf' | 'csv') => {
     try {
       if (!session?.user) throw new Error('No hay sesión activa para descargar.');
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const url = `${baseUrl}/api/cajas/cortes/${corteId}/${formato}`;
-      const res = await fetch(url, {
-        credentials: 'include',
-      });
+      const res = await fetchApi(`/api/cajas/cortes/${corteId}/${formato}`);
       if (!res.ok) throw new Error(`Error al descargar ${formato.toUpperCase()}`);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);

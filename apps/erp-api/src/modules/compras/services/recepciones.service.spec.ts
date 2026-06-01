@@ -441,6 +441,7 @@ describe('RecepcionesService', () => {
       expect(eventBusService.emitMovimientoStock).toHaveBeenCalledTimes(1);
       expect(eventBusService.emitMovimientoStock).toHaveBeenCalledWith(
         expect.objectContaining({
+          movimientoId: 'mov-1',
           productoId: 'prod-1',
           tipoMovimiento: 'ENTRADA',
           cantidad: 5,

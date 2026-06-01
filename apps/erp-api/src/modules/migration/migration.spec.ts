@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { parseCsv, toBoolean, toDateOrNull, toNumber, validateHeaders } from './util/csv-parser.util';
 import { validateRuc, validateDni, validateDocumento, toSafeIntegerDocumento } from './util/peru-doc.util';
 import { ClientesImporter } from './importers/clientes.importer';
@@ -32,6 +34,15 @@ function makeFakeSupabase() {
     builder,
     service: { getClient: jest.fn().mockReturnValue(builder) } as any,
   };
+}
+
+function readRepoFile(relativePath: string) {
+  const candidates = [join(process.cwd(), relativePath), join(process.cwd(), '..', '..', relativePath)];
+  const filePath = candidates.find((candidate) => existsSync(candidate));
+  if (!filePath) {
+    throw new Error(`No se encontró ${relativePath}`);
+  }
+  return readFileSync(filePath, 'utf8');
 }
 
 describe('util/csv-parser', () => {
@@ -410,5 +421,28 @@ describe('ClientesImporter.run (con Supabase mockeada)', () => {
     expect(result.okRows).toBe(1);
     expect(result.created).toBe(0); // dry run no crea
     expect(builder.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('migrations/341 transactional idempotency coverage', () => {
+  const sql = () => readRepoFile('supabase/migrations/341__transactional_idempotency_coverage_hardening.sql');
+
+  it('amarra entradas de recepción al item exacto y rechaza legacy ambiguo', () => {
+    const migration = sql();
+
+    expect(migration).toContain("metadata->>'recepcion_item_id'");
+    expect(migration).toContain("'recepcion_item_id', v_item.id::text");
+    expect(migration).toContain('Movimiento legacy ambiguo');
+    expect(migration).not.toContain('AND producto_id = v_item.producto_id\n      AND tipo = ');
+  });
+
+  it('no permite skip ciego cuando hay reservas parciales del pedido', () => {
+    const migration = sql();
+
+    expect(migration).toContain("metadata->>'pedido_detalle_id'");
+    expect(migration).toContain("'pedido_detalle_id', v_item.id::text");
+    expect(migration).toContain('Reservas existentes incompletas o ambiguas');
+    expect(migration).toContain('reservas completas existentes');
+    expect(migration).not.toContain("'reservas ya existentes'");
   });
 });

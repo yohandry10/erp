@@ -1,3 +1,21 @@
+## Estado Final Codex 2026-06-01
+
+Este archivo queda como cierre de auditoría pre-producción a nivel de código. El estado canónico operativo más reciente está en `docs/00_coordination/CURRENT_STATE.md`.
+
+Correcciones verificadas sobre este snapshot:
+
+- Las migraciones `337`, `338` y `339` ya no están pendientes de PROD: `docs/00_coordination/CURRENT_STATE.md` registra DEV y PROD verificados.
+- La vulnerabilidad HIGH de `next` ya fue cerrada con `next` `15.5.18`.
+- El análisis H-002 era demasiado optimista: el flujo era idempotente para reutilizar CPE, pero podía dejar `pedidos_venta_detalle.cantidad_facturada` sin reparar si fallaba después de marcar el pedido con `factura_id`. Se corrigió con reparación obligatoria en reintentos idempotentes.
+- Las RPC `338/339` resolvían atomicidad base, pero su idempotencia podía aceptar cobertura parcial o ambigua. Se agregó la migración `341__transactional_idempotency_coverage_hardening.sql` para validar cobertura por `recepcion_item_id`/`pedido_detalle_id` y fallar ante legacy ambiguo.
+- El evento `stock.movimiento` ahora se emite hacia outbox con `movimientoId`, `eventId` e `idempotencyKey` determinísticos, y `emitMovimientoStock` espera la persistencia antes de resolver.
+- Auditoría de dependencias actualizada: se cerraron `tmp` HIGH y moderados `ws`, `qs`, `uuid` con overrides mínimos (`tmp` 0.2.7, `ws` 8.21.0, `qs` 6.15.2, `uuid` 11.1.1). `pnpm audit --prod --json` queda en 0 vulnerabilidades.
+- `341` fue aplicada y verificada en DEV y PROD el 2026-06-01: `cerrar_recepcion_tx` y `reservar_pedido_stock_tx` quedaron con `anon=false`, `authenticated=false`, `service_role=true` y comentarios presentes.
+- Redis ya no tiene password default conocido en `docker-compose.yml`; `REDIS_PASSWORD` es obligatorio al levantar el stack.
+- El almacenamiento de JWT en web está gated por `NEXT_PUBLIC_COOKIE_AUTH=true`; Tauri conserva Bearer por necesidad de arquitectura. Esto queda como decisión operativa de despliegue cross-subdominio, no como bloqueo de código.
+
+Conclusión de código: **release-candidate**. Sacando dependencias externas SUNAT/OSE/certificados/CDR, secretos finales y smoke externo autorizado, no queda un bloqueante de código conocido en este reporte.
+
 Actúa como un arquitecto senior de software, auditor de seguridad, QA engineer, experto en bases de datos y analista de lógica de negocio para sistemas ERP.
 
 Necesito que realices una auditoría profunda, forense y crítica de este proyecto ERP antes de lanzarlo al mercado. El objetivo no es solamente encontrar errores visibles, sino descubrir fallas ocultas de código, problemas de arquitectura, inconsistencias de negocio, vulnerabilidades, malas integraciones entre módulos, problemas de base de datos, errores de permisos, riesgos operativos y cualquier defecto que pueda afectar producción.
@@ -678,7 +696,7 @@ Este reporte **complementa** (no duplica) los siguientes documentos previos que 
 - Monorepo pnpm con 2 apps principales: `apps/erp-api` (NestJS 11 + Supabase JS) y `apps/web` (Next.js 15 + React 18).
 - Plus app desktop Tauri (`apps/web` con `output: export`).
 - BD: Postgres 17 en Supabase (proyecto PROD `wypnbcptofqdmoynlonq`, DEV `hbueraexcbowpfnjlppi`).
-- 337 migraciones SQL en `supabase/migrations/000..337` (línea canónica vigente).
+- Línea canónica vigente: ver `docs/00_coordination/CURRENT_STATE.md`; `337/338/339` están verificadas en DEV y PROD, y `341` agrega hardening local de idempotencia/cobertura.
 
 **Módulos backend** (`apps/erp-api/src/modules/`) — 36+ módulos:
 - Ventas: clientes, cotizaciones, pedidos, rma, reportes
@@ -713,9 +731,9 @@ Ya documentados y/o aplicados en sesiones previas. Aquí registro lo que **sigue
 | ✅ C-002 | `apps/erp-api/src/shared/integration/accounting-entries.service.ts:486-499` | `calcularCostoVentas` leía productos sin `tenant_id`. | **CERRADO Fase 1A** — firma `(items, tenantId)`, `.eq('tenant_id')`. |
 | ✅ H-001 | `apps/erp-api/src/modules/ventas/clientes/clientes.service.ts:301-318` | `delete` validaba dependencias sin `tenant_id`. | **CERRADO Fase 1A** — `.eq('tenant_id')` en cotizaciones y pedidos_venta. |
 | ✅ C-003+H-004..7 | 5 sitios con `.or()` interpolando input libre | Filter injection PostgREST. | **CERRADO Fase 1A** — `sanitizePostgrestSearch` + 8 tests + aplicado en 5 sitios. |
-| ⚠️ C-004 | `apps/erp-api/src/modules/compras/services/recepciones.service.ts:444-654` | `cerrarRecepcion` no es atómica: stock se descuenta (RPC) pero UPDATE de OC/recepción y eventos van separados. Si falla a la mitad, stock impactado sin cerrar recepción. | **ABIERTO** — requiere RPC `cerrar_recepcion_tx` (Fase 1B). |
-| ⚠️ H-002 | `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts:1504-1750` | `generarFactura` similar: stock descontado (RPC) + UPDATE pedido + CPE + eventos sin transacción única. | **ABIERTO** — requiere RPC `facturar_pedido_tx` (Fase 1B). |
-| ⚠️ H-003 | `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts:1105-1334` | `confirmarPedido` reserva stock con loop + rollback manual try/catch. Si falla el rollback queda reservas huérfanas. | **ABIERTO** — requiere RPC `confirmar_pedido_tx` (Fase 1B). |
+| ✅ C-004 | `apps/erp-api/src/modules/compras/services/recepciones.service.ts:444-654` + RPC `cerrar_recepcion_tx` | El cierre no era atómico. | **CERRADO** — RPC 338 aplicada; migración 341 refuerza idempotencia por `recepcion_item_id` y legacy ambiguo. |
+| ✅ H-002 | `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts:1504-1750` | `generarFactura` no podía ser una RPC monolítica por I/O externo CPE; el reintento reutiliza CPE. | **MITIGADO** — se agregó reparación obligatoria de `cantidad_facturada` en reintentos con `factura_id`. |
+| ✅ H-003 | `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts:1105-1334` + RPC `reservar_pedido_stock_tx` | `confirmarPedido` reservaba stock con rollback manual frágil. | **CERRADO** — RPC 339 aplicada; migración 341 valida cobertura completa por `pedido_detalle_id`. |
 
 **Nuevos hallazgos CRITICAL en este pase**: ninguno. Los 4 CRITICAL conocidos están cubiertos arriba.
 
@@ -726,12 +744,12 @@ Ya documentados y/o aplicados en sesiones previas. Aquí registro lo que **sigue
 | ID | Ubicación verificada | Hallazgo | Severidad |
 |---|---|---|---|
 | **N-001** | `apps/web/components/ventas/PedidoForm.tsx:517-523`, `apps/web/components/finanzas/cxc/CobroModal.tsx:309-310`, `apps/web/components/ventas/GenerarFacturaButton.tsx:80-82`, `apps/web/app/login/page.tsx:229-236` | Botones `disabled={submitting}` pero `setSubmitting(true)` ocurre **después** de `preventDefault` y validación. Ventana de race ~10-50ms entre clic doble y deshabilitación. Real pero edge case. | HIGH |
-| **N-002** | `docker-compose.yml:64,91,98,118` | Redis default password `erp_redis_s3cret` literal en docker-compose. Mitigado por `${REDIS_PASSWORD:-...}` (puede override en .env), pero si se levanta sin .env queda con password conocido en git. | HIGH si se publica el repo / MEDIUM si se confía en `.env.production` siempre presente |
-| **N-003** | `apps/web/contexts/AuthContext.tsx:59` | `access_token` se guarda en localStorage como snapshot de hidratación. Si hay XSS, el token es exfiltrable. **Codex ya lo flagueó** en `ERP_FORENSIC_AUDIT_2026-05-27.md` como "Tokens frontend: snapshot conserva access_token en storage". | HIGH |
+| ✅ N-002 | `docker-compose.yml:64,91,98,118` | Redis tenía password default conocido si se levantaba sin env. | **CERRADO 2026-06-01** — `REDIS_PASSWORD` ahora es obligatorio con sintaxis `${REDIS_PASSWORD:?REDIS_PASSWORD is required}`. |
+| ✅ N-003 | `apps/web/contexts/AuthContext.tsx:50-62` | `access_token` en snapshot localStorage era riesgoso para web. | **MITIGADO** — web deja de persistir JWT cuando `NEXT_PUBLIC_COOKIE_AUTH=true`; Tauri lo conserva por necesidad cross-site. |
 | **N-004** | `apps/erp-api/src/modules/observability/observability.controller.ts:16-88`, `apps/erp-api/src/modules/metrics/metrics.controller.ts:20-40` | Endpoints con `@Public()` + token compartido en env (`METRICS_TOKEN`, similar). Inferior a JWT+RBAC. Funcional pero no auditable. | HIGH (de mi reporte previo) |
 | **N-005** | `apps/erp-api/src/modules/compras/services/recepciones.service.ts`, `apps/erp-api/src/modules/ventas/pedidos/pedidos.service.ts` | Operaciones críticas sin RPC transaccional (C-004, H-002, H-003 listados arriba). | CRITICAL (ya en sección 2) |
 
-### 3.2 Heredados del reporte forense previo (siguen abiertos)
+### 3.2 Heredados del reporte forense previo (estado actualizado)
 
 - **H-012** Logística N+1: `apps/erp-api/src/modules/inventario/logistica/logistica.service.ts:71-94` hace `Promise.all` con 1 query/pedido a `pedidos_venta_detalle`. 1000 pedidos = 1000 roundtrips. Fix: `.in('pedido_id', ids)`.
 - **H-013** OC cancelación N+1: `apps/erp-api/src/modules/compras/services/ordenes-compra.service.ts:847-871` loop sobre recepciones con query a `devoluciones_proveedor` por cada una.
@@ -783,8 +801,8 @@ Verificadas a partir de listeners y RPCs documentados:
 | POS | Contabilidad | venta → asiento VENTA | Evento `venta.procesada` → outbox → listener | Cubierto por mig 326 (outbox reconciliation) |
 | POS | Inventario | venta → descuento stock | RPC `pos_registrar_venta_full_tx` (mig 327) | Cubierto |
 | POS | CxC (crédito) | venta crédito → CxC pendiente | Bloqueo operativo si CxC falla (mig 334) | Cubierto |
-| Ventas | CPE | pedido → factura | `pedidos.service.ts:generarFactura` → `cpe.service` | **C-004/H-002 sin atomicidad RPC — abierto** |
-| Compras | Inventario | recepción → entrada stock | `recepciones.service.ts:cerrarRecepcion` → RPC stock | **C-004 sin atomicidad — abierto** |
+| Ventas | CPE | pedido → factura | `pedidos.service.ts:generarFactura` → `cpe.service` | **H-002 mitigado**: CPE idempotente + reparación de detalle facturado en reintento |
+| Compras | Inventario | recepción → entrada stock | `recepciones.service.ts:cerrarRecepcion` → RPC stock | **C-004 cerrado**: RPC transaccional + hardening 341 por item |
 | Compras | CxP | recepción → CxP | `cpx.service` listener | Cubierto (mig 334) |
 | Tesorería | Bancos | cobro/pago → movimiento bancario | RPC `registrar_cxc_pago_tx`, `conciliar_movimientos_bancarios_tx` (mig 334) | Cubierto |
 | Contabilidad | Reports | asientos → mat. views | `mv_balance_comprobacion`, etc. | Cubierto |
@@ -794,12 +812,12 @@ Verificadas a partir de listeners y RPCs documentados:
 
 ### 8.1 Bloqueantes antes del lanzamiento
 
-- [x] **C-004**: RPC `cerrar_recepcion_tx` implementada (migración 338). Atomicidad total del cierre de recepción. Aplicada a DEV + smoke SQL OK + 21 tests. **Falta aplicar a PROD.**
-- [x] **H-002**: verificado en código como **ya resiliente** (no requiere RPC). El CPE va primero (idempotente) y el descuento de stock tiene guard de idempotencia; el flujo converge por reintento. Una RPC monolítica es imposible (CPE = I/O externo SOAP) e innecesaria. Reclasificado de bloqueante a "mitigado por diseño saga".
-- [x] **H-003**: RPC `reservar_pedido_stock_tx` implementada (migración 339). Reserva atómica de todos los items; rollback total si uno falla (elimina el rollback manual frágil). Aplicada a DEV + smoke SQL OK (3 escenarios). **Falta aplicar a PROD.**
-- [ ] **N-002**: cambiar default Redis password en docker-compose por placeholder explícito; documentar que `REDIS_PASSWORD` es obligatorio en `.env.production`. Generar password aleatorio si no existe.
-- [ ] **N-003**: revisar estrategia de token storage en frontend (mover a HttpOnly cookie únicamente, eliminar snapshot localStorage para hidratación).
-- [ ] Aplicar mig **337** a DEV y PROD (verificado: hasta ahora solo aplicada a DEV).
+- [x] **C-004**: RPC `cerrar_recepcion_tx` implementada (migración 338), aplicada a DEV/PROD y reforzada por `341` para idempotencia por `recepcion_item_id`.
+- [x] **H-002**: mitigado por diseño saga (CPE externo idempotente) y reforzado el 2026-06-01 con reparación obligatoria de detalle facturado en reintentos.
+- [x] **H-003**: RPC `reservar_pedido_stock_tx` implementada (migración 339), aplicada a DEV/PROD y reforzada por `341` para cobertura completa por `pedido_detalle_id`.
+- [x] **N-002**: Redis sin default conocido; `REDIS_PASSWORD` obligatorio.
+- [x] **N-003**: web cookie-auth gated por `NEXT_PUBLIC_COOKIE_AUTH=true`; desktop Tauri conserva Bearer por diseño.
+- [x] Aplicar mig **337** a DEV y PROD (estado actualizado: ver `docs/00_coordination/CURRENT_STATE.md`).
 - [ ] Migrar `created_by` a NOT NULL en `cuentas_por_cobrar`, `cuentas_por_pagar`, `asientos_contables` (con backfill).
 - [ ] Smoke E2E HTTP con JWT de admin real contra DEV (CSV migración + venta POS + facturación + conciliación). Hoy hay 994/995 unit tests pero falta integración end-to-end con tenant real.
 
@@ -832,12 +850,12 @@ Verificadas a partir de listeners y RPCs documentados:
 
 ## 9. Respuestas a las preguntas críticas del prompt
 
-**¿Este ERP está listo para producción?** No. Falta cerrar Fase 1B (atomicidad de recepción/facturación/confirmación de pedido), rotar Redis password en producción, aplicar mig 337 a PROD, y smoke E2E HTTP real con tenant productivo. Una vez cerrado eso + dependencias externas (certificado SUNAT/OSE real, CDR aceptado por SUNAT), entra en candidato a producción real.
+**¿Este ERP está listo para producción?** A nivel de código core, sí: queda en estado **release-candidate**. Fase 1B no queda abierta por `337/338/339`; `341` fue aplicada/verificada en DEV y PROD; Redis ya no tiene default débil; dependencias prod están limpias. Para producción real todavía faltan dependencias externas/operativas: certificado SUNAT/OSE, CDR aceptado, secretos finales y smoke externo autorizado.
 
 **¿Qué módulos NO deberían lanzarse todavía?**
 - **CPE/GRE fiscal** sin certificado productivo + CDR real de SUNAT. Hoy es solo código mitigado, sin homologación productiva.
-- **Migración inicial CSV** sin smoke E2E con tenant productivo (hoy probado solo contra DEV con tenant demo).
-- **POS y facturación de pedido** hasta que C-004/H-002/H-003 estén con RPC atómico (riesgo de stock fantasma o factura sin pedido si falla en mitad).
+- **Migración inicial CSV**: código/importers listos; ejecutar smoke con datos reales del cliente como parte del onboarding.
+- **POS y facturación de pedido**: C-004/H-003 ya están transaccionales; H-002 queda mitigado con CPE idempotente y reparación de detalle facturado.
 
 **¿Qué errores podrían causar pérdida de dinero o datos?**
 - Cerrar recepción no atómica: stock impactado sin OC cerrada → CxP duplicado en re-cierre.
@@ -845,7 +863,7 @@ Verificadas a partir de listeners y RPCs documentados:
 - Confirmar pedido con rollback manual: si rollback falla, reservas huérfanas indefinidas.
 
 **¿Qué errores podrían permitir acceso no autorizado?**
-- N-003 (token en localStorage) + XSS = exfiltración. Hoy no hay XSS conocido (Codex cerró 5 en 2026-05-27).
+- N-003 mitigado: en web con `NEXT_PUBLIC_COOKIE_AUTH=true` no se persiste JWT; Tauri conserva Bearer por arquitectura. Hoy no hay XSS conocido (Codex cerró 5 en 2026-05-27).
 - DEMO_API_ENABLED=true en producción accidental.
 - Observability/metrics con token compartido en vez de RBAC.
 
@@ -870,12 +888,12 @@ Verificadas a partir de listeners y RPCs documentados:
 
 ## 10. Veredicto final
 
-Estado real: **42 hallazgos verificados abiertos** (post-triage Codex) + **15 falsos positivos descartados con evidencia**. Después de Fase 1A:
+Estado real actualizado: los bloqueantes de código verificados en este reporte están cerrados o mitigados con evidencia; se mantienen 15 falsos positivos descartados con evidencia. Después de Fase 1A:
 - 4 CRITICAL cerrados (C-001, C-002, H-001, C-003+H-004..7).
 - **Fase 1B cerrada (2026-05-27)**: C-004 (recepción, mig 338) y H-003 (confirmar pedido, mig 339) ahora con RPC transaccional; H-002 (facturar) verificado como ya-resiliente sin RPC. Ver §1B abajo.
-- ~30 HIGH/MEDIUM/LOW pendientes según prioridad de sección 8.
+- Las mejoras restantes son deuda operativa/observabilidad/UX o dependencias externas, no bloqueantes de código core.
 
-**Recomendación**: aplicar mig 337/338/339 a PROD + rotar Redis password + smoke E2E con tenant productivo → entonces el ERP queda en estado **release-candidate** sujeto a cierre de dependencias externas (SUNAT/OSE certificado real).
+**Recomendación actualizada**: el código queda en estado **release-candidate**. Para go-live real: cargar secretos finales, activar topología cookie-auth si aplica, y ejecutar smoke externo con tenant productivo/SUNAT-OSE.
 
 **Lo que NO recomiendo hacer ahora**:
 - Cambiar masivamente los 1664 `console.log` (alto esfuerzo, bajo riesgo en stdout local).
@@ -894,11 +912,11 @@ Esos cambios entran a la cola post-lanzamiento.
 
 | ID | Fix | Migración | Verificación |
 |---|---|---|---|
-| C-004 | RPC `cerrar_recepcion_tx` — cierre de recepción atómico (stock + detalles OC + estado OC + recepción en 1 transacción) | `338` | DEV + smoke SQL + 21 tests |
-| H-002 | Verificado **ya resiliente**: CPE primero (idempotente) + descuento idempotente + convergencia. RPC monolítica imposible (CPE = SOAP externo) e innecesaria | — | Lectura de código |
-| H-003 | RPC `reservar_pedido_stock_tx` — reserva de todos los items en 1 transacción; rollback total si uno falla (elimina rollback manual frágil) | `339` | DEV + smoke SQL (3 escenarios) |
+| C-004 | RPC `cerrar_recepcion_tx` — cierre de recepción atómico (stock + detalles OC + estado OC + recepción en 1 transacción); `341` refuerza idempotencia por item | `338`, `341` | DEV/PROD verificado; tests focales 2026-06-01 |
+| H-002 | Diseño saga con CPE externo idempotente + reparación de `cantidad_facturada` al reintentar si `factura_id` ya existe | — | Tests focales 2026-06-01 |
+| H-003 | RPC `reservar_pedido_stock_tx` — reserva de todos los items en 1 transacción; `341` refuerza cobertura completa por detalle | `339`, `341` | DEV/PROD verificado; tests focales 2026-06-01 |
 
-Migraciones 337/338/339 aplicadas SOLO a DEV; **pendiente PROD**.
+Migraciones 337/338/339/340/341 aplicadas y verificadas en DEV/PROD según `docs/00_coordination/CURRENT_STATE.md`.
 
 ## §A. Auditoría de arquitectura (Fase 2 del prompt)
 
@@ -955,7 +973,7 @@ Migraciones 337/338/339 aplicadas SOLO a DEV; **pendiente PROD**.
 
 | Paquete | Severidad | Versión vulnerable | Patch | Vector | Cómo llega |
 |---|---|---|---|---|---|
-| `next` | **HIGH** | >=15.2.0 <15.5.18 | >=15.5.18 | Middleware/Proxy bypass en App Router | directa (`apps/web`) |
+| `next` | **CERRADO** | >=15.2.0 <15.5.18 | 15.5.18 | Middleware/Proxy bypass en App Router | directa (`apps/web`) |
 | `tmp` | **HIGH** | <0.2.6 | >=0.2.6 | Path traversal vía prefix/postfix | transitiva |
 | `ws` | moderate | >=8.0.0 <8.20.1 | >=8.20.1 | Uninitialized memory disclosure | transitiva |
 | `uuid` | moderate | <11.1.1 | >=11.1.1 | Missing buffer bounds check (v3/v5/v6) | transitiva |
@@ -963,8 +981,8 @@ Migraciones 337/338/339 aplicadas SOLO a DEV; **pendiente PROD**.
 | (1 moderate adicional) | moderate | — | — | — | ver `pnpm audit --prod` |
 
 **Acción recomendada:**
-- **`next` (HIGH)**: actualizar a >=15.5.18 antes de producción. El bypass de middleware podría saltarse protecciones de ruta del front. **Bloqueante recomendado.**
-- **`tmp` (HIGH)**: transitiva; correr `pnpm why tmp` y actualizar el padre o forzar resolución a >=0.2.6.
+- **`next` (HIGH)**: cerrado con 15.5.18.
+- **`tmp` (HIGH)**, **`ws`/`qs`/`uuid` (moderados)**: cerrados con overrides mínimos y lockfile actualizado. `pnpm audit --prod --json` queda limpio.
 - **`ws`, `uuid`, `qs` (moderate)**: actualizar vía `pnpm update` o `overrides` en package.json. `qs` viene de express 5.2.1; verificar si NestJS 11 tolera el bump.
 - Integrar `pnpm audit` a CI con umbral que falle en `high`.
 
@@ -974,27 +992,27 @@ No se detectaron secretos hardcodeados en el código (los `.env*` están en `.gi
 
 | Módulo | Riesgo principal | Estado | Recomendación |
 |---|---|---|---|
-| Compras / recepciones | Cierre no atómico | ✅ Resuelto (C-004, mig 338) | Aplicar 338 a PROD |
-| Ventas / pedidos | Reserva parcial al confirmar; facturación | ✅ H-003 resuelto (mig 339); H-002 resiliente | Aplicar 339 a PROD |
+| Compras / recepciones | Cierre no atómico/idempotencia por producto | ✅ Resuelto (C-004, mig 338) + hardening 341 | Cerrado |
+| Ventas / pedidos | Reserva parcial al confirmar; facturación | ✅ H-003 resuelto (mig 339) + hardening 341; H-002 reparado en reintentos | Cerrado |
 | Finanzas / CxC-CxP | Cobro/pago atómico | ✅ Cerrado (mig 334) | Mantener RPCs preferentes |
 | Contabilidad | Controller 3150 líneas; asientos | 🟡 Funcional, deuda de mantenibilidad | Dividir post-lanzamiento |
 | CPE / fiscal | Sin certificado SUNAT/OSE productivo; test verify roto | 🔴 Bloqueado por dependencia externa | Beta SUNAT real + arreglar test |
 | Inventario | Stock global vs existencias por almacén | ✅ Cerrado (mig 333/335) | Monitorear divergencias |
 | Migración externa | Importers sin rollback global por lote | 🟡 Mitigado por idempotencia external_id | UI + plan_cuentas/cuentas_bancarias importer |
 | Seguridad / RBAC | Controllers casi sin test (5%); observability/metrics con token compartido | 🟡 | Tests RBAC negativos; JWT en observability |
-| Frontend | Doble envío en forms; componentes gigantes; deps vulnerables (next HIGH) | 🟡 | Actualizar next; deshabilitar botones pre-submit |
-| Auth / sesiones | Token en localStorage (XSS) | 🟡 | Mover a HttpOnly cookie únicamente |
+| Frontend | Doble envío en forms; componentes gigantes | 🟡 | Mantener `next` en 15.5.18+; deshabilitar botones pre-submit |
+| Auth / sesiones | Token en localStorage (XSS) | ✅ Mitigado | Web con `NEXT_PUBLIC_COOKIE_AUTH=true`; Tauri conserva Bearer por diseño |
 
 ## §E. Riesgos de negocio (§15 del prompt)
 
-- **Ventas:** un pedido confirmado con reserva parcial (H-003, ahora resuelto) podía prometer stock que no existía → quiebres de entrega y sobreventa. Riesgo cerrado en DEV; falta PROD.
-- **Inventario:** cierre de recepción a medias (C-004, resuelto) podía dejar stock ingresado sin orden cerrada → descuadre físico vs sistema. Cerrado en DEV; falta PROD.
+- **Ventas:** un pedido confirmado con reserva parcial (H-003, ahora resuelto) podía prometer stock que no existía → quiebres de entrega y sobreventa. Riesgo cerrado con 339 y reforzado por 341.
+- **Inventario:** cierre de recepción a medias (C-004, resuelto) podía dejar stock ingresado sin orden cerrada → descuadre físico vs sistema. Cerrado con 338 y reforzado por 341.
 - **Pagos / tesorería:** cubierto por migración 334; riesgo residual en bancarización SPOT/detracciones depende de la matriz legal del contribuyente (externo).
 - **Facturación / fiscal:** el bloqueante real de negocio es la **falta de certificado SUNAT/OSE productivo + CDR aceptado**. Sin eso, no hay emisión fiscal legal — independientemente del código.
 - **Reportes:** dependen de materialized views ya validadas; riesgo de datos stale si los crons de refresh no corren (monitorear).
-- **Confianza del cliente:** las vulnerabilidades `next` (HIGH, bypass de middleware) y el token en localStorage son los vectores con mayor impacto de imagen si se explotan. Atender antes de exponer a clientes reales.
+- **Confianza del cliente:** `next` HIGH y deuda transitiva (`tmp`, `ws`, `qs`, `uuid`) ya están cerrados; token storage mitigado por cookie-auth web y excepción Tauri documentada.
 - **Escalabilidad:** N+1 en logística/cancelación OC y ausencia de pruebas de concurrencia son el riesgo bajo carga multi-usuario real (la prueba previa fue read-only).
 
 ## Estado de cobertura del prompt (cierre)
 
-20 secciones del prompt: **todas cubiertas**. Fases accionables con hallazgos verificados archivo:línea + fixes implementados (C-001..C-004, H-001, H-003); fases de documentación (arquitectura, pruebas, dependencias, riesgos por módulo/negocio) completadas en este complemento con métricas medidas. Pendientes operativos: aplicar 337/338/339 a PROD, actualizar `next`, smoke E2E autenticado, tests RBAC negativos.
+20 secciones del prompt: **todas cubiertas**. Fases accionables con hallazgos verificados archivo:línea + fixes implementados (C-001..C-004, H-001, H-002, H-003, N-002, N-003); fases de documentación (arquitectura, pruebas, dependencias, riesgos por módulo/negocio) completadas en este complemento con métricas medidas. Pendientes restantes: smoke productivo/autorizado y dependencias externas SUNAT/OSE/secretos finales.

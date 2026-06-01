@@ -4,7 +4,7 @@ Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Ne
 
 ## Estado vigente
 
-La app desktop es **online-first con soporte offline local**: empaqueta la UI web como cliente Tauri y consume el backend API real mediante `NEXT_PUBLIC_API_URL`. Cuando no hay conexión o el usuario activa `offline_mode`, las lecturas pueden usar cache local reciente y las escrituras JSON se guardan en una cola local durable para sincronizarse después.
+La app desktop es **online-first con soporte offline local**: empaqueta la UI web como cliente Tauri y consume el backend API real mediante `NEXT_PUBLIC_API_URL`. Cuando no hay conexión o el usuario activa `offline_mode`, las lecturas pueden usar cache local reciente y las escrituras JSON serializables se guardan en SQLite local para sincronizarse después.
 
 La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNAT/OSE y generación fiscal autoritativa viven en el backend. En offline, esos flujos quedan en estado pendiente/local; no se declara aceptación SUNAT/CDR hasta que el backend procese la cola.
 
@@ -14,7 +14,7 @@ La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNA
 - **Cliente nativo Tauri** para operar contra el API del ERP.
 - **Configuración local mínima** para preferencias desktop; no reemplaza la configuración fiscal del backend.
 - **Certificados y credenciales fiscales**: se gestionan en el backend/wizard del ERP.
-- **Outbox offline durable** en desktop para operaciones pendientes.
+- **Outbox offline durable** en SQLite desktop para operaciones pendientes.
 - **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
 
@@ -122,7 +122,9 @@ apps/web/
 ~/.config/com.erpsuite.desktop/     # Linux
 ~/Library/Application Support/com.erpsuite.desktop/  # macOS
 ├── config.json          # Preferencias locales desktop
-├── offline_outbox.json  # Operaciones pendientes/sincronizadas offline
+├── erp_local.sqlite     # Cola offline durable y metadatos locales
+├── erp_local.sqlite-wal # WAL de SQLite, si hay actividad pendiente
+├── offline_outbox.json.migrated # Cola legacy migrada, si existía
 └── logs/                # Logs de la aplicación
 ```
 
@@ -156,7 +158,7 @@ apps/web/
 El modo offline soportado es de continuidad operativa, no una segunda base autoritativa:
 
 - `GET`: si la red falla, se devuelve la última respuesta JSON/text cacheada para esa URL.
-- `POST/PUT/PATCH/DELETE`: si la red falla y el body es serializable, se guarda en `offline_outbox.json` y la UI recibe una respuesta `202` con `offline_queue_id`.
+- `POST/PUT/PATCH/DELETE`: si la red falla y el body es serializable, se guarda en `erp_local.sqlite` y la UI recibe una respuesta `202` con `offline_queue_id`.
 - `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
 - `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, sincronizados y permite reintentar.
 - El indicador superior muestra `Offline` y el número de operaciones pendientes.
@@ -234,7 +236,7 @@ TAURI_DEBUG=1 pnpm run desktop:dev
 ### DevTools
 - **Frontend**: DevTools de Chrome integradas
 - **Backend**: Logs en consola de Rust
-- **Datos locales desktop**: inspeccionar `config.json` y `offline_outbox.json`; la base autoritativa se revisa en Supabase/Postgres.
+- **Datos locales desktop**: inspeccionar `config.json` y `erp_local.sqlite`; la base autoritativa se revisa en Supabase/Postgres.
 
 ## 📦 Distribución
 

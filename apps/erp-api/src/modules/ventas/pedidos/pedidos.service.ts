@@ -1563,6 +1563,7 @@ export class PedidosService {
 
     if (pedido.factura_id) {
       console.log(`ℹ️ [PedidosService] Pedido ${id} ya tiene factura ${pedido.factura_id}, retornando datos actuales`);
+      await this.repararDetalleFacturadoSiEsNecesario(pedido, tenantId);
       const sugerenciaExistente = await this.greIntegrationService.verificarSugerenciaGRE(pedido, tenantId);
       return {
         success: true,
@@ -1820,6 +1821,40 @@ export class PedidosService {
 
     if (backordersError) {
       throw new BadRequestException('No se pudieron limpiar los backorders al facturar pedido');
+    }
+  }
+
+  private async repararDetalleFacturadoSiEsNecesario(
+    pedido: PedidoVenta & { detalle: PedidoDetalle[] },
+    tenantId: string,
+  ): Promise<void> {
+    const pendientes = (pedido.detalle ?? []).filter((item) => {
+      const cantidad = this.redondearCantidad(Number(item.cantidad ?? 0));
+      const facturada = this.redondearCantidad(Number(item.cantidad_facturada ?? 0));
+      return cantidad > 0 && facturada < cantidad;
+    });
+
+    if (pendientes.length === 0) {
+      return;
+    }
+
+    const client = this.supabase.getClient();
+    for (const item of pendientes) {
+      const cantidad = this.redondearCantidad(Number(item.cantidad ?? 0));
+      const { data, error } = await client
+        .from('pedidos_venta_detalle')
+        .update({
+          cantidad_facturada: cantidad,
+          estado_item: 'FACTURADO',
+        })
+        .eq('id', item.id)
+        .eq('tenant_id', tenantId)
+        .select('id')
+        .maybeSingle();
+
+      if (error || !data) {
+        throw new BadRequestException('No se pudo reparar el detalle facturado del pedido');
+      }
     }
   }
 
