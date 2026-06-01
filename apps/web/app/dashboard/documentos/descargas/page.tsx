@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Filter, FileText, RefreshCcw } from 'lucide-react'
 import { useApi } from '@/hooks/use-api'
+import { fetchApi } from '@/lib/api-fetch'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -29,6 +30,7 @@ export default function DescargasPage() {
   })
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [loading, setLoading] = useState(false)
+  const [descargandoId, setDescargandoId] = useState<string | null>(null)
 
   const cargar = async () => {
     setLoading(true)
@@ -55,9 +57,30 @@ export default function DescargasPage() {
     setFiltros(prev => ({ ...prev, [key]: value }))
   }
 
-  const descargar = (id: string, tipo: 'pdf' | 'xml') => {
-    const url = `/api/documentos/${id}/descargar-${tipo}`
-    window.open(url, '_blank')
+  const descargar = async (id: string, tipo: 'pdf' | 'xml') => {
+    setDescargandoId(`${id}-${tipo}`)
+    try {
+      const response = await fetchApi(`/api/documentos/${id}/descargar-${tipo}`)
+      if (!response.ok) {
+        const message = await response.text().catch(() => '')
+        throw new Error(message || `No se pudo descargar ${tipo.toUpperCase()}`)
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `documento-${id}.${tipo}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error descargando documento', error)
+      alert(error instanceof Error ? error.message : 'No se pudo descargar el documento')
+    } finally {
+      setDescargandoId(null)
+    }
   }
 
   const formatos = useMemo(
@@ -191,10 +214,18 @@ export default function DescargasPage() {
                     <td className="px-4 py-2 text-sm text-slate-700">{doc.estado || '-'}</td>
                     <td className="px-4 py-2 text-sm text-slate-700">
                       <div className="flex gap-2">
-                        <button className="btn btn-secondary" onClick={() => descargar(doc.id, 'pdf')}>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => descargar(doc.id, 'pdf')}
+                          disabled={descargandoId === `${doc.id}-pdf`}
+                        >
                           PDF
                         </button>
-                        <button className="btn btn-secondary" onClick={() => descargar(doc.id, 'xml')}>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => descargar(doc.id, 'xml')}
+                          disabled={descargandoId === `${doc.id}-xml`}
+                        >
                           XML
                         </button>
                       </div>

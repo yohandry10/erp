@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { buildApiUrl } from '@/lib/api-url';
+import { fetchWithOfflineSupport } from '@/lib/offline-store';
 
 interface DemoStatus {
   is_demo: boolean;
@@ -28,9 +30,13 @@ export function DemoBanner() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/api/demo/status`, {
+      const response = await fetchWithOfflineSupport(buildApiUrl('/api/demo/status'), {
         headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        mode: 'cors',
+        cache: 'no-store',
+      }, {
+        endpoint: '/api/demo/status',
       });
 
       if (response.ok) {
@@ -47,14 +53,18 @@ export function DemoBanner() {
   const handleExtend = async () => {
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/api/demo/extend`, {
+      const response = await fetchWithOfflineSupport(buildApiUrl('/api/demo/extend'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ dias_extension: 7 }),
+        credentials: 'include',
+        mode: 'cors',
+        cache: 'no-store',
+      }, {
+        endpoint: '/api/demo/extend',
       });
 
       if (response.ok) {

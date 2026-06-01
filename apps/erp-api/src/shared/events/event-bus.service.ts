@@ -53,6 +53,9 @@ export interface MovimientoStockEvent {
   tenantId?: string;
   idempotencyKey?: string;
   source?: string;
+  movimientoId?: string;
+  movimiento_id?: string;
+  aggregateId?: string;
   productoId: string;
   tipoMovimiento: 'ENTRADA' | 'SALIDA' | 'AJUSTE';
   cantidad: number;
@@ -656,6 +659,7 @@ export class EventBusService {
     'planilla.liquidada',
     'planilla.pagada',
     'cpe.anulado',
+    'stock.movimiento',
   ]);
 
   constructor(private readonly outboxService?: OutboxService) {
@@ -683,6 +687,8 @@ export class EventBusService {
         const aggregateId =
           data?.aggregateId ||
           data?.id ||
+          data?.movimientoId ||
+          data?.movimiento_id ||
           data?.ventaId ||
           data?.cpeId ||
           data?.facturaId ||
@@ -844,13 +850,21 @@ export class EventBusService {
   }
 
   // Eventos de inventario
-  emitMovimientoStock(data: MovimientoStockEvent, tenantId?: string) {
+  async emitMovimientoStock(data: MovimientoStockEvent, tenantId?: string) {
     const resolvedTenant = tenantId ?? (data as any)?.tenantId ?? (data as any)?.tenant_id ?? null;
+    const movimientoId = data?.movimientoId ?? data?.movimiento_id;
+    const idempotencyKey =
+      data?.idempotencyKey ??
+      (resolvedTenant && movimientoId ? `stock.movimiento:${resolvedTenant}:${movimientoId}` : undefined);
     const payload: MovimientoStockEvent = {
       ...data,
       tenantId: resolvedTenant ?? data?.tenantId,
+      movimientoId: data?.movimientoId ?? data?.movimiento_id,
+      eventId: data?.eventId ?? movimientoId,
+      aggregateId: data?.aggregateId ?? movimientoId,
+      idempotencyKey,
     };
-    this.emit('stock.movimiento', payload, 'inventario', resolvedTenant ?? undefined);
+    await this.emit('stock.movimiento', payload, 'inventario', resolvedTenant ?? undefined);
   }
 
   async emitProductoStockBajo(data: ProductoStockBajoEvent, tenantId?: string) {

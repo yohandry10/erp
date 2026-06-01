@@ -28,8 +28,7 @@ export default function OrdenCompraModal({
   orden 
 }: OrdenCompraModalProps) {
   const { tasaIgv } = useTaxConfig()
-  const { get } = useApi()
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+  const { get, post, put } = useApi()
   
   // DEBUG: Log de props recibidas
   console.log('🔍 OrdenCompraModal recibido props:', { isOpen, orden })
@@ -244,21 +243,9 @@ export default function OrdenCompraModal({
       
       console.log('📤 Datos completos a enviar:', JSON.stringify(ordenData, null, 2))
 
-      const url = orden 
-        ? `${API_URL}/api/compras/ordenes/${orden.id}`
-        : `${API_URL}/api/compras/ordenes`
-      
-      const method = orden ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(ordenData)
-      })
-
-      const result = await response.json()
+      const result = orden
+        ? await put(`/api/compras/ordenes/${orden.id}`, ordenData)
+        : await post('/api/compras/ordenes', ordenData)
 
       if (result.success) {
         onSuccess()

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext'
+import { fetchApi } from '@/lib/api-fetch';
 
 interface DemoStatus {
   is_demo: boolean;
@@ -26,10 +27,7 @@ export function useDemoStatus() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/api/demo/status`, {
-        credentials: 'include',
-      });
+      const response = await fetchApi('/api/demo/status');
 
       if (response.ok) {
         const data = await response.json();

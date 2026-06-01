@@ -68,7 +68,7 @@ Generar nuevos, no reusar los de dev:
 
 ## 1. Aplicar baseline de BD en el proyecto productivo
 
-Las migraciones `000..335` forman la linea canonica reproducible. Se valido el 2026-05-24 que aplican limpio en Postgres 16 desde cero. Detalle en `docs/00_coordination/CURRENT_STATE.md`.
+Las migraciones `000..341` forman la linea canonica vigente. La linea `000..335` fue validada desde cero el 2026-05-24; `337..341` ya fueron aplicadas/verificadas en DEV y PROD remoto por `psql` segun `docs/00_coordination/CURRENT_STATE.md`.
 
 ### 1.1 Pre-requisitos no-Supabase (saltable en Supabase, requerido en Postgres puro)
 
@@ -87,7 +87,7 @@ DO $$ BEGIN
 END $$;
 ```
 
-### 1.2 Aplicar las 332 migraciones en orden
+### 1.2 Aplicar las migraciones en orden
 
 Definir `POSTGRES_URL` apuntando al proyecto productivo (NO al de dev). Desde la raiz del repo:
 
@@ -101,7 +101,7 @@ done
 
 Si alguna migracion falla, no continuar. Anotar el error en `CURRENT_STATE.md` y abrir un fix antes de retomar.
 
-### 1.3 Verificar artefactos clave 327..335
+### 1.3 Verificar artefactos clave 327..341
 
 ```bash
 psql --dbname="$PG_URL" -c "
@@ -117,13 +117,15 @@ WHERE n.nspname IN ('public','app')
     'validar_tesoreria_caja_bancos_runtime',
     'descontar_stock_y_liberar_reserva',
     'registrar_cxc_pago_tx',
-    'conciliar_movimientos_bancarios_tx'
+    'conciliar_movimientos_bancarios_tx',
+    'cerrar_recepcion_tx',
+    'reservar_pedido_stock_tx'
   )
 ORDER BY proname;
 "
 ```
 
-Debe devolver las 10 funciones.
+Debe devolver las 12 funciones.
 
 ### 1.4 Correr los 3 validadores runtime
 

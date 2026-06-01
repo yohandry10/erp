@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { buildApiUrl } from '@/lib/api-url';
 
 export default function ConvertDemoPage() {
   const router = useRouter();
@@ -22,14 +23,16 @@ export default function ConvertDemoPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-      const response = await fetch(`${apiUrl}/api/demo/convert-to-real`, {
+      const response = await fetch(buildApiUrl('/api/demo/convert-to-real'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(formData),
+        credentials: 'include',
+        mode: 'cors',
+        cache: 'no-store',
       });
 
       if (!response.ok) {

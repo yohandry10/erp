@@ -20,6 +20,7 @@ El stack local estandar usa:
 
 - Docker Desktop activo.
 - `.env` local creado desde `.env.example`.
+- `REDIS_PASSWORD` definido en `.env` o variables del host; el compose falla intencionalmente si falta para evitar defaults conocidos.
 - Secretos reales solo en `.env`, variables del host o secret manager. No commitear secretos.
 - Certificado demo/local en `certs/demo.pfx` solo para homologacion local.
 

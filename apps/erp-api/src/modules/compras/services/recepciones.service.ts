@@ -577,7 +577,7 @@ export class RecepcionesService {
    * la data ya está committeada, un fallo aquí no revierte el cierre.
    */
   private async emitirEventosMovimientoEntrada(
-    movimientos: Array<{ producto_id: string; almacen_id: string; cantidad: number }>,
+    movimientos: Array<{ movimiento_id?: string; producto_id: string; almacen_id: string; cantidad: number }>,
     recepcion: any,
     tenantId: string,
   ): Promise<void> {
@@ -601,6 +601,7 @@ export class RecepcionesService {
 
         await this.eventBus.emitMovimientoStock(
           {
+            movimientoId: mov.movimiento_id,
             productoId: mov.producto_id,
             tipoMovimiento: 'ENTRADA',
             cantidad,

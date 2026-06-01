@@ -346,6 +346,117 @@ describe('PedidosService (facturación)', () => {
       cpeIntegrationService.generarFacturaDesdePedido.mock.invocationCallOrder[0],
     ).toBeLessThan(mockSupabaseClient.rpc.mock.invocationCallOrder[0]);
   });
+
+  it('repara cantidad_facturada al reintentar un pedido que ya tiene factura', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [
+          {
+            data: {
+              ruc: '20123456789',
+              razon_social: 'Empresa Test SAC',
+              direccion_fiscal: 'Av. Test 123',
+              certificado_pfx: 'base64-pfx',
+              certificado_password: 'secret',
+            },
+            error: null,
+          },
+        ],
+      },
+      pedidos_venta_detalle: {
+        maybeSingle: [{ data: { id: 'det-1' }, error: null }],
+      },
+    });
+
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+    (service as any).greIntegrationService.verificarSugerenciaGRE.mockResolvedValue({ sugerir: false });
+
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({
+      usar_flujo_logistica: false,
+    });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1',
+      estado: 'LISTO_FACTURAR',
+      numero: 'PV-0001',
+      detalle: [
+        {
+          id: 'det-1',
+          pedido_id: 'pedido-1',
+          producto_id: 'prod-1',
+          descripcion: 'Producto 1',
+          cantidad: 2,
+          cantidad_facturada: 1,
+          precio_unitario: 50,
+          subtotal: 100,
+          created_at: '2026-05-27T00:00:00Z',
+        },
+      ],
+      factura_id: 'cpe-1',
+    });
+
+    const result = await service.generarFactura('pedido-1', 'tenant-1', 'user-1');
+
+    expect(result).toEqual({ success: true, factura_id: 'cpe-1', sugerir_gre: false });
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.__spies.update).toHaveBeenCalledWith('pedidos_venta_detalle', {
+      cantidad_facturada: 2,
+      estado_item: 'FACTURADO',
+    });
+  });
+
+  it('no oculta un fallo al reparar cantidad_facturada en reintentos idempotentes', async () => {
+    mockSupabaseClient = createMockSupabaseClient({
+      empresa_config: {
+        single: [
+          {
+            data: {
+              ruc: '20123456789',
+              razon_social: 'Empresa Test SAC',
+              direccion_fiscal: 'Av. Test 123',
+              certificado_pfx: 'base64-pfx',
+              certificado_password: 'secret',
+            },
+            error: null,
+          },
+        ],
+      },
+      pedidos_venta_detalle: {
+        maybeSingle: [{ data: null, error: { message: 'update failed' } }],
+      },
+    });
+
+    (moduleRefSupabase(service) as any).getClient.mockReturnValue(mockSupabaseClient);
+
+    jest.spyOn(service as any, 'obtenerConfiguracionEmpresa').mockResolvedValue({
+      usar_flujo_logistica: false,
+    });
+    jest.spyOn(service as any, 'findOne').mockResolvedValue({
+      id: 'pedido-1',
+      estado: 'LISTO_FACTURAR',
+      numero: 'PV-0001',
+      detalle: [
+        {
+          id: 'det-1',
+          pedido_id: 'pedido-1',
+          producto_id: 'prod-1',
+          descripcion: 'Producto 1',
+          cantidad: 2,
+          cantidad_facturada: 1,
+          precio_unitario: 50,
+          subtotal: 100,
+          created_at: '2026-05-27T00:00:00Z',
+        },
+      ],
+      factura_id: 'cpe-1',
+    });
+
+    await expect(service.generarFactura('pedido-1', 'tenant-1', 'user-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(cpeIntegrationService.generarFacturaDesdePedido).not.toHaveBeenCalled();
+    expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+  });
 });
 
 function moduleRefSupabase(service: PedidosService) {

@@ -1,3 +1,4 @@
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -108,6 +109,16 @@ fn offline_outbox_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(config_dir.join("offline_outbox.json"))
 }
 
+fn offline_db_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("No se pudo resolver el directorio de configuracion: {e}"))?;
+    fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("No se pudo crear el directorio de configuracion: {e}"))?;
+    Ok(config_dir.join("erp_local.sqlite"))
+}
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -115,23 +126,155 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> {
-    let path = offline_outbox_path(app)?;
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
+fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
+    let path = offline_db_path(app)?;
+    let conn = Connection::open(path).map_err(|e| format!("No se pudo abrir SQLite local: {e}"))?;
+    conn.pragma_update(None, "journal_mode", "WAL")
+        .map_err(|e| format!("No se pudo activar WAL en SQLite local: {e}"))?;
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .map_err(|e| format!("No se pudo activar foreign_keys en SQLite local: {e}"))?;
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS local_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
 
-    let raw = fs::read_to_string(path)
-        .map_err(|e| format!("No se pudo leer la cola offline: {e}"))?;
-    serde_json::from_str(&raw).map_err(|e| format!("Cola offline invalida: {e}"))
+        CREATE TABLE IF NOT EXISTS offline_requests (
+            id TEXT PRIMARY KEY,
+            endpoint TEXT NOT NULL,
+            method TEXT NOT NULL,
+            url TEXT NOT NULL,
+            headers_json TEXT NOT NULL DEFAULT '[]',
+            body TEXT,
+            tenant_id TEXT,
+            user_id TEXT,
+            status TEXT NOT NULL CHECK (status IN ('pending', 'failed', 'synced')),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            last_error TEXT,
+            response_status INTEGER,
+            response_body TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_offline_requests_status_updated
+            ON offline_requests(status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_offline_requests_tenant_status
+            ON offline_requests(tenant_id, status);
+        "#,
+    )
+    .map_err(|e| format!("No se pudo inicializar SQLite local: {e}"))?;
+
+    migrate_legacy_json_outbox(app, &conn)?;
+    Ok(conn)
 }
 
-fn write_offline_queue(app: &AppHandle, items: &[OfflineQueueItem]) -> Result<(), String> {
+fn migrate_legacy_json_outbox(app: &AppHandle, conn: &Connection) -> Result<(), String> {
+    let existing: i64 = conn
+        .query_row("SELECT COUNT(*) FROM offline_requests", [], |row| {
+            row.get(0)
+        })
+        .map_err(|e| format!("No se pudo contar cola offline SQLite: {e}"))?;
+    if existing > 0 {
+        return Ok(());
+    }
+
     let path = offline_outbox_path(app)?;
-    let raw = serde_json::to_string_pretty(items)
-        .map_err(|e| format!("No se pudo serializar la cola offline: {e}"))?;
-    write_file_replace(&path, raw)
-        .map_err(|e| format!("No se pudo guardar la cola offline: {e}"))
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| format!("No se pudo leer cola offline legacy: {e}"))?;
+    let items: Vec<OfflineQueueItem> =
+        serde_json::from_str(&raw).map_err(|e| format!("Cola offline legacy invalida: {e}"))?;
+
+    for item in items {
+        insert_offline_item(conn, &item)?;
+    }
+
+    let migrated_path = path.with_extension("json.migrated");
+    let _ = fs::rename(path, migrated_path);
+    Ok(())
+}
+
+fn insert_offline_item(conn: &Connection, item: &OfflineQueueItem) -> Result<(), String> {
+    let headers_json = serde_json::to_string(&item.headers)
+        .map_err(|e| format!("No se pudo serializar headers offline: {e}"))?;
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO offline_requests (
+            id, endpoint, method, url, headers_json, body, tenant_id, user_id,
+            status, attempts, created_at, updated_at, last_error, response_status, response_body
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+        "#,
+        params![
+            &item.id,
+            &item.endpoint,
+            &item.method,
+            &item.url,
+            headers_json,
+            &item.body,
+            &item.tenant_id,
+            &item.user_id,
+            &item.status,
+            item.attempts,
+            item.created_at,
+            item.updated_at,
+            &item.last_error,
+            item.response_status,
+            &item.response_body,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar operacion offline en SQLite: {e}"))?;
+    Ok(())
+}
+
+fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> {
+    let conn = open_local_db(app)?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT id, endpoint, method, url, headers_json, body, tenant_id, user_id,
+                   status, attempts, created_at, updated_at, last_error, response_status, response_body
+            FROM offline_requests
+            ORDER BY created_at ASC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar lectura offline SQLite: {e}"))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let headers_json: String = row.get(4)?;
+            let headers: Vec<HeaderPair> = serde_json::from_str(&headers_json).unwrap_or_default();
+            Ok(OfflineQueueItem {
+                id: row.get(0)?,
+                endpoint: row.get(1)?,
+                method: row.get(2)?,
+                url: row.get(3)?,
+                headers,
+                body: row.get(5)?,
+                tenant_id: row.get(6)?,
+                user_id: row.get(7)?,
+                status: row.get(8)?,
+                attempts: row.get::<_, i64>(9)? as u32,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                last_error: row.get(12)?,
+                response_status: row.get::<_, Option<i64>>(13)?.map(|value| value as u16),
+                response_body: row.get(14)?,
+            })
+        })
+        .map_err(|e| format!("No se pudo leer cola offline SQLite: {e}"))?;
+
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(row.map_err(|e| format!("Fila offline SQLite invalida: {e}"))?);
+    }
+    Ok(items)
 }
 
 fn write_file_replace(path: &PathBuf, raw: String) -> std::io::Result<()> {
@@ -152,8 +295,7 @@ fn load_config(app: AppHandle) -> Result<AppConfig, String> {
 
     let raw = fs::read_to_string(path)
         .map_err(|e| format!("No se pudo leer la configuracion local: {e}"))?;
-    serde_json::from_str(&raw)
-        .map_err(|e| format!("Configuracion local invalida: {e}"))
+    serde_json::from_str(&raw).map_err(|e| format!("Configuracion local invalida: {e}"))
 }
 
 #[tauri::command]
@@ -171,7 +313,7 @@ fn enqueue_offline_request(
     request: OfflineRequestInput,
 ) -> Result<OfflineQueueItem, String> {
     let _guard = lock_offline_queue()?;
-    let mut queue = read_offline_queue(&app)?;
+    let conn = open_local_db(&app)?;
     let timestamp = now_ms();
     let item = OfflineQueueItem {
         id: Uuid::new_v4().to_string(),
@@ -191,8 +333,7 @@ fn enqueue_offline_request(
         response_body: None,
     };
 
-    queue.push(item.clone());
-    write_offline_queue(&app, &queue)?;
+    insert_offline_item(&conn, &item)?;
     Ok(item)
 }
 
@@ -210,66 +351,67 @@ fn mark_offline_request_synced(
     response_body: Option<String>,
 ) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let mut queue = read_offline_queue(&app)?;
-    let mut found = false;
-    for item in &mut queue {
-        if item.id == id {
-            item.status = "synced".to_string();
-            item.response_status = Some(response_status);
-            item.response_body = response_body.clone();
-            item.last_error = None;
-            item.updated_at = now_ms();
-            found = true;
-            break;
-        }
-    }
+    let conn = open_local_db(&app)?;
+    let changed = conn
+        .execute(
+            r#"
+            UPDATE offline_requests
+            SET status = 'synced',
+                response_status = ?2,
+                response_body = ?3,
+                last_error = NULL,
+                updated_at = ?4
+            WHERE id = ?1
+            "#,
+            params![&id, response_status as i64, &response_body, now_ms()],
+        )
+        .map_err(|e| format!("No se pudo marcar operacion offline sincronizada: {e}"))?;
 
-    if !found {
+    if changed == 0 {
         return Err(format!("No existe item offline con id {id}"));
     }
 
-    write_offline_queue(&app, &queue)
+    Ok(())
 }
 
 #[tauri::command]
-fn mark_offline_request_failed(
-    app: AppHandle,
-    id: String,
-    error: String,
-) -> Result<(), String> {
+fn mark_offline_request_failed(app: AppHandle, id: String, error: String) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let mut queue = read_offline_queue(&app)?;
-    let mut found = false;
-    for item in &mut queue {
-        if item.id == id {
-            item.status = "failed".to_string();
-            item.attempts = item.attempts.saturating_add(1);
-            item.last_error = Some(error.clone());
-            item.updated_at = now_ms();
-            found = true;
-            break;
-        }
-    }
+    let conn = open_local_db(&app)?;
+    let changed = conn
+        .execute(
+            r#"
+            UPDATE offline_requests
+            SET status = 'failed',
+                attempts = attempts + 1,
+                last_error = ?2,
+                updated_at = ?3
+            WHERE id = ?1
+            "#,
+            params![&id, &error, now_ms()],
+        )
+        .map_err(|e| format!("No se pudo marcar operacion offline fallida: {e}"))?;
 
-    if !found {
+    if changed == 0 {
         return Err(format!("No existe item offline con id {id}"));
     }
 
-    write_offline_queue(&app, &queue)
+    Ok(())
 }
 
 #[tauri::command]
 fn delete_offline_request(app: AppHandle, id: String) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
-    let mut queue = read_offline_queue(&app)?;
-    let original_len = queue.len();
-    queue.retain(|item| item.id != id);
+    let conn = open_local_db(&app)?;
+    let changed = conn
+        .execute("DELETE FROM offline_requests WHERE id = ?1", params![&id])
+        .map_err(|e| format!("No se pudo eliminar operacion offline: {e}"))?;
 
-    if queue.len() == original_len {
+    if changed == 0 {
         return Err(format!("No existe item offline con id {id}"));
     }
 
-    write_offline_queue(&app, &queue)
+    Ok(())
 }
 
 #[tauri::command]
@@ -308,7 +450,10 @@ async fn send_to_sunat(_signed_xml: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn generate_pdf(_xml_content: String, _template: Option<String>) -> Result<Vec<u8>, String> {
-    Err("La generacion de PDF fiscal se ejecuta en el backend API en modo desktop online-first.".to_string())
+    Err(
+        "La generacion de PDF fiscal se ejecuta en el backend API en modo desktop online-first."
+            .to_string(),
+    )
 }
 
 #[tauri::command]
@@ -316,11 +461,15 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
     let config = load_config(app.clone()).unwrap_or_default();
     let _guard = lock_offline_queue()?;
     let queue = read_offline_queue(&app)?;
+    let sqlite_path = offline_db_path(&app)
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_default();
     let payload = serde_json::json!({
         "kind": "erp_desktop_offline_backup",
         "generated_at": now_ms(),
         "config": config,
         "offline_outbox": queue,
+        "sqlite_path": sqlite_path,
         "note": "Backup local del cliente desktop. La base autoritativa sigue siendo backend/BD."
     });
     let raw = serde_json::to_string_pretty(&payload)
@@ -330,15 +479,20 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
 
 #[tauri::command]
 async fn export_sire_data(_periodo: String) -> Result<String, String> {
-    Err("La exportacion SIRE se ejecuta en el backend API en modo desktop online-first.".to_string())
+    Err(
+        "La exportacion SIRE se ejecuta en el backend API en modo desktop online-first."
+            .to_string(),
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build())
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
