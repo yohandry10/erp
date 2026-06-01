@@ -14,7 +14,8 @@ La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNA
 - **Cliente nativo Tauri** para operar contra el API del ERP.
 - **Configuración local mínima** para preferencias desktop; no reemplaza la configuración fiscal del backend.
 - **Certificados y credenciales fiscales**: se gestionan en el backend/wizard del ERP.
-- **Outbox offline durable** en SQLite desktop para operaciones pendientes.
+- **POS + caja local-first** en SQLite desktop para operar ventas, apertura y cierre sin red sobre datos sincronizados.
+- **Outbox offline durable** en SQLite desktop para operaciones pendientes de otros módulos.
 - **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
 
@@ -139,6 +140,9 @@ apps/web/
 - `mark_offline_request_synced(id, responseStatus, responseBody)` - Marcar operación sincronizada
 - `mark_offline_request_failed(id, error)` - Marcar operación fallida
 - `delete_offline_request(id)` - Eliminar operación local
+- `hydrate_local_first_response(endpoint, url, status, headers, body)` - Hidratar SQLite con snapshots POS/caja al operar online.
+- `get_local_first_response(endpoint, url)` - Leer snapshots/tablas locales para endpoints POS/caja offline.
+- `process_local_first_write(request)` - Procesar transacciones locales de POS/caja y dejar sync pendiente.
 
 ### Procesamiento de Documentos
 - `sign_xml(xmlContent)` - Existe para compatibilidad, pero responde que la firma se hace en backend.
@@ -155,15 +159,15 @@ apps/web/
 
 ## Modo Offline
 
-El modo offline soportado es de continuidad operativa, no una segunda base autoritativa:
+El modo offline tiene dos niveles:
 
-- `GET`: si la red falla, se devuelve la última respuesta JSON/text cacheada para esa URL.
-- `POST/PUT/PATCH/DELETE`: si la red falla y el body es serializable, se guarda en `erp_local.sqlite` y la UI recibe una respuesta `202` con `offline_queue_id`.
+- **POS + caja local-first**: productos, clientes, métodos de pago, empresa, ventas recientes, cajas y sesión abierta se hidratan en SQLite cuando hay red. Sin red, el POS lee SQLite; ventas, apertura y cierre de caja se guardan transaccionalmente en SQLite, descuentan stock local y quedan pendientes de sincronización.
+- **Resto de módulos**: continuidad operativa por cache/outbox. `GET` devuelve última respuesta JSON/text cacheada; `POST/PUT/PATCH/DELETE` serializable se guarda en `erp_local.sqlite` y la UI recibe `202` con `offline_queue_id`.
 - `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
 - `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, sincronizados y permite reintentar.
 - El indicador superior muestra `Offline` y el número de operaciones pendientes.
 - Al reconectar, la cola se puede sincronizar contra el backend API real vigente en `NEXT_PUBLIC_API_URL`.
-- `pnpm run test:offline` verifica cache de lectura, cola de escritura, sincronización exitosa y fallo persistido.
+- `pnpm run test:offline` verifica cache de lectura, cola de escritura, sincronización exitosa, fallo persistido y dispatch local-first POS.
 - La matriz de smoke desktop/static export del 2026-05-25 cubrio 108 rutas exportadas con API simulada: 108/108 OK.
 
 Restricciones deliberadas:
@@ -172,6 +176,7 @@ Restricciones deliberadas:
 - El cache de respuestas tiene limite por entrada y falla suave si el almacenamiento local esta lleno; la respuesta online no se invalida por un fallo de cache.
 - Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
+- POS/caja offline es autoritativo solo para el dispositivo local hasta sincronizar. Si otro dispositivo vende el mismo stock offline, el backend debe conciliar conflictos al recibir la cola.
 
 ## 🛠️ Desarrollo de Funcionalidades
 

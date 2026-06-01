@@ -37,6 +37,12 @@ export interface OfflineStatus {
   synced: number
 }
 
+export interface LocalFirstResponse {
+  status: number
+  body: string
+  headers: HeaderPair[]
+}
+
 interface ApiCacheEntry {
   url: string
   endpoint: string
@@ -52,6 +58,20 @@ const CACHE_KEY = 'erp.desktop.offline.cache'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
 const OFFLINE_MODE_CACHE_TTL = 5000
+const LOCAL_FIRST_GET_ENDPOINTS = new Set([
+  '/api/pos/productos',
+  '/api/pos/clientes',
+  '/api/pos/metodos-pago',
+  '/api/pos/empresa-config',
+  '/api/pos/ventas-recientes',
+  '/api/pos/sesion-caja',
+  '/api/cajas',
+])
+const LOCAL_FIRST_WRITE_ENDPOINTS = [
+  /^\/api\/pos\/venta$/,
+  /^\/api\/cajas\/[^/]+\/apertura$/,
+  /^\/api\/cajas\/[^/]+\/cierre$/,
+]
 
 let offlineModeCache: { value: boolean; expiresAt: number } | null = null
 
@@ -120,6 +140,84 @@ function pairsToHeaders(pairs: HeaderPair[]) {
     headers.set(pair.name, pair.value)
   }
   return headers
+}
+
+function isLocalFirstGetEndpoint(endpoint: string) {
+  return LOCAL_FIRST_GET_ENDPOINTS.has(endpoint)
+}
+
+function isLocalFirstWriteEndpoint(endpoint: string, method: string) {
+  if (method !== 'POST') return false
+  return LOCAL_FIRST_WRITE_ENDPOINTS.some((pattern) => pattern.test(endpoint))
+}
+
+function responseFromLocalFirst(local: LocalFirstResponse) {
+  const headers = pairsToHeaders(local.headers)
+  headers.set('x-erp-local-first', 'true')
+  headers.set('x-erp-offline-cache', 'true')
+  return new Response(local.body, {
+    status: local.status,
+    statusText: local.status >= 200 && local.status < 300 ? 'OK' : 'Local First',
+    headers,
+  })
+}
+
+async function readLocalFirstResponse(endpoint: string, url: string) {
+  if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return null
+  try {
+    const local = await invoke<LocalFirstResponse | null>('get_local_first_response', { endpoint, url })
+    return local ? responseFromLocalFirst(local) : null
+  } catch (error) {
+    console.warn('[offline-store] No se pudo leer respuesta local-first:', error)
+    return null
+  }
+}
+
+async function hydrateLocalFirstResponse(url: string, endpoint: string, response: Response) {
+  if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return
+  if (!response.ok || response.status === 204) return
+
+  const contentType = response.headers.get('Content-Type') || ''
+  if (!/application\/json|text\//i.test(contentType)) return
+
+  const body = await response.text().catch(() => '')
+  if (!body) return
+
+  try {
+    await invoke('hydrate_local_first_response', {
+      endpoint,
+      url,
+      status: response.status,
+      headers: headersToPairs(response.headers),
+      body,
+    })
+  } catch (error) {
+    console.warn('[offline-store] No se pudo hidratar SQLite local-first:', error)
+  }
+}
+
+async function processLocalFirstWrite(
+  url: string,
+  init: RequestInit,
+  meta: { endpoint: string; userId?: string | null; tenantId?: string | null },
+  method: string,
+) {
+  if (!isDesktopRuntime() || !isLocalFirstWriteEndpoint(meta.endpoint, method)) return null
+  const body = bodyToString(init.body)
+  if (body === null && init.body !== null && init.body !== undefined) return null
+
+  const local = await invoke<LocalFirstResponse>('process_local_first_write', {
+    request: {
+      endpoint: meta.endpoint,
+      method,
+      url,
+      headers: headersToPairs(init.headers),
+      body,
+      tenant_id: meta.tenantId ?? null,
+      user_id: meta.userId ?? null,
+    },
+  })
+  return responseFromLocalFirst(local)
 }
 
 export async function enqueueOfflineRequest(input: OfflineRequestInput): Promise<OfflineQueueItem> {
@@ -354,9 +452,15 @@ export async function fetchWithOfflineSupport(
 
   if (forceOffline) {
     if (method === 'GET') {
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url)
+      if (localFirst) return localFirst
+
       const cached = await readCachedApiResponse(url)
       if (cached) return cached
     }
+
+    const localFirstWrite = await processLocalFirstWrite(url, init, meta, method)
+    if (localFirstWrite) return localFirstWrite
 
     if (canQueue(method, init.body)) {
       const item = await enqueueOfflineRequest({
@@ -377,14 +481,21 @@ export async function fetchWithOfflineSupport(
   try {
     const response = await fetch(url, init)
     if (method === 'GET' && response.ok) {
+      await hydrateLocalFirstResponse(url, meta.endpoint, response.clone())
       await cacheApiResponse(url, meta.endpoint, response.clone())
     }
     return response
   } catch (error) {
     if (method === 'GET') {
+      const localFirst = await readLocalFirstResponse(meta.endpoint, url)
+      if (localFirst) return localFirst
+
       const cached = await readCachedApiResponse(url)
       if (cached) return cached
     }
+
+    const localFirstWrite = await processLocalFirstWrite(url, init, meta, method)
+    if (localFirstWrite) return localFirstWrite
 
     if (canQueue(method, init.body)) {
       const item = await enqueueOfflineRequest({

@@ -39,7 +39,25 @@ try {
     'dom,dom.iterable,es2022',
   ])
 
-  const testScript = `
+const testScript = `
+const Module = require('module')
+const originalLoad = Module._load
+let invokeCalls = []
+let invokeHandler = async () => {
+  throw new Error('invoke handler no configurado')
+}
+Module._load = function patchedLoad(request, parent, isMain) {
+  if (request === '@tauri-apps/api/core') {
+    return {
+      invoke: (command, args) => {
+        invokeCalls.push({ command, args })
+        return invokeHandler(command, args)
+      },
+    }
+  }
+  return originalLoad.apply(this, arguments)
+}
+
 const store = new Map()
 globalThis.window = {
   localStorage: {
@@ -150,6 +168,56 @@ const assert = (condition, message) => {
 
   const status = await mod.getOfflineStatus()
   assert(status.total === 2 && status.synced === 1 && status.failed === 1, 'status debe contar synced/failed')
+
+  window.__TAURI__ = {}
+  online = false
+  mod.invalidateOfflineModeCache()
+  invokeCalls = []
+  invokeHandler = async (command, args) => {
+    if (command === 'get_offline_status') {
+      return { offline_mode: true, total: 0, pending: 0, failed: 0, synced: 0 }
+    }
+    if (command === 'get_local_first_response') {
+      assert(args.endpoint === '/api/pos/productos', 'GET local-first debe pedir endpoint POS')
+      return {
+        status: 200,
+        body: JSON.stringify({ success: true, data: [{ id: 'p1', stock_actual: 4 }] }),
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+      }
+    }
+    if (command === 'process_local_first_write') {
+      assert(args.request.endpoint === '/api/pos/venta', 'venta POS debe procesarse local-first')
+      return {
+        status: 200,
+        body: JSON.stringify({ success: true, data: { venta_id: 'local-sale-1', estado: 'PENDIENTE_SYNC' } }),
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+      }
+    }
+    throw new Error('invoke inesperado: ' + command)
+  }
+
+  const localProducts = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/pos/productos',
+    { method: 'GET' },
+    { endpoint: '/api/pos/productos' },
+  )
+  assert(localProducts.headers.get('x-erp-local-first') === 'true', 'GET POS offline debe salir de SQLite local-first')
+  assert((await localProducts.json()).data[0].id === 'p1', 'GET POS local-first debe preservar data')
+
+  const localSale = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/pos/venta',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ total: 20, items: [{ producto_id: 'p1', cantidad: 1 }] }),
+    },
+    { endpoint: '/api/pos/venta', tenantId: 'tenant-1', userId: 'user-1' },
+  )
+  const localSalePayload = await localSale.json()
+  assert(localSale.status === 200, 'venta POS local-first debe responder 200 al POS')
+  assert(localSalePayload.data.venta_id === 'local-sale-1', 'venta POS local-first debe devolver venta local')
+  assert(invokeCalls.some((call) => call.command === 'process_local_first_write'), 'venta local-first debe invocar Tauri')
+
   console.log(JSON.stringify({ ok: true, fetchCalls, syncCall, status }, null, 2))
 })().catch((error) => {
   console.error(error)
