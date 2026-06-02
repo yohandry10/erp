@@ -18,6 +18,8 @@ La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNA
 - **Clientes e inventario base local-first**: clientes, productos, almacenes/movimientos por snapshot y alta/edición/eliminación local de clientes/productos con sincronización posterior.
 - **Ventas comerciales local-first**: cotizaciones y pedidos se pueden listar, consultar, crear, editar y eliminar localmente; los pedidos reservan stock local y quedan pendientes de sincronización.
 - **Cobertura genérica local-first para módulos restantes**: RRHH, compras, finanzas, contabilidad, documentos, configuración operativa, usuarios y reportes JSON hidratan snapshots locales. Las escrituras JSON no especializadas se guardan como registros locales pendientes y se sincronizan con el backend.
+- **Mapeo local-remoto**: las entidades creadas offline guardan metadata de ID local en la cola y registran el ID autoritativo devuelto por backend al sincronizar.
+- **Cache binario básico**: PDFs/reportes/binarios ya descargados online se guardan en SQLite desktop para relectura offline.
 - **Outbox offline durable** en SQLite desktop para operaciones pendientes de otros módulos.
 - **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
@@ -141,8 +143,11 @@ apps/web/
 - `enqueue_offline_request(request)` - Guardar operación local pendiente
 - `list_offline_requests()` - Listar operaciones locales
 - `mark_offline_request_synced(id, responseStatus, responseBody)` - Marcar operación sincronizada
-- `mark_offline_request_failed(id, error)` - Marcar operación fallida
+- `mark_offline_request_failed(id, error, responseStatus)` - Marcar operación fallida
 - `delete_offline_request(id)` - Eliminar operación local
+- `list_local_id_mappings()` - Listar mapeos local-remoto confirmados por sync.
+- `cache_binary_response(endpoint, url, status, headers, bodyBase64)` - Guardar respuesta binaria local.
+- `get_binary_response(endpoint, url)` - Leer respuesta binaria local.
 - `hydrate_local_first_response(endpoint, url, status, headers, body)` - Hidratar SQLite con snapshots POS/caja al operar online.
 - `get_local_first_response(endpoint, url)` - Leer snapshots/tablas locales para endpoints POS/caja offline.
 - `process_local_first_write(request)` - Procesar transacciones locales de POS/caja y dejar sync pendiente.
@@ -168,22 +173,22 @@ El modo offline tiene dos niveles:
 - **Clientes e inventario base local-first**: `/dashboard/ventas/clientes` y `/dashboard/inventario/productos` pueden leer SQLite offline. Crear, editar y eliminar clientes/productos se guarda localmente y se encola para sync. Inventario comparte la tabla local de productos con POS, por lo que el stock descontado por ventas offline se refleja en el catálogo local.
 - **Ventas comerciales local-first**: `/dashboard/ventas/cotizaciones` y `/dashboard/ventas/pedidos` leen SQLite offline. Crear/editar/eliminar cotizaciones y pedidos se guarda en SQLite y se encola para sync. Los pedidos creados offline reservan stock local, pero confirmación, despacho, facturación y GRE/CPE quedan sujetos al backend.
 - **Resto de módulos**: continuidad operativa local-first genérica. `GET` JSON hidrata snapshots SQLite y los mezcla con registros locales pendientes; `POST/PUT/DELETE` JSON serializable se guarda como entidad local con `sync_status=pending` y también se encola para sincronización.
+- **Binarios ya visitados**: reportes/PDFs/archivos descargados online se pueden consultar offline desde SQLite mientras no excedan el límite local.
 - `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
-- `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, sincronizados y permite reintentar.
+- `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, conflictos, mapeos local-remoto, permite reintentar y refrescar snapshots base.
 - El indicador superior muestra `Offline` y el número de operaciones pendientes.
 - Al reconectar, la cola se puede sincronizar contra el backend API real vigente en `NEXT_PUBLIC_API_URL`.
-- `pnpm run test:offline` verifica cache de lectura, cola de escritura, sincronización exitosa, fallo persistido y dispatch local-first POS.
+- `pnpm run test:offline` verifica cache de lectura, cache binario, cola de escritura, sincronización exitosa, fallo persistido, mapeos local-remoto y dispatch local-first POS/genérico.
 - La matriz de smoke desktop/static export del 2026-05-25 cubrio 108 rutas exportadas con API simulada: 108/108 OK.
 
 Restricciones deliberadas:
 
-- No se cachean PDFs/binarios ni `FormData`.
+- No se cachean cargas `FormData`; solo respuestas binarias ya descargadas y acotadas por tamaño.
 - El cache de respuestas tiene limite por entrada y falla suave si el almacenamiento local esta lleno; la respuesta online no se invalida por un fallo de cache.
 - Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
 - POS/caja offline es autoritativo solo para el dispositivo local hasta sincronizar. Si otro dispositivo vende el mismo stock offline, el backend debe conciliar conflictos al recibir la cola.
-- Clientes/productos creados offline usan IDs locales temporales hasta que el backend confirme la sincronización y el siguiente refresh hidrate los IDs autoritativos.
-- Cotizaciones/pedidos creados offline usan números e IDs temporales locales. La numeración comercial/fiscal autoritativa se rehidrata desde backend al sincronizar.
+- Clientes/productos/cotizaciones/pedidos y registros genéricos creados offline usan IDs locales temporales; al sincronizar se registra el mapeo local-remoto y el siguiente refresh hidrata el estado autoritativo.
 - En módulos genéricos, el registro local permite continuar la operación de UI, pero las reglas de negocio profundas, asientos definitivos, conciliaciones, permisos remotos y validaciones fiscales se confirman al sincronizar.
 
 ## 🛠️ Desarrollo de Funcionalidades

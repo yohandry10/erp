@@ -69,6 +69,16 @@ pub struct OfflineQueueItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalIdMapping {
+    pub local_id: String,
+    pub remote_id: String,
+    pub entity_type: String,
+    pub endpoint: String,
+    pub synced_at: i64,
+    pub response_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OfflineStatus {
     pub offline_mode: bool,
     pub total: usize,
@@ -82,6 +92,14 @@ pub struct LocalFirstResponse {
     pub status: u16,
     pub body: String,
     pub headers: Vec<HeaderPair>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BinaryLocalResponse {
+    pub status: u16,
+    pub headers: Vec<HeaderPair>,
+    pub body_base64: String,
+    pub cached_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -195,6 +213,31 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE INDEX IF NOT EXISTS idx_local_api_snapshots_endpoint
             ON local_api_snapshots(endpoint, cached_at);
+
+        CREATE TABLE IF NOT EXISTS local_binary_cache (
+            cache_key TEXT PRIMARY KEY,
+            endpoint TEXT NOT NULL,
+            url TEXT NOT NULL,
+            status INTEGER NOT NULL,
+            headers_json TEXT NOT NULL DEFAULT '[]',
+            body_base64 TEXT NOT NULL,
+            cached_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_binary_cache_endpoint
+            ON local_binary_cache(endpoint, cached_at);
+
+        CREATE TABLE IF NOT EXISTS local_id_map (
+            local_id TEXT PRIMARY KEY,
+            remote_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            synced_at INTEGER NOT NULL,
+            response_json TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_id_map_remote
+            ON local_id_map(remote_id, entity_type);
 
         CREATE TABLE IF NOT EXISTS pos_products (
             id TEXT PRIMARY KEY,
@@ -318,6 +361,33 @@ fn collection_endpoint(endpoint: &str) -> String {
 
 fn response_headers_json(headers: &[HeaderPair]) -> Result<String, String> {
     serde_json::to_string(headers).map_err(|e| format!("No se pudo serializar headers locales: {e}"))
+}
+
+fn header_value(headers: &[HeaderPair], name: &str) -> Option<String> {
+    headers
+        .iter()
+        .find(|header| header.name.eq_ignore_ascii_case(name))
+        .map(|header| header.value.clone())
+}
+
+fn with_local_entity_headers(
+    input: &LocalFirstWriteInput,
+    local_id: &str,
+    entity_type: &str,
+) -> LocalFirstWriteInput {
+    let mut next = input.clone();
+    next.headers
+        .retain(|header| !header.name.eq_ignore_ascii_case("x-erp-local-id")
+            && !header.name.eq_ignore_ascii_case("x-erp-local-entity-type"));
+    next.headers.push(HeaderPair {
+        name: "x-erp-local-id".to_string(),
+        value: local_id.to_string(),
+    });
+    next.headers.push(HeaderPair {
+        name: "x-erp-local-entity-type".to_string(),
+        value: entity_type.to_string(),
+    });
+    next
 }
 
 fn json_success_response(data: Value, message: &str) -> Result<LocalFirstResponse, String> {
@@ -1067,7 +1137,8 @@ fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> R
         ],
     )
     .map_err(|e| format!("No se pudo abrir caja local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &session_id, "cash_session");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(session, "Caja abierta localmente; pendiente de sincronizacion")
 }
 
@@ -1125,7 +1196,8 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
         ],
     )
     .map_err(|e| format!("No se pudo cerrar caja local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &session_id, "cash_session");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(session, "Caja cerrada localmente; pendiente de sincronizacion")
 }
 
@@ -1253,7 +1325,8 @@ fn process_local_pos_sale(conn: &Connection, input: &LocalFirstWriteInput) -> Re
         ],
     )
     .map_err(|e| format!("No se pudo guardar venta POS local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &sale_id, "pos_sale");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
 
     let data = response
         .get("data")
@@ -1374,7 +1447,8 @@ fn process_local_inventory_product(
         ],
     )
     .map_err(|e| format!("No se pudo guardar producto local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &id, "inventory_product");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(product, "Producto guardado localmente; pendiente de sincronizacion")
 }
 
@@ -1450,7 +1524,8 @@ fn process_local_customer(
         ],
     )
     .map_err(|e| format!("No se pudo guardar cliente local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &id, "customer");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(customer, "Cliente guardado localmente; pendiente de sincronizacion")
 }
 
@@ -1652,7 +1727,9 @@ fn process_local_sales_document(
         ],
     )
     .map_err(|e| format!("No se pudo guardar documento venta local: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let entity_type = if kind == "quote" { "sales_quote" } else { "sales_order" };
+    let queued_input = with_local_entity_headers(input, &id, entity_type);
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(
         attach_customer(conn, document),
         if kind == "quote" {
@@ -1735,7 +1812,8 @@ fn process_generic_local_write(
         ],
     )
     .map_err(|e| format!("No se pudo guardar registro local generico: {e}"))?;
-    enqueue_offline_request_with_conn(conn, input)?;
+    let queued_input = with_local_entity_headers(input, &id, "generic_record");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(data, "Operacion guardada localmente; pendiente de sincronizacion")
 }
 
@@ -1925,22 +2003,86 @@ fn insert_offline_item(conn: &Connection, item: &OfflineQueueItem) -> Result<(),
     Ok(())
 }
 
+fn response_data_json(response_body: Option<&String>) -> Option<String> {
+    response_body.and_then(|response| {
+        serde_json::from_str::<Value>(response).ok().and_then(|value| {
+            let data = value.get("data").cloned().unwrap_or(value);
+            serde_json::to_string(&data).ok()
+        })
+    })
+}
+
+fn response_remote_id(response_body: Option<&String>) -> Option<String> {
+    response_body
+        .and_then(|response| serde_json::from_str::<Value>(response).ok())
+        .and_then(|value| {
+            value
+                .get("data")
+                .and_then(|data| {
+                    value_string(data, "id")
+                        .or_else(|| value_string(data, "venta_id"))
+                        .or_else(|| value_string(data, "pedido_id"))
+                        .or_else(|| value_string(data, "cotizacion_id"))
+                })
+                .or_else(|| value_string(&value, "id"))
+        })
+}
+
+fn upsert_local_id_map(
+    conn: &Connection,
+    local_id: Option<&String>,
+    remote_id: Option<String>,
+    entity_type: Option<&String>,
+    endpoint: &str,
+    response_body: Option<&String>,
+) -> Result<(), String> {
+    let (Some(local_id), Some(remote_id), Some(entity_type)) = (local_id, remote_id, entity_type) else {
+        return Ok(());
+    };
+    if local_id == &remote_id {
+        return Ok(());
+    }
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_id_map
+            (local_id, remote_id, entity_type, endpoint, synced_at, response_json)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        params![local_id, remote_id, entity_type, endpoint, now_ms(), response_body],
+    )
+    .map_err(|e| format!("No se pudo registrar mapeo local/remoto: {e}"))?;
+    Ok(())
+}
+
 fn update_local_first_sync_status(
     conn: &Connection,
     offline_request_id: &str,
     sync_status: &str,
     response_body: Option<&String>,
 ) -> Result<(), String> {
-    let request: Option<(String, Option<String>)> = conn
+    let request: Option<(String, Option<String>, String)> = conn
         .query_row(
-            "SELECT endpoint, body FROM offline_requests WHERE id = ?1",
+            "SELECT endpoint, body, headers_json FROM offline_requests WHERE id = ?1",
             params![offline_request_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .ok();
-    let Some((endpoint, body)) = request else {
+    let Some((endpoint, body, headers_json)) = request else {
         return Ok(());
     };
+    let headers: Vec<HeaderPair> = serde_json::from_str(&headers_json).unwrap_or_default();
+    let local_id = header_value(&headers, "x-erp-local-id");
+    let entity_type = header_value(&headers, "x-erp-local-entity-type");
+    let remote_id = response_remote_id(response_body);
+    upsert_local_id_map(
+        conn,
+        local_id.as_ref(),
+        remote_id.clone(),
+        entity_type.as_ref(),
+        &endpoint,
+        response_body,
+    )?;
+
     let Some(raw_body) = body else {
         return Ok(());
     };
@@ -1952,21 +2094,8 @@ fn update_local_first_sync_status(
         || endpoint == "/api/cotizaciones/crear"
         || endpoint.starts_with("/api/ventas/cotizaciones/")
     {
-        let synced_document_json = response_body.and_then(|response| {
-            serde_json::from_str::<Value>(response).ok().and_then(|value| {
-                let data = value.get("data").cloned().unwrap_or(value);
-                serde_json::to_string(&data).ok()
-            })
-        });
-        let local_id = response_body
-            .and_then(|response| serde_json::from_str::<Value>(response).ok())
-            .and_then(|value| {
-                value
-                    .get("data")
-                    .and_then(|data| value_string(data, "id"))
-                    .or_else(|| value_string(&value, "id"))
-            })
-            .or_else(|| value_string(&payload, "id"));
+        let synced_document_json = response_data_json(response_body);
+        let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
                 "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'quote'",
@@ -1978,21 +2107,8 @@ fn update_local_first_sync_status(
     }
 
     if endpoint == "/api/ventas/pedidos" || endpoint.starts_with("/api/ventas/pedidos/") {
-        let synced_document_json = response_body.and_then(|response| {
-            serde_json::from_str::<Value>(response).ok().and_then(|value| {
-                let data = value.get("data").cloned().unwrap_or(value);
-                serde_json::to_string(&data).ok()
-            })
-        });
-        let local_id = response_body
-            .and_then(|response| serde_json::from_str::<Value>(response).ok())
-            .and_then(|value| {
-                value
-                    .get("data")
-                    .and_then(|data| value_string(data, "id"))
-                    .or_else(|| value_string(&value, "id"))
-            })
-            .or_else(|| value_string(&payload, "id"));
+        let synced_document_json = response_data_json(response_body);
+        let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
             conn.execute(
                 "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'order'",
@@ -2003,23 +2119,36 @@ fn update_local_first_sync_status(
         return Ok(());
     }
 
+    if endpoint == "/api/inventario/productos" || endpoint.starts_with("/api/inventario/productos/") {
+        let synced_json = response_data_json(response_body);
+        let local_id = local_id.or_else(|| value_string(&payload, "id"));
+        if let Some(id) = local_id {
+            conn.execute(
+                "UPDATE pos_products SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
+                params![id, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de producto local: {e}"))?;
+        }
+        return Ok(());
+    }
+
+    if endpoint == "/api/ventas/clientes" || endpoint.starts_with("/api/ventas/clientes/") {
+        let synced_json = response_data_json(response_body);
+        let local_id = local_id.or_else(|| value_string(&payload, "id"));
+        if let Some(id) = local_id {
+            conn.execute(
+                "UPDATE local_customers SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
+                params![id, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de cliente local: {e}"))?;
+        }
+        return Ok(());
+    }
+
     if endpoint != "/api/pos/venta" {
-        let generic_id = response_body
-            .and_then(|response| serde_json::from_str::<Value>(response).ok())
-            .and_then(|value| {
-                value
-                    .get("data")
-                    .and_then(|data| value_string(data, "id"))
-                    .or_else(|| value_string(&value, "id"))
-            })
-            .or_else(|| value_string(&payload, "id"));
+        let generic_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = generic_id {
-            let synced_json = response_body.and_then(|response| {
-                serde_json::from_str::<Value>(response).ok().and_then(|value| {
-                    let data = value.get("data").cloned().unwrap_or(value);
-                    serde_json::to_string(&data).ok()
-                })
-            });
+            let synced_json = response_data_json(response_body);
             conn.execute(
                 "UPDATE local_generic_records SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1",
                 params![id, sync_status, synced_json, now_ms()],
@@ -2192,7 +2321,12 @@ fn mark_offline_request_synced(
 }
 
 #[tauri::command]
-fn mark_offline_request_failed(app: AppHandle, id: String, error: String) -> Result<(), String> {
+fn mark_offline_request_failed(
+    app: AppHandle,
+    id: String,
+    error: String,
+    response_status: Option<u16>,
+) -> Result<(), String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let changed = conn
@@ -2202,10 +2336,11 @@ fn mark_offline_request_failed(app: AppHandle, id: String, error: String) -> Res
             SET status = 'failed',
                 attempts = attempts + 1,
                 last_error = ?2,
-                updated_at = ?3
+                response_status = ?3,
+                updated_at = ?4
             WHERE id = ?1
             "#,
-            params![&id, &error, now_ms()],
+            params![&id, &error, response_status.map(|status| status as i64), now_ms()],
         )
         .map_err(|e| format!("No se pudo marcar operacion offline fallida: {e}"))?;
 
@@ -2231,6 +2366,112 @@ fn delete_offline_request(app: AppHandle, id: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+fn list_local_id_mappings(app: AppHandle) -> Result<Vec<LocalIdMapping>, String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT local_id, remote_id, entity_type, endpoint, synced_at, response_json
+            FROM local_id_map
+            ORDER BY synced_at DESC
+            LIMIT 200
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar mapeos local/remoto: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(LocalIdMapping {
+                local_id: row.get(0)?,
+                remote_id: row.get(1)?,
+                entity_type: row.get(2)?,
+                endpoint: row.get(3)?,
+                synced_at: row.get(4)?,
+                response_json: row.get(5)?,
+            })
+        })
+        .map_err(|e| format!("No se pudo leer mapeos local/remoto: {e}"))?;
+    let mut mappings = Vec::new();
+    for row in rows {
+        mappings.push(row.map_err(|e| format!("Mapeo local/remoto invalido: {e}"))?);
+    }
+    Ok(mappings)
+}
+
+#[tauri::command]
+fn cache_binary_response(
+    app: AppHandle,
+    endpoint: String,
+    url: String,
+    status: u16,
+    headers: Vec<HeaderPair>,
+    body_base64: String,
+) -> Result<(), String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_binary_cache
+            (cache_key, endpoint, url, status, headers_json, body_base64, cached_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "#,
+        params![
+            local_cache_key(&endpoint, &url),
+            endpoint,
+            url,
+            status as i64,
+            response_headers_json(&headers)?,
+            body_base64,
+            now_ms(),
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar binario local: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_binary_response(
+    app: AppHandle,
+    endpoint: String,
+    url: String,
+) -> Result<Option<BinaryLocalResponse>, String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT status, headers_json, body_base64, cached_at
+            FROM local_binary_cache
+            WHERE cache_key = ?1 OR endpoint = ?2
+            ORDER BY CASE WHEN cache_key = ?1 THEN 0 ELSE 1 END, cached_at DESC
+            LIMIT 1
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar binario local: {e}"))?;
+    let mut rows = stmt
+        .query(params![local_cache_key(&endpoint, &url), endpoint])
+        .map_err(|e| format!("No se pudo consultar binario local: {e}"))?;
+    let Some(row) = rows
+        .next()
+        .map_err(|e| format!("No se pudo leer binario local: {e}"))?
+    else {
+        return Ok(None);
+    };
+    let headers_json: String = row.get(1).map_err(|e| format!("Binario local sin headers: {e}"))?;
+    let mut headers: Vec<HeaderPair> = serde_json::from_str(&headers_json).unwrap_or_default();
+    headers.push(HeaderPair {
+        name: "x-erp-offline-cache".to_string(),
+        value: "true".to_string(),
+    });
+    Ok(Some(BinaryLocalResponse {
+        status: row.get::<_, i64>(0).map_err(|e| format!("Binario local sin status: {e}"))? as u16,
+        headers,
+        body_base64: row.get(2).map_err(|e| format!("Binario local sin body: {e}"))?,
+        cached_at: row.get(3).map_err(|e| format!("Binario local sin fecha: {e}"))?,
+    }))
 }
 
 #[tauri::command]
@@ -2324,7 +2565,10 @@ pub fn run() {
             mark_offline_request_synced,
             mark_offline_request_failed,
             delete_offline_request,
+            list_local_id_mappings,
             get_offline_status,
+            cache_binary_response,
+            get_binary_response,
             hydrate_local_first_response,
             get_local_first_response,
             process_local_first_write,

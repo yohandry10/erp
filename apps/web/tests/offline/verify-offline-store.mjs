@@ -164,6 +164,7 @@ const assert = (condition, message) => {
   queue = await mod.listOfflineRequests()
   const failed = queue.find((item) => item.endpoint === '/api/fail')
   assert(failed.status === 'failed' && failed.attempts === 1, 'fallo debe persistir attempts')
+  assert(failed.response_status === 409, 'fallo HTTP debe persistir response_status')
   assert(failed.last_error.includes('conflict'), 'fallo debe persistir error del backend')
 
   const status = await mod.getOfflineStatus()
@@ -217,6 +218,25 @@ const assert = (condition, message) => {
         }),
         headers: [{ name: 'Content-Type', value: 'application/json' }],
       }
+    }
+    if (command === 'get_binary_response') {
+      assert(args.endpoint === '/api/reportes/pdf', 'binario offline debe pedir endpoint normalizado')
+      return {
+        status: 200,
+        body_base64: Buffer.from('%PDF-local').toString('base64'),
+        cached_at: Date.now(),
+        headers: [{ name: 'Content-Type', value: 'application/pdf' }],
+      }
+    }
+    if (command === 'list_local_id_mappings') {
+      return [{
+        local_id: 'local-entity-1',
+        remote_id: 'remote-entity-1',
+        entity_type: 'generic_record',
+        endpoint: '/api/rrhh/empleados',
+        synced_at: Date.now(),
+        response_json: null,
+      }]
     }
     throw new Error('invoke inesperado: ' + command)
   }
@@ -318,6 +338,17 @@ const assert = (condition, message) => {
     { endpoint: '/api/rrhh/empleados' },
   )
   assert((await localGenericCreate.json()).data.sync_status === 'pending', 'modulo generico offline debe quedar pending')
+
+  const localPdf = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/reportes/pdf',
+    { method: 'GET' },
+    { endpoint: '/api/reportes/pdf' },
+  )
+  assert(localPdf.headers.get('x-erp-offline-cache') === 'true', 'binario offline debe salir del cache SQLite')
+  assert((await localPdf.text()).includes('%PDF-local'), 'binario offline debe preservar bytes')
+
+  const mappings = await mod.listLocalIdMappings()
+  assert(mappings[0].local_id === 'local-entity-1', 'mapeos local-remoto deben exponerse al UI')
 
   console.log(JSON.stringify({ ok: true, fetchCalls, syncCall, status }, null, 2))
 })().catch((error) => {
