@@ -1,6 +1,8 @@
+use base64::{engine::general_purpose, Engine as _};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -8,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
+mod crypto;
 mod printer;
 
 static OFFLINE_QUEUE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -100,6 +103,35 @@ pub struct BinaryLocalResponse {
     pub headers: Vec<HeaderPair>,
     pub body_base64: String,
     pub cached_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OfflineFiscalDocumentInput {
+    pub document_type: String,
+    pub serie: Option<String>,
+    pub cliente_ruc: Option<String>,
+    pub cliente_nombre: Option<String>,
+    pub moneda: Option<String>,
+    pub subtotal: f64,
+    pub igv: f64,
+    pub total: f64,
+    pub items: Vec<Value>,
+    pub source_type: Option<String>,
+    pub source_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OfflineFiscalDocument {
+    pub id: String,
+    pub document_type: String,
+    pub serie: String,
+    pub numero: i64,
+    pub estado: String,
+    pub xml_content: String,
+    pub signed_xml: Option<String>,
+    pub pdf_base64: Option<String>,
+    pub hash: String,
+    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,6 +270,43 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
         CREATE INDEX IF NOT EXISTS idx_local_id_map_remote
             ON local_id_map(remote_id, entity_type);
+
+        CREATE TABLE IF NOT EXISTS local_fiscal_series (
+            document_type TEXT NOT NULL,
+            serie TEXT NOT NULL,
+            ultimo_numero INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (document_type, serie)
+        );
+
+        CREATE TABLE IF NOT EXISTS local_fiscal_documents (
+            id TEXT PRIMARY KEY,
+            document_type TEXT NOT NULL,
+            serie TEXT NOT NULL,
+            numero INTEGER NOT NULL,
+            estado TEXT NOT NULL CHECK (estado IN ('GENERADO_LOCAL', 'FIRMADO_LOCAL', 'PENDIENTE_ENVIO', 'ENVIADO', 'ACEPTADO', 'RECHAZADO', 'FALLIDO')),
+            cliente_ruc TEXT,
+            cliente_nombre TEXT,
+            moneda TEXT NOT NULL DEFAULT 'PEN',
+            subtotal REAL NOT NULL DEFAULT 0,
+            igv REAL NOT NULL DEFAULT 0,
+            total REAL NOT NULL DEFAULT 0,
+            source_type TEXT,
+            source_id TEXT,
+            xml_content TEXT NOT NULL,
+            signed_xml TEXT,
+            pdf_base64 TEXT,
+            hash TEXT NOT NULL,
+            response_json TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            UNIQUE(document_type, serie, numero)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_estado
+            ON local_fiscal_documents(estado, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_local_fiscal_documents_source
+            ON local_fiscal_documents(source_type, source_id);
 
         CREATE TABLE IF NOT EXISTS pos_products (
             id TEXT PRIMARY KEY,
@@ -429,6 +498,221 @@ fn value_number(value: &Value, key: &str) -> f64 {
 
 fn value_string(value: &Value, key: &str) -> Option<String> {
     value.get(key).and_then(Value::as_str).map(str::to_string)
+}
+
+fn escape_xml(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn document_type_code(document_type: &str) -> &'static str {
+    match document_type.to_lowercase().as_str() {
+        "boleta" | "03" => "03",
+        "nota_credito" | "nota-credito" | "07" => "07",
+        "nota_debito" | "nota-debito" | "08" => "08",
+        "gre" | "guia" | "09" => "09",
+        _ => "01",
+    }
+}
+
+fn default_series(document_type: &str) -> &'static str {
+    match document_type_code(document_type) {
+        "03" => "B001",
+        "07" => "FC01",
+        "08" => "FD01",
+        "09" => "T001",
+        _ => "F001",
+    }
+}
+
+fn fiscal_document_label(document_type: &str) -> &'static str {
+    match document_type_code(document_type) {
+        "03" => "BOLETA ELECTRONICA",
+        "07" => "NOTA DE CREDITO ELECTRONICA",
+        "08" => "NOTA DE DEBITO ELECTRONICA",
+        "09" => "GUIA DE REMISION ELECTRONICA",
+        _ => "FACTURA ELECTRONICA",
+    }
+}
+
+fn reserve_local_fiscal_number(
+    conn: &Connection,
+    document_type: &str,
+    serie: &str,
+) -> Result<i64, String> {
+    conn.execute(
+        r#"
+        INSERT OR IGNORE INTO local_fiscal_series
+            (document_type, serie, ultimo_numero, updated_at)
+        VALUES (?1, ?2, 0, ?3)
+        "#,
+        params![document_type_code(document_type), serie, now_ms()],
+    )
+    .map_err(|e| format!("No se pudo inicializar serie fiscal local: {e}"))?;
+
+    conn.execute(
+        r#"
+        UPDATE local_fiscal_series
+        SET ultimo_numero = ultimo_numero + 1,
+            updated_at = ?3
+        WHERE document_type = ?1 AND serie = ?2
+        "#,
+        params![document_type_code(document_type), serie, now_ms()],
+    )
+    .map_err(|e| format!("No se pudo reservar correlativo fiscal local: {e}"))?;
+
+    conn.query_row(
+        "SELECT ultimo_numero FROM local_fiscal_series WHERE document_type = ?1 AND serie = ?2",
+        params![document_type_code(document_type), serie],
+        |row| row.get(0),
+    )
+    .map_err(|e| format!("No se pudo leer correlativo fiscal local: {e}"))
+}
+
+fn hash_base64(raw: &str) -> String {
+    general_purpose::STANDARD.encode(Sha256::digest(raw.as_bytes()))
+}
+
+fn current_utc_date() -> String {
+    let days = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| (duration.as_secs() / 86_400) as i64)
+        .unwrap_or(0);
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if m <= 2 { 1 } else { 0 };
+    format!("{year:04}-{m:02}-{d:02}")
+}
+
+fn build_local_ubl_xml(
+    config: &AppConfig,
+    input: &OfflineFiscalDocumentInput,
+    serie: &str,
+    numero: i64,
+) -> String {
+    let document_type = document_type_code(&input.document_type);
+    let id = format!("{serie}-{:08}", numero);
+    let moneda = input.moneda.as_deref().unwrap_or("PEN");
+    let cliente_ruc = input.cliente_ruc.as_deref().unwrap_or("00000000");
+    let cliente_nombre = input.cliente_nombre.as_deref().unwrap_or("Cliente");
+    let issue_date = current_utc_date();
+    let mut lines = String::new();
+
+    for (index, item) in input.items.iter().enumerate() {
+        let cantidad = item.get("cantidad").and_then(Value::as_f64).unwrap_or(1.0);
+        let descripcion = value_string(item, "descripcion")
+            .or_else(|| value_string(item, "nombre"))
+            .unwrap_or_else(|| "Producto/servicio".to_string());
+        let precio = item
+            .get("precio_unitario")
+            .or_else(|| item.get("precio"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        let total = item
+            .get("total")
+            .or_else(|| item.get("subtotal"))
+            .and_then(Value::as_f64)
+            .unwrap_or(cantidad * precio);
+        lines.push_str(&format!(
+            r#"
+  <cac:InvoiceLine>
+    <cbc:ID>{}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="NIU">{:.2}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="{}">{:.2}</cbc:LineExtensionAmount>
+    <cac:Item><cbc:Description>{}</cbc:Description></cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="{}">{:.2}</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>"#,
+            index + 1,
+            cantidad,
+            moneda,
+            total,
+            escape_xml(&descripcion),
+            moneda,
+            precio,
+        ));
+    }
+
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID>{}</cbc:ID>
+  <cbc:IssueDate>{}</cbc:IssueDate>
+  <cbc:InvoiceTypeCode>{}</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>{}</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification><cbc:ID schemeID="6">{}</cbc:ID></cac:PartyIdentification>
+      <cac:PartyLegalEntity><cbc:RegistrationName>{}</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification><cbc:ID>{}</cbc:ID></cac:PartyIdentification>
+      <cac:PartyLegalEntity><cbc:RegistrationName>{}</cbc:RegistrationName></cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:TaxTotal><cbc:TaxAmount currencyID="{}">{:.2}</cbc:TaxAmount></cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="{}">{:.2}</cbc:LineExtensionAmount>
+    <cbc:PayableAmount currencyID="{}">{:.2}</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>{}
+</Invoice>"#,
+        id,
+        issue_date,
+        document_type,
+        moneda,
+        escape_xml(&config.ruc),
+        escape_xml(&config.razon_social),
+        escape_xml(cliente_ruc),
+        escape_xml(cliente_nombre),
+        moneda,
+        input.igv,
+        moneda,
+        input.subtotal,
+        moneda,
+        input.total,
+        lines,
+    )
+}
+
+fn build_local_pdf_bytes(document: &OfflineFiscalDocumentInput, serie: &str, numero: i64, hash: &str) -> Vec<u8> {
+    let text = format!(
+        "{}\\n{}-{:08}\\nCliente: {}\\nTotal: {:.2}\\nEstado: PENDIENTE ENVIO SUNAT/OSE\\nHash: {}",
+        fiscal_document_label(&document.document_type),
+        serie,
+        numero,
+        document.cliente_nombre.as_deref().unwrap_or("Cliente"),
+        document.total,
+        hash
+    );
+    format!(
+        "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 220] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length {} >>\nstream\nBT /F1 10 Tf 20 190 Td ({}) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n0\n%%EOF",
+        text.len() + 40,
+        escape_pdf_text(&text),
+    )
+    .into_bytes()
+}
+
+fn escape_pdf_text(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
+        .replace('\n', "\\n")
 }
 
 fn upsert_snapshot(
@@ -1201,7 +1485,11 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
     json_success_response(session, "Caja cerrada localmente; pendiente de sincronizacion")
 }
 
-fn process_local_pos_sale(conn: &Connection, input: &LocalFirstWriteInput) -> Result<LocalFirstResponse, String> {
+fn process_local_pos_sale(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+    config: &AppConfig,
+) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
     let idempotency_key = value_string(&payload, "idempotency_key")
         .unwrap_or_else(|| format!("local-{}", Uuid::new_v4()));
@@ -1281,7 +1569,7 @@ fn process_local_pos_sale(conn: &Connection, input: &LocalFirstWriteInput) -> Re
     }
 
     let timestamp = now_ms();
-    let response = serde_json::json!({
+    let mut response = serde_json::json!({
         "success": true,
         "offline": true,
         "local_first": true,
@@ -1305,6 +1593,36 @@ fn process_local_pos_sale(conn: &Connection, input: &LocalFirstWriteInput) -> Re
         },
         "message": "Venta guardada localmente; pendiente de sincronizacion"
     });
+    if !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty() {
+        let fiscal_input = OfflineFiscalDocumentInput {
+            document_type: if value_string(&payload, "tipo_comprobante")
+                .unwrap_or_default()
+                .eq_ignore_ascii_case("factura")
+            {
+                "factura".to_string()
+            } else {
+                "boleta".to_string()
+            },
+            serie: value_string(&payload, "serie"),
+            cliente_ruc: value_string(&payload, "cliente_documento"),
+            cliente_nombre: value_string(&payload, "cliente_nombre")
+                .or_else(|| Some("Cliente General".to_string())),
+            moneda: Some("PEN".to_string()),
+            subtotal: value_number(&payload, "subtotal"),
+            igv: value_number(&payload, "impuestos"),
+            total,
+            items: items.clone(),
+            source_type: Some("pos_sale".to_string()),
+            source_id: Some(sale_id.clone()),
+        };
+        if let Ok(fiscal_doc) = create_local_fiscal_document_with_conn(conn, config, fiscal_input) {
+            if let Some(data) = response.get_mut("data").and_then(Value::as_object_mut) {
+                data.insert("cpe_id".to_string(), serde_json::json!(fiscal_doc.id));
+                data.insert("cpe_estado".to_string(), serde_json::json!(fiscal_doc.estado));
+                data.insert("cpe_hash".to_string(), serde_json::json!(fiscal_doc.hash));
+            }
+        }
+    }
     let response_raw = serde_json::to_string(&response)
         .map_err(|e| format!("No se pudo serializar venta local: {e}"))?;
     conn.execute(
@@ -1896,6 +2214,7 @@ fn process_local_first_write(
     request: LocalFirstWriteInput,
 ) -> Result<LocalFirstResponse, String> {
     let _guard = lock_offline_queue()?;
+    let config = load_config(app.clone()).unwrap_or_default();
     let conn = open_local_db(&app)?;
     let tx = conn
         .unchecked_transaction()
@@ -1904,7 +2223,7 @@ fn process_local_first_write(
     let result = if request.method.eq_ignore_ascii_case("POST")
         && request.endpoint == "/api/pos/venta"
     {
-        process_local_pos_sale(&tx, &request)
+        process_local_pos_sale(&tx, &request, &config)
     } else if request.method.eq_ignore_ascii_case("POST")
         && request.endpoint.starts_with("/api/cajas/")
         && request.endpoint.ends_with("/apertura")
@@ -2474,6 +2793,148 @@ fn get_binary_response(
     }))
 }
 
+fn save_local_fiscal_document(
+    conn: &Connection,
+    document: &OfflineFiscalDocument,
+    input: &OfflineFiscalDocumentInput,
+) -> Result<(), String> {
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_fiscal_documents (
+            id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
+            moneda, subtotal, igv, total, source_type, source_id, xml_content,
+            signed_xml, pdf_base64, hash, response_json, created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, NULL, ?18, ?18)
+        "#,
+        params![
+            document.id,
+            document_type_code(&document.document_type),
+            document.serie,
+            document.numero,
+            document.estado,
+            input.cliente_ruc,
+            input.cliente_nombre,
+            input.moneda.as_deref().unwrap_or("PEN"),
+            input.subtotal,
+            input.igv,
+            input.total,
+            input.source_type,
+            input.source_id,
+            document.xml_content,
+            document.signed_xml,
+            document.pdf_base64,
+            document.hash,
+            document.created_at,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar documento fiscal local: {e}"))?;
+    Ok(())
+}
+
+fn create_local_fiscal_document_with_conn(
+    conn: &Connection,
+    config: &AppConfig,
+    document: OfflineFiscalDocumentInput,
+) -> Result<OfflineFiscalDocument, String> {
+    if config.ruc.trim().is_empty() || config.razon_social.trim().is_empty() {
+        return Err("Configura RUC y razon social en desktop antes de emitir offline".to_string());
+    }
+    let serie = document
+        .serie
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| default_series(&document.document_type).to_string());
+    let numero = reserve_local_fiscal_number(conn, &document.document_type, &serie)?;
+    let xml = build_local_ubl_xml(config, &document, &serie, numero);
+    let signed_xml = match (&config.certificado_path, &config.certificado_password) {
+        (Some(path), Some(password)) if !path.trim().is_empty() && !password.is_empty() => {
+            Some(crypto::sign_xml_document(&xml, path, password)?)
+        }
+        _ => None,
+    };
+    let hash = hash_base64(signed_xml.as_deref().unwrap_or(&xml));
+    let pdf_bytes = build_local_pdf_bytes(&document, &serie, numero, &hash);
+    let timestamp = now_ms();
+    let result = OfflineFiscalDocument {
+        id: format!("local-fiscal-{}", Uuid::new_v4()),
+        document_type: document_type_code(&document.document_type).to_string(),
+        serie: serie.clone(),
+        numero,
+        estado: if signed_xml.is_some() {
+            "PENDIENTE_ENVIO".to_string()
+        } else {
+            "GENERADO_LOCAL".to_string()
+        },
+        xml_content: xml,
+        signed_xml,
+        pdf_base64: Some(general_purpose::STANDARD.encode(pdf_bytes)),
+        hash,
+        created_at: timestamp,
+    };
+    save_local_fiscal_document(conn, &result, &document)?;
+
+    let queued_body = serde_json::to_string(&serde_json::json!({
+        "local_fiscal_id": result.id,
+        "document_type": result.document_type,
+        "serie": result.serie,
+        "numero": result.numero,
+        "estado": result.estado,
+        "xml_content": result.xml_content,
+        "signed_xml": result.signed_xml,
+        "hash": result.hash,
+        "source_type": document.source_type,
+        "source_id": document.source_id,
+        "cliente_ruc": document.cliente_ruc,
+        "cliente_nombre": document.cliente_nombre,
+        "subtotal": document.subtotal,
+        "igv": document.igv,
+        "total": document.total
+    }))
+    .map_err(|e| format!("No se pudo serializar documento fiscal para sync: {e}"))?;
+    let queued = LocalFirstWriteInput {
+        endpoint: "/api/cpe/offline-documents".to_string(),
+        method: "POST".to_string(),
+        url: "/api/cpe/offline-documents".to_string(),
+        headers: vec![
+            HeaderPair {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HeaderPair {
+                name: "x-erp-local-id".to_string(),
+                value: result.id.clone(),
+            },
+            HeaderPair {
+                name: "x-erp-local-entity-type".to_string(),
+                value: "fiscal_document".to_string(),
+            },
+        ],
+        body: Some(queued_body),
+        tenant_id: None,
+        user_id: None,
+    };
+    enqueue_offline_request_with_conn(conn, &queued)?;
+    Ok(result)
+}
+
+#[tauri::command]
+fn generate_offline_fiscal_document(
+    app: AppHandle,
+    document: OfflineFiscalDocumentInput,
+) -> Result<OfflineFiscalDocument, String> {
+    let config = load_config(app.clone()).unwrap_or_default();
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("No se pudo iniciar transaccion fiscal local: {e}"))?;
+    let result = create_local_fiscal_document_with_conn(&tx, &config, document)?;
+    tx.commit()
+        .map_err(|e| format!("No se pudo confirmar documento fiscal local: {e}"))?;
+    Ok(result)
+}
+
 #[tauri::command]
 fn get_offline_status(app: AppHandle) -> Result<OfflineStatus, String> {
     let config = load_config(app.clone()).unwrap_or_default();
@@ -2499,21 +2960,72 @@ async fn print_document(pdf_data: Vec<u8>, printer_name: Option<String>) -> Resu
 }
 
 #[tauri::command]
-async fn sign_xml(_xml_content: String) -> Result<String, String> {
-    Err("La firma XML se ejecuta en el backend API en modo desktop online-first.".to_string())
+async fn sign_xml(app: AppHandle, xml_content: String) -> Result<String, String> {
+    let config = load_config(app).unwrap_or_default();
+    let cert_path = config
+        .certificado_path
+        .ok_or_else(|| "Configura el certificado digital en desktop antes de firmar XML".to_string())?;
+    let cert_password = config
+        .certificado_password
+        .ok_or_else(|| "Configura la contrasena del certificado digital antes de firmar XML".to_string())?;
+    crypto::sign_xml_document(&xml_content, &cert_path, &cert_password)
 }
 
 #[tauri::command]
-async fn send_to_sunat(_signed_xml: String) -> Result<String, String> {
-    Err("El envio fiscal se ejecuta en el backend API en modo desktop online-first.".to_string())
+async fn send_to_sunat(app: AppHandle, signed_xml: String) -> Result<String, String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    let hash = hash_base64(&signed_xml);
+    let body = serde_json::to_string(&serde_json::json!({
+        "signed_xml": signed_xml,
+        "hash": hash,
+        "estado": "PENDIENTE_ENVIO",
+        "origen": "desktop_offline"
+    }))
+    .map_err(|e| format!("No se pudo serializar envio SUNAT pendiente: {e}"))?;
+    let queued = LocalFirstWriteInput {
+        endpoint: "/api/cpe/send-signed".to_string(),
+        method: "POST".to_string(),
+        url: "/api/cpe/send-signed".to_string(),
+        headers: vec![
+            HeaderPair {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HeaderPair {
+                name: "x-erp-local-id".to_string(),
+                value: hash.clone(),
+            },
+            HeaderPair {
+                name: "x-erp-local-entity-type".to_string(),
+                value: "fiscal_send".to_string(),
+            },
+        ],
+        body: Some(body),
+        tenant_id: None,
+        user_id: None,
+    };
+    enqueue_offline_request_with_conn(&conn, &queued)?;
+    Ok("PENDIENTE_ENVIO: XML firmado guardado localmente; SUNAT/OSE se enviara al reconectar".to_string())
 }
 
 #[tauri::command]
-async fn generate_pdf(_xml_content: String, _template: Option<String>) -> Result<Vec<u8>, String> {
-    Err(
-        "La generacion de PDF fiscal se ejecuta en el backend API en modo desktop online-first."
-            .to_string(),
-    )
+async fn generate_pdf(xml_content: String, _template: Option<String>) -> Result<Vec<u8>, String> {
+    let hash = hash_base64(&xml_content);
+    let input = OfflineFiscalDocumentInput {
+        document_type: "factura".to_string(),
+        serie: Some("LOCAL".to_string()),
+        cliente_ruc: None,
+        cliente_nombre: Some("Documento local".to_string()),
+        moneda: Some("PEN".to_string()),
+        subtotal: 0.0,
+        igv: 0.0,
+        total: 0.0,
+        items: Vec::new(),
+        source_type: Some("xml".to_string()),
+        source_id: None,
+    };
+    Ok(build_local_pdf_bytes(&input, "LOCAL", 0, &hash))
 }
 
 #[tauri::command]
@@ -2569,6 +3081,7 @@ pub fn run() {
             get_offline_status,
             cache_binary_response,
             get_binary_response,
+            generate_offline_fiscal_document,
             hydrate_local_first_response,
             get_local_first_response,
             process_local_first_write,
