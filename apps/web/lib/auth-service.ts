@@ -1,4 +1,5 @@
 import { buildApiUrl } from './api-url';
+import { getOfflineStatus, isDesktopRuntime } from './offline-store';
 
 // Rutas públicas donde el middleware ya garantiza que NO hay sesión válida (si la
 // hubiera, redirigiría a /dashboard antes de renderizar). Cualquier llamada a
@@ -82,6 +83,10 @@ class AuthService {
   }
 
   private async doFetchProfile(): Promise<User | null> {
+    if (await this.isOfflineAuthMode()) {
+      return this.getCachedSession().session?.user ?? null;
+    }
+
     // Corto-circuito: en /login y /demo el middleware garantiza ausencia de
     // sesión EN EL MOMENTO INICIAL. Pero después de signInWithPassword (login
     // exitoso desde /demo o /login) ya tenemos accessToken en memoria y SÍ
@@ -115,6 +120,17 @@ class AuthService {
 
     const user = await response.json();
     return this.normalizeUserPayload(user);
+  }
+
+  private async isOfflineAuthMode(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+    if (!isDesktopRuntime()) return false;
+    try {
+      return (await getOfflineStatus()).offline_mode;
+    } catch {
+      return false;
+    }
   }
 
   private saveSession(session: Session) {
@@ -188,14 +204,17 @@ class AuthService {
 
   async signOut(): Promise<{ error: Error | null }> {
     try {
-      await fetch(buildApiUrl('/api/auth/logout/'), {
-        method: 'POST',
-        credentials: 'include',
-      });
+      if (!(await this.isOfflineAuthMode())) {
+        await fetch(buildApiUrl('/api/auth/logout/'), {
+          method: 'POST',
+          credentials: 'include',
+        });
+      }
       this.clearSession();
       return { error: null };
     } catch (error) {
-      return { error: error instanceof Error ? error : new Error('Error al cerrar sesión') };
+      this.clearSession();
+      return { error: null };
     }
   }
 
@@ -248,7 +267,9 @@ class AuthService {
 
     if (typeof window !== 'undefined') {
       try {
-        const user = await this.fetchProfile();
+        const user = (await this.isOfflineAuthMode())
+          ? (this.session?.user ?? storedSession?.user ?? null)
+          : await this.fetchProfile();
         if (user) {
           this.saveSession({ user, access_token: this.accessToken || undefined });
         } else if (!this.session) {
@@ -273,6 +294,13 @@ class AuthService {
   }> {
     try {
       void session;
+      if (await this.isOfflineAuthMode()) {
+        const cached = this.getCachedSession().session;
+        return {
+          data: { session: cached },
+          error: cached ? null : new Error('No hay sesion local para operar offline'),
+        };
+      }
       const response = await fetch(buildApiUrl('/api/auth/profile/'), {
         method: 'GET',
         headers: {

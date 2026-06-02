@@ -167,8 +167,38 @@ const assert = (condition, message) => {
   assert(failed.response_status === 409, 'fallo HTTP debe persistir response_status')
   assert(failed.last_error.includes('conflict'), 'fallo debe persistir error del backend')
 
+  online = false
+  mod.invalidateOfflineModeCache()
+  const formData = new FormData()
+  formData.append('descripcion', 'archivo offline')
+  formData.append('archivo', new File([Buffer.from('contenido')], 'doc.txt', { type: 'text/plain' }))
+  const queuedUpload = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/documentos/upload',
+    {
+      method: 'POST',
+      body: formData,
+    },
+    { endpoint: '/api/documentos/upload', tenantId: 'tenant-1', userId: 'user-1' },
+  )
+  assert(queuedUpload.status === 202, 'FormData offline debe quedar en cola')
+  queue = await mod.listOfflineRequests()
+  const upload = queue.find((item) => item.endpoint === '/api/documentos/upload')
+  assert(upload.body.includes('__erp_offline_formdata'), 'FormData debe serializarse para sync')
+
+  const deferredValidation = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/documentos/validar-documento',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ total: 10 }),
+    },
+    { endpoint: '/api/documentos/validar-documento' },
+  )
+  assert(deferredValidation.headers.get('x-erp-validation-deferred') === 'true', 'validacion externa offline debe diferirse')
+  assert((await deferredValidation.json()).data.valido === true, 'validacion de documento offline debe permitir continuar provisionalmente')
+
   const status = await mod.getOfflineStatus()
-  assert(status.total === 2 && status.synced === 1 && status.failed === 1, 'status debe contar synced/failed')
+  assert(status.total === 3 && status.synced === 1 && status.failed === 1 && status.pending === 1, 'status debe contar synced/failed/pending')
 
   window.__TAURI__ = {}
   online = false

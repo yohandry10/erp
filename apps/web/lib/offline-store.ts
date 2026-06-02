@@ -18,6 +18,15 @@ export interface OfflineRequestInput {
   user_id?: string | null
 }
 
+interface SerializedFormDataPart {
+  kind: 'field' | 'file'
+  name: string
+  value?: string
+  filename?: string
+  content_type?: string
+  body_base64?: string
+}
+
 export interface OfflineQueueItem extends OfflineRequestInput {
   id: string
   status: OfflineRequestStatus
@@ -200,6 +209,50 @@ function isBusinessLocalFirstEndpoint(endpoint: string) {
   return true
 }
 
+function isDeferredValidationEndpoint(endpoint: string) {
+  const normalized = localFirstEndpoint(endpoint)
+  return normalized.startsWith('/api/validations/')
+    || normalized.includes('/validar-')
+    || normalized.includes('/validate-')
+}
+
+function deferredValidationResponse(endpoint: string, init: RequestInit) {
+  const body = bodyToString(init.body)
+  let payload: any = {}
+  try {
+    payload = body ? JSON.parse(body) : {}
+  } catch {
+    payload = {}
+  }
+  const normalized = localFirstEndpoint(endpoint)
+  const data = normalized.includes('validar-documento')
+    ? { valido: true, errores: [], offline: true, validacion_diferida: true }
+    : normalized.includes('dni-lookup')
+      ? { dni: payload.dni, offline: true, validacion_diferida: true }
+      : {
+          ...payload,
+          offline: true,
+          validacion_diferida: true,
+          mensaje: 'Validacion externa pendiente de conexion',
+        }
+
+  return new Response(JSON.stringify({
+    success: true,
+    offline: true,
+    local_first: true,
+    validation_deferred: true,
+    message: 'Validacion externa diferida hasta reconectar.',
+    data,
+  }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-erp-offline-cache': 'true',
+      'x-erp-validation-deferred': 'true',
+    },
+  })
+}
+
 function responseFromLocalFirst(local: LocalFirstResponse) {
   const headers = pairsToHeaders(local.headers)
   headers.set('x-erp-local-first', 'true')
@@ -227,6 +280,52 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
   }
   return btoa(binary)
+}
+
+async function serializeFormData(body: FormData): Promise<string> {
+  const parts: SerializedFormDataPart[] = []
+  for (const [name, value] of body.entries()) {
+    if (typeof value === 'string') {
+      parts.push({ kind: 'field', name, value })
+      continue
+    }
+    const file = value as File
+    const buffer = await file.arrayBuffer()
+    parts.push({
+      kind: 'file',
+      name,
+      filename: file.name || 'archivo',
+      content_type: file.type || 'application/octet-stream',
+      body_base64: arrayBufferToBase64(buffer),
+    })
+  }
+  return JSON.stringify({
+    __erp_offline_formdata: true,
+    parts,
+  })
+}
+
+function serializedFormDataToBody(raw: string): FormData | null {
+  try {
+    const payload = JSON.parse(raw)
+    if (!payload?.__erp_offline_formdata || !Array.isArray(payload.parts)) return null
+    const formData = new FormData()
+    for (const part of payload.parts as SerializedFormDataPart[]) {
+      if (part.kind === 'field') {
+        formData.append(part.name, part.value ?? '')
+      } else if (part.kind === 'file' && part.body_base64) {
+        const file = new File(
+          [base64ToUint8Array(part.body_base64)],
+          part.filename || 'archivo',
+          { type: part.content_type || 'application/octet-stream' },
+        )
+        formData.append(part.name, file)
+      }
+    }
+    return formData
+  } catch {
+    return null
+  }
 }
 
 function responseFromBinaryLocal(local: BinaryLocalResponse) {
@@ -521,9 +620,15 @@ function bodyToString(body: BodyInit | null | undefined): string | null {
 
 function canQueue(method: string, body: BodyInit | null | undefined) {
   if (method === 'GET' || method === 'HEAD') return false
-  if (typeof FormData !== 'undefined' && body instanceof FormData) return false
   if (typeof Blob !== 'undefined' && body instanceof Blob) return false
   return true
+}
+
+async function offlineBodyToString(body: BodyInit | null | undefined): Promise<string | null> {
+  if (typeof FormData !== 'undefined' && body instanceof FormData) {
+    return serializeFormData(body)
+  }
+  return bodyToString(body)
 }
 
 async function isOfflineModeEnabled() {
@@ -575,6 +680,10 @@ export async function fetchWithOfflineSupport(
   const forceOffline = await isOfflineModeEnabled()
 
   if (forceOffline) {
+    if (isDeferredValidationEndpoint(meta.endpoint)) {
+      return deferredValidationResponse(meta.endpoint, init)
+    }
+
     if (method === 'GET') {
       const localFirst = await readLocalFirstResponse(meta.endpoint, url)
       if (localFirst) return localFirst
@@ -590,12 +699,13 @@ export async function fetchWithOfflineSupport(
     if (localFirstWrite) return localFirstWrite
 
     if (canQueue(method, init.body)) {
+      const serializedBody = await offlineBodyToString(init.body)
       const item = await enqueueOfflineRequest({
         endpoint: meta.endpoint,
         method,
         url,
         headers: headersToPairs(init.headers),
-        body: bodyToString(init.body),
+        body: serializedBody,
         tenant_id: meta.tenantId ?? null,
         user_id: meta.userId ?? null,
       })
@@ -614,6 +724,10 @@ export async function fetchWithOfflineSupport(
     }
     return response
   } catch (error) {
+    if (isDeferredValidationEndpoint(meta.endpoint)) {
+      return deferredValidationResponse(meta.endpoint, init)
+    }
+
     if (method === 'GET') {
       const localFirst = await readLocalFirstResponse(meta.endpoint, url)
       if (localFirst) return localFirst
@@ -629,12 +743,13 @@ export async function fetchWithOfflineSupport(
     if (localFirstWrite) return localFirstWrite
 
     if (canQueue(method, init.body)) {
+      const serializedBody = await offlineBodyToString(init.body)
       const item = await enqueueOfflineRequest({
         endpoint: meta.endpoint,
         method,
         url,
         headers: headersToPairs(init.headers),
-        body: bodyToString(init.body),
+        body: serializedBody,
         tenant_id: meta.tenantId ?? null,
         user_id: meta.userId ?? null,
       })
@@ -653,10 +768,16 @@ export async function syncOfflineQueue() {
   for (const item of candidates) {
     try {
       const targetUrl = item.endpoint ? buildApiUrl(item.endpoint) : item.url
+      const formDataBody = item.body ? serializedFormDataToBody(item.body) : null
+      const headers = pairsToHeaders(item.headers)
+      if (formDataBody) {
+        headers.delete('Content-Type')
+        headers.delete('content-type')
+      }
       const response = await fetch(targetUrl, {
         method: item.method,
-        headers: pairsToHeaders(item.headers),
-        body: item.body ?? undefined,
+        headers,
+        body: formDataBody ?? item.body ?? undefined,
         credentials: 'include',
         mode: 'cors',
         cache: 'no-store',

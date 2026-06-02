@@ -4,7 +4,7 @@ Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Ne
 
 ## Estado vigente
 
-La app desktop es **online-first con soporte offline local**: empaqueta la UI web como cliente Tauri y consume el backend API real mediante `NEXT_PUBLIC_API_URL`. Cuando no hay conexión o el usuario activa `offline_mode`, las lecturas pueden usar cache local reciente y las escrituras JSON serializables se guardan en SQLite local para sincronizarse después.
+La app desktop es **offline-first operativa con sincronización**: empaqueta la UI web como cliente Tauri y usa SQLite local para continuidad sin red. Cuando hay conexión consume el backend API real mediante `NEXT_PUBLIC_API_URL`; cuando no hay conexión o el usuario activa `offline_mode`, las lecturas usan cache/snapshots locales y las escrituras serializables se guardan en SQLite para sincronizarse después.
 
 La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo. En offline, la app desktop puede generar documentos fiscales locales, PDF local, hash, correlativo SQLite y cola de envío; no declara aceptación SUNAT/CDR hasta que el backend/SUNAT/OSE procese la cola al reconectar.
 
@@ -21,6 +21,8 @@ La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo.
 - **Mapeo local-remoto**: las entidades creadas offline guardan metadata de ID local en la cola y registran el ID autoritativo devuelto por backend al sincronizar.
 - **Cache binario básico**: PDFs/reportes/binarios ya descargados online se guardan en SQLite desktop para relectura offline.
 - **Paquete fiscal local**: ventas POS offline generan documento fiscal local con XML, hash, PDF base64, correlativo local y estado `PENDIENTE_ENVIO` cuando la configuración fiscal local está completa.
+- **Adjuntos offline**: las cargas `FormData` serializables se guardan en cola con archivos en base64 y se reconstruyen al sincronizar.
+- **Sesión y permisos offline**: desktop conserva snapshot local de sesión y permisos para operar sin consultar `/auth/profile` o RBAC remoto mientras no haya red.
 - **Outbox offline durable** en SQLite desktop para operaciones pendientes de otros módulos.
 - **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
@@ -40,7 +42,7 @@ La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo.
 - **Formato SUNAT**: Exportación directa para SIRE
 - **Validación**: Verificación de datos antes de exportar
 - **Períodos**: Exportación por rangos de fechas
-- **Ejecución autoritativa**: backend API.
+- **Export local offline**: desktop puede generar un reporte local desde documentos fiscales pendientes/emitidos. La validación y aceptación oficial siguen fuera del dispositivo.
 
 ## 🚀 Instalación y Desarrollo
 
@@ -165,7 +167,7 @@ apps/web/
 
 ### Base de Datos
 - `backup_database(backupPath)` - Exporta backup JSON de configuración desktop y cola offline; la BD autoritativa sigue en backend/BD.
-- `export_sire_data(periodo)` - Existe para compatibilidad, pero la exportación se hace en backend.
+- `export_sire_data(periodo)` - Exporta datos fiscales locales del desktop para continuidad offline; la presentación/validación oficial queda para backend/SUNAT.
 
 ## Modo Offline
 
@@ -177,6 +179,8 @@ El modo offline tiene dos niveles:
 - **Ventas comerciales local-first**: `/dashboard/ventas/cotizaciones` y `/dashboard/ventas/pedidos` leen SQLite offline. Crear/editar/eliminar cotizaciones y pedidos se guarda en SQLite y se encola para sync. Los pedidos creados offline reservan stock local, pero confirmación, despacho, facturación y GRE/CPE quedan sujetos al backend.
 - **Resto de módulos**: continuidad operativa local-first genérica. `GET` JSON hidrata snapshots SQLite y los mezcla con registros locales pendientes; `POST/PUT/DELETE` JSON serializable se guarda como entidad local con `sync_status=pending` y también se encola para sincronización.
 - **Binarios ya visitados**: reportes/PDFs/archivos descargados online se pueden consultar offline desde SQLite mientras no excedan el límite local.
+- **Adjuntos y formularios multipart**: cuando una operación usa `FormData`, la cola offline conserva campos y archivos para rearmar el `multipart/form-data` al reconectar.
+- **Sesión/RBAC**: si el usuario ya inició sesión antes, desktop usa snapshot local de sesión y permisos; un usuario nuevo sin sesión previa todavía necesita conexión para autenticarse por primera vez.
 - `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
 - `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, conflictos, mapeos local-remoto, permite reintentar y refrescar snapshots base.
 - El indicador superior muestra `Offline` y el número de operaciones pendientes.
@@ -186,7 +190,7 @@ El modo offline tiene dos niveles:
 
 Restricciones deliberadas:
 
-- No se cachean cargas `FormData`; solo respuestas binarias ya descargadas y acotadas por tamaño.
+- Las cargas `FormData` se soportan para cola offline cuando los archivos pueden leerse en memoria; archivos enormes deben validarse operacionalmente por tamaño/tiempo de sync.
 - El cache de respuestas tiene limite por entrada y falla suave si el almacenamiento local esta lleno; la respuesta online no se invalida por un fallo de cache.
 - Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.

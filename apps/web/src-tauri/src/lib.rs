@@ -582,6 +582,14 @@ fn current_utc_date() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|duration| (duration.as_secs() / 86_400) as i64)
         .unwrap_or(0);
+    utc_date_from_days(days)
+}
+
+fn utc_date_from_ms(timestamp_ms: i64) -> String {
+    utc_date_from_days(timestamp_ms.max(0) / 86_400_000)
+}
+
+fn utc_date_from_days(days: i64) -> String {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = z - era * 146_097;
@@ -3032,7 +3040,43 @@ async fn generate_pdf(xml_content: String, _template: Option<String>) -> Result<
 async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), String> {
     let config = load_config(app.clone()).unwrap_or_default();
     let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
     let queue = read_offline_queue(&app)?;
+    let mut fiscal_stmt = conn
+        .prepare(
+            r#"
+            SELECT id, document_type, serie, numero, estado, cliente_ruc, cliente_nombre,
+                   moneda, subtotal, igv, total, source_type, source_id, hash, created_at
+            FROM local_fiscal_documents
+            ORDER BY created_at ASC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar backup fiscal local: {e}"))?;
+    let fiscal_rows = fiscal_stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "document_type": row.get::<_, String>(1)?,
+                "serie": row.get::<_, String>(2)?,
+                "numero": row.get::<_, i64>(3)?,
+                "estado": row.get::<_, String>(4)?,
+                "cliente_ruc": row.get::<_, Option<String>>(5)?,
+                "cliente_nombre": row.get::<_, Option<String>>(6)?,
+                "moneda": row.get::<_, String>(7)?,
+                "subtotal": row.get::<_, f64>(8)?,
+                "igv": row.get::<_, f64>(9)?,
+                "total": row.get::<_, f64>(10)?,
+                "source_type": row.get::<_, Option<String>>(11)?,
+                "source_id": row.get::<_, Option<String>>(12)?,
+                "hash": row.get::<_, String>(13)?,
+                "created_at": row.get::<_, i64>(14)?,
+            }))
+        })
+        .map_err(|e| format!("No se pudo leer backup fiscal local: {e}"))?;
+    let mut fiscal_documents = Vec::new();
+    for row in fiscal_rows {
+        fiscal_documents.push(row.map_err(|e| format!("Fila fiscal local invalida: {e}"))?);
+    }
     let sqlite_path = offline_db_path(&app)
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_default();
@@ -3041,6 +3085,7 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
         "generated_at": now_ms(),
         "config": config,
         "offline_outbox": queue,
+        "local_fiscal_documents": fiscal_documents,
         "sqlite_path": sqlite_path,
         "note": "Backup local del cliente desktop. La base autoritativa sigue siendo backend/BD."
     });
@@ -3050,11 +3095,65 @@ async fn backup_database(app: AppHandle, backup_path: String) -> Result<(), Stri
 }
 
 #[tauri::command]
-async fn export_sire_data(_periodo: String) -> Result<String, String> {
-    Err(
-        "La exportacion SIRE se ejecuta en el backend API en modo desktop online-first."
-            .to_string(),
-    )
+async fn export_sire_data(app: AppHandle, periodo: String) -> Result<String, String> {
+    let _guard = lock_offline_queue()?;
+    let conn = open_local_db(&app)?;
+    let period = periodo.trim();
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT document_type, serie, numero, cliente_ruc, cliente_nombre, moneda,
+                   subtotal, igv, total, estado, hash, created_at
+            FROM local_fiscal_documents
+            ORDER BY created_at ASC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar exportacion SIRE local: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "document_type": row.get::<_, String>(0)?,
+                "serie": row.get::<_, String>(1)?,
+                "numero": row.get::<_, i64>(2)?,
+                "cliente_ruc": row.get::<_, Option<String>>(3)?,
+                "cliente_nombre": row.get::<_, Option<String>>(4)?,
+                "moneda": row.get::<_, String>(5)?,
+                "subtotal": row.get::<_, f64>(6)?,
+                "igv": row.get::<_, f64>(7)?,
+                "total": row.get::<_, f64>(8)?,
+                "estado": row.get::<_, String>(9)?,
+                "hash": row.get::<_, String>(10)?,
+                "created_at": row.get::<_, i64>(11)?,
+            }))
+        })
+        .map_err(|e| format!("No se pudo leer documentos fiscales locales: {e}"))?;
+
+    let mut lines = vec![
+        "periodo|tipo|serie|numero|cliente_ruc|cliente_nombre|moneda|subtotal|igv|total|estado|hash".to_string(),
+    ];
+    for row in rows {
+        let item = row.map_err(|e| format!("Documento fiscal local invalido: {e}"))?;
+        let created_date = utc_date_from_ms(item["created_at"].as_i64().unwrap_or(0));
+        if !period.is_empty() && !created_date.starts_with(period) {
+            continue;
+        }
+        lines.push(format!(
+            "{}|{}|{}|{}|{}|{}|{}|{:.2}|{:.2}|{:.2}|{}|{}",
+            period,
+            item["document_type"].as_str().unwrap_or(""),
+            item["serie"].as_str().unwrap_or(""),
+            item["numero"].as_i64().unwrap_or(0),
+            item["cliente_ruc"].as_str().unwrap_or(""),
+            item["cliente_nombre"].as_str().unwrap_or(""),
+            item["moneda"].as_str().unwrap_or("PEN"),
+            item["subtotal"].as_f64().unwrap_or(0.0),
+            item["igv"].as_f64().unwrap_or(0.0),
+            item["total"].as_f64().unwrap_or(0.0),
+            item["estado"].as_str().unwrap_or("PENDIENTE_ENVIO"),
+            item["hash"].as_str().unwrap_or(""),
+        ));
+    }
+    Ok(lines.join("\n"))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
