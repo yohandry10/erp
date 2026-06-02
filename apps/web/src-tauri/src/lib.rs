@@ -271,6 +271,23 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             ON local_sales_documents(kind, updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_local_sales_documents_cliente
             ON local_sales_documents(cliente_id, kind);
+
+        CREATE TABLE IF NOT EXISTS local_generic_records (
+            id TEXT PRIMARY KEY,
+            endpoint TEXT NOT NULL,
+            collection_endpoint TEXT NOT NULL,
+            method TEXT NOT NULL,
+            data_json TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            sync_status TEXT NOT NULL CHECK (sync_status IN ('pending', 'synced', 'failed')),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_generic_records_collection
+            ON local_generic_records(collection_endpoint, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_local_generic_records_sync
+            ON local_generic_records(sync_status, updated_at);
         "#,
     )
     .map_err(|e| format!("No se pudo inicializar SQLite local: {e}"))?;
@@ -281,6 +298,22 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
 
 fn local_cache_key(endpoint: &str, url: &str) -> String {
     format!("{endpoint}|{url}")
+}
+
+fn collection_endpoint(endpoint: &str) -> String {
+    let trimmed = endpoint.trim_end_matches('/');
+    let mut parts: Vec<&str> = trimmed.split('/').filter(|part| !part.is_empty()).collect();
+    if parts.len() > 2 {
+        if let Some(last) = parts.last() {
+            let looks_like_id = last.starts_with("local-")
+                || last.len() >= 24
+                || last.chars().any(|ch| ch.is_ascii_digit());
+            if looks_like_id {
+                parts.pop();
+            }
+        }
+    }
+    format!("/{}", parts.join("/"))
 }
 
 fn response_headers_json(headers: &[HeaderPair]) -> Result<String, String> {
@@ -810,6 +843,115 @@ fn build_sales_document_detail_snapshot(
         attach_customer(conn, document),
         if kind == "quote" { "Cotizacion local" } else { "Pedido local" },
     )?))
+}
+
+fn merge_local_records_into_response(
+    conn: &Connection,
+    endpoint: &str,
+    snapshot: Option<LocalFirstResponse>,
+) -> Result<Option<LocalFirstResponse>, String> {
+    let collection = collection_endpoint(endpoint);
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT data_json FROM local_generic_records
+            WHERE collection_endpoint = ?1 AND deleted = 0
+            ORDER BY updated_at DESC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar registros locales genericos: {e}"))?;
+    let rows = stmt
+        .query_map(params![&collection], |row| {
+            let raw: String = row.get(0)?;
+            Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
+        })
+        .map_err(|e| format!("No se pudo leer registros locales genericos: {e}"))?;
+    let mut local_records = Vec::new();
+    for row in rows {
+        let value = row.map_err(|e| format!("Registro local generico invalido: {e}"))?;
+        if !value.is_null() {
+            local_records.push(value);
+        }
+    }
+
+    if local_records.is_empty() {
+        return Ok(snapshot);
+    }
+
+    let mut base = if let Some(snapshot_response) = snapshot {
+        serde_json::from_str::<Value>(&snapshot_response.body).unwrap_or_else(|_| {
+            serde_json::json!({
+                "success": true,
+                "data": []
+            })
+        })
+    } else {
+        serde_json::json!({
+            "success": true,
+            "offline": true,
+            "local_first": true,
+            "data": []
+        })
+    };
+
+    if let Some(data) = base.get_mut("data") {
+        match data {
+            Value::Array(items) => {
+                let mut merged = local_records;
+                merged.extend(items.clone());
+                *items = merged;
+            }
+            Value::Object(obj) => {
+                if let Some(Value::Array(items)) = obj.get_mut("data") {
+                    let mut merged = local_records;
+                    merged.extend(items.clone());
+                    *items = merged;
+                }
+            }
+            _ => {
+                base["data"] = Value::Array(local_records);
+            }
+        }
+    } else {
+        base["data"] = Value::Array(local_records);
+    }
+    base["success"] = serde_json::json!(true);
+    base["offline"] = serde_json::json!(true);
+    base["local_first"] = serde_json::json!(true);
+
+    Ok(Some(LocalFirstResponse {
+        status: 200,
+        body: serde_json::to_string(&base)
+            .map_err(|e| format!("No se pudo serializar listado local generico: {e}"))?,
+        headers: vec![
+            HeaderPair {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HeaderPair {
+                name: "x-erp-local-first".to_string(),
+                value: "true".to_string(),
+            },
+        ],
+    }))
+}
+
+fn build_generic_detail_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+) -> Result<Option<LocalFirstResponse>, String> {
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM local_generic_records WHERE endpoint = ?1 AND deleted = 0",
+            params![endpoint],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let data = serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null);
+    Ok(Some(json_success_response(data, "Registro local pendiente")?))
 }
 
 fn build_open_session_snapshot(conn: &Connection) -> Result<Option<LocalFirstResponse>, String> {
@@ -1521,6 +1663,82 @@ fn process_local_sales_document(
     )
 }
 
+fn process_generic_local_write(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let method = input.method.to_uppercase();
+    let timestamp = now_ms();
+    let collection = collection_endpoint(&input.endpoint);
+    let id = if method == "POST" {
+        format!("local-generic-{}", Uuid::new_v4())
+    } else {
+        input
+            .endpoint
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("local-generic-{}", Uuid::new_v4()))
+    };
+
+    let payload = if method == "DELETE" {
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT data_json FROM local_generic_records WHERE id = ?1",
+                params![&id],
+                |row| row.get(0),
+            )
+            .ok();
+        existing
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .unwrap_or_else(|| serde_json::json!({ "id": id.clone() }))
+    } else {
+        parse_json_body(&input.body)?
+    };
+
+    let mut data = payload;
+    if let Some(obj) = data.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(id.clone()));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+        obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
+        if !obj.contains_key("created_at") {
+            obj.insert("created_at".to_string(), serde_json::json!(timestamp));
+        }
+        if method == "DELETE" {
+            obj.insert("deleted".to_string(), serde_json::json!(true));
+        }
+    }
+
+    let detail_endpoint = if method == "POST" {
+        format!("{}/{}", collection.trim_end_matches('/'), id)
+    } else {
+        input.endpoint.clone()
+    };
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_generic_records
+            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'pending', ?7, ?7)
+        "#,
+        params![
+            id,
+            detail_endpoint,
+            collection,
+            method,
+            serde_json::to_string(&data)
+                .map_err(|e| format!("No se pudo serializar registro local generico: {e}"))?,
+            if method == "DELETE" { 1 } else { 0 },
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar registro local generico: {e}"))?;
+    enqueue_offline_request_with_conn(conn, input)?;
+    json_success_response(data, "Operacion guardada localmente; pendiente de sincronizacion")
+}
+
 #[tauri::command]
 fn hydrate_local_first_response(
     app: AppHandle,
@@ -1586,7 +1804,12 @@ fn get_local_first_response(
         return build_sales_document_detail_snapshot(&conn, &endpoint, "order");
     }
 
-    read_local_snapshot(&conn, &endpoint, &url)
+    if let Some(detail) = build_generic_detail_snapshot(&conn, &endpoint)? {
+        return Ok(Some(detail));
+    }
+
+    let snapshot = read_local_snapshot(&conn, &endpoint, &url)?;
+    merge_local_records_into_response(&conn, &endpoint, snapshot)
 }
 
 #[tauri::command]
@@ -1632,10 +1855,7 @@ fn process_local_first_write(
     {
         process_local_sales_document(&tx, &request, "order")
     } else {
-        Err(format!(
-            "Endpoint no soportado por local-first: {} {}",
-            request.method, request.endpoint
-        ))
+        process_generic_local_write(&tx, &request)
     }?;
 
     tx.commit()
@@ -1784,6 +2004,28 @@ fn update_local_first_sync_status(
     }
 
     if endpoint != "/api/pos/venta" {
+        let generic_id = response_body
+            .and_then(|response| serde_json::from_str::<Value>(response).ok())
+            .and_then(|value| {
+                value
+                    .get("data")
+                    .and_then(|data| value_string(data, "id"))
+                    .or_else(|| value_string(&value, "id"))
+            })
+            .or_else(|| value_string(&payload, "id"));
+        if let Some(id) = generic_id {
+            let synced_json = response_body.and_then(|response| {
+                serde_json::from_str::<Value>(response).ok().and_then(|value| {
+                    let data = value.get("data").cloned().unwrap_or(value);
+                    serde_json::to_string(&data).ok()
+                })
+            });
+            conn.execute(
+                "UPDATE local_generic_records SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1",
+                params![id, sync_status, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de registro local generico: {e}"))?;
+        }
         return Ok(());
     }
 

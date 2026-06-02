@@ -185,6 +185,7 @@ const assert = (condition, message) => {
           '/api/ventas/clientes',
           '/api/ventas/cotizaciones',
           '/api/ventas/pedidos',
+          '/api/rrhh/empleados',
         ].includes(args.endpoint),
         'GET local-first debe pedir endpoint soportado',
       )
@@ -202,6 +203,7 @@ const assert = (condition, message) => {
           '/api/ventas/clientes',
           '/api/ventas/cotizaciones',
           '/api/ventas/pedidos',
+          '/api/rrhh/empleados',
         ].includes(args.request.endpoint),
         'escritura debe procesarse local-first',
       )
@@ -298,6 +300,24 @@ const assert = (condition, message) => {
     { endpoint: '/api/ventas/pedidos' },
   )
   assert((await localOrderCreate.json()).data.sync_status === 'pending', 'pedido offline debe quedar pending')
+
+  const localGenericList = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/rrhh/empleados',
+    { method: 'GET' },
+    { endpoint: '/api/rrhh/empleados' },
+  )
+  assert(localGenericList.headers.get('x-erp-local-first') === 'true', 'modulo generico offline debe leer SQLite')
+
+  const localGenericCreate = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/rrhh/empleados',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombres: 'Empleado', apellidos: 'Offline' }),
+    },
+    { endpoint: '/api/rrhh/empleados' },
+  )
+  assert((await localGenericCreate.json()).data.sync_status === 'pending', 'modulo generico offline debe quedar pending')
 
   console.log(JSON.stringify({ ok: true, fetchCalls, syncCall, status }, null, 2))
 })().catch((error) => {

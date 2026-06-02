@@ -58,35 +58,17 @@ const CACHE_KEY = 'erp.desktop.offline.cache'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
 const OFFLINE_MODE_CACHE_TTL = 5000
-const LOCAL_FIRST_GET_ENDPOINTS = new Set([
-  '/api/pos/productos',
-  '/api/pos/clientes',
-  '/api/pos/metodos-pago',
-  '/api/pos/empresa-config',
-  '/api/pos/ventas-recientes',
-  '/api/pos/sesion-caja',
-  '/api/cajas',
-  '/api/inventario/productos',
-  '/api/inventario/almacenes',
-  '/api/inventario/movimientos',
-  '/api/inventario/stats',
-  '/api/ventas/clientes',
-  '/api/ventas/cotizaciones',
-  '/api/ventas/pedidos',
-])
-const LOCAL_FIRST_WRITE_ENDPOINTS = [
-  /^\/api\/pos\/venta$/,
-  /^\/api\/cajas\/[^/]+\/apertura$/,
-  /^\/api\/cajas\/[^/]+\/cierre$/,
-  /^\/api\/inventario\/productos$/,
-  /^\/api\/inventario\/productos\/[^/]+$/,
-  /^\/api\/ventas\/clientes$/,
-  /^\/api\/ventas\/clientes\/[^/]+$/,
-  /^\/api\/ventas\/cotizaciones$/,
-  /^\/api\/ventas\/cotizaciones\/[^/]+$/,
-  /^\/api\/cotizaciones\/crear$/,
-  /^\/api\/ventas\/pedidos$/,
-  /^\/api\/ventas\/pedidos\/[^/]+$/,
+const LOCAL_FIRST_EXCLUDED_PREFIXES = [
+  '/api/auth',
+  '/api/demo/convert-to-real',
+  '/api/validations',
+]
+const LOCAL_FIRST_EXCLUDED_PATTERNS = [
+  /\/descargar-/,
+  /\/pdf\/?$/,
+  /\/comprobante\/?$/,
+  /\/validar-/,
+  /\/validate-/,
 ]
 
 let offlineModeCache: { value: boolean; expiresAt: number } | null = null
@@ -165,17 +147,22 @@ function localFirstEndpoint(endpoint: string) {
 
 function isLocalFirstGetEndpoint(endpoint: string) {
   const normalized = localFirstEndpoint(endpoint)
-  return LOCAL_FIRST_GET_ENDPOINTS.has(normalized)
-    || /^\/api\/inventario\/productos\/[^/]+$/.test(normalized)
-    || /^\/api\/ventas\/clientes\/[^/]+$/.test(normalized)
-    || /^\/api\/ventas\/cotizaciones\/[^/]+$/.test(normalized)
-    || /^\/api\/ventas\/pedidos\/[^/]+$/.test(normalized)
+  if (!isBusinessLocalFirstEndpoint(normalized)) return false
+  return true
 }
 
 function isLocalFirstWriteEndpoint(endpoint: string, method: string) {
   const normalized = localFirstEndpoint(endpoint)
+  if (!isBusinessLocalFirstEndpoint(normalized)) return false
   if (!['POST', 'PUT', 'DELETE'].includes(method)) return false
-  return LOCAL_FIRST_WRITE_ENDPOINTS.some((pattern) => pattern.test(normalized))
+  return true
+}
+
+function isBusinessLocalFirstEndpoint(endpoint: string) {
+  if (!endpoint.startsWith('/api/') && !endpoint.startsWith('/')) return false
+  if (LOCAL_FIRST_EXCLUDED_PREFIXES.some((prefix) => endpoint.startsWith(prefix))) return false
+  if (LOCAL_FIRST_EXCLUDED_PATTERNS.some((pattern) => pattern.test(endpoint))) return false
+  return true
 }
 
 function responseFromLocalFirst(local: LocalFirstResponse) {
