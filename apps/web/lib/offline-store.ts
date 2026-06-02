@@ -43,6 +43,22 @@ export interface LocalFirstResponse {
   headers: HeaderPair[]
 }
 
+export interface BinaryLocalResponse {
+  status: number
+  body_base64: string
+  headers: HeaderPair[]
+  cached_at: number
+}
+
+export interface LocalIdMapping {
+  local_id: string
+  remote_id: string
+  entity_type: string
+  endpoint: string
+  synced_at: number
+  response_json?: string | null
+}
+
 interface ApiCacheEntry {
   url: string
   endpoint: string
@@ -57,7 +73,26 @@ const OUTBOX_KEY = 'erp.desktop.offline.outbox'
 const CACHE_KEY = 'erp.desktop.offline.cache'
 const CACHE_LIMIT = 120
 const CACHE_ENTRY_BODY_LIMIT = 512 * 1024
+const BINARY_CACHE_BODY_LIMIT = 8 * 1024 * 1024
 const OFFLINE_MODE_CACHE_TTL = 5000
+export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
+  '/api/dashboard/metrics',
+  '/api/dashboard/recent-activity',
+  '/api/pos/productos',
+  '/api/pos/clientes',
+  '/api/pos/sesion-caja',
+  '/api/inventario/productos',
+  '/api/ventas/clientes',
+  '/api/ventas/cotizaciones',
+  '/api/ventas/pedidos',
+  '/api/compras/proveedores',
+  '/api/compras/ordenes',
+  '/api/rrhh/empleados',
+  '/api/rrhh/planillas',
+  '/api/finanzas/cuentas-bancarias',
+  '/api/contabilidad/asientos',
+  '/api/cajas',
+]
 const LOCAL_FIRST_EXCLUDED_PREFIXES = [
   '/api/auth',
   '/api/demo/convert-to-real',
@@ -176,6 +211,35 @@ function responseFromLocalFirst(local: LocalFirstResponse) {
   })
 }
 
+function base64ToUint8Array(value: string) {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  }
+  return btoa(binary)
+}
+
+function responseFromBinaryLocal(local: BinaryLocalResponse) {
+  const headers = pairsToHeaders(local.headers)
+  headers.set('x-erp-offline-cache', 'true')
+  headers.set('x-erp-offline-cached-at', String(local.cached_at))
+  return new Response(base64ToUint8Array(local.body_base64), {
+    status: local.status,
+    statusText: local.status >= 200 && local.status < 300 ? 'OK' : 'Local Binary Cache',
+    headers,
+  })
+}
+
 async function readLocalFirstResponse(endpoint: string, url: string) {
   if (!isDesktopRuntime() || !isLocalFirstGetEndpoint(endpoint)) return null
   const normalizedEndpoint = localFirstEndpoint(endpoint)
@@ -184,6 +248,20 @@ async function readLocalFirstResponse(endpoint: string, url: string) {
     return local ? responseFromLocalFirst(local) : null
   } catch (error) {
     console.warn('[offline-store] No se pudo leer respuesta local-first:', error)
+    return null
+  }
+}
+
+async function readBinaryResponse(endpoint: string, url: string) {
+  if (!isDesktopRuntime()) return null
+  try {
+    const local = await invoke<BinaryLocalResponse | null>('get_binary_response', {
+      endpoint: localFirstEndpoint(endpoint),
+      url,
+    })
+    return local ? responseFromBinaryLocal(local) : null
+  } catch (error) {
+    console.warn('[offline-store] No se pudo leer binario local:', error)
     return null
   }
 }
@@ -208,6 +286,29 @@ async function hydrateLocalFirstResponse(url: string, endpoint: string, response
     })
   } catch (error) {
     console.warn('[offline-store] No se pudo hidratar SQLite local-first:', error)
+  }
+}
+
+async function hydrateBinaryResponse(url: string, endpoint: string, response: Response) {
+  if (!isDesktopRuntime()) return
+  if (!response.ok || response.status === 204) return
+
+  const contentType = response.headers.get('Content-Type') || ''
+  if (/application\/json|text\//i.test(contentType)) return
+
+  const buffer = await response.arrayBuffer().catch(() => null)
+  if (!buffer || buffer.byteLength === 0 || buffer.byteLength > BINARY_CACHE_BODY_LIMIT) return
+
+  try {
+    await invoke('cache_binary_response', {
+      endpoint: localFirstEndpoint(endpoint),
+      url,
+      status: response.status,
+      headers: headersToPairs(response.headers),
+      bodyBase64: arrayBufferToBase64(buffer),
+    })
+  } catch (error) {
+    console.warn('[offline-store] No se pudo hidratar binario local:', error)
   }
 }
 
@@ -268,6 +369,13 @@ export async function listOfflineRequests(): Promise<OfflineQueueItem[]> {
   return readJson<OfflineQueueItem[]>(OUTBOX_KEY, [])
 }
 
+export async function listLocalIdMappings(): Promise<LocalIdMapping[]> {
+  if (isDesktopRuntime()) {
+    return invoke<LocalIdMapping[]>('list_local_id_mappings')
+  }
+  return []
+}
+
 export async function markOfflineRequestSynced(
   id: string,
   responseStatus: number,
@@ -299,9 +407,9 @@ export async function markOfflineRequestSynced(
   }
 }
 
-export async function markOfflineRequestFailed(id: string, error: string) {
+export async function markOfflineRequestFailed(id: string, error: string, responseStatus?: number | null) {
   if (isDesktopRuntime()) {
-    await invoke('mark_offline_request_failed', { id, error })
+    await invoke('mark_offline_request_failed', { id, error, responseStatus: responseStatus ?? null })
     return
   }
 
@@ -313,6 +421,7 @@ export async function markOfflineRequestFailed(id: string, error: string) {
           status: 'failed' as const,
           attempts: item.attempts + 1,
           last_error: error,
+          response_status: responseStatus ?? item.response_status,
           updated_at: now(),
         }
       : item
@@ -470,6 +579,9 @@ export async function fetchWithOfflineSupport(
       const localFirst = await readLocalFirstResponse(meta.endpoint, url)
       if (localFirst) return localFirst
 
+      const binary = await readBinaryResponse(meta.endpoint, url)
+      if (binary) return binary
+
       const cached = await readCachedApiResponse(url)
       if (cached) return cached
     }
@@ -497,6 +609,7 @@ export async function fetchWithOfflineSupport(
     const response = await fetch(url, init)
     if (method === 'GET' && response.ok) {
       await hydrateLocalFirstResponse(url, meta.endpoint, response.clone())
+      await hydrateBinaryResponse(url, meta.endpoint, response.clone())
       await cacheApiResponse(url, meta.endpoint, response.clone())
     }
     return response
@@ -504,6 +617,9 @@ export async function fetchWithOfflineSupport(
     if (method === 'GET') {
       const localFirst = await readLocalFirstResponse(meta.endpoint, url)
       if (localFirst) return localFirst
+
+      const binary = await readBinaryResponse(meta.endpoint, url)
+      if (binary) return binary
 
       const cached = await readCachedApiResponse(url)
       if (cached) return cached
@@ -552,13 +668,54 @@ export async function syncOfflineQueue() {
         results.push({ id: item.id, ok: true, status: response.status })
       } else {
         const error = responseBody || `HTTP ${response.status}`
-        await markOfflineRequestFailed(item.id, error)
+        await markOfflineRequestFailed(item.id, error, response.status)
         results.push({ id: item.id, ok: false, status: response.status, error })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error de sincronizacion offline'
       await markOfflineRequestFailed(item.id, message)
       results.push({ id: item.id, ok: false, error: message })
+    }
+  }
+
+  return results
+}
+
+export async function refreshLocalFirstSnapshots(
+  endpoints: string[] = DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS,
+  headers?: HeadersInit,
+) {
+  const results: Array<{ endpoint: string; ok: boolean; status?: number; error?: string }> = []
+  if (await isOfflineModeEnabled()) {
+    return endpoints.map((endpoint) => ({
+      endpoint,
+      ok: false,
+      error: 'Modo offline activo',
+    }))
+  }
+
+  for (const endpoint of endpoints) {
+    try {
+      const url = buildApiUrl(endpoint)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        mode: 'cors',
+        cache: 'no-store',
+      })
+      if (response.ok) {
+        await hydrateLocalFirstResponse(url, endpoint, response.clone())
+        await hydrateBinaryResponse(url, endpoint, response.clone())
+        await cacheApiResponse(url, endpoint, response.clone())
+      }
+      results.push({ endpoint, ok: response.ok, status: response.status })
+    } catch (error) {
+      results.push({
+        endpoint,
+        ok: false,
+        error: error instanceof Error ? error.message : 'Error al actualizar snapshot local',
+      })
     }
   }
 
