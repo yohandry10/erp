@@ -179,7 +179,13 @@ const assert = (condition, message) => {
     }
     if (command === 'get_local_first_response') {
       assert(
-        ['/api/pos/productos', '/api/inventario/productos', '/api/ventas/clientes'].includes(args.endpoint),
+        [
+          '/api/pos/productos',
+          '/api/inventario/productos',
+          '/api/ventas/clientes',
+          '/api/ventas/cotizaciones',
+          '/api/ventas/pedidos',
+        ].includes(args.endpoint),
         'GET local-first debe pedir endpoint soportado',
       )
       return {
@@ -190,7 +196,13 @@ const assert = (condition, message) => {
     }
     if (command === 'process_local_first_write') {
       assert(
-        ['/api/pos/venta', '/api/inventario/productos', '/api/ventas/clientes'].includes(args.request.endpoint),
+        [
+          '/api/pos/venta',
+          '/api/inventario/productos',
+          '/api/ventas/clientes',
+          '/api/ventas/cotizaciones',
+          '/api/ventas/pedidos',
+        ].includes(args.request.endpoint),
         'escritura debe procesarse local-first',
       )
       return {
@@ -257,6 +269,35 @@ const assert = (condition, message) => {
     { endpoint: '/api/ventas/clientes' },
   )
   assert((await localCustomerCreate.json()).data.sync_status === 'pending', 'cliente offline debe quedar pending')
+
+  const localQuoteList = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/ventas/cotizaciones?page=1',
+    { method: 'GET' },
+    { endpoint: '/api/ventas/cotizaciones?page=1' },
+  )
+  assert(localQuoteList.headers.get('x-erp-local-first') === 'true', 'cotizaciones offline deben leer SQLite')
+
+  const localQuoteCreate = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/ventas/cotizaciones',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_id: 'c1', detalle: [{ producto_id: 'p1', cantidad: 1, precio_unitario: 10 }] }),
+    },
+    { endpoint: '/api/ventas/cotizaciones' },
+  )
+  assert((await localQuoteCreate.json()).data.sync_status === 'pending', 'cotizacion offline debe quedar pending')
+
+  const localOrderCreate = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/ventas/pedidos',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_id: 'c1', detalle: [{ producto_id: 'p1', cantidad: 1, precio_unitario: 10 }] }),
+    },
+    { endpoint: '/api/ventas/pedidos' },
+  )
+  assert((await localOrderCreate.json()).data.sync_status === 'pending', 'pedido offline debe quedar pending')
 
   console.log(JSON.stringify({ ok: true, fetchCalls, syncCall, status }, null, 2))
 })().catch((error) => {

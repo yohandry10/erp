@@ -16,6 +16,7 @@ La base autoritativa, firma fiscal, CPE/GRE/SIRE, certificado, credenciales SUNA
 - **Certificados y credenciales fiscales**: se gestionan en el backend/wizard del ERP.
 - **POS + caja local-first** en SQLite desktop para operar ventas, apertura y cierre sin red sobre datos sincronizados.
 - **Clientes e inventario base local-first**: clientes, productos, almacenes/movimientos por snapshot y alta/edición/eliminación local de clientes/productos con sincronización posterior.
+- **Ventas comerciales local-first**: cotizaciones y pedidos se pueden listar, consultar, crear, editar y eliminar localmente; los pedidos reservan stock local y quedan pendientes de sincronización.
 - **Outbox offline durable** en SQLite desktop para operaciones pendientes de otros módulos.
 - **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
@@ -164,6 +165,7 @@ El modo offline tiene dos niveles:
 
 - **POS + caja local-first**: productos, clientes, métodos de pago, empresa, ventas recientes, cajas y sesión abierta se hidratan en SQLite cuando hay red. Sin red, el POS lee SQLite; ventas, apertura y cierre de caja se guardan transaccionalmente en SQLite, descuentan stock local y quedan pendientes de sincronización.
 - **Clientes e inventario base local-first**: `/dashboard/ventas/clientes` y `/dashboard/inventario/productos` pueden leer SQLite offline. Crear, editar y eliminar clientes/productos se guarda localmente y se encola para sync. Inventario comparte la tabla local de productos con POS, por lo que el stock descontado por ventas offline se refleja en el catálogo local.
+- **Ventas comerciales local-first**: `/dashboard/ventas/cotizaciones` y `/dashboard/ventas/pedidos` leen SQLite offline. Crear/editar/eliminar cotizaciones y pedidos se guarda en SQLite y se encola para sync. Los pedidos creados offline reservan stock local, pero confirmación, despacho, facturación y GRE/CPE quedan sujetos al backend.
 - **Resto de módulos**: continuidad operativa por cache/outbox. `GET` devuelve última respuesta JSON/text cacheada; `POST/PUT/PATCH/DELETE` serializable se guarda en `erp_local.sqlite` y la UI recibe `202` con `offline_queue_id`.
 - `offline_mode`: fuerza el uso de cache/outbox sin intentar red; sirve para operar deliberadamente sin conexión.
 - `/dashboard/offline`: muestra estado de conexión, pendientes, fallidos, sincronizados y permite reintentar.
@@ -180,6 +182,7 @@ Restricciones deliberadas:
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
 - POS/caja offline es autoritativo solo para el dispositivo local hasta sincronizar. Si otro dispositivo vende el mismo stock offline, el backend debe conciliar conflictos al recibir la cola.
 - Clientes/productos creados offline usan IDs locales temporales hasta que el backend confirme la sincronización y el siguiente refresh hidrate los IDs autoritativos.
+- Cotizaciones/pedidos creados offline usan números e IDs temporales locales. La numeración comercial/fiscal autoritativa se rehidrata desde backend al sincronizar.
 
 ## 🛠️ Desarrollo de Funcionalidades
 
