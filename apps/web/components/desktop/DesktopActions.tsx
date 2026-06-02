@@ -84,11 +84,6 @@ export default function DesktopActions({
       return;
     }
 
-    if (config.offline_mode) {
-      toast.error('No se puede enviar en modo offline');
-      return;
-    }
-
     const response = await sendToSUNAT(signedXml);
     if (response) {
       if (response.includes('aceptado')) {
@@ -97,6 +92,9 @@ export default function DesktopActions({
       } else if (response.includes('Ticket')) {
         setDocumentStatus('ENVIADO');
         onStatusChange?.('ENVIADO');
+      } else if (response.includes('PENDIENTE_ENVIO')) {
+        setDocumentStatus('PENDIENTE_ENVIO');
+        onStatusChange?.('PENDIENTE_ENVIO');
       }
     }
   };
@@ -182,7 +180,7 @@ export default function DesktopActions({
 
         <Button
           onClick={handleSendToSUNAT}
-          disabled={loading || !signedXml || config.offline_mode}
+          disabled={loading || !signedXml}
           variant="outline"
           size="sm"
           className="flex items-center gap-2"
@@ -192,7 +190,7 @@ export default function DesktopActions({
           ) : (
             <Send className="h-4 w-4" />
           )}
-          Enviar SUNAT
+          Enviar/encolar SUNAT
         </Button>
 
         <Button

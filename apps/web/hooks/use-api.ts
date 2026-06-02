@@ -105,6 +105,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       // Headers base - convertir options.headers a objeto plano si es necesario
       const optionsHeaders: Record<string, string> = {}
       const rawHeaders = options.headers
+      const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
 
       if (rawHeaders instanceof Headers) {
         for (const [k, v] of rawHeaders.entries()) optionsHeaders[k] = v
@@ -115,9 +116,11 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
       }
       
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
         ...(resolvedSession?.access_token ? { Authorization: `Bearer ${resolvedSession.access_token}` } : {}),
         ...optionsHeaders,
+      }
+      if (!isFormDataBody && !headers['Content-Type'] && !headers['content-type']) {
+        headers['Content-Type'] = 'application/json'
       }
 
       // Inyección automática del país (si existe en localStorage)

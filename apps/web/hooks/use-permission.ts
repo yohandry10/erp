@@ -127,10 +127,45 @@ interface PermissionCache {
 }
 
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const OFFLINE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000 // 30 dias para continuidad offline
+const PERMISSION_STORAGE_KEY = 'erp.permissions.snapshot'
 const permissionCache = new Map<string, PermissionCache>()
 
 // Track in-flight requests to prevent duplicate API calls
 const pendingRequests = new Map<string, Promise<Permission[]>>()
+
+function readStoredPermissionCache(cacheKey: string): PermissionCache | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(PERMISSION_STORAGE_KEY)
+    const all = raw ? JSON.parse(raw) as Record<string, PermissionCache> : {}
+    const cached = all[cacheKey]
+    if (!cached || !Array.isArray(cached.permissions)) return null
+    return cached
+  } catch {
+    return null
+  }
+}
+
+function writeStoredPermissionCache(cacheKey: string, cache: PermissionCache) {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(PERMISSION_STORAGE_KEY)
+    const all = raw ? JSON.parse(raw) as Record<string, PermissionCache> : {}
+    all[cacheKey] = cache
+    window.localStorage.setItem(PERMISSION_STORAGE_KEY, JSON.stringify(all))
+  } catch {
+    /* cache offline best-effort */
+  }
+}
+
+function getUsableStoredPermissions(cacheKey: string) {
+  const cached = readStoredPermissionCache(cacheKey)
+  if (!cached) return null
+  if ((Date.now() - cached.timestamp) > OFFLINE_CACHE_TTL) return null
+  permissionCache.set(cacheKey, cached)
+  return cached.permissions
+}
 
 /**
  * Hook to check if the current user has a specific permission
@@ -200,17 +235,19 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
 
             if (!response) {
               console.warn(`[usePermission] No response from permissions API for user ${user.id}`)
-              return []
+              return getUsableStoredPermissions(cacheKey) || []
             }
 
             const perms = Array.isArray(response) ? response : (response.data || [])
             console.log(`[usePermission] Fetched ${perms.length} permissions for user ${user.id}`)
 
             // Update cache
-            permissionCache.set(cacheKey, {
+            const nextCache = {
               permissions: perms,
               timestamp: Date.now(),
-            })
+            }
+            permissionCache.set(cacheKey, nextCache)
+            writeStoredPermissionCache(cacheKey, nextCache)
 
             return perms
           })()
@@ -246,7 +283,20 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
       setHasPermission(hasRequiredPermission)
     } catch (error) {
       console.error('Error checking permission:', error)
-      setHasPermission(false)
+      const cacheKey = user && tenant ? `${user.id}:${tenant.id}` : null
+      const storedPermissions = cacheKey ? getUsableStoredPermissions(cacheKey) : null
+      if (storedPermissions) {
+        const normalizedModule = normalize(modulo)
+        const normalizedAction = normalize(accion)
+        const normalizedResource = normalizeResource(recurso)
+        setHasPermission(storedPermissions.some((permission) => (
+          normalize(permission.modulo) === normalizedModule
+          && matchesAction(permission.accion, normalizedAction)
+          && matchesResource(permission.recurso, normalizedResource)
+        )))
+      } else {
+        setHasPermission(false)
+      }
     } finally {
       setLoading(false)
     }
@@ -313,9 +363,11 @@ export function useUserPermissions() {
         // Create new request
         const fetchPromise = (async () => {
           const response = await get('/usuarios-sistema/me/permissions')
-          if (!response) return []
+          if (!response) return getUsableStoredPermissions(cacheKey) || []
           const perms = Array.isArray(response) ? response : (response.data || [])
-          permissionCache.set(cacheKey, { permissions: perms, timestamp: Date.now() })
+          const nextCache = { permissions: perms, timestamp: Date.now() }
+          permissionCache.set(cacheKey, nextCache)
+          writeStoredPermissionCache(cacheKey, nextCache)
           return perms
         })()
 
@@ -330,7 +382,8 @@ export function useUserPermissions() {
       setPermissions(userPermissions)
     } catch (error) {
       console.error('Error fetching permissions:', error)
-      setPermissions([])
+      const storedPermissions = getUsableStoredPermissions(`${user.id}:${tenant.id}`)
+      setPermissions(storedPermissions || [])
     } finally {
       setLoading(false)
     }
