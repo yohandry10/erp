@@ -39,6 +39,33 @@ export interface Factura {
   created_at: string;
 }
 
+export interface OfflineFiscalDocumentInput {
+  document_type: string;
+  serie?: string;
+  cliente_ruc?: string;
+  cliente_nombre?: string;
+  moneda?: string;
+  subtotal: number;
+  igv: number;
+  total: number;
+  items: unknown[];
+  source_type?: string;
+  source_id?: string;
+}
+
+export interface OfflineFiscalDocument {
+  id: string;
+  document_type: string;
+  serie: string;
+  numero: number;
+  estado: string;
+  xml_content: string;
+  signed_xml?: string | null;
+  pdf_base64?: string | null;
+  hash: string;
+  created_at: number;
+}
+
 export const useTauri = () => {
   const [isDesktop, setIsDesktop] = useState(false);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -168,6 +195,31 @@ export const useTauri = () => {
       await sendNotification({
         title: 'Error PDF',
         body: `Error al generar PDF: ${error}`
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateOfflineFiscalDocument = async (
+    document: OfflineFiscalDocumentInput,
+  ): Promise<OfflineFiscalDocument | null> => {
+    if (!isDesktop) return null;
+
+    setLoading(true);
+    try {
+      const result = await invoke<OfflineFiscalDocument>('generate_offline_fiscal_document', { document });
+      await sendNotification({
+        title: 'Documento fiscal local',
+        body: `${result.serie}-${String(result.numero).padStart(8, '0')} queda pendiente de envio SUNAT/OSE`
+      });
+      return result;
+    } catch (error) {
+      console.error('Error generating offline fiscal document:', error);
+      await sendNotification({
+        title: 'Error fiscal offline',
+        body: `No se pudo generar el documento local: ${error}`
       });
       return null;
     } finally {
@@ -365,6 +417,7 @@ export const useTauri = () => {
     signXML,
     sendToSUNAT,
     generatePDF,
+    generateOfflineFiscalDocument,
     savePDF,
     getPrinters,
     printDocument,

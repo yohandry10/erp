@@ -29,3 +29,5 @@ tauri-plugin-dialog = "2.0"
 tauri-plugin-shell = "2.0"
 tauri-plugin-notification = "2.0"
 uuid = { version = "1.11", features = ["v4"] }
+base64 = "0.22"
+sha2 = "0.10"
