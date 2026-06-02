@@ -71,6 +71,8 @@ const LOCAL_FIRST_GET_ENDPOINTS = new Set([
   '/api/inventario/movimientos',
   '/api/inventario/stats',
   '/api/ventas/clientes',
+  '/api/ventas/cotizaciones',
+  '/api/ventas/pedidos',
 ])
 const LOCAL_FIRST_WRITE_ENDPOINTS = [
   /^\/api\/pos\/venta$/,
@@ -80,6 +82,11 @@ const LOCAL_FIRST_WRITE_ENDPOINTS = [
   /^\/api\/inventario\/productos\/[^/]+$/,
   /^\/api\/ventas\/clientes$/,
   /^\/api\/ventas\/clientes\/[^/]+$/,
+  /^\/api\/ventas\/cotizaciones$/,
+  /^\/api\/ventas\/cotizaciones\/[^/]+$/,
+  /^\/api\/cotizaciones\/crear$/,
+  /^\/api\/ventas\/pedidos$/,
+  /^\/api\/ventas\/pedidos\/[^/]+$/,
 ]
 
 let offlineModeCache: { value: boolean; expiresAt: number } | null = null
@@ -161,6 +168,8 @@ function isLocalFirstGetEndpoint(endpoint: string) {
   return LOCAL_FIRST_GET_ENDPOINTS.has(normalized)
     || /^\/api\/inventario\/productos\/[^/]+$/.test(normalized)
     || /^\/api\/ventas\/clientes\/[^/]+$/.test(normalized)
+    || /^\/api\/ventas\/cotizaciones\/[^/]+$/.test(normalized)
+    || /^\/api\/ventas\/pedidos\/[^/]+$/.test(normalized)
 }
 
 function isLocalFirstWriteEndpoint(endpoint: string, method: string) {

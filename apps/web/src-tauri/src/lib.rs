@@ -252,6 +252,25 @@ fn open_local_db(app: &AppHandle) -> Result<Connection, String> {
             ON local_customers(documento);
         CREATE INDEX IF NOT EXISTS idx_local_customers_updated
             ON local_customers(updated_at);
+
+        CREATE TABLE IF NOT EXISTS local_sales_documents (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL CHECK (kind IN ('quote', 'order')),
+            numero TEXT NOT NULL,
+            cliente_id TEXT,
+            estado TEXT NOT NULL,
+            total REAL NOT NULL DEFAULT 0,
+            data_json TEXT NOT NULL,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            sync_status TEXT NOT NULL CHECK (sync_status IN ('pending', 'synced', 'failed')),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_local_sales_documents_kind_updated
+            ON local_sales_documents(kind, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_local_sales_documents_cliente
+            ON local_sales_documents(cliente_id, kind);
         "#,
     )
     .map_err(|e| format!("No se pudo inicializar SQLite local: {e}"))?;
@@ -436,6 +455,62 @@ fn hydrate_local_customers(conn: &Connection, body: &str) -> Result<(), String> 
     }
     tx.commit()
         .map_err(|e| format!("No se pudo confirmar hidratacion clientes: {e}"))?;
+    Ok(())
+}
+
+fn hydrate_sales_documents(conn: &Connection, body: &str, kind: &str) -> Result<(), String> {
+    let Some(data) = extract_response_data(body) else {
+        return Ok(());
+    };
+    let documents = match data {
+        Value::Array(items) => items,
+        Value::Object(ref obj) => obj
+            .get("data")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("No se pudo iniciar hidratacion ventas: {e}"))?;
+    for document in documents {
+        let Some(id) = value_string(&document, "id") else {
+            continue;
+        };
+        let numero = value_string(&document, "numero").unwrap_or_else(|| id.clone());
+        let cliente_id = value_string(&document, "cliente_id");
+        let estado = value_string(&document, "estado").unwrap_or_else(|| {
+            if kind == "quote" {
+                "BORRADOR".to_string()
+            } else {
+                "PENDIENTE".to_string()
+            }
+        });
+        let total = value_number(&document, "total");
+        tx.execute(
+            r#"
+            INSERT OR REPLACE INTO local_sales_documents
+                (id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 'synced', ?8, ?8)
+            "#,
+            params![
+                id,
+                kind,
+                numero,
+                cliente_id,
+                estado,
+                total,
+                serde_json::to_string(&document)
+                    .map_err(|e| format!("Documento venta invalido para cache local: {e}"))?,
+                now_ms(),
+            ],
+        )
+        .map_err(|e| format!("No se pudo hidratar documento venta local: {e}"))?;
+    }
+    tx.commit()
+        .map_err(|e| format!("No se pudo confirmar hidratacion ventas: {e}"))?;
     Ok(())
 }
 
@@ -630,6 +705,111 @@ fn build_customer_detail_snapshot(
     };
     let customer: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
     Ok(Some(json_success_response(customer, "Cliente local")?))
+}
+
+fn attach_customer(conn: &Connection, mut document: Value) -> Value {
+    let Some(cliente_id) = value_string(&document, "cliente_id") else {
+        return document;
+    };
+    let customer_raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM local_customers WHERE id = ?1 AND deleted = 0",
+            params![cliente_id],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = customer_raw else {
+        return document;
+    };
+    if let Ok(customer) = serde_json::from_str::<Value>(&raw) {
+        if let Some(obj) = document.as_object_mut() {
+            obj.insert("cliente".to_string(), customer);
+        }
+    }
+    document
+}
+
+fn build_sales_documents_snapshot(conn: &Connection, kind: &str) -> Result<LocalFirstResponse, String> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT data_json FROM local_sales_documents
+            WHERE kind = ?1 AND deleted = 0
+            ORDER BY updated_at DESC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar documentos venta locales: {e}"))?;
+    let rows = stmt
+        .query_map(params![kind], |row| {
+            let raw: String = row.get(0)?;
+            Ok(serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null))
+        })
+        .map_err(|e| format!("No se pudo leer documentos venta locales: {e}"))?;
+    let mut documents = Vec::new();
+    for row in rows {
+        let value = row.map_err(|e| format!("Documento venta local invalido: {e}"))?;
+        if !value.is_null() {
+            documents.push(attach_customer(conn, value));
+        }
+    }
+    let total = documents.len();
+    let body = serde_json::json!({
+        "success": true,
+        "offline": true,
+        "local_first": true,
+        "data": documents,
+        "total": total,
+        "pagination": {
+            "total": total,
+            "page": 1,
+            "limit": total,
+            "totalPages": 1
+        },
+        "message": if kind == "quote" { "Cotizaciones locales" } else { "Pedidos locales" }
+    });
+    Ok(LocalFirstResponse {
+        status: 200,
+        body: serde_json::to_string(&body)
+            .map_err(|e| format!("No se pudo serializar documentos venta locales: {e}"))?,
+        headers: vec![
+            HeaderPair {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HeaderPair {
+                name: "x-erp-local-first".to_string(),
+                value: "true".to_string(),
+            },
+        ],
+    })
+}
+
+fn build_sales_document_detail_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+    kind: &str,
+) -> Result<Option<LocalFirstResponse>, String> {
+    let prefix = if kind == "quote" {
+        "/api/ventas/cotizaciones/"
+    } else {
+        "/api/ventas/pedidos/"
+    };
+    let id = endpoint.trim_start_matches(prefix);
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM local_sales_documents WHERE id = ?1 AND kind = ?2 AND deleted = 0",
+            params![id, kind],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let document: Value = serde_json::from_str(&raw).unwrap_or(Value::Null);
+    Ok(Some(json_success_response(
+        attach_customer(conn, document),
+        if kind == "quote" { "Cotizacion local" } else { "Pedido local" },
+    )?))
 }
 
 fn build_open_session_snapshot(conn: &Connection) -> Result<Option<LocalFirstResponse>, String> {
@@ -1132,6 +1312,215 @@ fn process_local_customer(
     json_success_response(customer, "Cliente guardado localmente; pendiente de sincronizacion")
 }
 
+fn calculate_document_totals(payload: &Value) -> (f64, f64, f64) {
+    let detalle = payload
+        .get("detalle")
+        .or_else(|| payload.get("items"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let subtotal = payload.get("subtotal").and_then(Value::as_f64).unwrap_or_else(|| {
+        detalle
+            .iter()
+            .map(|item| {
+                item.get("subtotal")
+                    .or_else(|| item.get("total"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or_else(|| value_number(item, "cantidad") * value_number(item, "precio_unitario"))
+            })
+            .sum()
+    });
+    let igv = payload
+        .get("igv")
+        .or_else(|| payload.get("impuestos"))
+        .and_then(Value::as_f64)
+        .unwrap_or(subtotal * 0.18);
+    let total = payload.get("total").and_then(Value::as_f64).unwrap_or(subtotal + igv);
+    (subtotal, igv, total)
+}
+
+fn normalize_sales_document_payload(
+    payload: &Value,
+    id: String,
+    kind: &str,
+    deleted: bool,
+) -> Value {
+    let mut document = payload.clone();
+    let (subtotal, igv, total) = calculate_document_totals(payload);
+    if let Some(obj) = document.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(id.clone()));
+        obj.insert(
+            "numero".to_string(),
+            serde_json::json!(
+                value_string(payload, "numero").unwrap_or_else(|| {
+                    let prefix = if kind == "quote" { "COT-L" } else { "PED-L" };
+                    format!("{prefix}-{:08}", now_ms() % 100_000_000)
+                })
+            ),
+        );
+        obj.insert(
+            "estado".to_string(),
+            serde_json::json!(
+                value_string(payload, "estado").unwrap_or_else(|| {
+                    if kind == "quote" {
+                        "BORRADOR".to_string()
+                    } else {
+                        "PENDIENTE".to_string()
+                    }
+                })
+            ),
+        );
+        let date_key = if kind == "quote" { "fecha" } else { "fecha_pedido" };
+        if !obj.contains_key(date_key) {
+            obj.insert(date_key.to_string(), serde_json::json!(now_ms()));
+        }
+        obj.insert("subtotal".to_string(), serde_json::json!(subtotal));
+        obj.insert("igv".to_string(), serde_json::json!(igv));
+        obj.insert("total".to_string(), serde_json::json!(total));
+        obj.insert("activo".to_string(), serde_json::json!(!deleted));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+    }
+    document
+}
+
+fn reserve_order_stock(conn: &Connection, payload: &Value) -> Result<(), String> {
+    let detalle = payload
+        .get("detalle")
+        .or_else(|| payload.get("items"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| "El pedido local requiere detalle".to_string())?;
+
+    for item in detalle {
+        let producto_id = value_string(item, "producto_id")
+            .ok_or_else(|| "Item de pedido local sin producto_id".to_string())?;
+        let cantidad = value_number(item, "cantidad");
+        let raw: String = conn
+            .query_row(
+                "SELECT data_json FROM pos_products WHERE id = ?1",
+                params![&producto_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| format!("Producto {producto_id} no existe en SQLite local"))?;
+        let mut product_json: Value = serde_json::from_str(&raw)
+            .map_err(|e| format!("Producto {producto_id} invalido en SQLite local: {e}"))?;
+        let stock_actual = product_json
+            .get("stock_actual")
+            .or_else(|| product_json.get("stock"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        let stock_reservado = product_json
+            .get("stock_reservado")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        let disponible = stock_actual - stock_reservado;
+        if disponible < cantidad {
+            return Err(format!(
+                "Stock local insuficiente para reservar {}: disponible {}, requerido {}",
+                producto_id, disponible, cantidad
+            ));
+        }
+        let next_reservado = stock_reservado + cantidad;
+        if let Some(obj) = product_json.as_object_mut() {
+            obj.insert("stock_reservado".to_string(), serde_json::json!(next_reservado));
+            obj.insert("offline_dirty".to_string(), serde_json::json!(true));
+        }
+        conn.execute(
+            "UPDATE pos_products SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+            params![
+                producto_id,
+                serde_json::to_string(&product_json)
+                    .map_err(|e| format!("No se pudo serializar reserva local: {e}"))?,
+                now_ms(),
+            ],
+        )
+        .map_err(|e| format!("No se pudo reservar stock local: {e}"))?;
+    }
+    Ok(())
+}
+
+fn process_local_sales_document(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+    kind: &str,
+) -> Result<LocalFirstResponse, String> {
+    let method = input.method.to_uppercase();
+    let timestamp = now_ms();
+    let base = if kind == "quote" {
+        "/api/ventas/cotizaciones/"
+    } else {
+        "/api/ventas/pedidos/"
+    };
+    let id = if method == "POST" {
+        format!(
+            "local-{}-{}",
+            if kind == "quote" { "quote" } else { "order" },
+            Uuid::new_v4()
+        )
+    } else {
+        input.endpoint.trim_start_matches(base).to_string()
+    };
+
+    let payload = if method == "DELETE" {
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT data_json FROM local_sales_documents WHERE id = ?1 AND kind = ?2",
+                params![&id, kind],
+                |row| row.get(0),
+            )
+            .ok();
+        existing
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .unwrap_or_else(|| serde_json::json!({ "id": id.clone() }))
+    } else {
+        parse_json_body(&input.body)?
+    };
+
+    let document = normalize_sales_document_payload(&payload, id.clone(), kind, method == "DELETE");
+    if kind == "order" && method == "POST" {
+        reserve_order_stock(conn, &document)?;
+    }
+    let numero = value_string(&document, "numero").unwrap_or_else(|| id.clone());
+    let cliente_id = value_string(&document, "cliente_id");
+    let estado = value_string(&document, "estado").unwrap_or_else(|| {
+        if kind == "quote" {
+            "BORRADOR".to_string()
+        } else {
+            "PENDIENTE".to_string()
+        }
+    });
+    let total = value_number(&document, "total");
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_sales_documents
+            (id, kind, numero, cliente_id, estado, total, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending', ?9, ?9)
+        "#,
+        params![
+            id,
+            kind,
+            numero,
+            cliente_id,
+            estado,
+            total,
+            serde_json::to_string(&document)
+                .map_err(|e| format!("No se pudo serializar documento venta local: {e}"))?,
+            if method == "DELETE" { 1 } else { 0 },
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar documento venta local: {e}"))?;
+    enqueue_offline_request_with_conn(conn, input)?;
+    json_success_response(
+        attach_customer(conn, document),
+        if kind == "quote" {
+            "Cotizacion guardada localmente; pendiente de sincronizacion"
+        } else {
+            "Pedido guardado localmente; pendiente de sincronizacion"
+        },
+    )
+}
+
 #[tauri::command]
 fn hydrate_local_first_response(
     app: AppHandle,
@@ -1148,6 +1537,8 @@ fn hydrate_local_first_response(
     match endpoint.as_str() {
         "/api/pos/productos" | "/api/inventario/productos" => hydrate_pos_products(&conn, &body)?,
         "/api/pos/clientes" | "/api/ventas/clientes" => hydrate_local_customers(&conn, &body)?,
+        "/api/ventas/cotizaciones" => hydrate_sales_documents(&conn, &body, "quote")?,
+        "/api/ventas/pedidos" => hydrate_sales_documents(&conn, &body, "order")?,
         "/api/pos/sesion-caja" => hydrate_cash_session(&conn, &body)?,
         _ => {}
     }
@@ -1171,6 +1562,12 @@ fn get_local_first_response(
         "/api/pos/clientes" | "/api/ventas/clientes" => {
             return Ok(Some(build_customers_snapshot(&conn)?))
         }
+        "/api/ventas/cotizaciones" => {
+            return Ok(Some(build_sales_documents_snapshot(&conn, "quote")?))
+        }
+        "/api/ventas/pedidos" => {
+            return Ok(Some(build_sales_documents_snapshot(&conn, "order")?))
+        }
         "/api/pos/sesion-caja" => return build_open_session_snapshot(&conn),
         "/api/pos/ventas-recientes" => return Ok(Some(build_recent_sales_snapshot(&conn)?)),
         _ => {}
@@ -1181,6 +1578,12 @@ fn get_local_first_response(
     }
     if endpoint.starts_with("/api/ventas/clientes/") {
         return build_customer_detail_snapshot(&conn, &endpoint);
+    }
+    if endpoint.starts_with("/api/ventas/cotizaciones/") {
+        return build_sales_document_detail_snapshot(&conn, &endpoint, "quote");
+    }
+    if endpoint.starts_with("/api/ventas/pedidos/") {
+        return build_sales_document_detail_snapshot(&conn, &endpoint, "order");
     }
 
     read_local_snapshot(&conn, &endpoint, &url)
@@ -1219,6 +1622,15 @@ fn process_local_first_write(
         || request.endpoint.starts_with("/api/ventas/clientes/")
     {
         process_local_customer(&tx, &request)
+    } else if request.endpoint == "/api/ventas/cotizaciones"
+        || request.endpoint == "/api/cotizaciones/crear"
+        || request.endpoint.starts_with("/api/ventas/cotizaciones/")
+    {
+        process_local_sales_document(&tx, &request, "quote")
+    } else if request.endpoint == "/api/ventas/pedidos"
+        || request.endpoint.starts_with("/api/ventas/pedidos/")
+    {
+        process_local_sales_document(&tx, &request, "order")
     } else {
         Err(format!(
             "Endpoint no soportado por local-first: {} {}",
@@ -1309,15 +1721,72 @@ fn update_local_first_sync_status(
     let Some((endpoint, body)) = request else {
         return Ok(());
     };
-    if endpoint != "/api/pos/venta" {
-        return Ok(());
-    }
     let Some(raw_body) = body else {
         return Ok(());
     };
     let Ok(payload) = serde_json::from_str::<Value>(&raw_body) else {
         return Ok(());
     };
+
+    if endpoint == "/api/ventas/cotizaciones"
+        || endpoint == "/api/cotizaciones/crear"
+        || endpoint.starts_with("/api/ventas/cotizaciones/")
+    {
+        let synced_document_json = response_body.and_then(|response| {
+            serde_json::from_str::<Value>(response).ok().and_then(|value| {
+                let data = value.get("data").cloned().unwrap_or(value);
+                serde_json::to_string(&data).ok()
+            })
+        });
+        let local_id = response_body
+            .and_then(|response| serde_json::from_str::<Value>(response).ok())
+            .and_then(|value| {
+                value
+                    .get("data")
+                    .and_then(|data| value_string(data, "id"))
+                    .or_else(|| value_string(&value, "id"))
+            })
+            .or_else(|| value_string(&payload, "id"));
+        if let Some(id) = local_id {
+            conn.execute(
+                "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'quote'",
+                params![id, sync_status, synced_document_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de cotizacion local: {e}"))?;
+        }
+        return Ok(());
+    }
+
+    if endpoint == "/api/ventas/pedidos" || endpoint.starts_with("/api/ventas/pedidos/") {
+        let synced_document_json = response_body.and_then(|response| {
+            serde_json::from_str::<Value>(response).ok().and_then(|value| {
+                let data = value.get("data").cloned().unwrap_or(value);
+                serde_json::to_string(&data).ok()
+            })
+        });
+        let local_id = response_body
+            .and_then(|response| serde_json::from_str::<Value>(response).ok())
+            .and_then(|value| {
+                value
+                    .get("data")
+                    .and_then(|data| value_string(data, "id"))
+                    .or_else(|| value_string(&value, "id"))
+            })
+            .or_else(|| value_string(&payload, "id"));
+        if let Some(id) = local_id {
+            conn.execute(
+                "UPDATE local_sales_documents SET sync_status = ?2, data_json = COALESCE(?3, data_json), updated_at = ?4 WHERE id = ?1 AND kind = 'order'",
+                params![id, sync_status, synced_document_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de pedido local: {e}"))?;
+        }
+        return Ok(());
+    }
+
+    if endpoint != "/api/pos/venta" {
+        return Ok(());
+    }
+
     let Some(idempotency_key) = value_string(&payload, "idempotency_key") else {
         return Ok(());
     };
