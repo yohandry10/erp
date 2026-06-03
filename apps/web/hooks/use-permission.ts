@@ -127,9 +127,16 @@ interface PermissionCache {
 }
 
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
-const OFFLINE_CACHE_TTL = 30 * 24 * 60 * 60 * 1000 // 30 dias para continuidad offline
+const OFFLINE_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 horas para continuidad offline
+const SENSITIVE_OFFLINE_CACHE_TTL = 8 * 60 * 60 * 1000 // ventana corta para acciones sensibles
 const PERMISSION_STORAGE_KEY = 'erp.permissions.snapshot'
 const permissionCache = new Map<string, PermissionCache>()
+const SENSITIVE_ACTIONS = new Set([
+  ...WRITE_EQUIVALENTS,
+  ...DELETE_EQUIVALENTS,
+  ...APPROVE_EQUIVALENTS,
+  ...MANAGE_EQUIVALENTS,
+])
 
 // Track in-flight requests to prevent duplicate API calls
 const pendingRequests = new Map<string, Promise<Permission[]>>()
@@ -159,10 +166,14 @@ function writeStoredPermissionCache(cacheKey: string, cache: PermissionCache) {
   }
 }
 
-function getUsableStoredPermissions(cacheKey: string) {
+function getUsableStoredPermissions(cacheKey: string, requestedAction?: string) {
   const cached = readStoredPermissionCache(cacheKey)
   if (!cached) return null
-  if ((Date.now() - cached.timestamp) > OFFLINE_CACHE_TTL) return null
+  const normalizedAction = normalize(requestedAction)
+  const ttl = normalizedAction && SENSITIVE_ACTIONS.has(normalizedAction)
+    ? SENSITIVE_OFFLINE_CACHE_TTL
+    : OFFLINE_CACHE_TTL
+  if ((Date.now() - cached.timestamp) > ttl) return null
   permissionCache.set(cacheKey, cached)
   return cached.permissions
 }
@@ -235,7 +246,7 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
 
             if (!response) {
               console.warn(`[usePermission] No response from permissions API for user ${user.id}`)
-              return getUsableStoredPermissions(cacheKey) || []
+              return getUsableStoredPermissions(cacheKey, accion) || []
             }
 
             const perms = Array.isArray(response) ? response : (response.data || [])
@@ -284,7 +295,7 @@ export function usePermission(modulo: string, accion: string, recurso: string) {
     } catch (error) {
       console.error('Error checking permission:', error)
       const cacheKey = user && tenant ? `${user.id}:${tenant.id}` : null
-      const storedPermissions = cacheKey ? getUsableStoredPermissions(cacheKey) : null
+      const storedPermissions = cacheKey ? getUsableStoredPermissions(cacheKey, accion) : null
       if (storedPermissions) {
         const normalizedModule = normalize(modulo)
         const normalizedAction = normalize(accion)

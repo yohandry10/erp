@@ -145,6 +145,18 @@ export class CpeController {
     return this.cpeService.createFromComprobantePayload(payload, tenantId, userId);
   }
 
+  @Post('desktop/signed')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('cpe.comprobantes.emitir')
+  @ApiOperation({ summary: 'Registrar XML firmado desde desktop offline' })
+  async registerDesktopSignedXml(
+    @Body() payload: any,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.cpeService.registerDesktopSignedXml(payload, tenantId, userId);
+  }
+
   @Get('comprobantes')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('cpe.comprobantes.listar')

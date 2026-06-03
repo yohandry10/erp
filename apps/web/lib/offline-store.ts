@@ -86,20 +86,74 @@ const BINARY_CACHE_BODY_LIMIT = 8 * 1024 * 1024
 const OFFLINE_MODE_CACHE_TTL = 5000
 export const DEFAULT_LOCAL_FIRST_SNAPSHOT_ENDPOINTS = [
   '/api/dashboard/metrics',
+  '/api/dashboard/stats',
+  '/api/dashboard/activities',
   '/api/dashboard/recent-activity',
   '/api/pos/productos',
   '/api/pos/clientes',
+  '/api/pos/metodos-pago',
+  '/api/pos/empresa-config',
+  '/api/pos/configuration-status',
   '/api/pos/sesion-caja',
+  '/api/pos/ventas-recientes',
+  '/api/pos/detalles-venta',
+  '/api/configuration/gre-thresholds',
   '/api/inventario/productos',
   '/api/ventas/clientes',
   '/api/ventas/cotizaciones',
   '/api/ventas/pedidos',
   '/api/compras/proveedores',
+  '/api/compras/productos',
+  '/api/compras/next-number',
   '/api/compras/ordenes',
+  '/api/compras/cotizaciones',
+  '/api/compras/recepciones',
+  '/api/compras/devoluciones',
+  '/api/compras/stats',
   '/api/rrhh/empleados',
+  '/api/rrhh/departamentos',
   '/api/rrhh/planillas',
+  '/api/rrhh/pagos',
+  '/api/rrhh/contratos',
+  '/api/rrhh/candidatos',
+  '/api/rrhh/asistencia',
+  '/api/rrhh/asistencias',
   '/api/finanzas/cuentas-bancarias',
+  '/api/finanzas/cxc',
+  '/api/finanzas/cxp',
+  '/api/finanzas/tesoreria',
+  '/api/finanzas/tesoreria/pagos',
+  '/api/finanzas/bancos',
+  '/api/finanzas/bancos/cuentas',
+  '/api/finanzas/conciliacion/pendientes',
+  '/api/finanzas/tesoreria/programacion',
+  '/api/finanzas/cxp/vencimientos',
+  '/api/finanzas/conciliacion',
   '/api/contabilidad/asientos',
+  '/api/contabilidad/asientos-contables',
+  '/api/contabilidad/centros-costo',
+  '/api/contabilidad/presupuestos',
+  '/api/contabilidad/periodos',
+  '/api/contabilidad/plan-cuentas',
+  '/api/cpe/comprobantes',
+  '/api/cotizaciones/lista',
+  '/api/cotizaciones/stats',
+  '/api/gre/guias',
+  '/api/gre/reporte',
+  '/api/sire/files',
+  '/api/documentos',
+  '/api/paises',
+  '/api/paises/usuario/configuracion',
+  '/api/notifications',
+  '/api/notifications/unread',
+  '/api/usuarios-sistema/me/permissions',
+  '/api/tenants',
+  '/api/cajas/sesiones',
+  '/api/cajas/cortes',
+  '/api/cajas/movimientos',
+  '/api/cajas/retiros',
+  '/api/cajas/saldo-esperado',
+  '/api/cajas/cambios-turno',
   '/api/cajas',
 ]
 const LOCAL_FIRST_EXCLUDED_PREFIXES = [
@@ -109,6 +163,10 @@ const LOCAL_FIRST_EXCLUDED_PREFIXES = [
 ]
 const LOCAL_FIRST_EXCLUDED_PATTERNS = [
   /\/descargar-/,
+  /\/download\/?$/,
+  /\/exportar\/?$/,
+  /\/csv\/?$/,
+  /\/excel\/?$/,
   /\/pdf\/?$/,
   /\/comprobante\/?$/,
   /\/validar-/,
@@ -216,8 +274,14 @@ function isDeferredValidationEndpoint(endpoint: string) {
     || normalized.includes('/validate-')
 }
 
-function deferredValidationResponse(endpoint: string, init: RequestInit) {
-  const body = bodyToString(init.body)
+async function deferredValidationResponse(
+  endpoint: string,
+  init: RequestInit,
+  meta: { endpoint: string; userId?: string | null; tenantId?: string | null },
+  url: string,
+  method: string,
+) {
+  const body = await offlineBodyToString(init.body)
   let payload: any = {}
   try {
     payload = body ? JSON.parse(body) : {}
@@ -235,14 +299,19 @@ function deferredValidationResponse(endpoint: string, init: RequestInit) {
           validacion_diferida: true,
           mensaje: 'Validacion externa pendiente de conexion',
         }
+  const queued = await enqueueDeferredValidationRequest(url, init, meta, method, body)
 
   return new Response(JSON.stringify({
     success: true,
     offline: true,
     local_first: true,
     validation_deferred: true,
+    queued: true,
     message: 'Validacion externa diferida hasta reconectar.',
-    data,
+    data: {
+      ...data,
+      offline_validation_queue_id: queued.id,
+    },
   }), {
     status: 200,
     headers: {
@@ -250,6 +319,31 @@ function deferredValidationResponse(endpoint: string, init: RequestInit) {
       'x-erp-offline-cache': 'true',
       'x-erp-validation-deferred': 'true',
     },
+  })
+}
+
+async function enqueueDeferredValidationRequest(
+  url: string,
+  init: RequestInit,
+  meta: { endpoint: string; userId?: string | null; tenantId?: string | null },
+  method: string,
+  body: string | null,
+) {
+  const validationId = localId()
+  const headers = headersToPairs(init.headers)
+    .filter((header) => !header.name.toLowerCase().startsWith('x-erp-local-'))
+  headers.push({ name: 'x-erp-local-id', value: validationId })
+  headers.push({ name: 'x-erp-local-entity-type', value: 'external_validation' })
+  headers.push({ name: 'x-erp-validation-deferred', value: 'true' })
+
+  return enqueueOfflineRequest({
+    endpoint: meta.endpoint,
+    method,
+    url,
+    headers,
+    body,
+    tenant_id: meta.tenantId ?? null,
+    user_id: meta.userId ?? null,
   })
 }
 
@@ -418,7 +512,7 @@ async function processLocalFirstWrite(
   method: string,
 ) {
   if (!isDesktopRuntime() || !isLocalFirstWriteEndpoint(meta.endpoint, method)) return null
-  const body = bodyToString(init.body)
+  const body = await offlineBodyToString(init.body)
   if (body === null && init.body !== null && init.body !== undefined) return null
 
   const local = await invoke<LocalFirstResponse>('process_local_first_write', {
@@ -621,6 +715,8 @@ function bodyToString(body: BodyInit | null | undefined): string | null {
 function canQueue(method: string, body: BodyInit | null | undefined) {
   if (method === 'GET' || method === 'HEAD') return false
   if (typeof Blob !== 'undefined' && body instanceof Blob) return false
+  if (body instanceof ArrayBuffer) return false
+  if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) return false
   return true
 }
 
@@ -671,6 +767,19 @@ function queuedResponse(item: OfflineQueueItem) {
   })
 }
 
+function responseBodyFailureMessage(body: string) {
+  if (!body) return null
+  try {
+    const payload = JSON.parse(body)
+    if (payload && typeof payload === 'object' && payload.success === false) {
+      return String(payload.message || payload.error || 'Respuesta de sincronizacion con success=false')
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 export async function fetchWithOfflineSupport(
   url: string,
   init: RequestInit,
@@ -681,7 +790,7 @@ export async function fetchWithOfflineSupport(
 
   if (forceOffline) {
     if (isDeferredValidationEndpoint(meta.endpoint)) {
-      return deferredValidationResponse(meta.endpoint, init)
+      return deferredValidationResponse(meta.endpoint, init, meta, url, method)
     }
 
     if (method === 'GET') {
@@ -725,7 +834,7 @@ export async function fetchWithOfflineSupport(
     return response
   } catch (error) {
     if (isDeferredValidationEndpoint(meta.endpoint)) {
-      return deferredValidationResponse(meta.endpoint, init)
+      return deferredValidationResponse(meta.endpoint, init, meta, url, method)
     }
 
     if (method === 'GET') {
@@ -783,12 +892,13 @@ export async function syncOfflineQueue() {
         cache: 'no-store',
       })
       const responseBody = await response.text().catch(() => '')
+      const logicalError = response.ok ? responseBodyFailureMessage(responseBody) : null
 
-      if (response.ok) {
+      if (response.ok && !logicalError) {
         await markOfflineRequestSynced(item.id, response.status, responseBody)
         results.push({ id: item.id, ok: true, status: response.status })
       } else {
-        const error = responseBody || `HTTP ${response.status}`
+        const error = logicalError || responseBody || `HTTP ${response.status}`
         await markOfflineRequestFailed(item.id, error, response.status)
         results.push({ id: item.id, ok: false, status: response.status, error })
       }

@@ -53,9 +53,10 @@ export const QuickClient: React.FC<Props> = ({ onCreated }) => {
     }
     setLoading(true)
     try {
-      const resp = await post('/api/pos/clientes', {
-        tipo_documento: form.tipo_documento,
-        numero_documento: form.numero_documento,
+      const resp = await post('/api/ventas/clientes', {
+        tipo: form.tipo_documento === 'RUC' ? 'EMPRESA' : 'PERSONA',
+        documento_tipo: form.tipo_documento,
+        documento_numero: form.numero_documento.toUpperCase(),
         razon_social: form.nombre,
         nombre_comercial: form.nombre,
         email: form.email || undefined,

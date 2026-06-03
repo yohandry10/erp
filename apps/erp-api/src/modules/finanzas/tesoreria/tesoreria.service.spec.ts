@@ -726,6 +726,45 @@ describe('TesoreriaService', () => {
         }),
       );
     });
+
+    it('should return existing lote movements without reprocessing duplicate reference', async () => {
+      const existingMovements = [
+        {
+          id: 'mov-lote-1',
+          cxp_id: 'cxp-1',
+          monto: 1000,
+          saldo_anterior: 1000,
+          saldo_nuevo: 0,
+          referencia: 'local-payment-batch-1',
+          fecha: '2024-01-15',
+        },
+      ];
+      const existingBuilder: any = {
+        select: jest.fn(() => existingBuilder),
+        eq: jest.fn(() => existingBuilder),
+        then: (resolve: any) => resolve({ data: existingMovements, error: null }),
+      };
+      mockSupabaseClient.from.mockReturnValueOnce(existingBuilder);
+
+      const result = await service.registrarPagoLote(
+        tenantId,
+        {
+          cuenta_bancaria_id: 'cuenta-123',
+          fecha_pago: '2024-01-15',
+          metodo_pago: 'TRANSFERENCIA',
+          referencia_lote: 'local-payment-batch-1',
+          pagos: [{ cxp_id: 'cxp-1', monto: 1000 }],
+        },
+        userId,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data.idempotent_replay).toBe(true);
+      expect(result.data.referencia_lote).toBe('local-payment-batch-1');
+      expect(result.data.pagos).toHaveLength(1);
+      expect(mockSupabaseClient.rpc).not.toHaveBeenCalled();
+      expect(eventBusService.emitPagoProveedorRegistrado).not.toHaveBeenCalled();
+    });
   });
 
   describe('obtenerFlujoCaja', () => {

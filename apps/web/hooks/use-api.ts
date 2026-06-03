@@ -231,7 +231,7 @@ export function useApi<T = any>(options: UseApiOptions = {}) {
           // `success: "false"` nunca se trata como truthy.
           const success = apiSucceeded(result)
           
-          if (!success && result?.error) {
+          if (!success) {
             throw new Error(getApiErrorMessage(result, 'API call failed'))
           }
 

@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
 import { useCountryContext } from '@/hooks/use-country-context'
+import { customAuth } from '@/lib/auth-service'
 import { 
   Building2, 
   FileText, 
@@ -62,7 +62,6 @@ export function DashboardNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClientComponentClient()
   const { toast } = useToast()
   const country = useCountryContext()
   const isPeru = country.paisCodigo === 'PE'
@@ -70,7 +69,7 @@ export function DashboardNav() {
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
+      const { error } = await customAuth.signOut()
       if (error) {
         toast({
           variant: "destructive",

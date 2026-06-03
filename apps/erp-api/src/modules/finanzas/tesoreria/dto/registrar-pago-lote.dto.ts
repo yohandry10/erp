@@ -73,6 +73,15 @@ export class RegistrarPagoLoteDto {
   referencia_lote?: string;
 
   @ApiPropertyOptional({
+    description: 'Clave idempotente generada por cliente desktop/offline para reintentos seguros',
+    example: 'local-payment-batch-550e8400-e29b-41d4-a716-446655440000',
+  })
+  @IsOptional()
+  @IsString({ message: 'La clave idempotente debe ser un texto' })
+  @MaxLength(160, { message: 'La clave idempotente no puede exceder 160 caracteres' })
+  idempotency_key?: string;
+
+  @ApiPropertyOptional({
     description: 'Observaciones adicionales sobre el lote de pagos',
     example: 'Pago masivo de proveedores - Semana 43',
   })
