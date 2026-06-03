@@ -614,7 +614,7 @@ export class TesoreriaService {
     }
 
     // Generar ID de lote si no se proporciona referencia
-    const loteId = dto.referencia_lote || `LOTE-${new Date().getTime()}`;
+    const loteId = dto.referencia_lote || dto.idempotency_key || `LOTE-${new Date().getTime()}`;
     if (String(dto.metodo_pago || '').trim().toUpperCase() === 'EFECTIVO') {
       throw new BadRequestException('Los pagos en lote a proveedores deben registrarse con medio de pago bancarizado');
     }
@@ -626,6 +626,44 @@ export class TesoreriaService {
     }));
 
     try {
+      const { data: movimientosExistentes, error: existingError } = await client
+        .from('movimientos_bancarios')
+        .select('id, cxp_id, monto, saldo_anterior, saldo_nuevo, referencia, fecha')
+        .eq('tenant_id', tenantId)
+        .eq('cuenta_bancaria_id', dto.cuenta_bancaria_id)
+        .eq('referencia', loteId)
+        .eq('tipo', 'CARGO');
+
+      if (existingError) {
+        console.error('Error verificando idempotencia de lote de pagos:', existingError);
+        throw new BadRequestException(existingError.message || 'Error verificando lote de pagos existente');
+      }
+
+      if (Array.isArray(movimientosExistentes) && movimientosExistentes.length > 0) {
+        return {
+          success: true,
+          data: {
+            success: true,
+            idempotent_replay: true,
+            referencia_lote: loteId,
+            total_procesado: movimientosExistentes.reduce(
+              (sum: number, movimiento: any) => sum + Number(movimiento.monto || 0),
+              0,
+            ),
+            cantidad_pagos: movimientosExistentes.length,
+            pagos: movimientosExistentes.map((movimiento: any) => ({
+              cxp_id: movimiento.cxp_id,
+              movimiento_bancario_id: movimiento.id,
+              monto: Number(movimiento.monto || 0),
+              saldo_anterior: movimiento.saldo_anterior,
+              saldo_nuevo: movimiento.saldo_nuevo,
+              referencia: movimiento.referencia,
+              fecha: movimiento.fecha,
+            })),
+          },
+        };
+      }
+
       // Llamar a la función de PostgreSQL que procesa el lote en una transacción atómica
       const { data, error } = await client.rpc('procesar_pago_lote', {
         p_tenant_id: tenantId,

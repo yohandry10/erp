@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { writeFile, readFile } from '@tauri-apps/plugin-fs';
 import { sendNotification } from '@tauri-apps/plugin-notification';
+import { customAuth } from '@/lib/auth-service';
 import {
   getOfflineStatus,
   listOfflineRequests,
@@ -66,6 +67,10 @@ export interface OfflineFiscalDocument {
   created_at: number;
 }
 
+function isTauriRuntime() {
+  return typeof window !== 'undefined' && !!window.__TAURI__;
+}
+
 export const useTauri = () => {
   const [isDesktop, setIsDesktop] = useState(false);
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -73,16 +78,16 @@ export const useTauri = () => {
   const [offlineStatus, setOfflineStatus] = useState<OfflineStatus | null>(null);
 
   useEffect(() => {
-    // Detectar si estamos en Tauri
-    if (typeof window !== 'undefined' && window.__TAURI__) {
+    const desktop = isTauriRuntime();
+    if (desktop) {
       setIsDesktop(true);
-      loadConfig();
+      void loadConfig(true);
       refreshOfflineStatus();
     }
   }, []);
 
-  const loadConfig = async (): Promise<AppConfig | null> => {
-    if (!isDesktop) return null;
+  const loadConfig = async (forceDesktop = false): Promise<AppConfig | null> => {
+    if (!forceDesktop && !isDesktop && !isTauriRuntime()) return null;
     
     try {
       const loadedConfig = await invoke<AppConfig>('load_config');
@@ -162,13 +167,22 @@ export const useTauri = () => {
 
   const sendToSUNAT = async (signedXml: string): Promise<string | null> => {
     if (!isDesktop) return null;
-    
+
     setLoading(true);
     try {
-      const response = await invoke<string>('send_to_sunat', { signedXml });
+      const context = getOfflineSyncContext();
+      const response = await invoke<string>('send_to_sunat', {
+        signedXml,
+        tenantId: context.tenantId,
+        userId: context.userId,
+        accessToken: context.accessToken,
+      });
+      const queued = response.includes('PENDIENTE_ENVIO');
       await sendNotification({
-        title: 'Enviado a SUNAT',
-        body: 'El documento ha sido enviado correctamente'
+        title: queued ? 'SUNAT encolado' : 'Enviado a SUNAT',
+        body: queued
+          ? 'El documento queda pendiente para enviarse al reconectar'
+          : 'El documento ha sido enviado correctamente'
       });
       return response;
     } catch (error) {
@@ -209,7 +223,13 @@ export const useTauri = () => {
 
     setLoading(true);
     try {
-      const result = await invoke<OfflineFiscalDocument>('generate_offline_fiscal_document', { document });
+      const context = getOfflineSyncContext();
+      const result = await invoke<OfflineFiscalDocument>('generate_offline_fiscal_document', {
+        document,
+        tenantId: context.tenantId,
+        userId: context.userId,
+        accessToken: context.accessToken,
+      });
       await sendNotification({
         title: 'Documento fiscal local',
         body: `${result.serie}-${String(result.numero).padStart(8, '0')} queda pendiente de envio SUNAT/OSE`
@@ -425,6 +445,15 @@ export const useTauri = () => {
     exportSIRE
   };
 };
+
+function getOfflineSyncContext() {
+  const { session, accessToken } = customAuth.getCachedSession();
+  return {
+    tenantId: session?.user?.tenant_id ?? null,
+    userId: session?.user?.id ?? null,
+    accessToken: accessToken ?? session?.access_token ?? null,
+  };
+}
 
 // Hook para detectar si estamos en modo desktop
 export const useIsDesktop = () => {

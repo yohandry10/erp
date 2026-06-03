@@ -812,6 +812,7 @@ export class CajasService {
     monto: number,
     motivo: string,
     userId: string,
+    idempotencyKey?: string,
   ) {
     if (!monto || monto <= 0) {
       throw new BadRequestException('Monto inválido');
@@ -822,6 +823,27 @@ export class CajasService {
 
     const movimientoTipo = tipo === 'INGRESO' ? TipoMovimiento.INGRESO : TipoMovimiento.AJUSTE;
     const montoAplicado = tipo === 'INGRESO' ? monto : -monto;
+    const referenciaDocumento = idempotencyKey?.trim() || tipo;
+
+    if (idempotencyKey?.trim()) {
+      const { data: existente, error } = await this.supabase
+        .getClient()
+        .from('movimientos_caja')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('sesion_caja_id', sesionId)
+        .eq('referencia_tipo', 'MANUAL')
+        .eq('referencia_documento', referenciaDocumento)
+        .maybeSingle();
+
+      if (error) {
+        throw new BadRequestException(`Error verificando movimiento de caja existente: ${error.message}`);
+      }
+
+      if (existente) {
+        return existente;
+      }
+    }
 
     return this.movementsService.registrarMovimiento(
       sesionId,
@@ -831,7 +853,8 @@ export class CajasService {
         usuario_id: userId,
         motivo: `${tipo}: ${motivo}`,
         referencia_tipo: 'MANUAL',
-        referencia_documento: tipo,
+        referencia_documento: referenciaDocumento,
+        idempotency_key: idempotencyKey?.trim() || undefined,
       },
       tenantId,
     );

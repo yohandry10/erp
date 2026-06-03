@@ -886,6 +886,184 @@ export class CpeService {
     return this.create(dto, tenantId, userId);
   }
 
+  async registerDesktopSignedXml(payload: any, tenantId: string, userId?: string) {
+    const signedXml = String(payload?.signed_xml ?? payload?.signedXml ?? '').trim();
+    if (!signedXml) {
+      throw new BadRequestException('El XML firmado desktop es requerido');
+    }
+
+    const client = this.supabaseService.getClient();
+    const hash = crypto.createHash('sha256').update(signedXml).digest('base64');
+    const providedHash = String(payload?.hash ?? '').trim();
+    if (providedHash && providedHash !== hash) {
+      throw new BadRequestException('El hash del XML firmado no coincide con el contenido recibido');
+    }
+
+    const idempotencyKey = String(payload?.idempotency_key ?? payload?.idempotencyKey ?? `desktop.signed:${tenantId}:${hash}`).trim();
+    const { data: existing, error: existingError } = await client
+      .from('cpe')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('idempotency_key', idempotencyKey)
+      .maybeSingle();
+
+    if (existingError && existingError.code && existingError.code !== 'PGRST116') {
+      throw new BadRequestException('No se pudo validar idempotencia del XML desktop');
+    }
+    if (existing) {
+      return { success: true, data: existing, message: 'XML firmado desktop ya registrado' };
+    }
+
+    const emisor = await this.getEmpresaEmisorInfoStrict(tenantId);
+    const xmlId = this.extractXmlTag(signedXml, 'ID');
+    const [serieFromXml, numeroFromXml] = xmlId.includes('-') ? xmlId.split('-', 2) : ['', ''];
+    const tipoDocumento = this.normalizeTipoDocumentoSunat(
+      payload?.tipo_documento ?? payload?.document_type ?? this.extractXmlTag(signedXml, 'InvoiceTypeCode') ?? '01',
+    );
+    const serie = String(payload?.serie ?? serieFromXml ?? this.defaultSerieForTipo(tipoDocumento)).trim().toUpperCase();
+    const numero = Number(payload?.numero ?? numeroFromXml ?? 1);
+    const totalVenta = this.roundMoney(
+      payload?.total_venta ?? payload?.total ?? this.extractXmlNumber(signedXml, 'PayableAmount') ?? 0,
+    );
+    const totalIgv = this.roundMoney(payload?.total_igv ?? payload?.igv ?? 0);
+    const totalGravadas = this.roundMoney(payload?.total_gravadas ?? payload?.subtotal ?? Math.max(totalVenta - totalIgv, 0));
+    const documentoReceptor = String(payload?.documento_receptor ?? payload?.cliente_ruc ?? '00000000').replace(/\D/g, '');
+    const tipoDocumentoReceptor = this.resolveTipoDocumentoReceptor(
+      tipoDocumento,
+      payload?.tipo_documento_receptor ?? payload?.clienteTipoDocumento,
+      documentoReceptor,
+    );
+    const eventId = randomUUID();
+
+    const cpePayload = {
+      tenant_id: tenantId,
+      tipo_documento: tipoDocumento,
+      serie,
+      numero: Number.isFinite(numero) && numero > 0 ? numero : 1,
+      fecha_emision: new Date().toISOString(),
+      fecha_vencimiento: new Date().toISOString(),
+      ruc_emisor: emisor.ruc,
+      razon_social_emisor: emisor.razonSocial,
+      tipo_documento_receptor: tipoDocumentoReceptor,
+      documento_receptor: documentoReceptor,
+      razon_social_receptor: String(payload?.razon_social_receptor ?? payload?.cliente_nombre ?? 'Cliente desktop offline'),
+      direccion_receptor: String(payload?.direccion_receptor ?? ''),
+      moneda: String(payload?.moneda ?? 'PEN'),
+      total_gravadas: totalGravadas,
+      total_igv: totalIgv,
+      total_venta: totalVenta,
+      items: Array.isArray(payload?.items) ? payload.items : [],
+      idempotency_key: idempotencyKey,
+      event_id: eventId,
+      estado: 'FIRMADO',
+      hash,
+      hash_firma: hash,
+      sunat_status: this.sunatStatuses.NOT_SENT,
+      xml_firmado: signedXml,
+    };
+
+    const { data, error } = await client
+      .from('cpe')
+      .insert(cpePayload)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(`❌ [CPE] Error registrando XML firmado desktop: ${error.message}`, error);
+      throw new BadRequestException('No se pudo registrar el XML firmado desktop');
+    }
+
+    const createdCpe = Array.isArray(data) ? data[0] : data;
+    const documentoId = await this.ensureDocumentoParaCpe(createdCpe, tenantId);
+    if (documentoId) {
+      (createdCpe as any).documento_id = documentoId;
+    } else {
+      throw new BadRequestException(`CPE desktop ${createdCpe.id} no tiene documento operativo asociado`);
+    }
+
+    await this.eventBus.emitComprobanteCreadoEvent({
+      eventId: randomUUID(),
+      tenantId,
+      idempotencyKey: `desktop.cpe.creado:${tenantId}:${createdCpe.id}`,
+      cpeId: createdCpe.id,
+      tipoDocumento,
+      serie,
+      numero: createdCpe.numero,
+      clienteId: createdCpe.documento_receptor,
+      total: createdCpe.total_venta,
+      esCredito: false,
+      ventaId: undefined,
+      requiereTransporte: false,
+      moneda: createdCpe.moneda,
+    });
+
+    await this.eventBus.emitFacturaEmitidaEvent({
+      eventId,
+      tenantId,
+      idempotencyKey,
+      cpeId: createdCpe.id,
+      facturaId: documentoId,
+      serie,
+      numero: String(createdCpe.numero),
+      clienteId: createdCpe.documento_receptor,
+      subtotal: createdCpe.total_gravadas,
+      impuestos: createdCpe.total_igv,
+      total: createdCpe.total_venta,
+      moneda: createdCpe.moneda,
+      fechaEmision: createdCpe.fecha_emision,
+      fechaVencimiento: createdCpe.fecha_vencimiento,
+      source: 'cpe.desktop',
+      sunatStatus: this.sunatStatuses.NOT_SENT,
+      hashFirma: hash,
+      hash,
+    });
+
+    try {
+      await this.auditService.registrarCambio(
+        'cpe',
+        'INSERT',
+        userId ?? null,
+        {
+          new: {
+            tipo_documento: tipoDocumento,
+            serie,
+            numero: createdCpe.numero,
+            total_venta: createdCpe.total_venta,
+            estado: 'FIRMADO',
+            source: 'desktop_offline',
+          },
+        },
+        tenantId,
+        createdCpe.id,
+        { accion: 'REGISTRAR_CPE_DESKTOP', tipo_documento: tipoDocumento },
+      );
+    } catch (auditError) {
+      this.logger.warn('⚠️ No se pudo registrar auditoria de CPE desktop:', auditError);
+    }
+
+    try {
+      await this.cacheInvalidation.onCpeCreated(tenantId);
+    } catch (cacheError) {
+      this.logger.warn('⚠️ No se pudo invalidar cache despues de CPE desktop:', cacheError);
+    }
+
+    return {
+      success: true,
+      data: createdCpe,
+      message: 'XML firmado desktop registrado; envio SUNAT/OSE pendiente de confirmacion externa',
+    };
+  }
+
+  private extractXmlTag(xml: string, tag: string): string {
+    const pattern = new RegExp(`<(?:\\w+:)?${tag}[^>]*>([^<]+)</(?:\\w+:)?${tag}>`, 'i');
+    return pattern.exec(xml)?.[1]?.trim() ?? '';
+  }
+
+  private extractXmlNumber(xml: string, tag: string): number | null {
+    const value = Number(this.extractXmlTag(xml, tag));
+    return Number.isFinite(value) ? value : null;
+  }
+
   async crearCPEDesdeDocumento(documento: DocumentoFiscal, tenantId: string) {
     const client = this.supabaseService.getClient();
     const idempotencyKey = `doc.cpe:${documento.id}`;

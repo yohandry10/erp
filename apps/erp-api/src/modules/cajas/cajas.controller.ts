@@ -318,7 +318,13 @@ export class CajasController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('sesionId') sesionId: string,
-    @Body() dto: { tipo: 'INGRESO' | 'GASTO'; monto: number; motivo: string },
+    @Body() dto: {
+      tipo: 'INGRESO' | 'GASTO';
+      monto: number;
+      motivo: string;
+      idempotency_key?: string;
+      referencia_documento?: string;
+    },
   ) {
     const data = await this.service.registrarMovimientoManual(
       tenantId,
@@ -327,6 +333,7 @@ export class CajasController {
       dto.monto,
       dto.motivo,
       user?.id,
+      dto.idempotency_key || dto.referencia_documento,
     );
     return { success: true, data };
   }

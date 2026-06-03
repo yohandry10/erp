@@ -428,6 +428,24 @@ fn collection_endpoint(endpoint: &str) -> String {
     format!("/{}", parts.join("/"))
 }
 
+fn local_collection_endpoint_for_write(endpoint: &str) -> String {
+    match endpoint {
+        "/api/contabilidad/asiento-contable" => "/api/contabilidad/asientos".to_string(),
+        "/api/documentos/crear" => "/api/documentos".to_string(),
+        "/api/finanzas/tesoreria/lote" => "/api/finanzas/tesoreria/pagos".to_string(),
+        "/api/usuarios-sistema/crear" => "/api/usuarios".to_string(),
+        "/api/sire/generar-reporte" => "/api/sire/files".to_string(),
+        _ if endpoint.starts_with("/api/cajas/movimientos/manual/") => {
+            "/api/cajas/movimientos".to_string()
+        }
+        _ if endpoint.starts_with("/api/cajas/retiros/") => "/api/cajas/movimientos".to_string(),
+        _ if endpoint.starts_with("/api/cajas/cambio-turno/") => {
+            "/api/cajas/cambios-turno".to_string()
+        }
+        _ => collection_endpoint(endpoint),
+    }
+}
+
 fn response_headers_json(headers: &[HeaderPair]) -> Result<String, String> {
     serde_json::to_string(headers).map_err(|e| format!("No se pudo serializar headers locales: {e}"))
 }
@@ -437,6 +455,19 @@ fn header_value(headers: &[HeaderPair], name: &str) -> Option<String> {
         .iter()
         .find(|header| header.name.eq_ignore_ascii_case(name))
         .map(|header| header.value.clone())
+}
+
+fn bearer_token_from_headers(headers: &[HeaderPair]) -> Option<String> {
+    header_value(headers, "Authorization")
+        .and_then(|value| {
+            let trimmed = value.trim();
+            trimmed
+                .strip_prefix("Bearer ")
+                .or_else(|| trimmed.strip_prefix("bearer "))
+                .map(str::trim)
+                .filter(|token| !token.is_empty())
+                .map(str::to_string)
+        })
 }
 
 fn with_local_entity_headers(
@@ -457,6 +488,61 @@ fn with_local_entity_headers(
         value: entity_type.to_string(),
     });
     next
+}
+
+fn with_json_body_fields(
+    input: &LocalFirstWriteInput,
+    fields: &[(&str, Value)],
+) -> Result<LocalFirstWriteInput, String> {
+    let mut body = parse_json_body(&input.body)?;
+    let object = body
+        .as_object_mut()
+        .ok_or_else(|| "El cuerpo local-first debe ser un objeto JSON".to_string())?;
+    for (key, value) in fields {
+        object.insert((*key).to_string(), value.clone());
+    }
+
+    let mut next = input.clone();
+    next.body = Some(
+        serde_json::to_string(&body)
+            .map_err(|e| format!("No se pudo serializar cuerpo local-first: {e}"))?,
+    );
+    Ok(next)
+}
+
+fn offline_sync_headers(
+    access_token: Option<&str>,
+    tenant_id: Option<&str>,
+    local_id: &str,
+    entity_type: &str,
+) -> Vec<HeaderPair> {
+    let mut headers = vec![
+        HeaderPair {
+            name: "Content-Type".to_string(),
+            value: "application/json".to_string(),
+        },
+        HeaderPair {
+            name: "x-erp-local-id".to_string(),
+            value: local_id.to_string(),
+        },
+        HeaderPair {
+            name: "x-erp-local-entity-type".to_string(),
+            value: entity_type.to_string(),
+        },
+    ];
+    if let Some(token) = access_token.filter(|value| !value.trim().is_empty()) {
+        headers.push(HeaderPair {
+            name: "Authorization".to_string(),
+            value: format!("Bearer {}", token.trim()),
+        });
+    }
+    if let Some(tenant) = tenant_id.filter(|value| !value.trim().is_empty()) {
+        headers.push(HeaderPair {
+            name: "x-erp-tenant-id".to_string(),
+            value: tenant.trim().to_string(),
+        });
+    }
+    headers
 }
 
 fn json_success_response(data: Value, message: &str) -> Result<LocalFirstResponse, String> {
@@ -498,6 +584,60 @@ fn value_number(value: &Value, key: &str) -> f64 {
 
 fn value_string(value: &Value, key: &str) -> Option<String> {
     value.get(key).and_then(Value::as_str).map(str::to_string)
+}
+
+fn normalize_fiscal_sync_items(items: &[Value]) -> Vec<Value> {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let descripcion = value_string(item, "descripcion")
+                .or_else(|| value_string(item, "nombre"))
+                .or_else(|| value_string(item, "producto_nombre"))
+                .unwrap_or_else(|| format!("Item {}", index + 1));
+            let cantidad = item
+                .get("cantidad")
+                .and_then(Value::as_f64)
+                .unwrap_or(1.0);
+            let precio_unitario = item
+                .get("precio_unitario")
+                .or_else(|| item.get("precioUnitario"))
+                .or_else(|| item.get("precio"))
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            let valor_venta = item
+                .get("valor_venta")
+                .or_else(|| item.get("valorVenta"))
+                .or_else(|| item.get("subtotal"))
+                .or_else(|| item.get("total"))
+                .and_then(Value::as_f64)
+                .unwrap_or(cantidad * precio_unitario);
+            let igv = item
+                .get("igv")
+                .or_else(|| item.get("impuesto_igv"))
+                .or_else(|| item.get("impuestos"))
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            serde_json::json!({
+                "codigo": value_string(item, "codigo")
+                    .or_else(|| value_string(item, "codigo_producto"))
+                    .unwrap_or_else(|| format!("ITEM-{}", index + 1)),
+                "descripcion": descripcion,
+                "cantidad": cantidad,
+                "unidad": value_string(item, "unidad")
+                    .or_else(|| value_string(item, "unidad_medida"))
+                    .unwrap_or_else(|| "NIU".to_string()),
+                "precio_unitario": precio_unitario,
+                "valor_venta": valor_venta,
+                "igv": igv,
+                "precio_venta": item
+                    .get("precio_venta")
+                    .or_else(|| item.get("total"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(valor_venta + igv),
+            })
+        })
+        .collect()
 }
 
 fn escape_xml(value: &str) -> String {
@@ -751,6 +891,38 @@ fn upsert_snapshot(
     Ok(())
 }
 
+fn read_metadata_json(conn: &Connection, key: &str) -> Result<Option<Value>, String> {
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT value FROM local_metadata WHERE key = ?1",
+            params![key],
+            |row| row.get(0),
+        )
+        .ok();
+    raw.map(|value| {
+        serde_json::from_str::<Value>(&value)
+            .map_err(|e| format!("Metadata local invalida para {key}: {e}"))
+    })
+    .transpose()
+}
+
+fn write_metadata_json(conn: &Connection, key: &str, value: &Value) -> Result<(), String> {
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_metadata (key, value, updated_at)
+        VALUES (?1, ?2, ?3)
+        "#,
+        params![
+            key,
+            serde_json::to_string(value)
+                .map_err(|e| format!("No se pudo serializar metadata local {key}: {e}"))?,
+            now_ms(),
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar metadata local {key}: {e}"))?;
+    Ok(())
+}
+
 fn extract_response_data(body: &str) -> Option<Value> {
     let parsed: Value = serde_json::from_str(body).ok()?;
     Some(parsed.get("data").cloned().unwrap_or(parsed))
@@ -996,6 +1168,314 @@ fn read_local_snapshot(conn: &Connection, endpoint: &str, url: &str) -> Result<O
     }))
 }
 
+fn build_default_cajas_snapshot() -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!([
+            {
+                "id": "local-caja",
+                "nombre": "Caja local",
+                "codigo": "LOCAL",
+                "estado": "ACTIVA",
+                "offline": true
+            }
+        ]),
+        "Cajas locales",
+    )
+}
+
+fn build_default_payment_methods_snapshot() -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!([
+            {
+                "id": "local-cash",
+                "codigo": "EFECTIVO",
+                "nombre": "Efectivo",
+                "tipo": "EFECTIVO",
+                "requiere_referencia": false,
+                "comision_porcentaje": 0,
+                "offline": true
+            },
+            {
+                "id": "local-card",
+                "codigo": "TARJETA",
+                "nombre": "Tarjeta",
+                "tipo": "TARJETA",
+                "requiere_referencia": true,
+                "comision_porcentaje": 0,
+                "offline": true
+            }
+        ]),
+        "Metodos de pago locales",
+    )
+}
+
+fn build_empresa_config_snapshot(config: &AppConfig) -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!({
+            "ruc": config.ruc,
+            "razon_social": config.razon_social,
+            "nombre_comercial": config.razon_social,
+            "direccion": "",
+            "direccion_fiscal": "",
+            "email": "",
+            "telefono": "",
+            "offline": true
+        }),
+        "Empresa local",
+    )
+}
+
+fn build_pos_configuration_status_snapshot(config: &AppConfig) -> Result<LocalFirstResponse, String> {
+    let has_company = !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty();
+    let has_certificate = config
+        .certificado_path
+        .as_deref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    let mut missing_items = Vec::new();
+    if !has_company {
+        missing_items.push(serde_json::json!("empresa"));
+    }
+    if !has_certificate {
+        missing_items.push(serde_json::json!("certificado"));
+    }
+    json_success_response(
+        serde_json::json!({
+            "isComplete": has_company && has_certificate,
+            "offline": true,
+            "missingItems": missing_items,
+            "company": {
+                "isValid": has_company,
+                "ruc": config.ruc,
+                "razonSocial": config.razon_social
+            },
+            "certificate": {
+                "isValid": has_certificate,
+                "expiresAt": Value::Null
+            },
+            "sunat": {
+                "endpoint": config.sunat_endpoint,
+                "available": false,
+                "externalPending": true
+            }
+        }),
+        "Configuracion POS local",
+    )
+}
+
+fn build_gre_thresholds_snapshot() -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!({
+            "umbralGREAutomatico": 700,
+            "greAutomaticoHabilitado": true,
+            "offline": true
+        }),
+        "Umbrales GRE locales",
+    )
+}
+
+fn build_next_number_snapshot(prefix: &str) -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!({
+            "numero": format!("{prefix}-L{:08}", now_ms() % 100_000_000),
+            "offline": true
+        }),
+        "Numero local temporal",
+    )
+}
+
+fn build_empty_collection_snapshot(endpoint: &str) -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        Value::Array(Vec::new()),
+        &format!("Listado local sin cache previa para {endpoint}"),
+    )
+}
+
+fn build_empty_object_snapshot(endpoint: &str) -> Result<LocalFirstResponse, String> {
+    json_success_response(
+        serde_json::json!({
+            "offline": true,
+            "local_first": true
+        }),
+        &format!("Snapshot local sin cache previa para {endpoint}"),
+    )
+}
+
+fn is_known_empty_collection_endpoint(endpoint: &str) -> bool {
+    if matches!(
+        endpoint,
+        "/api/dashboard/recent-activity"
+            | "/api/dashboard/activities"
+            | "/api/compras/proveedores"
+            | "/api/compras/productos"
+            | "/api/compras/next-number"
+            | "/api/compras/ordenes"
+            | "/api/compras/cotizaciones"
+            | "/api/compras/recepciones"
+            | "/api/compras/devoluciones"
+            | "/api/compras/reporte-compras"
+            | "/api/inventario/recepciones"
+            | "/api/inventario/kardex"
+            | "/api/inventario/almacenes"
+            | "/api/inventario/movimientos"
+            | "/api/inventario/logistica/ordenes-pendientes"
+            | "/api/inventario/logistica/listo-despacho"
+            | "/api/rrhh/empleados"
+            | "/api/rrhh/departamentos"
+            | "/api/rrhh/planillas"
+            | "/api/rrhh/pagos"
+            | "/api/rrhh/contratos"
+            | "/api/rrhh/candidatos"
+            | "/api/rrhh/vacantes"
+            | "/api/rrhh/asistencia"
+            | "/api/rrhh/asistencias"
+            | "/api/finanzas/cuentas-bancarias"
+            | "/api/finanzas/cxc"
+            | "/api/finanzas/cxp"
+            | "/api/finanzas/tesoreria"
+            | "/api/finanzas/tesoreria/pagos"
+            | "/api/finanzas/bancos"
+            | "/api/finanzas/bancos/cuentas"
+            | "/api/finanzas/bancos/movimientos/periodo"
+            | "/api/finanzas/conciliacion"
+            | "/api/finanzas/conciliacion/pendientes"
+            | "/api/finanzas/tesoreria/programacion"
+            | "/api/finanzas/cxp/vencimientos"
+            | "/api/finanzas/cxp/proveedores-mayor-deuda"
+            | "/api/finanzas/cxp/aging"
+            | "/api/contabilidad/asientos"
+            | "/api/contabilidad/asientos-contables"
+            | "/api/contabilidad/centros-costo"
+            | "/api/contabilidad/presupuestos"
+            | "/api/contabilidad/periodos"
+            | "/api/contabilidad/plan-cuentas"
+            | "/api/cpe/comprobantes"
+            | "/api/cpe/cotizaciones"
+            | "/api/cotizaciones/lista"
+            | "/api/cotizaciones/clientes-top"
+            | "/api/gre/guias"
+            | "/api/gre/reporte"
+            | "/api/sire/files"
+            | "/api/documentos"
+            | "/api/documentos/descargas"
+            | "/api/cajas"
+            | "/api/cajas/sesiones"
+            | "/api/cajas/cortes"
+            | "/api/cajas/movimientos"
+            | "/api/cajas/retiros"
+            | "/api/cajas/cambios-turno"
+            | "/api/notifications"
+            | "/api/notifications/unread"
+            | "/api/audit/logs"
+            | "/api/audit-logs/integrations"
+            | "/api/users"
+            | "/api/roles"
+            | "/api/usuarios"
+            | "/api/tenants"
+            | "/api/usuarios-sistema/me/permissions"
+            | "/api/usuarios-sistema/roles"
+            | "/api/paises"
+            | "/api/ventas/pedidos/aprobaciones/pendientes"
+            | "/api/ventas/reportes/fill-rate"
+            | "/api/ventas/reportes/cotizaciones-pendientes"
+            | "/api/ventas/reportes/cxc-aging"
+            | "/api/ventas/reportes/pedidos-por-estado"
+            | "/api/ventas/reportes/lead-time"
+            | "/api/ventas/reportes/pipeline"
+            | "/api/ventas/reportes/productos-mas-vendidos"
+            | "/api/ventas/reportes/sunat-kpis"
+            | "/api/ventas/reportes/top-clientes"
+            | "/api/ventas/reportes/ventas-por-cliente"
+    ) {
+        return true;
+    }
+
+    endpoint.ends_with("/movimientos")
+        || endpoint.ends_with("/pagos")
+        || endpoint.ends_with("/diferencias")
+        || endpoint.ends_with("/historial")
+        || endpoint.ends_with("/historial-pagos")
+        || endpoint.ends_with("/aprobaciones")
+        || endpoint.ends_with("/recepciones")
+        || endpoint.ends_with("/gres")
+        || endpoint.ends_with("/eventos")
+        || endpoint.ends_with("/backorders")
+        || endpoint.contains("/movimientos/")
+        || endpoint.contains("/reportes/")
+}
+
+fn is_known_empty_object_endpoint(endpoint: &str) -> bool {
+    if matches!(
+        endpoint,
+        "/api/dashboard/metrics"
+            | "/api/dashboard/stats"
+            | "/api/inventario/stats"
+            | "/api/compras/stats"
+            | "/api/cotizaciones/stats"
+            | "/api/usuarios-sistema/stats"
+            | "/api/configuration/status"
+            | "/api/configuration/complete"
+            | "/api/configuration/context/status"
+            | "/api/configuration/context/country"
+            | "/api/configuration/empresa"
+            | "/api/configuration/wizard/progress"
+            | "/api/configuration/wizard/reset"
+            | "/api/configuration/wizard/step"
+            | "/api/demo/status"
+            | "/api/configuracion/empresa"
+            | "/api/configuracion-fiscal"
+            | "/api/cpe/fiscal-config"
+            | "/api/configuracion/ose"
+            | "/api/analytics/deudas-clientes"
+            | "/api/analytics/deudas-proveedores"
+            | "/api/analytics/ventas-categoria"
+            | "/api/analytics/kpis-visuales"
+            | "/api/contabilidad/registro-compras"
+            | "/api/contabilidad/balance-comprobacion"
+            | "/api/contabilidad/kardex-valorizado"
+            | "/api/contabilidad/libro-caja-bancos"
+            | "/api/contabilidad/registro-activos-fijos"
+            | "/api/contabilidad/libro-planillas"
+            | "/api/contabilidad/libro-inventarios-balances"
+            | "/api/contabilidad/registro-costos"
+            | "/api/contabilidad/libros-electronicos-sunat"
+            | "/api/finanzas/tesoreria/flujo-caja"
+            | "/api/finanzas/bancos/saldos"
+            | "/api/cajas/saldo-esperado"
+            | "/api/security/dashboard/violations-by-table"
+            | "/api/security/dashboard/violations-recent"
+            | "/api/security/dashboard/alerts-unacknowledged"
+    ) {
+        return true;
+    }
+
+    let detail_prefixes = [
+        "/api/compras/proveedores/",
+        "/api/compras/ordenes/",
+        "/api/compras/cotizaciones/",
+        "/api/compras/recepciones/",
+        "/api/compras/devoluciones/",
+        "/api/finanzas/bancos/cuentas/",
+        "/api/finanzas/cxc/",
+        "/api/finanzas/cxp/",
+        "/api/finanzas/conciliacion/",
+        "/api/contabilidad/asientos/",
+        "/api/contabilidad/asientos-contables/",
+        "/api/contabilidad/centros-costo/",
+        "/api/contabilidad/presupuestos/",
+        "/api/ventas/clientes/",
+        "/api/ventas/cotizaciones/",
+        "/api/ventas/pedidos/",
+        "/api/rrhh/contratos/",
+        "/api/rrhh/candidatos/",
+        "/api/rrhh/planillas/",
+        "/api/documentos/",
+        "/api/cpe/comprobantes/",
+        "/api/gre/guias/",
+    ];
+    detail_prefixes.iter().any(|prefix| endpoint.starts_with(prefix))
+}
+
 fn build_products_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
     let mut stmt = conn
         .prepare("SELECT data_json FROM pos_products ORDER BY nombre ASC")
@@ -1087,7 +1567,9 @@ fn build_customer_detail_snapshot(
     conn: &Connection,
     endpoint: &str,
 ) -> Result<Option<LocalFirstResponse>, String> {
-    let id = endpoint.trim_start_matches("/api/ventas/clientes/");
+    let id = endpoint
+        .trim_start_matches("/api/ventas/clientes/")
+        .trim_start_matches("/api/pos/clientes/");
     let raw: Option<String> = conn
         .query_row(
             "SELECT data_json FROM local_customers WHERE id = ?1 AND deleted = 0",
@@ -1362,6 +1844,829 @@ fn build_recent_sales_snapshot(conn: &Connection) -> Result<LocalFirstResponse, 
     json_success_response(Value::Array(sales), "Ventas POS locales")
 }
 
+fn build_pos_sale_details_snapshot(
+    conn: &Connection,
+    endpoint: &str,
+) -> Result<LocalFirstResponse, String> {
+    let id = endpoint.trim_start_matches("/api/pos/detalles-venta/");
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT body_json, response_json FROM pos_sales WHERE id = ?1 OR idempotency_key = ?1",
+            params![id],
+            |row| Ok(format!("{}\n{}", row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return json_success_response(Value::Array(Vec::new()), "Detalle de venta local no encontrado");
+    };
+    let mut parts = raw.splitn(2, '\n');
+    let body = parts
+        .next()
+        .and_then(|value| serde_json::from_str::<Value>(value).ok())
+        .unwrap_or(Value::Null);
+    let response = parts
+        .next()
+        .and_then(|value| serde_json::from_str::<Value>(value).ok())
+        .unwrap_or(Value::Null);
+    let sale_id = response
+        .get("data")
+        .and_then(|data| value_string(data, "id").or_else(|| value_string(data, "venta_id")))
+        .unwrap_or_else(|| id.to_string());
+    let items = body
+        .get("items")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .enumerate()
+        .map(|(index, item)| {
+            serde_json::json!({
+                "id": format!("local-sale-detail-{sale_id}-{}", index + 1),
+                "venta_id": sale_id,
+                "producto_id": value_string(&item, "producto_id"),
+                "descripcion": value_string(&item, "descripcion")
+                    .or_else(|| value_string(&item, "nombre"))
+                    .or_else(|| value_string(&item, "producto_nombre"))
+                    .unwrap_or_else(|| "Producto".to_string()),
+                "cantidad": item.get("cantidad").and_then(Value::as_f64).unwrap_or(0.0),
+                "precio_unitario": item
+                    .get("precio_unitario")
+                    .or_else(|| item.get("precio"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0),
+                "total": item.get("total").and_then(Value::as_f64).unwrap_or(0.0),
+                "offline": true
+            })
+        })
+        .collect::<Vec<_>>();
+    json_success_response(Value::Array(items), "Detalle de venta POS local")
+}
+
+fn build_user_country_config_snapshot(conn: &Connection) -> Result<LocalFirstResponse, String> {
+    if let Some(config) = read_metadata_json(conn, "usuario_configuracion")? {
+        return json_success_response(config, "Configuracion de usuario local");
+    }
+    json_success_response(
+        serde_json::json!({
+            "id": "local-user-config",
+            "pais_preferido_id": 1,
+            "idioma": "es",
+            "zona_horaria": "America/Lima",
+            "offline": true,
+            "local_first": true
+        }),
+        "Configuracion de usuario local por defecto",
+    )
+}
+
+fn notification_id_from_endpoint(endpoint: &str, suffix: &str) -> Option<String> {
+    endpoint
+        .strip_prefix("/api/notifications/")?
+        .strip_suffix(suffix)?
+        .trim_matches('/')
+        .split('/')
+        .next()
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn mark_notification_read(value: &mut Value, timestamp: i64) {
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert("leida".to_string(), serde_json::json!(true));
+        obj.insert("read".to_string(), serde_json::json!(true));
+        obj.insert("fecha_lectura".to_string(), serde_json::json!(timestamp));
+        obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+    }
+}
+
+fn mutate_notification_array(
+    items: &mut Vec<Value>,
+    target_id: Option<&str>,
+    mark_all: bool,
+    delete: bool,
+    timestamp: i64,
+) -> usize {
+    let mut changed = 0usize;
+    if delete {
+        let original = items.len();
+        items.retain(|item| {
+            let matches_target = target_id
+                .and_then(|id| value_string(item, "id").map(|item_id| item_id == id))
+                .unwrap_or(false);
+            !matches_target
+        });
+        return original.saturating_sub(items.len());
+    }
+
+    for item in items.iter_mut() {
+        let matches_target = mark_all
+            || target_id
+                .and_then(|id| value_string(item, "id").map(|item_id| item_id == id))
+                .unwrap_or(false);
+        if matches_target {
+            mark_notification_read(item, timestamp);
+            changed += 1;
+        }
+    }
+    changed
+}
+
+fn mutate_notification_snapshot_body(
+    body: &str,
+    target_id: Option<&str>,
+    mark_all: bool,
+    delete: bool,
+    force_unread_empty: bool,
+    timestamp: i64,
+) -> Result<(String, usize), String> {
+    let mut parsed: Value = serde_json::from_str(body)
+        .map_err(|e| format!("Snapshot de notificaciones invalido: {e}"))?;
+    let mut changed = 0usize;
+
+    if force_unread_empty {
+        if let Some(data) = parsed.get_mut("data") {
+            *data = Value::Array(Vec::new());
+        } else {
+            parsed = serde_json::json!({
+                "success": true,
+                "data": []
+            });
+        }
+        parsed["offline"] = serde_json::json!(true);
+        parsed["local_first"] = serde_json::json!(true);
+        return serde_json::to_string(&parsed)
+            .map(|raw| (raw, changed))
+            .map_err(|e| format!("No se pudo serializar snapshot de notificaciones: {e}"));
+    }
+
+    if let Some(data) = parsed.get_mut("data") {
+        match data {
+            Value::Array(items) => {
+                changed += mutate_notification_array(items, target_id, mark_all, delete, timestamp);
+            }
+            Value::Object(obj) => {
+                if let Some(Value::Array(items)) = obj.get_mut("data") {
+                    changed += mutate_notification_array(items, target_id, mark_all, delete, timestamp);
+                }
+            }
+            _ => {}
+        }
+    } else if let Value::Array(items) = &mut parsed {
+        changed += mutate_notification_array(items, target_id, mark_all, delete, timestamp);
+    }
+
+    parsed["offline"] = serde_json::json!(true);
+    parsed["local_first"] = serde_json::json!(true);
+    serde_json::to_string(&parsed)
+        .map(|raw| (raw, changed))
+        .map_err(|e| format!("No se pudo serializar snapshot de notificaciones: {e}"))
+}
+
+fn update_notification_snapshots(
+    conn: &Connection,
+    target_id: Option<&str>,
+    mark_all: bool,
+    delete: bool,
+) -> Result<usize, String> {
+    let timestamp = now_ms();
+    let mut changed = 0usize;
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT cache_key, endpoint, body
+            FROM local_api_snapshots
+            WHERE endpoint IN ('/api/notifications', '/api/notifications/unread')
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar snapshots de notificaciones: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })
+        .map_err(|e| format!("No se pudo leer snapshots de notificaciones: {e}"))?;
+    let mut updates = Vec::new();
+    for row in rows {
+        let (cache_key, endpoint, body) =
+            row.map_err(|e| format!("Snapshot de notificaciones invalido: {e}"))?;
+        let force_unread_empty = endpoint == "/api/notifications/unread" && mark_all;
+        let (next_body, count) = mutate_notification_snapshot_body(
+            &body,
+            target_id,
+            mark_all,
+            delete || endpoint == "/api/notifications/unread",
+            force_unread_empty,
+            timestamp,
+        )?;
+        changed += count;
+        updates.push((cache_key, next_body));
+    }
+    drop(stmt);
+
+    for (cache_key, body) in updates {
+        conn.execute(
+            "UPDATE local_api_snapshots SET body = ?2, cached_at = ?3 WHERE cache_key = ?1",
+            params![cache_key, body, timestamp],
+        )
+        .map_err(|e| format!("No se pudo actualizar snapshot de notificaciones: {e}"))?;
+    }
+
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT id, data_json
+            FROM local_generic_records
+            WHERE collection_endpoint = '/api/notifications' AND deleted = 0
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar notificaciones locales: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(|e| format!("No se pudo leer notificaciones locales: {e}"))?;
+    let mut local_updates = Vec::new();
+    for row in rows {
+        let (id, raw) = row.map_err(|e| format!("Notificacion local invalida: {e}"))?;
+        let mut value = serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null);
+        let matches_target = mark_all || target_id.map(|target| id == target).unwrap_or(false);
+        if matches_target && !delete {
+            mark_notification_read(&mut value, timestamp);
+            local_updates.push((id, Some(value)));
+        } else if matches_target {
+            local_updates.push((id, None));
+        }
+    }
+    drop(stmt);
+
+    for (id, value) in local_updates {
+        if let Some(value) = value {
+            conn.execute(
+                "UPDATE local_generic_records SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+                params![
+                    id,
+                    serde_json::to_string(&value)
+                        .map_err(|e| format!("No se pudo serializar notificacion local: {e}"))?,
+                    timestamp,
+                ],
+            )
+        } else {
+            conn.execute(
+                "UPDATE local_generic_records SET deleted = 1, updated_at = ?2 WHERE id = ?1",
+                params![id, timestamp],
+            )
+        }
+        .map_err(|e| format!("No se pudo actualizar notificacion local: {e}"))?;
+    }
+
+    Ok(changed)
+}
+
+fn process_local_notifications_mutation(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let method = input.method.to_uppercase();
+    let (target_id, mark_all, delete) = if method == "PUT" && input.endpoint == "/api/notifications/mark-all-read" {
+        (None, true, false)
+    } else if method == "PUT" && input.endpoint.ends_with("/read") {
+        (notification_id_from_endpoint(&input.endpoint, "/read"), false, false)
+    } else if method == "DELETE" && input.endpoint.starts_with("/api/notifications/") {
+        (
+            input
+                .endpoint
+                .trim_start_matches("/api/notifications/")
+                .trim_matches('/')
+                .split('/')
+                .next()
+                .filter(|value| !value.is_empty())
+                .map(str::to_string),
+            false,
+            true,
+        )
+    } else {
+        return process_generic_local_write(conn, input);
+    };
+
+    let changed = update_notification_snapshots(conn, target_id.as_deref(), mark_all, delete)?;
+    let local_id = target_id
+        .clone()
+        .unwrap_or_else(|| format!("notifications-mark-all-{}", now_ms()));
+    let queued_input = with_local_entity_headers(input, &local_id, "notification");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+
+    let data = serde_json::json!({
+        "id": target_id,
+        "count": changed,
+        "leida": !delete,
+        "deleted": delete,
+        "offline": true,
+        "sync_status": "pending"
+    });
+    json_success_response(data, "Operacion de notificaciones guardada localmente")
+}
+
+fn process_local_user_country_config(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let timestamp = now_ms();
+    let payload = parse_json_body(&input.body)?;
+    let mut config = read_metadata_json(conn, "usuario_configuracion")?.unwrap_or_else(|| {
+        serde_json::json!({
+            "id": "local-user-config",
+            "idioma": "es",
+            "zona_horaria": "America/Lima"
+        })
+    });
+    if let (Some(obj), Some(payload_obj)) = (config.as_object_mut(), payload.as_object()) {
+        for (key, value) in payload_obj {
+            obj.insert(key.clone(), value.clone());
+        }
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("local_first".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+        obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
+    }
+    write_metadata_json(conn, "usuario_configuracion", &config)?;
+    let queued_input = with_local_entity_headers(input, "local-user-config", "user_country_config");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+    json_success_response(config, "Configuracion de usuario guardada localmente")
+}
+
+fn extract_data_array(value: Value) -> Vec<Value> {
+    match value {
+        Value::Array(items) => items,
+        Value::Object(obj) => obj
+            .get("data")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+fn latest_snapshot_arrays(conn: &Connection, endpoint: &str) -> Result<Vec<Value>, String> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT body FROM local_api_snapshots
+            WHERE endpoint = ?1
+            ORDER BY cached_at DESC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar snapshots locales {endpoint}: {e}"))?;
+    let rows = stmt
+        .query_map(params![endpoint], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("No se pudo leer snapshots locales {endpoint}: {e}"))?;
+    let mut values = Vec::new();
+    for row in rows {
+        let raw = row.map_err(|e| format!("Snapshot local invalido {endpoint}: {e}"))?;
+        if let Some(data) = extract_response_data(&raw) {
+            values.extend(extract_data_array(data));
+        }
+    }
+    Ok(values)
+}
+
+fn find_local_snapshot_item(conn: &Connection, endpoint: &str, id: &str) -> Result<Option<Value>, String> {
+    Ok(latest_snapshot_arrays(conn, endpoint)?
+        .into_iter()
+        .find(|item| value_string(item, "id").map(|item_id| item_id == id).unwrap_or(false)))
+}
+
+fn process_local_treasury_batch(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let payload = parse_json_body(&input.body)?;
+    let pagos = payload
+        .get("pagos")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let batch_id = value_string(&payload, "referencia_lote")
+        .or_else(|| value_string(&payload, "idempotency_key"))
+        .unwrap_or_else(|| format!("local-payment-batch-{}", Uuid::new_v4()));
+    let timestamp = now_ms();
+    let cuenta_id = value_string(&payload, "cuenta_bancaria_id").unwrap_or_default();
+    let cuenta = if cuenta_id.is_empty() {
+        None
+    } else {
+        find_local_snapshot_item(conn, "/api/finanzas/bancos/cuentas", &cuenta_id)?
+    };
+
+    let mut total = 0.0f64;
+    let mut payment_details = Vec::new();
+    for pago in pagos.iter() {
+        let cxp_id = value_string(pago, "cxp_id").unwrap_or_default();
+        let cxp = if cxp_id.is_empty() {
+            None
+        } else {
+            find_local_snapshot_item(conn, "/api/finanzas/tesoreria/programacion", &cxp_id)?
+                .or_else(|| find_local_snapshot_item(conn, "/api/finanzas/cxp", &cxp_id).ok().flatten())
+        };
+        let saldo = cxp
+            .as_ref()
+            .and_then(|value| value.get("saldo").and_then(Value::as_f64))
+            .unwrap_or(0.0);
+        let monto = pago
+            .get("monto")
+            .and_then(Value::as_f64)
+            .filter(|value| *value > 0.0)
+            .unwrap_or(saldo);
+        total += monto;
+        let saldo_nuevo = (saldo - monto).max(0.0);
+        let proveedor = cxp
+            .as_ref()
+            .and_then(|value| value.get("proveedor"))
+            .and_then(|value| {
+                value_string(value, "razon_social")
+                    .or_else(|| value_string(value, "nombre"))
+                    .or_else(|| value_string(value, "ruc"))
+            })
+            .or_else(|| cxp.as_ref().and_then(|value| value_string(value, "proveedor_nombre")))
+            .unwrap_or_else(|| "Proveedor pendiente de sincronizacion".to_string());
+        payment_details.push(serde_json::json!({
+            "id": format!("local-payment-{}", Uuid::new_v4()),
+            "cxp_id": cxp_id,
+            "proveedor": proveedor,
+            "numero_documento": cxp
+                .as_ref()
+                .and_then(|value| value_string(value, "numero_documento"))
+                .unwrap_or_else(|| "Pendiente".to_string()),
+            "monto": monto,
+            "saldo_anterior": saldo,
+            "saldo_nuevo": saldo_nuevo,
+            "estado_anterior": cxp
+                .as_ref()
+                .and_then(|value| value_string(value, "estado"))
+                .unwrap_or_else(|| "PENDIENTE".to_string()),
+            "estado_nuevo": if saldo_nuevo <= 0.0 { "PAGADO" } else { "PARCIAL" },
+            "offline": true,
+            "sync_status": "pending"
+        }));
+    }
+
+    let saldo_anterior = cuenta
+        .as_ref()
+        .and_then(|value| value.get("saldo").and_then(Value::as_f64))
+        .unwrap_or(0.0);
+    let saldo_nuevo = if saldo_anterior > 0.0 {
+        (saldo_anterior - total).max(0.0)
+    } else {
+        0.0
+    };
+    let result = serde_json::json!({
+        "lote_id": batch_id,
+        "total_pagos": payment_details.len(),
+        "pagos_exitosos": payment_details.len(),
+        "monto_total": total,
+        "fecha_pago": value_string(&payload, "fecha_pago"),
+        "metodo_pago": value_string(&payload, "metodo_pago"),
+        "referencia_lote": value_string(&payload, "referencia_lote")
+            .unwrap_or_else(|| batch_id.clone()),
+        "observaciones": value_string(&payload, "observaciones"),
+        "cuenta_bancaria": {
+            "id": cuenta_id,
+            "nombre": cuenta
+                .as_ref()
+                .and_then(|value| value_string(value, "nombre"))
+                .unwrap_or_else(|| "Cuenta local".to_string()),
+            "moneda": cuenta
+                .as_ref()
+                .and_then(|value| value_string(value, "moneda"))
+                .unwrap_or_else(|| "PEN".to_string()),
+            "saldo_anterior": saldo_anterior,
+            "saldo_nuevo": saldo_nuevo
+        },
+        "pagos": payment_details,
+        "offline": true,
+        "local_first": true,
+        "sync_status": "pending",
+        "created_at": timestamp,
+        "updated_at": timestamp
+    });
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_generic_records
+            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, '/api/finanzas/tesoreria/pagos', 'POST', ?3, 0, 'pending', ?4, ?4)
+        "#,
+        params![
+            batch_id,
+            format!("/api/finanzas/tesoreria/pagos/{batch_id}"),
+            serde_json::to_string(&result)
+                .map_err(|e| format!("No se pudo serializar lote local de pagos: {e}"))?,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar lote local de pagos: {e}"))?;
+
+    let queued_input = with_json_body_fields(
+        &with_local_entity_headers(input, &batch_id, "treasury_payment_batch"),
+        &[
+            ("referencia_lote", serde_json::json!(batch_id.clone())),
+            ("idempotency_key", serde_json::json!(batch_id.clone())),
+        ],
+    )?;
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+    json_success_response(result, "Lote de pagos guardado localmente; pendiente de sincronizacion")
+}
+
+fn session_id_from_endpoint(endpoint: &str, prefix: &str) -> Option<String> {
+    endpoint
+        .strip_prefix(prefix)?
+        .trim_matches('/')
+        .split('/')
+        .next()
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn local_cash_movements(conn: &Connection, session_id: &str) -> Result<Vec<Value>, String> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT data_json FROM local_generic_records
+            WHERE collection_endpoint = '/api/cajas/movimientos'
+              AND deleted = 0
+            ORDER BY created_at ASC
+            "#,
+        )
+        .map_err(|e| format!("No se pudo preparar movimientos de caja locales: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("No se pudo leer movimientos de caja locales: {e}"))?;
+    let mut movements = Vec::new();
+    for row in rows {
+        let raw = row.map_err(|e| format!("Movimiento de caja local invalido: {e}"))?;
+        let value = serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null);
+        let belongs = value_string(&value, "sesion_caja_id")
+            .or_else(|| value_string(&value, "sesion_id"))
+            .map(|id| id == session_id)
+            .unwrap_or(false);
+        if belongs {
+            movements.push(value);
+        }
+    }
+    Ok(movements)
+}
+
+fn local_session_start_amount(conn: &Connection, session_id: &str) -> Result<f64, String> {
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT data_json FROM pos_cash_sessions WHERE id = ?1",
+            params![session_id],
+            |row| row.get(0),
+        )
+        .ok();
+    let Some(raw) = raw else {
+        return Ok(0.0);
+    };
+    let session = serde_json::from_str::<Value>(&raw).unwrap_or(Value::Null);
+    Ok(session
+        .get("monto_inicio")
+        .or_else(|| session.get("monto_inicial"))
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0))
+}
+
+fn local_session_sales_total(conn: &Connection, session_id: &str) -> Result<f64, String> {
+    let mut stmt = conn
+        .prepare("SELECT total FROM pos_sales WHERE sesion_caja_id = ?1")
+        .map_err(|e| format!("No se pudo preparar ventas de sesion local: {e}"))?;
+    let rows = stmt
+        .query_map(params![session_id], |row| row.get::<_, f64>(0))
+        .map_err(|e| format!("No se pudo leer ventas de sesion local: {e}"))?;
+    let mut total = 0.0;
+    for row in rows {
+        total += row.map_err(|e| format!("Venta de sesion local invalida: {e}"))?;
+    }
+    Ok(total)
+}
+
+fn local_cash_expected_balance(conn: &Connection, session_id: &str) -> Result<f64, String> {
+    let start = local_session_start_amount(conn, session_id)?;
+    let sales = local_session_sales_total(conn, session_id)?;
+    let movements = local_cash_movements(conn, session_id)?
+        .iter()
+        .map(|movement| movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0))
+        .sum::<f64>();
+    Ok(start + sales + movements)
+}
+
+fn build_cash_movements_snapshot(conn: &Connection, endpoint: &str) -> Result<LocalFirstResponse, String> {
+    let session_id = session_id_from_endpoint(endpoint, "/api/cajas/movimientos/").unwrap_or_default();
+    let mut movements = local_cash_movements(conn, &session_id)?;
+    let mut saldo = local_session_start_amount(conn, &session_id)?;
+    for (index, movement) in movements.iter_mut().enumerate() {
+        let amount = movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0);
+        let saldo_anterior = saldo;
+        saldo += amount;
+        if let Some(obj) = movement.as_object_mut() {
+            obj.insert("secuencia".to_string(), serde_json::json!(index + 1));
+            obj.insert("saldo_anterior".to_string(), serde_json::json!(saldo_anterior));
+            obj.insert("saldo_nuevo".to_string(), serde_json::json!(saldo));
+        }
+    }
+    json_success_response(Value::Array(movements), "Movimientos de caja locales")
+}
+
+fn build_cash_expected_balance_snapshot(conn: &Connection, endpoint: &str) -> Result<LocalFirstResponse, String> {
+    let session_id = session_id_from_endpoint(endpoint, "/api/cajas/saldo-esperado/").unwrap_or_default();
+    let monto_inicial = local_session_start_amount(conn, &session_id)?;
+    let ventas = local_session_sales_total(conn, &session_id)?;
+    let movimientos = local_cash_movements(conn, &session_id)?
+        .iter()
+        .map(|movement| movement.get("monto").and_then(Value::as_f64).unwrap_or(0.0))
+        .sum::<f64>();
+    let saldo_esperado = monto_inicial + ventas + movimientos;
+    json_success_response(
+        serde_json::json!({
+            "sesion_id": session_id,
+            "monto_inicial": monto_inicial,
+            "total_ventas": ventas,
+            "total_movimientos": movimientos,
+            "saldo_esperado": saldo_esperado,
+            "monto_esperado": saldo_esperado,
+            "offline": true,
+            "local_first": true
+        }),
+        "Saldo esperado local de caja",
+    )
+}
+
+fn process_local_cash_movement(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let payload = parse_json_body(&input.body)?;
+    let session_id = session_id_from_endpoint(&input.endpoint, "/api/cajas/movimientos/manual/")
+        .or_else(|| session_id_from_endpoint(&input.endpoint, "/api/cajas/retiros/"))
+        .ok_or_else(|| "El movimiento local requiere sesion de caja".to_string())?;
+    let timestamp = now_ms();
+    let movement_id = value_string(&payload, "idempotency_key")
+        .or_else(|| value_string(&payload, "referencia_documento"))
+        .unwrap_or_else(|| format!("local-cash-movement-{}", Uuid::new_v4()));
+    let is_withdrawal = input.endpoint.starts_with("/api/cajas/retiros/");
+    let tipo = if is_withdrawal {
+        "RETIRO".to_string()
+    } else {
+        value_string(&payload, "tipo").unwrap_or_else(|| "INGRESO".to_string()).to_uppercase()
+    };
+    let raw_amount = payload.get("monto").and_then(Value::as_f64).unwrap_or(0.0).abs();
+    let signed_amount = if matches!(tipo.as_str(), "GASTO" | "RETIRO" | "EGRESO") {
+        -raw_amount
+    } else {
+        raw_amount
+    };
+    let saldo_anterior = local_cash_expected_balance(conn, &session_id)?;
+    let saldo_nuevo = saldo_anterior + signed_amount;
+    let movement = serde_json::json!({
+        "id": movement_id,
+        "sesion_caja_id": session_id,
+        "sesion_id": session_id,
+        "tipo_movimiento": tipo,
+        "monto": signed_amount,
+        "saldo_anterior": saldo_anterior,
+        "saldo_nuevo": saldo_nuevo,
+        "timestamp": timestamp,
+        "motivo": value_string(&payload, "motivo")
+            .or_else(|| value_string(&payload, "motivo_detalle"))
+            .unwrap_or_else(|| "Movimiento offline".to_string()),
+        "referencia_tipo": if is_withdrawal { "RETIRO" } else { "MANUAL" },
+        "referencia_documento": movement_id,
+        "offline": true,
+        "local_first": true,
+        "sync_status": "pending"
+    });
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_generic_records
+            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, '/api/cajas/movimientos', 'POST', ?3, 0, 'pending', ?4, ?4)
+        "#,
+        params![
+            &movement_id,
+            format!("/api/cajas/movimientos/{session_id}/{movement_id}"),
+            serde_json::to_string(&movement)
+                .map_err(|e| format!("No se pudo serializar movimiento de caja local: {e}"))?,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar movimiento de caja local: {e}"))?;
+    let queued_input = with_json_body_fields(
+        &with_local_entity_headers(input, &movement_id, "cash_movement"),
+        &[
+            ("idempotency_key", serde_json::json!(movement_id.clone())),
+            ("referencia_documento", serde_json::json!(movement_id.clone())),
+        ],
+    )?;
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+    json_success_response(movement, "Movimiento de caja guardado localmente")
+}
+
+fn process_local_shift_change(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let payload = parse_json_body(&input.body)?;
+    let timestamp = now_ms();
+    if input.endpoint.starts_with("/api/cajas/cambio-turno/iniciar/") {
+        let session_id = session_id_from_endpoint(&input.endpoint, "/api/cajas/cambio-turno/iniciar/")
+            .ok_or_else(|| "El cambio de turno local requiere sesion".to_string())?;
+        let change_id = value_string(&payload, "idempotency_key")
+            .unwrap_or_else(|| format!("local-shift-change-{}", Uuid::new_v4()));
+        let saldo_sistema = local_cash_expected_balance(conn, &session_id)?;
+        let data = serde_json::json!({
+            "id": change_id,
+            "sesion_caja_id": session_id,
+            "usuario_entrante_id": value_string(&payload, "usuario_entrante_id"),
+            "saldo_sistema": saldo_sistema,
+            "estado": "EN_CONTEO",
+            "offline": true,
+            "local_first": true,
+            "sync_status": "pending",
+            "created_at": timestamp,
+            "updated_at": timestamp
+        });
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO local_generic_records
+                (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+            VALUES (?1, ?2, '/api/cajas/cambios-turno', 'POST', ?3, 0, 'pending', ?4, ?4)
+            "#,
+            params![
+                &change_id,
+                format!("/api/cajas/cambios-turno/{change_id}"),
+                serde_json::to_string(&data)
+                    .map_err(|e| format!("No se pudo serializar cambio de turno local: {e}"))?,
+                timestamp,
+            ],
+        )
+        .map_err(|e| format!("No se pudo guardar cambio de turno local: {e}"))?;
+        let queued_input = with_json_body_fields(
+            &with_local_entity_headers(input, &change_id, "cash_shift_change"),
+            &[("idempotency_key", serde_json::json!(change_id.clone()))],
+        )?;
+        enqueue_offline_request_with_conn(conn, &queued_input)?;
+        return json_success_response(data, "Cambio de turno iniciado localmente");
+    }
+
+    let change_id = session_id_from_endpoint(&input.endpoint, "/api/cajas/cambio-turno/completar/")
+        .ok_or_else(|| "El cierre de cambio local requiere cambio_id".to_string())?;
+    let mut data = conn
+        .query_row(
+            "SELECT data_json FROM local_generic_records WHERE id = ?1",
+            params![&change_id],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .unwrap_or_else(|| serde_json::json!({ "id": change_id }));
+    let saldo_sistema = data
+        .get("saldo_sistema")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    let monto_contado = payload
+        .get("monto_contado")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0);
+    if let (Some(obj), Some(payload_obj)) = (data.as_object_mut(), payload.as_object()) {
+        for (key, value) in payload_obj {
+            obj.insert(key.clone(), value.clone());
+        }
+        obj.insert("estado".to_string(), serde_json::json!("COMPLETADO"));
+        obj.insert("saldo_sistema".to_string(), serde_json::json!(saldo_sistema));
+        obj.insert("diferencia".to_string(), serde_json::json!(monto_contado - saldo_sistema));
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("local_first".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+        obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
+    }
+    conn.execute(
+        "UPDATE local_generic_records SET data_json = ?2, updated_at = ?3 WHERE id = ?1",
+        params![
+            &change_id,
+            serde_json::to_string(&data)
+                .map_err(|e| format!("No se pudo serializar cierre de cambio local: {e}"))?,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo actualizar cambio de turno local: {e}"))?;
+    let queued_input = with_json_body_fields(
+        &with_local_entity_headers(input, &change_id, "cash_shift_change"),
+        &[("idempotency_key", serde_json::json!(change_id.clone()))],
+    )?;
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+    json_success_response(data, "Cambio de turno completado localmente")
+}
+
 fn enqueue_offline_request_with_conn(
     conn: &Connection,
     input: &LocalFirstWriteInput,
@@ -1390,12 +2695,17 @@ fn enqueue_offline_request_with_conn(
 
 fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
-    let caja_id = input
-        .endpoint
-        .trim_start_matches("/api/cajas/")
-        .trim_end_matches("/apertura")
-        .to_string();
-    let session_id = format!("local-session-{}", Uuid::new_v4());
+    let caja_id = value_string(&payload, "caja_id").unwrap_or_else(|| {
+        input
+            .endpoint
+            .trim_start_matches("/api/cajas/")
+            .trim_end_matches("/apertura")
+            .trim_end_matches("/abrir")
+            .to_string()
+    });
+    let session_id = value_string(&payload, "idempotency_key")
+        .or_else(|| value_string(&payload, "local_session_id"))
+        .unwrap_or_else(|| format!("local-session-{}", Uuid::new_v4()));
     let monto_inicio = value_number(&payload, "monto_inicio");
     let timestamp = now_ms();
     let session = serde_json::json!({
@@ -1429,7 +2739,13 @@ fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> R
         ],
     )
     .map_err(|e| format!("No se pudo abrir caja local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &session_id, "cash_session");
+    let queued_input = with_json_body_fields(
+        &with_local_entity_headers(input, &session_id, "cash_session"),
+        &[
+            ("idempotency_key", serde_json::json!(session_id.clone())),
+            ("local_session_id", serde_json::json!(session_id.clone())),
+        ],
+    )?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(session, "Caja abierta localmente; pendiente de sincronizacion")
 }
@@ -1437,6 +2753,8 @@ fn process_local_cash_open(conn: &Connection, input: &LocalFirstWriteInput) -> R
 fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> Result<LocalFirstResponse, String> {
     let payload = parse_json_body(&input.body)?;
     let session_id = value_string(&payload, "sesion_id")
+        .or_else(|| value_string(&payload, "sesionId"))
+        .or_else(|| input.endpoint.strip_prefix("/api/cajas/cerrar/").map(str::to_string))
         .ok_or_else(|| "El cierre local requiere sesion_id".to_string())?;
     let monto_cierre = payload
         .get("monto_cierre")
@@ -1488,7 +2806,10 @@ fn process_local_cash_close(conn: &Connection, input: &LocalFirstWriteInput) -> 
         ],
     )
     .map_err(|e| format!("No se pudo cerrar caja local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &session_id, "cash_session");
+    let queued_input = with_json_body_fields(
+        &with_local_entity_headers(input, &session_id, "cash_session"),
+        &[("idempotency_key", serde_json::json!(format!("cash-close-{session_id}")))],
+    )?;
     enqueue_offline_request_with_conn(conn, &queued_input)?;
     json_success_response(session, "Caja cerrada localmente; pendiente de sincronizacion")
 }
@@ -1601,6 +2922,30 @@ fn process_local_pos_sale(
         },
         "message": "Venta guardada localmente; pendiente de sincronizacion"
     });
+    let response_raw = serde_json::to_string(&response)
+        .map_err(|e| format!("No se pudo serializar venta local: {e}"))?;
+    conn.execute(
+        r#"
+        INSERT INTO pos_sales
+            (id, idempotency_key, sesion_caja_id, numero_ticket, total, body_json, response_json, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
+        "#,
+        params![
+            sale_id,
+            idempotency_key,
+            sesion_caja_id,
+            numero_ticket,
+            total,
+            input.body.clone().unwrap_or_default(),
+            response_raw,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar venta POS local: {e}"))?;
+
+    let queued_input = with_local_entity_headers(input, &sale_id, "pos_sale");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+
     if !config.ruc.trim().is_empty() && !config.razon_social.trim().is_empty() {
         let fiscal_input = OfflineFiscalDocumentInput {
             document_type: if value_string(&payload, "tipo_comprobante")
@@ -1623,37 +2968,28 @@ fn process_local_pos_sale(
             source_type: Some("pos_sale".to_string()),
             source_id: Some(sale_id.clone()),
         };
-        if let Ok(fiscal_doc) = create_local_fiscal_document_with_conn(conn, config, fiscal_input) {
+        if let Ok(fiscal_doc) = create_local_fiscal_document_with_conn(
+            conn,
+            config,
+            fiscal_input,
+            input.tenant_id.clone(),
+            input.user_id.clone(),
+            bearer_token_from_headers(&input.headers),
+        ) {
             if let Some(data) = response.get_mut("data").and_then(Value::as_object_mut) {
                 data.insert("cpe_id".to_string(), serde_json::json!(fiscal_doc.id));
                 data.insert("cpe_estado".to_string(), serde_json::json!(fiscal_doc.estado));
                 data.insert("cpe_hash".to_string(), serde_json::json!(fiscal_doc.hash));
             }
+            let response_raw = serde_json::to_string(&response)
+                .map_err(|e| format!("No se pudo serializar venta local con CPE: {e}"))?;
+            conn.execute(
+                "UPDATE pos_sales SET response_json = ?2, updated_at = ?3 WHERE id = ?1",
+                params![sale_id, response_raw, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar venta POS local con CPE: {e}"))?;
         }
     }
-    let response_raw = serde_json::to_string(&response)
-        .map_err(|e| format!("No se pudo serializar venta local: {e}"))?;
-    conn.execute(
-        r#"
-        INSERT INTO pos_sales
-            (id, idempotency_key, sesion_caja_id, numero_ticket, total, body_json, response_json, sync_status, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8)
-        "#,
-        params![
-            sale_id,
-            idempotency_key,
-            sesion_caja_id,
-            numero_ticket,
-            total,
-            input.body.clone().unwrap_or_default(),
-            response_raw,
-            timestamp,
-        ],
-    )
-    .map_err(|e| format!("No se pudo guardar venta POS local: {e}"))?;
-    let queued_input = with_local_entity_headers(input, &sale_id, "pos_sale");
-    enqueue_offline_request_with_conn(conn, &queued_input)?;
-
     let data = response
         .get("data")
         .cloned()
@@ -1809,6 +3145,7 @@ fn process_local_customer(
         input
             .endpoint
             .trim_start_matches("/api/ventas/clientes/")
+            .trim_start_matches("/api/pos/clientes/")
             .to_string()
     };
 
@@ -2066,13 +3403,118 @@ fn process_local_sales_document(
     )
 }
 
+fn process_local_attendance_mark(
+    conn: &Connection,
+    input: &LocalFirstWriteInput,
+) -> Result<LocalFirstResponse, String> {
+    let payload = parse_json_body(&input.body)?;
+    let timestamp = now_ms();
+    let empleado_id = value_string(&payload, "empleado_id")
+        .or_else(|| {
+            input
+                .endpoint
+                .trim_start_matches("/api/rrhh/asistencia/entrada/")
+                .trim_start_matches("/api/rrhh/asistencia/salida/")
+                .split('/')
+                .next()
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        })
+        .ok_or_else(|| "La marcacion local requiere empleado_id".to_string())?;
+    let fecha = value_string(&payload, "fecha").unwrap_or_else(current_utc_date);
+    let tipo = value_string(&payload, "tipo").unwrap_or_else(|| {
+        if input.endpoint.contains("/salida/") {
+            "salida".to_string()
+        } else {
+            "entrada".to_string()
+        }
+    });
+    let hora = value_string(&payload, "hora").unwrap_or_else(|| {
+        let seconds = (timestamp / 1000) % 86_400;
+        format!("{:02}:{:02}:{:02}", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+    });
+
+    let mut existing_id: Option<String> = None;
+    let mut existing_data: Option<Value> = None;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, data_json FROM local_generic_records WHERE collection_endpoint = '/api/rrhh/asistencias' AND deleted = 0",
+        )
+        .map_err(|e| format!("No se pudo preparar asistencia local: {e}"))?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(|e| format!("No se pudo leer asistencia local: {e}"))?;
+    for row in rows {
+        let (id, raw) = row.map_err(|e| format!("Asistencia local invalida: {e}"))?;
+        if let Ok(data) = serde_json::from_str::<Value>(&raw) {
+            let same_employee = value_string(&data, "empleado_id")
+                .or_else(|| value_string(&data, "id_empleado"))
+                .map(|value| value == empleado_id)
+                .unwrap_or(false);
+            let same_date = value_string(&data, "fecha")
+                .map(|value| value == fecha)
+                .unwrap_or(false);
+            if same_employee && same_date {
+                existing_id = Some(id);
+                existing_data = Some(data);
+                break;
+            }
+        }
+    }
+
+    let id = existing_id.unwrap_or_else(|| format!("local-attendance-{}", Uuid::new_v4()));
+    let mut attendance = existing_data.unwrap_or_else(|| {
+        serde_json::json!({
+            "id": id,
+            "empleado_id": empleado_id,
+            "id_empleado": empleado_id,
+            "fecha": fecha,
+            "offline": true,
+            "sync_status": "pending"
+        })
+    });
+    if let Some(obj) = attendance.as_object_mut() {
+        obj.insert("id".to_string(), serde_json::json!(id.clone()));
+        obj.insert("empleado_id".to_string(), serde_json::json!(empleado_id));
+        obj.insert("id_empleado".to_string(), serde_json::json!(empleado_id));
+        obj.insert("fecha".to_string(), serde_json::json!(fecha));
+        if tipo.eq_ignore_ascii_case("salida") {
+            obj.insert("hora_salida".to_string(), serde_json::json!(hora));
+        } else {
+            obj.insert("hora_entrada".to_string(), serde_json::json!(hora));
+        }
+        obj.insert("offline".to_string(), serde_json::json!(true));
+        obj.insert("sync_status".to_string(), serde_json::json!("pending"));
+        obj.insert("updated_at".to_string(), serde_json::json!(timestamp));
+    }
+
+    conn.execute(
+        r#"
+        INSERT OR REPLACE INTO local_generic_records
+            (id, endpoint, collection_endpoint, method, data_json, deleted, sync_status, created_at, updated_at)
+        VALUES (?1, ?2, '/api/rrhh/asistencias', 'POST', ?3, 0, 'pending', ?4, ?4)
+        "#,
+        params![
+            id,
+            format!("/api/rrhh/asistencias/{id}"),
+            serde_json::to_string(&attendance)
+                .map_err(|e| format!("No se pudo serializar asistencia local: {e}"))?,
+            timestamp,
+        ],
+    )
+    .map_err(|e| format!("No se pudo guardar asistencia local: {e}"))?;
+    let queued_input = with_local_entity_headers(input, &id, "rrhh_attendance");
+    enqueue_offline_request_with_conn(conn, &queued_input)?;
+    json_success_response(attendance, "Asistencia guardada localmente; pendiente de sincronizacion")
+}
+
 fn process_generic_local_write(
     conn: &Connection,
     input: &LocalFirstWriteInput,
 ) -> Result<LocalFirstResponse, String> {
     let method = input.method.to_uppercase();
     let timestamp = now_ms();
-    let collection = collection_endpoint(&input.endpoint);
+    let collection = local_collection_endpoint_for_write(&input.endpoint);
     let id = if method == "POST" {
         format!("local-generic-{}", Uuid::new_v4())
     } else {
@@ -2176,8 +3618,48 @@ fn get_local_first_response(
 ) -> Result<Option<LocalFirstResponse>, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
+    let config = load_config(app.clone()).unwrap_or_default();
 
     match endpoint.as_str() {
+        "/api/cajas" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_default_cajas_snapshot()?));
+        }
+        "/api/pos/metodos-pago" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_default_payment_methods_snapshot()?));
+        }
+        "/api/pos/empresa-config" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_empresa_config_snapshot(&config)?));
+        }
+        "/api/pos/configuration-status" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_pos_configuration_status_snapshot(&config)?))
+        }
+        "/api/configuration/gre-thresholds" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_gre_thresholds_snapshot()?));
+        }
+        "/api/compras/next-number" => {
+            if let Some(snapshot) = read_local_snapshot(&conn, &endpoint, &url)? {
+                return Ok(Some(snapshot));
+            }
+            return Ok(Some(build_next_number_snapshot("OC")?));
+        }
+        "/api/paises/usuario/configuracion" => {
+            return Ok(Some(build_user_country_config_snapshot(&conn)?));
+        }
         "/api/pos/productos" | "/api/inventario/productos" => {
             return Ok(Some(build_products_snapshot(&conn)?))
         }
@@ -2195,24 +3677,53 @@ fn get_local_first_response(
         _ => {}
     }
 
-    if endpoint.starts_with("/api/inventario/productos/") {
-        return build_product_detail_snapshot(&conn, &endpoint);
+    if endpoint.starts_with("/api/pos/detalles-venta/") {
+        return Ok(Some(build_pos_sale_details_snapshot(&conn, &endpoint)?));
     }
-    if endpoint.starts_with("/api/ventas/clientes/") {
-        return build_customer_detail_snapshot(&conn, &endpoint);
+    if endpoint.starts_with("/api/cajas/movimientos/") {
+        return Ok(Some(build_cash_movements_snapshot(&conn, &endpoint)?));
+    }
+    if endpoint.starts_with("/api/cajas/saldo-esperado/") {
+        return Ok(Some(build_cash_expected_balance_snapshot(&conn, &endpoint)?));
+    }
+    if endpoint.starts_with("/api/inventario/productos/") {
+        return Ok(Some(
+            build_product_detail_snapshot(&conn, &endpoint)?
+                .unwrap_or(build_empty_object_snapshot(&endpoint)?),
+        ));
+    }
+    if endpoint.starts_with("/api/ventas/clientes/") || endpoint.starts_with("/api/pos/clientes/") {
+        return Ok(Some(
+            build_customer_detail_snapshot(&conn, &endpoint)?
+                .unwrap_or(build_empty_object_snapshot(&endpoint)?),
+        ));
     }
     if endpoint.starts_with("/api/ventas/cotizaciones/") {
-        return build_sales_document_detail_snapshot(&conn, &endpoint, "quote");
+        return Ok(Some(
+            build_sales_document_detail_snapshot(&conn, &endpoint, "quote")?
+                .unwrap_or(build_empty_object_snapshot(&endpoint)?),
+        ));
     }
     if endpoint.starts_with("/api/ventas/pedidos/") {
-        return build_sales_document_detail_snapshot(&conn, &endpoint, "order");
+        return Ok(Some(
+            build_sales_document_detail_snapshot(&conn, &endpoint, "order")?
+                .unwrap_or(build_empty_object_snapshot(&endpoint)?),
+        ));
     }
 
     if let Some(detail) = build_generic_detail_snapshot(&conn, &endpoint)? {
         return Ok(Some(detail));
     }
 
-    let snapshot = read_local_snapshot(&conn, &endpoint, &url)?;
+    let snapshot = read_local_snapshot(&conn, &endpoint, &url)?.or_else(|| {
+        if is_known_empty_collection_endpoint(&endpoint) {
+            build_empty_collection_snapshot(&endpoint).ok()
+        } else if is_known_empty_object_endpoint(&endpoint) {
+            build_empty_object_snapshot(&endpoint).ok()
+        } else {
+            None
+        }
+    });
     merge_local_records_into_response(&conn, &endpoint, snapshot)
 }
 
@@ -2233,13 +3744,15 @@ fn process_local_first_write(
     {
         process_local_pos_sale(&tx, &request, &config)
     } else if request.method.eq_ignore_ascii_case("POST")
-        && request.endpoint.starts_with("/api/cajas/")
-        && request.endpoint.ends_with("/apertura")
+        && ((request.endpoint.starts_with("/api/cajas/")
+            && request.endpoint.ends_with("/apertura"))
+            || request.endpoint == "/api/cajas/abrir")
     {
         process_local_cash_open(&tx, &request)
     } else if request.method.eq_ignore_ascii_case("POST")
-        && request.endpoint.starts_with("/api/cajas/")
-        && request.endpoint.ends_with("/cierre")
+        && ((request.endpoint.starts_with("/api/cajas/")
+            && request.endpoint.ends_with("/cierre"))
+            || request.endpoint.starts_with("/api/cajas/cerrar/"))
     {
         process_local_cash_close(&tx, &request)
     } else if request.endpoint == "/api/inventario/productos"
@@ -2247,7 +3760,9 @@ fn process_local_first_write(
     {
         process_local_inventory_product(&tx, &request)
     } else if request.endpoint == "/api/ventas/clientes"
+        || request.endpoint == "/api/pos/clientes"
         || request.endpoint.starts_with("/api/ventas/clientes/")
+        || request.endpoint.starts_with("/api/pos/clientes/")
     {
         process_local_customer(&tx, &request)
     } else if request.endpoint == "/api/ventas/cotizaciones"
@@ -2259,6 +3774,32 @@ fn process_local_first_write(
         || request.endpoint.starts_with("/api/ventas/pedidos/")
     {
         process_local_sales_document(&tx, &request, "order")
+    } else if request.method.eq_ignore_ascii_case("POST")
+        && (request.endpoint == "/api/rrhh/asistencias/marcar"
+            || request.endpoint.starts_with("/api/rrhh/asistencia/entrada/")
+            || request.endpoint.starts_with("/api/rrhh/asistencia/salida/"))
+    {
+        process_local_attendance_mark(&tx, &request)
+    } else if request.endpoint == "/api/paises/usuario/configuracion" {
+        process_local_user_country_config(&tx, &request)
+    } else if request.endpoint == "/api/finanzas/tesoreria/lote"
+        && request.method.eq_ignore_ascii_case("POST")
+    {
+        process_local_treasury_batch(&tx, &request)
+    } else if request.method.eq_ignore_ascii_case("POST")
+        && (request.endpoint.starts_with("/api/cajas/movimientos/manual/")
+            || request.endpoint.starts_with("/api/cajas/retiros/"))
+    {
+        process_local_cash_movement(&tx, &request)
+    } else if request.method.eq_ignore_ascii_case("POST")
+        && (request.endpoint.starts_with("/api/cajas/cambio-turno/iniciar/")
+            || request.endpoint.starts_with("/api/cajas/cambio-turno/completar/"))
+    {
+        process_local_shift_change(&tx, &request)
+    } else if request.endpoint == "/api/notifications/mark-all-read"
+        || request.endpoint.starts_with("/api/notifications/")
+    {
+        process_local_notifications_mutation(&tx, &request)
     } else {
         process_generic_local_write(&tx, &request)
     }?;
@@ -2355,6 +3896,43 @@ fn response_remote_id(response_body: Option<&String>) -> Option<String> {
         })
 }
 
+fn response_fiscal_status(sync_status: &str, response_body: Option<&String>) -> String {
+    if sync_status == "failed" {
+        return "FALLIDO".to_string();
+    }
+    let normalized = response_body
+        .and_then(|response| serde_json::from_str::<Value>(response).ok())
+        .and_then(|value| {
+            let data = value.get("data").unwrap_or(&value);
+            value_string(data, "sunat_status")
+                .or_else(|| value_string(data, "status"))
+                .or_else(|| value_string(data, "estado"))
+                .or_else(|| value_string(&value, "sunat_status"))
+                .or_else(|| value_string(&value, "status"))
+                .or_else(|| value_string(&value, "estado"))
+        })
+        .unwrap_or_else(|| "ENVIADO".to_string())
+        .to_uppercase();
+
+    if normalized.contains("ACEPT") || normalized == "ACCEPTED" {
+        "ACEPTADO".to_string()
+    } else if normalized.contains("RECHAZ") || normalized == "REJECTED" {
+        "RECHAZADO".to_string()
+    } else if normalized.contains("FALL") || normalized.contains("ERROR") {
+        "FALLIDO".to_string()
+    } else if normalized.contains("PEND")
+        || normalized.contains("FIRMADO")
+        || normalized == "READY"
+        || normalized == "NOT_SENT"
+    {
+        "PENDIENTE_ENVIO".to_string()
+    } else if normalized.contains("ENVIADO") || normalized == "SENDING" {
+        "ENVIADO".to_string()
+    } else {
+        "ENVIADO".to_string()
+    }
+}
+
 fn upsert_local_id_map(
     conn: &Connection,
     local_id: Option<&String>,
@@ -2417,6 +3995,36 @@ fn update_local_first_sync_status(
         return Ok(());
     };
 
+    if endpoint == "/api/cpe/comprobantes" {
+        let fiscal_id = local_id
+            .or_else(|| value_string(&payload, "local_fiscal_id"))
+            .or_else(|| value_string(&payload, "id"));
+        if let Some(id) = fiscal_id {
+            let fiscal_status = response_fiscal_status(sync_status, response_body);
+            let synced_json = response_data_json(response_body);
+            conn.execute(
+                "UPDATE local_fiscal_documents SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4 WHERE id = ?1",
+                params![id, fiscal_status, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de documento fiscal local: {e}"))?;
+        }
+        return Ok(());
+    }
+
+    if endpoint == "/api/cpe/desktop/signed" {
+        let fiscal_hash = value_string(&payload, "hash").or(local_id);
+        if let Some(hash) = fiscal_hash {
+            let fiscal_status = response_fiscal_status(sync_status, response_body);
+            let synced_json = response_data_json(response_body);
+            conn.execute(
+                "UPDATE local_fiscal_documents SET estado = ?2, response_json = COALESCE(?3, response_json), updated_at = ?4 WHERE hash = ?1",
+                params![hash, fiscal_status, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de envio fiscal local: {e}"))?;
+        }
+        return Ok(());
+    }
+
     if endpoint == "/api/ventas/cotizaciones"
         || endpoint == "/api/cotizaciones/crear"
         || endpoint.starts_with("/api/ventas/cotizaciones/")
@@ -2459,7 +4067,11 @@ fn update_local_first_sync_status(
         return Ok(());
     }
 
-    if endpoint == "/api/ventas/clientes" || endpoint.starts_with("/api/ventas/clientes/") {
+    if endpoint == "/api/ventas/clientes"
+        || endpoint == "/api/pos/clientes"
+        || endpoint.starts_with("/api/ventas/clientes/")
+        || endpoint.starts_with("/api/pos/clientes/")
+    {
         let synced_json = response_data_json(response_body);
         let local_id = local_id.or_else(|| value_string(&payload, "id"));
         if let Some(id) = local_id {
@@ -2469,6 +4081,40 @@ fn update_local_first_sync_status(
             )
             .map_err(|e| format!("No se pudo actualizar sync de cliente local: {e}"))?;
         }
+        return Ok(());
+    }
+
+    if (endpoint.starts_with("/api/cajas/") && (endpoint.ends_with("/apertura") || endpoint.ends_with("/cierre")))
+        || endpoint == "/api/cajas/abrir"
+        || endpoint.starts_with("/api/cajas/cerrar/")
+    {
+        let synced_json = response_data_json(response_body);
+        let session_id = local_id
+            .or_else(|| value_string(&payload, "sesion_id"))
+            .or_else(|| value_string(&payload, "sesionId"))
+            .or_else(|| value_string(&payload, "id"));
+        if let Some(id) = session_id {
+            conn.execute(
+                "UPDATE pos_cash_sessions SET data_json = COALESCE(?2, data_json), updated_at = ?3 WHERE id = ?1",
+                params![id, synced_json, now_ms()],
+            )
+            .map_err(|e| format!("No se pudo actualizar sync de caja local: {e}"))?;
+        }
+        return Ok(());
+    }
+
+    if endpoint == "/api/paises/usuario/configuracion" {
+        let synced_json = response_data_json(response_body);
+        let mut config = synced_json
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .unwrap_or(payload);
+        if let Some(obj) = config.as_object_mut() {
+            obj.insert("sync_status".to_string(), serde_json::json!(sync_status));
+            obj.insert("offline".to_string(), serde_json::json!(sync_status != "synced"));
+            obj.insert("local_first".to_string(), serde_json::json!(true));
+            obj.insert("updated_at".to_string(), serde_json::json!(now_ms()));
+        }
+        write_metadata_json(conn, "usuario_configuracion", &config)?;
         return Ok(());
     }
 
@@ -2512,7 +4158,7 @@ fn read_offline_queue(app: &AppHandle) -> Result<Vec<OfflineQueueItem>, String> 
             SELECT id, endpoint, method, url, headers_json, body, tenant_id, user_id,
                    status, attempts, created_at, updated_at, last_error, response_status, response_body
             FROM offline_requests
-            ORDER BY created_at ASC
+            ORDER BY created_at ASC, rowid ASC
             "#,
         )
         .map_err(|e| format!("No se pudo preparar lectura offline SQLite: {e}"))?;
@@ -2844,6 +4490,9 @@ fn create_local_fiscal_document_with_conn(
     conn: &Connection,
     config: &AppConfig,
     document: OfflineFiscalDocumentInput,
+    tenant_id: Option<String>,
+    user_id: Option<String>,
+    access_token: Option<String>,
 ) -> Result<OfflineFiscalDocument, String> {
     if config.ruc.trim().is_empty() || config.razon_social.trim().is_empty() {
         return Err("Configura RUC y razon social en desktop antes de emitir offline".to_string());
@@ -2881,46 +4530,52 @@ fn create_local_fiscal_document_with_conn(
         created_at: timestamp,
     };
     save_local_fiscal_document(conn, &result, &document)?;
+    let sync_items = normalize_fiscal_sync_items(&document.items);
 
     let queued_body = serde_json::to_string(&serde_json::json!({
         "local_fiscal_id": result.id,
+        "idempotency_key": format!("desktop.offline.cpe:{}", result.id),
         "document_type": result.document_type,
+        "tipo_documento": result.document_type,
         "serie": result.serie,
         "numero": result.numero,
         "estado": result.estado,
         "xml_content": result.xml_content,
         "signed_xml": result.signed_xml,
         "hash": result.hash,
-        "source_type": document.source_type,
-        "source_id": document.source_id,
-        "cliente_ruc": document.cliente_ruc,
-        "cliente_nombre": document.cliente_nombre,
+        "source_type": document.source_type.clone(),
+        "source_id": document.source_id.clone(),
+        "cliente_ruc": document.cliente_ruc.clone(),
+        "clienteRuc": document.cliente_ruc.clone(),
+        "documento_receptor": document.cliente_ruc.clone(),
+        "cliente_nombre": document.cliente_nombre.clone(),
+        "clienteNombre": document.cliente_nombre.clone(),
+        "razon_social_receptor": document.cliente_nombre.clone(),
+        "moneda": document.moneda.clone(),
+        "items": sync_items,
         "subtotal": document.subtotal,
+        "total_gravadas": document.subtotal,
         "igv": document.igv,
-        "total": document.total
+        "total_igv": document.igv,
+        "total": document.total,
+        "total_venta": document.total,
+        "tenant_id": tenant_id.clone(),
+        "user_id": user_id.clone()
     }))
     .map_err(|e| format!("No se pudo serializar documento fiscal para sync: {e}"))?;
     let queued = LocalFirstWriteInput {
-        endpoint: "/api/cpe/offline-documents".to_string(),
+        endpoint: "/api/cpe/desktop/signed".to_string(),
         method: "POST".to_string(),
-        url: "/api/cpe/offline-documents".to_string(),
-        headers: vec![
-            HeaderPair {
-                name: "Content-Type".to_string(),
-                value: "application/json".to_string(),
-            },
-            HeaderPair {
-                name: "x-erp-local-id".to_string(),
-                value: result.id.clone(),
-            },
-            HeaderPair {
-                name: "x-erp-local-entity-type".to_string(),
-                value: "fiscal_document".to_string(),
-            },
-        ],
+        url: "/api/cpe/desktop/signed".to_string(),
+        headers: offline_sync_headers(
+            access_token.as_deref(),
+            tenant_id.as_deref(),
+            &result.id,
+            "fiscal_document",
+        ),
         body: Some(queued_body),
-        tenant_id: None,
-        user_id: None,
+        tenant_id,
+        user_id,
     };
     enqueue_offline_request_with_conn(conn, &queued)?;
     Ok(result)
@@ -2930,6 +4585,9 @@ fn create_local_fiscal_document_with_conn(
 fn generate_offline_fiscal_document(
     app: AppHandle,
     document: OfflineFiscalDocumentInput,
+    tenant_id: Option<String>,
+    user_id: Option<String>,
+    access_token: Option<String>,
 ) -> Result<OfflineFiscalDocument, String> {
     let config = load_config(app.clone()).unwrap_or_default();
     let _guard = lock_offline_queue()?;
@@ -2937,7 +4595,14 @@ fn generate_offline_fiscal_document(
     let tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("No se pudo iniciar transaccion fiscal local: {e}"))?;
-    let result = create_local_fiscal_document_with_conn(&tx, &config, document)?;
+    let result = create_local_fiscal_document_with_conn(
+        &tx,
+        &config,
+        document,
+        tenant_id,
+        user_id,
+        access_token,
+    )?;
     tx.commit()
         .map_err(|e| format!("No se pudo confirmar documento fiscal local: {e}"))?;
     Ok(result)
@@ -2980,38 +4645,51 @@ async fn sign_xml(app: AppHandle, xml_content: String) -> Result<String, String>
 }
 
 #[tauri::command]
-async fn send_to_sunat(app: AppHandle, signed_xml: String) -> Result<String, String> {
+async fn send_to_sunat(
+    app: AppHandle,
+    signed_xml: String,
+    tenant_id: Option<String>,
+    user_id: Option<String>,
+    access_token: Option<String>,
+) -> Result<String, String> {
     let _guard = lock_offline_queue()?;
     let conn = open_local_db(&app)?;
     let hash = hash_base64(&signed_xml);
+    let local_fiscal_id: Option<String> = conn
+        .query_row(
+            "SELECT id FROM local_fiscal_documents WHERE hash = ?1 LIMIT 1",
+            params![&hash],
+            |row| row.get(0),
+        )
+        .ok();
+    let idempotency_key = local_fiscal_id
+        .as_ref()
+        .map(|id| format!("desktop.offline.cpe:{id}"))
+        .unwrap_or_else(|| format!("desktop.signed:{hash}"));
     let body = serde_json::to_string(&serde_json::json!({
         "signed_xml": signed_xml,
-        "hash": hash,
+        "hash": hash.clone(),
+        "local_fiscal_id": local_fiscal_id,
+        "idempotency_key": idempotency_key,
         "estado": "PENDIENTE_ENVIO",
-        "origen": "desktop_offline"
+        "origen": "desktop_offline",
+        "tenant_id": tenant_id.clone(),
+        "user_id": user_id.clone()
     }))
     .map_err(|e| format!("No se pudo serializar envio SUNAT pendiente: {e}"))?;
     let queued = LocalFirstWriteInput {
-        endpoint: "/api/cpe/send-signed".to_string(),
+        endpoint: "/api/cpe/desktop/signed".to_string(),
         method: "POST".to_string(),
-        url: "/api/cpe/send-signed".to_string(),
-        headers: vec![
-            HeaderPair {
-                name: "Content-Type".to_string(),
-                value: "application/json".to_string(),
-            },
-            HeaderPair {
-                name: "x-erp-local-id".to_string(),
-                value: hash.clone(),
-            },
-            HeaderPair {
-                name: "x-erp-local-entity-type".to_string(),
-                value: "fiscal_send".to_string(),
-            },
-        ],
+        url: "/api/cpe/desktop/signed".to_string(),
+        headers: offline_sync_headers(
+            access_token.as_deref(),
+            tenant_id.as_deref(),
+            &hash,
+            "fiscal_send",
+        ),
         body: Some(body),
-        tenant_id: None,
-        user_id: None,
+        tenant_id,
+        user_id,
     };
     enqueue_offline_request_with_conn(&conn, &queued)?;
     Ok("PENDIENTE_ENVIO: XML firmado guardado localmente; SUNAT/OSE se enviara al reconectar".to_string())

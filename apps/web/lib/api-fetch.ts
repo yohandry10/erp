@@ -1,8 +1,9 @@
-import { buildApiUrl } from './api-url'
+import { buildApiUrl, normalizeApiEndpoint } from './api-url'
 import { customAuth } from './auth-service'
 import { fetchWithOfflineSupport } from './offline-store'
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
+  const normalizedEndpoint = normalizeApiEndpoint(endpoint)
   const headers = new Headers(options.headers)
   const hasBody = options.body !== undefined && options.body !== null
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
@@ -21,14 +22,14 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     }
   }
 
-  return fetchWithOfflineSupport(buildApiUrl(endpoint), {
+  return fetchWithOfflineSupport(buildApiUrl(normalizedEndpoint), {
     credentials: 'include',
     mode: 'cors',
     cache: 'no-store',
     ...options,
     headers,
   }, {
-    endpoint,
+    endpoint: normalizedEndpoint,
     tenantId: session?.user?.tenant_id,
     userId: session?.user?.id,
   })

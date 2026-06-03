@@ -167,6 +167,28 @@ const assert = (condition, message) => {
   assert(failed.response_status === 409, 'fallo HTTP debe persistir response_status')
   assert(failed.last_error.includes('conflict'), 'fallo debe persistir error del backend')
 
+  await mod.enqueueOfflineRequest({
+    endpoint: '/api/logical-fail',
+    method: 'POST',
+    url: 'http://api.test/api/logical-fail',
+    headers: [],
+    body: '{}',
+    tenant_id: null,
+    user_id: null,
+  })
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: false, message: 'fallo logico' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+  const logicalFailedResult = await mod.syncOfflineQueue()
+  assert(
+    logicalFailedResult.some((item) => item.ok === false && item.status === 200 && item.error.includes('fallo logico')),
+    'HTTP 200 con success=false debe reportar fallo logico',
+  )
+  queue = await mod.listOfflineRequests()
+  const logicalFailed = queue.find((item) => item.endpoint === '/api/logical-fail')
+  assert(logicalFailed.status === 'failed' && logicalFailed.response_status === 200, 'fallo logico debe persistirse como failed')
+
   online = false
   mod.invalidateOfflineModeCache()
   const formData = new FormData()
@@ -185,6 +207,21 @@ const assert = (condition, message) => {
   const upload = queue.find((item) => item.endpoint === '/api/documentos/upload')
   assert(upload.body.includes('__erp_offline_formdata'), 'FormData debe serializarse para sync')
 
+  let binaryRejected = false
+  try {
+    await mod.fetchWithOfflineSupport(
+      'http://api.test/api/binario',
+      {
+        method: 'POST',
+        body: new ArrayBuffer(8),
+      },
+      { endpoint: '/api/binario' },
+    )
+  } catch {
+    binaryRejected = true
+  }
+  assert(binaryRejected, 'body binario no serializable no debe entrar en cola offline')
+
   const deferredValidation = await mod.fetchWithOfflineSupport(
     'http://api.test/api/documentos/validar-documento',
     {
@@ -195,10 +232,19 @@ const assert = (condition, message) => {
     { endpoint: '/api/documentos/validar-documento' },
   )
   assert(deferredValidation.headers.get('x-erp-validation-deferred') === 'true', 'validacion externa offline debe diferirse')
-  assert((await deferredValidation.json()).data.valido === true, 'validacion de documento offline debe permitir continuar provisionalmente')
+  const deferredPayload = await deferredValidation.json()
+  assert(deferredPayload.data.valido === true, 'validacion de documento offline debe permitir continuar provisionalmente')
+  assert(deferredPayload.data.offline_validation_queue_id, 'validacion diferida debe guardar id de cola')
+  queue = await mod.listOfflineRequests()
+  const validationQueueItem = queue.find((item) => item.id === deferredPayload.data.offline_validation_queue_id)
+  assert(validationQueueItem?.endpoint === '/api/documentos/validar-documento', 'validacion diferida debe quedar en outbox')
+  assert(
+    validationQueueItem.headers.some((header) => header.name === 'x-erp-local-entity-type' && header.value === 'external_validation'),
+    'validacion diferida debe marcar tipo de entidad local',
+  )
 
   const status = await mod.getOfflineStatus()
-  assert(status.total === 3 && status.synced === 1 && status.failed === 1 && status.pending === 1, 'status debe contar synced/failed/pending')
+  assert(status.total === 5 && status.synced === 1 && status.failed === 2 && status.pending === 2, 'status debe contar synced/failed/pending')
 
   window.__TAURI__ = {}
   online = false
@@ -217,6 +263,10 @@ const assert = (condition, message) => {
           '/api/ventas/cotizaciones',
           '/api/ventas/pedidos',
           '/api/rrhh/empleados',
+          '/api/cajas/movimientos/active-session',
+          '/api/cajas/saldo-esperado/active-session',
+          '/api/pos/detalles-venta/local-sale-1',
+          '/api/paises/usuario/configuracion',
         ].includes(args.endpoint),
         'GET local-first debe pedir endpoint soportado',
       )
@@ -235,6 +285,13 @@ const assert = (condition, message) => {
           '/api/ventas/cotizaciones',
           '/api/ventas/pedidos',
           '/api/rrhh/empleados',
+          '/api/finanzas/tesoreria/lote',
+          '/api/cajas/movimientos/manual/active-session',
+          '/api/cajas/retiros/active-session',
+          '/api/cajas/cambio-turno/iniciar/active-session',
+          '/api/cajas/cambio-turno/completar/local-shift-change-1',
+          '/api/notifications/mark-all-read',
+          '/api/paises/usuario/configuracion',
         ].includes(args.request.endpoint),
         'escritura debe procesarse local-first',
       )
@@ -368,6 +425,53 @@ const assert = (condition, message) => {
     { endpoint: '/api/rrhh/empleados' },
   )
   assert((await localGenericCreate.json()).data.sync_status === 'pending', 'modulo generico offline debe quedar pending')
+
+  const localCashMovement = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/cajas/movimientos/manual/active-session',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'INGRESO', monto: 15, motivo: 'Ajuste local' }),
+    },
+    { endpoint: '/api/cajas/movimientos/manual/active-session' },
+  )
+  assert((await localCashMovement.json()).data.sync_status === 'pending', 'movimiento de caja offline debe quedar pending')
+
+  const localCashBalance = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/cajas/saldo-esperado/active-session',
+    { method: 'GET' },
+    { endpoint: '/api/cajas/saldo-esperado/active-session' },
+  )
+  assert(localCashBalance.headers.get('x-erp-local-first') === 'true', 'saldo esperado offline debe leer SQLite')
+
+  const localTreasuryBatch = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/finanzas/tesoreria/lote',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pagos: [{ cxp_id: 'cxp-1', monto: 10 }], cuenta_bancaria_id: 'bank-1' }),
+    },
+    { endpoint: '/api/finanzas/tesoreria/lote' },
+  )
+  assert((await localTreasuryBatch.json()).data.sync_status === 'pending', 'lote de tesoreria offline debe quedar pending')
+
+  const localNotificationsRead = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/notifications/mark-all-read',
+    { method: 'PUT' },
+    { endpoint: '/api/notifications/mark-all-read' },
+  )
+  assert((await localNotificationsRead.json()).data.sync_status === 'pending', 'notificaciones offline deben quedar pending')
+
+  const localCountryConfig = await mod.fetchWithOfflineSupport(
+    'http://api.test/api/paises/usuario/configuracion',
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pais_preferido_id: 1 }),
+    },
+    { endpoint: '/api/paises/usuario/configuracion' },
+  )
+  assert((await localCountryConfig.json()).data.sync_status === 'pending', 'preferencia de pais offline debe quedar pending')
 
   const localPdf = await mod.fetchWithOfflineSupport(
     'http://api.test/api/reportes/pdf',
