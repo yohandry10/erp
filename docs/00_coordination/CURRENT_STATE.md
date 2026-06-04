@@ -1,22 +1,34 @@
 # Estado Actual del ERP
 
-Fecha de actualizacion: 2026-06-01 (cierre codigo pre-prod: migracion 341 aplicada DEV/PROD, dependencias limpias, Redis sin default debil)
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `estado_vivo`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
 
-Este documento es la entrada canonica para recuperar contexto al iniciar una sesion nueva. No reemplaza las auditorias, manuales ni reportes; solo indica que leer primero y cual es la linea vigente.
+Fecha de actualizacion: 2026-06-04 (cierre codigo pre-prod: migracion 341 aplicada DEV/PROD, dependencias limpias, Redis sin default debil; desktop offline-first revalidado; navegacion documental consolidada)
+
+Este documento es la fuente canonica de estado vivo. La primera lectura de una sesion nueva es `docs/START_HERE.md`, que explica el orden de lectura, jerarquia documental y rutas por tarea. Este archivo no reemplaza las auditorias, manuales ni reportes; fija la linea vigente.
 
 ## Lectura obligatoria al iniciar
 
-1. `docs/00_coordination/CURRENT_STATE.md`
-2. `docs/00_coordination/FLOW_STATUS.md`
-3. `docs/db_rebuild_status.md`
-4. `docs/production-readiness/ERP_PRODUCTION_READINESS.md`
-5. `docs/CODEX_HANDOFF_2026-05-24.md`
+1. `docs/START_HERE.md`
+2. `docs/00_coordination/CURRENT_STATE.md`
+3. `docs/00_coordination/FLOW_STATUS.md`
+4. `docs/00_coordination/AGENT_SYNC.md`
+5. `docs/DOC_NAVIGATION_MANIFEST.md` si la tarea requiere revisar documentacion o decidir fuentes.
+6. Documento fuente del dominio que vas a tocar, segun `docs/START_HERE.md`.
 
 Si la sesion toca base de datos, tambien consultar los artefactos baseline listados en `AGENTS.md` antes de borrar, reconstruir o aplicar migraciones.
 
 ## Estado ejecutivo
 
 - ERP listo a nivel de codigo core para candidato de produccion: type-check monorepo OK, pruebas focales criticas OK, audit prod npm limpio, migraciones `337..341` aplicadas/verificadas en DEV y PROD. No declarar produccion real absoluta sin certificado SUNAT/OSE productivo, secretos productivos finales, email real si aplica y smoke externo autorizado.
+- Desktop/Tauri queda listo a nivel de codigo para operar offline-first en los flujos controlables por codigo: SQLite local por tenant, outbox durable, snapshots/cache binario por tenant, escrituras genericas local-first para modulos restantes, fiscal local con correlativos por tenant, SIRE local filtrado por tenant, DPAPI/redaccion de secretos locales y runtime sin shell capability. Verificado el 2026-06-03 con `tauri:build`, `test:offline`, type-check web/backend, `cargo check` y `git diff --check`. Siguen fuera del codigo: primera autenticacion sin sesion previa, certificado/credenciales SUNAT/OSE productivos, CDR/aceptacion externa y smoke con API real desde el `.exe`.
 - Readiness base: Gate 21/22 documentado al 2026-05-16 en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
 - Despues del corte de readiness existen auditorias forenses y migraciones posteriores. El head documental actual debe considerar `327..341`.
 - Auditoria multiusuario/performance aplicada el 2026-05-26: retries frontend no idempotentes desactivados para escrituras, polling visible/sin solapes, banners de configuracion cacheados, workers cron protegidos con locks distribuidos y banderas de apagado para pruebas read-only. Prueba autenticada read-only contra API local + Supabase real: 589/589 OK, 0 errores, 0 HTTP 429/5xx, p95 1490 ms, p99 1956 ms. Se corrigio `GET /api/finanzas/cxp?limit=10&page=1` para aceptar paginacion. Outbox remoto quedo limpio: `completed=3985`, `pending=0`, `processing=0`, `failed=0`, `dead_letter=0`.
@@ -33,7 +45,7 @@ Si la sesion toca base de datos, tambien consultar los artefactos baseline lista
 - **H-002 (facturar pedido) — RECLASIFICADO a "ya resiliente, no requiere RPC" tras verificación en código (2026-05-27)**: `generarFactura` ejecuta el CPE PRIMERO (`cpeIdempotencyKey`, idempotente) y el descuento de stock DESPUÉS, con guard de idempotencia en `aplicarSalidaStockFacturacionSimplificada` (verifica movimiento SALIDA existente por PEDIDO+producto antes de descontar, línea ~1828) usando la RPC atómica `descontar_stock_y_liberar_reserva`. Los UPDATEs de pedido/detalles son idempotentes en efecto. Un reintento converge (CPE reutilizado → stock skip → pedido actualizado). Una RPC SQL monolítica es **imposible** (el CPE es I/O externo SOAP/firma a SUNAT, no puede correr dentro de una transacción Postgres) e **innecesaria** (el flujo ya es un saga idempotente convergente). El riesgo original de la auditoría ("stock descontado sin factura") está mitigado por el orden CPE-primero + idempotencia. No se agrega RPC.
 - **H-003 (confirmar pedido) — CERRADO 2026-05-27**: nueva migración `339__reservar_pedido_stock_transaccional.sql` con RPC `reservar_pedido_stock_tx(p_pedido_id, p_tenant_id)`. Reserva el stock de TODOS los items del pedido en una sola transacción reusando `reservar_stock_atomico` por item; si un item no tiene stock, la excepción aborta el statement y Postgres hace ROLLBACK total (libera las reservas ya creadas automáticamente) — elimina el rollback manual frágil que podía dejar el pedido CONFIRMADO con reserva parcial. Idempotente: si ya hay reservas para el pedido, retorna `skipped=true`. `pedidos.service.ts:confirmarPedido` refactorizado: reemplaza el bloque loop+rollback-manual (~80 líneas) por una llamada a la RPC, preservando la semántica de `saltarReserva` (ahora = `reservaResult.skipped`) para el revert best-effort posterior. Verificación: migración aplicada a DEV; smoke SQL real en 3 escenarios — (1) stock insuficiente en item 2 → excepción + 0 reservas en item 1 (rollback total OK, sin reserva parcial), (2) stock suficiente → ambos reservados + 2 movimientos, (3) idempotencia → 2da llamada skipped sin duplicar. tsc limpio; suite backend 991/992 (único fallo `cpe-integration.verify.spec.ts` pre-existente). Migración 339 aplicada a DEV **y PROD** (PROD verificado 2026-05-29: `reservar_pedido_stock_tx` presente, EXECUTE solo `service_role`).
 - **Fase 1B COMPLETA**: C-004 (recepción, mig 338) + H-003 (confirmar pedido, mig 339) con RPC transaccional; H-002 (facturar) como saga idempotente reforzada. Migración `341__transactional_idempotency_coverage_hardening.sql` aplicada y verificada en DEV y PROD el 2026-06-01: `cerrar_recepcion_tx` ahora valida idempotencia por `recepcion_item_id`; `reservar_pedido_stock_tx` valida cobertura completa por `pedido_detalle_id`; ambas RPC mantienen EXECUTE solo para `service_role` (`anon=false`, `authenticated=false`, `service_role=true`). Además `stock.movimiento` se persiste con `eventId/idempotencyKey` determinísticos y H-002 repara `cantidad_facturada` en reintentos con `factura_id`.
-- Auditoria forense full-scope adicional 2026-05-26 anexada al prompt `SISTEM-ANALITICS-COMPLETED.md` (raiz del repo): mapa del sistema, hallazgos por severidad post-triage, matriz de integracion modulo-a-modulo, checklist preproduccion y 15 falsos positivos descartados con evidencia (`.env` NO esta en git, axios 1.16 no es vulnerable, Stripe SI valida HMAC, indices CxC/CxP SI existen, etc.). El complemento 2026-06-01 deja C-004/H-002/H-003 cerrados o mitigados con pruebas.
+- Auditoria forense full-scope adicional 2026-05-26 en `docs/audits/2026-05-26-system-analytics-completed.md`: mapa del sistema, hallazgos por severidad post-triage, matriz de integracion modulo-a-modulo, checklist preproduccion y 15 falsos positivos descartados con evidencia (`.env` NO esta en git, axios 1.16 no es vulnerable, Stripe SI valida HMAC, indices CxC/CxP SI existen, etc.). El complemento 2026-06-01 deja C-004/H-002/H-003 cerrados o mitigados con pruebas.
 - **Auditoria de seguridad 2026-05-29 (rama `codex/accounting-production-closure`, diff completo vs `main`; foco auth/RLS/RPC SECURITY DEFINER):**
   - **H-1 (cross-tenant via RPC directa) — CERRADO:** `334` concedio `registrar_cxc_pago_tx`, `conciliar_movimientos_bancarios_tx` y `validar_tesoreria_caja_bancos_runtime` a `authenticated`; las 3 son `SECURITY DEFINER` y confian en el `p_tenant_id` del caller sin contrastarlo con `app.current_tenant_id()`. Pre-estado PROD confirmaba `authenticated=EXECUTE` (exposicion real explotable por RPC PostgREST directa). Cerrado con nueva migracion `340__securitydefiner_rpc_grant_hardening.sql`: `REVOKE` de `PUBLIC/anon/authenticated` + `GRANT` solo a `service_role` (alineado con 337/338/339). El backend ya invoca las 4 con `service_role`, no se rompe ningun flujo.
   - **H-2 (menor) — CERRADO:** `descontar_stock_y_liberar_reserva` (333/335) quedo `SECURITY DEFINER` sin GRANT explicito; pre-estado PROD ya tenia `authenticated=false` (defaults de Supabase revocan PUBLIC), exposicion practica nula. La `340` lo hace explicito/consistente. No deriva de `p_tenant_id` (toma el tenant del producto).
@@ -89,7 +101,9 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 
 | Tema | Fuente primaria | Notas |
 |---|---|---|
-| Estado actual y siguiente sesion | `docs/00_coordination/CURRENT_STATE.md` | Entrada obligatoria |
+| Primera lectura y navegacion | `docs/START_HERE.md` | Orden de lectura, jerarquia documental y rutas por tarea |
+| Mapa completo documental | `docs/DOC_NAVIGATION_MANIFEST.md` | Cataloga Markdown y artefactos CSV/TXT/JSON; cada Markdown tiene cabecera `DOC-NAV` |
+| Estado actual y siguiente sesion | `docs/00_coordination/CURRENT_STATE.md` | Fuente viva despues de `START_HERE.md` |
 | Estado por flujo | `docs/00_coordination/FLOW_STATUS.md` | Matriz de cierre y pendientes |
 | Reconstruccion BD base | `docs/db_rebuild_status.md` | Historico `000..305`; no usar solo para produccion |
 | Readiness local/sandbox | `docs/production-readiness/ERP_PRODUCTION_READINESS.md` | Gate 21/22 y decision de no produccion real absoluta |
@@ -103,7 +117,7 @@ Get-ChildItem -Path supabase\migrations -Filter *.sql |
 | Tesoreria/caja/bancos/CxC/CxP | `docs/auditoria_forense_tesoreria_caja_bancos_cxc_cxp_2026-05.md` | Cierre `334` |
 | Operacion Supabase | `docs/ops/supabase-connection.md` | Aplicacion manual por `psql` y notas remotas |
 | Seguridad/rutas | `docs/security/route-access-matrix.md` | Matriz vigente de autorizacion por endpoint |
-| Docs historicas | `docs/DOCUMENTATION_QUARANTINE.md` y `x_doc/` | Consultar como contexto, no como verdad unica |
+| Docs historicas | `docs/DOCUMENTATION_QUARANTINE.md` y `docs/archive/` | Consultar como contexto, no como verdad unica |
 
 ## Pendientes reales
 
@@ -162,13 +176,15 @@ Conclusion: las 332 migraciones forman una linea canonica reproducible sobre Pos
 ## Protocolo de nueva sesion
 
 1. Ejecutar `git status --short`.
-2. Leer `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`.
-3. Verificar duplicados de prefijo en `supabase/migrations`.
-4. Si se toca BD, leer baseline forense y plan de reconstruccion antes de cualquier cambio.
-5. Si se toca inventario, revisar `333__inventory_stock_reconciliation_hardening.sql`, `335__descontar_stock_authoritative.sql` y la auditoria de inventario.
-6. Si se toca tesoreria/caja/bancos/CxC/CxP, revisar `334__treasury_cash_bank_forensic_closure.sql` y el handoff.
-7. Si se toca produccion/release, revisar readiness, production checklist y ops Supabase.
-8. No usar manuales de modulo como estado final sin contrastar con auditorias de mayo 2026 y este archivo.
+2. Leer `docs/START_HERE.md`.
+3. Leer `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md` y `docs/00_coordination/AGENT_SYNC.md`.
+4. Leer `docs/DOC_NAVIGATION_MANIFEST.md` si la tarea toca documentacion, auditorias o seleccion de fuentes.
+5. Verificar duplicados de prefijo en `supabase/migrations` antes de tocar BD.
+6. Si se toca BD, leer baseline forense y plan de reconstruccion antes de cualquier cambio.
+7. Si se toca inventario, revisar `333__inventory_stock_reconciliation_hardening.sql`, `335__descontar_stock_authoritative.sql` y la auditoria de inventario.
+8. Si se toca tesoreria/caja/bancos/CxC/CxP, revisar `334__treasury_cash_bank_forensic_closure.sql` y el handoff.
+9. Si se toca produccion/release, revisar readiness, production checklist y ops Supabase.
+10. No usar manuales de modulo como estado final sin contrastar con auditorias de mayo 2026 y este archivo.
 
 ## Protocolo de cierre de tarea
 
@@ -177,4 +193,5 @@ Antes de responder como terminado:
 1. Revisar si la tarea cambio estado global, estado de flujo, migraciones, riesgos, pendientes o navegacion documental.
 2. Si hubo cambio, actualizar `docs/00_coordination/CURRENT_STATE.md` y/o `docs/00_coordination/FLOW_STATUS.md`.
 3. Actualizar tambien el documento fuente del flujo afectado.
-4. No tocar estos archivos si la tarea fue local y no cambia estado ni contexto compartido.
+4. Actualizar `docs/START_HERE.md` si cambia el resumen ejecutivo, jerarquia documental o rutas de lectura.
+5. No tocar estos archivos si la tarea fue local y no cambia estado ni contexto compartido.

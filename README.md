@@ -1,5 +1,15 @@
 # 🏢 ERP Suite - Sistema Empresarial Completo
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `indice_vigente`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
@@ -11,6 +21,7 @@
 
 **Sistema ERP empresarial multi-tenant con facturación electrónica SUNAT/OSE, gestión comercial, inventarios, finanzas y contabilidad automatizada.**
 
+[Primera lectura para cualquier sesion](docs/START_HERE.md) •
 [📚 Documentación](#-documentación) •
 [🚀 Inicio Rápido](#-inicio-rápido) •
 [🏗️ Arquitectura](#️-arquitectura) •
@@ -871,8 +882,8 @@ pnpm k8s:deploy
 
 | Documento | Descripción |
 |-----------|-------------|
-| [x_doc/PROJECT_STATUS.md](x_doc/PROJECT_STATUS.md) | Estado operativo histórico de estabilización, gates ejecutados, riesgos y bloqueantes |
-| [x_doc/PROJECT_REVIEW_INDEX.md](x_doc/PROJECT_REVIEW_INDEX.md) | Índice maestro histórico de revisión exhaustiva por rondas |
+| [docs/archive/session_history_legacy/PROJECT_STATUS.md](docs/archive/session_history_legacy/PROJECT_STATUS.md) | Estado operativo histórico de estabilización, gates ejecutados, riesgos y bloqueantes |
+| [docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md](docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md) | Índice maestro histórico de revisión exhaustiva por rondas |
 | [docs/CODEX_HANDOFF_2026-05-24.md](docs/CODEX_HANDOFF_2026-05-24.md) | Handoff más reciente de tesorería/caja/bancos/CxC/CxP |
 | [docs/db_rebuild_status.md](docs/db_rebuild_status.md) | Fuente base histórica de reconstrucción BD `000..305` |
 | [docs/DOCUMENTATION_QUARANTINE.md](docs/DOCUMENTATION_QUARANTINE.md) | Clasificación de docs/artefactos obsoletos antes de borrar |

@@ -1,5 +1,15 @@
 # Auditoria Forense Inventario, Logistica, Kardex y Costeo
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `auditoria_forense`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Fecha de ejecucion: 2026-05-23
 Zona horaria: America/Lima
 Alcance: responder las 20 preguntas solicitadas sobre recepciones, devoluciones, ventas, POS, GRE, RMA, kardex, stock, costeo, contabilidad y auditoria.

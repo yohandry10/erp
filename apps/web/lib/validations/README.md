@@ -1,5 +1,15 @@
 # Validaciones del Módulo de Ventas
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este directorio contiene todas las validaciones y reglas de negocio para el módulo de ventas del sistema ERP.
 
 ## Archivos
@@ -155,7 +165,7 @@ Badge que muestra el conteo de ítems con código de colores.
 Muestra advertencia cuando una boleta sin RUC requiere GRE.
 
 ```tsx
-<BoletaGREWarning 
+<BoletaGREWarning
   documentoTipo={cliente.documento_tipo}
   total={pedido.total}
 />
@@ -165,7 +175,7 @@ Muestra advertencia cuando una boleta sin RUC requiere GRE.
 Badge que indica si se requiere GRE.
 
 ```tsx
-<GRERequirementBadge 
+<GRERequirementBadge
   documentoTipo={cliente.documento_tipo}
   total={pedido.total}
 />

@@ -1,5 +1,15 @@
 # Configuración de entorno – apps/erp-api
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `documento_general`.
+>
+> Leer tambien: `docs/README.md`, `docs/START_HERE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este documento describe las variables usadas por el backend NestJS.
 Todas las variables sensibles se validan con `joi` mediante `apps/erp-api/src/config/env.schema.ts`.
 
@@ -33,7 +43,7 @@ Las siguientes variables son requeridas en entornos fuera de `NODE_ENV=test`:
 
 ## Variables de firma fiscal (opcional, pero consistentes)
 
-- `PFX_PATH` y `PFX_PASS` (se deben definir juntas).  
+- `PFX_PATH` y `PFX_PASS` (se deben definir juntas).
   Se usan como fallback global de firma para CPE/RA cuando el tenant no tiene certificado configurado.
 
 ## Variables de runtime

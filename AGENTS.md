@@ -1,9 +1,43 @@
 # AGENTS.md
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `documento_general`.
+>
+> Leer tambien: `docs/README.md`, `docs/START_HERE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 - Responde en espanol por defecto.
 - Usa `rg` para buscar archivos o texto cuando sea posible.
 - No uses comandos destructivos sin aprobacion explicita.
 - No reviertas cambios existentes que no hayas hecho.
+
+## Primera lectura obligatoria
+
+Antes de iniciar cualquier tarea, leer:
+
+1. `docs/START_HERE.md`
+2. `docs/00_coordination/CURRENT_STATE.md`
+3. `docs/00_coordination/FLOW_STATUS.md`
+4. `docs/00_coordination/AGENT_SYNC.md`
+5. `docs/DOC_NAVIGATION_MANIFEST.md` cuando la tarea toque documentacion, auditorias o seleccion de fuentes
+
+`AGENTS.md` conserva reglas operativas y baseline DB; no reemplaza el estado vivo. Si este archivo contradice `docs/START_HERE.md` o `docs/00_coordination/*`, prevalecen esos documentos salvo en la lista obligatoria de artefactos DB antes de borrar/reconstruir.
+
+## Regla antes de codificar
+
+Antes de escribir codigo, crear migraciones, cambiar tests o auditar un modulo:
+
+1. Ubicar el dominio en `docs/DOC_NAVIGATION_MANIFEST.md`.
+2. Leer el documento fuente y sus `Leer tambien`.
+3. Revisar `docs/00_coordination/FLOW_STATUS.md` para saber si el flujo ya esta cerrado o si falta algo externo.
+4. Buscar en la doc con `rg` para no duplicar analisis o reimplementar algo ya resuelto.
+5. Recién despues buscar en codigo y modificar.
+
+Si una auditoria historica contradice la doc canonica, no asumir que la auditoria sigue vigente. Verificar en codigo y migraciones actuales.
 
 ## Baseline BD pre-reconstruccion (obligatorio consultar)
 

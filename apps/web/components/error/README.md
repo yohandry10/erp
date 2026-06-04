@@ -1,5 +1,15 @@
 # Sistema de Manejo de Errores Consistente
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este módulo implementa un sistema completo y consistente de manejo de errores para toda la aplicación ERP.
 
 ## Componentes
@@ -163,7 +173,7 @@ export default function MiFormulario() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     await executeWithErrorHandling(
       async () => {
         const response = await fetch('/api/save', {
@@ -171,12 +181,12 @@ export default function MiFormulario() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData),
         })
-        
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           throw new Error(errorData.message || 'Error al guardar')
         }
-        
+
         return response.json()
       },
       {
@@ -234,12 +244,12 @@ El sistema usa CSS inline y clases globales de `globals.css`. Los estilos son co
 
 ## Características
 
-✅ **Consistente:** Todos los errores se muestran con el mismo estilo  
-✅ **Accesible:** Incluye iconos y texto descriptivo  
-✅ **Desarrollo:** Muestra detalles técnicos solo en modo desarrollo  
-✅ **Flexible:** Múltiples variantes según el contexto  
-✅ **Integrado:** Error Boundary global captura errores no manejados  
-✅ **Type-safe:** Completamente tipado con TypeScript  
+✅ **Consistente:** Todos los errores se muestran con el mismo estilo
+✅ **Accesible:** Incluye iconos y texto descriptivo
+✅ **Desarrollo:** Muestra detalles técnicos solo en modo desarrollo
+✅ **Flexible:** Múltiples variantes según el contexto
+✅ **Integrado:** Error Boundary global captura errores no manejados
+✅ **Type-safe:** Completamente tipado con TypeScript
 
 ## Próximos Pasos
 
@@ -247,4 +257,3 @@ El sistema usa CSS inline y clases globales de `globals.css`. Los estilos son co
 2. Agregar logging de errores a servicio de monitoreo (opcional)
 3. Crear variantes adicionales si es necesario
 4. Documentar patrones específicos por módulo
-

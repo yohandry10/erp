@@ -1,5 +1,15 @@
 # 🖥️ ERP Suite Desktop
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Aplicación desktop del sistema ERP tributario peruano construida con Tauri + Next.js.
 
 ## Estado vigente
@@ -14,6 +24,8 @@ La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo.
 - **Cliente nativo Tauri** para operar contra el API del ERP.
 - **Configuración local mínima** para preferencias desktop; no reemplaza la configuración fiscal del backend.
 - **Certificados y credenciales fiscales**: se gestionan en el backend/wizard del ERP.
+- **Secreto fiscal local protegido**: si el desktop conserva una contraseña de certificado en `config.json`, en Windows se guarda con DPAPI y los backups la redactan.
+- **Superficie Tauri reducida**: el runtime desktop no expone `tauri-plugin-shell` ni capability `shell:default`.
 - **POS + caja local-first** en SQLite desktop para operar ventas, apertura y cierre sin red sobre datos sincronizados.
 - **Clientes e inventario base local-first**: clientes, productos, almacenes/movimientos por snapshot y alta/edición/eliminación local de clientes/productos con sincronización posterior.
 - **Ventas comerciales local-first**: cotizaciones y pedidos se pueden listar, consultar, crear, editar y eliminar localmente; los pedidos reservan stock local y quedan pendientes de sincronización.
@@ -23,8 +35,8 @@ La base autoritativa final y la respuesta SUNAT/OSE viven fuera del dispositivo.
 - **Paquete fiscal local**: ventas POS offline generan documento fiscal local con XML, hash, PDF base64, correlativo local y estado `PENDIENTE_ENVIO` cuando la configuración fiscal local está completa.
 - **Adjuntos offline**: las cargas `FormData` serializables se guardan en cola con archivos en base64 y se reconstruyen al sincronizar.
 - **Sesión y permisos offline**: desktop conserva snapshot local de sesión y permisos para operar sin consultar `/auth/profile` o RBAC remoto mientras no haya red.
-- **Outbox offline durable** en SQLite desktop para operaciones pendientes de otros módulos.
-- **Cache local de lecturas** para que pantallas ya visitadas puedan consultarse sin red.
+- **Outbox offline durable por tenant** en SQLite desktop para operaciones pendientes de otros módulos.
+- **Cache local de lecturas por tenant** para que pantallas ya visitadas puedan consultarse sin red sin mezclar empresas.
 - **Navegación entre módulos optimizada**: el sidebar limita el prefetch inicial y mantiene prefetch bajo intención de usuario.
 
 ### 📄 Procesamiento de Documentos
@@ -167,7 +179,7 @@ apps/web/
 
 ### Base de Datos
 - `backup_database(backupPath)` - Exporta backup JSON de configuración desktop y cola offline; la BD autoritativa sigue en backend/BD.
-- `export_sire_data(periodo)` - Exporta datos fiscales locales del desktop para continuidad offline; la presentación/validación oficial queda para backend/SUNAT.
+- `export_sire_data(periodo, tenantId?)` - Exporta datos fiscales locales del desktop para continuidad offline; la presentación/validación oficial queda para backend/SUNAT.
 
 ## Modo Offline
 
@@ -187,6 +199,7 @@ El modo offline tiene dos niveles:
 - Al reconectar, la cola se puede sincronizar contra el backend API real vigente en `NEXT_PUBLIC_API_URL`.
 - `pnpm run test:offline` verifica cache de lectura, cache binario, cola de escritura, sincronización exitosa, fallo persistido, mapeos local-remoto y dispatch local-first POS/genérico.
 - La matriz de smoke desktop/static export del 2026-05-25 cubrio 108 rutas exportadas con API simulada: 108/108 OK.
+- La pasada de cierre del 2026-06-03 revalidó build Tauri, `test:offline`, type-check web/backend, `cargo check` y `git diff --check`. Además dejó el almacenamiento local, fiscales, binarios, SIRE y snapshots aislados por tenant.
 
 Restricciones deliberadas:
 
@@ -195,6 +208,7 @@ Restricciones deliberadas:
 - Las operaciones fiscales no obtienen CDR en offline; quedan pendientes hasta procesarse en backend.
 - Conflictos de negocio, correlativos y validaciones SUNAT/OSE se resuelven en backend al sincronizar.
 - La firma criptográfica SUNAT/OSE definitiva depende del certificado real del cliente y de la validación externa; el desktop deja el paquete local preparado y trazable.
+- La contraseña local del certificado no se considera respaldo autoritativo; el onboarding/backend siguen siendo la fuente de configuración fiscal productiva.
 - POS/caja offline es autoritativo solo para el dispositivo local hasta sincronizar. Si otro dispositivo vende el mismo stock offline, el backend debe conciliar conflictos al recibir la cola.
 - Clientes/productos/cotizaciones/pedidos y registros genéricos creados offline usan IDs locales temporales; al sincronizar se registra el mapeo local-remoto y el siguiente refresh hidrata el estado autoritativo.
 - En módulos genéricos, el registro local permite continuar la operación de UI, pero las reglas de negocio profundas, asientos definitivos, conciliaciones, permisos remotos y validaciones fiscales se confirman al sincronizar.

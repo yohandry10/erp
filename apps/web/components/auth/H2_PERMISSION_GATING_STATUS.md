@@ -1,5 +1,15 @@
 # H2: Verificación de Gating por Permisos en UI
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## ✅ Componentes con Protección de Permisos Implementada
 
 ### Componentes que ya usan `usePermission`:
@@ -67,4 +77,3 @@ Para componentes críticos que aún no tienen protección, usar `ProtectedCompon
 
 - ✅ H1: Flujo completo de password reset en frontend
 - ✅ H2: Verificación y adición de protección en componentes críticos de compras (aprobar/rechazar)
-

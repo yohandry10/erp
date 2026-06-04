@@ -1,5 +1,15 @@
 # Documentación Técnica Exhaustiva: Compras e Inventario
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `manual_modulo`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este documento detalla los flujos de abastecimiento, aprobación de compras, gestión de inventarios y logística del ERP.
 
 ---
@@ -122,18 +132,18 @@ async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string)
   this.validarPreciosNoNegativos(createDto.detalles);
   this.validarCantidadesMayorCero(createDto.detalles);
   this.validarFechaEntrega(createDto.fecha_entrega_esperada, createDto.fecha_orden);
-  
+
   // 2. Cálculo de totales con precisión decimal
   const totales = this.calcularTotales(createDto.detalles);
-  
+
   // 3. Evaluar si requiere aprobación
   const requiereAprobacion = await this.evaluarRequiereAprobacion(
     totales.total, tenantId
   );
-  
+
   // 4. Determinar estado inicial
   const estadoInicial = requiereAprobacion ? 'APROBACION' : 'PENDIENTE';
-  
+
   // 5. Persistir orden
   const orden = await this.ordenesRepository.create({
     ...createDto,
@@ -142,13 +152,13 @@ async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string)
     numero_orden: await this.generarNumeroOrden(tenantId),
     ...totales
   });
-  
+
   // 6. Si requiere aprobación, crear registros pendientes
   if (requiereAprobacion) {
     await this.crearAprobacionesPendientes(orden.id, tenantId, totales.total);
     await this.notificarAprobadores(orden.id, tenantId, totales.total);
   }
-  
+
   return orden;
 }
 ```
@@ -159,14 +169,14 @@ async create(createDto: CreateOrdenCompraDto, tenantId: string, userId?: string)
 ```typescript
 async evaluarRequiereAprobacion(total: number, tenantId: string): Promise<boolean> {
   const config = await this.obtenerConfiguracion(tenantId);
-  
+
   // Regla 1: Monto máximo sin aprobación
   if (config.monto_maximo_compra_sin_aprobacion) {
     if (total > config.monto_maximo_compra_sin_aprobacion) {
       return true;
     }
   }
-  
+
   // Regla 2: Presupuesto disponible (si aplica)
   if (config.control_presupuestal_habilitado) {
     const presupuestoDisponible = await this.verificarPresupuesto(tenantId);
@@ -174,7 +184,7 @@ async evaluarRequiereAprobacion(total: number, tenantId: string): Promise<boolea
       return true;
     }
   }
-  
+
   return false;
 }
 ```
@@ -183,10 +193,10 @@ async evaluarRequiereAprobacion(total: number, tenantId: string): Promise<boolea
 ```typescript
 async aprobar(id: string, aprobarDto: AprobarOrdenCompraDto, tenantId: string, userId?: string) {
   const orden = await this.findById(id, tenantId);
-  
+
   // Validar transición de estado
   this.validarTransicionEstadoOrden(orden.estado, 'APROBADA');
-  
+
   // Registrar aprobación
   await this.ocAprobacionesRepository.registrarAprobacion({
     orden_id: id,
@@ -195,16 +205,16 @@ async aprobar(id: string, aprobarDto: AprobarOrdenCompraDto, tenantId: string, u
     comentarios: aprobarDto.comentarios,
     fecha_decision: new Date()
   });
-  
+
   // Actualizar estado de la orden
   await this.ordenesRepository.update(id, { estado: 'APROBADA' });
-  
+
   // Emitir evento para integración con CxP y Contabilidad
   await this.emitirEventoOrdenAprobada(orden, tenantId, userId);
-  
+
   // Invalidar caché
   await this.cacheInvalidation.invalidate(`ordenes:${tenantId}`);
-  
+
   return this.findById(id, tenantId);
 }
 ```
@@ -230,19 +240,19 @@ async aprobar(id: string, aprobarDto: AprobarOrdenCompraDto, tenantId: string, u
 async cerrarRecepcion(recepcionId: string, tenantId: string, dto: CerrarRecepcionDto, userId?: string) {
   const recepcion = await this.obtenerRecepcionPorId(recepcionId, tenantId);
   const orden = await this.obtenerOrdenCompra(recepcion.orden_compra_id, tenantId);
-  
+
   // Validación: No recibir más de lo ordenado
   for (const item of recepcion.items) {
     const detalleOrden = orden.detalles.find(d => d.producto_id === item.producto_id);
     const totalRecibido = detalleOrden.cantidad_recibida + item.cantidad;
-    
+
     if (totalRecibido > detalleOrden.cantidad) {
       throw new BadRequestException(
         `Producto ${item.producto.nombre}: excede cantidad ordenada`
       );
     }
   }
-  
+
   // Registrar entrada de inventario (atómico)
   for (const item of recepcion.items) {
     await this.inventarioService.registrarEntradaStockAtomico({
@@ -257,17 +267,17 @@ async cerrarRecepcion(recepcionId: string, tenantId: string, dto: CerrarRecepcio
       fechaExpiracion: item.fecha_expiracion
     });
   }
-  
+
   // Actualizar cantidades recibidas en OC
   await this.actualizarCantidadesRecibidas(orden.id, recepcion.items);
-  
+
   // Actualizar estado de la orden
   await this.actualizarEstadoOrden(orden.id, tenantId);
-  
+
   // Emitir eventos para CxP y Contabilidad
   await this.emitirEventoRecepcionRegistrada(recepcion, orden, tenantId);
   await this.emitirEventoCompraEntregada(recepcion, orden, tenantId);
-  
+
   return this.marcarRecepcionCerrada(recepcionId);
 }
 ```
@@ -277,23 +287,23 @@ async cerrarRecepcion(recepcionId: string, tenantId: string, dto: CerrarRecepcio
 ```typescript
 async cancelar(id: string, cancelarDto: CancelarOrdenCompraDto, tenantId: string, userId?: string) {
   const orden = await this.findById(id, tenantId);
-  
+
   // Verificar recepciones activas
   const recepcionesActivas = await this.findRecepcionesByOrdenId(id, tenantId);
   const tieneRecepcionesEnCurso = recepcionesActivas.some(r => r.estado !== 'CERRADA');
   const tieneRecepcionesCerradas = recepcionesActivas.some(r => r.estado === 'CERRADA');
-  
+
   if (tieneRecepcionesEnCurso) {
     throw new BadRequestException('No se puede cancelar: tiene recepciones en curso');
   }
-  
+
   if (tieneRecepcionesCerradas) {
     if (!cancelarDto.permitir_cancelar_con_recepciones_cerradas) {
       throw new BadRequestException(
         'Orden tiene recepciones cerradas. Use flag permitir_cancelar_con_recepciones_cerradas'
       );
     }
-    
+
     // Revertir recepciones cerradas (devolver stock, revertir CxP)
     await this.revertirRecepcionesCerradasAntesDeCancelar({
       ordenId: id,
@@ -303,7 +313,7 @@ async cancelar(id: string, cancelarDto: CancelarOrdenCompraDto, tenantId: string
       userId
     });
   }
-  
+
   // Cancelar orden
   return this.ordenesRepository.update(id, {
     estado: 'ANULADA',
@@ -380,9 +390,9 @@ async registrarEntradaStockAtomico(params: MovimientoAlmacenParams): Promise<str
     p_fecha_expiracion: params.fechaExpiracion,
     p_notas: params.notas
   });
-  
+
   if (error) throw new BadRequestException(error.message);
-  
+
   // Verificar que el stock se actualizó correctamente
   const verificacion = await this.verificarStockActualizado(
     params.productoId,
@@ -391,11 +401,11 @@ async registrarEntradaStockAtomico(params: MovimientoAlmacenParams): Promise<str
     params.cantidad,
     params.tenantId
   );
-  
+
   if (!verificacion.stockActualizado) {
     throw new Error(`Stock no actualizado: ${verificacion.error}`);
   }
-  
+
   return data.movimiento_id;
 }
 ```
@@ -422,27 +432,27 @@ BEGIN
   -- Bloquear fila para evitar race conditions
   SELECT stock_actual INTO v_stock_anterior
   FROM producto_existencias
-  WHERE tenant_id = p_tenant_id 
-    AND producto_id = p_producto_id 
+  WHERE tenant_id = p_tenant_id
+    AND producto_id = p_producto_id
     AND almacen_id = p_almacen_id
   FOR UPDATE;
-  
+
   -- Si no existe, crear registro
   IF v_stock_anterior IS NULL THEN
     v_stock_anterior := 0;
     INSERT INTO producto_existencias (tenant_id, producto_id, almacen_id, stock_actual)
     VALUES (p_tenant_id, p_producto_id, p_almacen_id, 0);
   END IF;
-  
+
   v_stock_nuevo := v_stock_anterior + p_cantidad;
-  
+
   -- Actualizar stock
   UPDATE producto_existencias
   SET stock_actual = v_stock_nuevo, updated_at = NOW()
-  WHERE tenant_id = p_tenant_id 
-    AND producto_id = p_producto_id 
+  WHERE tenant_id = p_tenant_id
+    AND producto_id = p_producto_id
     AND almacen_id = p_almacen_id;
-  
+
   -- Crear movimiento
   INSERT INTO movimientos_inventario (
     tenant_id, producto_id, almacen_id, tipo, cantidad,
@@ -453,7 +463,7 @@ BEGIN
     v_stock_anterior, v_stock_nuevo,
     p_referencia_tipo, p_referencia_id, p_lote, p_fecha_expiracion, p_notas
   ) RETURNING id INTO v_movimiento_id;
-  
+
   RETURN QUERY SELECT v_movimiento_id, v_stock_anterior, v_stock_nuevo;
 END;
 $$;
@@ -477,7 +487,7 @@ async reservarStock(
       `Stock insuficiente. Disponible: ${disponible}, Solicitado: ${cantidad}`
     );
   }
-  
+
   // Incrementar stock_reservado (atómico)
   const { data, error } = await this.supabase.rpc('reservar_stock', {
     p_tenant_id: tenant_id,
@@ -486,9 +496,9 @@ async reservarStock(
     p_referencia_tipo: referencia_tipo,
     p_referencia_id: referencia_id
   });
-  
+
   if (error) throw new BadRequestException(error.message);
-  
+
   // Crear movimiento tipo RESERVA
   return this.crearMovimiento({
     tenant_id,
@@ -516,7 +526,7 @@ async liberarReserva(
     p_producto_id: producto_id,
     p_cantidad: cantidad
   });
-  
+
   // Crear movimiento tipo LIBERACION
   return this.crearMovimiento({
     tenant_id,
@@ -544,7 +554,7 @@ async descontarStock(
   if (existencias.stock_actual < cantidad) {
     throw new BadRequestException('Stock insuficiente para despacho');
   }
-  
+
   // 2. Decrementar stock_actual y stock_reservado (si aplica)
   const { error } = await this.supabase.rpc('descontar_stock', {
     p_tenant_id: tenant_id,
@@ -552,9 +562,9 @@ async descontarStock(
     p_cantidad: cantidad,
     p_liberar_reserva: true // También libera la reserva correspondiente
   });
-  
+
   if (error) throw new BadRequestException(error.message);
-  
+
   // 3. Crear movimiento tipo SALIDA
   const movimientoId = await this.crearMovimiento({
     tenant_id,
@@ -564,7 +574,7 @@ async descontarStock(
     referencia_tipo,
     referencia_id
   });
-  
+
   // 4. Emitir evento para contabilidad (Costo de Ventas)
   await this.eventBus.emit('inventario.movimiento', {
     tipo: 'SALIDA',
@@ -573,7 +583,7 @@ async descontarStock(
     costo_unitario: existencias.costo_promedio,
     tenant_id
   });
-  
+
   return movimientoId;
 }
 ```
@@ -600,11 +610,11 @@ async verificarStockActualizado(
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  
+
   if (!movimiento) {
     return { stockActualizado: false, error: 'Movimiento no encontrado' };
   }
-  
+
   // Verificar que stock_posterior coincide con existencias actuales
   const { data: existencias } = await this.supabase
     .from('producto_existencias')
@@ -613,9 +623,9 @@ async verificarStockActualizado(
     .eq('producto_id', productoId)
     .eq('almacen_id', almacenId)
     .single();
-  
+
   const coincide = existencias.stock_actual === movimiento.stock_posterior;
-  
+
   return {
     stockActualizado: coincide,
     stockActual: existencias.stock_actual,
@@ -686,31 +696,31 @@ async prepararPedido(
 ): Promise<{ success: boolean }> {
   // 1. Bloquear pedido para evitar modificaciones concurrentes
   await this.pedidoLockService.adquirirLock(pedidoId, 'PREPARACION');
-  
+
   try {
     // 2. Validar estado actual
     const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
     if (pedido.estado !== 'CONFIRMADO') {
       throw new BadRequestException('Pedido no está en estado CONFIRMADO');
     }
-    
+
     // 3. Actualizar estado
     await this.supabase
       .from('pedidos_venta')
-      .update({ 
+      .update({
         estado: 'EN_PREPARACION',
         preparado_por: userId,
         fecha_inicio_preparacion: new Date()
       })
       .eq('id', pedidoId);
-    
+
     // 4. Registrar evento de picking
     await this.registrarEventoLogistico(tenantId, pedidoId, 'PICKING', {
       usuario: userId,
       almacen: dto.almacen_id,
       notas: dto.notas
     });
-    
+
     return { success: true };
   } finally {
     await this.pedidoLockService.liberarLock(pedidoId);
@@ -728,20 +738,20 @@ async confirmarDespacho(
   userId?: string
 ): Promise<{ success: boolean }> {
   const pedido = await this.obtenerPedidoConDetalle(pedidoId, tenantId);
-  
+
   // Normalizar items despachados
   const itemsDespachados = this.normalizarItemsDespachados(
     pedido.detalle,
     dto.items
   );
-  
+
   let tieneBackorder = false;
-  
+
   // Procesar cada línea
   for (const detalle of pedido.detalle) {
     const cantidadDespachar = itemsDespachados.get(detalle.id) || 0;
     const pendiente = detalle.cantidad - detalle.cantidad_despachada - cantidadDespachar;
-    
+
     if (cantidadDespachar > 0) {
       // Descontar stock
       await this.inventarioService.descontarStock(
@@ -751,11 +761,11 @@ async confirmarDespacho(
         'DESPACHO',
         pedidoId
       );
-      
+
       // Actualizar cantidad despachada
       await this.actualizarDetalleDespachado(detalle.id, cantidadDespachar);
     }
-    
+
     if (pendiente > 0) {
       tieneBackorder = true;
       // Crear registro de backorder
@@ -767,23 +777,23 @@ async confirmarDespacho(
       });
     }
   }
-  
+
   // Determinar estado final
   const nuevoEstado = tieneBackorder ? 'DESPACHO_PARCIAL' : 'DESPACHADO';
-  
+
   await this.actualizarEstadoPedido(pedidoId, nuevoEstado, {
     despachado_por: userId,
     fecha_despacho: new Date(),
     transportista: dto.transportista,
     numero_guia: dto.numero_guia
   });
-  
+
   // Registrar evento
   await this.registrarEventoLogistico(tenantId, pedidoId, 'DESPACHO', {
     items: Array.from(itemsDespachados),
     backorder: tieneBackorder
   });
-  
+
   return { success: true };
 }
 ```
@@ -800,11 +810,11 @@ async reprogramarBackorder(
 ): Promise<{ success: boolean; data: any[] }> {
   // Obtener backorder actual
   const backorder = await this.obtenerBackorder(pedidoId, detalleId, tenantId);
-  
+
   if (!backorder) {
     throw new NotFoundException('Backorder no encontrado');
   }
-  
+
   // Actualizar fecha y prioridad
   await this.supabase
     .from('backorders')
@@ -817,10 +827,10 @@ async reprogramarBackorder(
     })
     .eq('pedido_id', pedidoId)
     .eq('detalle_id', detalleId);
-  
+
   // Notificar al cliente si está configurado
   await this.notificarReprogramacionBackorder(pedidoId, dto);
-  
+
   return { success: true, data: await this.obtenerBackorders(pedidoId, tenantId) };
 }
 ```
@@ -835,7 +845,7 @@ async actualizarTracking(
   userId?: string
 ): Promise<{ success: boolean }> {
   const pedido = await this.obtenerPedidoBasico(pedidoId, tenantId);
-  
+
   // Validar transición de tracking
   const transicionesTracking = {
     DESPACHADO: ['EN_TRANSITO'],
@@ -843,13 +853,13 @@ async actualizarTracking(
     EN_TRANSITO: ['ENTREGADO', 'INCIDENCIA'],
     INCIDENCIA: ['EN_TRANSITO', 'ENTREGADO']
   };
-  
+
   if (!transicionesTracking[pedido.estado]?.includes(dto.nuevo_estado)) {
     throw new BadRequestException(
       `Transición de tracking no permitida: ${pedido.estado} → ${dto.nuevo_estado}`
     );
   }
-  
+
   // Actualizar estado
   await this.supabase
     .from('pedidos_venta')
@@ -863,18 +873,18 @@ async actualizarTracking(
       }
     })
     .eq('id', pedidoId);
-  
+
   // Si es ENTREGADO y ya está facturado, marcar como COMPLETADO
   if (dto.nuevo_estado === 'ENTREGADO' && pedido.facturado) {
     await this.actualizarEstadoPedido(pedidoId, 'COMPLETADO');
   }
-  
+
   // Registrar evento
   await this.registrarEventoLogistico(tenantId, pedidoId, dto.nuevo_estado, {
     ubicacion: dto.ubicacion_actual,
     evidencia: dto.evidencia_entrega
   });
-  
+
   return { success: true };
 }
 ```

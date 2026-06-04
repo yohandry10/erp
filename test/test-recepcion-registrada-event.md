@@ -1,5 +1,15 @@
 # Test Plan: RecepcionRegistrada Event Listener
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_tests`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/README.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## Objetivo
 Verificar que el listener de `RecepcionRegistrada` funciona correctamente y crea cuentas por pagar automáticamente.
 
@@ -46,7 +56,7 @@ Verificar que el listener de `RecepcionRegistrada` funciona correctamente y crea
 
 **Verificación en BD:**
 ```sql
-SELECT 
+SELECT
   numero,
   proveedor_id,
   tipo_documento,
@@ -129,7 +139,7 @@ WHERE referencia_tipo = 'RECEPCION'
 
 **Verificación:**
 ```sql
-SELECT 
+SELECT
   fecha_emision,
   fecha_vencimiento,
   DATE_PART('day', fecha_vencimiento::timestamp - fecha_emision::timestamp) as dias_diferencia
@@ -153,7 +163,7 @@ WHERE referencia_id = '[recepcion_id]';
 
 **Verificación:**
 ```sql
-SELECT 
+SELECT
   numero,
   numero_documento,
   total,

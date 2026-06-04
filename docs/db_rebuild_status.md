@@ -1,5 +1,15 @@
 # Estado de Reconstruccion de BD (Post-Reset)
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `baseline_db`.
+>
+> Leer tambien: `docs/START_HERE.md`, `AGENTS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 > Aviso vigente 2026-05-16: este documento queda como registro historico de la reconstruccion base. El estado de readiness actual, migraciones remotas aplicadas y decision de alta se mantiene en `docs/production-readiness/ERP_PRODUCTION_READINESS.md`.
 >
 > Las migraciones nuevas `312..326` fueron aplicadas manualmente en Supabase remoto el 2026-05-16 con `psql`. No usar este archivo como unica fuente para declarar produccion real.

@@ -1,8 +1,18 @@
 # Auditoria forense contable: Tesoreria, Caja, Bancos, CxC/CxP y conciliacion
 
-Fecha de corte: 2026-05-24  
-Repositorio: `C:\Users\PC\Desktop\erp`  
-Alcance: revision forense de flujo de dinero real, documentos, saldos, bancos, caja, CxC, CxP, conciliacion y asientos contables.  
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `auditoria_forense`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
+Fecha de corte: 2026-05-24
+Repositorio: `C:\Users\PC\Desktop\erp`
+Alcance: revision forense de flujo de dinero real, documentos, saldos, bancos, caja, CxC, CxP, conciliacion y asientos contables.
 Normativa base: Peru, bancarizacion SUNAT vigente para operaciones desde S/ 2,000 o US$ 500, segun fuente oficial SUNAT: https://emprender.sunat.gob.pe/comprobantes-libros/comprobantes-pago/bancarizacion
 
 ## 1. Veredicto ejecutivo
@@ -175,8 +185,8 @@ flowchart LR
 
 ### HIGH-01 - CxC: cobro no es atomicamente indivisible con banco y saldo CxC
 
-Modulo: CxC / Bancos  
-Archivo: `apps/erp-api/src/modules/finanzas/cxc/cxc.service.ts`  
+Modulo: CxC / Bancos
+Archivo: `apps/erp-api/src/modules/finanzas/cxc/cxc.service.ts`
 Evidencia: insercion de `cxc_pagos` y movimiento bancario antes de actualizar saldo CxC; actualizacion optimista posterior sobre `monto_pendiente`.
 
 Impacto: si falla la actualizacion final de CxC por concurrencia o error intermedio, puede quedar pago registrado y banco afectado, pero CxC sin reducir. Esto rompe `CxC = documentos - cobros - notas` y puede duplicar ingresos operativos.
@@ -185,8 +195,8 @@ Recomendacion: mover `registrarPago` a RPC transaccional en base de datos, con l
 
 ### HIGH-02 - Conciliacion: pareo de movimientos no es atomico
 
-Modulo: Conciliacion bancaria  
-Archivo: `apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.service.ts`  
+Modulo: Conciliacion bancaria
+Archivo: `apps/erp-api/src/modules/finanzas/conciliacion/conciliacion.service.ts`
 Evidencia: conciliacion automatica y manual actualizan el movimiento sistema y el movimiento extracto en pasos separados.
 
 Impacto: si el primer update se aplica y el segundo falla, queda una conciliacion parcial. Eso puede bloquear futuros pareos, generar diferencia artificial y romper `Banco = extracto = conciliacion = mayor`.
@@ -195,8 +205,8 @@ Recomendacion: convertir conciliacion automatica/manual en RPC transaccional con
 
 ### HIGH-03 - CxP: existen saldos descuadrados contra pagos bancarios
 
-Modulo: CxP / Tesoreria / Bancos  
-Tablas: `cuentas_por_pagar`, `movimientos_bancarios`  
+Modulo: CxP / Tesoreria / Bancos
+Tablas: `cuentas_por_pagar`, `movimientos_bancarios`
 Evidencia: 2 cuentas por pagar tienen saldo registrado distinto al saldo calculado con pagos bancarios.
 
 Impacto: el flujo `CxP = documentos recibidos - pagos - notas` no cierra. Puede mostrar deuda incorrecta, distorsionar flujo de caja y generar mayor auxiliar distinto al contable.
@@ -205,8 +215,8 @@ Recomendacion: ejecutar conciliacion correctiva controlada por tenant y document
 
 ### HIGH-04 - POS credito: venta puede quedar sin CxC si falla integracion posterior
 
-Modulo: POS / CxC  
-Archivo: `apps/erp-api/src/modules/pos/pos.service.ts`  
+Modulo: POS / CxC
+Archivo: `apps/erp-api/src/modules/pos/pos.service.ts`
 Evidencia: creacion de CxC posterior a venta; si falla, se captura error y continua.
 
 Impacto: una venta a credito puede quedar facturada o registrada sin cuenta por cobrar. Esto rompe cobranza, mayor auxiliar y reporte de deuda.
@@ -217,8 +227,8 @@ Recomendacion: para ventas credito, registrar venta y CxC en una misma transacci
 
 ### MED-01 - Outbox financiero en dead-letter
 
-Modulo: Outbox / Contabilidad  
-Tabla: `outbox_events`  
+Modulo: Outbox / Contabilidad
+Tabla: `outbox_events`
 Evidencia: 1 evento `cxc.creada` en `dead_letter`, retry 4, error por falta de cuentas en plan contable.
 
 Impacto: el asiento derivado puede no existir. No se cumple el criterio "sin eventos financieros muertos en outbox".
@@ -227,8 +237,8 @@ Recomendacion: corregir plan de cuentas del tenant afectado, reencolar evento y 
 
 ### MED-02 - Ventas POS pagadas sin fila en `ventas_pos_pagos`
 
-Modulo: POS  
-Tablas: `ventas_pos`, `ventas_pos_pagos`, `movimientos_caja`  
+Modulo: POS
+Tablas: `ventas_pos`, `ventas_pos_pagos`, `movimientos_caja`
 Evidencia: 6 ventas pagadas no tienen fila de pago, aunque si tienen movimiento de caja.
 
 Impacto: caja puede cuadrar, pero reportes por medio de pago, conciliacion contra pasarela o analisis de cobros POS quedan incompletos.
@@ -237,8 +247,8 @@ Recomendacion: backfill historico seguro desde `movimientos_caja` y bloquear nue
 
 ### MED-03 - Pago POS efectivo sin movimiento de caja
 
-Modulo: POS / Caja  
-Tablas: `ventas_pos_pagos`, `movimientos_caja`  
+Modulo: POS / Caja
+Tablas: `ventas_pos_pagos`, `movimientos_caja`
 Evidencia: 1 pago efectivo con venta pagada sin movimiento de caja.
 
 Impacto: venta y pago existen, pero caja fisica queda subregistrada. Rompe cierre de caja.
@@ -247,8 +257,8 @@ Recomendacion: reconstruir movimiento de caja desde pago validado o anular/repro
 
 ### MED-04 - Cierre simple de caja tolera fallo de corte/asiento posterior
 
-Modulo: Caja / Contabilidad  
-Archivo: `apps/erp-api/src/modules/cajas/cajas.service.ts`  
+Modulo: Caja / Contabilidad
+Archivo: `apps/erp-api/src/modules/cajas/cajas.service.ts`
 Evidencia: cierre simple actualiza sesion y luego intenta corte/asiento; si falla, loguea auditoria pero no revierte cierre.
 
 Impacto: caja puede quedar cerrada sin corte contable completo.
@@ -257,8 +267,8 @@ Recomendacion: unificar ruta de cierre hacia `cashClosingService` o hacer que co
 
 ### MED-05 - Outbox de movimiento bancario manual es best-effort
 
-Modulo: Bancos / Outbox  
-Archivo: `apps/erp-api/src/modules/finanzas/bancos/bancos.service.ts`  
+Modulo: Bancos / Outbox
+Archivo: `apps/erp-api/src/modules/finanzas/bancos/bancos.service.ts`
 Evidencia: el movimiento bancario se confirma y el evento outbox se intenta despues; si falla, no revierte el movimiento.
 
 Impacto: banco queda correcto operacionalmente, pero contabilidad puede no enterarse.

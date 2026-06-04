@@ -1,5 +1,15 @@
 # Auditoría forense pre-producción 2026-05-26
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `auditoria_forense`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 > Objetivo: detectar fallos de lógica, brechas de seguridad, integridad de datos y rendimiento antes de declarar producción. Cubre las 5 preguntas del usuario: lógica de negocio, seguridad backend, rendimiento frontend, integridad de datos, manejo de errores. Complementa (no reemplaza) las auditorías forenses temáticas de mayo 2026.
 
 Estado al cierre del análisis: **NO listo para producción real**. 4 hallazgos CRITICAL + 13 HIGH bloquean el go-live. Lista priorizada abajo.
@@ -407,5 +417,3 @@ Codex tiene razón: este reporte es **útil para la siguiente fase**, pero **no 
 - 31 hallazgos verificados se mantienen.
 
 **Lo realmente CRITICAL es:** C-001 (+`@Body() any`), C-002, C-004 — todos relacionados a aislamiento de tenant en escritura o atomicidad fiscal. El orden sugerido por Codex (C-001, C-002, H-001, sanitizador PostgREST, después RPCs transaccionales) es el correcto.
-
-
