@@ -1,5 +1,15 @@
 # Documentación Técnica Exhaustiva: Finanzas y Contabilidad
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `manual_modulo`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este documento detalla los flujos financieros, gestión de tesorería, motor contable automatizado, y módulos de cuentas por cobrar/pagar del ERP.
 
 ---
@@ -52,7 +62,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
   if (!caja || !caja.activa) {
     throw new BadRequestException('Caja no existe o está inactiva');
   }
-  
+
   // VALIDACIÓN 2: No hay sesión abierta para esta caja
   const sesionExistente = await this.buscarSesionAbierta(cajaId, tenantId);
   if (sesionExistente) {
@@ -60,7 +70,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
       `Caja ya tiene sesión abierta por ${sesionExistente.cajero.nombre}`
     );
   }
-  
+
   // VALIDACIÓN 3: Usuario no tiene otra caja abierta
   const otraSesion = await this.buscarSesionPorUsuario(userId, tenantId);
   if (otraSesion) {
@@ -68,7 +78,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
       `Usuario ya tiene abierta la caja ${otraSesion.caja.nombre}`
     );
   }
-  
+
   // VALIDACIÓN 4: Monto de apertura en rango permitido
   const config = await this.configuracionService.obtenerConfiguracion(tenantId);
   if (dto.monto_inicial > config.monto_maximo_apertura) {
@@ -80,7 +90,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
     }
     await this.autorizacionesService.validarAutorizacion(dto.supervisor_id, 'APERTURA_EXCEDIDA');
   }
-  
+
   // Crear sesión
   const sesion = await this.insertarSesion({
     tenant_id: tenantId,
@@ -96,7 +106,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
     foto_apertura: dto.foto_apertura,
     user_agent: dto.user_agent
   });
-  
+
   // Registrar en auditoría
   await this.auditService.registrar({
     tipo: 'APERTURA_CAJA',
@@ -105,7 +115,7 @@ async abrirCaja(tenantId: string, cajaId: string, dto: AbrirCajaDto, userId?: st
     usuario_id: userId,
     metadata: { monto: dto.monto_inicial, caja: caja.nombre }
   });
-  
+
   return sesion;
 }
 ```
@@ -138,20 +148,20 @@ async cerrarCaja(
       warnings: validacion.warnings
     });
   }
-  
+
   // 2. Obtener sesión y movimientos
   const sesion = await this.obtenerSesion(sesionId, tenantId);
   const movimientos = await this.movementsService.obtenerMovimientos(sesionId);
-  
+
   // 3. Calcular saldo esperado
   const saldoEsperado = await this.reconciliationService.calcularSaldoEsperado(
     sesion.monto_inicio,
     movimientos
   );
-  
+
   // 4. Calcular diferencia
   const diferencia = datos.monto_contado - saldoEsperado;
-  
+
   // 5. Si diferencia excede tolerancia, requerir supervisor
   const config = await this.configuracionService.obtenerConfiguracion(tenantId);
   if (Math.abs(diferencia) > config.tolerancia_diferencia_caja) {
@@ -165,10 +175,10 @@ async cerrarCaja(
     }
     await this.authService.validarAutorizacion(supervisorId, 'CIERRE_CON_DIFERENCIA');
   }
-  
+
   // 6. Calcular hash de integridad (SHA-256)
   const hashIntegridad = this.calcularHashIntegridad(sesion, movimientos, datos);
-  
+
   // 7. Cerrar sesión (inmutable después de esto)
   const sesionCerrada = await this.actualizarSesion(sesionId, {
     estado: 'CERRADA',
@@ -182,14 +192,14 @@ async cerrarCaja(
     supervisor_cierre: supervisorId,
     notas_cierre: datos.notas
   });
-  
+
   // 8. Registrar en auditoría
   await this.auditService.registrar({
     tipo: 'CIERRE_CAJA',
     sesion_id: sesionId,
     metadata: { diferencia, hash: hashIntegridad }
   });
-  
+
   return sesionCerrada;
 }
 ```
@@ -221,7 +231,7 @@ calcularHashIntegridad(sesion: any, movimientos: MovimientoCaja[], cierre: Datos
     },
     timestamp: new Date().toISOString()
   };
-  
+
   // SHA-256 del JSON serializado
   return crypto
     .createHash('sha256')
@@ -233,7 +243,7 @@ calcularHashIntegridad(sesion: any, movimientos: MovimientoCaja[], cierre: Datos
 async verificarIntegridad(sesionId: string, tenantId: string): Promise<boolean> {
   const sesion = await this.obtenerSesionCerrada(sesionId, tenantId);
   const movimientos = await this.movementsService.obtenerMovimientos(sesionId);
-  
+
   const hashRecalculado = this.calcularHashIntegridad(
     sesion,
     movimientos,
@@ -242,7 +252,7 @@ async verificarIntegridad(sesionId: string, tenantId: string): Promise<boolean> 
       denominaciones: sesion.denominaciones_cierre
     }
   );
-  
+
   return hashRecalculado === sesion.hash_integridad;
 }
 ```
@@ -262,15 +272,15 @@ async iniciarCambioTurno(
   usuarioEntranteId: string
 ): Promise<{ cambioId: string }> {
   const sesion = await this.obtenerSesion(sesionId, tenantId);
-  
+
   // Validar que el usuario saliente es el cajero actual
   if (sesion.cajero_id !== usuarioSalienteId) {
     throw new BadRequestException('Solo el cajero actual puede iniciar cambio de turno');
   }
-  
+
   // Marcar sesión como EN_CAMBIO_TURNO (bloquea nuevas ventas)
   await this.actualizarSesion(sesionId, { estado: 'EN_CAMBIO_TURNO' });
-  
+
   // Crear registro de cambio
   const cambio = await this.insertarCambioTurno({
     sesion_id: sesionId,
@@ -279,7 +289,7 @@ async iniciarCambioTurno(
     estado: 'PENDIENTE',
     iniciado_en: new Date()
   });
-  
+
   return { cambioId: cambio.id };
 }
 
@@ -293,11 +303,11 @@ async completarCambioTurno(
 ): Promise<void> {
   const cambio = await this.obtenerCambioTurno(cambioId, tenantId);
   const sesion = await this.obtenerSesion(cambio.sesion_id, tenantId);
-  
+
   // Calcular diferencia
   const saldoEsperado = await this.calcularSaldoEsperado(cambio.sesion_id);
   const diferencia = saldoContado - saldoEsperado;
-  
+
   // Registrar arqueo intermedio
   await this.insertarArqueoIntermedio({
     sesion_id: cambio.sesion_id,
@@ -310,14 +320,14 @@ async completarCambioTurno(
     firma_saliente: firmas.firma_saliente,
     firma_entrante: firmas.firma_entrante
   });
-  
+
   // Actualizar sesión con nuevo cajero
   await this.actualizarSesion(cambio.sesion_id, {
     cajero_id: cambio.usuario_entrante_id,
     estado: 'ABIERTA',
     ultimo_cambio_turno: new Date()
   });
-  
+
   // Completar cambio de turno
   await this.actualizarCambioTurno(cambioId, {
     estado: 'COMPLETADO',
@@ -337,16 +347,16 @@ async cerrarSesionAdministrativa(
   userId: string
 ): Promise<void> {
   const sesion = await this.obtenerSesion(sesionId, tenantId);
-  
+
   // Solo sesiones ABIERTA o EN_CAMBIO_TURNO
   if (!['ABIERTA', 'EN_CAMBIO_TURNO'].includes(sesion.estado)) {
     throw new BadRequestException('Sesión no está en estado que permita cierre administrativo');
   }
-  
+
   // Calcular saldo teórico (no hay conteo real)
   const movimientos = await this.movementsService.obtenerMovimientos(sesionId);
   const saldoTeorico = this.calcularSaldoTeorico(sesion.monto_inicio, movimientos);
-  
+
   // Cerrar con flag administrativo
   await this.actualizarSesion(sesionId, {
     estado: 'CERRADA',
@@ -358,7 +368,7 @@ async cerrarSesionAdministrativa(
     razon_cierre_admin: razonCierre,
     admin_cierre_id: userId
   });
-  
+
   // Auditoría especial
   await this.auditService.registrar({
     tipo: 'CIERRE_ADMINISTRATIVO',
@@ -395,21 +405,21 @@ export class CxcService {
 ```typescript
 async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<void> {
   const idempotencyKey = `factura:${evento.tenant_id}:${evento.factura_id}`;
-  
+
   // Verificar idempotencia
   const yaExiste = await this.verificarIdempotencia(idempotencyKey);
   if (yaExiste) {
     this.logger.log(`CxC ya creada para factura ${evento.factura_id}`);
     return;
   }
-  
+
   // Obtener configuración y cliente
   const config = await this.obtenerConfiguracionEmpresa(evento.tenant_id);
   const cliente = await this.obtenerCliente(evento.cliente_id, evento.tenant_id);
-  
+
   // Calcular ajustes tributarios
   const ajustes = this.calcularAjustesDesdeEvento(evento, cliente, config);
-  
+
   // Validar cuadre tributario
   const validacion = await this.retencionesValidation.validar({
     total: evento.total,
@@ -418,11 +428,11 @@ async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<voi
     percepcion: ajustes.percepcion,
     anticipo: ajustes.anticipo
   });
-  
+
   if (!validacion.valido) {
     throw new Error(`Cuadre tributario inválido: ${validacion.errores.join(', ')}`);
   }
-  
+
   // Calcular monto pendiente inicial
   const montoPendienteInicial = new Decimal(evento.total)
     .minus(ajustes.retencion)
@@ -430,7 +440,7 @@ async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<voi
     .minus(ajustes.anticipo)
     .plus(ajustes.percepcion)
     .toNumber();
-  
+
   // Crear cuenta por cobrar
   const cxc = await this.insertarCxc({
     tenant_id: evento.tenant_id,
@@ -453,7 +463,7 @@ async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<voi
     },
     estado: montoPendienteInicial === 0 ? 'CANCELADO' : 'PENDIENTE'
   });
-  
+
   // Crear movimientos iniciales por tributos
   if (ajustes.retencion > 0) {
     await this.crearPagoInterno(cxc.id, evento.tenant_id, {
@@ -462,7 +472,7 @@ async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<voi
       descripcion: 'Retención IGV (3%)'
     });
   }
-  
+
   if (ajustes.detraccion > 0) {
     await this.crearPagoInterno(cxc.id, evento.tenant_id, {
       tipo: 'DETRACCION',
@@ -470,10 +480,10 @@ async crearCuentaPorCobrarDesdeFactura(evento: FacturaEmitidaEvent): Promise<voi
       descripcion: `Detracción SPOT (${config.detraccion_tasa * 100}%)`
     });
   }
-  
+
   // Registrar idempotencia
   await this.registrarIdempotencia(idempotencyKey, cxc.id);
-  
+
   // Auditoría
   await this.auditService.registrar({
     tipo: 'CXC_CREADA',
@@ -496,27 +506,27 @@ calcularAjustesDesdeEvento(
   let percepcion = 0;
   let detraccion = 0;
   let anticipo = 0;
-  
+
   // RETENCIÓN: Si cliente es agente de retención
   if (cliente.sujeto_retencion && config.aplicar_retencion) {
     retencion = this.round2(evento.total * (config.retencion_tasa || 0.03));
   }
-  
+
   // DETRACCIÓN: Si servicio está sujeto a SPOT
   if (evento.sujeto_detraccion && config.aplicar_detraccion) {
     detraccion = this.round2(evento.total * (config.detraccion_tasa || 0.12));
   }
-  
+
   // PERCEPCIÓN: Solo para ventas de combustibles y similares
   if (evento.tipo_percepcion && config.aplicar_percepcion) {
     percepcion = this.round2(evento.total * (config.percepcion_tasa || 0.02));
   }
-  
+
   // ANTICIPO: Si hay anticipos registrados del cliente
   if (evento.anticipo_aplicado) {
     anticipo = evento.anticipo_aplicado;
   }
-  
+
   return { retencion, percepcion, detraccion, anticipo };
 }
 
@@ -536,14 +546,14 @@ async registrarPago(
   userId?: string
 ): Promise<{ success: boolean; data: any }> {
   const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
-  
+
   // Validación: No pagar más de lo pendiente
   if (dto.monto > cuenta.monto_pendiente) {
     throw new BadRequestException(
       `Monto ${dto.monto} excede pendiente ${cuenta.monto_pendiente}`
     );
   }
-  
+
   // Validación de cuenta bancaria (si aplica)
   if (dto.cuenta_bancaria_id) {
     const cuentaBanco = await this.validarCuentaBancaria(
@@ -551,20 +561,20 @@ async registrarPago(
       dto.moneda || cuenta.moneda,
       tenantId
     );
-    
+
     if (cuentaBanco.moneda !== cuenta.moneda && !dto.tipo_cambio) {
       throw new BadRequestException('Se requiere tipo de cambio para monedas diferentes');
     }
   }
-  
+
   // Iniciar transacción
   const idempotencyKey = `cxc.cobro:${tenantId}:${dto.referencia_pago || uuidv4()}`;
-  
+
   // Verificar idempotencia
   if (await this.verificarIdempotencia(idempotencyKey)) {
     return { success: true, data: { mensaje: 'Pago ya registrado' } };
   }
-  
+
   // Registrar pago
   const pago = await this.insertarPago({
     cuenta_id: cuentaId,
@@ -577,23 +587,23 @@ async registrarPago(
     notas: dto.notas,
     registrado_por: userId
   });
-  
+
   // Actualizar saldo de cuenta bancaria (si aplica)
   if (dto.cuenta_bancaria_id) {
     await this.actualizarSaldoBancario(dto.cuenta_bancaria_id, dto.monto, 'ABONO');
   }
-  
+
   // Actualizar monto pendiente de CxC
   const nuevoPendiente = this.round2(cuenta.monto_pendiente - dto.monto);
-  const nuevoEstado = nuevoPendiente === 0 ? 'CANCELADO' : 
+  const nuevoEstado = nuevoPendiente === 0 ? 'CANCELADO' :
                       nuevoPendiente < cuenta.monto_total ? 'PARCIAL' : 'PENDIENTE';
-  
+
   await this.actualizarCxc(cuentaId, {
     monto_pendiente: nuevoPendiente,
     estado: nuevoEstado,
     ultimo_pago: new Date()
   });
-  
+
   // Emitir evento para contabilidad
   await this.eventBus.emit('cxc.cobro.registrado', {
     tenant_id: tenantId,
@@ -602,10 +612,10 @@ async registrarPago(
     monto: dto.monto,
     cuenta_bancaria_id: dto.cuenta_bancaria_id
   });
-  
+
   // Registrar idempotencia
   await this.registrarIdempotencia(idempotencyKey, pago.id);
-  
+
   return { success: true, data: pago };
 }
 ```
@@ -620,22 +630,22 @@ async reprogramarCuentaPorCobrar(
   userId?: string
 ): Promise<{ success: boolean; data: any }> {
   const cuenta = await this.obtenerCuentaPorCobrar(tenantId, cuentaId);
-  
+
   // Solo cuentas pendientes o parciales
   if (!['PENDIENTE', 'PARCIAL', 'VENCIDO'].includes(cuenta.estado)) {
     throw new BadRequestException('Solo se pueden reprogramar cuentas pendientes');
   }
-  
+
   // Guardar fecha original para auditoría
   const fechaOriginal = cuenta.fecha_vencimiento;
-  
+
   // Actualizar vencimiento
   await this.actualizarCxc(cuentaId, {
     fecha_vencimiento: dto.nueva_fecha_vencimiento,
     estado: new Date(dto.nueva_fecha_vencimiento) >= new Date() ? 'PENDIENTE' : cuenta.estado,
     notas_reprogramacion: dto.motivo
   });
-  
+
   // Auditoría
   await this.auditService.registrar({
     tipo: 'CXC_REPROGRAMADA',
@@ -648,7 +658,7 @@ async reprogramarCuentaPorCobrar(
       motivo: dto.motivo
     }
   });
-  
+
   return { success: true, data: await this.obtenerCuentaPorCobrar(tenantId, cuentaId) };
 }
 ```
@@ -668,20 +678,20 @@ async crearCuentaPorPagar(
   // Calcular fecha de vencimiento según condiciones de pago
   const diasCredito = this.obtenerDiasCreditoPorCondicion(dto.condiciones_pago);
   const fechaVencimiento = this.calcularFechaVencimiento(dto.fecha_emision, diasCredito);
-  
+
   // Calcular ajustes tributarios
   let montoNeto = dto.total;
-  
+
   if (dto.sujeto_retencion) {
     const retencion = this.round2(dto.total * 0.03);
     montoNeto = this.round2(montoNeto - retencion);
   }
-  
+
   if (dto.sujeto_detraccion) {
     const detraccion = this.round2(dto.total * dto.tasa_detraccion);
     montoNeto = this.round2(montoNeto - detraccion);
   }
-  
+
   // Crear CxP
   const cxp = await this.insertarCxp({
     tenant_id: tenantId,
@@ -704,7 +714,7 @@ async crearCuentaPorPagar(
     estado: 'PENDIENTE',
     created_by: userId
   });
-  
+
   return { success: true, data: cxp };
 }
 
@@ -730,7 +740,7 @@ async obtenerAgingCxp(
   proveedorId?: string
 ): Promise<{ success: boolean; data: any }> {
   const hoy = new Date();
-  
+
   let query = this.supabase
     .from('cuentas_por_pagar')
     .select(`
@@ -739,13 +749,13 @@ async obtenerAgingCxp(
     `)
     .eq('tenant_id', tenantId)
     .in('estado', ['PENDIENTE', 'PARCIAL', 'VENCIDO']);
-  
+
   if (proveedorId) {
     query = query.eq('proveedor_id', proveedorId);
   }
-  
+
   const { data: cuentas } = await query;
-  
+
   // Clasificar por antigüedad
   const aging = {
     corriente: { count: 0, monto: 0 },      // No vencido
@@ -755,17 +765,17 @@ async obtenerAgingCxp(
     'mas_90': { count: 0, monto: 0 },       // Más de 90 días
     total: { count: 0, monto: 0 }
   };
-  
+
   for (const cuenta of cuentas) {
     const diasVencido = this.calcularDiasVencido(cuenta.fecha_vencimiento, hoy);
     const bucket = this.clasificarBucket(diasVencido);
-    
+
     aging[bucket].count++;
     aging[bucket].monto += cuenta.monto_pendiente;
     aging.total.count++;
     aging.total.monto += cuenta.monto_pendiente;
   }
-  
+
   return { success: true, data: aging };
 }
 
@@ -792,11 +802,11 @@ async crearMovimientoBancario(
 ): Promise<{ success: boolean; data: any }> {
   // Obtener cuenta bancaria con saldo actual
   const cuenta = await this.obtenerCuentaBancaria(tenantId, dto.cuenta_bancaria_id);
-  
+
   // Validación de sobregiro (si es CARGO)
   if (dto.tipo === 'CARGO') {
     const nuevoSaldo = this.round2(cuenta.saldo_actual - dto.monto);
-    
+
     if (nuevoSaldo < 0 && !cuenta.permite_sobregiro) {
       throw new BadRequestException({
         code: 'SALDO_INSUFICIENTE',
@@ -805,7 +815,7 @@ async crearMovimientoBancario(
         saldo_resultante: nuevoSaldo
       });
     }
-    
+
     if (nuevoSaldo < 0 && cuenta.permite_sobregiro) {
       if (Math.abs(nuevoSaldo) > cuenta.limite_sobregiro) {
         throw new BadRequestException({
@@ -816,12 +826,12 @@ async crearMovimientoBancario(
       }
     }
   }
-  
+
   // Calcular nuevo saldo
   const nuevoSaldo = dto.tipo === 'ABONO'
     ? this.round2(cuenta.saldo_actual + dto.monto)
     : this.round2(cuenta.saldo_actual - dto.monto);
-  
+
   // Crear movimiento
   const movimiento = await this.insertarMovimiento({
     tenant_id: tenantId,
@@ -837,10 +847,10 @@ async crearMovimientoBancario(
     notas: dto.notas,
     created_by: userId
   });
-  
+
   // Actualizar saldo de la cuenta
   await this.actualizarSaldoCuenta(dto.cuenta_bancaria_id, nuevoSaldo);
-  
+
   // Emitir evento para contabilidad
   await this.eventBus.emit('banco.movimiento', {
     tenant_id: tenantId,
@@ -849,7 +859,7 @@ async crearMovimientoBancario(
     monto: dto.monto,
     movimiento_id: movimiento.id
   });
-  
+
   return { success: true, data: movimiento };
 }
 ```
@@ -863,19 +873,19 @@ async obtenerSaldosConsolidados(tenantId: string): Promise<{ success: boolean; d
     .select('id, nombre, banco, numero_cuenta, moneda, saldo_actual, tipo_cuenta')
     .eq('tenant_id', tenantId)
     .eq('activa', true);
-  
+
   // Agrupar por moneda
-  const consolidado: Record<string, { 
-    cuentas: number; 
-    saldo_total: number; 
-    detalle: any[] 
+  const consolidado: Record<string, {
+    cuentas: number;
+    saldo_total: number;
+    detalle: any[]
   }> = {};
-  
+
   for (const cuenta of cuentas) {
     if (!consolidado[cuenta.moneda]) {
       consolidado[cuenta.moneda] = { cuentas: 0, saldo_total: 0, detalle: [] };
     }
-    
+
     consolidado[cuenta.moneda].cuentas++;
     consolidado[cuenta.moneda].saldo_total = this.round2(
       consolidado[cuenta.moneda].saldo_total + cuenta.saldo_actual
@@ -886,7 +896,7 @@ async obtenerSaldosConsolidados(tenantId: string): Promise<{ success: boolean; d
       saldo: cuenta.saldo_actual
     });
   }
-  
+
   return { success: true, data: consolidado };
 }
 ```
@@ -918,15 +928,15 @@ export class AsientosGeneratorService {
   ): Promise<AsientoContable> {
     // 1. Validar período abierto
     await this.periodosService.validarPeriodoAbierto(tenantId, fecha);
-    
+
     // 2. Validar cuadre contable
     const totalDebe = detalles.reduce((sum, d) => sum + d.debe, 0);
     const totalHaber = detalles.reduce((sum, d) => sum + d.haber, 0);
-    
+
     if (Math.abs(totalDebe - totalHaber) > 0.01) {
       throw new Error(`Asiento descuadrado: Debe=${totalDebe}, Haber=${totalHaber}`);
     }
-    
+
     // 3. Verificar idempotencia (si hay sourceEventId)
     if (sourceEventId) {
       const existente = await this.buscarAsientoPorEvento(tenantId, sourceEventId);
@@ -934,10 +944,10 @@ export class AsientosGeneratorService {
         return existente;
       }
     }
-    
+
     // 4. Generar número de asiento
     const numeroAsiento = await this.generarNumeroAsiento(tenantId, fecha);
-    
+
     // 5. Crear asiento con detalles
     const asiento = await this.insertarAsiento({
       tenant_id: tenantId,
@@ -950,7 +960,7 @@ export class AsientosGeneratorService {
       estado: 'REGISTRADO',
       source_event_id: sourceEventId
     });
-    
+
     // 6. Insertar líneas de detalle
     for (const detalle of detalles) {
       await this.insertarDetalleAsiento({
@@ -962,7 +972,7 @@ export class AsientosGeneratorService {
         centro_costo_id: detalle.centro_costo_id
       });
     }
-    
+
     return asiento;
   }
 }
@@ -980,10 +990,10 @@ async handleDocumentoFiscalGenerado(evento: DocumentoFiscalGeneradoEvent) {
     } else if (evento.tipo_documento === '07') {
       await this.generarAsientoNotaCredito(evento);
     }
-    
+
     // Marcar evento como procesado
     await this.marcarEventoComoProcesado(evento.event_id);
-    
+
   } catch (error) {
     // Marcar como fallido para reintento
     await this.marcarEventoComoFallido(evento.event_id, error.message);
@@ -997,7 +1007,7 @@ async generarAsientoVenta(evento: any): Promise<AsientoContable> {
     { codigo: '40' },  // Tributos por pagar
     { codigo: '70' }   // Ventas
   ]);
-  
+
   const detalles: DetalleAsiento[] = [
     // DEBE: 12 Clientes por el total
     {
@@ -1021,7 +1031,7 @@ async generarAsientoVenta(evento: any): Promise<AsientoContable> {
       concepto: 'IGV por pagar'
     }
   ];
-  
+
   return this.generarAsiento(
     evento.tenant_id,
     new Date(evento.fecha_emision),
@@ -1041,21 +1051,21 @@ export class PeriodosService {
   async validarPeriodoAbierto(tenantId: string, fecha: Date): Promise<void> {
     const anio = fecha.getFullYear();
     const mes = fecha.getMonth() + 1;
-    
+
     const periodo = await this.obtenerPeriodo(tenantId, anio, mes);
-    
+
     if (!periodo) {
       // Auto-crear período si no existe
       await this.crearPeriodo(tenantId, anio, mes);
       return;
     }
-    
+
     if (periodo.estado === 'CERRADO') {
       throw new BadRequestException(
         `Período ${mes}/${anio} está cerrado. No se permiten nuevos asientos.`
       );
     }
-    
+
     if (periodo.estado === 'BLOQUEADO') {
       throw new BadRequestException(
         `Período ${mes}/${anio} está bloqueado. Contacte al administrador.`
@@ -1077,7 +1087,7 @@ export class PeriodosService {
         asientos: validacionAsientos.asientosDescuadrados
       });
     }
-    
+
     // 2. Validar que no haya eventos pendientes
     const validacionEventos = await this.validarEventosPendientes(tenantId, anio, mes);
     if (!validacionEventos.valido) {
@@ -1086,10 +1096,10 @@ export class PeriodosService {
         cantidad: validacionEventos.eventosPendientes
       });
     }
-    
+
     // 3. Refrescar estados financieros
     await this.estadosFinancierosService.refrescarEstadosFinancieros(tenantId, anio, mes);
-    
+
     // 4. Cerrar período
     return this.actualizarPeriodo(tenantId, anio, mes, {
       estado: 'CERRADO',
@@ -1114,7 +1124,7 @@ async getEstadoResultados(
     p_anio: anio,
     p_mes: mes
   });
-  
+
   return {
     ingresos: {
       ventas: saldos.ventas_70 || 0,
@@ -1145,7 +1155,7 @@ async getBalanceGeneral(
     p_anio: anio,
     p_mes: mes
   });
-  
+
   return {
     activos: {
       corrientes: {
@@ -1190,7 +1200,7 @@ async obtenerProgramacionPagos(
 ): Promise<{ success: boolean; data: any[] }> {
   const desde = query.fecha_desde || new Date().toISOString().split('T')[0];
   const hasta = query.fecha_hasta || this.addDays(new Date(), 30).toISOString().split('T')[0];
-  
+
   // Obtener CxP vencidas y próximas a vencer
   const { data: cxps } = await this.supabase
     .from('cuentas_por_pagar')
@@ -1203,13 +1213,13 @@ async obtenerProgramacionPagos(
     .gte('fecha_vencimiento', desde)
     .lte('fecha_vencimiento', hasta)
     .order('fecha_vencimiento');
-  
+
   // Agrupar por semana
   const programacion = this.agruparPorSemana(cxps);
-  
+
   // Calcular flujo de caja proyectado
   const saldoBancario = await this.obtenerSaldoTotalBancos(tenantId);
-  
+
   return {
     success: true,
     data: {
@@ -1235,7 +1245,7 @@ async obtenerFlujoCaja(
     .eq('tipo', 'ABONO')
     .gte('fecha_movimiento', query.fecha_desde)
     .lte('fecha_movimiento', query.fecha_hasta);
-  
+
   const { data: egresos } = await this.supabase
     .from('movimientos_bancarios')
     .select('monto, fecha_movimiento')
@@ -1243,10 +1253,10 @@ async obtenerFlujoCaja(
     .eq('tipo', 'CARGO')
     .gte('fecha_movimiento', query.fecha_desde)
     .lte('fecha_movimiento', query.fecha_hasta);
-  
+
   const totalIngresos = ingresos.reduce((sum, m) => sum + m.monto, 0);
   const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
-  
+
   return {
     success: true,
     data: {
@@ -1281,11 +1291,11 @@ export class OutboxEventsService {
       .select('*')
       .eq('id', eventId)
       .single();
-    
+
     if (!evento || !['failed', 'dead_letter'].includes(evento.status)) {
       return false;
     }
-    
+
     // Resetear para reprocesamiento
     await this.supabase
       .from('outbox_events')
@@ -1296,7 +1306,7 @@ export class OutboxEventsService {
         updated_at: new Date()
       })
       .eq('id', eventId);
-    
+
     return true;
   }
 
@@ -1310,13 +1320,13 @@ export class OutboxEventsService {
       .from('outbox_events')
       .select('status, event_type')
       .in('status', ['failed', 'dead_letter']);
-    
+
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
     }
-    
+
     const { data } = await query;
-    
+
     return {
       total_fallidos: data.filter(e => e.status === 'failed').length,
       total_dead_letter: data.filter(e => e.status === 'dead_letter').length,

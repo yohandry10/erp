@@ -1,8 +1,19 @@
-# AUDITORÍA TÉCNICA (REVERSIÓN CORREGIDA) – MÓDULO DE VENTAS  
+# AUDITORÍA TÉCNICA (REVERSIÓN CORREGIDA) – MÓDULO DE VENTAS
+
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_tests`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/README.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## Sistema ERP Multi-Tenant
 
-**Fecha de actualización:** 21 de octubre de 2025  
-**Analista responsable:** Codex Auditor (GPT-5)  
+**Fecha de actualización:** 21 de octubre de 2025
+**Analista responsable:** Codex Auditor (GPT-5)
 **Alcance:** Implementación completa del módulo Ventas y su flujo end-to-end (Ventas ↔ Inventario/Logística ↔ CPE ↔ GRE ↔ CxC ↔ Postventa/Contabilidad) con énfasis en aislación multi-tenant.
 
 ---
@@ -24,7 +35,7 @@ La presente versión reemplaza el contenido anterior y establece el estado real.
 
 ## 2. Resumen ejecutivo
 
-- **Resultado global:** **EN VALIDACIÓN**  
+- **Resultado global:** **EN VALIDACIÓN**
 - **Motivo principal:** Las capacidades críticas (RLS, inventario, CPE/GRE y parciales) ya están implementadas; resta ejecutar pruebas automáticas y observabilidad antes de liberar.
 
 ---
@@ -120,4 +131,3 @@ La presente versión reemplaza el contenido anterior y establece el estado real.
    - `apps/erp-api/src/modules/ventas/reportes/reportes.service.ts:560`
    - `apps/erp-api/src/modules/ventas/reportes/reportes.service.ts:980`
 > Configuración multi-tenant disponible en `supabase/migrations/015_configuracion_p3_ventas.sql` y `supabase/migrations/016_p3_rma_multialmacen_dashboards.sql`. Plan detallado de dependencias y milestones en `docs/p3-roadmap.md`.
-

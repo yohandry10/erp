@@ -1,5 +1,15 @@
 # useEmpresaConfig Hook
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## Overview
 
 The `useEmpresaConfig` hook provides access to the tenant's empresa (company) configuration, including settings for sales flow, GRE automation, and other business rules. The configuration is cached in a React Context and automatically loaded when the application starts.
@@ -80,7 +90,7 @@ interface EmpresaConfig {
   representanteLegal?: string
   regimen?: string
   igvPorcentaje?: number
-  
+
   // Sales configuration
   tipo_empresa: TipoEmpresa
   usar_flujo_logistica: boolean
@@ -136,7 +146,7 @@ function LogisticsModule() {
 function OrderTimeline({ currentState }) {
   const { isFlujologistica } = useEmpresaConfig()
 
-  const steps = isFlujologistica 
+  const steps = isFlujologistica
     ? ['PENDIENTE', 'CONFIRMADO', 'EN_PREPARACION', 'LISTO_DESPACHO', 'LISTO_FACTURAR']
     : ['PENDIENTE', 'CONFIRMADO', 'LISTO_FACTURAR']
 
@@ -161,7 +171,7 @@ function ConfigurationForm() {
 
   const handleSave = async (newConfig) => {
     await put('/api/configuracion/empresa', newConfig)
-    
+
     // Refresh the cached configuration
     await refreshConfig()
   }
@@ -182,7 +192,7 @@ function InvoiceButton({ pedido }) {
 
   const handleGenerateInvoice = async () => {
     const response = await generateInvoice(pedido.id)
-    
+
     // Check if should suggest GRE
     if (isGreAutomatico && pedido.total > umbralGre) {
       showGRESuggestionModal()
@@ -220,7 +230,7 @@ import { useEmpresaConfigStandalone } from '@/hooks/use-empresa-config'
 
 function StandaloneComponent() {
   const { config, loading } = useEmpresaConfigStandalone()
-  
+
   // This will make its own API call
   // Use this only when necessary
 }

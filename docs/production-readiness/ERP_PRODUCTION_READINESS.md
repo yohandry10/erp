@@ -1,5 +1,15 @@
 # ERP Production Readiness
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `readiness`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Fecha de corte: 2026-05-16
 Estado real: `validado tecnicamente en sandbox/local`
 Decision: no declarar produccion real absoluta hasta cargar certificado/secretos productivos y repetir smoke final contra esas credenciales.

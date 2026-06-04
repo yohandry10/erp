@@ -1,5 +1,15 @@
 # Ejemplos de Uso - Validaciones de Ventas
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `frontend_local`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## 1. Formulario de Cliente con Validación Zod
 
 ```tsx
@@ -30,7 +40,7 @@ export function ClienteForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       })
-      
+
       if (response.ok) {
         toast.success('Cliente creado exitosamente')
       }
@@ -100,10 +110,10 @@ export function CotizacionForm() {
       return
     }
 
-    setItems([...items, { 
-      producto_id: '', 
-      descripcion: '', 
-      cantidad: 1, 
+    setItems([...items, {
+      producto_id: '',
+      descripcion: '',
+      cantidad: 1,
       precio_unitario: 0,
       subtotal: 0
     }])
@@ -125,7 +135,7 @@ export function CotizacionForm() {
       <div className="space-y-2">
         {items.map((item, index) => (
           <div key={index} className="flex gap-2">
-            <input 
+            <input
               placeholder="Producto"
               value={item.descripcion}
               onChange={(e) => {
@@ -134,7 +144,7 @@ export function CotizacionForm() {
                 setItems(newItems)
               }}
             />
-            <input 
+            <input
               type="number"
               placeholder="Cantidad"
               value={item.cantidad}
@@ -144,7 +154,7 @@ export function CotizacionForm() {
                 setItems(newItems)
               }}
             />
-            <input 
+            <input
               type="number"
               placeholder="Precio"
               value={item.precio_unitario}
@@ -161,8 +171,8 @@ export function CotizacionForm() {
         ))}
       </div>
 
-      <button 
-        type="button" 
+      <button
+        type="button"
         onClick={handleAddItem}
         disabled={!canAddMore}
       >
@@ -200,14 +210,14 @@ export function PedidoDetail({ pedido }: PedidoDetailProps) {
       <div className="flex items-center justify-between">
         <h2>Pedido {pedido.numero}</h2>
         {validation.requiresGRE && (
-          <GRERequirementBadge 
+          <GRERequirementBadge
             documentoTipo={pedido.cliente?.documento_tipo}
             total={pedido.total}
           />
         )}
       </div>
 
-      <BoletaGREWarning 
+      <BoletaGREWarning
         documentoTipo={pedido.cliente?.documento_tipo}
         total={pedido.total}
       />
@@ -253,7 +263,7 @@ export function GenerarFacturaButton({ pedidoId, onSuccess }: GenerarFacturaButt
       <CertificateValidationAlert showOnlyErrors />
 
       {/* Botón con validación automática */}
-      <PreInvoiceValidation 
+      <PreInvoiceValidation
         onValidationSuccess={handleGenerateInvoice}
         onValidationFailure={() => {
           toast.error('No se puede generar la factura. Verifique el certificado digital.')
@@ -274,10 +284,10 @@ export function GenerarFacturaButton({ pedidoId, onSuccess }: GenerarFacturaButt
 import { useState } from 'react'
 import { useBoletaValidation } from '@/hooks/use-boleta-validation'
 import { useCertificateValidation } from '@/hooks/use-certificate-validation'
-import { 
-  BoletaGREWarning, 
+import {
+  BoletaGREWarning,
   CertificateValidationAlert,
-  PreInvoiceValidation 
+  PreInvoiceValidation
 } from '@/components/ventas'
 import type { PedidoVenta } from '@/types/ventas'
 
@@ -306,7 +316,7 @@ export function PedidoPage({ pedido }: PedidoPageProps) {
 
       if (response.ok) {
         const data = await response.json()
-        
+
         toast.success('Factura generada exitosamente')
 
         // Si requiere GRE, mostrar sugerencia
@@ -335,7 +345,7 @@ export function PedidoPage({ pedido }: PedidoPageProps) {
       {/* Advertencias */}
       <div className="space-y-4">
         {/* Advertencia de boleta sin RUC */}
-        <BoletaGREWarning 
+        <BoletaGREWarning
           documentoTipo={pedido.cliente?.documento_tipo}
           total={pedido.total}
         />
@@ -382,7 +392,7 @@ export function useVentasValidation({
   const certificateValidation = useCertificateValidation()
 
   const hasErrors = useMemo(() => {
-    return !itemLimit.validation.isValid || 
+    return !itemLimit.validation.isValid ||
            !certificateValidation.canProceed
   }, [itemLimit.validation.isValid, certificateValidation.canProceed])
 
@@ -435,7 +445,7 @@ import { TipoDocumento } from '@/types/ventas'
 
 export function DocumentoValidationField() {
   const { register, setError, clearErrors } = useFormContext()
-  
+
   // Watch both fields
   const documentoTipo = useWatch({ name: 'documento_tipo' })
   const documentoNumero = useWatch({ name: 'documento_numero' })
@@ -443,7 +453,7 @@ export function DocumentoValidationField() {
   useEffect(() => {
     if (documentoTipo && documentoNumero) {
       const isValid = validarDocumento(documentoTipo as TipoDocumento, documentoNumero)
-      
+
       if (!isValid) {
         setError('documento_numero', {
           type: 'manual',
@@ -461,12 +471,12 @@ export function DocumentoValidationField() {
         <option value={TipoDocumento.RUC}>RUC</option>
         <option value={TipoDocumento.DNI}>DNI</option>
       </select>
-      
-      <input 
+
+      <input
         {...register('documento_numero')}
         placeholder={
-          documentoTipo === TipoDocumento.RUC 
-            ? '11 dígitos' 
+          documentoTipo === TipoDocumento.RUC
+            ? '11 dígitos'
             : '8 dígitos'
         }
       />

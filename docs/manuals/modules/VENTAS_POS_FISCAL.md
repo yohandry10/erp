@@ -1,5 +1,15 @@
 # Documentación Técnica Exhaustiva: Ventas, POS y Fiscal
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `manual_modulo`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Este documento detalla la arquitectura, flujos, lógica de negocio, validaciones y patrones técnicos de los módulos comerciales del ERP. Incluye el ciclo completo desde la cotización hasta la facturación electrónica.
 
 ---
@@ -187,7 +197,7 @@ async decidirAprobacion(pedidoId, decision, motivos, userId) {
   if (!usuario.permisos.includes('ventas.aprobaciones.resolver')) {
     throw new ForbiddenException();
   }
-  
+
   if (decision === 'APROBAR') {
     // Mover a PENDIENTE (listo para confirmar)
     await this.updateEstado(pedidoId, 'PENDIENTE');
@@ -211,7 +221,7 @@ async confirmarPedido(pedidoId: string, tenantId: string) {
   // 1. Bloqueo optimista del pedido
   const pedido = await this.findOne(pedidoId, tenantId);
   this.validarTransicionEstado(pedido.estado, 'CONFIRMADO');
-  
+
   // 2. Reservar stock para cada línea
   for (const detalle of pedido.detalle) {
     await this.inventarioService.reservarStock(
@@ -222,7 +232,7 @@ async confirmarPedido(pedidoId: string, tenantId: string) {
       pedidoId
     );
   }
-  
+
   // 3. Actualizar estado
   await this.updateEstado(pedidoId, 'CONFIRMADO');
 }
@@ -240,15 +250,15 @@ async confirmarPedido(pedidoId: string, tenantId: string) {
 async generarFactura(pedidoId, tipoDocumento, userId): DocumentoGeneradoResult {
   // 1. Obtener datos del pedido
   const pedido = await this.findOne(pedidoId, tenantId);
-  
+
   // 2. Validar estado permitido
   if (!['DESPACHADO', 'CONFIRMADO'].includes(pedido.estado)) {
     throw new BadRequestException('Estado no permite facturación');
   }
-  
+
   // 3. Generar CPE (Factura '01' o Boleta '03')
   const cpe = await this.cpeIntegrationService.generarCPE(pedido, tipoDocumento);
-  
+
   // 4. Crear Cuenta por Cobrar automáticamente
   await this.eventBus.emit('documento.fiscal.generado', {
     cpe_id: cpe.id,
@@ -256,7 +266,7 @@ async generarFactura(pedidoId, tipoDocumento, userId): DocumentoGeneradoResult {
     cliente_id: pedido.cliente_id,
     // ...
   });
-  
+
   // 5. Actualizar estado del pedido
   return this.updateEstado(pedidoId, 'FACTURADO');
 }
@@ -308,10 +318,10 @@ Diseñado para alta transaccionalidad y venta rápida (retail). Prioriza la velo
 ```typescript
 async runWithTenantContext<T>(user: any, operation: () => Promise<T>): Promise<T> {
   const tenantId = user.tenant_id;
-  
+
   // Establecer contexto para toda la transacción
   await this.supabase.rpc('set_tenant_context', { tenant_id: tenantId });
-  
+
   try {
     return await operation();
   } finally {
@@ -359,22 +369,22 @@ async procesarVentaInternal(ventaData, user) {
   const tenantId = user.tenant_id;
   const sesionCajaId = await this.getSesionCajaActual(user);
   const idempotencyKey = ventaData.idempotency_key;
-  
+
   // 1. Lock global de transacción (evita duplicados exactos)
   const lockKey = this.generateLockKey(tenantId, sesionCajaId, idempotencyKey);
   await this.supabase.rpc('pg_advisory_xact_lock', { key: lockKey });
-  
+
   // 2. Ordenar productos para evitar deadlocks
-  const productosOrdenados = ventaData.items.sort((a, b) => 
+  const productosOrdenados = ventaData.items.sort((a, b) =>
     a.producto_id.localeCompare(b.producto_id)
   );
-  
+
   // 3. Adquirir locks individuales por producto (en orden)
   for (const item of productosOrdenados) {
     const productLock = this.generateProductLock(tenantId, item.producto_id);
     await this.supabase.rpc('pg_advisory_xact_lock', { key: productLock });
   }
-  
+
   // 4. Ejecutar transacción de venta
   return this.ejecutarVenta(ventaData, user);
 }
@@ -434,7 +444,7 @@ if (tipoComprobante === '03' && tipoDocCliente === '6') { // Boleta con RUC
 ```typescript
 inferirTipoDocumento(doc: string, tipoExplicito?: string): string {
   if (tipoExplicito) return tipoExplicito;
-  
+
   // Catálogo SUNAT
   if (doc.length === 11 && /^[12]0/.test(doc)) return '6'; // RUC
   if (doc.length === 8 && /^\d+$/.test(doc)) return '1';   // DNI
@@ -473,19 +483,19 @@ async abrirCaja(tenantId, cajaId, dto, userId) {
   // 1. Verificar que la caja exista y esté activa
   const caja = await this.obtenerCaja(cajaId, tenantId);
   if (!caja.activa) throw new BadRequestException('Caja inactiva');
-  
+
   // 2. Verificar que no haya sesión abierta en ESTA caja
   const sesionActiva = await this.buscarSesionAbierta(cajaId);
   if (sesionActiva) {
     throw new ConflictException('Esta caja ya tiene una sesión abierta');
   }
-  
+
   // 3. Verificar que el usuario no tenga otra caja abierta
   const otraSesion = await this.buscarSesionUsuario(userId);
   if (otraSesion) {
     throw new ConflictException('Usuario ya tiene caja abierta');
   }
-  
+
   // 4. Validar monto de apertura en rango permitido
   if (dto.monto_inicial > caja.monto_maximo_apertura) {
     // Requiere autorización de supervisor
@@ -495,7 +505,7 @@ async abrirCaja(tenantId, cajaId, dto, userId) {
       dto.supervisor_id
     );
   }
-  
+
   // 5. Crear sesión con metadata
   return this.insertarSesion({
     caja_id: cajaId,
@@ -525,10 +535,10 @@ interface DatosCierre {
 async cerrarCaja(sesionId, datos, userId) {
   // 1. Calcular saldo esperado
   const esperado = await this.calcularSaldoEsperado(sesionId);
-  
+
   // 2. Calcular diferencia
   const diferencia = datos.monto_contado - esperado;
-  
+
   // 3. Si diferencia > tolerancia, requiere supervisor
   if (Math.abs(diferencia) > this.config.tolerancia_diferencia) {
     await this.autorizacionesService.requerirSupervisor(
@@ -536,10 +546,10 @@ async cerrarCaja(sesionId, datos, userId) {
       { diferencia, esperado, contado: datos.monto_contado }
     );
   }
-  
+
   // 4. Calcular hash de integridad (SHA-256)
   const hash = this.calcularHashIntegridad(sesion, movimientos, datos);
-  
+
   // 5. Cerrar sesión (inmutable después)
   return this.actualizarSesion(sesionId, {
     estado: 'CERRADA',
@@ -574,7 +584,7 @@ calcularHashIntegridad(sesion, movimientos, cierre): string {
       denominaciones: cierre.denominaciones
     }
   });
-  
+
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 ```
@@ -587,13 +597,13 @@ Proceso programado que detecta y cierra sesiones "colgadas":
 @Cron('0 3 * * *') // 3:00 AM diariamente
 async cerrarSesionesAbandonadas() {
   const sesionesHuerfanas = await this.buscarSesionesAbandonadas();
-  
+
   for (const sesion of sesionesHuerfanas) {
-    await this.cerrarSesionAdministrativa(sesion.id, 
+    await this.cerrarSesionAdministrativa(sesion.id,
       'CIERRE_AUTOMATICO',
       'Sistema: Sesión de día anterior no cerrada'
     );
-    
+
     await this.auditService.registrar({
       tipo: 'CIERRE_ADMIN_AUTOMATICO',
       sesion_id: sesion.id,
@@ -644,23 +654,23 @@ Motor de facturación electrónica que abstrae la complejidad de XML/UBL, firma 
 async create(dto: CreateFacturaDto, tenantId: string, userId?: string): Promise<FacturaDto> {
   // 1. Recalcular totales (nunca confiar en frontend)
   dto = this.recalculateTotals(dto);
-  
+
   // 2. Obtener info del emisor
   const emisor = await this.getEmpresaEmisorInfo(tenantId);
-  
+
   // 3. Generar serie-correlativo
   const { serie, numero } = await this.generarCorrelativo(tenantId, dto.tipo_documento);
-  
+
   // 4. Construir payload XML
   const xmlPayload = this.buildXmlPayload(dto, emisor, serie, numero);
-  
+
   // 5. Generar XML UBL 2.1
   const xmlContent = this.generateXmlUbl(xmlPayload);
-  
+
   // 6. Firmar digitalmente
   const signer = await this.getXmlSigner(tenantId);
   const xmlFirmado = signer.sign(xmlContent);
-  
+
   // 7. Persistir CPE
   const cpe = await this.insertarCpe({
     tenant_id: tenantId,
@@ -671,10 +681,10 @@ async create(dto: CreateFacturaDto, tenantId: string, userId?: string): Promise<
     hash_cpe: this.calculateHash(xmlFirmado),
     estado: 'FIRMADO'
   });
-  
+
   // 8. Encolar para envío (Outbox Pattern)
   await this.eventBus.emit('cpe.creado', { cpe_id: cpe.id, tenantId });
-  
+
   return this.mapToDto(cpe);
 }
 ```
@@ -689,10 +699,10 @@ async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     .select('certificado_digital, certificado_password')
     .eq('tenant_id', tenantId)
     .single();
-  
+
   let certBuffer: Buffer;
   let password: string;
-  
+
   if (config.certificado_digital) {
     // Desencriptar certificado almacenado
     certBuffer = this.decryptCertificate(config.certificado_digital);
@@ -702,7 +712,7 @@ async getXmlSigner(tenantId: string): Promise<XmlSigner> {
     certBuffer = fs.readFileSync('./certs/demo.p12');
     password = 'demo123';
   }
-  
+
   return new XmlSigner(certBuffer, password);
 }
 ```
@@ -712,26 +722,26 @@ async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 ```typescript
 async sendToOse(cpeId: string, options?: { idempotencyKey?: string }): Promise<void> {
   const cpe = await this.getCpeById(cpeId);
-  
+
   // Idempotencia: si ya fue procesado, no reenviar
   if (options?.idempotencyKey) {
     const yaEnviado = await this.verificarIdempotencia(options.idempotencyKey);
     if (yaEnviado) return;
   }
-  
+
   try {
     // Actualizar estado a ENVIANDO
     await this.actualizarEstado(cpeId, 'SENDING');
-    
+
     // Enviar vía SOAP a OSE
     const response = await this.oseService.sendBillSync(
       cpe.xml_firmado,
       this.generateFileName(cpe)
     );
-    
+
     // Procesar respuesta CDR
     const cdr = this.parseCDR(response.cdr);
-    
+
     if (cdr.codigo === '0') { // Aceptado
       await this.actualizarEstado(cpeId, 'ACCEPTED', {
         codigo_respuesta: cdr.codigo,
@@ -773,7 +783,7 @@ isTechnicalError(codigo: string, descripcion: string): boolean {
   // Códigos 01XX, 02XX generalmente son errores de validación (no reintentar)
   // Códigos 03XX+ pueden ser técnicos
   if (/^0[12]/.test(codigo)) return false;
-  
+
   return ERRORES_TECNICOS.some(pattern => pattern.test(descripcion));
 }
 ```
@@ -791,10 +801,10 @@ async ensureDocumentoParaCpe(cpeRecord, tenantId) {
     return docId;
   } catch (rpcError) {
     this.logger.warn('RPC falló, usando fallback manual:', rpcError);
-    
+
     // Fallback: Inserción directa mínima
     const emisor = await this.getEmpresaInfoFallback(tenantId);
-    
+
     const { data: doc } = await this.supabase
       .from('documentos')
       .insert({
@@ -809,7 +819,7 @@ async ensureDocumentoParaCpe(cpeRecord, tenantId) {
       })
       .select('id')
       .single();
-    
+
     return doc.id;
   }
 }
@@ -829,21 +839,21 @@ Se dispara automáticamente cuando:
 ```typescript
 async evaluarCreacionAutomaticaGRE(datos) {
   const config = await this.obtenerConfiguracion(datos.tenantId);
-  
+
   if (!config.gre_automatico_habilitado) return;
   if (datos.total < config.umbral_gre_automatico) return;
-  
+
   // Verificar datos de transporte del cliente
   const requiere = await this.verificarConfiguracionClienteTransporte(
     datos.cliente_id,
     datos.total,
     datos.tenantId
   );
-  
+
   if (requiere) {
     // Calcular peso estimado
     const peso = this.calcularPesoEstimado(datos.productos, datos.total);
-    
+
     // Crear GRE
     await this.createGuia({
       motivo_traslado: 'VENTA',
@@ -907,31 +917,31 @@ async evaluarCreacionAutomaticaGRE(datos) {
 async crear(tenantId, userId, dto: CrearRmaDto) {
   // 1. Obtener pedido original
   const pedido = await this.obtenerPedidoConDetalle(tenantId, dto.pedido_id);
-  
+
   // 2. Validar estado del pedido
   if (!['FACTURADO', 'ENTREGADO', 'COMPLETADO'].includes(pedido.estado)) {
     throw new BadRequestException('Pedido no permite devoluciones');
   }
-  
+
   // 3. Validar ventana de devolución
   const config = await this.obtenerConfig(tenantId);
   const diasDesdeVenta = this.calcularDiasDesde(pedido.fecha_facturacion);
   if (diasDesdeVenta > config.dias_maximos_rma) {
     throw new BadRequestException(`Excede ventana de ${config.dias_maximos_rma} días`);
   }
-  
+
   // 4. Validar cantidades (no devolver más de lo vendido)
   for (const item of dto.items) {
     const detalle = pedido.detalle.find(d => d.id === item.detalle_id);
     const devolucionesPrevias = await this.obtenerDevolucionesPrevias(item.detalle_id);
-    
+
     if (item.cantidad > detalle.cantidad - devolucionesPrevias) {
       throw new BadRequestException(
         `Item ${detalle.producto.nombre}: cantidad excede disponible`
       );
     }
   }
-  
+
   // 5. Crear RMA con número secuencial
   return this.insertarRma({
     numero_rma: await this.generarSecuenciaRma(tenantId),
@@ -949,7 +959,7 @@ async crear(tenantId, userId, dto: CrearRmaDto) {
 async recepcionar(tenantId, userId, rmaId, dto: RecepcionarRmaDto) {
   const rma = await this.obtenerPorId(tenantId, rmaId);
   const config = await this.obtenerConfig(tenantId);
-  
+
   // Validar ubicación de destino si requiere control de calidad
   if (config.rma_requiere_control_calidad) {
     if (!dto.ubicacion_control_calidad) {
@@ -957,7 +967,7 @@ async recepcionar(tenantId, userId, rmaId, dto: RecepcionarRmaDto) {
     }
     await this.validarUbicacion(tenantId, dto.ubicacion_control_calidad, new Set());
   }
-  
+
   // Registrar retorno en inventario
   for (const item of dto.items) {
     await this.inventarioService.registrarRetornoRma({
@@ -970,7 +980,7 @@ async recepcionar(tenantId, userId, rmaId, dto: RecepcionarRmaDto) {
       referencia_id: rmaId
     });
   }
-  
+
   return this.actualizarEstado(rmaId, 'RECEPCIONADA');
 }
 ```
@@ -980,14 +990,14 @@ async recepcionar(tenantId, userId, rmaId, dto: RecepcionarRmaDto) {
 ```typescript
 async generarNotaCredito(tenantId, userId, rmaId, dto: GenerarNotaCreditoDto) {
   const rma = await this.obtenerPorId(tenantId, rmaId);
-  
+
   // Obtener factura original vinculada
   const pedido = await this.obtenerPedidoConFactura(rma.pedido_id);
   const facturaOriginal = pedido.cpe;
-  
+
   // Calcular montos de NC
   const montoNC = this.calcularMontoNC(rma.items, facturaOriginal.moneda);
-  
+
   // Crear NC via DocumentosService
   const nc = await this.documentosService.crearNotaCredito({
     tipo_documento: '07', // Nota de Crédito
@@ -1007,14 +1017,14 @@ async generarNotaCredito(tenantId, userId, rmaId, dto: GenerarNotaCreditoDto) {
     moneda: facturaOriginal.moneda,
     total: montoNC
   }, tenantId, userId);
-  
+
   // Actualizar RMA con referencia a NC
   await this.actualizarRma(rmaId, {
     estado: 'PROCESADA',
     nota_credito_id: nc.id,
     nota_credito_numero: nc.serie + '-' + nc.numero
   });
-  
+
   return nc;
 }
 ```
@@ -1042,7 +1052,7 @@ async verificarIdempotencia(key: string): Promise<boolean> {
     .select('key')
     .eq('key', key)
     .single();
-  
+
   return !!data;
 }
 

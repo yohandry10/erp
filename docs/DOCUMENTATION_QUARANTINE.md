@@ -1,5 +1,15 @@
 # Cuarentena de Documentacion
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `control_documental`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Fecha de corte: 2026-05-07
 
 Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado sin eliminar nada hasta validar referencias y fuente vigente.
@@ -19,8 +29,8 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 | Seguridad reciente | `docs/security/rate-limiting.md`, `session-auth.md`, `route-access-matrix.md`, `supabase-access-audit.md` |
 | Operacion reciente | `docs/ops/docker.md`, `docs/ops/health.md` |
 | Release reciente | `docs/release/production-checklist.md`, `branch-protection.md` |
-| Estado proyecto actual | `x_doc/PROJECT_STATUS.md` en el worktree actual |
-| Indice revision | `x_doc/PROJECT_REVIEW_INDEX.md` en el worktree actual |
+| Estado proyecto actual | `docs/archive/session_history_legacy/PROJECT_STATUS.md` como contexto historico + `docs/00_coordination/CURRENT_STATE.md` como estado vivo |
+| Indice revision | `docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md` como contexto historico + `docs/DOC_NAVIGATION_MANIFEST.md` como indice vivo |
 
 ## Candidatos iniciales
 
@@ -33,10 +43,10 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 | `docs/security/IMPLEMENTACION-AUDITORIA-RLS.md` | Vigente historico o duplicado | Mismo dominio que `rls-audit-system.md`. | Docs DB/security recientes. | Consolidar con RLS actual. |
 | `docs/security/rls-alerts-guide.md` | Requiere decision humana | Puede ser guia operativa aun util. | Docs ops/security recientes. | Verificar implementacion real en codigo. |
 | `docs/security/rls-alerts-quick-reference.md` | Requiere decision humana | Quick reference puede depender de guia anterior. | Guia consolidada de seguridad. | Mantener hasta consolidar. |
-| `docs/manuals/PROJECT_STATUS.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB `000..301`; referencia publica antigua desde `docs/README.md`. | `x_doc/PROJECT_STATUS.md` y `docs/db_rebuild_status.md`. | Borrado en ronda 7 tras reemplazo validado. |
+| `docs/manuals/PROJECT_STATUS.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB `000..301`; referencia publica antigua desde `docs/README.md`. | `docs/archive/session_history_legacy/PROJECT_STATUS.md` y `docs/db_rebuild_status.md`. | Borrado en ronda 7 tras reemplazo validado. |
 | `docs/manuals/DATABASE_REFERENCE.md` | Desactualizado probable | Fecha 2026-01-07, anterior a reconstruccion DB 2026-02. | `docs/db_rebuild_status.md` y catalogos DB. | Regenerar o marcar obsoleto. |
-| `docs/manuals/SYSTEM_ARCHITECTURE.md` | Desactualizado probable | Puede describir arquitectura general, pero previo a cambios recientes. | README + `x_doc/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
-| `docs/manuals/MODULES_REFERENCE.md` | Desactualizado probable | Manual general anterior a migraciones finales. | Matriz de verticales en `x_doc/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
+| `docs/manuals/SYSTEM_ARCHITECTURE.md` | Desactualizado probable | Puede describir arquitectura general, pero previo a cambios recientes. | README + `docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
+| `docs/manuals/MODULES_REFERENCE.md` | Desactualizado probable | Manual general anterior a migraciones finales. | Matriz de verticales en `docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md`. | Borrado en ronda 7 tras reemplazo validado. |
 | `docs/manuals/DEVELOPER_GUIDE.md` | Desactualizado probable | Guia anterior a la consolidacion de README/docs ops. | README + docs ops. | Borrado en ronda 7 tras reemplazo validado. |
 | `docs/analisis.md` | Historico | Auditoria inicial de codigo legado. | No aplica. | Mantener como historico salvo decision. |
 | `route_matrix_block03.md` | Borrado seguro | Output raiz untracked, sin referencias fuera de cuarentena; contenia matriz vieja que contradice la vigente, por ejemplo `testConnection` como `PUBLIC`. | `docs/security/route-access-matrix.md`. | Borrado en ronda 6. |
@@ -45,7 +55,7 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 | `tmp_route_audit_v2.tsv` | Borrado seguro | Output temporal raiz untracked, sin referencias fuera de cuarentena. | `docs/security/route-access-matrix.md`. | Borrado en ronda 6. |
 | `scripts/tmp_generate_route_matrix.js` | Temporal o herramienta interna | Script `tmp`; puede ser generador de matriz. | Script permanente documentado o eliminacion. | Decidir si se formaliza en `scripts/` o se borra. |
 | `temp_retenciones.spec.ts` | Borrado seguro | Spec temporal raiz trackeado; cobertura equivalente existe en `apps/erp-api/src/modules/finanzas/shared/retenciones-validation.service.spec.ts`, que corre en `pnpm test`. | `apps/erp-api/src/modules/finanzas/shared/retenciones-validation.service.spec.ts`. | Borrado en ronda 6. |
-| `CODEX.md` | Requiere decision humana | Nuevo sin trackear, posiblemente instrucciones de agente. | `AGENTS.md`. | Comparar y decidir si se versiona o elimina. |
+| `docs/archive/legacy_root_docs/CODEX-2026-04-historical.md` | Historico archivado | Plan tecnico de abril 2026; contiene contexto util, pero ya no es fuente primaria de estado. | `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`, `docs/00_coordination/FLOW_STATUS.md`. | Movido desde raiz en ronda 8; no usar si contradice fuentes canonicas. |
 | `fix_permisos.sql` | Forense/no ejecutar | SQL suelto en raiz con tenant UUID hardcodeado `2635846d-237d-4323-a0e6-59daeb39ac3a`; busqueda en migraciones no encontro ese tenant ni evidencia de incorporacion directa. | Migraciones Supabase activas y `docs/db_rebuild_status.md`. | Mantener en cuarentena; no ejecutar ni borrar hasta decidir si se transforma en seed/migracion idempotente. |
 | `fix_permisos_cotizaciones.sql` | Forense/no ejecutar | SQL suelto en raiz con tenant UUID hardcodeado y permiso puntual `ventas/delete/cotizaciones`; no hay evidencia de incorporacion directa en migraciones. | Migraciones Supabase activas y `docs/db_rebuild_status.md`. | Mantener en cuarentena; no ejecutar ni borrar hasta decidir si se transforma en seed/migracion idempotente. |
 | `query_clientes.sql` | Temporal reproducible/no critico | Query de inspeccion a `information_schema.columns` para `clientes`; no modifica BD y es reproducible. | Scripts o docs DB vigentes. | Candidato a borrado posterior, pero mantener mientras se revisan SQL raiz en bloque separado. |
@@ -83,9 +93,21 @@ Objetivo: registrar documentos candidatos a consolidacion, reemplazo o borrado s
 |---|---|
 | `docs/manuals/DATABASE_REFERENCE.md` | `docs/db_rebuild_status.md` |
 | `docs/manuals/DEVELOPER_GUIDE.md` | `README.md` raíz + `docs/configuration.md` + `docs/ops/*` |
-| `docs/manuals/MODULES_REFERENCE.md` | `docs/manuals/modules/*` (modules) + `x_doc/PROJECT_REVIEW_INDEX.md` (matriz) |
-| `docs/manuals/PROJECT_STATUS.md` | `x_doc/PROJECT_STATUS.md` |
-| `docs/manuals/SYSTEM_ARCHITECTURE.md` | `x_doc/PROJECT_REVIEW_INDEX.md` (arquitectura por vertical) |
+| `docs/manuals/MODULES_REFERENCE.md` | `docs/manuals/modules/*` (modules) + `docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md` (matriz historica) |
+| `docs/manuals/PROJECT_STATUS.md` | `docs/archive/session_history_legacy/PROJECT_STATUS.md` como historico + `docs/00_coordination/CURRENT_STATE.md` como vivo |
+| `docs/manuals/SYSTEM_ARCHITECTURE.md` | `docs/archive/session_history_legacy/PROJECT_REVIEW_INDEX.md` (arquitectura historica por vertical) |
+
+## Ronda 8 (2026-06-04)
+
+Objetivo: sacar documentacion historica del nivel activo para evitar que agentes la lean como verdad vigente.
+
+| Accion | Resultado | Motivo |
+| --- | --- | --- |
+| Mover `audit_reports/*` | `docs/archive/audit_reports_legacy/*` | Reportes forenses y QA utiles como evidencia, pero potencialmente superados por correcciones posteriores. |
+| Mover `x_doc/*` | `docs/archive/session_history_legacy/*` | Memoria de sesiones y estabilizacion; sirve para contexto, no para estado vivo. |
+| Mover `CODEX.md` | `docs/archive/legacy_root_docs/CODEX-2026-04-historical.md` | Plan historico de abril 2026; ya no debe competir con `AGENTS.md` ni `docs/START_HERE.md`. |
+| Mover `SISTEM-ANALITICS-COMPLETED.md` | `docs/audits/2026-05-26-system-analytics-completed.md` | Auditoria full-scope sigue siendo util, pero debe vivir en `docs/audits/` con nombre fechable. |
+| Borrar directorios raiz vacios | `audit_reports/` y `x_doc/` removidos si quedaron vacios | El root queda limpio; los historicos permanecen trazables dentro de `docs/archive/`. |
 
 **Mantenidos:** `docs/manuals/modules/{VENTAS_POS_FISCAL,COMPRAS_INVENTARIO,FINANZAS_CONTABILIDAD}.md` (manuales funcionales vigentes referenciados desde README raíz).
 

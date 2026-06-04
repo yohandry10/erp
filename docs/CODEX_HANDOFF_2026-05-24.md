@@ -1,9 +1,19 @@
 # Codex handoff - 2026-05-24
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `documento_general`.
+>
+> Leer tambien: `docs/README.md`, `docs/START_HERE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## Contexto general
 
-Repositorio local: `C:\Users\PC\Desktop\erp`  
-Idioma por defecto con el usuario: espanol.  
+Repositorio local: `C:\Users\PC\Desktop\erp`
+Idioma por defecto con el usuario: espanol.
 Rama actual durante el trabajo: `codex/accounting-production-closure`.
 
 El usuario esta haciendo una auditoria/cierre forense contable del ERP peruano, modulo por modulo. El foco mas reciente fue:

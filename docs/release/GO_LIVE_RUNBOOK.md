@@ -1,5 +1,15 @@
 # Go-Live Runbook ERP
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `release`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/FLOW_STATUS.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 Fecha de creacion: 2026-05-24
 Audiencia: operador con credenciales productivas en mano.
 Objetivo: ejecutar el primer despliegue productivo real del ERP sin reabrir auditorias ni decisiones tecnicas. Todo lo que NO depende de credenciales productivas ya quedo cerrado y validado.

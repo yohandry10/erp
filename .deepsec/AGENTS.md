@@ -1,5 +1,15 @@
 # Agent setup
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `reglas_agente`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/AGENT_SYNC.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 This is a deepsec scanning workspace. Each registered project has its
 own setup prompt at `data/<id>/SETUP.md` — open the relevant one when
 asked to set a project up.

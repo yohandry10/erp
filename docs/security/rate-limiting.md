@@ -1,5 +1,15 @@
 # Rate limiting en backend (P2.4)
 
+<!-- DOC-NAV:START -->
+> Navegacion documental: primero lee `docs/START_HERE.md`. Estado vivo: `docs/00_coordination/CURRENT_STATE.md` y `docs/00_coordination/FLOW_STATUS.md`. Mapa completo: `docs/DOC_NAVIGATION_MANIFEST.md`.
+>
+> Rol de este archivo: `seguridad`.
+>
+> Leer tambien: `docs/START_HERE.md`, `docs/00_coordination/CURRENT_STATE.md`.
+>
+> Regla: si este documento contradice codigo verificado o docs canonicos, prevalecen codigo actual + `START_HERE` + `CURRENT_STATE` + `FLOW_STATUS`.
+<!-- DOC-NAV:END -->
+
 ## Objetivo
 
 Reactivar control de tasa global en API y definir límites diferenciados por categoría de endpoint para reducir abuso y proteger infraestructura.
@@ -7,7 +17,7 @@ Reactivar control de tasa global en API y definir límites diferenciados por cat
 ## Implementación actual
 
 - `RateLimitGuard` se aplica como guard global (`APP_GUARD`) en `apps/erp-api/src/app.module.ts`.
-- `RateLimitGuard` ahora identifica al usuario autenticado (`req.user.id` o `req.user.sub`) y usa ese identificador como tracker antes que IP.  
+- `RateLimitGuard` ahora identifica al usuario autenticado (`req.user.id` o `req.user.sub`) y usa ese identificador como tracker antes que IP.
   Si no hay usuario, usa IP (`req.ip`, `connection.remoteAddress`, `socket.remoteAddress`).
 - Endpoints de salud y metadatos públicos se excluyen con `@SkipThrottle()`:
   - `GET /`
