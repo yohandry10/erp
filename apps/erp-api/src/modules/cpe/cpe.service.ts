@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
+import { categoriaDeAfectacion } from '../../shared/utils/igv-afectacion.util';
 import { CreateFacturaDto, FacturaDto, PaginationDto, PaginatedResponseDto } from '@erp-suite/dtos';
 import { XmlSigner } from '@erp-suite/crypto';
 import { ConfigService } from '@nestjs/config';
@@ -90,6 +91,10 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
     let subtotal = 0;
     let totalIgv = 0;
+    let gravadas = 0;
+    let exoneradas = 0;
+    let inafectas = 0;
+    let exportacion = 0;
 
     for (const item of createFacturaDto.items) {
       const cantidad = sanitizeNumber((item as any).cantidad);
@@ -106,6 +111,22 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
       subtotal += valorVenta;
       totalIgv += igvItem;
+
+      // El subtotal agrupa todas las bases, pero cada una se declara por separado
+      // según su afectación: total_gravadas no puede incluir lo exonerado.
+      switch (categoriaDeAfectacion((item as any).tipo_afectacion_igv ?? (item as any).afectacion_igv)) {
+        case 'EXONERADO':
+          exoneradas += valorVenta;
+          break;
+        case 'INAFECTO':
+          inafectas += valorVenta;
+          break;
+        case 'EXPORTACION':
+          exportacion += valorVenta;
+          break;
+        default:
+          gravadas += valorVenta;
+      }
     }
 
     const total = subtotal + totalIgv;
@@ -114,12 +135,30 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
       subtotal: Number(subtotal.toFixed(2)),
       totalIgv: Number(totalIgv.toFixed(2)),
       total: Number(total.toFixed(2)),
+      gravadas: Number(gravadas.toFixed(2)),
+      exoneradas: Number(exoneradas.toFixed(2)),
+      inafectas: Number(inafectas.toFixed(2)),
+      exportacion: Number(exportacion.toFixed(2)),
     };
   }
 
-  private assertProvidedTotalsMatch(dto: CreateFacturaDto, calculated: { subtotal: number; totalIgv: number; total: number }) {
+  private assertProvidedTotalsMatch(
+    dto: CreateFacturaDto,
+    calculated: {
+      subtotal: number;
+      totalIgv: number;
+      total: number;
+      gravadas: number;
+      exoneradas: number;
+      inafectas: number;
+      exportacion: number;
+    },
+  ) {
     const fields: Array<[string, any, number]> = [
-      ['total_gravadas', (dto as any).total_gravadas, calculated.subtotal],
+      ['total_gravadas', (dto as any).total_gravadas, calculated.gravadas],
+      ['total_exoneradas', (dto as any).total_exoneradas, calculated.exoneradas],
+      ['total_inafectas', (dto as any).total_inafectas, calculated.inafectas],
+      ['total_exportacion', (dto as any).total_exportacion, calculated.exportacion],
       ['total_igv', (dto as any).total_igv, calculated.totalIgv],
       ['total_venta', (dto as any).total_venta, calculated.total],
     ];
@@ -159,6 +198,74 @@ private async getXmlSigner(tenantId: string): Promise<XmlSigner> {
 
     if (tipoDocumento === '01' && tipo !== '6') {
       throw new BadRequestException('La factura requiere receptor con RUC');
+    }
+
+    // SUNAT (Reglamento de Comprobantes de Pago): la boleta cuyo importe total
+    // supere S/ 700 debe identificar al adquirente con apellidos y nombres o
+    // razón social, y su número de documento. El genérico "clientes varios"
+    // (tipo 0 / 99999999) solo es admisible por debajo de ese umbral.
+    if (tipoDocumento === '03') {
+      const moneda = String((dto as any).moneda ?? 'PEN').trim().toUpperCase();
+      const totalVenta = Number((dto as any).total_venta ?? 0);
+      const razonSocial = String((dto as any).razon_social_receptor ?? '').trim();
+      const documentoGenerico = tipo === '0' || /^9+$/.test(documento);
+
+      // El umbral es en soles; para otras monedas no se infiere un tipo de cambio.
+      if (moneda === 'PEN' && totalVenta > 700 && (documentoGenerico || !razonSocial)) {
+        throw new BadRequestException(
+          'Las boletas mayores a S/ 700 requieren identificar al adquirente con apellidos y nombres o razón social, y su número de documento',
+        );
+      }
+    }
+  }
+
+  /**
+   * SUNAT exige que la serie sea de 4 caracteres alfanuméricos y que su primera
+   * letra corresponda al tipo de comprobante: F para facturas y B para boletas.
+   * Las notas de crédito/débito conservan el prefijo del documento que modifican.
+   */
+  private assertSerieCoherenteConTipo(dto: CreateFacturaDto) {
+    const serie = String((dto as any).serie ?? '').trim().toUpperCase();
+    const tipoDocumento = String((dto as any).tipo_documento ?? '').trim();
+
+    if (!/^[A-Z0-9]{4}$/.test(serie)) {
+      throw new BadRequestException(
+        'La serie debe tener exactamente 4 caracteres alfanuméricos en mayúsculas (ej: F001, B001)',
+      );
+    }
+
+    const prefijosPorTipo: Record<string, string[]> = {
+      '01': ['F'], // Factura
+      '03': ['B'], // Boleta de venta
+      '07': ['F', 'B'], // Nota de crédito (sigue al documento afectado)
+      '08': ['F', 'B'], // Nota de débito (sigue al documento afectado)
+    };
+
+    const prefijosValidos = prefijosPorTipo[tipoDocumento];
+    if (prefijosValidos && !prefijosValidos.includes(serie.charAt(0))) {
+      const esperado = prefijosValidos.join(' o ');
+      throw new BadRequestException(
+        `La serie ${serie} no corresponde al tipo de comprobante ${tipoDocumento}: debe empezar con ${esperado}`,
+      );
+    }
+  }
+
+  /**
+   * SUNAT rechaza comprobantes con fecha de emisión posterior a la fecha actual.
+   * La comparación se hace en horario de Perú para no rechazar emisiones válidas
+   * por el desfase entre UTC y America/Lima.
+   */
+  private assertFechaEmisionNoFutura(emissionDate: string) {
+    const fechaEmision = String(emissionDate ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaEmision)) {
+      return;
+    }
+
+    const hoyEnPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    if (fechaEmision > hoyEnPeru) {
+      throw new BadRequestException(
+        `La fecha de emisión (${fechaEmision}) no puede ser futura; hoy en Perú es ${hoyEnPeru}`,
+      );
     }
   }
 
@@ -202,13 +309,20 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
       const emissionDate = this.resolveEmissionDate((createFacturaDto as any).fecha_emision);
       const issueTime = this.resolveIssueTime((createFacturaDto as any).fecha_emision);
       const dueDate = this.resolveDueDate(emissionDate, (createFacturaDto as any).fecha_vencimiento);
-      const { subtotal, totalIgv, total } = this.recalculateTotals(createFacturaDto);
-      this.assertProvidedTotalsMatch(createFacturaDto, { subtotal, totalIgv, total });
+      const totalesCalculados = this.recalculateTotals(createFacturaDto);
+      const { totalIgv, total, gravadas, exoneradas, inafectas, exportacion } = totalesCalculados;
+      this.assertProvidedTotalsMatch(createFacturaDto, totalesCalculados);
       this.assertReceptorValido(createFacturaDto);
+      this.assertSerieCoherenteConTipo(createFacturaDto);
+      this.assertFechaEmisionNoFutura(emissionDate);
       const idempotencyKey = this.resolveIdempotencyKey(createFacturaDto, tenantId);
 
-      // Reemplazar totales con cálculo servidor
-      (createFacturaDto as any).total_gravadas = subtotal;
+      // Reemplazar totales con cálculo servidor. Las bases van separadas por
+      // afectación: total_gravadas solo contiene lo que efectivamente paga IGV.
+      (createFacturaDto as any).total_gravadas = gravadas;
+      (createFacturaDto as any).total_exoneradas = exoneradas;
+      (createFacturaDto as any).total_inafectas = inafectas;
+      (createFacturaDto as any).total_exportacion = exportacion;
       (createFacturaDto as any).total_igv = totalIgv;
       (createFacturaDto as any).total_venta = total;
 
@@ -320,6 +434,11 @@ private getEmpresaEmisorInfoStrict(tenantId: string) {
         direccion_receptor: createFacturaDto.direccion_receptor,
         moneda: createFacturaDto.moneda,
         total_gravadas: createFacturaDto.total_gravadas,
+        // Bases por afectación: sin persistirlas, una venta exonerada quedaría
+        // registrada como si toda su base fuese gravada.
+        total_exoneradas: (createFacturaDto as any).total_exoneradas ?? 0,
+        total_inafectas: (createFacturaDto as any).total_inafectas ?? 0,
+        total_exportacion: (createFacturaDto as any).total_exportacion ?? 0,
         total_igv: createFacturaDto.total_igv,
         total_venta: createFacturaDto.total_venta,
         items: createFacturaDto.items,

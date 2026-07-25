@@ -184,9 +184,15 @@ async anularComprobante(
 
 private resolveSerieNotaCredito(serie: string): string {
     const normalized = String(serie || '').trim().toUpperCase();
-    if (normalized.startsWith('F')) return normalized.replace(/^F/, 'FC');
-    if (normalized.startsWith('B')) return normalized.replace(/^B/, 'BC');
-    return `NC${normalized}`.slice(0, 4);
+    // SUNAT exige series de EXACTAMENTE 4 caracteres alfanuméricos. La nota de
+    // crédito conserva el prefijo del comprobante afectado (F para facturas, B
+    // para boletas) y añade "C" para distinguirla: F001 -> FC01, B001 -> BC01.
+    // Concatenar sin recortar producía series de 5 caracteres (FC001) que SUNAT
+    // rechaza y que además violan el propio contrato de ValidationService.
+    const correlativoSerie = normalized.replace(/\D/g, '').slice(-2).padStart(2, '0');
+    if (normalized.startsWith('F')) return `FC${correlativoSerie}`;
+    if (normalized.startsWith('B')) return `BC${correlativoSerie}`;
+    return `NC${correlativoSerie}`;
   }
 
 private formatCpeNumero(cpe: any): string {

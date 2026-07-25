@@ -112,6 +112,24 @@ export class CreateFacturaDto {
   @Min(0)
   total_venta: number;
 
+  // Bases por tipo de afectación del IGV (SUNAT Catálogo 07). Son opcionales
+  // para no romper a los emisores que solo manejan operaciones gravadas, pero
+  // sin ellas un comprobante con ítems exonerados se declararía como gravado.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  total_exoneradas?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  total_inafectas?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  total_exportacion?: number;
+
   @IsOptional()
   @IsISO8601()
   fecha_emision?: string;

@@ -884,8 +884,18 @@ export class DocumentosService {
         errores.push('Las facturas requieren RUC del cliente (11 dígitos)');
       }
 
-      if (documentoData.tipo_documento === 'BOLETA' && documentoData.total > 700) {
-        errores.push('Boletas mayores a S/ 700 requieren documento de identidad del cliente');
+      // SUNAT (Reglamento de Comprobantes de Pago): la boleta cuyo importe total
+      // supere S/ 700 debe identificar al adquirente con nombre/razón social y
+      // número de documento. Solo se rechaza cuando ESA identificación falta o es
+      // el genérico "clientes varios" (99999999); una boleta con DNI real es válida.
+      if (documentoData.tipo_documento === 'BOLETA' && Number(documentoData.total) > 700) {
+        const documentoReceptor = String(documentoData.receptor_numero_doc ?? '').trim();
+        const nombreReceptor = String(documentoData.receptor_razon_social ?? '').trim();
+        if (!documentoReceptor || /^9+$/.test(documentoReceptor) || !nombreReceptor) {
+          errores.push(
+            'Boletas mayores a S/ 700 requieren identificar al adquirente con nombre o razón social y número de documento',
+          );
+        }
       }
 
       // Validar detalles si existen

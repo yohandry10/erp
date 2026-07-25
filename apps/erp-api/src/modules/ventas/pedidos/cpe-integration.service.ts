@@ -3,6 +3,7 @@ import { SupabaseService } from '../../../shared/supabase/supabase.service';
 import { CpeService } from '../../cpe/cpe.service';
 import { ValidationService } from '../../validations/validation.service';
 import { TaxCalculatorService } from '../../../shared/utils/tax-calculator';
+import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../../shared/utils/igv-afectacion.util';
 import { CreateFacturaDto, TipoDocumento, ItemFacturaDto } from '@erp-suite/dtos';
 import { PedidoVenta, PedidoDetalle } from './entities';
 import { IntegrationAlertsService } from '../../notifications/integration-alerts.service';
@@ -159,12 +160,20 @@ export class CPEIntegrationService {
     // ✅ CORRECCIÓN SRP: Obtener tasa de IGV una sola vez usando TaxCalculatorService
     const tasaIgv = await this.taxCalculator.getTasaIgv(pedido.tenant_id);
 
+    // La afectación del IGV vive en el producto (SUNAT Catálogo 07): sin ella,
+    // una factura con bienes exonerados cobraría IGV que no corresponde.
+    const afectacionPorProducto = await this.obtenerAfectacionPorProducto(
+      pedido.tenant_id,
+      pedido.detalle.map((item) => item.producto_id),
+    );
+
     // Mapear items del pedido a items de factura
     const items: ItemFacturaDto[] = pedido.detalle.map((item) => {
       const cantidad = Number(item.cantidad ?? 0);
       const precioUnitario = Number(item.precio_unitario ?? 0);
       const valorVenta = Number(item.subtotal ?? cantidad * precioUnitario);
-      const igv = valorVenta * tasaIgv;
+      const afectacion = afectacionPorProducto.get(item.producto_id) ?? AFECTACION_IGV.GRAVADO;
+      const igv = esGravado(afectacion) ? valorVenta * tasaIgv : 0;
       const precioVenta = valorVenta + igv;
 
       return {
@@ -176,8 +185,19 @@ export class CPEIntegrationService {
         valor_venta: valorVenta,
         igv,
         precio_venta: precioVenta,
-      };
+        tipo_afectacion_igv: afectacion,
+      } as ItemFacturaDto;
     });
+
+    const desgloseIgv = calcularDesgloseIgv(
+      pedido.detalle.map((item) => ({
+        baseImponible: Number(
+          item.subtotal ?? Number(item.cantidad ?? 0) * Number(item.precio_unitario ?? 0),
+        ),
+        afectacionIgv: afectacionPorProducto.get(item.producto_id),
+      })),
+      tasaIgv,
+    );
 
     const numeroDocumentoCliente = this.resolverDocumentoCliente(cliente);
 
@@ -211,12 +231,58 @@ export class CPEIntegrationService {
       direccion_receptor: cliente.direccion || 'DIRECCIÓN NO REGISTRADA',
       moneda: 'PEN', // Por ahora solo soles
       items: items,
-      total_gravadas: Number(pedido.subtotal ?? 0),
-      total_igv: Number(pedido.igv ?? 0),
-      total_venta: Number(pedido.total ?? 0),
+      // Bases separadas por afectación; el IGV se recalcula sobre lo gravado en
+      // lugar de arrastrar el total del pedido, que asumía todo gravado.
+      total_gravadas: desgloseIgv.gravadas,
+      total_exoneradas: desgloseIgv.exoneradas,
+      total_inafectas: desgloseIgv.inafectas,
+      total_exportacion: desgloseIgv.exportacion,
+      total_igv: desgloseIgv.igv,
+      total_venta: desgloseIgv.total,
     };
 
     return facturaDto;
+  }
+
+  /**
+   * Devuelve la afectación del IGV de cada producto del pedido. Ante un producto
+   * sin dato se asume gravado, que es el caso mayoritario y no subdeclara IGV.
+   */
+  private async obtenerAfectacionPorProducto(
+    tenantId: string,
+    productoIds: string[],
+  ): Promise<Map<string, string>> {
+    const ids = Array.from(new Set((productoIds ?? []).filter(Boolean)));
+    const afectaciones = new Map<string, string>();
+    if (ids.length === 0) return afectaciones;
+
+    // Nunca debe impedir emitir: si la consulta falla, cada ítem cae al default
+    // gravado, que es el comportamiento previo y no subdeclara IGV.
+    try {
+      const { data, error } = await this.supabase
+        .getClient()
+        .from('productos')
+        .select('id, afectacion_igv')
+        .eq('tenant_id', tenantId)
+        .in('id', ids);
+
+      if (error) {
+        this.logger.warn(
+          `No se pudo leer la afectación IGV de los productos del pedido: ${error.message}`,
+        );
+        return afectaciones;
+      }
+
+      for (const producto of data ?? []) {
+        afectaciones.set(producto.id, String(producto.afectacion_igv ?? AFECTACION_IGV.GRAVADO));
+      }
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo leer la afectación IGV de los productos del pedido: ${(error as Error)?.message}`,
+      );
+    }
+
+    return afectaciones;
   }
 
   /**

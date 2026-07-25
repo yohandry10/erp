@@ -741,4 +741,85 @@ describe('CpeService', () => {
             );
         });
     });
+
+    describe('boleta mayor a S/ 700 (SUNAT)', () => {
+        const boleta = (overrides: Record<string, any> = {}) => ({
+            tipo_documento: '03',
+            tipo_documento_receptor: '1',
+            documento_receptor: '45678912',
+            razon_social_receptor: 'Juan Perez Lopez',
+            moneda: 'PEN',
+            total_venta: 850,
+            ...overrides,
+        }) as unknown as CreateFacturaDto;
+
+        const validar = (dto: CreateFacturaDto) => (service as any).assertReceptorValido(dto);
+
+        it('acepta la boleta cuando el adquirente está identificado', () => {
+            expect(() => validar(boleta())).not.toThrow();
+        });
+
+        it('rechaza la boleta emitida a "clientes varios" (99999999)', () => {
+            expect(() =>
+                validar(boleta({ documento_receptor: '99999999', razon_social_receptor: 'Cliente General' })),
+            ).toThrow(BadRequestException);
+        });
+
+        it('rechaza la boleta sin nombre ni razón social del adquirente', () => {
+            expect(() => validar(boleta({ razon_social_receptor: '   ' }))).toThrow(BadRequestException);
+        });
+
+        it('no exige identificación por debajo del umbral', () => {
+            expect(() =>
+                validar(boleta({ total_venta: 700, documento_receptor: '99999999', razon_social_receptor: 'Cliente General' })),
+            ).not.toThrow();
+        });
+    });
+
+    describe('serie coherente con el tipo de comprobante (SUNAT)', () => {
+        const validarSerie = (serie: string, tipo_documento: string) =>
+            (service as any).assertSerieCoherenteConTipo({ serie, tipo_documento } as any);
+
+        it('acepta las combinaciones válidas', () => {
+            expect(() => validarSerie('F001', '01')).not.toThrow();
+            expect(() => validarSerie('B001', '03')).not.toThrow();
+            expect(() => validarSerie('FC01', '07')).not.toThrow();
+            expect(() => validarSerie('BC01', '07')).not.toThrow();
+        });
+
+        it('rechaza una factura con serie de boleta', () => {
+            expect(() => validarSerie('B001', '01')).toThrow(BadRequestException);
+        });
+
+        it('rechaza una boleta con serie de factura', () => {
+            expect(() => validarSerie('F001', '03')).toThrow(BadRequestException);
+        });
+
+        it('rechaza series con largo distinto de 4', () => {
+            expect(() => validarSerie('FC001', '07')).toThrow(BadRequestException);
+            expect(() => validarSerie('F01', '01')).toThrow(BadRequestException);
+        });
+    });
+
+    describe('fecha de emisión no futura (SUNAT)', () => {
+        const validarFecha = (fecha: string) => (service as any).assertFechaEmisionNoFutura(fecha);
+        const hoyEnPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+        const desplazarDias = (dias: number) => {
+            const base = new Date(`${hoyEnPeru}T12:00:00Z`);
+            base.setUTCDate(base.getUTCDate() + dias);
+            return base.toISOString().slice(0, 10);
+        };
+
+        it('acepta la fecha de hoy en Perú', () => {
+            expect(() => validarFecha(hoyEnPeru)).not.toThrow();
+        });
+
+        it('acepta fechas pasadas', () => {
+            expect(() => validarFecha(desplazarDias(-3))).not.toThrow();
+        });
+
+        it('rechaza una fecha futura', () => {
+            expect(() => validarFecha(desplazarDias(1))).toThrow(BadRequestException);
+        });
+    });
 });

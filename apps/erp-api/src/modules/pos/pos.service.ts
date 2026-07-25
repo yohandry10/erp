@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../../shared/supabase/supabase.service';
 import { CpeService } from '../cpe/cpe.service';
 import { ValidationService } from '../validations/validation.service';
@@ -7,6 +7,7 @@ import { EventBusService } from '../../shared/events/event-bus.service';
 import { InventoryIntegrationService } from '../../shared/integration/inventory-integration.service';
 import { CxcService } from '../finanzas/cxc/cxc.service';
 import { TaxCalculatorService } from '../../shared/utils/tax-calculator';
+import { AFECTACION_IGV, calcularDesgloseIgv, esGravado } from '../../shared/utils/igv-afectacion.util';
 import { CajasService } from '../cajas/cajas.service';
 import { AbrirCajaDto } from '../cajas/dto/abrir-caja.dto';
 import { CerrarCajaDto } from '../cajas/dto/cerrar-caja.dto';
@@ -306,7 +307,7 @@ export class PosService {
 
     const { data: productos, error } = await this.supabase.getClient()
       .from('productos')
-      .select('id, codigo, nombre, precio_venta, precio_compra, costo, stock, stock_actual, stock_reservado, activo, estado, es_servicio, controla_stock, unidad_medida')
+      .select('id, codigo, nombre, precio_venta, precio_compra, costo, stock, stock_actual, stock_reservado, activo, estado, es_servicio, controla_stock, unidad_medida, afectacion_igv')
       .eq('tenant_id', tenantId)
       .in('id', productIds);
 
@@ -617,7 +618,7 @@ export class PosService {
       // Validar config de empresa antes de crear venta (hard-stop CPE)
       const { data: empresaCfg, error: empresaCfgErr } = await this.supabase.getClient()
         .from('empresa_config')
-        .select('ruc, razon_social, moneda_defecto, igv_porcentaje')
+        .select('ruc, razon_social, moneda_defecto, igv_porcentaje, serie_factura, serie_boleta')
         .eq('tenant_id', user.tenant_id)
         .single();
       if (empresaCfgErr) {
@@ -663,14 +664,47 @@ export class PosService {
         };
       });
 
+      // Los productos se validan ANTES de calcular el dinero: su afectación del
+      // IGV (Catálogo 07) decide qué parte de la venta es gravada. Calcular un
+      // IGV plano cobraría impuesto sobre bienes exonerados o inafectos.
+      const productosMap = await this.validarProductosVentaPOS(
+        recomputed,
+        user.tenant_id,
+        ventaData?.permite_venta_sin_stock === true,
+      );
+
+      const desgloseIgv = calcularDesgloseIgv(
+        recomputed.map((item: any) => ({
+          baseImponible: Number(item.subtotal ?? 0),
+          afectacionIgv: productosMap.get(item.producto_id)?.afectacion_igv,
+        })),
+        tasaIgv,
+      );
+
       // ✅ FIX: Usar Decimal.js para sumas y cálculos de impuestos
       const subtotalCalculado = recomputed.reduce(
         (acc, item) => acc.plus(item.subtotal ?? 0),
         new Decimal(0)
       ).toDecimalPlaces(2).toNumber();
-      const impuestosCalculados = new Decimal(subtotalCalculado).times(tasaIgv).toDecimalPlaces(2).toNumber();
+      const impuestosCalculados = desgloseIgv.igv;
       const totalCalculado = new Decimal(subtotalCalculado).plus(impuestosCalculados).toDecimalPlaces(2).toNumber();
       const totalCalculadoDecimal = new Decimal(totalCalculado);
+
+      // SUNAT: una boleta mayor a S/ 700 debe identificar al adquirente. Se valida
+      // ANTES de cobrar y descontar stock: si se dejara para la emisión del CPE, el
+      // cajero cobraría la venta y recién después descubriría que le falta el DNI,
+      // con el cliente ya fuera de la tienda y la venta sin comprobante.
+      const tipoComprobanteSolicitado = String(ventaData?.comprobante?.tipo || '03').trim();
+      if (tipoComprobanteSolicitado === '03' && totalCalculado > 700) {
+        const documentoCliente = String(ventaData?.cliente_documento ?? '').trim();
+        const nombreCliente = String(ventaData?.cliente_nombre ?? '').trim();
+        if (!documentoCliente || /^9+$/.test(documentoCliente) || !nombreCliente) {
+          throw new BadRequestException(
+            'Las boletas mayores a S/ 700 requieren los datos del cliente (nombre y número de documento). ' +
+              'Solicítalos antes de cobrar o emite una factura.',
+          );
+        }
+      }
 
       const pagosRaw = Array.isArray(ventaData?.pagos) ? ventaData.pagos : null;
       let pagosNormalizados: Array<{
@@ -768,12 +802,6 @@ export class PosService {
           }
         };
       }
-
-      const productosMap = await this.validarProductosVentaPOS(
-        recomputed,
-        user.tenant_id,
-        ventaData?.permite_venta_sin_stock === true,
-      );
 
       this.logger.log('✅ All pre-sale validations passed');
       // ===== END PRE-SALE VALIDATIONS =====
@@ -999,10 +1027,24 @@ export class PosService {
 
         // Tomar tipo/serie/moneda/UOM reales
         const tipoComprobante = ventaData?.comprobante?.tipo || '03';
-        const serieCpe =
-          ventaData?.comprobante?.serie ||
-          ventaResult.numero_ticket?.split('-')[0] ||
-          (tipoComprobante === '01' ? 'F001' : 'B001');
+        // La serie FISCAL depende del tipo de comprobante (SUNAT: F### para
+        // facturas, B### para boletas). El ticket del POS usa una serie interna
+        // por caja (T###) que NO es válida ante SUNAT; heredarla hacía que todas
+        // las boletas del POS fueran rechazadas. Solo se acepta la serie recibida
+        // si es coherente con el tipo; si no, se usa la configurada del tenant.
+        const prefijoFiscal = tipoComprobante === '01' ? 'F' : 'B';
+        const serieSolicitada = String(ventaData?.comprobante?.serie ?? '').trim().toUpperCase();
+        const serieConfigurada = String(
+          (tipoComprobante === '01' ? empresaCfg.serie_factura : empresaCfg.serie_boleta) ?? '',
+        ).trim().toUpperCase();
+        const esSerieFiscalValida = (serie: string) =>
+          /^[A-Z0-9]{4}$/.test(serie) && serie.startsWith(prefijoFiscal);
+
+        const serieCpe = esSerieFiscalValida(serieSolicitada)
+          ? serieSolicitada
+          : esSerieFiscalValida(serieConfigurada)
+            ? serieConfigurada
+            : `${prefijoFiscal}001`;
         const monedaCpe = (ventaData?.moneda || empresaCfg.moneda_defecto || 'PEN').toString();
 
         // Sanitizar documento del receptor y validar contra tipo de comprobante
@@ -1036,7 +1078,12 @@ export class PosService {
             'Cliente',
           direccion_receptor: ventaData.cliente_direccion || '',
           moneda: monedaCpe,
-          total_gravadas: parseFloat(subtotalCalculado.toFixed(2)),
+          // Bases separadas por afectación: declarar todo como gravado haría que
+          // SUNAT reciba IGV sobre bienes exonerados o inafectos.
+          total_gravadas: desgloseIgv.gravadas,
+          total_exoneradas: desgloseIgv.exoneradas,
+          total_inafectas: desgloseIgv.inafectas,
+          total_exportacion: desgloseIgv.exportacion,
           total_igv: parseFloat(impuestosCalculados.toFixed(2)),
           total_venta: parseFloat(totalCalculado.toFixed(2)),
           items: (recomputed || []).map((item: any) => {
@@ -1044,7 +1091,9 @@ export class PosService {
             const cantidad = parseFloat(item.cantidad) || 1;
             const baseUnit = parseFloat(item.precio_unitario) || 0; // asumido sin IGV
             const baseItem = parseFloat(item.subtotal) || 0; // base total
-            const igvItem = parseFloat((baseItem * tasaIgv).toFixed(2));
+            const afectacionItem = String(producto.afectacion_igv ?? AFECTACION_IGV.GRAVADO);
+            const tasaItem = esGravado(afectacionItem) ? tasaIgv : 0;
+            const igvItem = parseFloat((baseItem * tasaItem).toFixed(2));
             const totalItem = parseFloat((baseItem + igvItem).toFixed(2));
             const uom =
               item.producto?.unidad_medida_sunat ||
@@ -1059,13 +1108,14 @@ export class PosService {
               codigo_producto: item.producto?.codigo || item.codigo || item.sku || producto.codigo || 'PROD',
               descripcion: item.producto?.nombre || item.nombre || item.descripcion || producto.nombre || 'Producto',
               unidad_medida: uom,
-              precio_unitario: parseFloat((baseUnit * (1 + tasaIgv)).toFixed(6)), // con IGV
+              precio_unitario: parseFloat((baseUnit * (1 + tasaItem)).toFixed(6)), // con IGV
               valor_unitario: parseFloat(baseUnit.toFixed(6)), // sin IGV
               precio_venta: totalItem, // con IGV
               valor_venta: baseItem, // sin IGV
               igv: igvItem,
               total_impuestos: igvItem,
               total: totalItem,
+              tipo_afectacion_igv: afectacionItem,
             };
           })
         };

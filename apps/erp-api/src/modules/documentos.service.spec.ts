@@ -276,4 +276,38 @@ describe('DocumentosService', () => {
       expect(result.error).toContain('dígito verificador');
     });
   });
+
+  describe('boleta mayor a S/ 700 (SUNAT)', () => {
+    const boleta = (overrides: Record<string, any> = {}) => ({
+      tipo_documento: 'BOLETA',
+      receptor_numero_doc: '45678912',
+      receptor_razon_social: 'Juan Perez Lopez',
+      total: 850,
+      ...overrides,
+    });
+
+    it('acepta la boleta cuando el adquirente está identificado con DNI y nombre', async () => {
+      const result = await service.validarDocumento(boleta());
+
+      expect(result.data.valido).toBe(true);
+      expect(result.data.errores).toEqual([]);
+    });
+
+    it('rechaza la boleta cuando el documento es el genérico de clientes varios', async () => {
+      const result = await service.validarDocumento(
+        boleta({ receptor_numero_doc: '99999999', receptor_razon_social: 'Clientes Varios' }),
+      );
+
+      expect(result.data.valido).toBe(false);
+      expect(result.data.errores.join(' ')).toContain('S/ 700');
+    });
+
+    it('no exige identificación por debajo del umbral', async () => {
+      const result = await service.validarDocumento(
+        boleta({ total: 700, receptor_numero_doc: '99999999', receptor_razon_social: 'Clientes Varios' }),
+      );
+
+      expect(result.data.valido).toBe(true);
+    });
+  });
 });
